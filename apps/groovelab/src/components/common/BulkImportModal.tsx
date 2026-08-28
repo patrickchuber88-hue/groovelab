@@ -1,8 +1,8 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
   Upload, FileText, Check, AlertTriangle, X, RefreshCw, 
-  Sparkles, ShieldCheck, ArrowRight, Download, Users, CheckCircle2,
-  HelpCircle, Eye
+  ShieldCheck, ArrowRight, Download, Users, CheckCircle2,
+  GraduationCap, HelpCircle, Eye, Info
 } from 'lucide-react';
 import { normalizeInstrument } from '../../utils/instruments';
 import { executeResilientBatch, BatchProgress } from '../../lib/batchOperations';
@@ -17,6 +17,13 @@ interface BulkImportModalProps {
   onImportComplete?: (count: number) => void;
 }
 
+interface ExistingStudent {
+  id: string;
+  name: string;
+  instrument?: string;
+  teacher_id?: string;
+}
+
 interface ParsedRow {
   originalFirstName: string;
   originalLastName: string;
@@ -25,7 +32,8 @@ interface ParsedRow {
   teacherName?: string;
   teacherId?: string;
   email?: string;
-  valid: boolean;
+  status: 'NEW' | 'EXISTING' | 'INVALID';
+  existingStudentId?: string;
   error?: string;
 }
 
@@ -43,13 +51,64 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
   const [step, setStep] = useState<'UPLOAD' | 'PREVIEW' | 'IMPORTING' | 'SUCCESS'>('UPLOAD');
   const [progress, setProgress] = useState<BatchProgress<ParsedRow> | null>(null);
   const [importCount, setImportCount] = useState(0);
+  const [existingPreservedCount, setExistingPreservedCount] = useState(0);
   const [importErrors, setImportErrors] = useState<string[]>([]);
   const [targetType, setTargetType] = useState<'STUDENT' | 'TEACHER'>('STUDENT');
+  const [existingStudents, setExistingStudents] = useState<ExistingStudent[]>([]);
+  const [isLoadingExisting, setIsLoadingExisting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Fetch existing students from Supabase to enable Smart Delta-Sync (Optimierung 4)
+  useEffect(() => {
+    if (isOpen && schoolId) {
+      fetchExistingStudents();
+    }
+  }, [isOpen, schoolId]);
+
+  const fetchExistingStudents = async () => {
+    setIsLoadingExisting(true);
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('id, name, instrument, teacher_id')
+        .eq('school_id', schoolId)
+        .eq('role', 'student');
+      
+      if (!error && data) {
+        setExistingStudents(data as ExistingStudent[]);
+      }
+    } catch (err) {
+      console.warn('[BulkImportModal] Could not fetch existing students for delta sync:', err);
+    } finally {
+      setIsLoadingExisting(false);
+    }
+  };
 
   if (!isOpen) return null;
 
-  // DSGVO Sanitize Name: "Max Mustermann" -> "Max M."
+  // Optimierung 2: Encoding- & Mojibake-Reparatur (Windows-1252 / ANSI / UTF-8 BOM Fix)
+  const fixMojibakeAndEncoding = (str: string): string => {
+    if (!str) return '';
+    // Strip UTF-8 BOM
+    let text = str.replace(/^\uFEFF/, '');
+    
+    // Replace common Mojibake patterns (ISO-8859-1 / Windows-1252 decoded as UTF-8)
+    const mojibakeMap: Record<string, string> = {
+      'Ã¤': 'ä', 'Ã¶': 'ö', 'Ã¼': 'ü', 'ÃŸ': 'ß',
+      'Ã„': 'Ä', 'Ã–': 'Ö', 'Ãœ': 'Ü',
+      'Ã¡': 'á', 'Ã©': 'é', 'Ã­': 'í', 'Ã³': 'ó', 'Ãº': 'ú',
+      'Ã ': 'à', 'Ã¨': 'è', 'Ã¬': 'ì', 'Ã²': 'ò', 'Ã¹': 'ù',
+      'â€“': '–', 'â€”': '—', 'â€ž': '„', 'â€œ': '“', 'â€™': '’',
+      'Ã±': 'ñ', 'Ã§': 'ç'
+    };
+
+    for (const [bad, good] of Object.entries(mojibakeMap)) {
+      text = text.split(bad).join(good);
+    }
+    return text;
+  };
+
+  // Optimierung 5: DSGVO Sanitize Name: "Max Mustermann" -> "Max M."
   const sanitizeStudentName = (firstName: string, lastName: string): string => {
     const cleanFirst = firstName.trim();
     const cleanLast = lastName.trim();
@@ -57,13 +116,19 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
     return `${cleanFirst} ${cleanLast.charAt(0).toUpperCase()}.`;
   };
 
-  // Parse CSV / TSV text
-  const parseCSVContent = (text: string) => {
-    // Detect delimiter: semicolon (common in DE/Excel), comma, or tab
+  // Parse CSV / TSV text with bulletproof delimiter detection & data minimization
+  const parseCSVContent = (rawText: string) => {
+    const text = fixMojibakeAndEncoding(rawText);
     const firstLine = text.split(/\r\n|\n/)[0];
-    let delimiter = ',';
-    if (firstLine.includes(';')) delimiter = ';';
-    else if (firstLine.includes('\t')) delimiter = '\t';
+    
+    // Delimiter detection: Count semicolons, tabs, and commas (prefer semicolon for German exports)
+    const semiCount = (firstLine.match(/;/g) || []).length;
+    const tabCount = (firstLine.match(/\t/g) || []).length;
+    const commaCount = (firstLine.match(/,/g) || []).length;
+
+    let delimiter = ';';
+    if (tabCount > semiCount && tabCount > commaCount) delimiter = '\t';
+    else if (commaCount > semiCount && commaCount > tabCount) delimiter = ',';
 
     const lines = text.split(/\r\n|\n/).filter(line => line.trim().length > 0);
     if (lines.length < 2) {
@@ -75,16 +140,28 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
     setHeaders(rawHeaders);
 
     // Identify Column Indices
-    let firstIdx = rawHeaders.findIndex(h => /vorname|first|fname|name/i.test(h));
-    let lastIdx = rawHeaders.findIndex(h => /nachname|last|lname|familienname/i.test(h));
-    let instrIdx = rawHeaders.findIndex(h => /instrument|fach|kurs|modul/i.test(h));
-    let teacherIdx = rawHeaders.findIndex(h => /lehrer|lehrkraft|dozent|teacher|coach/i.test(h));
+    let firstIdx = rawHeaders.findIndex(h => /vorname|first|fname/i.test(h));
+    let lastIdx = rawHeaders.findIndex(h => /nachname|last|lname|familienname|zuname/i.test(h));
+    let instrIdx = rawHeaders.findIndex(h => /instrument|fach|kurs|modul|hauptfach/i.test(h));
+    let teacherIdx = rawHeaders.findIndex(h => /lehrer|lehrkraft|dozent|teacher|coach|dozent_name|lehrkraft_kuerzel/i.test(h));
     let emailIdx = rawHeaders.findIndex(h => /mail|e-mail/i.test(h));
 
-    // Fallbacks if only one "Name" column exists
-    const isCombinedName = firstIdx !== -1 && lastIdx === -1 && /name/i.test(rawHeaders[firstIdx]);
+    // Fallback if only one "Name" or "Schüler" column exists
+    if (firstIdx === -1 && lastIdx === -1) {
+      firstIdx = rawHeaders.findIndex(h => /schueler|schüler|name|teilnehmer/i.test(h));
+    }
+    const isCombinedName = firstIdx !== -1 && lastIdx === -1;
 
     const parsed: ParsedRow[] = [];
+
+    // Pre-index existing students for O(1) matching in Delta-Sync
+    const existingMap = new Map<string, ExistingStudent>();
+    existingStudents.forEach(s => {
+      const cleanName = (s.name || '').toLowerCase().trim();
+      const cleanInstr = (s.instrument || '').toLowerCase().trim();
+      existingMap.set(`${cleanName}|${cleanInstr}`, s);
+      existingMap.set(cleanName, s); // Fallback match by name
+    });
 
     for (let i = 1; i < lines.length; i++) {
       const row = lines[i].split(delimiter).map(c => c.replace(/^["']|["']$/g, '').trim());
@@ -94,28 +171,57 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
       let lastName = '';
 
       if (isCombinedName) {
-        const parts = (row[firstIdx] || '').split(' ');
-        firstName = parts[0] || '';
-        lastName = parts.slice(1).join(' ') || '';
+        const full = row[firstIdx] || '';
+        if (full.includes(',')) {
+          // Format "Mustermann, Max"
+          const parts = full.split(',');
+          lastName = parts[0]?.trim() || '';
+          firstName = parts[1]?.trim() || '';
+        } else {
+          // Format "Max Mustermann"
+          const parts = full.split(' ');
+          firstName = parts[0] || '';
+          lastName = parts.slice(1).join(' ') || '';
+        }
       } else {
         firstName = firstIdx !== -1 ? row[firstIdx] || '' : (row[0] || '');
         lastName = lastIdx !== -1 ? row[lastIdx] || '' : (row[1] || '');
       }
 
+      // Clean & sanitize
+      firstName = fixMojibakeAndEncoding(firstName).trim();
+      lastName = fixMojibakeAndEncoding(lastName).trim();
+
       const rawInstrument = instrIdx !== -1 ? row[instrIdx] || 'Allgemein' : 'Allgemein';
-      const instrument = normalizeInstrument(rawInstrument);
-      const rawTeacher = teacherIdx !== -1 ? row[teacherIdx] || '' : '';
+      const instrument = normalizeInstrument(fixMojibakeAndEncoding(rawInstrument));
+      const rawTeacher = teacherIdx !== -1 ? fixMojibakeAndEncoding(row[teacherIdx] || '') : '';
       const email = emailIdx !== -1 ? row[emailIdx] || '' : '';
 
       // Match teacher if available
       let matchedTeacherId: string | undefined;
       if (rawTeacher && teachers.length > 0) {
-        const found = teachers.find(t => t.name.toLowerCase().includes(rawTeacher.toLowerCase()));
+        const found = teachers.find(t => t.name.toLowerCase().includes(rawTeacher.toLowerCase()) || rawTeacher.toLowerCase().includes(t.name.toLowerCase()));
         if (found) matchedTeacherId = found.id;
       }
 
       const sanitizedName = sanitizeStudentName(firstName, lastName);
       const isValid = Boolean(sanitizedName && sanitizedName.length >= 2);
+
+      // Optimierung 4: Smart Delta-Sync Classification
+      let rowStatus: ParsedRow['status'] = 'NEW';
+      let existingMatch: ExistingStudent | undefined;
+
+      if (!isValid) {
+        rowStatus = 'INVALID';
+      } else if (targetType === 'STUDENT') {
+        const lookupKeyWithInstr = `${sanitizedName.toLowerCase()}|${instrument.toLowerCase()}`;
+        const lookupKeyNameOnly = sanitizedName.toLowerCase();
+        existingMatch = existingMap.get(lookupKeyWithInstr) || existingMap.get(lookupKeyNameOnly);
+
+        if (existingMatch) {
+          rowStatus = 'EXISTING';
+        }
+      }
 
       parsed.push({
         originalFirstName: firstName,
@@ -125,7 +231,8 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
         teacherName: rawTeacher,
         teacherId: matchedTeacherId,
         email,
-        valid: isValid,
+        status: rowStatus,
+        existingStudentId: existingMatch?.id,
         error: !isValid ? 'Vorname fehlt' : undefined
       });
     }
@@ -164,62 +271,74 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
   };
 
   const executeImport = async () => {
-    const validRows = parsedRows.filter(r => r.valid);
-    if (validRows.length === 0) return;
-
+    const newRows = parsedRows.filter(r => r.status === 'NEW');
+    const existingRows = parsedRows.filter(r => r.status === 'EXISTING');
+    
     setStep('IMPORTING');
     setImportErrors([]);
 
-    const batchResult = await executeResilientBatch<ParsedRow, any>(
-      validRows,
-      async (row, idx) => {
-        if (targetType === 'STUDENT') {
-          const { data, error } = await supabase.from('users').insert([{
-            school_id: schoolId,
-            name: row.sanitizedName,
-            role: 'student',
-            instrument: row.instrument,
-            teacher_id: row.teacherId || null,
-            status: 'active',
-            is_campus_active: true,
-            is_groovelab_active: false,
-            created_at: new Date().toISOString()
-          }]).select();
+    let createdCount = 0;
 
-          if (error) throw error;
-          return data;
-        } else {
-          // Teacher Import
-          const { data, error } = await supabase.from('users').insert([{
-            school_id: schoolId,
-            name: `${row.originalFirstName} ${row.originalLastName}`.trim(),
-            role: 'teacher',
-            instrument: row.instrument,
-            email: row.email || null,
-            status: 'active',
-            created_at: new Date().toISOString()
-          }]).select();
+    if (newRows.length > 0) {
+      const batchResult = await executeResilientBatch<ParsedRow, any>(
+        newRows,
+        async (row) => {
+          if (targetType === 'STUDENT') {
+            const { data, error } = await supabase.from('users').insert([{
+              school_id: schoolId,
+              name: row.sanitizedName,
+              role: 'student',
+              instrument: row.instrument,
+              teacher_id: row.teacherId || null,
+              status: 'active',
+              is_campus_active: true,
+              is_groovelab_active: false,
+              created_at: new Date().toISOString()
+            }]).select();
 
-          if (error) throw error;
-          return data;
+            if (error) throw error;
+            return data;
+          } else {
+            // Teacher Import
+            const { data, error } = await supabase.from('users').insert([{
+              school_id: schoolId,
+              name: `${row.originalFirstName} ${row.originalLastName}`.trim(),
+              role: 'teacher',
+              instrument: row.instrument,
+              email: row.email || null,
+              status: 'active',
+              created_at: new Date().toISOString()
+            }]).select();
+
+            if (error) throw error;
+            return data;
+          }
+        },
+        {
+          chunkSize: 10,
+          maxRetries: 3,
+          onProgress: (p) => setProgress(p)
         }
-      },
-      {
-        chunkSize: 10,
-        maxRetries: 3,
-        onProgress: (p) => setProgress(p)
-      }
-    );
+      );
 
-    if (batchResult.success) {
-      setImportCount(batchResult.results.length);
-      setStep('SUCCESS');
-      if (onImportComplete) onImportComplete(batchResult.results.length);
-    } else {
-      setImportErrors(batchResult.failedItems.map(f => `Zeile ${f.index + 1}: ${f.error?.message || 'Fehler beim DB-Schreiben'}`));
-      setStep('PREVIEW');
+      if (batchResult.success) {
+        createdCount = batchResult.results.length;
+      } else {
+        setImportErrors(batchResult.failedItems.map(f => `Zeile ${f.index + 1}: ${f.error?.message || 'Fehler beim DB-Schreiben'}`));
+        setStep('PREVIEW');
+        return;
+      }
     }
+
+    setImportCount(createdCount);
+    setExistingPreservedCount(existingRows.length);
+    setStep('SUCCESS');
+    if (onImportComplete) onImportComplete(createdCount + existingRows.length);
   };
+
+  const newRowsCount = parsedRows.filter(r => r.status === 'NEW').length;
+  const existingRowsCount = parsedRows.filter(r => r.status === 'EXISTING').length;
+  const invalidRowsCount = parsedRows.filter(r => r.status === 'INVALID').length;
 
   return (
     <div style={{
@@ -260,16 +379,16 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
               width: '42px',
               height: '42px',
               borderRadius: '14px',
-              background: 'linear-gradient(135deg, #e6f4ea 0%, #d1fae5 100%)',
+              background: '#f0fdf4',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              color: '#047857'
+              color: '#16a34a'
             }}>
               <Upload size={22} />
             </div>
             <div>
-              <span style={{ fontSize: '0.68rem', fontWeight: 900, color: '#047857', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              <span style={{ fontSize: '0.68rem', fontWeight: 900, color: '#16a34a', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                 ONBOARDING-BOOSTER • {schoolName}
               </span>
               <h3 style={{ margin: '2px 0 0 0', fontSize: '1.2rem', fontWeight: 900, color: '#0f172a' }}>
@@ -279,6 +398,7 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
           </div>
 
           <button
+            type="button"
             onClick={onClose}
             style={{
               background: '#f1f5f9',
@@ -300,9 +420,10 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
           {step === 'UPLOAD' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
               
-              {/* Type Switcher */}
+              {/* Type Switcher with 100% Monochrome Icons */}
               <div style={{ display: 'flex', gap: '8px', background: '#f1f5f9', padding: '4px', borderRadius: '14px' }}>
                 <button
+                  type="button"
                   onClick={() => setTargetType('STUDENT')}
                   style={{
                     flex: 1,
@@ -314,12 +435,18 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
                     fontWeight: 800,
                     fontSize: '0.82rem',
                     cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
                     boxShadow: targetType === 'STUDENT' ? '0 2px 8px rgba(0,0,0,0.06)' : 'none'
                   }}
                 >
-                  🎓 Schüler-Import (mit DSGVO-Maskierung)
+                  <GraduationCap size={16} />
+                  <span>Schüler-Import (mit DSGVO-Maskierung)</span>
                 </button>
                 <button
+                  type="button"
                   onClick={() => setTargetType('TEACHER')}
                   style={{
                     flex: 1,
@@ -331,14 +458,19 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
                     fontWeight: 800,
                     fontSize: '0.82rem',
                     cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
                     boxShadow: targetType === 'TEACHER' ? '0 2px 8px rgba(0,0,0,0.06)' : 'none'
                   }}
                 >
-                  👨‍🏫 Lehrkräfte-Import
+                  <Users size={16} />
+                  <span>Lehrkräfte-Import</span>
                 </button>
               </div>
 
-              {/* DSGVO Info Banner */}
+              {/* Optimierung 5: DSGVO Info Banner */}
               <div style={{
                 background: '#f0fdf4',
                 border: '1px solid #bbf7d0',
@@ -348,9 +480,9 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
                 alignItems: 'center',
                 gap: '14px'
               }}>
-                <ShieldCheck size={26} color="#166534" style={{ flexShrink: 0 }} />
+                <ShieldCheck size={26} color="#16a34a" style={{ flexShrink: 0 }} />
                 <div style={{ fontSize: '0.80rem', color: '#166534', lineHeight: 1.5 }}>
-                  <strong>DSGVO Zero-PII Autopilot:</strong> Du kannst deine reguläre Schülerliste mit vollem Vor- und Nachnamen hochladen. Unser System kürzt den Nachnamen direkt lokal im Browser auf <code>Max M.</code>. Es werden keine privaten Adressen oder E-Mails von Minderjährigen gespeichert.
+                  <strong>DSGVO Zero-PII Autopilot &amp; Smart Delta-Sync:</strong> Du kannst deine gewohnte CSV-Liste aus iMikel, Musikschul-Manager oder WinMusik hochladen. Schülernamen werden automatisch lokal im Browser auf <code>Max M.</code> maskiert. Private Adressen, Bankdaten oder Geburtsdaten werden im Browser sofort verworfen. Bereits bestehende Schüler werden erkannt und ihre Hausaufgaben, Streaks und XP bleiben zu 100% geschützt.
                 </div>
               </div>
 
@@ -382,7 +514,7 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  color: '#34a853'
+                  color: '#16a34a'
                 }}>
                   <FileText size={26} />
                 </div>
@@ -390,7 +522,7 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
                   CSV-, Excel- oder Textdatei hier ablegen oder auswählen
                 </div>
                 <span style={{ fontSize: '0.78rem', color: '#64748b' }}>
-                  Unterstützt .csv, .tsv, .txt (Trennzeichen: Komma, Semikolon oder Tabulator)
+                  Unterstützt .csv, .tsv, .txt (Umlaute aus Windows-1252 / Excel werden automatisch korrigiert)
                 </span>
                 <input
                   ref={fileInputRef}
@@ -432,13 +564,29 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
                   <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#0f172a' }}>
                     Vorschau: {parsedRows.length} Datensätze erkannt
                   </h4>
-                  <p style={{ margin: '2px 0 0 0', fontSize: '0.78rem', color: '#64748b' }}>
-                    {parsedRows.filter(r => r.valid).length} bereit zum Import • {parsedRows.filter(r => !r.valid).length} ungültig
-                  </p>
+                  <div style={{ display: 'flex', gap: '12px', marginTop: '4px', fontSize: '0.78rem', fontWeight: 700 }}>
+                    <span style={{ color: '#16a34a', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#16a34a' }} />
+                      {newRowsCount} Neu anlegen
+                    </span>
+                    {existingRowsCount > 0 && (
+                      <span style={{ color: '#2563eb', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#2563eb' }} />
+                        {existingRowsCount} Bereits vorhanden (Geschützt)
+                      </span>
+                    )}
+                    {invalidRowsCount > 0 && (
+                      <span style={{ color: '#dc2626', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#dc2626' }} />
+                        {invalidRowsCount} Fehlerhaft
+                      </span>
+                    )}
+                  </div>
                 </div>
 
                 <div style={{ display: 'flex', gap: '8px' }}>
                   <button
+                    type="button"
                     onClick={() => { setStep('UPLOAD'); setParsedRows([]); setFile(null); }}
                     style={{
                       background: '#f1f5f9',
@@ -472,30 +620,45 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
                     <tr style={{ color: '#64748b', fontWeight: 800, fontSize: '0.70rem', textTransform: 'uppercase' }}>
                       <th style={{ padding: '10px 14px' }}>#</th>
                       <th style={{ padding: '10px 14px' }}>ORIGINAL-NAME</th>
-                      <th style={{ padding: '10px 14px', color: '#047857' }}>DSGVO-NAME (IN APP)</th>
+                      <th style={{ padding: '10px 14px', color: '#16a34a' }}>DSGVO-NAME (IN APP)</th>
                       <th style={{ padding: '10px 14px' }}>INSTRUMENT</th>
-                      <th style={{ padding: '10px 14px' }}>STATUS</th>
+                      <th style={{ padding: '10px 14px' }}>STATUS &amp; DELTA-SYNC</th>
                     </tr>
                   </thead>
                   <tbody>
                     {parsedRows.map((row, idx) => (
-                      <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9', background: row.valid ? '#ffffff' : '#fff1f2' }}>
+                      <tr key={idx} style={{ 
+                        borderBottom: '1px solid #f1f5f9', 
+                        background: row.status === 'INVALID' ? '#fff1f2' : (row.status === 'EXISTING' ? '#f8fafc' : '#ffffff') 
+                      }}>
                         <td style={{ padding: '10px 14px', color: '#94a3b8' }}>{idx + 1}</td>
                         <td style={{ padding: '10px 14px', color: '#64748b' }}>{row.originalFirstName} {row.originalLastName}</td>
                         <td style={{ padding: '10px 14px', fontWeight: 800, color: '#0f172a' }}>
-                          <span style={{ background: '#f0fdf4', color: '#166534', padding: '2px 8px', borderRadius: '6px', border: '1px solid #bbf7d0' }}>
+                          <span style={{ 
+                            background: row.status === 'EXISTING' ? '#eff6ff' : '#f0fdf4', 
+                            color: row.status === 'EXISTING' ? '#1d4ed8' : '#166534', 
+                            padding: '2px 8px', 
+                            borderRadius: '6px', 
+                            border: row.status === 'EXISTING' ? '1px solid #bfdbfe' : '1px solid #bbf7d0' 
+                          }}>
                             {row.sanitizedName}
                           </span>
                         </td>
                         <td style={{ padding: '10px 14px', color: '#475569' }}>{row.instrument}</td>
                         <td style={{ padding: '10px 14px' }}>
-                          {row.valid ? (
-                            <span style={{ color: '#059669', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 700 }}>
-                              <Check size={14} /> Bereit
+                          {row.status === 'NEW' && (
+                            <span style={{ color: '#16a34a', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 700 }}>
+                              <Check size={14} /> Neu anlegen
                             </span>
-                          ) : (
-                            <span style={{ color: '#dc2626', fontWeight: 700 }}>
-                              {row.error}
+                          )}
+                          {row.status === 'EXISTING' && (
+                            <span style={{ color: '#2563eb', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 700 }} title="Historie, Hausaufgaben und XP bleiben geschützt">
+                              <ShieldCheck size={14} /> Bereits vorhanden (Geschützt)
+                            </span>
+                          )}
+                          {row.status === 'INVALID' && (
+                            <span style={{ color: '#dc2626', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 700 }}>
+                              <AlertTriangle size={14} /> {row.error || 'Ungültig'}
                             </span>
                           )}
                         </td>
@@ -510,13 +673,13 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
           {/* STEP 3: IMPORTING */}
           {step === 'IMPORTING' && (
             <div style={{ padding: '40px 20px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
-              <RefreshCw size={36} color="#34a853" className="animate-spin" />
+              <RefreshCw size={36} color="#16a34a" className="animate-spin" />
               <div>
                 <h4 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 900, color: '#0f172a' }}>
-                  Resilienter Batch-Import läuft...
+                  Resilienter Smart Delta-Import läuft...
                 </h4>
                 <p style={{ margin: '4px 0 0 0', fontSize: '0.82rem', color: '#64748b' }}>
-                  Verarbeitet mit automatischem Retry- &amp; Rollback-Schutz.
+                  Neue Schüler werden angelegt, bestehende Historien und Hausaufgaben bleiben geschützt.
                 </p>
               </div>
 
@@ -526,13 +689,13 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
                     <div style={{
                       width: `${progress.percent}%`,
                       height: '100%',
-                      background: 'linear-gradient(90deg, #10b981 0%, #059669 100%)',
+                      background: 'linear-gradient(90deg, #16a34a 0%, #15803d 100%)',
                       borderRadius: '100px',
                       transition: 'width 0.2s ease'
                     }} />
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.74rem', color: '#64748b', fontWeight: 700 }}>
-                    <span>{progress.completed} von {progress.total} importiert</span>
+                    <span>{progress.completed} von {progress.total} verarbeitet</span>
                     <span>{progress.percent}%</span>
                   </div>
                 </div>
@@ -547,30 +710,37 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
                 width: '64px',
                 height: '64px',
                 borderRadius: '50%',
-                background: '#ecfdf5',
-                border: '2px solid #a7f3d0',
+                background: '#f0fdf4',
+                border: '2px solid #bbf7d0',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: '#059669'
+                color: '#16a34a'
               }}>
                 <CheckCircle2 size={36} />
               </div>
 
               <div>
                 <h4 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#0f172a' }}>
-                  Import erfolgreich abgeschlossen!
+                  Smart Delta-Import erfolgreich abgeschlossen!
                 </h4>
-                <p style={{ margin: '4px 0 0 0', fontSize: '0.88rem', color: '#475569' }}>
-                  Es wurden <strong>{importCount} {targetType === 'STUDENT' ? 'Schülerprofile' : 'Lehrkräfte'}</strong> datenschutzkonform in die Datenbank von <strong>{schoolName}</strong> übertragen.
+                <p style={{ margin: '6px 0 0 0', fontSize: '0.88rem', color: '#475569', lineHeight: 1.5 }}>
+                  Es wurden <strong>{importCount} neue {targetType === 'STUDENT' ? 'Schülerprofile' : 'Lehrkräfte'}</strong> datenschutzkonform angelegt.
+                  {existingPreservedCount > 0 && (
+                    <>
+                      <br />
+                      <strong>{existingPreservedCount} bestehende Schüler</strong> wurden beibehalten (Hausaufgaben, Streaks und XP blieben geschützt).
+                    </>
+                  )}
                 </p>
               </div>
 
               <button
+                type="button"
                 onClick={onClose}
                 style={{
                   marginTop: '12px',
-                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                  background: '#16a34a',
                   color: '#ffffff',
                   border: 'none',
                   borderRadius: '14px',
@@ -578,9 +748,8 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
                   fontWeight: 900,
                   fontSize: '0.88rem',
                   cursor: 'pointer',
-                  boxShadow: '0 4px 14px rgba(16, 185, 129, 0.25)'
+                  boxShadow: '0 4px 14px rgba(22, 163, 74, 0.25)'
                 }}
-                className="hover-scale-mini"
               >
                 Fertigstellen &amp; Übersicht aktualisieren
               </button>
@@ -600,6 +769,7 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
             background: '#fafbfc'
           }}>
             <button
+              type="button"
               onClick={() => { setStep('UPLOAD'); setParsedRows([]); setFile(null); }}
               style={{
                 background: '#f1f5f9',
@@ -616,25 +786,25 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
             </button>
 
             <button
+              type="button"
               onClick={executeImport}
-              disabled={parsedRows.filter(r => r.valid).length === 0}
+              disabled={newRowsCount === 0 && existingRowsCount === 0}
               style={{
-                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                color: '#ffffff',
+                background: (newRowsCount === 0 && existingRowsCount === 0) ? '#e2e8f0' : '#16a34a',
+                color: (newRowsCount === 0 && existingRowsCount === 0) ? '#94a3b8' : '#ffffff',
                 border: 'none',
                 borderRadius: '12px',
                 padding: '10px 24px',
                 fontSize: '0.84rem',
                 fontWeight: 900,
-                cursor: 'pointer',
+                cursor: (newRowsCount === 0 && existingRowsCount === 0) ? 'not-allowed' : 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '8px',
-                boxShadow: '0 4px 14px rgba(16, 185, 129, 0.25)'
+                boxShadow: (newRowsCount > 0 || existingRowsCount > 0) ? '0 4px 14px rgba(22, 163, 74, 0.25)' : 'none'
               }}
-              className="hover-scale-mini"
             >
-              <span>{parsedRows.filter(r => r.valid).length} Datensätze jetzt importieren</span>
+              <span>{newRowsCount > 0 ? `${newRowsCount} neue Datensätze importieren` : 'Aktualisieren'}</span>
               <ArrowRight size={16} />
             </button>
           </div>
