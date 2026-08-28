@@ -1331,6 +1331,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   const [selectedStudentMonth, setSelectedStudentMonth] = useState<{ key: string; label: string } | null>(null);
   const [showTeacherFavoritesOnly, setShowTeacherFavoritesOnly] = useState<boolean>(false);
   const [showStudentFavoritesOnly, setShowStudentFavoritesOnly] = useState<boolean>(false);
+  const [mobileRecordingsTab, setMobileRecordingsTab] = useState<'teacher' | 'student'>('teacher');
   const [favoriteAudioUrls, setFavoriteAudioUrls] = useState<string[]>(() => {
     try {
       const stored = localStorage.getItem(`campus_audio_favorites_${student?.id || "default"}`);
@@ -1997,10 +1998,13 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
   // Audio Recorder logic
   const startRecordingAudio = async () => {
-    const userRoleInSession = sessionStorage.getItem('groovelab_user_role') || localStorage.getItem('groovelab_user_role');
+    const userRoleInSession = typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_user_role') || localStorage.getItem('groovelab_user_role')) : null;
     const isStudentActor = !isTeacherTools && userRoleInSession?.toLowerCase() === 'student';
     if (isStudentActor) {
+      const studentIdVal = (student as any)?.id;
+      const localAudioKey = studentIdVal && typeof window !== 'undefined' ? localStorage.getItem(`groovelab_parent_allow_audio_${studentIdVal}`) : null;
       const isAudioAllowed = (student as any)?.parent_allow_audio !== false && 
+        (localAudioKey !== null ? localAudioKey !== 'false' : true) &&
         (typeof window !== 'undefined' ? localStorage.getItem('campus_board_override_recordings') !== 'false' && localStorage.getItem('campus_allow_audio') !== 'false' : true);
       if (!isAudioAllowed) {
         alert('Die Aufnahme-Funktion ist im Eltern-Kontrollzentrum aktuell deaktiviert.');
@@ -6749,7 +6753,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             display: 'flex',
             flexDirection: 'column',
             gap: '14px',
-            padding: isMobileOrTabletView ? '16px' : '24px',
+            padding: isMobileOrTabletView ? '16px 16px calc(140px + env(safe-area-inset-bottom, 20px)) 16px' : '24px',
             position: 'relative'
           }}
         >
@@ -6759,16 +6763,16 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
               background: '#ffffff',
               border: '1px solid #e2e8f0',
               borderRadius: '20px',
-              padding: '18px 20px',
+              padding: isMobileOrTabletView ? '14px 16px' : '18px 20px',
               boxShadow: '0 4px 16px -2px rgba(0, 0, 0, 0.04)',
               display: 'flex',
               flexDirection: 'column',
               gap: '12px'
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#0f172a', fontWeight: 850, fontSize: '0.86rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#0f172a', fontWeight: 850, fontSize: isMobileOrTabletView ? '0.82rem' : '0.86rem' }}>
                   <span style={{ fontSize: '1.1rem' }}>🎯</span>
-                  <span>Aktiver Wochenschwerpunkt</span>
+                  <span style={{ whiteSpace: 'nowrap' }}>Aktiver Wochenschwerpunkt</span>
                 </div>
                 <span style={{
                   fontSize: '0.68rem',
@@ -6777,7 +6781,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                   background: activeWeeklyTargetTags.length > 0 ? '#fef3c7' : '#f1f5f9',
                   border: `1px solid ${activeWeeklyTargetTags.length > 0 ? '#fde68a' : '#e2e8f0'}`,
                   padding: '2px 9px',
-                  borderRadius: '100px'
+                  borderRadius: '100px',
+                  whiteSpace: 'nowrap'
                 }}>
                   {activeWeeklyTargetTags.length > 0 ? 'Fokus aktiv' : 'Ausgeglichen'}
                 </span>
@@ -6884,18 +6889,18 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
               background: '#ffffff',
               border: '1px solid #e2e8f0',
               borderRadius: '20px',
-              padding: '18px 20px',
+              padding: isMobileOrTabletView ? '14px 16px' : '18px 20px',
               boxShadow: '0 4px 16px -2px rgba(0, 0, 0, 0.04)',
               display: 'flex',
               flexDirection: 'column',
               gap: '12px'
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#0f172a', fontWeight: 850, fontSize: '0.86rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#0f172a', fontWeight: 850, fontSize: isMobileOrTabletView ? '0.82rem' : '0.86rem' }}>
                   <span style={{ fontSize: '1.1rem' }}>📊</span>
-                  <span>Kompetenz-Übersicht (5 Säulen)</span>
+                  <span style={{ whiteSpace: 'nowrap' }}>Kompetenz-Übersicht (5 Säulen)</span>
                 </div>
-                <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#64748b' }}>
+                <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#64748b', whiteSpace: 'nowrap' }}>
                   5 Stufen System
                 </span>
               </div>
@@ -6918,20 +6923,20 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                         transition: 'all 0.2s ease'
                       }}
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: '130px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: isMobileOrTabletView ? '100px' : '130px' }}>
                         <span style={{ fontSize: '0.84rem' }}>{s.icon}</span>
                         <span style={{ fontSize: '0.78rem', fontWeight: 800, color: s.color || '#0f172a' }}>
                           {s.shortLabel}
                         </span>
                         {isTarget && (
-                          <span style={{ fontSize: '0.62rem', fontWeight: 850, color: s.color || '#b45309', background: s.bg || '#fef3c7', border: `1px solid ${s.border || '#fde68a'}`, padding: '1px 6px', borderRadius: '100px' }}>
+                          <span style={{ fontSize: '0.60rem', fontWeight: 850, color: s.color || '#b45309', background: s.bg || '#fef3c7', border: `1px solid ${s.border || '#fde68a'}`, padding: '1px 5px', borderRadius: '100px' }}>
                             Fokus
                           </span>
                         )}
                       </div>
 
-                      {/* 5 Apple-Dots (Direkt klickbar für Lehrkräfte) */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      {/* 5 Apple-Dots (Direkt klickbar für Lehrkräfte mit 22px Touch-Hitbox) */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
                         {[1, 2, 3, 4, 5].map(seg => {
                           const isFilled = s.level >= seg;
                           let dotColor = '#e2e8f0';
@@ -6951,18 +6956,28 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                               }}
                               title={`Stufe ${seg}/5 für ${s.shortLabel} festlegen`}
                               style={{
+                                width: '22px',
+                                height: '22px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                background: 'transparent',
+                                border: 'none',
+                                padding: 0,
+                                cursor: (readOnly && !isTeacherTools) ? 'default' : 'pointer'
+                              }}
+                              className={(!readOnly || isTeacherTools) ? 'hover-scale-mini' : ''}
+                            >
+                              <span style={{
                                 width: '11px',
                                 height: '11px',
                                 borderRadius: '50%',
                                 background: dotColor,
-                                border: 'none',
-                                padding: 0,
-                                cursor: (readOnly && !isTeacherTools) ? 'default' : 'pointer',
                                 transition: 'all 0.15s ease',
-                                boxShadow: isFilled ? `0 1px 3px ${dotColor}66` : 'none'
-                              }}
-                              className={(!readOnly || isTeacherTools) ? 'hover-scale-mini' : ''}
-                            />
+                                boxShadow: isFilled ? `0 1px 3px ${dotColor}66` : 'none',
+                                display: 'inline-block'
+                              }} />
+                            </button>
                           );
                         })}
                       </div>
@@ -7312,7 +7327,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
         {/* Header - Apple-style compact redesign */}
         <div style={{
-          padding: isMobileOrSim ? '8px 12px 6px 12px' : 'max(16px, env(safe-area-inset-top, 16px)) max(20px, env(safe-area-inset-right, 20px)) 16px max(20px, env(safe-area-inset-left, 20px))',
+          padding: isMobileOrSim ? 'max(10px, env(safe-area-inset-top, 10px)) max(12px, env(safe-area-inset-right, 12px)) 6px max(12px, env(safe-area-inset-left, 12px))' : 'max(16px, env(safe-area-inset-top, 16px)) max(20px, env(safe-area-inset-right, 20px)) 16px max(20px, env(safe-area-inset-left, 20px))',
           background: 'linear-gradient(135deg, #34a853 0%, #4f46e5 100%)',
           backdropFilter: 'none',
           borderBottom: '1px solid rgba(255, 255, 255, 0.15)',
@@ -7798,20 +7813,106 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
               />
             </div>
           ) : activeViewMode === 'recordings' ? (
-            <div style={{ display: 'flex', width: '100%', height: '100%', minHeight: 0, overflow: 'hidden' }}>
+            <div style={{
+              display: 'flex',
+              flexDirection: isMobileOrSim ? 'column' : 'row',
+              width: '100%',
+              height: '100%',
+              minHeight: 0,
+              overflow: isMobileOrSim ? 'auto' : 'hidden'
+            }}>
+              {/* 44px Segmented Capsule Touch Switcher for Mobile */}
+              {isMobileOrSim && !isTeacherTools && (
+                <div style={{
+                  width: '100%',
+                  display: 'flex',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  padding: '8px 16px',
+                  background: '#ffffff',
+                  borderBottom: '1px solid #e2e8f0',
+                  flexShrink: 0,
+                  zIndex: 35
+                }}>
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    background: '#f1f5f9',
+                    borderRadius: '100px',
+                    padding: '3px',
+                    width: '100%',
+                    maxWidth: '380px',
+                    height: '44px',
+                    boxSizing: 'border-box',
+                    gap: '4px'
+                  }}>
+                    <button
+                      type="button"
+                      onClick={() => setMobileRecordingsTab('teacher')}
+                      style={{
+                        flex: 1,
+                        height: '38px',
+                        borderRadius: '100px',
+                        border: 'none',
+                        background: mobileRecordingsTab === 'teacher' ? '#ffffff' : 'transparent',
+                        color: mobileRecordingsTab === 'teacher' ? '#15803d' : '#64748b',
+                        fontWeight: 800,
+                        fontSize: '0.78rem',
+                        cursor: 'pointer',
+                        boxShadow: mobileRecordingsTab === 'teacher' ? '0 2px 8px rgba(0,0,0,0.1)' : 'none',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px',
+                        transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
+                      }}
+                    >
+                      <Mic size={14} color={mobileRecordingsTab === 'teacher' ? '#15803d' : '#64748b'} />
+                      <span>Vom Unterricht</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setMobileRecordingsTab('student')}
+                      style={{
+                        flex: 1,
+                        height: '38px',
+                        borderRadius: '100px',
+                        border: 'none',
+                        background: mobileRecordingsTab === 'student' ? '#ffffff' : 'transparent',
+                        color: mobileRecordingsTab === 'student' ? '#6d28d9' : '#64748b',
+                        fontWeight: 800,
+                        fontSize: '0.78rem',
+                        cursor: 'pointer',
+                        boxShadow: mobileRecordingsTab === 'student' ? '0 2px 8px rgba(0,0,0,0.1)' : 'none',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px',
+                        transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
+                      }}
+                    >
+                      <Star size={14} color={mobileRecordingsTab === 'student' ? '#6d28d9' : '#64748b'} fill={mobileRecordingsTab === 'student' ? '#6d28d9' : 'none'} />
+                      <span>Dein Übe-Studio</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* ========================================================================= */}
               {/* LEFT PAGE: 🎙️ AUFNAHMEN VOM LEHRER (Play-Alongs & Unterrichts-Audios)     */}
               {/* ========================================================================= */}
               <div style={{
-                  flex: isTeacherTools ? '1 1 100%' : '1 1 0%',
+                flex: isMobileOrSim ? 'none' : (isTeacherTools ? '1 1 100%' : '1 1 0%'),
+                width: isMobileOrSim ? '100%' : undefined,
+                display: isMobileOrSim ? (mobileRecordingsTab === 'teacher' || isTeacherTools ? 'flex' : 'none') : 'flex',
                 overflowY: 'auto',
-                display: 'flex',
                 flexDirection: 'column',
                 background: useNotebookLayout ? '#faf8f2' : '#ffffff',
                 borderRadius: isTeacherTools ? '0 0 20px 20px' : (useNotebookLayout ? '0 0 0 20px' : '0'),
                 boxShadow: useNotebookLayout ? '-10px 10px 20px rgba(0,0,0,0.15)' : 'none',
-                borderRight: isTeacherTools ? 'none' : (useNotebookLayout ? '1px dashed #e5e0d4' : '1px solid #e8e8ed'),
-                padding: isMobileOrSim ? '20px 16px calc(280px + env(safe-area-inset-bottom, 40px)) 16px' : '28px'
+                borderRight: isTeacherTools || isMobileOrSim ? 'none' : (useNotebookLayout ? '1px dashed #e5e0d4' : '1px solid #e8e8ed'),
+                padding: isMobileOrSim ? '20px 16px calc(140px + env(safe-area-inset-bottom, 20px)) 16px' : '28px'
               }}>
                 {useNotebookLayout && !isTeacherTools && (
                   <div style={{
@@ -8480,7 +8581,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
                         <div style={{
                           display: "grid",
-                          gridTemplateColumns: "repeat(6, 1fr)",
+                          gridTemplateColumns: isMobileOrSim ? (windowWidth < 600 ? "repeat(3, 1fr)" : "repeat(4, 1fr)") : "repeat(6, 1fr)",
                           gap: "8px"
                         }}>
                           {/* ⭐ Radiant Apple Liquid Gold & Spotify Starburst Favoriten Cover Card */}
@@ -8630,17 +8731,18 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
               {/* RIGHT PAGE: ⭐ EIGENE AUFNAHMEN (SCHÜLER - Private Audio-Sandbox)          */}
               {/* ========================================================================= */}
               <div style={{
-                flex: '1 1 0%',
+                flex: isMobileOrSim ? 'none' : '1 1 0%',
+                width: isMobileOrSim ? '100%' : undefined,
+                display: isMobileOrSim ? (mobileRecordingsTab === 'student' && !isTeacherTools ? 'flex' : 'none') : 'flex',
                 overflowY: 'auto',
-                display: 'flex',
                 flexDirection: 'column',
                 background: useNotebookLayout ? 'white' : '#f8fafc',
                 backgroundImage: useNotebookLayout ? 'repeating-linear-gradient(white, white 27px, #e5e0d4 27px, #e5e0d4 28px)' : 'none',
-                borderLeft: useNotebookLayout ? 'none' : '1px solid #e4e4e7',
+                borderLeft: useNotebookLayout || isMobileOrSim ? 'none' : '1px solid #e4e4e7',
                 borderRadius: useNotebookLayout ? '0 0 20px 0' : '0',
                 boxShadow: useNotebookLayout ? '10px 10px 20px rgba(0,0,0,0.15)' : 'none',
                 position: 'relative',
-                padding: '24px'
+                padding: isMobileOrSim ? '20px 16px calc(140px + env(safe-area-inset-bottom, 20px)) 16px' : '24px'
               }}>
                 {useNotebookLayout && (
                   <div style={{
@@ -8770,7 +8872,10 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                       const effectiveTresorAvailable = hasTresorStorage && !isStorageOverCap;
                       const isLimitReached = !effectiveTresorAvailable && studentRecordingsTotalSec >= monthlyLimit;
 
+                      const studentIdVal = (student as any)?.id;
+                      const localAudioKey = studentIdVal && typeof window !== 'undefined' ? localStorage.getItem(`groovelab_parent_allow_audio_${studentIdVal}`) : null;
                       const isAudioAllowed = (student as any)?.parent_allow_audio !== false && 
+                        (localAudioKey !== null ? localAudioKey !== 'false' : true) &&
                         (typeof window !== 'undefined' ? localStorage.getItem('campus_board_override_recordings') !== 'false' && localStorage.getItem('campus_allow_audio') !== 'false' : true);
 
                       if (!isAudioAllowed) {
@@ -8827,7 +8932,13 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                             )}
                           </div>
 
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%' }}>
+                          <div style={{
+                            display: 'flex',
+                            flexDirection: isMobileOrSim ? 'column' : 'row',
+                            alignItems: isMobileOrSim ? 'stretch' : 'center',
+                            gap: '8px',
+                            width: '100%'
+                          }}>
                             {!isRecordingAudio && !isLimitReached && (
                               <input
                                 type="text"
@@ -8835,10 +8946,11 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                 value={audioLabel}
                                 onChange={(e) => setAudioLabel(e.target.value)}
                                 style={{
-                                  flex: 1,
+                                  flex: isMobileOrSim ? 'none' : 1,
+                                  width: isMobileOrSim ? '100%' : undefined,
                                   minWidth: 0,
-                                  fontSize: '0.80rem',
-                                  padding: '8px 12px',
+                                  fontSize: '0.82rem',
+                                  padding: '9px 12px',
                                   borderRadius: '10px',
                                   border: '1.5px solid #cbd5e1',
                                   background: '#f8fafc',
@@ -8849,7 +8961,14 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                             )}
 
                             {!isRecordingAudio ? (
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0, position: 'relative' }}>
+                              <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                flexShrink: 0,
+                                width: isMobileOrSim ? '100%' : 'auto',
+                                position: 'relative'
+                              }}>
                                 {/* ⏱️ Metronom / Klick Button */}
                                 <button
                                   type="button"
@@ -8859,16 +8978,15 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                     border: isRecordingMetronomeActive ? '1.5px solid #16a34a' : '1.5px solid #cbd5e1',
                                     color: isRecordingMetronomeActive ? '#15803d' : '#64748b',
                                     borderRadius: '12px',
-                                    width: '36px',
-                                    height: '36px',
+                                    width: isMobileOrSim ? '42px' : '36px',
+                                    height: isMobileOrSim ? '42px' : '36px',
                                     display: 'flex',
                                     alignItems: 'center',
                                     justifyContent: 'center',
                                     cursor: 'pointer',
                                     flexShrink: 0,
                                     boxShadow: isRecordingMetronomeActive ? '0 2px 8px rgba(22, 163, 74, 0.25)' : 'none',
-                                    transition: 'all 0.15s ease',
-                                    position: 'relative'
+                                    transition: 'all 0.15s ease'
                                   }}
                                   className="hover-scale-mini"
                                   title={isRecordingMetronomeActive ? `Klick aktiv (${recordingBpm} BPM)` : 'Klick / Metronom einstellen'}
@@ -8894,22 +9012,16 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                     flexDirection: 'column',
                                     gap: '10px'
                                   }}>
-                                    {/* Header */}
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                       <span style={{ fontSize: '0.80rem', fontWeight: 900, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '5px' }}>
                                         <MechanicalMetronomeIcon size={16} color="#16a34a" strokeWidth={2.2} />
                                         <span>Klick / Metronom</span>
                                       </span>
-                                      <button
-                                        type="button"
-                                        onClick={() => setShowRecordingMetronomePopup(false)}
-                                        style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '2px' }}
-                                      >
+                                      <button type="button" onClick={() => setShowRecordingMetronomePopup(false)} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '2px' }}>
                                         <X size={14} />
                                       </button>
                                     </div>
 
-                                    {/* Toggle Button */}
                                     <button
                                       type="button"
                                       onClick={() => {
@@ -8925,65 +9037,48 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                         borderRadius: '10px',
                                         padding: '7px 10px',
                                         fontSize: '0.76rem',
-                                        fontWeight: 850,
+                                        fontWeight: 800,
                                         cursor: 'pointer',
                                         display: 'flex',
                                         alignItems: 'center',
                                         justifyContent: 'center',
-                                        gap: '6px',
-                                        transition: 'all 0.15s ease'
+                                        gap: '6px'
                                       }}
                                     >
-                                      <Check size={14} style={{ opacity: isRecordingMetronomeActive ? 1 : 0 }} />
-                                      <span>{isRecordingMetronomeActive ? 'Klick bei Aufnahme aktiv' : 'Klick einschalten'}</span>
+                                      <span>{isRecordingMetronomeActive ? '✓ Klick aktiv' : 'Klick einschalten'}</span>
                                     </button>
 
-                                    {/* BPM Stepper & Slider */}
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                        <button
-                                          type="button"
-                                          onClick={() => setRecordingBpm(p => Math.max(40, p - 5))}
-                                          style={{ background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '3px 8px', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer' }}
-                                        >
-                                          -5
-                                        </button>
-                                        <span style={{ fontSize: '0.92rem', fontWeight: 900, color: '#0f172a' }}>
-                                          {recordingBpm} <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 700 }}>BPM</span>
-                                        </span>
-                                        <button
-                                          type="button"
-                                          onClick={() => setRecordingBpm(p => Math.min(240, p + 5))}
-                                          style={{ background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '3px 8px', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer' }}
-                                        >
-                                          +5
-                                        </button>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.72rem', fontWeight: 800, color: '#475569' }}>
+                                        <span>Tempo</span>
+                                        <span style={{ color: '#16a34a', fontWeight: 900 }}>{recordingBpm} BPM</span>
                                       </div>
-
-                                      <input
-                                        type="range"
-                                        min="40"
-                                        max="240"
-                                        value={recordingBpm}
-                                        onChange={(e) => setRecordingBpm(Number(e.target.value))}
-                                        style={{ width: '100%', accentColor: '#16a34a', cursor: 'pointer' }}
-                                      />
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                        <button
+                                          type="button"
+                                          onClick={() => setRecordingBpm(b => Math.max(40, b - 5))}
+                                          style={{ background: '#f1f5f9', border: 'none', borderRadius: '6px', width: '24px', height: '24px', fontWeight: 900, cursor: 'pointer' }}
+                                        >-</button>
+                                        <input
+                                          type="range"
+                                          min="40"
+                                          max="240"
+                                          value={recordingBpm}
+                                          onChange={(e) => setRecordingBpm(parseInt(e.target.value, 10))}
+                                          style={{ flex: 1, accentColor: '#16a34a', cursor: 'pointer' }}
+                                        />
+                                        <button
+                                          type="button"
+                                          onClick={() => setRecordingBpm(b => Math.min(240, b + 5))}
+                                          style={{ background: '#f1f5f9', border: 'none', borderRadius: '6px', width: '24px', height: '24px', fontWeight: 900, cursor: 'pointer' }}
+                                        >+</button>
+                                      </div>
                                     </div>
 
-                                    {/* Test Click / Beep */}
                                     <button
                                       type="button"
                                       onClick={() => playMetronomeTick(true)}
-                                      style={{
-                                        background: '#f8fafc',
-                                        border: '1px dashed #cbd5e1',
-                                        color: '#64748b',
-                                        borderRadius: '8px',
-                                        padding: '5px',
-                                        fontSize: '0.68rem',
-                                        fontWeight: 750,
-                                        cursor: 'pointer'
-                                      }}
+                                      style={{ background: '#f8fafc', border: '1px dashed #cbd5e1', color: '#64748b', borderRadius: '8px', padding: '5px', fontSize: '0.68rem', fontWeight: 750, cursor: 'pointer' }}
                                     >
                                       🔊 Klick kurz testen
                                     </button>
@@ -8995,6 +9090,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                   onClick={startRecordingAudio}
                                   disabled={isUploadingAudio || isLimitReached}
                                   style={{
+                                    flex: isMobileOrSim ? 1 : 'none',
+                                    height: isMobileOrSim ? '42px' : '36px',
                                     background: isLimitReached ? '#cbd5e1' : 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
                                     color: '#fff',
                                     border: 'none',
@@ -9009,7 +9106,6 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                     gap: '6px',
                                     boxShadow: isLimitReached ? 'none' : '0 3px 10px rgba(99, 102, 241, 0.25)',
                                     whiteSpace: 'nowrap',
-                                    height: '36px',
                                     boxSizing: 'border-box'
                                   }}
                                   className={isLimitReached ? '' : 'hover-scale'}
@@ -9482,7 +9578,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
                         <div style={{
                           display: "grid",
-                          gridTemplateColumns: "repeat(6, 1fr)",
+                          gridTemplateColumns: isMobileOrSim ? (windowWidth < 600 ? "repeat(3, 1fr)" : "repeat(4, 1fr)") : "repeat(6, 1fr)",
                           gap: "8px"
                         }}>
                           {/* ⭐ Radiant Apple Liquid Gold & Spotify Starburst Favoriten Cover Card */}
@@ -19222,6 +19318,13 @@ const InlineAudioPlayer: React.FC<{
   const audioRef = React.useRef<HTMLAudioElement | null>(null);
   const countInTimerRef = React.useRef<any>(null);
   const playerIdRef = React.useRef<string>(`player_${Math.random().toString(36).substring(2, 9)}_${Date.now()}`);
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' ? window.innerWidth < 768 : false);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(typeof window !== 'undefined' ? window.innerWidth < 768 : false);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const notifyGlobalPlay = () => {
     window.dispatchEvent(new CustomEvent('campus-global-audio-play', { detail: { playerId: playerIdRef.current } }));
@@ -19386,13 +19489,13 @@ const InlineAudioPlayer: React.FC<{
   return (
     <div style={{
       background: isPlaying ? '#f0fdf4' : '#ffffff',
-      borderRadius: '14px',
+      borderRadius: '16px',
       border: isPlaying ? `1.5px solid ${themeColor}` : '1.5px solid #e2e8f0',
-      padding: '8px 14px',
+      padding: isMobile ? '12px 14px' : '8px 14px',
       width: '100%',
       boxShadow: isPlaying ? `0 4px 16px ${themeColor}20, 0 1px 3px rgba(0,0,0,0.03)` : '0 1px 4px rgba(0,0,0,0.02)',
       display: 'flex',
-      alignItems: 'center',
+      flexDirection: 'column',
       gap: '8px',
       boxSizing: 'border-box',
       position: 'relative',
@@ -19401,75 +19504,170 @@ const InlineAudioPlayer: React.FC<{
     }}>
       <audio ref={audioRef} src={resolvedUrl} />
 
-      {/* Left: Play / Pause Circular Button (34px) */}
-      <button
-        type="button"
-        onClick={(e) => togglePlay(e)}
-        style={{
-          width: '34px',
-          height: '34px',
-          borderRadius: '50%',
-          background: countInStep !== null 
-            ? '#f59e0b'
-            : (isPlaying ? themeColor : `linear-gradient(135deg, ${themeColor} 0%, ${themeColor}ee 100%)`),
-          color: '#ffffff',
-          border: 'none',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          flexShrink: 0,
-          boxShadow: isPlaying ? `0 0 10px ${themeColor}55` : `0 2px 6px ${themeColor}33`,
-          transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
-          fontSize: countInStep !== null ? '0.86rem' : undefined,
-          fontWeight: 900
-        }}
-        className="hover-scale"
-        title={countInStep !== null ? `Einzähler: ${countInStep}` : (isPlaying ? 'Pause' : 'Abspielen')}
-      >
-        {countInStep !== null ? (
-          <span>{countInStep}</span>
-        ) : isPlaying ? (
-          <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor">
-            <rect x="6" y="5" width="4" height="14" rx="1.5" />
-            <rect x="14" y="5" width="4" height="14" rx="1.5" />
-          </svg>
-        ) : (
-          <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" style={{ marginLeft: '2px' }}>
-            <path d="M8 5v14l11-7z" />
-          </svg>
-        )}
-      </button>
+      {/* Primary Top Row */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%' }}>
+        {/* Left: Play / Pause Circular Button */}
+        <button
+          type="button"
+          onClick={(e) => togglePlay(e)}
+          style={{
+            width: isMobile ? '38px' : '34px',
+            height: isMobile ? '38px' : '34px',
+            borderRadius: '50%',
+            background: countInStep !== null 
+              ? '#f59e0b'
+              : (isPlaying ? themeColor : `linear-gradient(135deg, ${themeColor} 0%, ${themeColor}ee 100%)`),
+            color: '#ffffff',
+            border: 'none',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+            boxShadow: isPlaying ? `0 0 10px ${themeColor}55` : `0 2px 6px ${themeColor}33`,
+            transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+            fontSize: countInStep !== null ? '0.86rem' : undefined,
+            fontWeight: 900
+          }}
+          className="hover-scale"
+          title={countInStep !== null ? `Einzähler: ${countInStep}` : (isPlaying ? 'Pause' : 'Abspielen')}
+        >
+          {countInStep !== null ? (
+            <span>{countInStep}</span>
+          ) : isPlaying ? (
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+              <rect x="6" y="5" width="4" height="14" rx="1.5" />
+              <rect x="14" y="5" width="4" height="14" rx="1.5" />
+            </svg>
+          ) : (
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" style={{ marginLeft: '2px' }}>
+              <path d="M8 5v14l11-7z" />
+            </svg>
+          )}
+        </button>
 
-      {/* Middle: Title & Metadata */}
-      <div style={{ flex: '1 1 auto', minWidth: '60px', display: 'flex', flexDirection: 'column', gap: '2px', overflow: 'hidden' }}>
-        <span style={{
-          fontSize: '0.82rem',
-          fontWeight: 850,
-          color: '#0f172a',
-          lineHeight: 1.2,
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap',
-          display: 'block'
-        }}>
-          {cleanTitle}
-        </span>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.66rem', color: '#64748b', fontWeight: 650, whiteSpace: 'nowrap' }}>
-          {formattedDate && <span>{formattedDate}</span>}
-          {formattedDate && <span>•</span>}
-          <span style={{ fontVariantNumeric: 'tabular-nums' }}>
-            {isActiveOrPlaying ? `${formatTime(currentTime)} / ${formatTime(duration)}` : `${formatTime(duration)} min`}
+        {/* Middle: Title & Metadata */}
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '2px' }}>
+          <span style={{
+            fontSize: '0.86rem',
+            fontWeight: 850,
+            color: '#0f172a',
+            lineHeight: 1.2,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap'
+          }}>
+            {cleanTitle}
           </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.68rem', color: '#64748b', fontWeight: 650, whiteSpace: 'nowrap' }}>
+            {formattedDate && <span>{formattedDate}</span>}
+            {formattedDate && <span>•</span>}
+            <span style={{ fontVariantNumeric: 'tabular-nums' }}>
+              {isActiveOrPlaying ? `${formatTime(currentTime)} / ${formatTime(duration)}` : `${formatTime(duration)} min`}
+            </span>
+          </div>
+        </div>
+
+        {/* Right Area: Favorite + Badge + Delete */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0, marginLeft: 'auto' }}>
+          {/* ⭐ Star / Favorite Button */}
+          {onToggleFavorite && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleFavorite();
+              }}
+              style={{
+                background: isFavorite ? '#fef3c7' : '#f8fafc',
+                border: isFavorite ? '1.2px solid #f59e0b' : '1px solid #cbd5e1',
+                color: isFavorite ? '#d97706' : '#94a3b8',
+                borderRadius: '8px',
+                padding: '5px 7px',
+                fontSize: '0.64rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                height: '30px',
+                boxSizing: 'border-box',
+                transition: 'all 0.15s ease'
+              }}
+              className="hover-scale-mini"
+              title={isFavorite ? "Aus Favoriten entfernen" : "Zu Favoriten hinzufügen"}
+            >
+              <Star size={13} strokeWidth={isFavorite ? 2.6 : 2} fill={isFavorite ? "#f59e0b" : "none"} color={isFavorite ? "#d97706" : "#94a3b8"} />
+            </button>
+          )}
+
+          {/* Status Badge (1-Click Toggle) */}
+          {badge && (
+            <span 
+              onClick={onBadgeClick ? (e) => { e.stopPropagation(); onBadgeClick(); } : undefined}
+              style={{
+                fontSize: '0.66rem',
+                fontWeight: 800,
+                background: badgeBg,
+                color: badgeColor,
+                padding: '4px 8px',
+                borderRadius: '100px',
+                whiteSpace: 'nowrap',
+                display: 'inline-flex',
+                alignItems: 'center',
+                cursor: onBadgeClick ? 'pointer' : 'default',
+                userSelect: 'none',
+                height: '30px',
+                boxSizing: 'border-box',
+                transition: 'all 0.15s ease'
+              }}
+              className={onBadgeClick ? 'hover-scale-mini' : ''}
+              title={badgeTitle || (onBadgeClick ? 'Klicken zum Umschalten (Privat / Für Lehrkraft freigeben)' : undefined)}
+            >
+              {badge}
+            </span>
+          )}
+
+          {/* Delete Button */}
+          {onDelete && (
+            <button
+              type="button"
+              onClick={onDelete}
+              style={{
+                background: '#fff1f2',
+                border: '1px solid #fecdd3',
+                color: '#e11d48',
+                cursor: 'pointer',
+                width: '30px',
+                height: '30px',
+                borderRadius: '8px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+                transition: 'all 0.15s ease'
+              }}
+              className="hover-scale"
+              title="Aufnahme löschen"
+            >
+              <Trash2 size={13} strokeWidth={2} />
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Right Area: Dynamic Morphing (Paused = 4 Action Buttons | Playing = Live Waveform + Quick Pills) */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0, marginLeft: 'auto' }}>
+      {/* Secondary Bottom Toolbar (Full width scrubbable waveform when playing OR 4 action pills when paused) */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '6px',
+        width: '100%',
+        paddingTop: '2px',
+        borderTop: isPlaying ? '1px dashed rgba(22, 163, 74, 0.2)' : '1px dashed #f1f5f9'
+      }}>
         {isPlaying ? (
-          /* PLAYBACK MODE: Waveform + Quick Loop & Speed Pills */
+          /* Live Scrubbable Waveform Track */
           <>
-            {/* Waveform Track with Touch Scrubbing */}
             <div 
               onClick={(e) => {
                 const rect = e.currentTarget.getBoundingClientRect();
@@ -19483,18 +19681,18 @@ const InlineAudioPlayer: React.FC<{
                 display: 'flex',
                 alignItems: 'center',
                 gap: '2px',
-                height: '18px',
-                width: '90px',
+                height: '24px',
+                flex: 1,
                 cursor: 'pointer',
-                padding: '2px 4px',
+                padding: '2px 6px',
                 background: '#f8fafc',
                 borderRadius: '8px',
                 border: '1px solid #e2e8f0'
               }}
               title="Klicken zum Spulen"
             >
-              {waveformHeights.slice(0, 16).map((h, i) => {
-                const barRatio = i / 16;
+              {waveformHeights.map((h, i) => {
+                const barRatio = i / waveformHeights.length;
                 const isFilled = barRatio <= progressRatio;
                 return (
                   <div
@@ -19523,21 +19721,22 @@ const InlineAudioPlayer: React.FC<{
                 background: isLooping ? '#dcfce7' : '#f8fafc',
                 border: isLooping ? '1.2px solid #16a34a' : '1px solid #cbd5e1',
                 color: isLooping ? '#15803d' : '#64748b',
-                borderRadius: '6px',
-                padding: '4px 6px',
-                fontSize: '0.62rem',
+                borderRadius: '8px',
+                padding: '4px 8px',
+                fontSize: '0.66rem',
                 fontWeight: 800,
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'center',
+                gap: '4px',
                 height: '28px',
                 boxSizing: 'border-box'
               }}
               className="hover-scale-mini"
               title={isLooping ? 'Loop aktiv' : 'Loop aktivieren'}
             >
-              <Repeat size={11} strokeWidth={isLooping ? 2.6 : 2} />
+              <Repeat size={12} strokeWidth={isLooping ? 2.6 : 2} />
+              <span>Loop</span>
             </button>
 
             {/* Quick Speed Pill */}
@@ -19553,9 +19752,9 @@ const InlineAudioPlayer: React.FC<{
                 background: playbackRate !== 1 ? '#eff6ff' : '#f8fafc',
                 border: playbackRate !== 1 ? '1.2px solid #bfdbfe' : '1px solid #cbd5e1',
                 color: playbackRate !== 1 ? '#2563eb' : '#64748b',
-                borderRadius: '6px',
-                padding: '4px 6px',
-                fontSize: '0.62rem',
+                borderRadius: '8px',
+                padding: '4px 8px',
+                fontSize: '0.66rem',
                 fontWeight: 800,
                 cursor: 'pointer',
                 height: '28px',
@@ -19566,41 +19765,10 @@ const InlineAudioPlayer: React.FC<{
             >
               {playbackRate}×
             </button>
-
-            {/* ⭐ Star / Favorite Button (Playing Mode) */}
-            {onToggleFavorite && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onToggleFavorite();
-                }}
-                style={{
-                  background: isFavorite ? '#fef3c7' : '#f8fafc',
-                  border: isFavorite ? '1.2px solid #f59e0b' : '1px solid #cbd5e1',
-                  color: isFavorite ? '#d97706' : '#94a3b8',
-                  borderRadius: '6px',
-                  padding: '4px 6px',
-                  fontSize: '0.62rem',
-                  fontWeight: 800,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  height: '28px',
-                  boxSizing: 'border-box',
-                  transition: 'all 0.15s ease'
-                }}
-                className="hover-scale-mini"
-                title={isFavorite ? "Aus Favoriten entfernen" : "Zu Favoriten hinzufügen"}
-              >
-                <Star size={12} strokeWidth={isFavorite ? 2.6 : 2} fill={isFavorite ? "#f59e0b" : "none"} color={isFavorite ? "#d97706" : "#94a3b8"} />
-              </button>
-            )}
           </>
         ) : (
-          /* PAUSED / IDLE MODE: All 4 Action Buttons in 1 Sleek Row */
-          <>
+          /* Paused Mode: 4 Action Utility Pills */
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', width: '100%', overflowX: 'auto', padding: '2px 0' }}>
             {/* 🔁 Loop Button */}
             <button
               type="button"
@@ -19612,21 +19780,22 @@ const InlineAudioPlayer: React.FC<{
                 background: isLooping ? '#dcfce7' : '#f8fafc',
                 border: isLooping ? '1.2px solid #16a34a' : '1px solid #cbd5e1',
                 color: isLooping ? '#15803d' : '#64748b',
-                borderRadius: '6px',
-                padding: '4px 6px',
-                fontSize: '0.62rem',
+                borderRadius: '8px',
+                padding: '4px 8px',
+                fontSize: '0.66rem',
                 fontWeight: 800,
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'center',
+                gap: '4px',
                 height: '28px',
                 boxSizing: 'border-box'
               }}
               className="hover-scale-mini"
               title={isLooping ? 'Loop aktiv (Endlos-Schleife)' : 'Loop aktivieren (Endlos-Schleife für Play-Alongs)'}
             >
-              <Repeat size={11} strokeWidth={isLooping ? 2.6 : 2} />
+              <Repeat size={12} strokeWidth={isLooping ? 2.6 : 2} />
+              <span>Loop</span>
             </button>
 
             {/* ⏱️ 4-Beat Count-In Button */}
@@ -19640,22 +19809,22 @@ const InlineAudioPlayer: React.FC<{
                 background: countInActive ? '#dcfce7' : '#f8fafc',
                 border: countInActive ? '1.2px solid #16a34a' : '1px solid #cbd5e1',
                 color: countInActive ? '#15803d' : '#64748b',
-                borderRadius: '6px',
-                padding: '4px 6px',
-                fontSize: '0.62rem',
+                borderRadius: '8px',
+                padding: '4px 8px',
+                fontSize: '0.66rem',
                 fontWeight: 850,
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '2px',
+                gap: '3px',
                 height: '28px',
                 boxSizing: 'border-box'
               }}
               className="hover-scale-mini"
               title={countInActive ? '4-Beat Einzähler aktiv' : '4-Beat Einzähler vor Abspielen aktivieren'}
             >
-              <Timer size={11} strokeWidth={countInActive ? 2.4 : 2} />
-              <span>4</span>
+              <Timer size={12} strokeWidth={countInActive ? 2.4 : 2} />
+              <span>4er Klick</span>
             </button>
 
             {/* 🚀 Speed Rate Button */}
@@ -19671,9 +19840,9 @@ const InlineAudioPlayer: React.FC<{
                 background: playbackRate !== 1 ? '#eff6ff' : '#f8fafc',
                 border: playbackRate !== 1 ? '1.2px solid #bfdbfe' : '1px solid #cbd5e1',
                 color: playbackRate !== 1 ? '#2563eb' : '#64748b',
-                borderRadius: '6px',
-                padding: '4px 6px',
-                fontSize: '0.62rem',
+                borderRadius: '8px',
+                padding: '4px 8px',
+                fontSize: '0.66rem',
                 fontWeight: 800,
                 cursor: 'pointer',
                 height: '28px',
@@ -19682,7 +19851,7 @@ const InlineAudioPlayer: React.FC<{
               className="hover-scale-mini"
               title="Tempo anpassen"
             >
-              {playbackRate}×
+              Tempo {playbackRate}×
             </button>
 
             {/* ✂️ Studio Editor Button */}
@@ -19696,109 +19865,24 @@ const InlineAudioPlayer: React.FC<{
                 background: '#f8fafc',
                 border: '1px solid #cbd5e1',
                 color: '#6366f1',
-                borderRadius: '6px',
-                padding: '4px 6px',
-                fontSize: '0.62rem',
+                borderRadius: '8px',
+                padding: '4px 8px',
+                fontSize: '0.66rem',
                 fontWeight: 800,
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'center',
+                gap: '4px',
                 height: '28px',
                 boxSizing: 'border-box'
               }}
               className="hover-scale-mini"
               title="Aufnahme zuschneiden & Pitch verändern"
             >
-              <Scissors size={11} strokeWidth={2.2} />
+              <Scissors size={12} strokeWidth={2.2} />
+              <span>Studio</span>
             </button>
-
-            {/* ⭐ Star / Favorite Button */}
-            {onToggleFavorite && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onToggleFavorite();
-                }}
-                style={{
-                  background: isFavorite ? '#fef3c7' : '#f8fafc',
-                  border: isFavorite ? '1.2px solid #f59e0b' : '1px solid #cbd5e1',
-                  color: isFavorite ? '#d97706' : '#94a3b8',
-                  borderRadius: '6px',
-                  padding: '4px 6px',
-                  fontSize: '0.62rem',
-                  fontWeight: 800,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  height: '28px',
-                  boxSizing: 'border-box',
-                  transition: 'all 0.15s ease'
-                }}
-                className="hover-scale-mini"
-                title={isFavorite ? "Aus Favoriten entfernen" : "Zu Favoriten hinzufügen"}
-              >
-                <Star size={12} strokeWidth={isFavorite ? 2.6 : 2} fill={isFavorite ? "#f59e0b" : "none"} color={isFavorite ? "#d97706" : "#94a3b8"} />
-              </button>
-            )}
-          </>
-        )}
-
-        {/* Status Badge (1-Click Toggle) */}
-        {badge && (
-          <span 
-            onClick={onBadgeClick ? (e) => { e.stopPropagation(); onBadgeClick(); } : undefined}
-            style={{
-              fontSize: '0.64rem',
-              fontWeight: 800,
-              background: badgeBg,
-              color: badgeColor,
-              padding: '3px 7px',
-              borderRadius: '100px',
-              whiteSpace: 'nowrap',
-              display: 'inline-flex',
-              alignItems: 'center',
-              cursor: onBadgeClick ? 'pointer' : 'default',
-              userSelect: 'none',
-              height: '26px',
-              boxSizing: 'border-box',
-              transition: 'all 0.15s ease'
-            }}
-            className={onBadgeClick ? 'hover-scale-mini' : ''}
-            title={badgeTitle || (onBadgeClick ? 'Klicken zum Umschalten (Privat / Für Lehrkraft freigeben)' : undefined)}
-          >
-            {badge}
-          </span>
-        )}
-
-        {/* Delete Button */}
-        {onDelete && (
-          <button
-            type="button"
-            onClick={onDelete}
-            style={{
-              background: '#f8fafc',
-              border: '1px solid #e2e8f0',
-              color: '#94a3b8',
-              cursor: 'pointer',
-              width: '26px',
-              height: '26px',
-              borderRadius: '6px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0,
-              marginLeft: '3px',
-              marginRight: '2px',
-              transition: 'all 0.15s ease'
-            }}
-            className="hover-scale"
-            title="Aufnahme löschen"
-          >
-            <Trash2 size={12} strokeWidth={2} />
-          </button>
+          </div>
         )}
       </div>
 

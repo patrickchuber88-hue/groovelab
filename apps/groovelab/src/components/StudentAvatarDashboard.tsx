@@ -857,15 +857,84 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
   const [firstPinSavedSuccess, setFirstPinSavedSuccess] = useState<boolean>(false);
   const [matchCelebrationData, setMatchCelebrationData] = useState<any | null>(null);
 
-  // Parent Control Center Draft States & Step-Up Save Modal
-  const [draftUiLevel, setDraftUiLevel] = useState<string | null>(null);
-  const [draftAllowAbsences, setDraftAllowAbsences] = useState<boolean | null>(null);
-  const [draftAllowChat, setDraftAllowChat] = useState<boolean | null>(null);
-  const [draftAllowTimer, setDraftAllowTimer] = useState<boolean | null>(null);
-  const [draftAllowLeaderboard, setDraftAllowLeaderboard] = useState<boolean | null>(null);
-  const [draftAllowProposals, setDraftAllowProposals] = useState<boolean | null>(null);
-  const [draftAllowAudio, setDraftAllowAudio] = useState<boolean | null>(null);
-  const [draftAllowTts, setDraftAllowTts] = useState<boolean | null>(null);
+  // Parent Control Center Draft States & Step-Up Save Modal (Deterministic SSOT)
+  const [draftUiLevel, setDraftUiLevel] = useState<string | null>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('campus_student_ui_level');
+      if (saved) return saved;
+    }
+    return initialUser?.campus_ui_level || null;
+  });
+  const [draftAllowAbsences, setDraftAllowAbsences] = useState<boolean | null>(() => {
+    if (typeof window !== 'undefined' && studentId) {
+      const saved = localStorage.getItem(`groovelab_parent_allow_absences_${studentId}`);
+      if (saved !== null) return saved === 'true';
+    }
+    if (initialUser?.parent_allow_absences !== undefined && initialUser?.parent_allow_absences !== null) {
+      return Boolean(initialUser.parent_allow_absences);
+    }
+    return null;
+  });
+  const [draftAllowChat, setDraftAllowChat] = useState<boolean | null>(() => {
+    if (typeof window !== 'undefined' && studentId) {
+      const saved = localStorage.getItem(`groovelab_parent_allow_chat_${studentId}`);
+      if (saved !== null) return saved === 'true';
+    }
+    if (initialUser?.parent_allow_chat !== undefined && initialUser?.parent_allow_chat !== null) {
+      return Boolean(initialUser.parent_allow_chat);
+    }
+    return null;
+  });
+  const [draftAllowTimer, setDraftAllowTimer] = useState<boolean | null>(() => {
+    if (typeof window !== 'undefined' && studentId) {
+      const saved = localStorage.getItem(`groovelab_parent_allow_timer_${studentId}`);
+      if (saved !== null) return saved === 'true';
+    }
+    if (initialUser?.parent_allow_timer !== undefined && initialUser?.parent_allow_timer !== null) {
+      return Boolean(initialUser.parent_allow_timer);
+    }
+    return null;
+  });
+  const [draftAllowLeaderboard, setDraftAllowLeaderboard] = useState<boolean | null>(() => {
+    if (typeof window !== 'undefined' && studentId) {
+      const saved = localStorage.getItem(`groovelab_parent_allow_leaderboard_${studentId}`);
+      if (saved !== null) return saved === 'true';
+    }
+    if (initialUser?.parent_allow_leaderboard !== undefined && initialUser?.parent_allow_leaderboard !== null) {
+      return Boolean(initialUser.parent_allow_leaderboard);
+    }
+    return null;
+  });
+  const [draftAllowProposals, setDraftAllowProposals] = useState<boolean | null>(() => {
+    if (typeof window !== 'undefined' && studentId) {
+      const saved = localStorage.getItem(`groovelab_parent_allow_proposals_${studentId}`);
+      if (saved !== null) return saved === 'true';
+    }
+    if (initialUser?.parent_allow_proposals !== undefined && initialUser?.parent_allow_proposals !== null) {
+      return Boolean(initialUser.parent_allow_proposals);
+    }
+    return null;
+  });
+  const [draftAllowAudio, setDraftAllowAudio] = useState<boolean | null>(() => {
+    if (typeof window !== 'undefined' && studentId) {
+      const saved = localStorage.getItem(`groovelab_parent_allow_audio_${studentId}`);
+      if (saved !== null) return saved === 'true';
+    }
+    if (initialUser?.parent_allow_audio !== undefined && initialUser?.parent_allow_audio !== null) {
+      return Boolean(initialUser.parent_allow_audio);
+    }
+    return null;
+  });
+  const [draftAllowTts, setDraftAllowTts] = useState<boolean | null>(() => {
+    if (typeof window !== 'undefined' && studentId) {
+      const saved = localStorage.getItem(`groovelab_parent_allow_tts_${studentId}`);
+      if (saved !== null) return saved === 'true';
+    }
+    if (initialUser?.parent_allow_tts !== undefined && initialUser?.parent_allow_tts !== null) {
+      return Boolean(initialUser.parent_allow_tts);
+    }
+    return null;
+  });
   const [draftBoardOverrides, setDraftBoardOverrides] = useState<Record<string, boolean>>({});
   const [showSavePinModal, setShowSavePinModal] = useState<boolean>(false);
   const [savePinInput, setSavePinInput] = useState<string>('');
@@ -1078,25 +1147,25 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     const nextUiLevel = updates.uiLevel ?? draftUiLevel ?? (studentUser as any)?.campus_ui_level ?? (localStorage.getItem('campus_student_ui_level') || 'junior');
     const nextAllowAbsences = updates.allowAbsences !== undefined 
       ? updates.allowAbsences 
-      : (draftAllowAbsences !== null ? draftAllowAbsences : ((studentUser as any)?.parent_allow_absences !== undefined && (studentUser as any)?.parent_allow_absences !== null ? Boolean((studentUser as any)?.parent_allow_absences) : (nextUiLevel === 'pro')));
+      : (draftAllowAbsences !== null ? draftAllowAbsences : ((studentUser as any)?.parent_allow_absences !== undefined && (studentUser as any)?.parent_allow_absences !== null ? Boolean((studentUser as any)?.parent_allow_absences) : (studentId && typeof window !== 'undefined' && localStorage.getItem(`groovelab_parent_allow_absences_${studentId}`) !== null ? localStorage.getItem(`groovelab_parent_allow_absences_${studentId}`) === 'true' : (nextUiLevel === 'pro'))));
     const nextAllowChat = updates.allowChat !== undefined 
       ? updates.allowChat 
-      : (draftAllowChat !== null ? draftAllowChat : ((studentUser as any)?.parent_allow_chat !== undefined && (studentUser as any)?.parent_allow_chat !== null ? Boolean((studentUser as any)?.parent_allow_chat) : (nextUiLevel !== 'junior')));
+      : (draftAllowChat !== null ? draftAllowChat : ((studentUser as any)?.parent_allow_chat !== undefined && (studentUser as any)?.parent_allow_chat !== null ? Boolean((studentUser as any)?.parent_allow_chat) : (studentId && typeof window !== 'undefined' && localStorage.getItem(`groovelab_parent_allow_chat_${studentId}`) !== null ? localStorage.getItem(`groovelab_parent_allow_chat_${studentId}`) === 'true' : (nextUiLevel !== 'junior'))));
     const nextAllowTimer = updates.allowTimer !== undefined 
       ? updates.allowTimer 
-      : (draftAllowTimer !== null ? draftAllowTimer : ((studentUser as any)?.parent_allow_timer !== undefined && (studentUser as any)?.parent_allow_timer !== null ? Boolean((studentUser as any)?.parent_allow_timer) : true));
+      : (draftAllowTimer !== null ? draftAllowTimer : ((studentUser as any)?.parent_allow_timer !== undefined && (studentUser as any)?.parent_allow_timer !== null ? Boolean((studentUser as any)?.parent_allow_timer) : (studentId && typeof window !== 'undefined' && localStorage.getItem(`groovelab_parent_allow_timer_${studentId}`) !== null ? localStorage.getItem(`groovelab_parent_allow_timer_${studentId}`) === 'true' : true)));
     const nextAllowLeaderboard = updates.allowLeaderboard !== undefined 
       ? updates.allowLeaderboard 
-      : (draftAllowLeaderboard !== null ? draftAllowLeaderboard : ((studentUser as any)?.parent_allow_leaderboard !== undefined && (studentUser as any)?.parent_allow_leaderboard !== null ? Boolean((studentUser as any)?.parent_allow_leaderboard) : (nextUiLevel !== 'junior')));
+      : (draftAllowLeaderboard !== null ? draftAllowLeaderboard : ((studentUser as any)?.parent_allow_leaderboard !== undefined && (studentUser as any)?.parent_allow_leaderboard !== null ? Boolean((studentUser as any)?.parent_allow_leaderboard) : (studentId && typeof window !== 'undefined' && localStorage.getItem(`groovelab_parent_allow_leaderboard_${studentId}`) !== null ? localStorage.getItem(`groovelab_parent_allow_leaderboard_${studentId}`) === 'true' : (nextUiLevel !== 'junior'))));
     const nextAllowProposals = updates.allowProposals !== undefined 
       ? updates.allowProposals 
-      : (draftAllowProposals !== null ? draftAllowProposals : ((studentUser as any)?.parent_allow_proposals !== undefined && (studentUser as any)?.parent_allow_proposals !== null ? Boolean((studentUser as any)?.parent_allow_proposals) : (nextUiLevel !== 'junior')));
+      : (draftAllowProposals !== null ? draftAllowProposals : ((studentUser as any)?.parent_allow_proposals !== undefined && (studentUser as any)?.parent_allow_proposals !== null ? Boolean((studentUser as any)?.parent_allow_proposals) : (studentId && typeof window !== 'undefined' && localStorage.getItem(`groovelab_parent_allow_proposals_${studentId}`) !== null ? localStorage.getItem(`groovelab_parent_allow_proposals_${studentId}`) === 'true' : (nextUiLevel !== 'junior'))));
     const nextAllowAudio = updates.allowAudio !== undefined 
       ? updates.allowAudio 
-      : (draftAllowAudio !== null ? draftAllowAudio : ((studentUser as any)?.parent_allow_audio !== undefined && (studentUser as any)?.parent_allow_audio !== null ? Boolean((studentUser as any)?.parent_allow_audio) : true));
+      : (draftAllowAudio !== null ? draftAllowAudio : ((studentUser as any)?.parent_allow_audio !== undefined && (studentUser as any)?.parent_allow_audio !== null ? Boolean((studentUser as any)?.parent_allow_audio) : (studentId && typeof window !== 'undefined' && localStorage.getItem(`groovelab_parent_allow_audio_${studentId}`) !== null ? localStorage.getItem(`groovelab_parent_allow_audio_${studentId}`) === 'true' : true)));
     const nextAllowTts = updates.allowTts !== undefined 
       ? updates.allowTts 
-      : (draftAllowTts !== null ? draftAllowTts : ((studentUser as any)?.parent_allow_tts !== undefined && (studentUser as any)?.parent_allow_tts !== null ? Boolean((studentUser as any)?.parent_allow_tts) : (nextUiLevel === 'junior')));
+      : (draftAllowTts !== null ? draftAllowTts : ((studentUser as any)?.parent_allow_tts !== undefined && (studentUser as any)?.parent_allow_tts !== null ? Boolean((studentUser as any)?.parent_allow_tts) : (studentId && typeof window !== 'undefined' && localStorage.getItem(`groovelab_parent_allow_tts_${studentId}`) !== null ? localStorage.getItem(`groovelab_parent_allow_tts_${studentId}`) === 'true' : (nextUiLevel === 'junior'))));
     const nextOverrides = {
       ...((studentUser as any)?.parent_permissions?.board_overrides || {}),
       ...draftBoardOverrides,
@@ -1125,6 +1194,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       setDraftAllowTimer(updates.allowTimer);
       localStorage.setItem('campus_allow_timer', String(updates.allowTimer));
       localStorage.setItem('campus_board_override_practice_board', String(updates.allowTimer));
+      if (studentId) localStorage.setItem(`groovelab_parent_allow_timer_${studentId}`, String(updates.allowTimer));
       window.dispatchEvent(new CustomEvent('campus_board_permission_changed', { detail: { boardId: 'practice_board', allowed: updates.allowTimer } }));
     }
     if (updates.allowLeaderboard !== undefined) {
@@ -1138,12 +1208,14 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       setDraftAllowProposals(updates.allowProposals);
       localStorage.setItem('campus_allow_proposals', String(updates.allowProposals));
       localStorage.setItem('campus_board_override_mediathek', String(updates.allowProposals));
+      if (studentId) localStorage.setItem(`groovelab_parent_allow_proposals_${studentId}`, String(updates.allowProposals));
       window.dispatchEvent(new CustomEvent('campus_board_permission_changed', { detail: { boardId: 'mediathek', allowed: updates.allowProposals } }));
     }
     if (updates.allowAudio !== undefined) {
       setDraftAllowAudio(updates.allowAudio);
       localStorage.setItem('campus_allow_audio', String(updates.allowAudio));
       localStorage.setItem('campus_board_override_recordings', String(updates.allowAudio));
+      if (studentId) localStorage.setItem(`groovelab_parent_allow_audio_${studentId}`, String(updates.allowAudio));
       window.dispatchEvent(new CustomEvent('campus_board_permission_changed', { detail: { boardId: 'recordings', allowed: updates.allowAudio } }));
     }
     if (updates.allowTts !== undefined) {
@@ -1160,7 +1232,8 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
 
     const nextPermissions = {
       ...((studentUser as any)?.parent_permissions || {}),
-      board_overrides: nextOverrides
+      board_overrides: nextOverrides,
+      parent_allow_tts: nextAllowTts
     };
 
     const payload: any = {
@@ -1171,12 +1244,20 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       parent_allow_leaderboard: nextAllowLeaderboard,
       parent_allow_proposals: nextAllowProposals,
       parent_allow_audio: nextAllowAudio,
-      parent_allow_tts: nextAllowTts,
       parent_permissions: nextPermissions
     };
 
     // Update in-memory React state immediately for snappy UI
-    setStudentUser((prev: any) => prev ? { ...prev, ...payload } : prev);
+    setStudentUser((prev: any) => prev ? { ...prev, ...payload, parent_allow_tts: nextAllowTts } : prev);
+
+    // Propagate to App.tsx root user state so initialUser is 100% synchronized!
+    if (onProfileUpdate) {
+      try {
+        onProfileUpdate({ ...payload, parent_allow_tts: nextAllowTts });
+      } catch (e) {
+        console.warn('Could not propagate profile update to root:', e);
+      }
+    }
 
     try {
       const { error: userErr } = await supabase.from('users').update(payload).eq('id', studentId);
@@ -1189,8 +1270,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
           parent_allow_timer: nextAllowTimer,
           parent_allow_leaderboard: nextAllowLeaderboard,
           parent_allow_proposals: nextAllowProposals,
-          parent_allow_audio: nextAllowAudio,
-          parent_allow_tts: nextAllowTts
+          parent_allow_audio: nextAllowAudio
         };
         await supabase.from('users').update(fallbackPayload).eq('id', studentId);
       }
@@ -2490,23 +2570,20 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       const cleanInput = inputPin.trim();
       let isMatch = false;
 
+      // 1. Cached parent pin
       const cachedParentPin = localStorage.getItem(`groovelab_parent_pin_${studentId}`);
-      const cachedUserPin = localStorage.getItem(`groovelab_user_pin_${studentId}`);
-      const cachedStudentPin = localStorage.getItem(`groovelab_student_pin_${studentId}`);
-      if ((cachedParentPin && cachedParentPin === cleanInput) ||
-          (cachedUserPin && cachedUserPin === cleanInput) ||
-          (cachedStudentPin && cachedStudentPin === cleanInput)) {
+      if (cachedParentPin && cachedParentPin === cleanInput) {
         isMatch = true;
       }
 
-      if (!isMatch && studentUser) {
-        if (studentUser.parent_pin && String(studentUser.parent_pin).trim() === cleanInput) {
-          isMatch = true;
-        } else if (studentUser.personal_pin && String(studentUser.personal_pin).trim() === cleanInput) {
+      // 2. In-memory parent pin
+      if (!isMatch && studentUser?.parent_pin) {
+        if (String(studentUser.parent_pin).trim() === cleanInput) {
           isMatch = true;
         }
       }
 
+      // 3. Supabase RPC verify_parent_pin
       if (!isMatch && studentId) {
         try {
           const { data: parentOk } = await supabase.rpc('verify_parent_pin', {
@@ -2517,26 +2594,15 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
         } catch (e) {}
       }
 
-      if (!isMatch && studentId) {
-        try {
-          const { data: personalOk } = await supabase.rpc('verify_personal_pin', {
-            user_uuid: studentId,
-            input_pin: cleanInput
-          });
-          if (personalOk === true) isMatch = true;
-        } catch (e) {}
-      }
-
+      // 4. Fallback parent_pin in database
       if (!isMatch && studentId) {
         const { data: uData } = await supabase
           .from('users')
-          .select('parent_pin, personal_pin, onboarding_pin')
+          .select('parent_pin')
           .eq('id', studentId)
           .maybeSingle();
-        if (uData) {
-          if (String(uData.parent_pin || '').trim() === cleanInput || 
-              String(uData.personal_pin || '').trim() === cleanInput ||
-              String(uData.onboarding_pin || '').trim() === cleanInput) {
+        if (uData && uData.parent_pin) {
+          if (String(uData.parent_pin).trim() === cleanInput) {
             isMatch = true;
           }
         }
@@ -23077,13 +23143,13 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                           const currentLvlKey = (draftUiLevel ?? (studentUser as any)?.campus_ui_level ?? (localStorage.getItem('campus_student_ui_level') || 'junior')) as 'junior' | 'teen' | 'pro';
                           const standard = CAMPUS_AGE_STANDARDS[currentLvlKey] || CAMPUS_AGE_STANDARDS.junior;
 
-                          const curAbsences = draftAllowAbsences !== null ? draftAllowAbsences : ((studentUser as any)?.parent_allow_absences !== undefined && (studentUser as any)?.parent_allow_absences !== null ? Boolean((studentUser as any)?.parent_allow_absences) : (currentLvlKey === 'pro'));
-                          const curChat = draftAllowChat ?? (studentUser as any)?.parent_allow_chat ?? (currentLvlKey !== 'junior');
-                          const curTimer = draftAllowTimer ?? (studentUser as any)?.parent_allow_timer ?? true;
-                          const curLeaderboard = draftAllowLeaderboard ?? (studentUser as any)?.parent_allow_leaderboard ?? (currentLvlKey !== 'junior');
-                          const curProposals = draftAllowProposals ?? (studentUser as any)?.parent_allow_proposals ?? (draftBoardOverrides.mediathek ?? (currentLvlKey !== 'junior'));
-                          const curAudio = draftAllowAudio ?? (studentUser as any)?.parent_allow_audio ?? (draftBoardOverrides.recordings ?? true);
-                          const curTts = draftAllowTts ?? (studentUser as any)?.parent_allow_tts ?? (currentLvlKey === 'junior');
+                          const curAbsences = draftAllowAbsences !== null ? draftAllowAbsences : ((studentUser as any)?.parent_allow_absences !== undefined && (studentUser as any)?.parent_allow_absences !== null ? Boolean((studentUser as any)?.parent_allow_absences) : (studentId && typeof window !== 'undefined' && localStorage.getItem(`groovelab_parent_allow_absences_${studentId}`) !== null ? localStorage.getItem(`groovelab_parent_allow_absences_${studentId}`) === 'true' : (currentLvlKey === 'pro')));
+                          const curChat = draftAllowChat !== null ? draftAllowChat : ((studentUser as any)?.parent_allow_chat !== undefined && (studentUser as any)?.parent_allow_chat !== null ? Boolean((studentUser as any)?.parent_allow_chat) : (studentId && typeof window !== 'undefined' && localStorage.getItem(`groovelab_parent_allow_chat_${studentId}`) !== null ? localStorage.getItem(`groovelab_parent_allow_chat_${studentId}`) === 'true' : (currentLvlKey !== 'junior')));
+                          const curTimer = draftAllowTimer !== null ? draftAllowTimer : ((studentUser as any)?.parent_allow_timer !== undefined && (studentUser as any)?.parent_allow_timer !== null ? Boolean((studentUser as any)?.parent_allow_timer) : (studentId && typeof window !== 'undefined' && localStorage.getItem(`groovelab_parent_allow_timer_${studentId}`) !== null ? localStorage.getItem(`groovelab_parent_allow_timer_${studentId}`) === 'true' : true));
+                          const curLeaderboard = draftAllowLeaderboard !== null ? draftAllowLeaderboard : ((studentUser as any)?.parent_allow_leaderboard !== undefined && (studentUser as any)?.parent_allow_leaderboard !== null ? Boolean((studentUser as any)?.parent_allow_leaderboard) : (studentId && typeof window !== 'undefined' && localStorage.getItem(`groovelab_parent_allow_leaderboard_${studentId}`) !== null ? localStorage.getItem(`groovelab_parent_allow_leaderboard_${studentId}`) === 'true' : (currentLvlKey !== 'junior')));
+                          const curProposals = draftAllowProposals !== null ? draftAllowProposals : ((studentUser as any)?.parent_allow_proposals !== undefined && (studentUser as any)?.parent_allow_proposals !== null ? Boolean((studentUser as any)?.parent_allow_proposals) : (studentId && typeof window !== 'undefined' && localStorage.getItem(`groovelab_parent_allow_proposals_${studentId}`) !== null ? localStorage.getItem(`groovelab_parent_allow_proposals_${studentId}`) === 'true' : (draftBoardOverrides.mediathek ?? (currentLvlKey !== 'junior'))));
+                          const curAudio = draftAllowAudio !== null ? draftAllowAudio : ((studentUser as any)?.parent_allow_audio !== undefined && (studentUser as any)?.parent_allow_audio !== null ? Boolean((studentUser as any)?.parent_allow_audio) : (studentId && typeof window !== 'undefined' && localStorage.getItem(`groovelab_parent_allow_audio_${studentId}`) !== null ? localStorage.getItem(`groovelab_parent_allow_audio_${studentId}`) === 'true' : (draftBoardOverrides.recordings ?? true)));
+                          const curTts = draftAllowTts !== null ? draftAllowTts : ((studentUser as any)?.parent_allow_tts !== undefined && (studentUser as any)?.parent_allow_tts !== null ? Boolean((studentUser as any)?.parent_allow_tts) : (studentId && typeof window !== 'undefined' && localStorage.getItem(`groovelab_parent_allow_tts_${studentId}`) !== null ? localStorage.getItem(`groovelab_parent_allow_tts_${studentId}`) === 'true' : (currentLvlKey === 'junior')));
 
                           const isDeviating = 
                             curAbsences !== standard.allowAbsences ||

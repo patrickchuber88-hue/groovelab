@@ -511,23 +511,20 @@ export function CampusDirectMessages({
       const cleanInput = inputPin.trim();
       let isMatch = false;
 
+      // 1. Cached parent pin
       const cachedParentPin = localStorage.getItem(`groovelab_parent_pin_${user?.id}`);
-      const cachedUserPin = localStorage.getItem(`groovelab_user_pin_${user?.id}`);
-      const cachedStudentPin = localStorage.getItem(`groovelab_student_pin_${user?.id}`);
-      if ((cachedParentPin && cachedParentPin === cleanInput) ||
-          (cachedUserPin && cachedUserPin === cleanInput) ||
-          (cachedStudentPin && cachedStudentPin === cleanInput)) {
+      if (cachedParentPin && cachedParentPin === cleanInput) {
         isMatch = true;
       }
 
-      if (!isMatch && user) {
-        if (user.parent_pin && String(user.parent_pin).trim() === cleanInput) {
-          isMatch = true;
-        } else if (user.personal_pin && String(user.personal_pin).trim() === cleanInput) {
+      // 2. In-memory parent pin
+      if (!isMatch && user?.parent_pin) {
+        if (String(user.parent_pin).trim() === cleanInput) {
           isMatch = true;
         }
       }
 
+      // 3. Supabase RPC verify_parent_pin
       if (!isMatch && user?.id) {
         try {
           const { data: parentOk } = await supabase.rpc('verify_parent_pin', {
@@ -538,26 +535,15 @@ export function CampusDirectMessages({
         } catch (e) {}
       }
 
-      if (!isMatch && user?.id) {
-        try {
-          const { data: personalOk } = await supabase.rpc('verify_personal_pin', {
-            user_uuid: user.id,
-            input_pin: cleanInput
-          });
-          if (personalOk === true) isMatch = true;
-        } catch (e) {}
-      }
-
+      // 4. Fallback parent_pin in database
       if (!isMatch && user?.id) {
         const { data: uData } = await supabase
           .from('users')
-          .select('parent_pin, personal_pin, onboarding_pin')
+          .select('parent_pin')
           .eq('id', user.id)
           .maybeSingle();
-        if (uData) {
-          if (String(uData.parent_pin || '').trim() === cleanInput || 
-              String(uData.personal_pin || '').trim() === cleanInput ||
-              String(uData.onboarding_pin || '').trim() === cleanInput) {
+        if (uData && uData.parent_pin) {
+          if (String(uData.parent_pin).trim() === cleanInput) {
             isMatch = true;
           }
         }

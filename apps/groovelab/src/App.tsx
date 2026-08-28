@@ -9217,6 +9217,41 @@ function App() {
             </div>
           </button>
 
+          {/* Leitfäden & Akademie Button */}
+          <button 
+            type="button"
+            onClick={() => setIsGlobalHelpCenterOpen(true)}
+            style={{ 
+              width: '100%', 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center',
+              gap: '8px', 
+              padding: '12px 14px', 
+              borderRadius: '14px', 
+              border: '1px solid #e2e8f0', 
+              background: '#f8fafc', 
+              color: '#334155', 
+              fontWeight: 800, 
+              fontSize: '0.82rem',
+              cursor: 'pointer',
+              boxShadow: '0 2px 6px rgba(0,0,0,0.02)',
+              transition: 'all 0.2s ease'
+            }}
+            className="hover-scale"
+            title="Leitfäden & Akademie öffnen"
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = '#f1f5f9';
+              e.currentTarget.style.color = '#0f172a';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = '#f8fafc';
+              e.currentTarget.style.color = '#334155';
+            }}
+          >
+            <BookOpen size={16} color="#64748b" /> Leitfäden &amp; Akademie
+          </button>
+
           {/* Ausweis button */}
           {(user?.qr_token || user?.teacher_qr_token) && (() => {
             const isPureAdminOrSec = (user?.role === 'admin' || user?.role === 'secretary') && (!user?.roles || !user.roles.includes('teacher'));
@@ -9859,39 +9894,6 @@ function App() {
                   </div>
                 </div>
               )}
-              {/* Leitfäden & Akademie Button */}
-              <button 
-                onClick={() => setIsGlobalHelpCenterOpen(true)}
-                style={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  gap: '6px',
-                  height: windowWidth <= 768 ? '36px' : '40px', 
-                  padding: windowWidth <= 1024 ? '0 10px' : '0 14px',
-                  borderRadius: '12px', 
-                  background: '#f8fafc', 
-                  border: '1px solid #e2e8f0', 
-                  color: '#475569', 
-                  fontWeight: 750,
-                  fontSize: '0.78rem',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s ease',
-                  flexShrink: 0
-                }}
-                className="hover-scale"
-                title="Leitfäden & Akademie öffnen"
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = '#f1f5f9';
-                  e.currentTarget.style.color = '#0f172a';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = '#f8fafc';
-                  e.currentTarget.style.color = '#475569';
-                }}
-              >
-                <BookOpen size={15} />
-                {windowWidth > 1024 && <span>Hilfe & Guides</span>}
-              </button>
 
               {/* Must-Have 2b: Sibling / Family Quick-Switch Capsule in Header (Only when Parent Session is Active) */}
               {user?.role?.toLowerCase() === 'student' && activePlatform === 'campus' && (() => {

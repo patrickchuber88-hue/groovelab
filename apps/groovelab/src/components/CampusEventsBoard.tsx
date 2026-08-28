@@ -470,25 +470,20 @@ export function CampusEventsBoard({
       let isMatch = false;
 
       // 1. LocalStorage cached PINs
+      // 1. Cached parent pin
       const cachedParentPin = localStorage.getItem(`groovelab_parent_pin_${userId}`);
-      const cachedUserPin = localStorage.getItem(`groovelab_user_pin_${userId}`);
-      const cachedStudentPin = localStorage.getItem(`groovelab_student_pin_${userId}`);
-      if ((cachedParentPin && cachedParentPin === cleanInput) ||
-          (cachedUserPin && cachedUserPin === cleanInput) ||
-          (cachedStudentPin && cachedStudentPin === cleanInput)) {
+      if (cachedParentPin && cachedParentPin === cleanInput) {
         isMatch = true;
       }
 
       // 2. Direct studentUser prop check
-      if (!isMatch && studentUser) {
-        if (studentUser.parent_pin && String(studentUser.parent_pin).trim() === cleanInput) {
-          isMatch = true;
-        } else if (studentUser.personal_pin && String(studentUser.personal_pin).trim() === cleanInput) {
+      if (!isMatch && studentUser?.parent_pin) {
+        if (String(studentUser.parent_pin).trim() === cleanInput) {
           isMatch = true;
         }
       }
 
-      // 3. Supabase RPC verify_parent_pin or verify_personal_pin
+      // 3. Supabase RPC verify_parent_pin
       if (!isMatch) {
         try {
           const { data: parentOk } = await supabase.rpc('verify_parent_pin', {
@@ -499,27 +494,15 @@ export function CampusEventsBoard({
         } catch (e) {}
       }
 
-      if (!isMatch) {
-        try {
-          const { data: personalOk } = await supabase.rpc('verify_personal_pin', {
-            user_uuid: userId,
-            input_pin: cleanInput
-          });
-          if (personalOk === true) isMatch = true;
-        } catch (e) {}
-      }
-
       // 4. Fallback users table query
       if (!isMatch) {
         const { data: uData } = await supabase
           .from('users')
-          .select('parent_pin, personal_pin, onboarding_pin')
+          .select('parent_pin')
           .eq('id', userId)
           .maybeSingle();
-        if (uData) {
-          if (String(uData.parent_pin || '').trim() === cleanInput || 
-              String(uData.personal_pin || '').trim() === cleanInput ||
-              String(uData.onboarding_pin || '').trim() === cleanInput) {
+        if (uData && uData.parent_pin) {
+          if (String(uData.parent_pin).trim() === cleanInput) {
             isMatch = true;
           }
         }

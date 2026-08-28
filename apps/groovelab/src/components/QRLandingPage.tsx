@@ -204,6 +204,8 @@ interface ProfileData {
   parent_allow_leaderboard?: boolean;
   parent_allow_groups?: boolean;
   parent_allow_proposals?: boolean;
+  parent_allow_audio?: boolean;
+  parent_permissions?: any;
   campus_ui_level?: 'junior' | 'teen' | 'pro' | string;
   streak_flame?: number;
   total_practice_minutes?: number;
@@ -1229,7 +1231,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         // Vorab Namen des Schülers/Lehrers/Admins holen
         const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(token);
         const upperToken = token.toUpperCase();
-        const selectFields = 'id, first_name, last_name, role, roles, school_id, teacher_id, is_campus_active, is_groovelab_active, app_usage_mode, joker_used_at, weekly_jokers_used, created_at, is_pin_activated, personal_pin, parent_pin, instrument, photo_url, is_trial, trial_ends_at, exempt_from_direct_billing, has_parent_pin, pin_enforced_for_preview, parent_allow_absences, parent_allow_chat, parent_allow_timer, parent_allow_leaderboard, parent_allow_groups, parent_allow_proposals, campus_ui_level';
+        const selectFields = 'id, first_name, last_name, role, roles, school_id, teacher_id, is_campus_active, is_groovelab_active, app_usage_mode, joker_used_at, created_at, is_pin_activated, personal_pin, parent_pin, instrument, photo_url, is_trial, trial_ends_at, exempt_from_direct_billing, has_parent_pin, pin_enforced_for_preview, parent_allow_absences, parent_allow_chat, parent_allow_timer, parent_allow_leaderboard, parent_allow_groups, parent_allow_proposals, parent_allow_audio, parent_permissions, campus_ui_level';
         const minimalFields = 'id, first_name, last_name, role, school_id, is_campus_active, is_groovelab_active, is_pin_activated, has_parent_pin';
 
         let userData: any = null;
@@ -1438,6 +1440,8 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           parent_allow_leaderboard: userData.parent_allow_leaderboard !== undefined && userData.parent_allow_leaderboard !== null ? Boolean(userData.parent_allow_leaderboard) : false,
           parent_allow_groups: userData.parent_allow_groups !== undefined && userData.parent_allow_groups !== null ? Boolean(userData.parent_allow_groups) : false,
           parent_allow_proposals: userData.parent_allow_proposals !== undefined && userData.parent_allow_proposals !== null ? Boolean(userData.parent_allow_proposals) : false,
+          parent_allow_audio: userData.parent_allow_audio !== undefined && userData.parent_allow_audio !== null ? Boolean(userData.parent_allow_audio) : true,
+          parent_permissions: userData.parent_permissions || null,
           campus_ui_level: userData.campus_ui_level || localStorage.getItem('campus_student_ui_level') || 'junior'
         });
 
@@ -6077,10 +6081,28 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
     }
 
     // 2. Unlocked Control Center with Draft Changes & Step-Up PIN Confirmation
-    const effectiveUiLevel = draftUiLevel ?? profile?.campus_ui_level ?? 'junior';
-    const effectiveAllowAbsences = draftAllowAbsences !== null ? draftAllowAbsences : (profile?.parent_allow_absences !== undefined && profile?.parent_allow_absences !== null ? Boolean(profile.parent_allow_absences) : false);
-    const effectiveAllowChat = draftAllowChat !== null ? draftAllowChat : (profile?.parent_allow_chat !== undefined && profile?.parent_allow_chat !== null ? Boolean(profile.parent_allow_chat) : (effectiveUiLevel !== 'junior'));
-    const effectiveAllowLeaderboard = draftAllowLeaderboard !== null ? draftAllowLeaderboard : (profile?.parent_allow_leaderboard !== undefined && profile?.parent_allow_leaderboard !== null ? Boolean(profile.parent_allow_leaderboard) : false);
+    const effectiveUiLevel = draftUiLevel ?? profile?.campus_ui_level ?? (typeof window !== 'undefined' ? localStorage.getItem('campus_student_ui_level') || 'junior' : 'junior');
+    const effectiveAllowAbsences = draftAllowAbsences !== null 
+      ? draftAllowAbsences 
+      : (profile?.parent_allow_absences !== undefined && profile?.parent_allow_absences !== null 
+        ? Boolean(profile.parent_allow_absences) 
+        : (profile?.id && typeof window !== 'undefined' && localStorage.getItem(`groovelab_parent_allow_absences_${profile.id}`) !== null 
+          ? localStorage.getItem(`groovelab_parent_allow_absences_${profile.id}`) === 'true' 
+          : false));
+    const effectiveAllowChat = draftAllowChat !== null 
+      ? draftAllowChat 
+      : (profile?.parent_allow_chat !== undefined && profile?.parent_allow_chat !== null 
+        ? Boolean(profile.parent_allow_chat) 
+        : (profile?.id && typeof window !== 'undefined' && localStorage.getItem(`groovelab_parent_allow_chat_${profile.id}`) !== null 
+          ? localStorage.getItem(`groovelab_parent_allow_chat_${profile.id}`) === 'true' 
+          : (effectiveUiLevel !== 'junior')));
+    const effectiveAllowLeaderboard = draftAllowLeaderboard !== null 
+      ? draftAllowLeaderboard 
+      : (profile?.parent_allow_leaderboard !== undefined && profile?.parent_allow_leaderboard !== null 
+        ? Boolean(profile.parent_allow_leaderboard) 
+        : (profile?.id && typeof window !== 'undefined' && localStorage.getItem(`groovelab_parent_allow_leaderboard_${profile.id}`) !== null 
+          ? localStorage.getItem(`groovelab_parent_allow_leaderboard_${profile.id}`) === 'true' 
+          : false));
 
     const hasUnsavedSettings = Boolean(
       (draftUiLevel !== null && draftUiLevel !== (profile?.campus_ui_level ?? 'junior')) ||

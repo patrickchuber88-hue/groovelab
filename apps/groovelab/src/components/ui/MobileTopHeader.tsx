@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { GraduationCap, Music, Bell, Cloud, CloudOff, RefreshCw, User, BookOpen } from 'lucide-react';
+import { GraduationCap, Music, Bell, Cloud, CloudOff, RefreshCw, User } from 'lucide-react';
 import { subscribePendingOfflineCount, flushOfflineSyncQueue } from '../../services/offlineSyncService';
 
 interface MobileTopHeaderProps {
@@ -253,32 +253,6 @@ export const MobileTopHeader: React.FC<MobileTopHeaderProps> = ({
             )}
           </button>
         )}
-
-        {/* Leitfäden & Akademie Button */}
-        <button
-          type="button"
-          onClick={() => {
-            window.dispatchEvent(new CustomEvent('campus_open_help_center'));
-          }}
-          style={{
-            width: '38px',
-            height: '38px',
-            minWidth: '38px',
-            minHeight: '38px',
-            borderRadius: '50%',
-            background: 'rgba(241, 245, 249, 0.9)',
-            border: 'none',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: '#475569',
-            cursor: 'pointer',
-            touchAction: 'manipulation'
-          }}
-          title="Leitfäden & Akademie"
-        >
-          <BookOpen size={17} />
-        </button>
 
         {/* Unread Notifications Bell */}
         <div style={{ position: 'relative' }}>

@@ -50,6 +50,10 @@ export const AudioMemoRecorder: React.FC<AudioMemoRecorderProps> = ({
   }, [audioUrl, stopHardwareStream]);
 
   const startRecording = async () => {
+    if (user?.parent_allow_audio === false) {
+      setErrorMsg('Sprachaufnahmen wurden von den Erziehungsberechtigten deaktiviert.');
+      return;
+    }
     if (!hasTresor) return;
     setErrorMsg(null);
     try {
