@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { Smartphone, Monitor, Check, ArrowRight, Loader2, AlertTriangle, Share2, Tablet } from 'lucide-react';
+import { SmartAppInstallPrompt } from './ui/SmartAppInstallPrompt';
 
 interface DeviceOnboardingPageProps {
   token: string;
@@ -586,37 +587,11 @@ export const DeviceOnboardingPage: React.FC<DeviceOnboardingPageProps> = ({ toke
         </div>
 
         {/* PWA / App Installation Guidance */}
-        <div id="pwa-install-guide" style={{ 
-          background: 'rgba(255, 255, 255, 0.02)', 
-          border: '1px solid rgba(255, 255, 255, 0.06)', 
-          borderRadius: '24px', 
-          padding: '24px', 
-          display: 'flex', 
-          flexDirection: 'column', 
-          gap: '16px', 
-          transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)' 
-        }}>
-          <h3 style={{ fontSize: '0.95rem', fontWeight: 700, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '8px', margin: '0', letterSpacing: '-0.015em' }}>
-            <Smartphone size={18} color="#facc15" /> Campus-Groovelab App installieren
-          </h3>
-          <p style={{ fontSize: '0.82rem', color: 'rgba(255, 255, 255, 0.55)', margin: '0', lineHeight: 1.45 }}>
-            Installiere die App auf diesem iPad für schnellen Zugriff und verlässlichen Vollbildmodus:
-          </p>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '0.8rem', marginTop: '4px' }}>
-            <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
-              <span style={{ background: 'rgba(250, 204, 21, 0.1)', color: '#facc15', borderRadius: '50%', width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontWeight: 700, fontSize: '0.72rem' }}>1</span>
-              <div style={{ color: 'rgba(255, 255, 255, 0.65)' }}>
-                <span style={{ fontWeight: 650, color: '#ffffff' }}>iOS (Safari):</span> Tippe auf das Teilen-Symbol <Share2 size={13} style={{ display: 'inline', verticalAlign: 'middle', margin: '0 2px', color: '#facc15' }} /> und wähle <span style={{ fontWeight: 650, color: '#ffffff' }}>"Zum Home-Bildschirm"</span>.
-              </div>
-            </div>
-            <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
-              <span style={{ background: 'rgba(250, 204, 21, 0.1)', color: '#facc15', borderRadius: '50%', width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontWeight: 700, fontSize: '0.72rem' }}>2</span>
-              <div style={{ color: 'rgba(255, 255, 255, 0.65)' }}>
-                <span style={{ fontWeight: 650, color: '#ffffff' }}>Android (Chrome):</span> Tippe auf die drei Punkte oben rechts und wähle <span style={{ fontWeight: 650, color: '#ffffff' }}>"App installieren"</span>.
-              </div>
-            </div>
-          </div>
+        <div id="pwa-install-guide" style={{ width: '100%' }}>
+          <SmartAppInstallPrompt 
+            appName="Campus-Groovelab" 
+            isCampus={false} 
+          />
         </div>
 
       </div>

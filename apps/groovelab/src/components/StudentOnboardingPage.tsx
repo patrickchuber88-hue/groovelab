@@ -5,6 +5,8 @@ import QRCode from 'react-qr-code';
 import { getInstrumentAvatarUrl, getDefaultMusicianAvatarUrl } from './StudioAvatar';
 import { StudentMobileScheduleWizard } from './StudentMobileScheduleWizard';
 import { IDBadgeCard } from './IDBadgeCard';
+import { downloadAppleWalletPass } from '../utils/walletPassGenerator';
+import { SmartAppInstallPrompt } from './ui/SmartAppInstallPrompt';
 
 interface StudentOnboardingPageProps {
   token: string;
@@ -296,6 +298,22 @@ export const StudentOnboardingPage: React.FC<StudentOnboardingPageProps> = ({ to
       }
       setShowNotification(false);
     }
+  };
+
+  const handleAppleWalletPassDownload = () => {
+    if (!student) return;
+    const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams();
+    const platformParam = urlParams.get('platform');
+    const isCampusMode = platformParam === 'campus' || (platformParam !== 'groovelab' && student.is_campus_active && !student.is_groovelab_active);
+    
+    downloadAppleWalletPass({
+      schoolName: school?.name || 'Campus-Groovelab',
+      userName: `${student.first_name || ''} ${student.last_name || ''}`.trim() || 'Schüler',
+      userRole: 'Schüler',
+      instrument: student.instrument || 'Instrument',
+      qrToken: student.qr_token || student.id,
+      isCampus: Boolean(isCampusMode)
+    });
   };
 
   const handleDownloadJPEG = () => {
@@ -807,31 +825,31 @@ Deine Vorteile auf einen Blick:
               gap: '6px' 
             }}
           >
-            🏷️ Noten-Sticker
+            Noten-Sticker
           </button>
         </div>
 
         {/* 4. Wallet Buttons */}
         <div style={{ display: 'flex', gap: '8px' }}>
           <button 
-            onClick={() => setWalletGuide(walletGuide === 'apple' ? null : 'apple')}
+            onClick={handleAppleWalletPassDownload}
             style={{ 
               flex: 1, 
               background: '#000000', 
               color: '#ffffff', 
               border: 'none', 
               borderRadius: '12px', 
-              padding: '8px', 
-              fontSize: '0.72rem', 
+              padding: '9px 12px', 
+              fontSize: '0.74rem', 
               fontWeight: 800, 
               cursor: 'pointer', 
               display: 'flex', 
               alignItems: 'center', 
               justifyContent: 'center', 
-              gap: '4px'
+              gap: '6px'
             }}
           >
-            <span></span> Apple Wallet
+            <Download size={13} /> <span>Apple Wallet Pass</span>
           </button>
 
           <button 
@@ -842,21 +860,29 @@ Deine Vorteile auf einen Blick:
               color: '#ffffff', 
               border: 'none', 
               borderRadius: '12px', 
-              padding: '8px', 
-              fontSize: '0.72rem', 
+              padding: '9px 12px', 
+              fontSize: '0.74rem', 
               fontWeight: 800, 
               cursor: 'pointer', 
               display: 'flex', 
               alignItems: 'center', 
               justifyContent: 'center', 
-              gap: '4px'
+              gap: '6px'
             }}
           >
             <span>Google Wallet</span>
           </button>
         </div>
 
-        {/* 5. WhatsApp/E-Mail Teilen */}
+        {/* 5. Smart App Install Prompt (PWA / Home Screen Guide) */}
+        <div style={{ marginTop: '2px', width: '100%' }}>
+          <SmartAppInstallPrompt 
+            appName={isCampus ? 'Campus-Groovelab' : 'GrooveLab'} 
+            isCampus={isCampus} 
+          />
+        </div>
+
+        {/* 6. WhatsApp/E-Mail Teilen */}
         <button 
           onClick={handleCopyLink} 
           style={{ 
@@ -879,7 +905,7 @@ Deine Vorteile auf einen Blick:
           {copied ? 'WhatsApp/E-Mail Einladung kopiert!' : 'Zugangs-Link kopieren'}
         </button>
 
-        {/* 6. Login Button */}
+        {/* 7. Login Button */}
         <button 
           onClick={() => window.location.replace(`/login?platform=${isCampus ? 'campus' : 'groovelab'}`)}
           style={{ 

@@ -566,6 +566,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
   const [isCameraActive, setIsCameraActive] = useState(true);
   const [cameraHasError, setCameraHasError] = useState(false);
   const [scanSuccess, setScanSuccess] = useState(false);
+  const qrFileInputRef = useRef<HTMLInputElement>(null);
 
   // Biometric Vault States
   const [biometricProfiles, setBiometricProfiles] = useState<BiometricVaultProfile[]>([]);
@@ -3229,35 +3230,48 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
     reader.onload = (event) => {
       const img = new Image();
       img.onload = async () => {
-        const canvas = document.createElement('canvas');
-        canvas.width = img.width;
-        canvas.height = img.height;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) {
-          setError('Canvas-Kontext konnte nicht erstellt werden.');
-          setLoading(false);
-          return;
-        }
-        ctx.drawImage(img, 0, 0, img.width, img.height);
-        const imageData = ctx.getImageData(0, 0, img.width, img.height);
-        
         try {
           const jsqrLib = await loadJSQR();
-          const code = jsqrLib(imageData.data, imageData.width, imageData.height);
-          if (code) {
-            handleScan(code.data);
+          
+          // Multi-scale decode attempts for optimal high-res and low-res detection
+          const scales = [1, 0.75, 0.5, 0.35];
+          let foundCode: any = null;
+
+          for (const scale of scales) {
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.max(160, Math.round(img.width * scale));
+            canvas.height = Math.max(160, Math.round(img.height * scale));
+            const ctx = canvas.getContext('2d');
+            if (!ctx) continue;
+
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+            foundCode = jsqrLib(imageData.data, imageData.width, imageData.height, {
+              inversionAttempts: 'attemptBoth'
+            });
+
+            if (foundCode && foundCode.data) break;
+          }
+
+          if (foundCode && foundCode.data) {
+            handleScan(foundCode.data);
           } else {
-            setError('Kein QR-Code im Bild gefunden. Bitte lade ein schärferes Foto hoch.');
+            setError('Kein QR-Code im Foto/Screenshot erkannt. Bitte stelle sicher, dass der QR-Code unverdeckt und gut lesbar ist.');
             setLoading(false);
           }
         } catch (err) {
+          console.error('[LoginScreen] Error parsing photo QR:', err);
           setError('QR-Code-Bibliothek konnte nicht geladen werden.');
           setLoading(false);
+        } finally {
+          if (e.target) e.target.value = '';
         }
       };
       img.onerror = () => {
-        setError('Bild konnte nicht geladen werden.');
+        setError('Bilddatei konnte nicht geladen werden.');
         setLoading(false);
+        if (e.target) e.target.value = '';
       };
       img.src = event.target?.result as string;
     };
@@ -4590,17 +4604,55 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 </div>
               )}
             </div>
+
+            {/* Same-Device Photo/Screenshot QR Upload */}
+            <div style={{ marginTop: '12px', width: '100%', display: 'flex', justifyContent: 'center' }}>
+              <input 
+                type="file" 
+                ref={qrFileInputRef} 
+                accept="image/*" 
+                style={{ display: 'none' }} 
+                onChange={handleFileUpload} 
+              />
+              <button
+                type="button"
+                onClick={() => qrFileInputRef.current?.click()}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.08)',
+                  border: '1px solid rgba(255, 255, 255, 0.16)',
+                  borderRadius: '14px',
+                  padding: '9px 16px',
+                  color: '#ffffff',
+                  fontSize: '0.78rem',
+                  fontWeight: 750,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  backdropFilter: 'blur(10px)',
+                  WebkitBackdropFilter: 'blur(10px)',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
+                  transition: 'all 0.15s ease'
+                }}
+                onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.14)'}
+                onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'}
+              >
+                <Upload size={14} />
+                <span>QR-Ausweis aus Fotos / Screenshot wählen</span>
+              </button>
+            </div>
+
             {isCameraActive && !cameraHasError && (
               <p style={{
                 fontSize: '10px',
                 color: 'rgba(255, 255, 255, 0.45)',
-                marginTop: '12px',
+                marginTop: '10px',
                 marginBottom: 0,
                 textAlign: 'center',
                 lineHeight: 1.3,
                 maxWidth: '280px'
               }}>
-                🔒 Die Kamera-Verarbeitung erfolgt ausschließlich lokal auf Ihrem Gerät; es werden keine Bilddaten übertragen.
+                🔒 Die Kamera- &amp; Bildverarbeitung erfolgt ausschließlich lokal auf Ihrem Gerät.
               </p>
             )}
           </div>
