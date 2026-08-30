@@ -37,6 +37,12 @@ scp supabase/migrations/297_tier1_enterprise_goldstandard_security.sql \
     supabase/migrations/309_session_leases_and_master_auth_resolver.sql \
     supabase/migrations/310_harden_session_leases_policy.sql \
     supabase/migrations/311_include_trial_schools_in_search.sql \
+    supabase/migrations/312_enterprise_event_sourced_activation_ledger.sql \
+    supabase/migrations/313_enterprise_token_hardening_and_revocation.sql \
+    supabase/migrations/314_enterprise_hermetic_rpc_and_backdoor_elimination.sql \
+    supabase/migrations/315_enterprise_onboarding_ttl_and_token_isolation.sql \
+    supabase/migrations/316_dev_bypass_school_users.sql \
+    supabase/migrations/317_grant_get_encryption_key_execute.sql \
     "$SERVER:$REMOTE_TEMP/"
 
 # 4. Führe Migrationen nacheinander in supabase-db aus
@@ -100,15 +106,18 @@ ssh "$SERVER" "docker exec -i supabase-db psql -U postgres postgres < $REMOTE_TE
 echo "⚡ Führe Migration 316 aus (Dev Bypass School Users Resolver)..."
 ssh "$SERVER" "docker exec -i supabase-db psql -U postgres postgres < $REMOTE_TEMP/316_dev_bypass_school_users.sql"
 
+echo "⚡ Führe Migration 317 aus (Ensure get_encryption_key execute privilege for users view)..."
+ssh "$SERVER" "docker exec -i supabase-db psql -U postgres postgres < $REMOTE_TEMP/317_grant_get_encryption_key_execute.sql"
+
 echo "🧹 Bereinige temporäre Migrationsdateien..."
 ssh "$SERVER" "rm -rf $REMOTE_TEMP"
 
 echo ""
-echo "✅ Alle 20 Enterprise-Migrationen erfolgreich und fehlerfrei auf dem Produktiv-Container angewendet!"
+echo "✅ Alle 21 Enterprise-Migrationen erfolgreich und fehlerfrei auf dem Produktiv-Container angewendet!"
 ssh "$SERVER" "docker exec -t supabase-db psql -U postgres postgres -c \"NOTIFY pgrst, 'reload schema';\""
 
 # 6. Aufräumen
 ssh "$SERVER" "rm -rf $REMOTE_TEMP"
 
 echo ""
-echo "✅ Alle Enterprise Sicherheitsmigrationen (297-316) erfolgreich auf Live-Datenbank angewendet!"
+echo "✅ Alle Enterprise Sicherheitsmigrationen (297-317) erfolgreich auf Live-Datenbank angewendet!"

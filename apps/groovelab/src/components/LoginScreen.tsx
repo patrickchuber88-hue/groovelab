@@ -4566,6 +4566,12 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                     onClick={() => {
                       sessionStorage.setItem('groovelab_user_id', p.id);
                       sessionStorage.setItem('groovelab_location_mode', 'home');
+                      sessionStorage.setItem('groovelab_active_workspace', 'student');
+                      sessionStorage.setItem('groovelab_active_platform', 'campus');
+                      sessionStorage.setItem('campus_active_tab', 'briefing');
+                      sessionStorage.setItem('groovelab_active_tab', 'briefing');
+                      sessionStorage.removeItem('groovelab_is_master_admin');
+                      sessionStorage.removeItem('groovelab_support_ghost');
                       onLogin(p.id, true);
                     }}
                     role="button"
