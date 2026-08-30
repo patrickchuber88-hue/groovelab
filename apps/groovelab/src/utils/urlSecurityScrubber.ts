@@ -35,7 +35,7 @@ export function scrubSensitiveUrlParams(): void {
 
     if (hasSensitive) {
       const cleanPath = url.pathname + (url.search ? url.search : '') + url.hash;
-      window.history.replaceState({}, document.title, cleanPath);
+      window.history.replaceState(null, '', cleanPath);
       console.log('[Security] Sensitive URL tokens successfully scrubbed from address bar.');
     }
   } catch (err) {

@@ -113,8 +113,12 @@ export async function decryptVaultData<T = any>(payload: string | null): Promise
     const ivHex = parts[2];
     const cipherHex = parts[3];
 
-    const iv = new Uint8Array(ivHex.match(/.{1,2}/g)!.map(byte => parseInt(byte, 16)));
-    const ciphertext = new Uint8Array(cipherHex.match(/.{1,2}/g)!.map(byte => parseInt(byte, 16)));
+    const ivMatches = ivHex.match(/.{1,2}/g);
+    const cipherMatches = cipherHex.match(/.{1,2}/g);
+    if (!ivMatches || !cipherMatches) return null;
+
+    const iv = new Uint8Array(ivMatches.map(byte => parseInt(byte, 16)));
+    const ciphertext = new Uint8Array(cipherMatches.map(byte => parseInt(byte, 16)));
 
     const key = await getOrCreateVaultKey();
     const decryptedBuffer = await window.crypto.subtle.decrypt(
