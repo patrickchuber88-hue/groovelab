@@ -62,6 +62,7 @@ import { MaintenanceLockoutOverlay } from './components/MaintenanceLockoutOverla
 import { GlobalBroadcastBanner } from './components/GlobalBroadcastBanner';
 import { PwaUpdateToast } from './components/ui/PwaUpdateToast';
 import { OfflineStatusBadge } from './components/ui/OfflineStatusBadge';
+import { OfflineSyncIndicator } from './components/ui/OfflineSyncIndicator';
 import { runStorageJanitor, runClientStorageJanitor } from './services/storageJanitorService';
 import { verifyMasterSessionLease, revokeMasterSessionLease } from './utils/masterAuditLogger';
 import { scrubSensitiveUrlParams } from './utils/urlSecurityScrubber';
@@ -8350,6 +8351,7 @@ function App() {
         />
       )}
       <GlobalBroadcastBanner announcement={broadcastAnnouncement} currentRole={user?.role} />
+      <OfflineSyncIndicator />
       {/* Soft Trial Pre-Expiry Warning Banner for Admin/Secretary (Days 27-30) */}
       {(user?.role === 'admin' || user?.role === 'secretary') && school?.is_trial && !school?.subscription_bypass && trialDaysLeft !== null && trialDaysLeft <= 3 && trialDaysLeft > 0 && (
         <div style={{

@@ -43,14 +43,14 @@ rsync -avz --delete \
   "$LOCAL_DIST/" \
   "$SERVER:$REMOTE_DIR/"
 
-# 4. Synchronisiere Build-Dateien direkt in den aktiven Web-Container
+# 4. Synchronisiere Build-Dateien & Nginx Security Config direkt in den aktiven Web-Container
 echo "🚀 Synchronisiere Live-Web-Container..."
-ssh "$SERVER" "WEB_CONTAINER=\$(docker ps --format '{{.Names}}' | grep -v 'supabase\|coolify' | head -n 1); if [ -n \"\$WEB_CONTAINER\" ]; then docker cp $REMOTE_DIR/. \$WEB_CONTAINER:/usr/share/nginx/html/; echo \"  ✓ Live-Web-Container (\$WEB_CONTAINER) erfolgreich aktualisiert.\"; fi"
+ssh "$SERVER" "WEB_CONTAINER=\$(docker ps --format '{{.Names}}' | grep -v 'supabase\|coolify' | head -n 1); if [ -n \"\$WEB_CONTAINER\" ]; then docker cp $REMOTE_DIR/. \$WEB_CONTAINER:/usr/share/nginx/html/; if [ -f $REMOTE_DIR/nginx.default.conf ]; then docker cp $REMOTE_DIR/nginx.default.conf \$WEB_CONTAINER:/etc/nginx/conf.d/default.conf && docker exec \$WEB_CONTAINER nginx -s reload 2>/dev/null || true; fi; echo \"  ✓ Live-Web-Container (\$WEB_CONTAINER) erfolgreich aktualisiert.\"; fi"
 
 # 5. Synchronisiere Enterprise Server-Skripte nach /root/scripts
 echo "⚙️  Synchronisiere Enterprise Server-Skripte..."
 ssh "$SERVER" "mkdir -p /root/scripts"
-scp scripts/backup_supabase_enterprise.sh scripts/server_health_watchdog.sh scripts/server_maintenance_weekly.sh "$SERVER:/root/scripts/" || true
+scp scripts/backup_supabase_enterprise.sh scripts/nightly_secops_audit.sh scripts/server_health_watchdog.sh scripts/server_maintenance_weekly.sh "$SERVER:/root/scripts/" || true
 ssh "$SERVER" "chmod +x /root/scripts/*.sh 2>/dev/null || true"
 echo "  ✓ Server-Skripte synchronisiert & ausführbar."
 
