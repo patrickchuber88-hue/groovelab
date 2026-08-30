@@ -66,6 +66,7 @@ import { OfflineSyncIndicator } from './components/ui/OfflineSyncIndicator';
 import { PrivacyShieldOverlay } from './components/ui/PrivacyShieldOverlay';
 import { usePrivacyShield } from './hooks/usePrivacyShield';
 import { initGlobalErrorSanitizer } from './utils/errorSanitizer';
+import { initAntiTamperShield } from './utils/antiTamper';
 import { runStorageJanitor, runClientStorageJanitor } from './services/storageJanitorService';
 import { verifyMasterSessionLease, revokeMasterSessionLease } from './utils/masterAuditLogger';
 import { scrubSensitiveUrlParams } from './utils/urlSecurityScrubber';
@@ -74,8 +75,9 @@ import { initAuthBroadcastListener } from './utils/authBroadcastSync';
 import { useInactivityTimeout } from './hooks/useInactivityTimeout';
 import './App.css';
 
-// Initialize FinTech Zero-PII Crash Telemetry Sanitizer
+// Initialize FinTech Zero-PII Crash Telemetry Sanitizer & Anti-Tamper Shield
 initGlobalErrorSanitizer();
+initAntiTamperShield();
 
 // --- GLOBAL CAMERA KILL SWITCH ---
 // This guarantees that any third-party scanner library like react-qr-scanner
