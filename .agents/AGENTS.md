@@ -153,3 +153,33 @@
 - **Zwingende Sekretariats-Bestätigung für Lehrkraft-Buchungen**: Wenn eine Lehrkraft einen Raum bucht, muss die Buchung IMMER initial im Status unbestätigt (`status: 'pending'`, `is_confirmed: false`) angelegt werden und zwingend durch das Sekretariat bzw. die Schulleitung bestätigt werden.
 - **Doppelrollen-Gültigkeit**: Diese Regel gilt ausnahmslos auch dann, wenn die buchende Lehrkraft eine Doppelrolle als Administrator (`admin`) oder Sekretariat (`secretary`) innehat. Buchungen aus dem Lehrkraft-Kontext/Buchungsformular dürfen sich niemals selbst automatisch freigeben.
 
+## Enterprise Zero-Trust Security & Data Isolation Axioms (Die 7 Unverrückbaren Sicherheits-Axiome)
+1. **Absoluter Zero-Knowledge & Datenminimierung (DSGVO/COPPA)**:
+   - Schülervornamen sind im PostgreSQL-Kernel mittels PGP verschlüsselt (`student_first_names`).
+   - Die Kernel-Funktion `get_encryption_key()` darf NIEMALS an `anon` oder `authenticated` vergeben werden (Zugriff ausschließlich für interne Kernel-Trigger).
+   - Schülernamen im Lehrer-Dashboard MÜSSEN immer auf "Vorname + 1. Buchstabe Nachname" (z. B. "Max M.") maskiert sein. Im Schüler-Dashboard werden keine persönlichen Namen in Titeln oder Begrüßungen gerendert.
+   - Lehrkräftenamen werden auf allen Dashboards und Landingpages IMMER vollständig angezeigt ("Severin Landenberger").
+2. **Keine Login-Abfragen via Datenbank-ID (IDOR / BOLA Schutz)**:
+   - Es ist STRENGSTENS VERBOTEN, in Login-, Authentifizierungs- oder Onboarding-Queries nach der primären Datenbank-ID (`id.eq.`) zu suchen.
+   - Authentifizierungen dürfen AUSSCHLIESSLICH über dedizierte, unvorhersehbare Secrets (`qr_token`, `teacher_qr_token`, `ausweis_nummer` + PIN) erfolgen.
+3. **Lückenlose Row-Level Security (FORCE RLS)**:
+   - Jede einzelne Tabelle im `public`-Schema MUSS `rowsecurity = TRUE` besitzen.
+   - Alle Mandantenabfragen MÜSSEN serverseitig an `school_id = get_current_user_school_id()` gebunden sein.
+   - Anonyme Abfragen an Tabellen müssen immer `0 Zeilen` oder `HTTP 401` zurückgeben.
+   - Sensible Auth-Tabellen (`user_secrets`, `school_secrets`) verbleiben im unexponierten Schema `private_auth`.
+4. **Verbot von dynamischem SQL & Fuzzy-Matching Backdoors**:
+   - Dynamische SQL-Execution-Funktionen (`execute_sql`, `get_sql_json`, `eval`) sind DAUERHAFT VERBOTEN.
+   - Registrierungs- und Onboarding-Flows dürfen NIEMALS unscharfe Namensabgleiche nutzen.
+   - Schüler-Onboardings laufen ausschließlich über Einmal-Tokens mit 30-Tage-TTL und Single-Use Entwertung (`used_at = NOW()`).
+5. **FinTech Client-Shield & Anti-Tampering (Production Isolation)**:
+   - In der Produktion (`!isDev`) MÜSSEN `console.log`, `console.info` und `console.debug` stummgeschaltet sein.
+   - DevTools-Tastenkombinationen (F12, Strg+Shift+I) werden auf Kiosk- und Schüler-Oberflächen abgefangen.
+   - Das `PrivacyShieldOverlay` aktiviert sich automatisch bei Tab-Wechsel oder Minimierung.
+   - Beim Logout MUSS `sessionZeroize()` alle Tokens und In-Memory-Daten unwiderruflich überschreiben.
+6. **Supply-Chain-Schutz & Subresource Integrity (SRI)**:
+   - Jeder Build MUSS kryptografische SHA-384 Hashes für alle JS/CSS-Bundles in `dist/index.html` injizieren.
+   - Ein NIST SP 800-161 SBOM muss mit jedem Release generiert werden (`dist/sbom.json`).
+   - Die Content Security Policy (CSP) in Nginx verbietet alle unautorisierten Third-Party Script- und Connect-Quellen.
+7. **URL- & Adresszeilen-Hygiene (Path Scrubbing)**:
+   - Sobald ein Token aus `/qr/:token` oder `/onboarding/:token` in den Speicher übernommen wurde, MUSS die Adresszeile per `scrubSensitiveUrlPath('/')` sofort bereinigt werden, um History- und Referrer-Leaks zu verhindern.
+
