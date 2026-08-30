@@ -6959,17 +6959,22 @@ useEffect(() => {
   };
 
   const renderSickCardWidget = () => (
-    <div style={{ 
-      padding: isSickWidgetExpanded ? '20px 24px' : '12px 20px', 
-      borderRadius: '24px',
-      background: 'linear-gradient(135deg, #fff1f2 0%, #fff5f5 100%)',
-      boxShadow: '0 4px 20px rgba(239,68,68,0.10)',
-      border: '1.5px solid #fecaca',
-      display: 'flex',
-      flexDirection: 'column',
-      gap: '12px',
-      transition: 'all 0.35s ease'
-    }}>
+    <div 
+      className="sick-card-container"
+      style={{ 
+        padding: isSickWidgetExpanded ? '18px 20px' : '12px 18px', 
+        borderRadius: '20px',
+        background: 'linear-gradient(135deg, #fff1f2 0%, #fff5f5 100%)',
+        boxShadow: '0 4px 20px rgba(239,68,68,0.10)',
+        border: '1.5px solid #fecaca',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '12px',
+        width: '100%',
+        boxSizing: 'border-box',
+        transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
+      }}
+    >
       {/* Success / Gute Besserung screen */}
       {sickSuccessShown ? (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', padding: '8px 0', textAlign: 'center' }}>
@@ -6989,13 +6994,13 @@ useEffect(() => {
               const next = !isSickWidgetExpanded;
               setIsSickWidgetExpanded(next);
               if (next) {
-                const target = e.currentTarget;
+                const target = e.currentTarget.closest('.sick-card-container') || e.currentTarget;
                 setTimeout(() => {
-                  target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                }, 150);
+                  target.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                }, 100);
               }
             }}
-            style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', gap: '8px' }}
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', gap: '8px', width: '100%' }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
               <span style={{ fontSize: '1.1rem', flexShrink: 0, display: 'flex', alignItems: 'center' }}>
