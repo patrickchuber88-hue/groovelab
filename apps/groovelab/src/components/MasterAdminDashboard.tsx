@@ -2538,8 +2538,8 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
       setNewSchoolAdminEmail('');
       fetchSchoolsAndStats();
     } catch (err: any) {
-      console.error('Fehler beim Erstellen der Schule:', err.message);
-      alert('Fehler beim Erstellen: ' + err.message);
+      console.error('Fehler beim Erstellen der Schule:', err?.message || err);
+      alert('Fehler beim Erstellen: ' + (err?.message || String(err)));
     } finally {
       setCreating(false);
     }
@@ -2579,7 +2579,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
       setArchiveConfirmName('');
       fetchSchoolsAndStats();
     } catch (err: any) {
-      alert('Fehler beim Archivieren: ' + err.message);
+      alert('Fehler beim Archivieren: ' + (err?.message || String(err)));
     } finally {
       setArchivingSchool(false);
     }
@@ -2690,8 +2690,8 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
       setTimeout(() => setSaveSuccessToast(null), 3500);
       await fetchSchoolsAndStats();
     } catch (err: any) {
-      console.error('Fehler beim Löschen:', err.message);
-      alert('Fehler beim Löschen: ' + err.message);
+      console.error('Fehler beim Löschen:', err?.message || err);
+      alert('Fehler beim Löschen: ' + (err?.message || String(err)));
     } finally {
       setLoading(false);
     }

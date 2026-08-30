@@ -46,7 +46,7 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
       if (error) throw error;
       alert(`Erfolg: ${data || 0} aktive Benutzer-Sitzungen der Schule "${school?.name || ''}" wurden mit sofortiger Wirkung beendet.`);
     } catch (err: any) {
-      alert('Fehler beim Widerrufen der Sitzungen: ' + err.message);
+      alert('Fehler beim Widerrufen der Sitzungen: ' + (err?.message || String(err)));
     } finally {
       setRevokingSessions(false);
     }
