@@ -202,7 +202,12 @@ export function calculateSchoolEffectiveRates(
   school: SchoolPricingData | null | undefined,
   masterPricing: MasterPricingRates
 ): EffectiveRates {
-  const schoolCurrency: CurrencyCode = (school?.currency === 'CHF' || school?.country === 'CH') 
+  const isSchoolChf = school?.currency === 'CHF' || 
+    school?.country === 'CH' || 
+    school?.country === 'Schweiz' || 
+    String(school?.country || '').toLowerCase().includes('schweiz') || 
+    String(school?.country || '').toLowerCase().includes('switzerland');
+  const schoolCurrency: CurrencyCode = isSchoolChf 
     ? 'CHF' 
     : (masterPricing.currency || 'EUR');
   const currencyMaster = MASTER_CURRENCY_RATES[schoolCurrency] || MASTER_CURRENCY_RATES.EUR;

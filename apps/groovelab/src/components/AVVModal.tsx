@@ -225,7 +225,7 @@ export const AVVModal: React.FC<AVVModalProps> = ({ isOpen, onClose, school, onA
                   fontSize: '0.64rem',
                   fontWeight: 800
                 }}>
-                  Art. 28 DSGVO &amp; § 126b BGB
+                  Art. 28 DSGVO &amp; Art. 9 CH-nDSG
                 </span>
               </div>
               <p style={{ margin: '2px 0 0 0', fontSize: '0.74rem', color: '#64748b', fontWeight: 500 }}>

@@ -54,7 +54,11 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
   const [agreeWithdrawalWaiver, setAgreeWithdrawalWaiver] = useState(true);
 
   // Dynamic School Year Calculation (Registration month = free, remaining months until August 31st)
-  const isChf = schoolData?.currency === 'CHF' || schoolData?.country === 'CH';
+  const isChf = schoolData?.currency === 'CHF' || 
+    schoolData?.country === 'CH' || 
+    schoolData?.country === 'Schweiz' || 
+    String(schoolData?.country || '').toLowerCase().includes('schweiz') || 
+    String(schoolData?.country || '').toLowerCase().includes('switzerland');
   const activeCurrency = isChf ? 'CHF' : 'EUR';
   const schoolYearCalc = calculateSchoolYearDirectBilling(undefined, activeCurrency);
   const effectiveAnnualFee = annualFee !== 5.88 && annualFee !== 12.00 && annualFee !== 9.60 ? annualFee : schoolYearCalc.totalAmount;

@@ -165,7 +165,8 @@ export const SchoolSelfOnboardingModal: React.FC<SchoolSelfOnboardingModalProps>
           house_number: houseNumber.trim() || null,
           zip_code: cleanZip,
           city: city.trim(),
-          country: country
+          country: country,
+          currency: country === 'Schweiz' ? 'CHF' : 'EUR'
         };
         userRecord = {
           id: rpcData.admin_id,
@@ -199,6 +200,7 @@ export const SchoolSelfOnboardingModal: React.FC<SchoolSelfOnboardingModalProps>
             zip_code: cleanZip,
             city: city.trim(),
             country: country,
+            currency: country === 'Schweiz' ? 'CHF' : 'EUR',
             primary_color: '#34a853',
             has_campus_subscription: false,
             has_groovelab_subscription: false,
@@ -709,7 +711,7 @@ export const SchoolSelfOnboardingModal: React.FC<SchoolSelfOnboardingModalProps>
               }}>
                 <Shield size={18} color="#15803d" />
                 <div style={{ fontSize: '0.75rem', color: '#475569', lineHeight: 1.4 }}>
-                  <strong style={{ color: '#0f172a' }}>Software-Bereitstellung: 0,00 € (Inklusive).</strong> Keine Einrichtungsgebühr. Modul-Auswahl (Campus &amp; GrooveLab) flexibel im Dashboard wählbar.
+                  <strong style={{ color: '#0f172a' }}>Software-Bereitstellung: {country === 'Schweiz' ? 'CHF 0.00' : '0,00 €'} (Inklusive).</strong> Keine Einrichtungsgebühr. Modul-Auswahl (Campus &amp; GrooveLab) flexibel im Dashboard wählbar.
                 </div>
               </div>
 

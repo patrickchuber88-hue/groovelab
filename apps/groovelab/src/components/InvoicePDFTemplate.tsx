@@ -51,7 +51,12 @@ export const InvoicePDFTemplate: React.FC<InvoicePDFTemplateProps> = ({
   onClose
 }) => {
   const masterPricing = useMasterPricing();
-  const isChf = (school as any)?.currency === 'CHF' || (school as any)?.country === 'CH' || masterPricing.currency === 'CHF';
+  const isChf = (school as any)?.currency === 'CHF' || 
+    (school as any)?.country === 'CH' || 
+    (school as any)?.country === 'Schweiz' || 
+    String((school as any)?.country || '').toLowerCase().includes('schweiz') || 
+    String((school as any)?.country || '').toLowerCase().includes('switzerland') || 
+    masterPricing.currency === 'CHF';
   const currency: 'EUR' | 'CHF' = isChf ? 'CHF' : 'EUR';
   const fmt = (amt: number) => masterPricing.formatPrice(amt, currency);
 

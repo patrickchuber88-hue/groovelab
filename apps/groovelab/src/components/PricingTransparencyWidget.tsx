@@ -9,7 +9,12 @@ interface PricingTransparencyWidgetProps {
 
 export const PricingTransparencyWidget: React.FC<PricingTransparencyWidgetProps> = ({ school }) => {
   const pricing = useMasterPricing();
-  const isChf = school?.currency === 'CHF' || school?.country === 'CH' || pricing.currency === 'CHF';
+  const isChf = school?.currency === 'CHF' || 
+    school?.country === 'CH' || 
+    school?.country === 'Schweiz' || 
+    String(school?.country || '').toLowerCase().includes('schweiz') || 
+    String(school?.country || '').toLowerCase().includes('switzerland') || 
+    pricing.currency === 'CHF';
   const currency = isChf ? 'CHF' : 'EUR';
   const currentRates = isChf ? pricing.ratesCHF : pricing.ratesEUR;
   const fmt = (amt: number) => pricing.formatPrice(amt, currency);
