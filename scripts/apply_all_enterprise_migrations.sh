@@ -34,6 +34,7 @@ scp supabase/migrations/297_tier1_enterprise_goldstandard_security.sql \
     supabase/migrations/306_enterprise_rbac_and_room_confirmation.sql \
     supabase/migrations/307_enterprise_privilege_timeout_and_audit.sql \
     supabase/migrations/308_enterprise_force_rls_suite.sql \
+    supabase/migrations/309_session_leases_and_master_auth_resolver.sql \
     "$SERVER:$REMOTE_TEMP/"
 
 # 4. Führe Migrationen nacheinander in supabase-db aus
@@ -61,17 +62,20 @@ ssh "$SERVER" "docker exec -i supabase-db psql -U postgres postgres < $REMOTE_TE
 echo "⚡ Führe Migration 304 aus (High-Concurrency Composite Indexes)..."
 ssh "$SERVER" "docker exec -i supabase-db psql -U postgres postgres < $REMOTE_TEMP/304_enterprise_high_concurrency_indexes.sql"
 
-echo "⚡ Führe Migration 305 aus (Idempotency Key Vault & RFC 7807 Handler)..."
+echo "⚡ Führe Migration 305 aus (Idempotency Engine & RFC 7807 Exception Framework)..."
 ssh "$SERVER" "docker exec -i supabase-db psql -U postgres postgres < $REMOTE_TEMP/305_enterprise_idempotency_and_rfc7807.sql"
 
-echo "⚡ Führe Migration 306 aus (RBAC Triggers & Room Confirmation Enforcement)..."
+echo "⚡ Führe Migration 306 aus (RBAC Granularity & Mandatory Room Confirmation)..."
 ssh "$SERVER" "docker exec -i supabase-db psql -U postgres postgres < $REMOTE_TEMP/306_enterprise_rbac_and_room_confirmation.sql"
 
-echo "⚡ Führe Migration 307 aus (Statement Timeouts & Security Posture Audit)..."
+echo "⚡ Führe Migration 307 aus (Privilege Audit & Anti-DoS Timeouts)..."
 ssh "$SERVER" "docker exec -i supabase-db psql -U postgres postgres < $REMOTE_TEMP/307_enterprise_privilege_timeout_and_audit.sql"
 
-echo "⚡ Führe Migration 308 aus (FORCE ROW LEVEL SECURITY Suite)..."
+echo "⚡ Führe Migration 308 aus (Force RLS Suite on all public tables)..."
 ssh "$SERVER" "docker exec -i supabase-db psql -U postgres postgres < $REMOTE_TEMP/308_enterprise_force_rls_suite.sql"
+
+echo "⚡ Führe Migration 309 aus (Session Leases & Robust Master Auth Resolver)..."
+ssh "$SERVER" "docker exec -i supabase-db psql -U postgres postgres < $REMOTE_TEMP/309_session_leases_and_master_auth_resolver.sql"
 
 # 5. Schema Cache in PostgREST neu laden
 echo "🔄 Lade PostgREST Schema Cache neu..."
