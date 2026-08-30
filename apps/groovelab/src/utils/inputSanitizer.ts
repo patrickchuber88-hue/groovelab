@@ -6,7 +6,7 @@
  */
 
 /**
- * Strips all HTML tags, script elements, event handlers, and javascript: protocols.
+ * Strips all HTML tags, script elements, event handlers, MathML, SVG, and javascript: protocols.
  */
 export function sanitizeTextInput(input: string | null | undefined): string {
   if (!input || typeof input !== 'string') return '';
@@ -14,6 +14,11 @@ export function sanitizeTextInput(input: string | null | undefined): string {
   return input
     .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '') // Remove <script> tags
     .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')   // Remove <style> tags
+    .replace(/<svg\b[^<]*(?:(?!<\/svg>)<[^<]*)*<\/svg>/gi, '')         // Remove <svg> tags
+    .replace(/<math\b[^<]*(?:(?!<\/math>)<[^<]*)*<\/math>/gi, '')       // Remove <math> tags
+    .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, '') // Remove <iframe> tags
+    .replace(/<object\b[^<]*(?:(?!<\/object>)<[^<]*)*<\/object>/gi, '') // Remove <object> tags
+    .replace(/<embed\b[^<]*(?:(?!<\/embed>)<[^<]*)*<\/embed>/gi, '')   // Remove <embed> tags
     .replace(/<[^>]+>/g, '')                                          // Strip all remaining HTML tags
     .replace(/javascript:/gi, '')                                     // Strip javascript: protocol
     .replace(/vbscript:/gi, '')                                       // Strip vbscript: protocol
@@ -21,6 +26,14 @@ export function sanitizeTextInput(input: string | null | undefined): string {
     .replace(/on\w+\s*=/gi, '')                                       // Strip inline event handlers (e.g. onload=)
     .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')                // Strip non-printable control characters
     .trim();
+}
+
+/**
+ * Sanitizes rich Meisterwerk documentation notes and homework descriptions while preserving formatting safely.
+ */
+export function sanitizeRichTextNote(note: string | null | undefined): string {
+  if (!note || typeof note !== 'string') return '';
+  return sanitizeTextInput(note).substring(0, 10000);
 }
 
 /**

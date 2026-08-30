@@ -5,6 +5,18 @@ import App from './App'
 import { MasterPricingProvider } from './context/MasterPricingContext'
 import './index.css'
 
+// Anti-Clickjacking & Frame-Busting Guard (ASVS Level 3)
+if (typeof window !== 'undefined' && window.top !== window.self) {
+  try {
+    if (window.top) {
+      window.top.location.href = window.self.location.href;
+    }
+  } catch (e) {
+    // If top window is cross-origin and blocks modification, clear view
+    document.body.innerHTML = '';
+  }
+}
+
 // Automatically redirect localhost subdomains to the main localhost origin with query parameters to bypass CORS and script import errors.
 if (typeof window !== 'undefined' && window.location.hostname.includes('localhost') && window.location.hostname !== 'localhost') {
   const parts = window.location.hostname.split('.');
