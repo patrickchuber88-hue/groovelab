@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { Music, Tablet, ShieldCheck, FileText, X, Check, School, AlertCircle, ArrowRight, Download, User, Upload, Key, KeyRound, RotateCw, HelpCircle, Lock, Calendar, Clock, ArrowLeft, Mail, Users, Plus, Fingerprint, Timer, Trophy, Smartphone, Camera, CameraOff, Unlink, SwitchCamera, Star, Ban, Sparkles } from 'lucide-react';
@@ -1514,7 +1514,28 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
   const [schoolData, setSchoolData] = useState<any>(null);
   const [logoTheme, setLogoTheme] = useState<'light' | 'dark'>('light');
 
+  // Tenant-Scoped Family Profiles (Strict Multi-Tenancy: Only show students belonging to the currently selected school)
+  const scopedFamilyProfiles = useMemo(() => {
+    if (!schoolData?.id) return [];
+    return savedFamilyProfiles.filter((p: any) => {
+      if (!p || !p.id) return false;
+      const isDirectMatch = p.school_id === schoolData.id;
+      const isMusaekMatch = isMusaekSchool(p.school_id) && isMusaekSchool(schoolData.id);
+      return isDirectMatch || isMusaekMatch;
+    });
+  }, [savedFamilyProfiles, schoolData?.id]);
 
+  // Tenant-Scoped Biometric Profiles
+  const scopedBiometricProfiles = useMemo(() => {
+    if (!schoolData?.id && !schoolData?.name) return biometricProfiles;
+    return biometricProfiles.filter((p: any) => {
+      if (!p) return false;
+      if (!p.schoolName) return true; // Generic device credential
+      const schoolNameMatch = p.schoolName.trim().toLowerCase() === (schoolData.name || '').trim().toLowerCase();
+      const musaekMatch = isMusaekSchool(schoolData.id) && p.schoolName.toLowerCase().includes('musaek');
+      return schoolNameMatch || musaekMatch;
+    });
+  }, [biometricProfiles, schoolData?.name, schoolData?.id]);
 
   useEffect(() => {
     if (!schoolData?.logo_url) return;
@@ -4341,7 +4362,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         transition: 'background 0.3s ease, border 0.3s ease, box-shadow 0.3s ease'
       }}>
         {/* Biometric Quick-Login Section */}
-        {biometricProfiles.length > 0 && (
+        {scopedBiometricProfiles.length > 0 && (
           <div style={{
             width: '100%',
             marginBottom: '20px',
@@ -4388,7 +4409,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
             {/* Profile Selector Chips with Avatars & Remove Button */}
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'center', width: '100%' }}>
-              {biometricProfiles.map((p) => {
+              {scopedBiometricProfiles.map((p) => {
                 const isAdminOrSecretary = p.role === 'admin' || p.role === 'secretary';
                 const avatarSrc = isAdminOrSecretary
                   ? '/campus_login_hero.png'
@@ -4504,7 +4525,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         )}
 
         {/* ─── 1-TAP FAMILY AVATAR STAGE (SIBLING QUICKSTART - SCALABLE 1-10+ PROFILES) ─── */}
-        {savedFamilyProfiles.length > 0 && !isGroovelabKiosk && (
+        {scopedFamilyProfiles.length > 0 && !isGroovelabKiosk && (
           <div style={{
             width: '100%',
             marginBottom: '16px',
@@ -4535,7 +4556,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 gap: '4px'
               }}>
                 <Sparkles size={10} />
-                {savedFamilyProfiles.length > 1 ? `${savedFamilyProfiles.length} Profile` : '1-Tap Start'}
+                {scopedFamilyProfiles.length > 1 ? `${scopedFamilyProfiles.length} Profile` : '1-Tap Start'}
               </span>
             </div>
 
@@ -4543,20 +4564,20 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             <div style={{ 
               display: 'flex', 
               gap: '10px', 
-              justifyContent: savedFamilyProfiles.length <= 2 ? 'center' : 'flex-start', 
+              justifyContent: scopedFamilyProfiles.length <= 2 ? 'center' : 'flex-start', 
               alignItems: 'stretch', 
               overflowX: 'auto',
               scrollSnapType: 'x mandatory',
               WebkitOverflowScrolling: 'touch',
               scrollbarWidth: 'none',
               padding: '4px 6px 6px 6px',
-              maskImage: savedFamilyProfiles.length > 2 
+              maskImage: scopedFamilyProfiles.length > 2 
                 ? 'linear-gradient(to right, transparent 0%, black 14px, black calc(100% - 14px), transparent 100%)' 
                 : 'none',
               width: '100%',
               boxSizing: 'border-box'
             }}>
-              {savedFamilyProfiles.map((p) => {
+              {scopedFamilyProfiles.map((p) => {
                 const avatarSrc = getInstrumentAvatarUrl(p.instrument || p.groovelab_instrument || '');
                 const displayLastName = p.last_name ? (p.last_name.trim().length > 1 ? `${p.last_name.trim()[0]}.` : p.last_name) : '';
                 return (

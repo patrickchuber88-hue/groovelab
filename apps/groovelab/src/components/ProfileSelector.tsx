@@ -5,9 +5,10 @@ import { UserPlus, Lock, X, ArrowLeft, Eye, EyeOff } from 'lucide-react';
 interface ProfileSelectorProps {
   onLoginSuccess: (userId: string) => void;
   onShowStandardLogin: () => void;
+  schoolId?: string | null;
 }
 
-export const ProfileSelector: React.FC<ProfileSelectorProps> = ({ onLoginSuccess, onShowStandardLogin }) => {
+export const ProfileSelector: React.FC<ProfileSelectorProps> = ({ onLoginSuccess, onShowStandardLogin, schoolId }) => {
   const [profiles, setProfiles] = useState<any[]>([]);
   const [selectedProfile, setSelectedProfile] = useState<any | null>(null);
   const [pinInput, setPinInput] = useState<string>('');
@@ -19,9 +20,13 @@ export const ProfileSelector: React.FC<ProfileSelectorProps> = ({ onLoginSuccess
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const stored = JSON.parse(localStorage.getItem('groovelab_local_profiles') || '[]');
-      setProfiles(stored);
+      if (schoolId) {
+        setProfiles(stored.filter((p: any) => p.school_id === schoolId || (p.school_id === 'cc05137f-5904-4774-80be-6a172c52bf99' && schoolId === '53e83805-1d5a-4ed8-988e-1fb0b8200b9c') || (p.school_id === '53e83805-1d5a-4ed8-988e-1fb0b8200b9c' && schoolId === 'cc05137f-5904-4774-80be-6a172c52bf99')));
+      } else {
+        setProfiles(stored);
+      }
     }
-  }, []);
+  }, [schoolId]);
 
   const handleProfileSelect = async (profile: any) => {
     const urlParams = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '');
