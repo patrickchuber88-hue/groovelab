@@ -64,6 +64,8 @@ import { PwaUpdateToast } from './components/ui/PwaUpdateToast';
 import { OfflineStatusBadge } from './components/ui/OfflineStatusBadge';
 import { runStorageJanitor, runClientStorageJanitor } from './services/storageJanitorService';
 import { verifyMasterSessionLease, revokeMasterSessionLease } from './utils/masterAuditLogger';
+import { scrubSensitiveUrlParams } from './utils/urlSecurityScrubber';
+import { executeSessionZeroize } from './utils/sessionZeroize';
 import './App.css';
 
 // --- GLOBAL CAMERA KILL SWITCH ---
@@ -1584,6 +1586,14 @@ function App() {
   const currentView = (location.pathname === '/login' || location.pathname === '/signup')
     ? 'login'
     : (location.pathname === '/' ? 'landing' : 'dashboard');
+
+  useEffect(() => {
+    // Proactive URL token scrubbing to protect user history and referrers
+    const timer = setTimeout(() => {
+      scrubSensitiveUrlParams();
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [location.pathname, searchParams]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
