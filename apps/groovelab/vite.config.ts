@@ -53,8 +53,11 @@ export default defineConfig({
             }
             if (id.includes('lucide-react')) return 'vendor-lucide';
             if (id.includes('@supabase')) return 'vendor-supabase';
-            if (id.includes('html2canvas') || id.includes('jspdf') || id.includes('purify')) return 'vendor-pdf';
+            if (id.includes('html2canvas') || id.includes('jspdf') || id.includes('purify') || id.includes('html-to-image')) return 'vendor-pdf';
             if (id.includes('jsqr') || id.includes('jsQR') || id.includes('qrcode') || id.includes('react-qr-scanner')) return 'vendor-qr';
+          }
+          if (id.includes('ScheduleBoard') || id.includes('ScheduleCalendarView')) {
+            return 'schedule-designer-suite';
           }
           if (id.includes('MasterAdminDashboard') || id.includes('masterAdmin/') || id.includes('AdminDashboard') || id.includes('BillingDashboard')) {
             return 'admin-master-suite';

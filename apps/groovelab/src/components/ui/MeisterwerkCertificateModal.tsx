@@ -2,7 +2,6 @@ import React, { useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Printer, Award, Sparkles, Music, ShieldCheck, Download, Loader2, Share2, Check } from 'lucide-react';
 import { toPng } from 'html-to-image';
-import jsPDF from 'jspdf';
 
 export interface MeisterwerkCertificateProps {
   studentName: string;
@@ -71,7 +70,12 @@ export const MeisterwerkCertificateModal: React.FC<MeisterwerkCertificateProps> 
     if (!certificateRef.current || isExporting) return;
     setIsExporting(true);
     try {
-      const dataUrl = await toPng(certificateRef.current, {
+      const [{ toPng: toPngFn }, { default: jsPDF }] = await Promise.all([
+        import('html-to-image'),
+        import('jspdf')
+      ]);
+
+      const dataUrl = await toPngFn(certificateRef.current, {
         quality: 0.98,
         pixelRatio: 2.5,
         backgroundColor: '#ffffff'
