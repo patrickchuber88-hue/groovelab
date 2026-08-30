@@ -719,6 +719,23 @@ export function DeviceSetupScreen({
           })()}
         </div>
 
+        <div style={{
+          background: '#f8fafc',
+          border: '1px solid #e2e8f0',
+          borderRadius: '16px',
+          padding: '14px 16px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px',
+          textAlign: 'left'
+        }}>
+          <ShieldCheck size={20} color="#34a853" style={{ flexShrink: 0 }} />
+          <div style={{ fontSize: '0.78rem', color: '#475569', lineHeight: '1.4' }}>
+            <strong style={{ display: 'block', color: '#1e293b', marginBottom: '2px' }}>Kiosk-Schutz für Unterrichts-Tablets</strong>
+            Für den dauerhaften Raum-Kiosk-Betrieb bitte auf dem iPad den <strong>Geführten Zugriff</strong> (3× Home-/Power-Taste) aktivieren.
+          </div>
+        </div>
+
         <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
           <button onClick={handleSkip} style={{ background: 'transparent', border: 'none', color: '#64748b', fontSize: '0.875rem', fontWeight: 600, cursor: 'pointer' }}>
             Setup überspringen (nur Home-Mode)
