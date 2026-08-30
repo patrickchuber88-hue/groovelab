@@ -417,6 +417,8 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
   const [boards, setBoards] = useState<DayBoard[]>([]);
   const [undoStack, setUndoStack] = useState<{ boards: DayBoard[]; students: Student[] }[]>([]);
   const [drafts, setDrafts] = useState<{ id: string; name: string; boards: DayBoard[] }[]>([]);
+  const draftsRef = useRef<{ id: string; name: string; boards: DayBoard[] }[]>([]);
+  draftsRef.current = drafts;
 
   const pushUndoSnapshot = () => {
     setUndoStack(prev => [
@@ -437,6 +439,8 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
     setToast({ message: 'Änderung rückgängig gemacht ↩️', type: 'success' });
   };
   const [activeDraftId, setActiveDraftId] = useState<string>('default');
+  const activeDraftIdRef = useRef<string>('default');
+  activeDraftIdRef.current = activeDraftId;
   const [submittedDraftId, setSubmittedDraftId] = useState<string>('');
   const lastSavedStateRef = useRef<string>('');
   const [students, setStudents] = useState<Student[]>([]);
@@ -1244,11 +1248,12 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
       }
       
       // 2. Fetch assigned student IDs across schedules, occurrences, bands, and teacher profile for selected teacher
-      const [{ data: schedData }, { data: occData }, { data: groupData }, { data: teacherProfile }] = await Promise.all([
+      const [{ data: schedData }, { data: occData }, { data: groupData }, { data: teacherProfile }, { data: teacherProfileRaw }] = await Promise.all([
         supabase.from('schedules').select('*, student:users!schedules_student_id_fkey(*)').eq('teacher_id', selectedTeacherId),
         supabase.from('schedule_occurrences').select('student_id').eq('teacher_id', selectedTeacherId),
         supabase.from('bands').select('id').eq('coach_id', selectedTeacherId),
-        supabase.from('users').select('*').eq('id', selectedTeacherId).maybeSingle()
+        supabase.from('users').select('*').eq('id', selectedTeacherId).maybeSingle(),
+        supabase.from('users_raw').select('*').eq('id', selectedTeacherId).maybeSingle()
       ]);
 
       const schedStudentIds = (schedData || []).map(s => s.student_id).filter(Boolean);
@@ -1261,7 +1266,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         groupStudentIds = (gsData || []).map(gs => gs.user_id).filter(Boolean);
       }
 
-      const rawPlannedEarly = teacherProfile?.planned_boards || (teacherProfile as any)?.campus_räume || (teacherProfile as any)?.groovelab_räume;
+      const rawPlannedEarly = teacherProfileRaw?.planned_boards || (teacherProfileRaw as any)?.campus_räume || (teacherProfileRaw as any)?.groovelab_räume || teacherProfile?.planned_boards || (teacherProfile as any)?.campus_räume || (teacherProfile as any)?.groovelab_räume;
       const savedTeacherStudentIds = new Set<string>(
         Array.isArray(rawPlannedEarly?.allTeacherStudentIds)
           ? rawPlannedEarly.allTeacherStudentIds
@@ -1289,9 +1294,9 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
       // Fetch students from users table
       const { data: allSchoolStudentUsers } = await supabase
         .from('users')
-        .select('id, first_name, last_name, instrument, lesson_duration, sibling_group_id, group_id, is_campus_active, is_groovelab_active, is_active, teacher_id')
+        .select('id, first_name, last_name, instrument, lesson_duration, sibling_group_id, group_id, is_campus_active, is_groovelab_active, is_active, teacher_id, role, avatar_url')
         .eq('school_id', schoolId)
-        .eq('role', 'student');
+        .in('role', ['student', 'learner']);
 
       // Fetch pending students from pending_students_decrypted view
       const { data: pendingData } = await supabase
@@ -1517,14 +1522,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
       setTeacherAvailability(teacherProfile?.teacher_availability ?? {});
 
       const rawPlanned = rawPlannedEarly;
-      const storedDraftState = localStorage.getItem(`groovelab_teacher_draft_state_${activePlatform}_${selectedTeacherId}`);
-      const storedBoardsState = localStorage.getItem(`groovelab_teacher_boards_${activePlatform}_${selectedTeacherId}`) || localStorage.getItem(`groovelab_teacher_boards_${selectedTeacherId}`);
-      const hasSavedDrafts = !!(
-        (rawPlanned && (Array.isArray(rawPlanned) ? rawPlanned.length > 0 : ((rawPlanned as any).drafts && (rawPlanned as any).drafts.length > 0))) ||
-        storedDraftState ||
-        storedBoardsState
-      );
-      
+
       let loadedDrafts: { id: string; name: string; boards: DayBoard[] }[] = [];
       let loadedActiveDraftId = 'default';
       let loadedSubmittedDraftId = '';
@@ -1539,19 +1537,49 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         // Legacy single draft format
         loadedDrafts = [{ id: 'default', name: 'Entwurf 1', boards: rawPlanned as any }];
         loadedActiveDraftId = 'default';
-      } else {
-        // Fallback to local storage
-        const stored = localStorage.getItem(`groovelab_teacher_draft_state_${activePlatform}_${selectedTeacherId}`);
-        if (stored) {
-          try {
-            const parsed = JSON.parse(stored);
-            if (parsed && parsed.drafts) {
-              loadedDrafts = parsed.drafts;
-              loadedActiveDraftId = parsed.activeDraftId || 'default';
-              loadedSubmittedDraftId = parsed.submittedDraftId || '';
-              loadedSubmittedAt = parsed.submittedAt || '';
+      }
+
+      // Read local storage draft state
+      const stored = localStorage.getItem(`groovelab_teacher_draft_state_${activePlatform}_${selectedTeacherId}`);
+      let localParsedDrafts: any[] = [];
+      let localActiveDraftId = '';
+      let localSubmittedDraftId = '';
+      let localSubmittedAt = '';
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          if (parsed && Array.isArray(parsed.drafts)) {
+            localParsedDrafts = parsed.drafts;
+            localActiveDraftId = parsed.activeDraftId || '';
+            localSubmittedDraftId = parsed.submittedDraftId || '';
+            localSubmittedAt = parsed.submittedAt || '';
+          }
+        } catch (e) {}
+      }
+
+      // FAIL-SAFE MERGE: Never drop any locally created drafts
+      if (localParsedDrafts.length > 0) {
+        if (loadedDrafts.length === 0) {
+          loadedDrafts = localParsedDrafts;
+          if (localActiveDraftId) loadedActiveDraftId = localActiveDraftId;
+          if (localSubmittedDraftId) loadedSubmittedDraftId = localSubmittedDraftId;
+          if (localSubmittedAt) loadedSubmittedAt = localSubmittedAt;
+        } else {
+          const dbDraftIdSet = new Set(loadedDrafts.map(d => d.id));
+          for (const ld of localParsedDrafts) {
+            if (!dbDraftIdSet.has(ld.id)) {
+              loadedDrafts.push(ld);
             }
-          } catch (e) {}
+          }
+          if (localActiveDraftId && loadedDrafts.some(d => d.id === localActiveDraftId)) {
+            loadedActiveDraftId = localActiveDraftId;
+          }
+          if (localSubmittedDraftId) {
+            loadedSubmittedDraftId = localSubmittedDraftId;
+          }
+          if (localSubmittedAt) {
+            loadedSubmittedAt = localSubmittedAt;
+          }
         }
       }
 
@@ -1570,32 +1598,82 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
 
       const validStudentIds = new Set(Array.from(studentMap.keys()));
 
+      // Helper to resolve canonical student from draft slot
+      const resolveStudentFromDraft = (s: any): Student | undefined => {
+        if (!s || s.isBreak || s.isVacant) return undefined;
+        if (s.id && studentMap.has(s.id)) return studentMap.get(s.id);
+        if (s.id && idAliasMap.has(s.id)) {
+          const canonicalId = idAliasMap.get(s.id)!;
+          if (studentMap.has(canonicalId)) return studentMap.get(canonicalId);
+        }
+        const fn = (s.first_name || '').trim().toLowerCase();
+        const ln = (s.last_name || '').trim().toLowerCase();
+        const nameKey = `${fn}_${ln}`;
+        if (nameKey !== '_' && nameToCanonicalIdMap.has(nameKey)) {
+          const canonicalId = nameToCanonicalIdMap.get(nameKey)!;
+          if (studentMap.has(canonicalId)) return studentMap.get(canonicalId);
+        }
+        return undefined;
+      };
+
       // Rename legacy 'Standard-Entwurf' to 'Entwurf 1' and filter out any students not explicitly assigned to this teacher (eliminating orphan drafts)
       loadedDrafts = loadedDrafts.map(d => ({
         ...d,
         name: d.name === 'Standard-Entwurf' ? 'Entwurf 1' : d.name,
         boards: (d.boards || []).map(b => ({
           ...b,
-          students: (b.students || []).filter(s => {
-            if (s.isBreak || s.isVacant) return true;
+          students: (b.students || []).map(s => {
+            if (s.isBreak || s.isVacant) return s;
             if (s.isGroup || (s.id && s.id.startsWith('group-')) || (s.groupStudents && s.groupStudents.length > 0)) {
               if (s.groupStudents && Array.isArray(s.groupStudents)) {
-                const validMembers = s.groupStudents.filter((gs: any) => gs && gs.id && validStudentIds.has(gs.id));
-                if (validMembers.length === 0) return false;
-                s.groupStudents = validMembers;
+                const validMembers: any[] = [];
+                s.groupStudents.forEach((gs: any) => {
+                  const resolved = resolveStudentFromDraft(gs);
+                  if (resolved) {
+                    validMembers.push({
+                      ...gs,
+                      id: resolved.id,
+                      first_name: resolved.first_name,
+                      last_name: resolved.last_name,
+                      instrument: resolved.instrument || gs.instrument,
+                      duration: resolved.duration || gs.duration
+                    });
+                  }
+                });
+                if (validMembers.length === 0) return null;
                 if (validMembers.length === 1) {
                   const m = validMembers[0];
-                  s.isGroup = false;
-                  s.id = m.id;
-                  s.first_name = m.first_name;
-                  s.last_name = m.last_name;
+                  return {
+                    ...s,
+                    isGroup: false,
+                    id: m.id,
+                    first_name: m.first_name,
+                    last_name: m.last_name,
+                    instrument: m.instrument,
+                    duration: m.duration,
+                    groupStudents: undefined
+                  };
                 }
-                return true;
+                return {
+                  ...s,
+                  groupStudents: validMembers
+                };
               }
-              return false;
+              return null;
             }
-            return Boolean(s.id && validStudentIds.has(s.id));
-          })
+            const resolved = resolveStudentFromDraft(s);
+            if (resolved) {
+              return {
+                ...s,
+                id: resolved.id,
+                first_name: resolved.first_name,
+                last_name: resolved.last_name,
+                instrument: resolved.instrument || s.instrument,
+                duration: resolved.duration || s.duration
+              };
+            }
+            return null;
+          }).filter(Boolean) as Student[]
         }))
       }));
 
@@ -1690,11 +1768,12 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
               startAnchor: p.startAnchor,
               roomId: daySched ? daySched.room_id : p.roomId,
               students: (p.students || []).map((s: any) => {
-                const dbStudent = loadedStudents.find(ls => ls.id === s.id);
+                const dbStudent = resolveStudentFromDraft(s) || loadedStudents.find(ls => ls.id === s.id);
                 const targetDuration = dbStudent?.duration || (s.lesson_duration ? s.lesson_duration : 30);
                 if (!s.isBreak) {
                   return {
                     ...s,
+                    id: dbStudent?.id || s.id,
                     duration: targetDuration,
                     first_name: dbStudent?.first_name || s.first_name,
                     last_name: dbStudent?.last_name || s.last_name,
@@ -2519,12 +2598,27 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         }))
       }));
 
-      const updatedDrafts = drafts.map(d => {
-        if (d.id === activeDraftId) {
+      const currentDraftsList = draftsRef.current.length > 0 ? draftsRef.current : drafts;
+      const currentActiveId = activeDraftIdRef.current || activeDraftId;
+
+      let draftFound = false;
+      const updatedDrafts = currentDraftsList.map(d => {
+        if (d.id === currentActiveId) {
+          draftFound = true;
           return { ...d, boards: boardDefinitions };
         }
         return d;
       });
+
+      if (!draftFound && currentActiveId) {
+        updatedDrafts.push({
+          id: currentActiveId,
+          name: `Entwurf ${updatedDrafts.length + 1}`,
+          boards: boardDefinitions
+        });
+      }
+
+      draftsRef.current = updatedDrafts;
       setDrafts(updatedDrafts);
 
       // ZERO-DATA-LOSS HARDENING: Extract all student IDs belonging to this teacher
@@ -2561,22 +2655,44 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         .filter(id => id && !id.startsWith('group-') && !id.startsWith('break-'));
 
       const draftStateToSave = {
-        activeDraftId,
-        submittedDraftId: activeDraftId,
+        activeDraftId: currentActiveId,
+        submittedDraftId: currentActiveId,
         submittedAt: new Date().toISOString(),
         drafts: updatedDrafts,
         allTeacherStudentIds,
         unassignedStudentIds
       };
 
-      await supabase
-        .from('users')
-        .update({
-          planned_boards: draftStateToSave,
-          campus_räume: draftStateToSave,
-          groovelab_räume: draftStateToSave
-        })
-        .eq('id', selectedTeacherId);
+      // 1. Immediate local storage persistence
+      localStorage.setItem(`groovelab_teacher_draft_state_${activePlatform}_${selectedTeacherId}`, JSON.stringify(draftStateToSave));
+
+      // 2. Physical table persistence (users_raw)
+      try {
+        await supabase
+          .from('users_raw')
+          .update({
+            planned_boards: draftStateToSave,
+            campus_räume: draftStateToSave,
+            groovelab_räume: draftStateToSave
+          })
+          .eq('id', selectedTeacherId);
+      } catch (rawErr) {
+        console.warn('[ScheduleBoard] users_raw persistence note:', rawErr);
+      }
+
+      // 3. View persistence (users)
+      try {
+        await supabase
+          .from('users')
+          .update({
+            planned_boards: draftStateToSave,
+            campus_räume: draftStateToSave,
+            groovelab_räume: draftStateToSave
+          })
+          .eq('id', selectedTeacherId);
+      } catch (viewErr) {
+        console.warn('[ScheduleBoard] users view persistence note:', viewErr);
+      }
 
       await supabase
         .from('schedules')
@@ -4001,15 +4117,19 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
   };
 
   const handleSwitchDraft = (draftId: string) => {
-    if (draftId === activeDraftId) return;
+    const currentActiveId = activeDraftIdRef.current || activeDraftId;
+    if (draftId === currentActiveId) return;
 
     // 1. Sync current boards to active draft in drafts state
-    setDrafts(prev => prev.map(d => d.id === activeDraftId ? { ...d, boards } : d));
+    const syncedDrafts = (draftsRef.current.length > 0 ? draftsRef.current : drafts).map(d => d.id === currentActiveId ? { ...d, boards } : d);
+    draftsRef.current = syncedDrafts;
+    setDrafts(syncedDrafts);
 
-    const targetDraft = drafts.find(d => d.id === draftId);
+    const targetDraft = syncedDrafts.find(d => d.id === draftId);
     if (!targetDraft) return;
 
     setActiveDraftId(draftId);
+    activeDraftIdRef.current = draftId;
     let newBoards = targetDraft.boards || [];
     if (newBoards.length === 0 && boards.length > 0) {
       newBoards = boards.map(b => ({
@@ -4025,18 +4145,23 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
 
   const handleCreateDraft = () => {
     // Sync current boards to active draft before creating new one
-    setDrafts(prev => prev.map(d => d.id === activeDraftId ? { ...d, boards } : d));
+    const currentActiveId = activeDraftIdRef.current || activeDraftId;
+    const syncedDrafts = (draftsRef.current.length > 0 ? draftsRef.current : drafts).map(d => d.id === currentActiveId ? { ...d, boards } : d);
+    draftsRef.current = syncedDrafts;
+    setDrafts(syncedDrafts);
     setShowNewDraftPromptModal(true);
   };
 
   const handleConfirmNewDraft = (copyTimes: boolean) => {
     setShowNewDraftPromptModal(false);
     const newId = `draft-${crypto.randomUUID()}`;
-    const nextNumber = drafts.length + 1;
+    const currentList = draftsRef.current.length > 0 ? draftsRef.current : drafts;
+    const nextNumber = currentList.length + 1;
     const draftName = `Entwurf ${nextNumber}`;
 
     let initialBoards: DayBoard[] = [];
-    const activeDraft = drafts.find(d => d.id === activeDraftId) || drafts[0];
+    const currentActiveId = activeDraftIdRef.current || activeDraftId;
+    const activeDraft = currentList.find(d => d.id === currentActiveId) || currentList[0];
 
     if (copyTimes && activeDraft && activeDraft.boards && activeDraft.boards.length > 0) {
       // Copy existing teaching days & times, but clear student placements
@@ -4065,10 +4190,46 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
       boards: initialBoards
     };
 
-    setDrafts(prev => [...prev, newDraft]);
+    const nextDrafts = [...currentList, newDraft];
+    draftsRef.current = nextDrafts;
+    setDrafts(nextDrafts);
     setActiveDraftId(newId);
+    activeDraftIdRef.current = newId;
     setBoards(initialBoards);
     syncStudentsWithBoards(initialBoards);
+
+    // Immediate persistence to ensure draft is never lost on refresh or submit
+    const draftStateToSave = {
+      activeDraftId: newId,
+      submittedDraftId,
+      submittedAt: lastSubmittedTime ? new Date().toISOString() : '',
+      drafts: nextDrafts,
+      allTeacherStudentIds: Array.from(new Set((masterStudentsRef.current.length > 0 ? masterStudentsRef.current : students).map(s => s.id))),
+      unassignedStudentIds: students.filter(s => !s.isBreak && !s.assignedDay).map(s => s.id)
+    };
+    const activePlatform = localStorage.getItem('groovelab_active_platform') || 'groovelab';
+    const columnName = activePlatform === 'campus' ? 'campus_räume' : 'groovelab_räume';
+    localStorage.setItem(`groovelab_teacher_draft_state_${activePlatform}_${selectedTeacherId}`, JSON.stringify(draftStateToSave));
+    
+    supabase
+      .from('users_raw')
+      .update({
+        planned_boards: draftStateToSave,
+        campus_räume: draftStateToSave,
+        groovelab_räume: draftStateToSave
+      })
+      .eq('id', selectedTeacherId)
+      .then();
+
+    supabase
+      .from('users')
+      .update({
+        planned_boards: draftStateToSave,
+        campus_räume: draftStateToSave,
+        groovelab_räume: draftStateToSave
+      })
+      .eq('id', selectedTeacherId)
+      .then();
 
     if (!copyTimes) {
       // Open day & time setup modal for fresh configuration
@@ -4077,27 +4238,73 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
   };
 
   const handleDeleteDraft = async (draftId: string) => {
-    if (drafts.length <= 1) {
+    const currentList = draftsRef.current.length > 0 ? draftsRef.current : drafts;
+    if (currentList.length <= 1) {
       await showAlert('Der letzte verbleibende Entwurf kann nicht gelöscht werden.');
       return;
     }
     if (!await showConfirm('Möchtest du diesen Entwurf wirklich löschen?')) {
       return;
     }
-    const filtered = drafts.filter(d => d.id !== draftId);
+    const filtered = currentList.filter(d => d.id !== draftId);
     const updatedDrafts = filtered.map((d, index) => ({
       ...d,
       name: `Entwurf ${index + 1}`
     }));
     
+    draftsRef.current = updatedDrafts;
     setDrafts(updatedDrafts);
-    if (activeDraftId === draftId) {
+
+    let nextActiveId = activeDraftIdRef.current || activeDraftId;
+    let nextBoards = boards;
+
+    if (nextActiveId === draftId) {
       const fallback = updatedDrafts[0];
+      nextActiveId = fallback.id;
       setActiveDraftId(fallback.id);
-      const newBoards = fallback.boards || [];
-      setBoards(newBoards);
-      syncStudentsWithBoards(newBoards);
+      activeDraftIdRef.current = fallback.id;
+      nextBoards = fallback.boards || [];
+      setBoards(nextBoards);
+      syncStudentsWithBoards(nextBoards);
     }
+
+    const nextSubmittedDraftId = submittedDraftId === draftId ? '' : submittedDraftId;
+    if (submittedDraftId === draftId) {
+      setSubmittedDraftId('');
+    }
+
+    // Persist deletion immediately
+    const draftStateToSave = {
+      activeDraftId: nextActiveId,
+      submittedDraftId: nextSubmittedDraftId,
+      submittedAt: nextSubmittedDraftId ? lastSubmittedTime : '',
+      drafts: updatedDrafts,
+      allTeacherStudentIds: Array.from(new Set((masterStudentsRef.current.length > 0 ? masterStudentsRef.current : students).map(s => s.id))),
+      unassignedStudentIds: students.filter(s => !s.isBreak && !s.assignedDay).map(s => s.id)
+    };
+    const activePlatform = localStorage.getItem('groovelab_active_platform') || 'groovelab';
+    const columnName = activePlatform === 'campus' ? 'campus_räume' : 'groovelab_räume';
+    localStorage.setItem(`groovelab_teacher_draft_state_${activePlatform}_${selectedTeacherId}`, JSON.stringify(draftStateToSave));
+    
+    supabase
+      .from('users_raw')
+      .update({
+        planned_boards: draftStateToSave,
+        campus_räume: draftStateToSave,
+        groovelab_räume: draftStateToSave
+      })
+      .eq('id', selectedTeacherId)
+      .then();
+
+    supabase
+      .from('users')
+      .update({
+        planned_boards: draftStateToSave,
+        campus_räume: draftStateToSave,
+        groovelab_räume: draftStateToSave
+      })
+      .eq('id', selectedTeacherId)
+      .then();
   };
 
   const handleHardResetSystem = async () => {
@@ -5129,7 +5336,22 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                           if (!isActive) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.65)';
                         }}
                       >
-                        <span>{d.id === submittedDraftId ? 'Mein Stundenplan' : d.name}</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span>{d.name}</span>
+                          {d.id === submittedDraftId && (
+                            <span style={{
+                              background: isActive ? 'rgba(255, 255, 255, 0.3)' : 'rgba(52, 168, 83, 0.15)',
+                              color: isActive ? '#ffffff' : '#15803d',
+                              padding: '1px 5px',
+                              borderRadius: '4px',
+                              fontSize: '0.62rem',
+                              fontWeight: 800,
+                              letterSpacing: '0.02em'
+                            }}>
+                              Eingereicht
+                            </span>
+                          )}
+                        </div>
                         <span style={{ 
                           background: isActive ? 'rgba(255, 255, 255, 0.25)' : 'rgba(0, 0, 0, 0.05)', 
                           padding: '1px 5px', 

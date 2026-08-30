@@ -62,7 +62,7 @@ export function DpoAuditPortal({ onClose, schoolName = 'Stadtmusikschule', schoo
       id: 'WORM-LOG-10491',
       timestamp: '11.08.2026, 09:15:22 MESZ',
       actorRole: 'ADMIN',
-      actorName: 'Severin L. (Admin)',
+      actorName: 'Schulleitung (Admin)',
       action: 'Client-Side Data Minimization: Geburtsjahr/-monat verworfen (Tag 14 als OTP PIN gespeichert)',
       category: 'DATA_PRIVACY',
       target: 'Schüler-Anlegung (ID #8492)',

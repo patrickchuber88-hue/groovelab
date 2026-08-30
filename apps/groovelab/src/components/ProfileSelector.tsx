@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { UserPlus, Lock, X, ArrowLeft, Eye, EyeOff } from 'lucide-react';
+import { registerClientSessionLease } from '../utils/sessionLeaseManager';
 
 interface ProfileSelectorProps {
   onLoginSuccess: (userId: string) => void;
@@ -21,7 +22,7 @@ export const ProfileSelector: React.FC<ProfileSelectorProps> = ({ onLoginSuccess
     if (typeof window !== 'undefined') {
       const stored = JSON.parse(localStorage.getItem('groovelab_local_profiles') || '[]');
       if (schoolId) {
-        setProfiles(stored.filter((p: any) => p.school_id === schoolId || (p.school_id === 'cc05137f-5904-4774-80be-6a172c52bf99' && schoolId === '53e83805-1d5a-4ed8-988e-1fb0b8200b9c') || (p.school_id === '53e83805-1d5a-4ed8-988e-1fb0b8200b9c' && schoolId === 'cc05137f-5904-4774-80be-6a172c52bf99')));
+        setProfiles(stored.filter((p: any) => p.school_id === schoolId));
       } else {
         setProfiles(stored);
       }
@@ -41,6 +42,11 @@ export const ProfileSelector: React.FC<ProfileSelectorProps> = ({ onLoginSuccess
         sessionStorage.setItem('groovelab_user_id', profile.id);
         sessionStorage.setItem('groovelab_location_mode', 'home');
         sessionStorage.setItem('groovelab_active_platform', isCampusPlatform ? 'campus' : (profile.is_campus_active ? 'campus' : 'groovelab'));
+
+        // Register session lease on server
+        if (profile.school_id) {
+          registerClientSessionLease(profile, profile.school_id).catch(e => console.warn('[SessionLease] Register notice:', e));
+        }
 
         // Update local cache registry
         const registry = JSON.parse(localStorage.getItem('groovelab_local_profiles') || '[]');
@@ -152,6 +158,11 @@ export const ProfileSelector: React.FC<ProfileSelectorProps> = ({ onLoginSuccess
         sessionStorage.setItem('groovelab_user_id', user.id);
         sessionStorage.setItem('groovelab_location_mode', 'home');
         
+        // Register session lease
+        if (user.school_id) {
+          registerClientSessionLease(user, user.school_id).catch(e => console.warn('[SessionLease] Register notice:', e));
+        }
+
         // Update cached active platform to student's allowed modules
         const nextPlat = user.role === 'student' 
           ? (user.is_campus_active ? 'campus' : 'groovelab') 

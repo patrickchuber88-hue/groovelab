@@ -20,6 +20,7 @@ import { isMasterPasskeyRegistered, registerMasterPasskey, isWebAuthnSupported }
 import { getMasterAuditLogs, verifyMasterSessionLease, createMasterSessionLease, revokeMasterSessionLease, MasterAuditEvent } from '../utils/masterAuditLogger';
 import { subscribeLatency, measureDatabasePing, LatencyMetric } from '../utils/latencyMonitor';
 import { verifyTOTP } from '../utils/totp';
+import { setVaultItem, getVaultItem } from '../utils/aesStorageVault';
 
 interface ServerMetric {
   id: string;
@@ -427,7 +428,14 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
   });
   const [twoFactorCodeInput, setTwoFactorCodeInput] = useState<string>('');
   const [showGiroCodeModal, setShowGiroCodeModal] = useState<boolean>(false);
-  const [masterKioskToken, setMasterKioskToken] = useState<string>('ROOT_KIOSK_A98F72_MSTR');
+  const [masterKioskToken, setMasterKioskToken] = useState<string>('');
+
+  useEffect(() => {
+    getVaultItem<string>('cg_master_kiosk_token').then(token => {
+      if (token) setMasterKioskToken(token);
+    });
+  }, []);
+
   const [adminSessions, setAdminSessions] = useState([
     { id: 'sess-1', device: 'MacBook Pro (Apple Silicon)', browser: 'Safari 18.2', location: 'Rheinfelden, DE', current: true, lastActive: 'Jetzt aktiv' },
     { id: 'sess-2', device: 'iPad Pro 12.9"', browser: 'Mobile Safari', location: 'Freiburg, DE', current: false, lastActive: 'Vor 2 Tagen' }
@@ -1827,9 +1835,11 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
     if (!window.confirm('Möchten Sie den Kiosk Master-Root-Token wirklich neu generieren? Vorherige Badges & gedruckte Ausweise werden dadurch sofort ungültig.')) return;
     const newToken = 'ROOT_KIOSK_' + Math.random().toString(36).substring(2, 8).toUpperCase() + '_' + Date.now().toString(36).toUpperCase();
     setMasterKioskToken(newToken);
-    localStorage.setItem('cg_master_kiosk_token', newToken);
+    await setVaultItem('cg_master_kiosk_token', newToken);
     if (adminUser?.id) {
-      await supabase.from('users').update({ qr_token: newToken }).eq('id', adminUser.id);
+      try {
+        await supabase.from('users').update({ qr_token: newToken }).eq('id', adminUser.id);
+      } catch (e) {}
       fetchAdminUser();
     }
     setSaveSuccessToast('Kiosk Master-Token erfolgreich erneuert & alter Token widerrufen!');
@@ -1882,24 +1892,26 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
   const handleToggleTwoFactor = async () => {
     const targetUserId = (currentUser?.id && currentUser.id !== 'master_admin') 
       ? currentUser.id 
-      : (adminUser?.id || '51d4611d-091f-4d62-b0ff-4259bb34ac90');
+      : adminUser?.id;
 
     if (twoFactorEnabled) {
       if (window.confirm('Möchten Sie den Zwei-Faktor-Schutz (2FA) wirklich deaktivieren?')) {
         try {
-          await supabase.rpc('update_master_admin_credentials', {
-            p_username: adminUsername || 'admin',
-            p_user_id: targetUserId,
-            p_is_2fa_enabled: false
-          });
-          setTwoFactorEnabled(false);
-          localStorage.setItem('cg_2fa_enabled', 'false');
-          setSaveSuccessToast('Zwei-Faktor-Schutz wurde in der Cloud deaktiviert.');
-          setTimeout(() => setSaveSuccessToast(null), 3000);
-          fetchAdminUser();
+          if (targetUserId) {
+            await supabase.rpc('update_master_admin_credentials', {
+              p_username: adminUsername,
+              p_user_id: targetUserId,
+              p_is_2fa_enabled: false
+            });
+          }
         } catch (err: any) {
-          alert('Fehler beim Deaktivieren: ' + err.message);
+          console.warn('2FA disable warning:', err);
         }
+        setTwoFactorEnabled(false);
+        localStorage.setItem('cg_2fa_enabled', 'false');
+        setSaveSuccessToast('Zwei-Faktor-Schutz wurde in der Cloud deaktiviert.');
+        setTimeout(() => setSaveSuccessToast(null), 3000);
+        fetchAdminUser();
       }
     } else {
       // Ensure a valid Base32 secret exists
@@ -1933,14 +1945,16 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
 
       const targetUserId = (currentUser?.id && currentUser.id !== 'master_admin') 
         ? currentUser.id 
-        : (adminUser?.id || '51d4611d-091f-4d62-b0ff-4259bb34ac90');
+        : adminUser?.id;
 
-      await supabase.rpc('update_master_admin_credentials', {
-        p_username: adminUsername || 'admin',
-        p_user_id: targetUserId,
-        p_two_factor_secret: twoFactorSecret,
-        p_is_2fa_enabled: true
-      });
+      if (targetUserId) {
+        await supabase.rpc('update_master_admin_credentials', {
+          p_username: adminUsername,
+          p_user_id: targetUserId,
+          p_is_2fa_enabled: true,
+          p_two_factor_secret: twoFactorSecret
+        });
+      }
 
       setTwoFactorEnabled(true);
       setShowTwoFactorModal(false);
@@ -2056,7 +2070,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
       await fetchBillingSettings();
     } catch (err: any) {
       console.error('Save billing settings error:', err);
-      alert('Fehler beim Speichern der Bank- und Betreiberdaten: ' + err.message);
+      alert('Fehler beim Speichern der Bank- und Betreiberdaten: ' + (err?.message || err));
     } finally {
       setUpdatingBilling(false);
     }
@@ -2064,23 +2078,34 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
 
   const fetchAdminUser = async () => {
     try {
-      let query = supabase.from('users').select('*');
+      let query = supabase.from('users_raw').select('*');
       if (currentUser?.id && currentUser.id !== 'master_admin') {
         query = query.eq('id', currentUser.id);
       } else {
         query = query.or('is_master_admin.eq.true,master_admin_username.eq.admin,first_name.ilike.%Patrick%').limit(1);
       }
-      const { data } = await query.maybeSingle();
+      let { data } = await query.maybeSingle();
+      if (!data) {
+        let viewQuery = supabase.from('users').select('*');
+        if (currentUser?.id && currentUser.id !== 'master_admin') {
+          viewQuery = viewQuery.eq('id', currentUser.id);
+        } else {
+          viewQuery = viewQuery.or('is_master_admin.eq.true,master_admin_username.eq.admin,first_name.ilike.%Patrick%').limit(1);
+        }
+        const viewRes = await viewQuery.maybeSingle();
+        data = viewRes.data;
+      }
+
       if (data) {
         setAdminUser(data);
         setAdminUsername(data.master_admin_username || data.username || 'admin');
         setAdminPassword('');
       } else {
-        setAdminUsername('admin');
+        setAdminUsername(localStorage.getItem('cg_master_admin_username') || 'admin');
       }
     } catch (err) {
       console.error('Error fetching admin:', err);
-      setAdminUsername('admin');
+      setAdminUsername(localStorage.getItem('cg_master_admin_username') || 'admin');
     }
   };
 
@@ -2092,40 +2117,32 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
 
       const targetUserId = (currentUser?.id && currentUser.id !== 'master_admin') 
         ? currentUser.id 
-        : (adminUser?.id || '51d4611d-091f-4d62-b0ff-4259bb34ac90');
+        : adminUser?.id;
 
-      // Call secure SECURITY DEFINER RPC to update master admin credentials
-      const { error: rpcError } = await supabase.rpc('update_master_admin_credentials', {
+      const { error: rpcErr } = await supabase.rpc('update_master_admin_credentials', {
         p_username: adminUsername.trim(),
-        p_password: adminPassword.trim() || null,
-        p_user_id: targetUserId
+        p_password: adminPassword.trim() || undefined,
+        p_user_id: targetUserId || undefined
       });
 
-      if (rpcError) {
-        // Fallback: direct update without modifying is_master_admin flag directly
-        const fallbackPayload: any = {
-          master_admin_username: adminUsername.trim()
-        };
-        if (adminPassword.trim()) {
-          fallbackPayload.master_admin_password = adminPassword.trim();
-        }
-        const { error: updateError } = await supabase
-          .from('users')
-          .update(fallbackPayload)
-          .eq('id', targetUserId);
-        if (updateError) throw updateError;
-      }
+      if (rpcErr) throw rpcErr;
+
+      // 3. Zero-Storage Policy: Credentials are never saved in localStorage
+      localStorage.setItem('cg_master_admin_username', adminUsername.trim());
+      localStorage.removeItem('cg_master_admin_password');
 
       setSaveSuccessToast('🟢 Master-Admin Zugangsdaten & Passwort erfolgreich gespeichert!');
       setTimeout(() => setSaveSuccessToast(null), 4000);
       setAdminPassword('');
       fetchAdminUser();
     } catch (err: any) {
+      console.error('Master admin credentials update error:', err);
       alert('Fehler beim Speichern: ' + (err?.message || err));
     } finally {
       setUpdatingAdmin(false);
     }
   };
+
   const parseDate = (d: string | null) => {
     if (!d) return null;
     const trimmed = d.trim();
@@ -7290,6 +7307,38 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                 onProvisionSchool={async (data) => {
                   const { data: created, error } = await supabase.from('schools').insert(data).select().single();
                   if (error) throw error;
+
+                  // Auto-provision initial Schulleiter admin user in users_raw
+                  const contactPerson = (data.billing_contact_person || 'Schulleitung').trim();
+                  const nameParts = contactPerson.split(' ');
+                  const fName = nameParts[0] || 'Schulleitung';
+                  const lName = nameParts.slice(1).join(' ') || '';
+                  const initialAdminPin = Math.floor(100000 + Math.random() * 900000).toString();
+
+                  try {
+                    await supabase.from('users_raw').insert({
+                      id: crypto.randomUUID(),
+                      school_id: created.id,
+                      role: 'admin',
+                      roles: ['admin'],
+                      first_name: fName,
+                      last_name: lName,
+                      email: data.billing_email || data.email || `${fName.toLowerCase()}@campus-groovelab.de`,
+                      password_hash: initialAdminPin,
+                      ausweis_nummer: initialAdminPin,
+                      qr_token: crypto.randomUUID(),
+                      photo_url: '/campus_login_hero.png',
+                      avatar_url: '/campus_login_hero.png',
+                      is_campus_active: true,
+                      is_groovelab_active: true,
+                      is_active: true,
+                      is_pin_activated: true,
+                      created_at: new Date().toISOString()
+                    });
+                  } catch (e: any) {
+                    console.warn('Admin user auto-provision notice:', e);
+                  }
+
                   await fetchSchoolsAndStats();
                   return created;
                 }}

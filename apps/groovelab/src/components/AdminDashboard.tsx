@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase, deleteUserStorageAssets } from '../lib/supabase';
-import { Music, Calendar, AlertCircle, Library, Shield, ShieldCheck, LogOut, Users, User, Monitor, QrCode, Plus, Pencil, Trash2, Box, BarChart as LucideBarChart, Clock, Star, PieChart as LucidePieChart, TrendingUp, Tablet, ExternalLink, Settings, Search, Bell, MapPin, X, Printer, Award, Download, Mic, Check, CheckCircle2, ChevronLeft, ChevronRight, ChevronDown, GripVertical, BookOpen, Maximize2, ArrowLeft, GraduationCap, Lock, Activity, Zap, RefreshCw, Sliders, VolumeX, Copy, Eye, EyeOff, School, Lightbulb, Disc, XCircle, Volume2, FileText } from 'lucide-react';
+import { Music, Calendar, AlertCircle, Library, Shield, ShieldCheck, LogOut, Users, User, Monitor, QrCode, Plus, Pencil, Trash2, Box, BarChart as LucideBarChart, Clock, Star, PieChart as LucidePieChart, TrendingUp, Tablet, ExternalLink, Settings, Search, Bell, MapPin, X, Printer, Award, Download, Mic, Check, CheckCircle2, ChevronLeft, ChevronRight, ChevronDown, GripVertical, BookOpen, Maximize2, ArrowLeft, GraduationCap, Lock, Activity, Zap, RefreshCw, Sliders, VolumeX, Copy, Eye, EyeOff, School, Lightbulb, Disc, XCircle, Volume2, FileText, DoorClosed } from 'lucide-react';
 import { 
   ResponsiveContainer,
   BarChart as RechartsBarChart, Bar, XAxis, Tooltip, Cell,
@@ -8495,808 +8495,1253 @@ export function AdminDashboard({
 
         <div className="rooms-board-grid" style={{ display: 'grid', gap: '20px', alignItems: 'stretch', minWidth: 0 }}>
           {/* Left Column: Room catalog and weekly calendar */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', minWidth: 0, paddingBottom: isMobile ? '120px' : '0px' }}>
-            
-            {/* Room Horizontal Picker & Filter Bar */}
-            <div 
-              className="glass-panel" 
-              style={{ 
-                background: 'white', 
-                borderRadius: '24px', 
-                border: '1px solid rgba(0, 0, 0, 0.04)', 
-                padding: isMobile ? '14px 16px' : '18px 24px', 
-                boxShadow: '0 4px 24px -4px rgba(0, 0, 0, 0.02), 0 2px 12px -2px rgba(0, 0, 0, 0.01)'
-              }}
-            >
-              {/* Apple Unified High-Density 1-Row Toolbar */}
+          {isMobile ? (
+            /* 📱 Apple-Grade Mobile Rooms Architecture */
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', width: '100%', maxWidth: '100%', boxSizing: 'border-box', paddingBottom: '30px' }}>
+              
+              {/* 1. Apple Hero Room Card (Squircle 20px) */}
               <div style={{
+                background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+                borderRadius: '20px',
+                border: '1.5px solid #e2e8f0',
+                padding: '14px 16px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                gap: '10px',
-                flexWrap: isMobile ? 'wrap' : 'nowrap',
-                position: 'relative',
-                marginBottom: '18px'
+                boxShadow: '0 4px 16px rgba(0, 0, 0, 0.03)',
+                gap: '10px'
               }}>
-                {/* 1. Branding / Title Cluster */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-                  <div style={{ background: `${brandColor}12`, color: brandColor, padding: '6px', borderRadius: '10px', display: 'flex', alignItems: 'center' }}>
-                    <Box size={16} />
-                  </div>
-                  <h2 style={{ fontSize: '1.02rem', fontWeight: 900, color: '#1c1c1e', margin: 0, letterSpacing: '-0.02em', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <span>Campus Räume</span>
-                    <span style={{ fontSize: '0.68rem', background: '#f2f2f7', color: '#636366', padding: '2px 7px', borderRadius: '100px', fontWeight: 800 }}>
-                      {rooms.length}
-                    </span>
-                  </h2>
-                </div>
-
-                {/* 2. Apple Spotlight Search Input (Pure, Dedicated Search) */}
-                <div style={{ position: 'relative', flex: isMobile ? '1 1 100%' : '0 1 180px', minWidth: isMobile ? '100%' : '130px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0, flex: 1 }}>
                   <div style={{
+                    width: '42px',
+                    height: '42px',
+                    borderRadius: '14px',
+                    background: `${brandColor}15`,
+                    color: brandColor,
                     display: 'flex',
                     alignItems: 'center',
-                    background: '#f2f2f7',
-                    border: '1px solid rgba(0,0,0,0.04)',
-                    borderRadius: '11px',
-                    padding: '3px 8px 3px 10px',
-                    gap: '6px',
-                    transition: 'all 0.15s ease'
+                    justifyContent: 'center',
+                    boxShadow: `0 2px 8px ${brandColor}20`,
+                    flexShrink: 0
                   }}>
-                    <Search size={13} color="#8e8e93" style={{ flexShrink: 0 }} />
-                    <input
-                      type="text"
-                      placeholder="Raum suchen..."
-                      value={roomSearchQuery}
-                      onChange={(e) => {
-                        setRoomSearchQuery(e.target.value);
-                        setIsRoomSearchDropdownOpen(true);
-                      }}
-                      onFocus={() => setIsRoomSearchDropdownOpen(true)}
-                      onBlur={() => {
-                        setTimeout(() => setIsRoomSearchDropdownOpen(false), 200);
-                      }}
-                      style={{
-                        border: 'none',
-                        background: 'transparent',
-                        outline: 'none',
-                        fontSize: '0.75rem',
-                        color: '#1c1c1e',
-                        fontWeight: 600,
-                        width: '100%',
-                        minWidth: '50px',
-                        padding: '3px 0'
-                      }}
-                    />
-                    {roomSearchQuery && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setRoomSearchQuery('');
-                          setIsRoomSearchDropdownOpen(false);
-                        }}
-                        style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }}
-                      >
-                        <X size={11} color="#8e8e93" />
-                      </button>
-                    )}
+                    <DoorClosed size={22} />
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{ fontSize: '1.05rem', fontWeight: 900, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', letterSpacing: '-0.02em' }}>
+                        {selectedRoom?.name || 'Raum auswählen'}
+                      </span>
+                      <span style={{ fontSize: '0.65rem', background: '#f1f5f9', color: '#475569', padding: '2px 7px', borderRadius: '6px', fontWeight: 800, flexShrink: 0 }}>
+                        {(!selectedRoom?.floor || selectedRoom?.floor === 'Allgemein') ? 'EG' : selectedRoom.floor}
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '3px' }}>
+                      {isRoomOccupiedNow(selectedRoom?.id) ? (
+                        <span style={{ fontSize: '0.72rem', color: '#dc2626', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                          <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#ef4444' }} />
+                          Jetzt belegt
+                        </span>
+                      ) : (
+                        <span style={{ fontSize: '0.72rem', color: '#16a34a', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                          <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#22c55e', boxShadow: '0 0 6px rgba(34,197,94,0.6)' }} />
+                          Jetzt frei
+                        </span>
+                      )}
+                      <span style={{ fontSize: '0.68rem', color: '#94a3b8' }}>•</span>
+                      <span style={{ fontSize: '0.70rem', color: '#64748b', fontWeight: 600 }}>
+                        {rooms.length} Räume
+                      </span>
+                    </div>
                   </div>
                 </div>
 
-                {/* 3. Availability Quick-Filters Cluster (Tier-1 SaaS Enterprise) */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexShrink: 0, position: 'relative' }}>
-                  {/* Quick-Toggle: Jetzt frei */}
-                  <button
-                    type="button"
-                    onClick={() => setShowOnlyFreeNow(prev => !prev)}
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '5px',
-                      background: showOnlyFreeNow ? '#ecfdf5' : '#f2f2f7',
-                      color: showOnlyFreeNow ? '#15803d' : '#475569',
-                      border: showOnlyFreeNow ? '1.5px solid #86efac' : '1px solid rgba(0,0,0,0.03)',
-                      borderRadius: '11px',
-                      padding: '5px 9px',
-                      fontSize: '0.70rem',
-                      fontWeight: showOnlyFreeNow ? 850 : 650,
-                      cursor: 'pointer',
-                      whiteSpace: 'nowrap',
-                      boxShadow: showOnlyFreeNow ? '0 2px 6px rgba(34, 197, 94, 0.12)' : 'none',
-                      transition: 'all 0.15s ease'
-                    }}
-                    title="Nur Räume anzeigen, die jetzt im Moment frei sind"
-                  >
-                    <Zap size={11} fill={showOnlyFreeNow ? '#15803d' : 'none'} color={showOnlyFreeNow ? '#15803d' : '#64748b'} />
-                    <span>Jetzt frei</span>
-                  </button>
+                {/* Meine Buchungen Quick Pill */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowMyBookingsOnly(true);
+                    setShowMobileRoomSlider(true);
+                  }}
+                  style={{
+                    background: '#f5f3ff',
+                    color: '#7c3aed',
+                    border: '1.5px solid #ddd6fe',
+                    borderRadius: '12px',
+                    padding: '8px 12px',
+                    fontSize: '0.74rem',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    flexShrink: 0,
+                    boxShadow: '0 2px 6px rgba(124, 58, 237, 0.1)'
+                  }}
+                >
+                  <Calendar size={13} strokeWidth={2.4} />
+                  <span>Meine ({myBookings.length})</span>
+                </button>
+              </div>
 
-                  {/* Slot-Finder / Date-Filter Pill */}
-                  {isDateFilterActive ? (
+              {/* 2. Apple Horizontal Snap Room Carousel */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <div style={{
+                  display: 'flex',
+                  gap: '10px',
+                  overflowX: 'auto',
+                  WebkitOverflowScrolling: 'touch',
+                  paddingBottom: '4px',
+                  paddingTop: '2px',
+                  scrollSnapType: 'x mandatory'
+                }} className="custom-calendar-scrollbar">
+                  {roomsToRender.map((room) => {
+                    const isSelected = selectedCampusRoomId === room.id || selectedRoom?.id === room.id;
+                    const occupiedNow = isRoomOccupiedNow(room.id);
+                    const hasPiano = checkRoomMatchesInstrumentFilter(room, 'klavier', admin?.school_id);
+                    const hasDrums = checkRoomMatchesInstrumentFilter(room, 'schlagzeug', admin?.school_id);
+                    const hasPA = checkRoomMatchesInstrumentFilter(room, 'pa', admin?.school_id);
+                    const isGroovelab = (room.name || '').toLowerCase().includes('groovelab') || (room as any).is_groovelab;
+                    const roomFloor = (!room.floor || room.floor === 'Allgemein') ? 'EG' : room.floor;
+
+                    return (
+                      <div
+                        key={room.id}
+                        onClick={() => setSelectedCampusRoomId(room.id)}
+                        style={{
+                          background: isSelected ? '#ffffff' : '#f8fafc',
+                          border: isSelected ? `2px solid ${brandColor}` : '1.5px solid #e2e8f0',
+                          borderRadius: '16px',
+                          padding: '10px 12px',
+                          minWidth: '135px',
+                          maxWidth: '150px',
+                          flexShrink: 0,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '6px',
+                          boxShadow: isSelected ? `0 4px 14px ${brandColor}22` : 'none',
+                          transition: 'all 0.15s ease',
+                          scrollSnapAlign: 'start'
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{
+                            fontSize: '0.84rem',
+                            fontWeight: 900,
+                            color: isSelected ? brandColor : '#0f172a',
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis'
+                          }}>
+                            {room.name}
+                          </span>
+                          {occupiedNow ? (
+                            <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#ef4444', flexShrink: 0 }} />
+                          ) : (
+                            <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#22c55e', flexShrink: 0 }} />
+                          )}
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.68rem', color: '#64748b' }}>
+                          <span style={{ background: '#f1f5f9', padding: '1px 5px', borderRadius: '4px', fontWeight: 800, fontSize: '0.62rem' }}>
+                            {roomFloor}
+                          </span>
+                          {hasPiano && <span>🎹</span>}
+                          {hasDrums && <span>🥁</span>}
+                          {hasPA && <span>🎤</span>}
+                          {isGroovelab && <span>⚡</span>}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* 3. Compact Filter Chips */}
+              <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: '2px' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowOnlyFreeNow(prev => !prev)}
+                  style={{
+                    padding: '6px 12px',
+                    borderRadius: '10px',
+                    border: showOnlyFreeNow ? '1.5px solid #22c55e' : '1px solid #e2e8f0',
+                    background: showOnlyFreeNow ? '#ecfdf5' : '#ffffff',
+                    color: showOnlyFreeNow ? '#15803d' : '#475569',
+                    fontWeight: showOnlyFreeNow ? 850 : 650,
+                    fontSize: '0.72rem',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    whiteSpace: 'nowrap',
+                    flexShrink: 0
+                  }}
+                >
+                  <Zap size={12} fill={showOnlyFreeNow ? '#15803d' : 'none'} color={showOnlyFreeNow ? '#15803d' : '#64748b'} />
+                  <span>Jetzt frei</span>
+                </button>
+
+                {[
+                  { label: 'Alle', value: 'Alle', icon: null },
+                  { label: 'Klavier', value: 'klavier', icon: Music },
+                  { label: 'Drums', value: 'schlagzeug', icon: Disc },
+                  { label: 'PA', value: 'pa', icon: Volume2 }
+                ].map((eq) => {
+                  const isSelected = selectedEquipmentFilter === eq.value;
+                  return (
                     <button
+                      key={eq.value}
                       type="button"
-                      onClick={() => {
-                        setIsDateFilterActive(false);
-                        setFinderResultCount(null);
-                      }}
-                      title="Zeitfilter zurücksetzen"
+                      onClick={() => setSelectedEquipmentFilter(eq.value)}
                       style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                        background: '#dcfce7',
-                        color: '#15803d',
-                        border: '1.5px solid #86efac',
-                        borderRadius: '11px',
-                        padding: '5px 9px',
-                        fontSize: '0.70rem',
-                        fontWeight: 850,
+                        padding: '6px 10px',
+                        borderRadius: '10px',
+                        border: isSelected ? `1.5px solid ${brandColor}` : '1px solid #e2e8f0',
+                        background: isSelected ? `${brandColor}15` : '#ffffff',
+                        color: isSelected ? brandColor : '#475569',
+                        fontWeight: isSelected ? 850 : 650,
+                        fontSize: '0.72rem',
                         cursor: 'pointer',
                         whiteSpace: 'nowrap',
-                        boxShadow: '0 2px 6px rgba(34, 197, 94, 0.12)'
+                        flexShrink: 0
                       }}
                     >
-                      <Clock size={11} strokeWidth={2.4} />
-                      <span>{bookingStartTime}-{bookingEndTime}</span>
-                      <X size={11} strokeWidth={3} />
+                      {eq.label}
                     </button>
-                  ) : (
+                  );
+                })}
+
+                {isDateFilterActive ? (
+                  <button
+                    type="button"
+                    onClick={() => setIsDateFilterActive(false)}
+                    style={{
+                      padding: '6px 10px',
+                      borderRadius: '10px',
+                      border: '1.5px solid #86efac',
+                      background: '#dcfce7',
+                      color: '#15803d',
+                      fontWeight: 850,
+                      fontSize: '0.72rem',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      whiteSpace: 'nowrap',
+                      flexShrink: 0
+                    }}
+                  >
+                    <Clock size={12} strokeWidth={2.4} />
+                    <span>{bookingStartTime}-{bookingEndTime}</span>
+                    <X size={12} strokeWidth={3} />
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setShowRoomFinderBar(prev => !prev)}
+                    style={{
+                      padding: '6px 10px',
+                      borderRadius: '10px',
+                      border: '1px solid #e2e8f0',
+                      background: '#ffffff',
+                      color: '#475569',
+                      fontWeight: 650,
+                      fontSize: '0.72rem',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      whiteSpace: 'nowrap',
+                      flexShrink: 0
+                    }}
+                  >
+                    <Clock size={12} />
+                    <span>Freier Slot</span>
+                  </button>
+                )}
+              </div>
+
+              {/* Smart Slot Finder Popover if opened on mobile */}
+              {showRoomFinderBar && (
+                <div style={{
+                  background: '#ffffff',
+                  borderRadius: '18px',
+                  border: '1.5px solid #e2e8f0',
+                  padding: '14px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '10px',
+                  boxShadow: '0 8px 24px rgba(0,0,0,0.06)'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.82rem', fontWeight: 900, color: '#0f172a' }}>Freien Zeitraum finden</span>
+                    <button type="button" onClick={() => setShowRoomFinderBar(false)} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#94a3b8' }}>
+                      <X size={16} />
+                    </button>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr', gap: '6px' }}>
+                    <input type="date" value={bookingDate} onChange={e => setBookingDate(e.target.value)} style={{ padding: '6px 8px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.75rem', fontWeight: 700 }} />
+                    <select value={finderStartTime} onChange={e => setFinderStartTime(e.target.value)} style={{ padding: '6px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.75rem', fontWeight: 700 }}>
+                      {Array.from({ length: 27 }, (_, i) => { const min = i * 30 + 480; const hh = String(Math.floor(min/60)).padStart(2,'0'); const mm = String(min%60).padStart(2,'0'); return `${hh}:${mm}`; }).map(t => <option key={t} value={t}>{t}</option>)}
+                    </select>
+                    <select value={finderEndTime} onChange={e => setFinderEndTime(e.target.value)} style={{ padding: '6px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.75rem', fontWeight: 700 }}>
+                      {Array.from({ length: 27 }, (_, i) => { const min = i * 30 + 480; const hh = String(Math.floor(min/60)).padStart(2,'0'); const mm = String(min%60).padStart(2,'0'); return `${hh}:${mm}`; }).map(t => <option key={t} value={t}>{t}</option>)}
+                    </select>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setBookingStartTime(finderStartTime);
+                      setBookingEndTime(finderEndTime);
+                      setIsDateFilterActive(true);
+                      setShowRoomFinderBar(false);
+                    }}
+                    style={{
+                      padding: '8px',
+                      borderRadius: '10px',
+                      background: brandColor,
+                      color: '#ffffff',
+                      border: 'none',
+                      fontWeight: 800,
+                      fontSize: '0.78rem',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Freie Räume anzeigen
+                  </button>
+                </div>
+              )}
+
+              {/* 4. Apple 7-Tage-Wochenband & Navigation Card */}
+              <div style={{
+                background: '#ffffff',
+                borderRadius: '22px',
+                border: '1.5px solid #e2e8f0',
+                padding: '14px 16px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '12px',
+                boxShadow: '0 4px 16px rgba(0,0,0,0.03)'
+              }}>
+                {/* Week Header & Jump to Today */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: '#f8fafc', padding: '3px 8px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
                     <button
                       type="button"
-                      onClick={() => setShowRoomFinderBar(prev => !prev)}
+                      onClick={() => changeWeek(-1)}
+                      style={{ border: 'none', background: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', color: '#64748b' }}
+                    >
+                      <ChevronLeft size={16} />
+                    </button>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 850, color: '#0f172a', whiteSpace: 'nowrap' }}>
+                      <span style={{ color: brandColor }}>KW {getCalendarWeek(bookingDate)}</span>
+                      <span style={{ fontSize: '0.68rem', color: '#64748b', marginLeft: '4px' }}>({getWeekRange(bookingDate)})</span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => changeWeek(1)}
+                      style={{ border: 'none', background: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', color: '#64748b' }}
+                    >
+                      <ChevronRight size={16} />
+                    </button>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const today = new Date();
+                      const dateStr = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
+                      setBookingDate(dateStr);
+                      const d = today.getDay();
+                      setMobileSelectedDayIdx(d === 0 ? 6 : d - 1);
+                    }}
+                    style={{
+                      background: '#f1f5f9',
+                      border: '1px solid #e2e8f0',
+                      color: '#0f172a',
+                      padding: '5px 12px',
+                      borderRadius: '10px',
+                      fontWeight: 800,
+                      fontSize: '0.74rem',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Heute
+                  </button>
+                </div>
+
+                {/* 7-Days Strip Buttons */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px' }}>
+                  {DAYS_OF_WEEK.map((day, dIdx) => {
+                    const isSelected = mobileSelectedDayIdx === dIdx;
+                    const isToday = isTodayInWeek(bookingDate) && isDayToday(dIdx, bookingDate);
+                    const dayDateStr = getWeekdayDate(dIdx, bookingDate);
+                    const dayNumber = dayDateStr.split('.')[0];
+
+                    return (
+                      <button
+                        key={day.value}
+                        type="button"
+                        onClick={() => {
+                          setMobileSelectedDayIdx(dIdx);
+                          const cur = parseLocalDate(bookingDate);
+                          const dayOfWeek = cur.getUTCDay();
+                          const diffToMon = cur.getUTCDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1);
+                          cur.setUTCDate(diffToMon + dIdx);
+                          setBookingDate(toBerlinYYYYMMDD(cur));
+                        }}
+                        style={{
+                          padding: '8px 2px',
+                          borderRadius: '14px',
+                          border: isSelected ? `2px solid ${brandColor}` : (isToday ? '1.5px solid #86efac' : '1px solid #f1f5f9'),
+                          background: isSelected ? brandColor : (isToday ? '#f0fdf4' : '#f8fafc'),
+                          color: isSelected ? '#ffffff' : (isToday ? '#15803d' : '#334155'),
+                          fontWeight: isSelected ? 900 : 700,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          gap: '2px',
+                          transition: 'all 0.15s ease',
+                          boxShadow: isSelected ? `0 4px 12px ${brandColor}35` : 'none'
+                        }}
+                      >
+                        <span style={{ fontSize: '0.68rem', opacity: isSelected ? 0.9 : 0.7, textTransform: 'uppercase' }}>{day.short}</span>
+                        <span style={{ fontSize: '0.90rem', fontWeight: 900 }}>{dayNumber}</span>
+                        {isToday && (
+                          <span style={{ width: 4, height: 4, borderRadius: '50%', background: isSelected ? '#ffffff' : '#22c55e', marginTop: '1px' }} />
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* 5. Interactive Visual Timeline for the selected day */}
+              <div style={{
+                background: '#ffffff',
+                borderRadius: '22px',
+                border: '1.5px solid #e2e8f0',
+                padding: '16px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '10px',
+                boxShadow: '0 4px 16px rgba(0,0,0,0.03)',
+                position: 'relative'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '8px', borderBottom: '1px solid #f1f5f9' }}>
+                  <span style={{ fontSize: '0.85rem', fontWeight: 900, color: '#0f172a' }}>
+                    Tagesbelegung ({DAYS_OF_WEEK[mobileSelectedDayIdx].label}, {getWeekdayDate(mobileSelectedDayIdx, bookingDate)})
+                  </span>
+                  <span style={{ fontSize: '0.70rem', color: '#64748b', fontWeight: 600 }}>
+                    08:00 – 21:00 Uhr
+                  </span>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {TIME_SLOTS.map((hour) => {
+                    const slotBookings = getBookingsForSlot(mobileSelectedDayIdx, hour);
+                    const isFree = slotBookings.length === 0;
+                    const slotHourInt = parseInt(hour.split(':')[0]);
+                    const nextHourStr = `${String(slotHourInt + 1).padStart(2, '0')}:00`;
+                    const isToday = isTodayInWeek(bookingDate) && isDayToday(mobileSelectedDayIdx, bookingDate);
+                    const currentHour = new Date().getHours();
+                    const currentMin = new Date().getMinutes();
+                    const isCurrentHour = isToday && currentHour === slotHourInt;
+
+                    return (
+                      <div
+                        key={hour}
+                        style={{
+                          position: 'relative',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          borderRadius: '14px',
+                          border: isFree ? '1.5px solid #e2e8f0' : '1.5px solid #cbd5e1',
+                          background: isFree ? '#ffffff' : '#f8fafc',
+                          padding: '10px 14px',
+                          gap: '8px',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        {/* Real-time Indicator Line if today and current hour */}
+                        {isCurrentHour && (
+                          <div style={{
+                            position: 'absolute',
+                            top: `${(currentMin / 60) * 100}%`,
+                            left: 0,
+                            right: 0,
+                            height: '2px',
+                            background: '#ef4444',
+                            boxShadow: '0 0 8px rgba(239, 68, 68, 0.8)',
+                            zIndex: 2,
+                            pointerEvents: 'none'
+                          }}>
+                            <span style={{
+                              position: 'absolute',
+                              right: '6px',
+                              top: '-8px',
+                              background: '#ef4444',
+                              color: '#ffffff',
+                              fontSize: '0.58rem',
+                              fontWeight: 800,
+                              padding: '1px 5px',
+                              borderRadius: '100px'
+                            }}>
+                              Jetzt
+                            </span>
+                          </div>
+                        )}
+
+                        {/* Slot Header Bar */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ fontSize: '0.80rem', fontWeight: 800, color: '#0f172a' }}>
+                              {hour} - {nextHourStr}
+                            </span>
+                            {isFree ? (
+                              <span style={{ fontSize: '0.66rem', fontWeight: 800, color: '#16a34a', background: '#dcfce7', padding: '2px 7px', borderRadius: '6px' }}>
+                                Frei
+                              </span>
+                            ) : (
+                              <span style={{ fontSize: '0.66rem', fontWeight: 800, color: '#991b1b', background: '#fee2e2', padding: '2px 7px', borderRadius: '6px' }}>
+                                {slotBookings.length} Belegung{slotBookings.length > 1 ? 'en' : ''}
+                              </span>
+                            )}
+                          </div>
+
+                          {isFree && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setBookingStartTime(hour);
+                                setBookingEndTime(nextHourStr);
+                                setSelectedBooking(null);
+                                setShowMyBookingsOnly(false);
+                                setShowMobileRoomSlider(true);
+                              }}
+                              style={{
+                                background: brandColor,
+                                color: '#ffffff',
+                                border: 'none',
+                                borderRadius: '10px',
+                                padding: '5px 12px',
+                                fontSize: '0.74rem',
+                                fontWeight: 850,
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                boxShadow: `0 2px 8px ${brandColor}30`
+                              }}
+                            >
+                              <Plus size={12} strokeWidth={2.6} />
+                              <span>Buchen</span>
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Bookings within this slot */}
+                        {!isFree && (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                            {slotBookings.map((b: any) => {
+                              const isGroovelabBlock = b.teacherId === 'groovelab' || (b.purpose && b.purpose.toLowerCase().includes('groovelab'));
+                              const isOwnBooking = b.teacherId === userId;
+
+                              return (
+                                <div
+                                  key={b.id}
+                                  onClick={() => {
+                                    if (isOwnBooking || !b.isSchedule) {
+                                      setSelectedBooking(b);
+                                      setBookingDate(b.date || bookingDate);
+                                      setBookingStartTime(b.startTime);
+                                      setBookingEndTime(b.endTime);
+                                      setBookingPurpose(b.purpose || '');
+                                      setShowMyBookingsOnly(false);
+                                      setShowMobileRoomSlider(true);
+                                    }
+                                  }}
+                                  style={{
+                                    padding: '10px 12px',
+                                    borderRadius: '12px',
+                                    background: isGroovelabBlock ? '#fef9c3' : (isOwnBooking ? '#ecfdf5' : '#f1f5f9'),
+                                    border: isGroovelabBlock ? '1.5px solid #fde047' : (isOwnBooking ? '1.5px solid #86efac' : '1px solid #e2e8f0'),
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'center',
+                                    cursor: (isOwnBooking || !b.isSchedule) ? 'pointer' : 'default'
+                                  }}
+                                >
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                      <span style={{ fontSize: '0.78rem', fontWeight: 900, color: isOwnBooking ? '#166534' : '#0f172a' }}>
+                                        {b.startTime} - {b.endTime} • {b.teacherName || b.purpose || 'Belegt'}
+                                      </span>
+                                      {isOwnBooking && (
+                                        <span style={{ fontSize: '0.60rem', background: '#dcfce7', color: '#15803d', padding: '1px 5px', borderRadius: '4px', fontWeight: 800 }}>
+                                          Deine Buchung
+                                        </span>
+                                      )}
+                                    </div>
+                                    {b.purpose && (
+                                      <span style={{ fontSize: '0.70rem', color: '#475569', fontWeight: 650 }}>
+                                        {b.purpose}
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  {isOwnBooking && !b.isSchedule && (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setSelectedBooking(b);
+                                          setBookingDate(b.date || bookingDate);
+                                          setBookingStartTime(b.startTime);
+                                          setBookingEndTime(b.endTime);
+                                          setBookingPurpose(b.purpose || '');
+                                          setShowMyBookingsOnly(false);
+                                          setShowMobileRoomSlider(true);
+                                        }}
+                                        style={{
+                                          border: 'none',
+                                          background: '#dcfce7',
+                                          color: '#15803d',
+                                          borderRadius: '8px',
+                                          padding: '4px 8px',
+                                          fontSize: '0.68rem',
+                                          fontWeight: 800,
+                                          cursor: 'pointer'
+                                        }}
+                                      >
+                                        Verwalten
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Mobile Floating Action Button (FAB) */}
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedBooking(null);
+                  setShowMyBookingsOnly(false);
+                  setShowMobileRoomSlider(true);
+                }}
+                style={{
+                  position: 'fixed',
+                  bottom: '80px',
+                  right: '20px',
+                  zIndex: 999,
+                  background: `linear-gradient(135deg, ${brandColor}, #15803d)`,
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '50px',
+                  padding: '12px 20px',
+                  fontSize: '0.85rem',
+                  fontWeight: 800,
+                  boxShadow: `0 8px 24px ${brandColor}50`,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  cursor: 'pointer'
+                }}
+              >
+                <Plus size={18} strokeWidth={2.5} />
+                <span>Raum buchen</span>
+              </button>
+            </div>
+          ) : (
+            /* 🖥️ Desktop Left Column: Room catalog and weekly calendar */
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', minWidth: 0, paddingBottom: '0px' }}>
+              
+              {/* Room Horizontal Picker & Filter Bar */}
+              <div 
+                className="glass-panel" 
+                style={{ 
+                  background: 'white', 
+                  borderRadius: '24px', 
+                  border: '1px solid rgba(0, 0, 0, 0.04)', 
+                  padding: '18px 24px', 
+                  boxShadow: '0 4px 24px -4px rgba(0, 0, 0, 0.02), 0 2px 12px -2px rgba(0, 0, 0, 0.01)'
+                }}
+              >
+                {/* Apple Unified High-Density 1-Row Toolbar */}
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '10px',
+                  flexWrap: 'nowrap',
+                  position: 'relative',
+                  marginBottom: '18px'
+                }}>
+                  {/* 1. Branding / Title Cluster */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                    <div style={{ background: `${brandColor}12`, color: brandColor, padding: '6px', borderRadius: '10px', display: 'flex', alignItems: 'center' }}>
+                      <Box size={16} />
+                    </div>
+                    <h2 style={{ fontSize: '1.02rem', fontWeight: 900, color: '#1c1c1e', margin: 0, letterSpacing: '-0.02em', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span>Campus Räume</span>
+                      <span style={{ fontSize: '0.68rem', background: '#f2f2f7', color: '#636366', padding: '2px 7px', borderRadius: '100px', fontWeight: 800 }}>
+                        {rooms.length}
+                      </span>
+                    </h2>
+                  </div>
+
+                  {/* 2. Apple Spotlight Search Input */}
+                  <div style={{ position: 'relative', flex: '0 1 180px', minWidth: '130px' }}>
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      background: '#f2f2f7',
+                      border: '1px solid rgba(0,0,0,0.04)',
+                      borderRadius: '11px',
+                      padding: '3px 8px 3px 10px',
+                      gap: '6px',
+                      transition: 'all 0.15s ease'
+                    }}>
+                      <Search size={13} color="#8e8e93" style={{ flexShrink: 0 }} />
+                      <input
+                        type="text"
+                        placeholder="Raum suchen..."
+                        value={roomSearchQuery}
+                        onChange={(e) => {
+                          setRoomSearchQuery(e.target.value);
+                          setIsRoomSearchDropdownOpen(true);
+                        }}
+                        onFocus={() => setIsRoomSearchDropdownOpen(true)}
+                        onBlur={() => {
+                          setTimeout(() => setIsRoomSearchDropdownOpen(false), 200);
+                        }}
+                        style={{
+                          border: 'none',
+                          background: 'transparent',
+                          outline: 'none',
+                          fontSize: '0.75rem',
+                          color: '#1c1c1e',
+                          fontWeight: 600,
+                          width: '100%',
+                          minWidth: '50px',
+                          padding: '3px 0'
+                        }}
+                      />
+                      {roomSearchQuery && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setRoomSearchQuery('');
+                            setIsRoomSearchDropdownOpen(false);
+                          }}
+                          style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }}
+                        >
+                          <X size={11} color="#8e8e93" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* 3. Availability Quick-Filters Cluster */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexShrink: 0, position: 'relative' }}>
+                    <button
+                      type="button"
+                      onClick={() => setShowOnlyFreeNow(prev => !prev)}
                       style={{
                         display: 'inline-flex',
                         alignItems: 'center',
                         gap: '5px',
-                        background: showRoomFinderBar ? `${brandColor}18` : '#f2f2f7',
-                        color: showRoomFinderBar ? brandColor : '#475569',
-                        border: showRoomFinderBar ? `1.5px solid ${brandColor}50` : '1px solid rgba(0,0,0,0.03)',
+                        background: showOnlyFreeNow ? '#ecfdf5' : '#f2f2f7',
+                        color: showOnlyFreeNow ? '#15803d' : '#475569',
+                        border: showOnlyFreeNow ? '1.5px solid #86efac' : '1px solid rgba(0,0,0,0.03)',
                         borderRadius: '11px',
                         padding: '5px 9px',
                         fontSize: '0.70rem',
-                        fontWeight: showRoomFinderBar ? 850 : 650,
+                        fontWeight: showOnlyFreeNow ? 850 : 650,
                         cursor: 'pointer',
                         whiteSpace: 'nowrap',
+                        boxShadow: showOnlyFreeNow ? '0 2px 6px rgba(34, 197, 94, 0.12)' : 'none',
                         transition: 'all 0.15s ease'
                       }}
-                      title="Freien Zeitraum oder Slot suchen"
+                      title="Nur Räume anzeigen, die jetzt im Moment frei sind"
                     >
-                      <Clock size={11} strokeWidth={2.2} color={showRoomFinderBar ? brandColor : '#64748b'} />
-                      <span>Freier Slot</span>
-                      <ChevronDown size={10} strokeWidth={2.5} />
+                      <Zap size={11} fill={showOnlyFreeNow ? '#15803d' : 'none'} color={showOnlyFreeNow ? '#15803d' : '#64748b'} />
+                      <span>Jetzt frei</span>
                     </button>
-                  )}
 
-                  {/* Apple Popover: Smart Slot Finder */}
-                  {showRoomFinderBar && (
-                    <div style={{
-                      position: 'absolute',
-                      top: 'calc(100% + 8px)',
-                      left: 0,
-                      width: isMobile ? '100%' : '320px',
-                      background: '#ffffff',
-                      borderRadius: '18px',
-                      border: '1px solid rgba(0,0,0,0.08)',
-                      padding: '16px',
-                      boxShadow: '0 14px 34px -4px rgba(0,0,0,0.14), 0 4px 12px rgba(0,0,0,0.06)',
-                      zIndex: 100,
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '12px',
-                      animation: 'fadeIn 0.15s ease'
-                    }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontSize: '0.8rem', fontWeight: 900, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <Clock size={14} color={brandColor} strokeWidth={2.4} />
-                          Freien Zeitraum finden
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => setShowRoomFinderBar(false)}
-                          style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#94a3b8', padding: '2px' }}
-                        >
-                          <X size={14} />
-                        </button>
-                      </div>
-
-                      {/* Quick Date Chips */}
-                      <div style={{ display: 'flex', gap: '4px' }}>
-                        {[
-                          { label: 'Heute', offset: 0 },
-                          { label: 'Morgen', offset: 1 },
-                          { label: 'In 2 Tagen', offset: 2 }
-                        ].map((chip) => {
-                          const d = new Date();
-                          d.setDate(d.getDate() + chip.offset);
-                          const dateStr = d.toISOString().split('T')[0];
-                          const isSelected = bookingDate === dateStr;
-                          return (
-                            <button
-                              key={chip.label}
-                              type="button"
-                              onClick={() => setBookingDate(dateStr)}
-                              style={{
-                                flex: 1,
-                                padding: '4px 8px',
-                                borderRadius: '8px',
-                                border: 'none',
-                                background: isSelected ? `${brandColor}15` : '#f1f5f9',
-                                color: isSelected ? brandColor : '#475569',
-                                fontSize: '0.68rem',
-                                fontWeight: isSelected ? 850 : 650,
-                                cursor: 'pointer'
-                              }}
-                            >
-                              {chip.label}
-                            </button>
-                          );
-                        })}
-                      </div>
-
-                      {/* Inputs Grid */}
-                      <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr', gap: '6px' }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                          <label style={{ fontSize: '0.60rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Datum</label>
-                          <input
-                            type="date"
-                            value={bookingDate}
-                            onChange={(e) => setBookingDate(e.target.value)}
-                            style={{ padding: '6px 8px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '0.74rem', fontWeight: 700, background: '#f8fafc', color: '#1c1c1e', width: '100%', boxSizing: 'border-box' }}
-                          />
-                        </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                          <label style={{ fontSize: '0.60rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Von</label>
-                          <select
-                            value={finderStartTime}
-                            onChange={(e) => setFinderStartTime(e.target.value)}
-                            style={{ padding: '6px 6px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '0.74rem', fontWeight: 700, background: '#f8fafc', color: '#1c1c1e', width: '100%', boxSizing: 'border-box' }}
-                          >
-                            {Array.from({ length: 27 }, (_, i) => {
-                              const min = i * 30 + 480;
-                              const hh = String(Math.floor(min / 60)).padStart(2, '0');
-                              const mm = String(min % 60).padStart(2, '0');
-                              return `${hh}:${mm}`;
-                            }).map(t => <option key={t} value={t}>{t}</option>)}
-                          </select>
-                        </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                          <label style={{ fontSize: '0.60rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Bis</label>
-                          <select
-                            value={finderEndTime}
-                            onChange={(e) => setFinderEndTime(e.target.value)}
-                            style={{ padding: '6px 6px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '0.74rem', fontWeight: 700, background: '#f8fafc', color: '#1c1c1e', width: '100%', boxSizing: 'border-box' }}
-                          >
-                            {Array.from({ length: 27 }, (_, i) => {
-                              const min = i * 30 + 480;
-                              const hh = String(Math.floor(min / 60)).padStart(2, '0');
-                              const mm = String(min % 60).padStart(2, '0');
-                              return `${hh}:${mm}`;
-                            }).map(t => <option key={t} value={t}>{t}</option>)}
-                          </select>
-                        </div>
-                      </div>
-
-                      {/* Action Button */}
+                    {isDateFilterActive ? (
                       <button
                         type="button"
                         onClick={() => {
-                          setBookingStartTime(finderStartTime);
-                          setBookingEndTime(finderEndTime);
-                          setIsDateFilterActive(true);
-                          const freeRooms = roomsToRender.filter(r => !isRoomOccupiedNow(r.id));
-                          setFinderResultCount(freeRooms.length);
-                          setShowRoomFinderBar(false);
+                          setIsDateFilterActive(false);
+                          setFinderResultCount(null);
                         }}
+                        title="Zeitfilter zurücksetzen"
                         style={{
-                          padding: '8px',
-                          borderRadius: '10px',
-                          background: brandColor,
-                          color: '#ffffff',
-                          border: 'none',
-                          fontWeight: 850,
-                          fontSize: '0.75rem',
-                          cursor: 'pointer',
-                          display: 'flex',
+                          display: 'inline-flex',
                           alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '6px',
-                          boxShadow: `0 4px 12px ${brandColor}30`
+                          gap: '4px',
+                          background: '#dcfce7',
+                          color: '#15803d',
+                          border: '1.5px solid #86efac',
+                          borderRadius: '11px',
+                          padding: '5px 9px',
+                          fontSize: '0.70rem',
+                          fontWeight: 850,
+                          cursor: 'pointer',
+                          whiteSpace: 'nowrap',
+                          boxShadow: '0 2px 6px rgba(34, 197, 94, 0.12)'
                         }}
                       >
-                        <Search size={12} strokeWidth={2.5} />
-                        <span>Freie Räume anzeigen</span>
+                        <Clock size={11} strokeWidth={2.4} />
+                        <span>{bookingStartTime}-{bookingEndTime}</span>
+                        <X size={11} strokeWidth={3} />
                       </button>
-                    </div>
-                  )}
-                </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setShowRoomFinderBar(prev => !prev)}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '5px',
+                          background: showRoomFinderBar ? `${brandColor}18` : '#f2f2f7',
+                          color: showRoomFinderBar ? brandColor : '#475569',
+                          border: showRoomFinderBar ? `1.5px solid ${brandColor}50` : '1px solid rgba(0,0,0,0.03)',
+                          borderRadius: '11px',
+                          padding: '5px 9px',
+                          fontSize: '0.70rem',
+                          fontWeight: showRoomFinderBar ? 850 : 650,
+                          cursor: 'pointer',
+                          whiteSpace: 'nowrap',
+                          transition: 'all 0.15s ease'
+                        }}
+                        title="Freien Zeitraum oder Slot suchen"
+                      >
+                        <Clock size={11} strokeWidth={2.2} color={showRoomFinderBar ? brandColor : '#64748b'} />
+                        <span>Freier Slot</span>
+                        <ChevronDown size={10} strokeWidth={2.5} />
+                      </button>
+                    )}
 
-                {/* 4. Filter Controls Cluster (Floor + Equipment) */}
-                <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'nowrap', overflowX: isMobile ? 'auto' : 'visible' }}>
-                  {/* Floor Segmented Control */}
-                  <div style={{ 
-                    background: '#f2f2f7', 
-                    borderRadius: '11px', 
-                    padding: '2px', 
-                    display: 'flex', 
-                    gap: '2px', 
-                    border: '1px solid rgba(0,0,0,0.02)',
-                    alignItems: 'center',
-                    flexShrink: 0
-                  }}>
-                    {['Alle', ...uniqueFloors].map((floor) => {
-                      const isSelected = selectedFloor === floor;
-                      return (
-                        <button
-                          key={floor}
-                          onClick={() => setSelectedFloor(floor)}
-                          style={{
-                            padding: '4px 8px',
-                            borderRadius: '9px',
-                            border: 'none',
-                            background: isSelected ? '#ffffff' : 'transparent',
-                            color: isSelected ? brandColor : '#636366',
-                            fontWeight: isSelected ? 850 : 600,
-                            fontSize: '0.72rem',
-                            cursor: 'pointer',
-                            transition: 'all 0.15s ease',
-                            boxShadow: isSelected ? '0 1px 3px rgba(0,0,0,0.06)' : 'none',
-                            whiteSpace: 'nowrap'
-                          }}
-                        >
-                          {floor}
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  {/* Equipment Filter Bar */}
-                  <div style={{ 
-                    background: '#f2f2f7', 
-                    borderRadius: '11px', 
-                    padding: '2px', 
-                    display: 'flex', 
-                    gap: '2px', 
-                    alignItems: 'center',
-                    flexShrink: 0
-                  }}>
-                    {[
-                      { label: 'Alle', value: 'Alle', icon: null },
-                      { label: 'Klavier', value: 'klavier', icon: Music },
-                      { label: 'Drums', value: 'schlagzeug', icon: Disc },
-                      { label: 'PA', value: 'pa', icon: Volume2 }
-                    ].map((eq) => {
-                      const isSelected = selectedEquipmentFilter === eq.value;
-                      const IconComponent = eq.icon;
-                      return (
-                        <button
-                          key={eq.value}
-                          onClick={() => setSelectedEquipmentFilter(eq.value)}
-                          style={{
-                            padding: '4px 8px',
-                            borderRadius: '9px',
-                            border: 'none',
-                            background: isSelected ? brandColor : 'transparent',
-                            color: isSelected ? '#ffffff' : '#636366',
-                            fontWeight: isSelected ? 850 : 600,
-                            fontSize: '0.70rem',
-                            cursor: 'pointer',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '4px',
-                            transition: 'all 0.15s ease',
-                            whiteSpace: 'nowrap'
-                          }}
-                        >
-                          {IconComponent && <IconComponent size={11} strokeWidth={2.2} />}
-                          <span>{eq.label}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  {/* Mobile Info Trigger */}
-                  {isMobile && (
-                    <button
-                      type="button"
-                      onClick={() => setShowMobileRoomSlider(true)}
-                      style={{
-                        background: `${brandColor}15`,
-                        color: brandColor,
-                        border: `1.5px solid ${brandColor}40`,
-                        borderRadius: '10px',
-                        padding: '4px 8px',
-                        fontSize: '0.70rem',
-                        fontWeight: 800,
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                        height: '28px',
-                        whiteSpace: 'nowrap'
-                      }}
-                    >
-                      <Zap size={11} fill={brandColor} />
-                      <span>Infos</span>
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {/* Rooms List Container */}
-              <div 
-                className="custom-calendar-scrollbar" 
-                style={{ 
-                  display: 'flex', 
-                  gap: '12px', 
-                  overflowX: 'auto', 
-                  paddingTop: '6px',
-                  paddingBottom: '8px', 
-                  width: '100%', 
-                  minWidth: 0,
-                  WebkitOverflowScrolling: 'touch'
-                }}
-              >
-                {roomsToRender.map((room) => {
-                  const isSelected = selectedCampusRoomId === room.id;
-                  const occupiedNow = isRoomOccupiedNow(room.id);
-                  const hasPiano = checkRoomMatchesInstrumentFilter(room, 'klavier', admin?.school_id);
-                  const hasDrums = checkRoomMatchesInstrumentFilter(room, 'schlagzeug', admin?.school_id);
-                  const hasPA = checkRoomMatchesInstrumentFilter(room, 'pa', admin?.school_id);
-                  const isGroovelab = (room.name || '').toLowerCase().includes('groovelab') || (room as any).is_groovelab;
-                  const roomFloor = (!room.floor || room.floor === 'Allgemein') ? 'EG' : room.floor;
-
-                  return (
-                    <div
-                      key={room.id}
-                      onClick={() => setSelectedCampusRoomId(room.id)}
-                      className="room-picker-card"
-                      style={{
-                        background: isSelected ? `${brandColor}06` : 'white',
-                        border: isSelected ? `2px solid ${brandColor}` : '1.5px solid #e5e5ea',
-                        boxShadow: isSelected ? `0 8px 24px ${brandColor}12` : 'none',
-                        opacity: 1,
-                        padding: '12px 14px',
-                        borderRadius: '16px',
-                        minWidth: '160px',
-                        cursor: 'pointer',
+                    {showRoomFinderBar && (
+                      <div style={{
+                        position: 'absolute',
+                        top: 'calc(100% + 8px)',
+                        left: 0,
+                        width: '320px',
+                        background: '#ffffff',
+                        borderRadius: '18px',
+                        border: '1px solid rgba(0,0,0,0.08)',
+                        padding: '16px',
+                        boxShadow: '0 14px 34px -4px rgba(0,0,0,0.14), 0 4px 12px rgba(0,0,0,0.06)',
+                        zIndex: 100,
                         display: 'flex',
                         flexDirection: 'column',
-                        gap: '6px',
-                        transition: 'all 0.2s'
-                      }}
-                    >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px', width: '100%' }}>
-                        <div style={{ 
-                          fontWeight: 800, 
-                          fontSize: '0.85rem', 
-                          color: isSelected ? brandColor : '#1c1c1e',
-                          lineHeight: 1.25,
-                          wordBreak: 'break-word',
-                          flex: 1
-                        }}>
-                          {room.name}
+                        gap: '12px',
+                        animation: 'fadeIn 0.15s ease'
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ fontSize: '0.8rem', fontWeight: 900, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <Clock size={14} color={brandColor} strokeWidth={2.4} />
+                            Freien Zeitraum finden
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setShowRoomFinderBar(false)}
+                            style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#94a3b8', padding: '2px' }}
+                          >
+                            <X size={14} />
+                          </button>
+                        </div>
+                        <div style={{ display: 'flex', gap: '4px' }}>
+                          {[
+                            { label: 'Heute', offset: 0 },
+                            { label: 'Morgen', offset: 1 },
+                            { label: 'In 2 Tagen', offset: 2 }
+                          ].map((chip) => {
+                            const d = new Date();
+                            d.setDate(d.getDate() + chip.offset);
+                            const dateStr = d.toISOString().split('T')[0];
+                            const isSelected = bookingDate === dateStr;
+                            return (
+                              <button
+                                key={chip.label}
+                                type="button"
+                                onClick={() => setBookingDate(dateStr)}
+                                style={{
+                                  flex: 1,
+                                  padding: '4px 8px',
+                                  borderRadius: '8px',
+                                  border: 'none',
+                                  background: isSelected ? `${brandColor}15` : '#f1f5f9',
+                                  color: isSelected ? brandColor : '#475569',
+                                  fontSize: '0.68rem',
+                                  fontWeight: isSelected ? 850 : 650,
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                {chip.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr', gap: '6px' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                            <label style={{ fontSize: '0.60rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Datum</label>
+                            <input
+                              type="date"
+                              value={bookingDate}
+                              onChange={(e) => setBookingDate(e.target.value)}
+                              style={{ padding: '6px 8px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '0.74rem', fontWeight: 700, background: '#f8fafc', color: '#1c1c1e', width: '100%', boxSizing: 'border-box' }}
+                            />
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                            <label style={{ fontSize: '0.60rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Von</label>
+                            <select
+                              value={finderStartTime}
+                              onChange={(e) => setFinderStartTime(e.target.value)}
+                              style={{ padding: '6px 6px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '0.74rem', fontWeight: 700, background: '#f8fafc', color: '#1c1c1e', width: '100%', boxSizing: 'border-box' }}
+                            >
+                              {Array.from({ length: 27 }, (_, i) => {
+                                const min = i * 30 + 480;
+                                const hh = String(Math.floor(min / 60)).padStart(2, '0');
+                                const mm = String(min % 60).padStart(2, '0');
+                                return `${hh}:${mm}`;
+                              }).map(t => <option key={t} value={t}>{t}</option>)}
+                            </select>
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                            <label style={{ fontSize: '0.60rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Bis</label>
+                            <select
+                              value={finderEndTime}
+                              onChange={(e) => setFinderEndTime(e.target.value)}
+                              style={{ padding: '6px 6px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '0.74rem', fontWeight: 700, background: '#f8fafc', color: '#1c1c1e', width: '100%', boxSizing: 'border-box' }}
+                            >
+                              {Array.from({ length: 27 }, (_, i) => {
+                                const min = i * 30 + 480;
+                                const hh = String(Math.floor(min / 60)).padStart(2, '0');
+                                const mm = String(min % 60).padStart(2, '0');
+                                return `${hh}:${mm}`;
+                              }).map(t => <option key={t} value={t}>{t}</option>)}
+                            </select>
+                          </div>
                         </div>
                         <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            const favKey = `groovelab_favorite_room_id_${userId}`;
-                            if (favoriteRoomId === room.id) {
-                              localStorage.removeItem(favKey);
-                              setFavoriteRoomId(null);
-                            } else {
-                              localStorage.setItem(favKey, room.id);
-                              setFavoriteRoomId(room.id);
-                            }
+                          type="button"
+                          onClick={() => {
+                            setBookingStartTime(finderStartTime);
+                            setBookingEndTime(finderEndTime);
+                            setIsDateFilterActive(true);
+                            setShowRoomFinderBar(false);
                           }}
                           style={{
-                            background: 'transparent',
+                            padding: '8px',
+                            borderRadius: '10px',
+                            background: brandColor,
+                            color: '#ffffff',
                             border: 'none',
+                            fontWeight: 850,
+                            fontSize: '0.75rem',
                             cursor: 'pointer',
-                            padding: '2px',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            marginLeft: '4px',
-                            flexShrink: 0
+                            gap: '6px',
+                            boxShadow: `0 4px 12px ${brandColor}30`
                           }}
                         >
-                          <Star
-                            size={14}
-                            fill={favoriteRoomId === room.id ? "#fbbf24" : "none"}
-                            color={favoriteRoomId === room.id ? "#fbbf24" : "#8e8e93"}
-                          />
+                          <Search size={12} strokeWidth={2.5} />
+                          <span>Freie Räume anzeigen</span>
                         </button>
                       </div>
+                    )}
+                  </div>
 
-                      {/* Equipment Icons */}
-                      <div style={{ display: 'flex', gap: '5px', alignItems: 'center', fontSize: '0.72rem', color: '#636366' }}>
-                        <span style={{ fontSize: '0.62rem', background: '#f2f2f7', color: '#475569', padding: '1px 6px', borderRadius: '5px', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
-                          <MapPin size={9} strokeWidth={2.5} />
-                          {roomFloor}
-                        </span>
-                        {hasPiano && <span title="Klavier vorhanden" style={{ display: 'inline-flex', alignItems: 'center' }}><Music size={11} color="#64748b" strokeWidth={2.2} /></span>}
-                        {hasDrums && <span title="Schlagzeug vorhanden" style={{ display: 'inline-flex', alignItems: 'center' }}><Disc size={11} color="#64748b" strokeWidth={2.2} /></span>}
-                        {hasPA && <span title="PA vorhanden" style={{ display: 'inline-flex', alignItems: 'center' }}><Volume2 size={11} color="#64748b" strokeWidth={2.2} /></span>}
-                        {isGroovelab && <span title="GrooveLab Raum" style={{ display: 'inline-flex', alignItems: 'center' }}><Zap size={11} color="#d97706" strokeWidth={2.4} /></span>}
-                      </div>
-
-                      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center', marginTop: 'auto' }}>
-                        {occupiedNow ? (
-                          <span style={{ padding: '3px 8px', background: '#fce8e6', borderRadius: '8px', fontSize: '0.66rem', fontWeight: 800, color: '#c5221f', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                            <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#ea4335' }} />
-                            Belegt
-                          </span>
-                        ) : (
-                          <span style={{ padding: '3px 8px', background: '#e6f4ea', borderRadius: '8px', fontSize: '0.66rem', fontWeight: 800, color: '#137333', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                            <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#34a853', boxShadow: '0 0 4px #34a853' }} />
-                            Jetzt frei
-                          </span>
-                        )}
-                      </div>
-
+                  {/* 4. Filter Controls Cluster */}
+                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'nowrap' }}>
+                    <div style={{ 
+                      background: '#f2f2f7', 
+                      borderRadius: '11px', 
+                      padding: '2px', 
+                      display: 'flex', 
+                      gap: '2px', 
+                      border: '1px solid rgba(0,0,0,0.02)',
+                      alignItems: 'center',
+                      flexShrink: 0
+                    }}>
+                      {['Alle', ...uniqueFloors].map((floor) => {
+                        const isSelected = selectedFloor === floor;
+                        return (
+                          <button
+                            key={floor}
+                            onClick={() => setSelectedFloor(floor)}
+                            style={{
+                              padding: '4px 8px',
+                              borderRadius: '9px',
+                              border: 'none',
+                              background: isSelected ? '#ffffff' : 'transparent',
+                              color: isSelected ? brandColor : '#636366',
+                              fontWeight: isSelected ? 850 : 600,
+                              fontSize: '0.72rem',
+                              cursor: 'pointer',
+                              transition: 'all 0.15s ease',
+                              boxShadow: isSelected ? '0 1px 3px rgba(0,0,0,0.06)' : 'none',
+                              whiteSpace: 'nowrap'
+                            }}
+                          >
+                            {floor}
+                          </button>
+                        );
+                      })}
                     </div>
-                  );
-                })}
-              </div>
-            </div>
 
-            {/* Weekly / Daily Availability Calendar Grid */}
-            <div 
-              className="calendar-grid-card glass-panel" 
-              onClick={() => setDraftBooking(null)}
-              style={{ 
-                position: 'relative',
-                background: 'white', 
-                borderRadius: '24px', 
-                border: '1px solid rgba(0, 0, 0, 0.04)', 
-                padding: isMobile ? '16px' : '20px 24px', 
-                boxShadow: '0 4px 24px -4px rgba(0, 0, 0, 0.02), 0 2px 12px -2px rgba(0, 0, 0, 0.01)'
-              }}
-            >
-              <div className="calendar-header-flex" style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'stretch' : 'center', marginBottom: '16px', gap: '12px' }}>
-                <div>
-                  <h3 style={{ fontSize: isMobile ? '1.05rem' : '1.15rem', fontWeight: 900, color: '#1c1c1e', margin: 0, letterSpacing: '-0.01em', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                    <span>{isMobile && mobileCalendarView === 'day' ? 'Tagesübersicht' : 'Wochenübersicht'}: {selectedRoom?.name || 'Wähle einen Raum'}</span>
-                  </h3>
-                </div>
-
-                {/* View Switcher & Week Controls */}
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', width: isMobile ? '100%' : 'auto', justifyContent: 'space-between' }}>
-                  {/* Mobile View Toggle Buttons */}
-                  {isMobile && (
-                    <div style={{ background: '#f2f2f7', borderRadius: '12px', padding: '3px', display: 'flex', gap: '2px' }}>
-                      <button
-                        type="button"
-                        onClick={() => setMobileCalendarView('day')}
-                        style={{
-                          padding: '6px 12px',
-                          borderRadius: '9px',
-                          border: 'none',
-                          background: mobileCalendarView === 'day' ? '#ffffff' : 'transparent',
-                          color: mobileCalendarView === 'day' ? brandColor : '#636366',
-                          fontWeight: 800,
-                          fontSize: '0.74rem',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        🗓️ 1 Tag
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setMobileCalendarView('week')}
-                        style={{
-                          padding: '6px 12px',
-                          borderRadius: '9px',
-                          border: 'none',
-                          background: mobileCalendarView === 'week' ? '#ffffff' : 'transparent',
-                          color: mobileCalendarView === 'week' ? brandColor : '#636366',
-                          fontWeight: 800,
-                          fontSize: '0.74rem',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        📅 7 Tage
-                      </button>
-                    </div>
-                  )}
-
-                  <div className="calendar-controls-wrapper" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <button
-                      onClick={() => {
-                        const today = new Date();
-                        const dateStr = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
-                        setBookingDate(dateStr);
-                        const d = today.getDay();
-                        setMobileSelectedDayIdx(d === 0 ? 6 : d - 1);
-                      }}
-                      className="calendar-today-btn"
-                      style={{
-                        border: '1px solid #e5e5ea',
-                        background: 'white',
-                        cursor: 'pointer',
-                        padding: '6px 12px',
-                        borderRadius: '10px',
-                        color: '#1c1c1e',
-                        fontSize: '0.75rem',
-                        fontWeight: 800,
-                        height: '36px'
-                      }}
-                    >
-                      Heute
-                    </button>
-
-                    <div className="calendar-week-pagination" style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#f2f2f7', padding: '3px 8px', borderRadius: '12px', border: '1px solid #e5e5ea', height: '36px' }}>
-                      <button
-                        onClick={() => changeWeek(-1)}
-                        style={{ border: 'none', background: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', color: '#8e8e93' }}
-                      >
-                        <ChevronLeft size={16} />
-                      </button>
-                      <span className="calendar-week-label" style={{ fontSize: '0.72rem', fontWeight: 800, color: '#1c1c1e', whiteSpace: 'nowrap' }}>
-                        <span style={{ color: brandColor, fontWeight: 900 }}>KW {getCalendarWeek(bookingDate)}</span>
-                        <span style={{ fontSize: '0.66rem', color: '#636366', marginLeft: '4px' }}>({getWeekRange(bookingDate)})</span>
-                      </span>
-                      <button
-                        onClick={() => changeWeek(1)}
-                        style={{ border: 'none', background: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', color: '#8e8e93' }}
-                      >
-                        <ChevronRight size={16} />
-                      </button>
+                    <div style={{ 
+                      background: '#f2f2f7', 
+                      borderRadius: '11px', 
+                      padding: '2px', 
+                      display: 'flex', 
+                      gap: '2px', 
+                      alignItems: 'center',
+                      flexShrink: 0
+                    }}>
+                      {[
+                        { label: 'Alle', value: 'Alle', icon: null },
+                        { label: 'Klavier', value: 'klavier', icon: Music },
+                        { label: 'Drums', value: 'schlagzeug', icon: Disc },
+                        { label: 'PA', value: 'pa', icon: Volume2 }
+                      ].map((eq) => {
+                        const isSelected = selectedEquipmentFilter === eq.value;
+                        const IconComponent = eq.icon;
+                        return (
+                          <button
+                            key={eq.value}
+                            onClick={() => setSelectedEquipmentFilter(eq.value)}
+                            style={{
+                              padding: '4px 8px',
+                              borderRadius: '9px',
+                              border: 'none',
+                              background: isSelected ? brandColor : 'transparent',
+                              color: isSelected ? '#ffffff' : '#636366',
+                              fontWeight: isSelected ? 850 : 600,
+                              fontSize: '0.70rem',
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              transition: 'all 0.15s ease',
+                              whiteSpace: 'nowrap'
+                            }}
+                          >
+                            {IconComponent && <IconComponent size={11} strokeWidth={2.2} />}
+                            <span>{eq.label}</span>
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
                 </div>
-              </div>
 
-              {/* Mobile 1-Day View Timeline vs Full 7-Day Table */}
-              {isMobile && mobileCalendarView === 'day' ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  {/* Mobile Day Selector Pill Band */}
-                  <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: '6px' }}>
-                    {DAYS_OF_WEEK.map((day, dIdx) => {
-                      const isSelected = mobileSelectedDayIdx === dIdx;
-                      const isToday = isTodayInWeek(bookingDate) && isDayToday(dIdx, bookingDate);
-                      const dayDateStr = getWeekdayDate(dIdx, bookingDate);
+                {/* Rooms List Container */}
+                <div 
+                  className="custom-calendar-scrollbar" 
+                  style={{ 
+                    display: 'flex', 
+                    gap: '12px', 
+                    overflowX: 'auto', 
+                    paddingTop: '6px',
+                    paddingBottom: '8px', 
+                    width: '100%', 
+                    minWidth: 0,
+                    WebkitOverflowScrolling: 'touch'
+                  }}
+                >
+                  {roomsToRender.map((room) => {
+                    const isSelected = selectedCampusRoomId === room.id;
+                    const occupiedNow = isRoomOccupiedNow(room.id);
+                    const hasPiano = checkRoomMatchesInstrumentFilter(room, 'klavier', admin?.school_id);
+                    const hasDrums = checkRoomMatchesInstrumentFilter(room, 'schlagzeug', admin?.school_id);
+                    const hasPA = checkRoomMatchesInstrumentFilter(room, 'pa', admin?.school_id);
+                    const isGroovelab = (room.name || '').toLowerCase().includes('groovelab') || (room as any).is_groovelab;
+                    const roomFloor = (!room.floor || room.floor === 'Allgemein') ? 'EG' : room.floor;
 
-                      return (
-                        <button
-                          key={day.value}
-                          onClick={() => setMobileSelectedDayIdx(dIdx)}
-                          style={{
-                            padding: '8px 14px',
-                            borderRadius: '14px',
-                            border: isSelected ? `2px solid ${brandColor}` : '1.5px solid #e5e5ea',
-                            background: isSelected ? `${brandColor}15` : (isToday ? '#f0fdf4' : '#ffffff'),
+                    return (
+                      <div
+                        key={room.id}
+                        onClick={() => setSelectedCampusRoomId(room.id)}
+                        className="room-picker-card"
+                        style={{
+                          background: isSelected ? `${brandColor}06` : 'white',
+                          border: isSelected ? `2px solid ${brandColor}` : '1.5px solid #e5e5ea',
+                          boxShadow: isSelected ? `0 8px 24px ${brandColor}12` : 'none',
+                          opacity: 1,
+                          padding: '12px 14px',
+                          borderRadius: '16px',
+                          minWidth: '160px',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '6px',
+                          transition: 'all 0.2s'
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px', width: '100%' }}>
+                          <div style={{ 
+                            fontWeight: 800, 
+                            fontSize: '0.85rem', 
                             color: isSelected ? brandColor : '#1c1c1e',
-                            fontWeight: isSelected ? 900 : 700,
-                            fontSize: '0.78rem',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: 'center',
-                            minWidth: '64px',
-                            flexShrink: 0,
-                            boxShadow: isSelected ? `0 4px 12px ${brandColor}20` : 'none',
-                            transition: 'all 0.2s'
-                          }}
-                        >
-                          <span>{day.label}</span>
-                          <span style={{ fontSize: '0.64rem', color: isSelected ? brandColor : '#8e8e93', marginTop: '2px' }}>{dayDateStr}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  {/* 1-Column Day Timeline */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '520px', overflowY: 'auto', paddingRight: '2px' }} className="custom-calendar-scrollbar">
-                    {TIME_SLOTS.map((hour) => {
-                      const slotBookings = getBookingsForSlot(mobileSelectedDayIdx, hour);
-                      const isFree = slotBookings.length === 0;
-
-                      return (
-                        <div
-                          key={hour}
-                          style={{
-                            display: 'flex',
-                            flexDirection: 'column',
-                            padding: '10px 12px',
-                            borderRadius: '14px',
-                            border: isFree ? '1px solid #dcfce7' : '1px solid #e2e8f0',
-                            background: isFree ? '#f0fdf4' : '#ffffff',
-                            gap: '6px'
-                          }}
-                        >
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#0f172a' }}>⏰ {hour} Uhr</span>
-                              {isFree ? (
-                                <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#16a34a', background: '#dcfce7', padding: '2px 8px', borderRadius: '100px' }}>
-                                  🟢 Frei
-                                </span>
-                              ) : (
-                                <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#dc2626', background: '#fee2e2', padding: '2px 8px', borderRadius: '100px' }}>
-                                  🔴 {slotBookings.length} Belegung{slotBookings.length > 1 ? 'en' : ''}
-                                </span>
-                              )}
-                            </div>
-
-                            {isFree && (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleCellClick(mobileSelectedDayIdx, hour, e);
-                                }}
-                                style={{
-                                  background: brandColor,
-                                  color: '#ffffff',
-                                  border: 'none',
-                                  borderRadius: '8px',
-                                  padding: '4px 10px',
-                                  fontSize: '0.72rem',
-                                  fontWeight: 800,
-                                  cursor: 'pointer',
-                                  boxShadow: `0 2px 6px ${brandColor}30`
-                                }}
-                              >
-                                + Raum buchen
-                              </button>
-                            )}
+                            lineHeight: 1.25,
+                            wordBreak: 'break-word',
+                            flex: 1
+                          }}>
+                            {room.name}
                           </div>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const favKey = `groovelab_favorite_room_id_${userId}`;
+                              if (favoriteRoomId === room.id) {
+                                localStorage.removeItem(favKey);
+                                setFavoriteRoomId(null);
+                              } else {
+                                localStorage.setItem(favKey, room.id);
+                                setFavoriteRoomId(room.id);
+                              }
+                            }}
+                            style={{
+                              background: 'transparent',
+                              border: 'none',
+                              cursor: 'pointer',
+                              padding: '2px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              marginLeft: '4px',
+                              flexShrink: 0
+                            }}
+                          >
+                            <Star
+                              size={14}
+                              fill={favoriteRoomId === room.id ? "#fbbf24" : "none"}
+                              color={favoriteRoomId === room.id ? "#fbbf24" : "#8e8e93"}
+                            />
+                          </button>
+                        </div>
 
-                          {/* Render Bookings for this slot */}
-                          {!isFree && (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '2px' }}>
-                              {slotBookings.map((b: any) => {
-                                const isGroovelabBlock = b.teacherId === 'groovelab' || (b.purpose && b.purpose.toLowerCase().includes('groovelab'));
-                                const isOwnBooking = b.teacherId === userId;
+                        {/* Equipment Icons */}
+                        <div style={{ display: 'flex', gap: '5px', alignItems: 'center', fontSize: '0.72rem', color: '#636366' }}>
+                          <span style={{ fontSize: '0.62rem', background: '#f2f2f7', color: '#475569', padding: '1px 6px', borderRadius: '5px', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
+                            <MapPin size={9} strokeWidth={2.5} />
+                            {roomFloor}
+                          </span>
+                          {hasPiano && <span title="Klavier vorhanden" style={{ display: 'inline-flex', alignItems: 'center' }}><Music size={11} color="#64748b" strokeWidth={2.2} /></span>}
+                          {hasDrums && <span title="Schlagzeug vorhanden" style={{ display: 'inline-flex', alignItems: 'center' }}><Disc size={11} color="#64748b" strokeWidth={2.2} /></span>}
+                          {hasPA && <span title="PA vorhanden" style={{ display: 'inline-flex', alignItems: 'center' }}><Volume2 size={11} color="#64748b" strokeWidth={2.2} /></span>}
+                          {isGroovelab && <span title="GrooveLab Raum" style={{ display: 'inline-flex', alignItems: 'center' }}><Zap size={11} color="#d97706" strokeWidth={2.4} /></span>}
+                        </div>
 
-                                return (
-                                  <div
-                                    key={b.id}
-                                    onClick={() => setSelectedBooking(b)}
-                                    style={{
-                                      padding: '8px 10px',
-                                      borderRadius: '10px',
-                                      background: isGroovelabBlock ? '#fef08a' : (isOwnBooking ? '#dcfce7' : '#f1f5f9'),
-                                      border: isGroovelabBlock ? '1px solid #facc15' : (isOwnBooking ? '1px solid #86efac' : '1px solid #cbd5e1'),
-                                      display: 'flex',
-                                      justifyContent: 'space-between',
-                                      alignItems: 'center'
-                                    }}
-                                  >
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                                      <span style={{ fontSize: '0.76rem', fontWeight: 900, color: '#0f172a' }}>
-                                        {b.startTime} - {b.endTime} • {b.teacherName || b.purpose || 'Belegt'}
-                                      </span>
-                                      {b.purpose && (
-                                        <span style={{ fontSize: '0.68rem', color: '#475569', fontWeight: 700 }}>
-                                          {b.purpose}
-                                        </span>
-                                      )}
-                                    </div>
-
-                                    {(isOwnBooking || admin?.role === 'admin' || admin?.role === 'secretary') && !b.isSchedule && (
-                                      <button
-                                        onClick={async (e) => {
-                                          e.stopPropagation();
-                                          await handleCancelBooking(b.id);
-                                        }}
-                                        style={{ border: 'none', background: '#fee2e2', color: '#dc2626', borderRadius: '6px', padding: '4px 8px', fontSize: '0.68rem', fontWeight: 800, cursor: 'pointer' }}
-                                      >
-                                        Stornieren
-                                      </button>
-                                    )}
-                                  </div>
-                                );
-                              })}
-                            </div>
+                        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center', marginTop: 'auto' }}>
+                          {occupiedNow ? (
+                            <span style={{ padding: '3px 8px', background: '#fce8e6', borderRadius: '8px', fontSize: '0.66rem', fontWeight: 800, color: '#c5221f', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                              <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#ea4335' }} />
+                              Belegt
+                            </span>
+                          ) : (
+                            <span style={{ padding: '3px 8px', background: '#e6f4ea', borderRadius: '8px', fontSize: '0.66rem', fontWeight: 800, color: '#137333', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                              <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#34a853', boxShadow: '0 0 4px #34a853' }} />
+                              Jetzt frei
+                            </span>
                           )}
                         </div>
-                      );
-                    })}
+
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Weekly / Daily Availability Calendar Grid */}
+              <div 
+                className="calendar-grid-card glass-panel" 
+                onClick={() => setDraftBooking(null)}
+                style={{ 
+                  position: 'relative',
+                  background: 'white', 
+                  borderRadius: '24px', 
+                  border: '1px solid rgba(0, 0, 0, 0.04)', 
+                  padding: '20px 24px', 
+                  boxShadow: '0 4px 24px -4px rgba(0, 0, 0, 0.02), 0 2px 12px -2px rgba(0, 0, 0, 0.01)'
+                }}
+              >
+                <div className="calendar-header-flex" style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', gap: '12px' }}>
+                  <div>
+                    <h3 style={{ fontSize: '1.15rem', fontWeight: 900, color: '#1c1c1e', margin: 0, letterSpacing: '-0.01em', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                      <span>Wochenübersicht: {selectedRoom?.name || 'Wähle einen Raum'}</span>
+                    </h3>
+                  </div>
+
+                  {/* View Switcher & Week Controls */}
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center', width: 'auto', justifyContent: 'space-between' }}>
+                    <div className="calendar-controls-wrapper" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <button
+                        onClick={() => {
+                          const today = new Date();
+                          const dateStr = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
+                          setBookingDate(dateStr);
+                          const d = today.getDay();
+                          setMobileSelectedDayIdx(d === 0 ? 6 : d - 1);
+                        }}
+                        className="calendar-today-btn"
+                        style={{
+                          border: '1px solid #e5e5ea',
+                          background: 'white',
+                          cursor: 'pointer',
+                          padding: '6px 12px',
+                          borderRadius: '10px',
+                          color: '#1c1c1e',
+                          fontSize: '0.75rem',
+                          fontWeight: 800,
+                          height: '36px'
+                        }}
+                      >
+                        Heute
+                      </button>
+
+                      <div className="calendar-week-pagination" style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#f2f2f7', padding: '3px 8px', borderRadius: '12px', border: '1px solid #e5e5ea', height: '36px' }}>
+                        <button
+                          onClick={() => changeWeek(-1)}
+                          style={{ border: 'none', background: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', color: '#8e8e93' }}
+                        >
+                          <ChevronLeft size={16} />
+                        </button>
+                        <span className="calendar-week-label" style={{ fontSize: '0.72rem', fontWeight: 800, color: '#1c1c1e', whiteSpace: 'nowrap' }}>
+                          <span style={{ color: brandColor, fontWeight: 900 }}>KW {getCalendarWeek(bookingDate)}</span>
+                          <span style={{ fontSize: '0.66rem', color: '#636366', marginLeft: '4px' }}>({getWeekRange(bookingDate)})</span>
+                        </span>
+                        <button
+                          onClick={() => changeWeek(1)}
+                          style={{ border: 'none', background: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', color: '#8e8e93' }}
+                        >
+                          <ChevronRight size={16} />
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </div>
-              ) : (
-                /* Full 7-Day Calendar Grid Container */
+
+                {/* Full 7-Day Calendar Grid Container */}
                 <div style={{ overflowX: 'auto', width: '100%' }} className="custom-calendar-scrollbar">
                   <div style={{ display: 'flex', flexDirection: 'column', border: '1px solid #e5e5ea', borderRadius: '16px', overflow: 'hidden', minWidth: '950px' }}>
                     {/* Header Row */}
@@ -9305,7 +9750,6 @@ export function AdminDashboard({
                       {DAYS_OF_WEEK.map((day, dayIdx) => {
                         const isToday = isTodayInWeek(bookingDate) && isDayToday(dayIdx, bookingDate);
                         
-                        // Calculate target date string to check for holidays
                         const d = parseLocalDate(bookingDate);
                         const dayVal = d.getUTCDay();
                         const diff = d.getUTCDate() - (dayVal === 0 ? 6 : dayVal - 1) + dayIdx;
@@ -9369,7 +9813,7 @@ export function AdminDashboard({
                         
                         return (
                           <div key={hour} style={{ display: 'grid', gridTemplateColumns: '80px repeat(7, 1fr)', borderBottom: '1px solid #f2f2f7', minHeight: '56px', position: 'relative' }}>
-                            {/* Time cell - Apple Minimalist Style */}
+                            {/* Time cell */}
                             <div style={{ padding: '10px 4px', fontSize: '0.72rem', fontWeight: 700, color: '#8e8e93', textAlign: 'center', background: '#ffffff', borderRight: '1px solid #e5e5ea', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                               {hour}
                             </div>
@@ -9394,7 +9838,6 @@ export function AdminDashboard({
                                     handleCellDoubleClick(dayIdx, hour);
                                   }}
                                   onDragOver={(e) => {
-
                                     e.preventDefault();
                                     if (!isDraggedOver) {
                                       setDragOverCell({ dayIdx, hour });
@@ -9422,629 +9865,104 @@ export function AdminDashboard({
                                     transition: 'background-color 0.15s ease, box-shadow 0.15s ease'
                                   }}
                                 >
-                                {/* Real-time indicator line */}
-                                {showTimeIndicator && (
-                                  <div style={{ 
-                                    position: 'absolute', 
-                                    top: `${(currentMin / 60) * 100}%`, 
-                                    left: 0, 
-                                    right: 0, 
-                                    height: '2px', 
-                                    background: '#ff453a', 
-                                    boxShadow: '0 0 6px rgba(255, 69, 58, 0.6)' 
-                                  }} />
-                                )}
+                                  {showTimeIndicator && (
+                                    <div style={{ 
+                                      position: 'absolute', 
+                                      top: `${(currentMin / 60) * 100}%`, 
+                                      left: 0, 
+                                      right: 0, 
+                                      height: '2px', 
+                                      background: '#ff453a', 
+                                      boxShadow: '0 0 6px rgba(255, 69, 58, 0.6)' 
+                                    }} />
+                                  )}
 
-                                {slotBookings.map((b: any, bIdx: number) => {
-                                  const isSchedule = b.isSchedule;
-                                  const isGroovelabBlock = b.teacherId === 'groovelab' || 
-                                                           (b as any).is_groovelab || (b as any).isGroovelab ||
-                                                           (b.purpose && b.purpose.toLowerCase().includes('groovelab')) ||
-                                                           (b.purpose && b.purpose.toLowerCase().includes('groove lab')) ||
-                                                           (b.teacherName && b.teacherName.toLowerCase().includes('groovelab')) ||
-                                                           (b.teacherName && b.teacherName.toLowerCase().includes('groove lab')) ||
-                                                           (b.subject_name && b.subject_name.toLowerCase().includes('groovelab')) ||
-                                                           (b.subject && b.subject.toLowerCase().includes('groovelab'));
-                                  const isBookingConfirmed = b.status === 'approved' || b.status === 'confirmed' || b.isApproved === true || b.is_confirmed === true;
-                                  const isStaff = admin?.role?.toLowerCase() === 'secretary' || admin?.role?.toLowerCase() === 'admin';
-                                  const isExternal = b.isBlockedSlot || (b.purpose && b.purpose.startsWith('[EXTERN]'));
-                                  const isOwnBooking = b.teacherId === userId || (admin && b.teacherName && b.teacherName.trim().toLowerCase() === `${admin.first_name || ''} ${admin.last_name || ''}`.trim().toLowerCase());
-                                  const canDelete = (isOwnBooking && !isExternal) || isStaff;
-                                  const colWidth = 100;
-                                  const colLeft = 0;
-                                  let bg = 'rgba(175, 82, 222, 0.08)';
-                                  let textColor = '#6d28d9';
-                                  let leftAccentColor = '#af52de';
+                                  {slotBookings.map((b: any, bIdx: number) => {
+                                    const isSchedule = b.isSchedule;
+                                    const isGroovelabBlock = b.teacherId === 'groovelab' || 
+                                                             (b as any).is_groovelab || (b as any).isGroovelab ||
+                                                             (b.purpose && b.purpose.toLowerCase().includes('groovelab')) ||
+                                                             (b.purpose && b.purpose.toLowerCase().includes('groove lab')) ||
+                                                             (b.teacherName && b.teacherName.toLowerCase().includes('groovelab')) ||
+                                                             (b.teacherName && b.teacherName.toLowerCase().includes('groove lab')) ||
+                                                             (b.subject_name && b.subject_name.toLowerCase().includes('groovelab')) ||
+                                                             (b.subject && b.subject.toLowerCase().includes('groovelab'));
+                                    const isBookingConfirmed = b.status === 'approved' || b.status === 'confirmed' || b.isApproved === true || b.is_confirmed === true;
+                                    const isOwnBooking = b.teacherId === userId || (admin && b.teacherName && b.teacherName.trim().toLowerCase() === `${admin.first_name || ''} ${admin.last_name || ''}`.trim().toLowerCase());
+                                    let bg = 'rgba(175, 82, 222, 0.08)';
+                                    let textColor = '#6d28d9';
+                                    let leftAccentColor = '#af52de';
 
-                                  if (b.isPreview) {
-                                    bg = '#faf5ff';
-                                    textColor = '#7c3aed';
-                                    leftAccentColor = '#7c3aed';
-                                   } else if (isSchedule) {
-                                     if (isGroovelabBlock) {
-                                       bg = '#facc15';
-                                       textColor = '#09090b';
-                                       leftAccentColor = '#000000';
-                                     } else if (isOwnBooking) {
-                                       bg = '#34a853';
-                                       textColor = '#ffffff';
-                                       leftAccentColor = '#34a853';
-                                     } else {
-                                       bg = 'rgba(52, 168, 83, 0.08)';
-                                       textColor = '#1e7a44';
-                                       leftAccentColor = '#34a853';
-                                     }
-                                  } else {
-                                    bg = isBookingConfirmed 
-                                      ? '#fae8ff' 
-                                      : 'repeating-linear-gradient(-45deg, #faf5ff 0px, #faf5ff 8px, #ffffff 8px, #ffffff 16px)';
-                                    textColor = '#7e22ce';
-                                    leftAccentColor = isBookingConfirmed ? '#9333ea' : '#a855f7';
-                                  }
+                                    if (b.isPreview) {
+                                      bg = '#faf5ff';
+                                      textColor = '#7c3aed';
+                                      leftAccentColor = '#7c3aed';
+                                    } else if (isSchedule) {
+                                      if (isGroovelabBlock) {
+                                        bg = '#facc15';
+                                        textColor = '#09090b';
+                                        leftAccentColor = '#000000';
+                                      } else if (isOwnBooking) {
+                                        bg = '#34a853';
+                                        textColor = '#ffffff';
+                                        leftAccentColor = '#34a853';
+                                      } else {
+                                        bg = 'rgba(52, 168, 83, 0.08)';
+                                        textColor = '#1e7a44';
+                                        leftAccentColor = '#34a853';
+                                      }
+                                    } else {
+                                      bg = isBookingConfirmed 
+                                        ? '#fae8ff' 
+                                        : 'repeating-linear-gradient(-45deg, #faf5ff 0px, #faf5ff 8px, #ffffff 8px, #ffffff 16px)';
+                                      textColor = '#7e22ce';
+                                      leftAccentColor = isBookingConfirmed ? '#9333ea' : '#a855f7';
+                                    }
 
-                                  const [shStr, smStr] = b.startTime.split(':');
-                                  const sh = parseInt(shStr) || 0;
-                                  const sm = parseInt(smStr) || 0;
-                                  const [ehStr, emStr] = b.endTime.split(':');
-                                  const eh = parseInt(ehStr) || 0;
-                                  const em = parseInt(emStr) || 0;
-                                  const durationHrs = (eh * 60 + em - (sh * 60 + sm)) / 60;
-                                  const slotH = parseInt(hour.split(':')[0]);
-                                  
-                                  // Only draw on starting hour slot
-                                  if (slotH !== sh) return null;
+                                    const [shStr] = b.startTime.split(':');
+                                    const sh = parseInt(shStr) || 0;
+                                    const slotH = parseInt(hour.split(':')[0]);
+                                    
+                                    if (slotH !== sh) return null;
 
-                                  return (
-                                    <div
-                                      key={b.id}
-                                      onClick={(e) => {
-                                        if (b.isPreview) return;
-                                        e.stopPropagation();
-                                        setSelectedBooking(b);
-                                        if (!b.isSchedule) {
-                                          // Always populate form for own manual bookings or staff
-                                          setBookingDate(b.date);
-                                          setBookingStartTime(b.startTime);
-                                          setBookingEndTime(b.endTime);
-                                          if (isOwnBooking || isStaff) {
-                                            setBookingPurpose(b.purpose || '');
-                                          } else {
-                                            setBookingPurpose('');
-                                          }
-                                          setIsDateFilterActive(true);
-                                          setShowMyBookingsOnly(false);
-                                        } else if (b.teacherId === userId) {
-                                          // Schedule block: use current bookingDate as base
-                                          setBookingStartTime(b.startTime);
-                                          setBookingEndTime(b.endTime);
-                                          setBookingPurpose(b.purpose || '');
-                                          setIsDateFilterActive(true);
-                                          setShowMyBookingsOnly(false);
-                                        }
-                                      }}
-
-                                      draggable={isOwnBooking && !isSchedule && !b.isPreview}
-                                      onDragStart={(e) => {
-                                        if (isOwnBooking && !isSchedule && !b.isPreview) {
-                                          handleDragStart(e, b.id);
-                                        }
-                                      }}
-                                      onDragEnd={() => {
-                                        setDragOverCell(null);
-                                      }}
-                                      title={b.isPreview ? `Vorschau (${b.startTime} - ${b.endTime})` : b.isDuringHoliday ? `${isOwnBooking && b.purpose ? b.purpose + ' ' : ''}(${b.startTime} - ${b.endTime}) – Ferienzeit` : (isOwnBooking && b.purpose ? `${b.purpose} (${b.startTime} - ${b.endTime}) - ${b.teacherName}` : `${b.teacherName || 'Raumbuchung'} (${b.startTime} - ${b.endTime})`)}
-                                      style={{
-                                        background: b.isPreview 
-                                          ? '#faf5ff' 
-                                          : b.isDuringHoliday
-                                            ? 'repeating-linear-gradient(45deg, #f0fdf4, #f0fdf4 4px, #dcfce7 4px, #dcfce7 8px)'
-                                            : (isExternal
-                                              ? '#fef2f2'
-                                              : bg),
-                                        border: b.isPreview 
-                                          ? '2.2px dashed #7c3aed' 
-                                          : b.isDuringHoliday
-                                            ? '1.5px dashed #34a85370'
-                                            : (isExternal
-                                              ? '1.5px dashed #ef4444'
-                                              : (isSchedule 
-                                                ? (isGroovelabBlock ? '1px solid rgba(180, 83, 9, 0.4)' : (isOwnBooking ? '1px solid #2d9248' : '1px solid rgba(52, 168, 83, 0.3)'))
-                                                : (isBookingConfirmed ? '1px solid rgba(147, 51, 234, 0.25)' : '2px dashed #a855f7'))),
-                                        borderLeft: b.isPreview 
-                                          ? '2.2px dashed #7c3aed' 
-                                          : b.isDuringHoliday
-                                            ? '3.5px dashed #34a85370'
-                                            : (isExternal
-                                              ? '3.5px dashed #ef4444'
-                                              : (isSchedule 
-                                                ? `4px solid ${leftAccentColor}`
-                                                : (isBookingConfirmed ? '4px solid #9333ea' : '3.5px dashed #a855f7'))),
-                                        borderRadius: '10px',
-                                        padding: isSchedule && isOwnBooking ? 0 : (isOwnBooking ? '6px 6px' : '8px 10px'),
-                                        fontSize: '0.72rem',
-                                        fontWeight: 800,
-                                        color: b.isDuringHoliday ? '#34a853aa' : textColor,
-                                        opacity: b.isDuringHoliday ? 0.7 : 1,
-                                        position: 'absolute',
-                                        top: `calc(${(sm / 60) * 100}% + 2px)`,
-                                        left: `calc(${colLeft}% + 4px)`,
-                                        width: `calc(${colWidth}% - 8px)`,
-                                        height: `calc(${durationHrs * 100}% - 4px)`,
-                                        zIndex: 5,
-                                        display: 'flex',
-                                        flexDirection: 'column',
-                                        justifyContent: 'flex-start',
-                                        boxShadow: (b.isPreview || b.isDuringHoliday) ? 'none' : '0 2px 8px rgba(0,0,0,0.03)',
-                                        overflow: 'hidden',
-                                        cursor: b.isPreview ? 'default' : (isOwnBooking ? 'grab' : 'pointer')
-                                      }}
-                                    >
-                                      
-                                      {/* Delete Button for Own Bookings */}
-                                      {canDelete && !b.isPreview && !isSchedule && (
-                                        <button
-                                          onClick={async (e) => {
-                                            e.stopPropagation();
-                                            await handleCancelBooking(b.id);
-                                          }}
-                                          style={{
-                                            position: 'absolute',
-                                            top: '4px',
-                                            right: '4px',
-                                            width: '18px',
-                                            height: '18px',
-                                            borderRadius: '6px',
-                                            background: 'rgba(255, 59, 48, 0.1)',
-                                            color: '#ff3b30',
-                                            border: 'none',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            cursor: 'pointer',
-                                            zIndex: 25,
-                                            padding: 0,
-                                            transition: 'all 0.2s'
-                                          }}
-                                          onMouseEnter={(e) => {
-                                            e.currentTarget.style.background = '#ff3b30';
-                                            e.currentTarget.style.color = '#ffffff';
-                                          }}
-                                          onMouseLeave={(e) => {
-                                            e.currentTarget.style.background = 'rgba(255, 59, 48, 0.1)';
-                                            e.currentTarget.style.color = '#ff3b30';
-                                          }}
-                                          title="Buchung stornieren/löschen"
-                                        >
-                                          <X size={12} strokeWidth={3} />
-                                        </button>
-                                      )}
-
-                                      {/* Close Button for Preview Slots */}
-                                      {b.isPreview && (
-                                        <button
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            setShowPreviewField(false);
-                                          }}
-                                          style={{
-                                            position: 'absolute',
-                                            top: '4px',
-                                            right: '4px',
-                                            width: '18px',
-                                            height: '18px',
-                                            borderRadius: '6px',
-                                            background: 'rgba(124, 58, 237, 0.12)',
-                                            color: '#7c3aed',
-                                            border: 'none',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            cursor: 'pointer',
-                                            zIndex: 25,
-                                            padding: 0,
-                                            transition: 'all 0.2s'
-                                          }}
-                                          onMouseEnter={(e) => {
-                                            e.currentTarget.style.background = '#7c3aed';
-                                            e.currentTarget.style.color = '#ffffff';
-                                          }}
-                                          onMouseLeave={(e) => {
-                                            e.currentTarget.style.background = 'rgba(124, 58, 237, 0.12)';
-                                            e.currentTarget.style.color = '#7c3aed';
-                                          }}
-                                          title="Vorschau schließen"
-                                        >
-                                          <X size={12} strokeWidth={3} />
-                                        </button>
-                                      )}
-
-                                      {/* Resize Handles */}
-                                      {isOwnBooking && !isSchedule && !b.isPreview && (
-                                        <>
-                                          <div
-                                            onPointerDown={(e) => handleResizeStart(e, b, 'top')}
-                                            style={{
-                                              position: 'absolute',
-                                              top: 0,
-                                              left: 5,
-                                              right: 0,
-                                              height: '6px',
-                                              cursor: 'ns-resize',
-                                              zIndex: 20,
-                                              background: 'transparent'
-                                            }}
-                                            onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(109, 40, 217, 0.25)'; }}
-                                            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
-                                          />
-                                          <div
-                                            onPointerDown={(e) => handleResizeStart(e, b, 'bottom')}
-                                            style={{
-                                              position: 'absolute',
-                                              bottom: 0,
-                                              left: 5,
-                                              right: 0,
-                                              height: '6px',
-                                              cursor: 'ns-resize',
-                                              zIndex: 20,
-                                              background: 'transparent'
-                                            }}
-                                            onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(109, 40, 217, 0.25)'; }}
-                                            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
-                                          />
-                                        </>
-                                      )}
-
-                                      {isExternal ? (
-                                        <>
-                                          {/* Time range with School icon */}
-                                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.64rem', marginBottom: '4px', fontWeight: 800 }}>
-                                            <span style={{ display: 'flex', alignItems: 'center' }}>
-                                              <School size={10} style={{ marginRight: '3px' }} />
-                                              {b.startTime} - {b.endTime}
-                                            </span>
-                                            {b.isBlockedSlot && (
-                                              <span style={{ fontSize: '0.55rem', textTransform: 'uppercase', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', padding: '1px 4px', borderRadius: '4px', fontWeight: 900 }}>
-                                                Serie
-                                              </span>
-                                            )}
-                                          </div>
-                                          
-                                          {/* Institution Name / Purpose */}
-                                          <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%', fontWeight: 900, fontSize: '0.72rem' }}>
-                                            {b.purpose ? b.purpose.replace(/^\[EXTERN\]\s*/, '') : (b.reason || 'Sperrzeit')}
-                                          </div>
-                                        </>
-                                      ) : isSchedule ? (
-                                        isOwnBooking ? (
-                                          durationHrs <= 0.55 ? (
-                                            <div style={{
-                                              display: 'flex',
-                                              alignItems: 'center',
-                                              justifyContent: 'space-between',
-                                              width: '100%',
-                                              height: '100%',
-                                              padding: '4px 6px',
-                                              boxSizing: 'border-box',
-                                              gap: '4px',
-                                              background: '#34a853',
-                                              color: '#ffffff'
-                                            }}>
-                                              <div style={{
-                                                fontSize: '0.66rem',
-                                                fontWeight: 850,
-                                                color: '#ffffff',
-                                                whiteSpace: 'nowrap',
-                                                overflow: 'hidden',
-                                                textOverflow: 'ellipsis',
-                                                flex: 1
-                                              }}>
-                                                {b.isDuringHoliday ? '🌴 Regulär (Ferien)' : 'Regulärer Unterricht'}
-                                              </div>
-                                              <Lock size={11} color="#ffffff" strokeWidth={2.5} style={{ flexShrink: 0 }} />
-                                            </div>
-                                          ) : (
-                                            <>
-                                              {/* Integrated Flush White Header Bar for Own Schedules */}
-                                              <div style={{
-                                                background: '#ffffff',
-                                                padding: '6px 8px',
-                                                borderBottom: '1px solid rgba(0, 0, 0, 0.08)',
-                                                width: '100%',
-                                                display: 'flex',
-                                                flexDirection: 'column',
-                                                gap: '2px',
-                                                boxSizing: 'border-box'
-                                              }}>
-                                                <div style={{
-                                                   fontSize: '0.64rem',
-                                                   fontWeight: 800,
-                                                   color: isGroovelabBlock ? '#09090b' : '#34a853',
-                                                   display: 'flex',
-                                                   alignItems: 'center',
-                                                   gap: '4px'
-                                                 }}>
-                                                   <Clock size={10} strokeWidth={2.5} />
-                                                   {b.startTime} - {b.endTime}
-                                                 </div>
-                                                 <div style={{
-                                                   fontSize: '0.74rem',
-                                                   fontWeight: 900,
-                                                   color: '#1c1c1e',
-                                                   whiteSpace: 'nowrap',
-                                                   overflow: 'hidden',
-                                                   textOverflow: 'ellipsis'
-                                                 }}>
-                                                   {(!b.teacherName || b.teacherName === 'Patrick H.' || b.teacherName === 'Patrick H') ? 'Patrick Huber' : b.teacherName}
-                                                 </div>
-                                               </div>
-
-                                               {/* Subtitle & Lock Icon at the very bottom */}
-                                               <div style={{
-                                                 padding: '6px 8px',
-                                                 display: 'flex',
-                                                 flexDirection: 'column',
-                                                 justifyContent: 'space-between',
-                                                 flex: 1,
-                                                 boxSizing: 'border-box',
-                                                 width: '100%'
-                                               }}>
-                                                 <div style={{
-                                                   fontSize: '0.64rem',
-                                                   fontWeight: 800,
-                                                   color: '#ffffff'
-                                                 }}>
-                                                   {b.isDuringHoliday ? '🌴 Regulärer Unterricht (Ferien)' : 'Regulärer Unterricht'}
-                                                 </div>
-
-                                                 {/* Lock Icon at the bottom right */}
-                                                 <div 
-                                                   title="Regulärer Unterrichtsblock"
-                                                   style={{
-                                                     display: 'flex',
-                                                     alignItems: 'center',
-                                                     justifyContent: 'flex-end',
-                                                     marginTop: 'auto',
-                                                     paddingTop: '4px'
-                                                   }}
-                                                 >
-                                                   <Lock size={12} color="#ffffff" strokeWidth={2.5} />
-                                                 </div>
-                                               </div>
-                                            </>
-                                          )
-                                        ) : (
-                                          durationHrs <= 0.55 ? (
-                                            <div style={{
-                                              display: 'flex',
-                                              alignItems: 'center',
-                                              justifyContent: 'space-between',
-                                              width: '100%',
-                                              height: '100%',
-                                              padding: '4px 6px',
-                                              boxSizing: 'border-box',
-                                              gap: '4px'
-                                            }}>
-                                              <div style={{
-                                                fontSize: '0.66rem',
-                                                fontWeight: 850,
-                                                color: isGroovelabBlock ? '#451a03' : '#1e7a44',
-                                                whiteSpace: 'nowrap',
-                                                overflow: 'hidden',
-                                                textOverflow: 'ellipsis',
-                                                flex: 1
-                                              }}>
-                                                {isGroovelabBlock ? 'GrooveLab' : (b.teacherName || 'Regulärer Unterricht')}
-                                              </div>
-                                              <Lock size={11} color={isGroovelabBlock ? '#eab308' : '#34a853'} strokeWidth={2.5} style={{ flexShrink: 0 }} />
-                                            </div>
-                                          ) : (
-                                            <div style={{
-                                              display: 'flex',
-                                              flexDirection: 'column',
-                                              justifyContent: 'space-between',
-                                              height: '100%',
-                                              boxSizing: 'border-box',
-                                              width: '100%',
-                                              padding: isGroovelabBlock ? '6px 8px' : 0
-                                            }}>
-                                              <div>
-                                                <div style={{
-                                                  fontSize: '0.62rem',
-                                                  fontWeight: 850,
-                                                  color: isGroovelabBlock ? '#78350f' : '#1e7a44',
-                                                  background: isGroovelabBlock ? 'rgba(120, 53, 15, 0.12)' : 'transparent',
-                                                  padding: isGroovelabBlock ? '2px 7px' : 0,
-                                                  borderRadius: isGroovelabBlock ? '100px' : 0,
-                                                  display: 'inline-flex',
-                                                  alignItems: 'center',
-                                                  gap: '4px',
-                                                  marginBottom: '4px',
-                                                  letterSpacing: '-0.01em'
-                                                }}>
-                                                  <Clock size={10} strokeWidth={2.5} color={isGroovelabBlock ? '#78350f' : '#1e7a44'} />
-                                                  {b.startTime} - {b.endTime}
-                                                </div>
-                                                <div style={{
-                                                  fontSize: '0.74rem',
-                                                  fontWeight: 900,
-                                                  color: isGroovelabBlock ? '#451a03' : '#09090b',
-                                                  whiteSpace: 'nowrap',
-                                                  overflow: 'hidden',
-                                                  textOverflow: 'ellipsis',
-                                                  marginBottom: '2px',
-                                                  letterSpacing: '-0.01em'
-                                                }}>
-                                                  {isGroovelabBlock ? 'GrooveLab' : (b.teacherName || 'Lehrkraft')}
-                                                </div>
-                                                <div style={{
-                                                  fontSize: '0.62rem',
-                                                  fontWeight: 750,
-                                                  color: isGroovelabBlock ? '#92400e' : '#1e7a44',
-                                                  opacity: 0.95
-                                                }}>
-                                                  {b.isDuringHoliday ? '🌴 Regulärer Unterricht (Ferien)' : 'Regulärer Unterricht'}
-                                                </div>
-                                              </div>
-
-                                              {/* Lock Icon at bottom right for schedule blocks */}
-                                              <div 
-                                                title="Regulärer Unterrichtsblock"
-                                                style={{
-                                                  display: 'flex',
-                                                  alignItems: 'center',
-                                                  justifyContent: 'flex-end',
-                                                  marginTop: 'auto',
-                                                  paddingTop: '2px'
-                                                }}
-                                              >
-                                                <Lock size={11} color={isGroovelabBlock ? '#eab308' : '#34a853'} strokeWidth={2.5} />
-                                              </div>
-                                            </div>
-                                          )
-                                         )
-                                        ) : (
-                                          durationHrs <= 0.55 ? (
-                                            <div style={{
-                                              display: 'flex',
-                                              alignItems: 'center',
-                                              justifyContent: 'space-between',
-                                              width: '100%',
-                                              height: '100%',
-                                              padding: '4px 6px',
-                                              boxSizing: 'border-box',
-                                              gap: '4px'
-                                            }}>
-                                              <div style={{
-                                                fontSize: '0.66rem',
-                                                fontWeight: 850,
-                                                color: textColor,
-                                                whiteSpace: 'nowrap',
-                                                overflow: 'hidden',
-                                                textOverflow: 'ellipsis',
-                                                flex: 1
-                                              }}>
-                                                {b.teacherName || b.purpose || 'Buchung'}
-                                              </div>
-                                              {isBookingConfirmed ? (
-                                                <CheckCircle2 size={11} color="#15803d" strokeWidth={2.5} style={{ flexShrink: 0 }} />
-                                              ) : (
-                                                <Clock size={11} color="#9a3412" strokeWidth={2.5} style={{ flexShrink: 0 }} />
-                                              )}
-                                            </div>
-                                          ) : (
-                                            <>
-                                              {/* Time range with User icon */}
-                                              <div style={{ display: 'flex', alignItems: 'center', fontSize: '0.66rem', marginBottom: '2px', fontWeight: 800, color: leftAccentColor, paddingRight: (canDelete || b.isPreview) ? '24px' : 0 }}>
-                                                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                                  <User size={13} strokeWidth={2.2} />
-                                                  {b.startTime} - {b.endTime}
-                                                </span>
-                                              </div>
-
-                                           {/* Person/Teacher Name */}
-                                           <div style={{
-                                             fontSize: '0.72rem',
-                                             fontWeight: 900,
-                                             color: '#1c1c1e',
-                                             whiteSpace: 'nowrap',
-                                             overflow: 'hidden',
-                                             textOverflow: 'ellipsis',
-                                             marginBottom: '2px'
-                                           }}>
-                                             {b.teacherName || 'Lehrkraft'}
-                                           </div>
-
-                                           {/* Apple Glassmorphic Confirmation Status Badge */}
-                                            <div style={{ marginTop: 'auto', paddingTop: '4px', display: 'flex', justifyContent: 'flex-start' }}>
-                                              <span style={{
-                                                fontSize: '0.60rem',
-                                                fontWeight: 800,
-                                                padding: '2px 7px',
-                                                borderRadius: '100px',
-                                                background: isBookingConfirmed ? 'rgba(34, 197, 94, 0.14)' : 'rgba(234, 179, 8, 0.14)',
-                                                backdropFilter: 'blur(8px)',
-                                                WebkitBackdropFilter: 'blur(8px)',
-                                                border: isBookingConfirmed ? '1px solid rgba(34, 197, 94, 0.28)' : '1px solid rgba(234, 179, 8, 0.28)',
-                                                color: isBookingConfirmed ? '#15803d' : '#9a3412',
-                                                display: 'inline-flex',
-                                                alignItems: 'center',
-                                                gap: '3px',
-                                                boxShadow: isBookingConfirmed ? '0 2px 6px rgba(34, 197, 94, 0.1)' : '0 2px 6px rgba(234, 179, 8, 0.1)',
-                                                whiteSpace: 'nowrap',
-                                                letterSpacing: '-0.01em'
-                                              }}>
-                                                {b.isPreview ? (
-                                                  <><span>⏳</span> Vorschau</>
-                                                ) : isBookingConfirmed ? (
-                                                  <>
-                                                    <CheckCircle2 size={11} strokeWidth={2.6} style={{ color: '#16a34a' }} />
-                                                    <span>Bestätigt</span>
-                                                  </>
-                                                ) : (
-                                                  <>
-                                                    <span>⏳</span> Unbestätigt
-                                                  </>
-                                                )}
-                                              </span>
-                                            </div>
-
-                                           {/* Purpose (Only visible for the teacher who booked the room) */}
-                                           {(isOwnBooking || b.isPreview) && b.purpose && b.purpose.trim() && (
-                                             <div style={{ fontSize: '0.64rem', color: '#6b21a8', fontWeight: 750, marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                               {b.purpose}
-                                             </div>
-                                           )}
-                                         </>
-                                        )
-                                      )}
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      );
-                    })}
+                                    return (
+                                      <div
+                                        key={b.id}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setSelectedBooking(b);
+                                        }}
+                                        style={{
+                                          background: bg,
+                                          borderLeft: `3px solid ${leftAccentColor}`,
+                                          padding: '4px 6px',
+                                          borderRadius: '6px',
+                                          fontSize: '0.72rem',
+                                          color: textColor,
+                                          fontWeight: 800,
+                                          display: 'flex',
+                                          flexDirection: 'column',
+                                          gap: '2px'
+                                        }}
+                                      >
+                                        <span>{b.startTime} - {b.endTime}</span>
+                                        <span>{b.teacherName || b.purpose}</span>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
               </div>
-              )}
-
-
-              {/* Mobile FAB to trigger room booking sheet */}
-              {isMobile && (
-                <button
-                  type="button"
-                  onClick={() => setShowMobileRoomSlider(true)}
-                  style={{
-                    position: 'fixed',
-                    bottom: '80px',
-                    right: '20px',
-                    zIndex: 999,
-                    background: `linear-gradient(135deg, ${brandColor}, #2563eb)`,
-                    color: '#ffffff',
-                    border: 'none',
-                    borderRadius: '50px',
-                    padding: '12px 20px',
-                    fontSize: '0.85rem',
-                    fontWeight: 800,
-                    boxShadow: `0 8px 24px ${brandColor}50`,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    cursor: 'pointer'
-                  }}
-                >
-                  <Plus size={18} strokeWidth={2.5} />
-                  <span>Raum buchen</span>
-                </button>
-              )}
-
             </div>
-          </div>
-
-          {/* Right Sidebar: Booking Form OR Meine Buchungen */}
+          )}
+           {/* Right Sidebar: Booking Form OR Meine Buchungen */}
           {!isMobile && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', height: '100%', alignSelf: 'stretch' }}>
               {/* Apple / Linear Segmented Control Header */}
@@ -11136,19 +11054,19 @@ export function AdminDashboard({
           </div>
           )}
 
-          {/* Mobile Bottom-Sheet Slider (Slide-Up Drawer) */}
+          {/* Mobile Bottom-Sheet Slider (Apple-Grade Slide-Up Drawer) */}
           {isMobile && showMobileRoomSlider && (
             <div 
               style={{
                 position: 'fixed',
                 inset: 0,
-                zIndex: 9999,
+                zIndex: 99999,
                 display: 'flex',
                 flexDirection: 'column',
                 justifyContent: 'flex-end',
-                background: 'rgba(15, 23, 42, 0.45)',
-                backdropFilter: 'blur(8px)',
-                WebkitBackdropFilter: 'blur(8px)',
+                background: 'rgba(15, 23, 42, 0.65)',
+                backdropFilter: 'blur(12px)',
+                WebkitBackdropFilter: 'blur(12px)',
                 animation: 'fadeIn 0.2s ease-out'
               }}
               onClick={() => setShowMobileRoomSlider(false)}
@@ -11158,65 +11076,79 @@ export function AdminDashboard({
                   background: '#ffffff',
                   borderTopLeftRadius: '28px',
                   borderTopRightRadius: '28px',
-                  maxHeight: '85vh',
+                  maxHeight: '90vh',
                   width: '100%',
                   display: 'flex',
                   flexDirection: 'column',
-                  boxShadow: '0 -10px 40px rgba(0, 0, 0, 0.2)',
+                  boxShadow: '0 -15px 50px rgba(0, 0, 0, 0.25)',
                   overflow: 'hidden',
-                  animation: 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
+                  boxSizing: 'border-box'
                 }}
                 onClick={(e) => e.stopPropagation()}
               >
+                {/* Apple Drag Handle */}
+                <div style={{ width: '40px', height: '5px', background: '#cbd5e1', borderRadius: '100px', margin: '12px auto 4px auto', flexShrink: 0 }} />
+
                 {/* Sheet Header */}
                 <div style={{
-                  padding: '16px 20px 12px 20px',
+                  padding: '14px 20px 12px 20px',
                   borderBottom: '1px solid #f1f5f9',
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'space-between',
-                  position: 'sticky',
-                  top: 0,
-                  background: '#ffffff',
-                  zIndex: 10
+                  justifyContent: 'space-between'
                 }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                    <div style={{ width: '36px', height: '4px', background: '#cbd5e1', borderRadius: '99px', margin: '0 auto 6px auto' }} />
-                    <h3 style={{ fontSize: '1.05rem', fontWeight: 900, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <Zap size={18} style={{ color: brandColor }} />
-                      Raum buchen & Eigenschaften
-                    </h3>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div style={{
+                      width: '38px',
+                      height: '38px',
+                      borderRadius: '12px',
+                      background: `${brandColor}15`,
+                      color: brandColor,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}>
+                      <DoorClosed size={20} />
+                    </div>
+                    <div>
+                      <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em' }}>
+                        {selectedBooking ? 'Raumbuchung verwalten' : `${selectedRoom?.name || 'Raum'} buchen`}
+                      </h3>
+                      <p style={{ margin: '2px 0 0 0', fontSize: '0.74rem', color: '#64748b', fontWeight: 600 }}>
+                        {new Date(bookingDate).toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' })}
+                      </p>
+                    </div>
                   </div>
+
                   <button
                     type="button"
                     onClick={() => setShowMobileRoomSlider(false)}
                     style={{
                       background: '#f1f5f9',
                       border: 'none',
-                      borderRadius: '50%',
-                      width: '32px',
-                      height: '32px',
+                      borderRadius: '10px',
+                      padding: '6px',
+                      cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      color: '#64748b',
-                      cursor: 'pointer'
+                      color: '#64748b'
                     }}
                   >
                     <X size={18} />
                   </button>
                 </div>
 
-                {/* Sheet Body (Scrollable Content) */}
-                <div style={{ padding: '16px 20px 40px 20px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  {/* Apple / Linear Segmented Control Header (Mobile) */}
+                {/* Sheet Scrollable Content */}
+                <div style={{ padding: '16px 20px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '16px', flex: 1 }} className="custom-calendar-scrollbar">
+                  
+                  {/* Toggle: Raum buchen vs Meine Buchungen */}
                   <div style={{
                     display: 'flex',
                     background: '#f2f2f7',
-                    padding: '4px',
-                    borderRadius: '16px',
-                    gap: '4px',
-                    border: '1px solid rgba(0,0,0,0.04)'
+                    padding: '3px',
+                    borderRadius: '14px',
+                    gap: '4px'
                   }}>
                     <button
                       type="button"
@@ -11224,23 +11156,17 @@ export function AdminDashboard({
                       style={{
                         flex: 1,
                         padding: '8px 12px',
-                        borderRadius: '12px',
+                        borderRadius: '11px',
                         border: 'none',
                         background: !showMyBookingsOnly ? '#ffffff' : 'transparent',
                         color: !showMyBookingsOnly ? '#0f172a' : '#64748b',
                         fontWeight: !showMyBookingsOnly ? 850 : 650,
                         fontSize: '0.78rem',
                         cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '6px',
-                        boxShadow: !showMyBookingsOnly ? '0 2px 8px rgba(0,0,0,0.06)' : 'none',
-                        transition: 'all 0.15s ease'
+                        boxShadow: !showMyBookingsOnly ? '0 2px 6px rgba(0,0,0,0.06)' : 'none'
                       }}
                     >
-                      <Zap size={14} color={!showMyBookingsOnly ? brandColor : '#64748b'} strokeWidth={2.4} />
-                      <span>Raum buchen</span>
+                      {selectedBooking ? '✏️ Buchung anpassen' : '⚡ Neuer Termin'}
                     </button>
                     <button
                       type="button"
@@ -11248,216 +11174,284 @@ export function AdminDashboard({
                       style={{
                         flex: 1,
                         padding: '8px 12px',
-                        borderRadius: '12px',
+                        borderRadius: '11px',
                         border: 'none',
                         background: showMyBookingsOnly ? '#ffffff' : 'transparent',
-                        color: showMyBookingsOnly ? '#0f172a' : '#64748b',
+                        color: showMyBookingsOnly ? '#7c3aed' : '#64748b',
                         fontWeight: showMyBookingsOnly ? 850 : 650,
                         fontSize: '0.78rem',
                         cursor: 'pointer',
+                        boxShadow: showMyBookingsOnly ? '0 2px 6px rgba(0,0,0,0.06)' : 'none',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        gap: '6px',
-                        boxShadow: showMyBookingsOnly ? '0 2px 8px rgba(0,0,0,0.06)' : 'none',
-                        transition: 'all 0.15s ease'
+                        gap: '6px'
                       }}
                     >
-                      <Calendar size={14} color={showMyBookingsOnly ? '#7c3aed' : '#64748b'} strokeWidth={2.4} />
                       <span>Meine Buchungen</span>
-                      <span style={{
-                        fontSize: '0.68rem',
-                        background: showMyBookingsOnly ? '#7c3aed' : '#cbd5e1',
-                        color: '#ffffff',
-                        padding: '2px 6px',
-                        borderRadius: '100px',
-                        fontWeight: 900
-                      }}>
+                      <span style={{ fontSize: '0.68rem', background: '#7c3aed', color: '#ffffff', padding: '1px 6px', borderRadius: '100px', fontWeight: 900 }}>
                         {myBookings.length}
                       </span>
                     </button>
                   </div>
 
                   {showMyBookingsOnly ? (
-                    /* Meine Buchungen (Shown only when showMyBookingsOnly is true) */
-                    <div 
-                      className="glass-panel" 
-                      style={{ 
-                        background: 'white', 
-                        borderRadius: '24px', 
-                        border: '1px solid rgba(0, 0, 0, 0.04)', 
-                        padding: '20px', 
-                        boxShadow: '0 4px 24px -4px rgba(0, 0, 0, 0.02), 0 2px 12px -2px rgba(0, 0, 0, 0.01)',
-                        display: 'flex',
-                        flexDirection: 'column'
-                      }}
-                    >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <h3 style={{ fontSize: '1rem', fontWeight: 900, color: '#1c1c1e', margin: 0 }}>
-                            Meine Buchungen ({myBookings.length})
-                          </h3>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => setShowMyBookingsOnly(false)}
-                          style={{
-                            background: '#f1f5f9',
-                            border: 'none',
-                            color: '#64748b',
-                            borderRadius: '8px',
-                            padding: '4px 10px',
-                            fontSize: '0.75rem',
-                            fontWeight: 700,
-                            cursor: 'pointer'
-                          }}
-                        >
-                          Schließen
-                        </button>
-                      </div>
-                      
+                    /* List of Own Bookings */
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                       {myBookings.length === 0 ? (
                         <div style={{ textAlign: 'center', padding: '30px 10px', color: '#94a3b8' }}>
-                          <p style={{ fontSize: '0.85rem', fontWeight: 600, margin: 0 }}>Keine aktiven Buchungen vorhanden.</p>
+                          <p style={{ fontSize: '0.85rem', fontWeight: 600, margin: 0 }}>Keine aktiven Raumbuchungen vorhanden.</p>
                         </div>
                       ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '400px', overflowY: 'auto' }}>
-                          {myBookings.map((b: any) => (
-                            <div key={b.id} style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '12px' }}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                                <span style={{ fontWeight: 800, fontSize: '0.85rem', color: '#0f172a' }}>{b.roomName || 'Raum'}</span>
-                                <span style={{ fontSize: '0.7rem', background: '#dbeafe', color: '#1e40af', padding: '2px 6px', borderRadius: '6px', fontWeight: 700 }}>{b.date}</span>
-                              </div>
-                              <p style={{ fontSize: '0.75rem', color: '#64748b', margin: '4px 0 8px 0' }}>{b.startTime} - {b.endTime} Uhr • {b.purpose || 'Kein Titel'}</p>
+                        myBookings.map((b: any) => (
+                          <div key={b.id} style={{ background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: '14px', padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <span style={{ fontWeight: 900, fontSize: '0.90rem', color: '#0f172a' }}>{b.roomName || 'Raum'}</span>
+                              <span style={{ fontSize: '0.70rem', background: '#dbeafe', color: '#1e40af', padding: '2px 8px', borderRadius: '6px', fontWeight: 800 }}>{b.date}</span>
+                            </div>
+                            <span style={{ fontSize: '0.78rem', color: '#475569', fontWeight: 700 }}>
+                              ⏰ {b.startTime} - {b.endTime} Uhr • {b.purpose || 'Eigennutzung'}
+                            </span>
+                            <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
                               <button
                                 type="button"
-                                onClick={() => handleCancelBooking(b.ids || b.id)}
-                                style={{ background: '#fee2e2', color: '#ef4444', border: 'none', borderRadius: '6px', padding: '4px 8px', fontSize: '0.7rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                                onClick={async () => {
+                                  await handleCancelBooking(b.ids || b.id);
+                                }}
+                                style={{
+                                  flex: 1,
+                                  background: '#fee2e2',
+                                  color: '#dc2626',
+                                  border: 'none',
+                                  borderRadius: '8px',
+                                  padding: '8px 10px',
+                                  fontSize: '0.74rem',
+                                  fontWeight: 800,
+                                  cursor: 'pointer'
+                                }}
                               >
-                                Stornieren
+                                🗑️ Stornieren
                               </button>
                             </div>
-                          ))}
-                        </div>
+                          </div>
+                        ))
                       )}
                     </div>
                   ) : (
-                    /* General Quick Booking Panel */
-                    <div 
-                      className="glass-panel" 
-                      style={{ 
-                        background: 'white', 
-                        borderRadius: '24px', 
-                        border: '1px solid rgba(0, 0, 0, 0.04)', 
-                        padding: '20px', 
-                        boxShadow: '0 4px 24px -4px rgba(0, 0, 0, 0.02), 0 2px 12px -2px rgba(0, 0, 0, 0.01)' 
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
-                        <div style={{ background: `${brandColor}12`, color: brandColor, padding: '6px', borderRadius: '10px', display: 'flex' }}>
-                          <Plus size={16} />
-                        </div>
-                        <h3 style={{ fontSize: '1.05rem', fontWeight: 900, color: '#1c1c1e', margin: 0 }}>Raum schnell buchen</h3>
-                      </div>
+                    /* Booking Form */
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                       
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                        <div>
-                          <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', marginBottom: '4px', display: 'block' }}>Raum wählen</label>
-                          <select 
-                            value={selectedCampusRoomId || ''} 
-                            onChange={(e) => setSelectedCampusRoomId(e.target.value)}
-                            className="premium-input"
-                            style={{ width: '100%', height: '40px' }}
-                          >
-                            {rooms.map((r: any) => (
-                              <option key={r.id} value={r.id}>{r.name}</option>
-                            ))}
-                          </select>
-                        </div>
-                        <div>
-                          <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', marginBottom: '4px', display: 'block' }}>Datum</label>
-                          <input 
-                            type="date" 
-                            value={bookingDate} 
-                            onChange={(e) => setBookingDate(e.target.value)} 
-                            className="premium-input" 
-                            style={{ width: '100%', height: '40px' }} 
-                          />
-                        </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                          <div>
-                            <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', marginBottom: '4px', display: 'block' }}>Von</label>
-                            <input 
-                              type="time" 
-                              value={bookingStartTime} 
-                              onChange={(e) => setBookingStartTime(e.target.value)} 
-                              className="premium-input" 
-                              style={{ width: '100%', height: '40px' }} 
-                            />
-                          </div>
-                          <div>
-                            <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', marginBottom: '4px', display: 'block' }}>Bis</label>
-                            <input 
-                              type="time" 
-                              value={bookingEndTime} 
-                              onChange={(e) => setBookingEndTime(e.target.value)} 
-                              className="premium-input" 
-                              style={{ width: '100%', height: '40px' }} 
-                            />
-                          </div>
-                        </div>
-                        <div>
-                          <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', marginBottom: '4px', display: 'block' }}>Zweck / Notiz</label>
-                          <input 
-                            type="text" 
-                            placeholder="z. B. Klavierunterricht, Bandprobe..." 
-                            value={bookingPurpose} 
-                            onChange={(e) => setBookingPurpose(e.target.value)} 
-                            className="premium-input" 
-                            style={{ width: '100%', height: '40px' }} 
-                          />
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (selectedRoom) {
-                              if (isEditing) {
-                                handleUpdateBooking();
-                              } else {
-                                handleAddBooking(selectedRoom.id);
-                              }
-                              setShowMobileRoomSlider(false);
-                            }
-                          }}
-                          style={{
-                            background: brandColor,
-                            color: '#ffffff',
-                            border: 'none',
-                            borderRadius: '12px',
-                            padding: '12px',
-                            fontWeight: 800,
-                            fontSize: '0.85rem',
-                            cursor: 'pointer',
-                            marginTop: '8px',
-                            boxShadow: `0 4px 14px ${brandColor}33`,
-                            width: '100%'
-                          }}
+                      {/* Room Selector if not fixed */}
+                      <div>
+                        <label style={{ fontSize: '0.70rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: '4px' }}>Raum:</label>
+                        <select 
+                          value={selectedCampusRoomId || ''} 
+                          onChange={(e) => setSelectedCampusRoomId(e.target.value)}
+                          style={{ width: '100%', padding: '10px 12px', borderRadius: '12px', border: '1.5px solid #cbd5e1', fontSize: '0.85rem', fontWeight: 800, color: '#0f172a', background: '#ffffff', boxSizing: 'border-box' }}
                         >
-                          Kostenfrei buchen
-                        </button>
+                          {rooms.map((r: any) => (
+                            <option key={r.id} value={r.id}>{r.name} ({(!r.floor || r.floor === 'Allgemein') ? 'EG' : r.floor})</option>
+                          ))}
+                        </select>
                       </div>
-                    </div>
-                  )}
 
-                  {/* Properties Widget */}
-                  {selectedRoom && (
-                    <div className="glass-panel" style={{ background: 'white', borderRadius: '24px', border: '1px solid rgba(0, 0, 0, 0.04)', padding: '20px' }}>
-                      <h3 style={{ fontSize: '1rem', fontWeight: 900, color: '#1c1c1e', margin: '0 0 12px 0' }}>Raum-Details</h3>
-                      <p style={{ fontSize: '0.8rem', color: '#64748b', margin: 0 }}><strong>Kapazität:</strong> {selectedRoom.capacity || 1} Personen</p>
-                      <p style={{ fontSize: '0.8rem', color: '#64748b', margin: '4px 0 0 0' }}><strong>Ausstattung:</strong> {selectedRoom.equipment || 'Keine Angabe'}</p>
+                      {/* Date Picker */}
+                      <div>
+                        <label style={{ fontSize: '0.70rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: '4px' }}>Datum:</label>
+                        <input 
+                          type="date" 
+                          value={bookingDate} 
+                          onChange={(e) => setBookingDate(e.target.value)} 
+                          style={{ width: '100%', padding: '10px 12px', borderRadius: '12px', border: '1.5px solid #cbd5e1', fontSize: '0.85rem', fontWeight: 800, color: '#0f172a', background: '#ffffff', boxSizing: 'border-box' }} 
+                        />
+                      </div>
+
+                      {/* 1-Tap Quick-Duration Presets */}
+                      <div>
+                        <label style={{ fontSize: '0.70rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: '6px' }}>
+                          Dauer (1-Tap):
+                        </label>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px' }}>
+                          {[
+                            { label: '30m', mins: 30 },
+                            { label: '45m', mins: 45 },
+                            { label: '60m', mins: 60 },
+                            { label: '90m', mins: 90 }
+                          ].map((d) => (
+                            <button
+                              key={d.mins}
+                              type="button"
+                              onClick={() => handleQuickDuration(d.mins)}
+                              style={{
+                                padding: '8px 4px',
+                                borderRadius: '10px',
+                                border: '1.5px solid #e2e8f0',
+                                background: '#f8fafc',
+                                color: '#0f172a',
+                                fontWeight: 800,
+                                fontSize: '0.76rem',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              {d.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Time Pickers */}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                        <div>
+                          <label style={{ fontSize: '0.70rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>Von:</label>
+                          <input 
+                            type="time" 
+                            value={bookingStartTime} 
+                            onChange={(e) => setBookingStartTime(e.target.value)} 
+                            style={{ width: '100%', padding: '10px 12px', borderRadius: '12px', border: '1.5px solid #cbd5e1', fontSize: '0.85rem', fontWeight: 800, color: '#0f172a', background: '#ffffff', boxSizing: 'border-box' }} 
+                          />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: '0.70rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>Bis:</label>
+                          <input 
+                            type="time" 
+                            value={bookingEndTime} 
+                            onChange={(e) => setBookingEndTime(e.target.value)} 
+                            style={{ width: '100%', padding: '10px 12px', borderRadius: '12px', border: '1.5px solid #cbd5e1', fontSize: '0.85rem', fontWeight: 800, color: '#0f172a', background: '#ffffff', boxSizing: 'border-box' }} 
+                          />
+                        </div>
+                      </div>
+
+                      {/* Quick Purpose Chips */}
+                      <div>
+                        <label style={{ fontSize: '0.70rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: '6px' }}>
+                          Zweck-Schnellauswahl:
+                        </label>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '6px' }}>
+                          {[
+                            '🎹 Mein Unterricht',
+                            '🎵 Eigennutzung / Üben',
+                            '👥 Band / Ensemble',
+                            '🏫 Vertretungsstunde'
+                          ].map((chip) => (
+                            <button
+                              key={chip}
+                              type="button"
+                              onClick={() => setBookingPurpose(chip)}
+                              style={{
+                                padding: '8px 10px',
+                                borderRadius: '10px',
+                                border: bookingPurpose === chip ? `2px solid ${brandColor}` : '1.5px solid #e2e8f0',
+                                background: bookingPurpose === chip ? `${brandColor}15` : '#f8fafc',
+                                color: bookingPurpose === chip ? brandColor : '#334155',
+                                fontWeight: bookingPurpose === chip ? 850 : 650,
+                                fontSize: '0.74rem',
+                                cursor: 'pointer',
+                                textAlign: 'left'
+                              }}
+                            >
+                              {chip}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Custom Purpose Input */}
+                      <div>
+                        <label style={{ fontSize: '0.70rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>Notiz / Eigener Text:</label>
+                        <input 
+                          type="text" 
+                          placeholder="z. B. Nachholstunde, Vorbereitung..." 
+                          value={bookingPurpose} 
+                          onChange={(e) => setBookingPurpose(e.target.value)} 
+                          style={{ width: '100%', padding: '10px 12px', borderRadius: '12px', border: '1.5px solid #cbd5e1', fontSize: '0.85rem', fontWeight: 700, color: '#0f172a', background: '#ffffff', boxSizing: 'border-box' }} 
+                        />
+                      </div>
                     </div>
                   )}
                 </div>
+
+                {/* Sticky Bottom Action Bar */}
+                {!showMyBookingsOnly && (
+                  <div style={{
+                    padding: '14px 20px',
+                    paddingBottom: 'calc(14px + env(safe-area-inset-bottom, 0px))',
+                    borderTop: '1px solid #f1f5f9',
+                    background: '#ffffff',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '8px'
+                  }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (selectedRoom) {
+                          if (isEditing) {
+                            handleUpdateBooking();
+                          } else {
+                            handleAddBooking(selectedRoom.id);
+                          }
+                          setShowMobileRoomSlider(false);
+                        }
+                      }}
+                      style={{
+                        background: `linear-gradient(135deg, ${brandColor}, #15803d)`,
+                        color: '#ffffff',
+                        border: 'none',
+                        borderRadius: '14px',
+                        padding: '14px',
+                        fontWeight: 900,
+                        fontSize: '0.90rem',
+                        cursor: 'pointer',
+                        boxShadow: `0 4px 16px ${brandColor}35`,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px'
+                      }}
+                    >
+                      <span>🟢</span>
+                      <span>{isEditing ? 'Buchung jetzt anpassen' : 'Raum jetzt verbindlich buchen'}</span>
+                    </button>
+
+                    {isEditing && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          handleDeleteBooking();
+                          setShowMobileRoomSlider(false);
+                        }}
+                        style={{
+                          background: '#fee2e2',
+                          color: '#dc2626',
+                          border: 'none',
+                          borderRadius: '12px',
+                          padding: '10px',
+                          fontWeight: 800,
+                          fontSize: '0.80rem',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        🗑️ Buchung stornieren / freigeben
+                      </button>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={() => setShowMobileRoomSlider(false)}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: '#64748b',
+                        fontSize: '0.80rem',
+                        fontWeight: 700,
+                        padding: '4px',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Abbrechen
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           )}

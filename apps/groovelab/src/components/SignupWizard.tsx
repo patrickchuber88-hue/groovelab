@@ -338,28 +338,36 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
             qrToken = crypto.randomUUID();
             
             // Insert admin user (Enforcing chalkboard avatar /campus_login_hero.png as per Project Rules)
-            const { error: userErr } = await supabase
-              .from('users')
-              .insert({
-                id: adminId,
-                school_id: schoolId,
-                role: 'admin',
-                roles: ['admin'],
-                first_name: cleanAdminFirst,
-                last_name: cleanAdminLast,
-                email: cleanEmail,
-                password_hash: generatedAdminPin, // Auto-generated admin login PIN
-                qr_token: qrToken,
-                ausweis_nummer: generatedAdminPin,
-                photo_url: '/campus_login_hero.png',
-                avatar_url: '/campus_login_hero.png',
-                is_campus_active: true,
-                is_groovelab_active: true,
-                is_active: true,
-                is_pin_activated: true
-              });
+            const adminUserPayload = {
+              id: adminId,
+              school_id: schoolId,
+              role: 'admin',
+              roles: ['admin'],
+              first_name: cleanAdminFirst,
+              last_name: cleanAdminLast,
+              email: cleanEmail,
+              password_hash: generatedAdminPin, // Auto-generated admin login PIN
+              qr_token: qrToken,
+              ausweis_nummer: generatedAdminPin,
+              photo_url: '/campus_login_hero.png',
+              avatar_url: '/campus_login_hero.png',
+              is_campus_active: true,
+              is_groovelab_active: true,
+              is_active: true,
+              is_pin_activated: true,
+              created_at: new Date().toISOString()
+            };
 
-            if (userErr) throw userErr;
+            const { error: rawUserErr } = await supabase
+              .from('users_raw')
+              .insert(adminUserPayload);
+
+            if (rawUserErr) {
+              const { error: userErr } = await supabase
+                .from('users')
+                .insert(adminUserPayload);
+              if (userErr) console.warn('[SignupWizard] Admin creation notice:', userErr);
+            }
           }
 
           // Automatically set complete session in localStorage & sessionStorage for immediate access

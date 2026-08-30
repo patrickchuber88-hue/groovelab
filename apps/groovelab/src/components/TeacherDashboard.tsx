@@ -14530,7 +14530,7 @@ useEffect(() => {
                             {item.attachment_url && (
                               <div style={{ marginTop: '4px' }}>
                                 {item.attachment_url.match(/\.(jpeg|jpg|gif|png|webp)$/i) ? (
-                                  <a href={item.attachment_url} target="_blank" rel="noreferrer">
+                                  <a href={item.attachment_url} target="_blank" rel="noopener noreferrer">
                                     <img 
                                       src={item.attachment_url} 
                                       alt="Anhang" 
@@ -14541,7 +14541,7 @@ useEffect(() => {
                                   <a 
                                     href={item.attachment_url} 
                                     target="_blank" 
-                                    rel="noreferrer" 
+                                    rel="noopener noreferrer" 
                                     style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.72rem', color: '#34a853', textDecoration: 'none', fontWeight: 650 }}
                                   >
                                     📄 Dokument öffnen

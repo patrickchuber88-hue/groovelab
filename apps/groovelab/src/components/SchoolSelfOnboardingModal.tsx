@@ -221,31 +221,44 @@ export const SchoolSelfOnboardingModal: React.FC<SchoolSelfOnboardingModalProps>
         if (schoolErr) throw schoolErr;
         schoolRecord = school;
 
-        // 2. Create Admin User Record (Admin photo must be /campus_login_hero.png as per guidelines)
-        const { data: user, error: userErr } = await supabase
-          .from('users')
-          .insert({
-            school_id: school.id,
-            first_name: firstName.trim(),
-            last_name: lastName.trim(),
-            email: email.trim().toLowerCase(),
-            role: 'admin',
-            roles: ['admin'],
-            ausweis_nummer: candidatePin,
-            password_hash: candidatePin,
-            qr_token: qrToken,
-            photo_url: '/campus_login_hero.png',
-            avatar_url: '/campus_login_hero.png',
-            is_campus_active: true,
-            is_groovelab_active: true,
-            is_active: true,
-            is_pin_activated: true
-          })
+        // 2. Create Admin User Record directly in users_raw (Admin photo must be /campus_login_hero.png as per guidelines)
+        const adminPayload = {
+          id: crypto.randomUUID(),
+          school_id: school.id,
+          first_name: firstName.trim(),
+          last_name: lastName.trim(),
+          email: email.trim().toLowerCase(),
+          role: 'admin',
+          roles: ['admin'],
+          ausweis_nummer: candidatePin,
+          password_hash: candidatePin,
+          qr_token: qrToken,
+          photo_url: '/campus_login_hero.png',
+          avatar_url: '/campus_login_hero.png',
+          is_campus_active: true,
+          is_groovelab_active: true,
+          is_active: true,
+          is_pin_activated: true,
+          created_at: new Date().toISOString()
+        };
+
+        const { data: rawUser, error: rawUserErr } = await supabase
+          .from('users_raw')
+          .insert(adminPayload)
           .select()
           .single();
 
-        if (userErr) throw userErr;
-        userRecord = user;
+        if (rawUser) {
+          userRecord = rawUser;
+        } else {
+          const { data: user, error: userErr } = await supabase
+            .from('users')
+            .insert(adminPayload)
+            .select()
+            .single();
+          if (userErr) throw userErr;
+          userRecord = user;
+        }
       }
 
       // 3. Set Session in LocalStorage & SessionStorage for immediate access

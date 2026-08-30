@@ -92,22 +92,13 @@ export const Startseite: React.FC<StartseiteProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Real fallback schools for offline/connection failure scenarios
+  // Generic fallback schools for offline/demo scenarios (Zero PII / Real School Leakage)
   const FALLBACK_SCHOOLS = [
     {
-      id: '53e83805-1d5a-4ed8-988e-1fb0b8200b9c',
-      name: 'Musäk Bad Säckingen',
-      subdomain: 'musaek-bad-saeckingen',
-      city: 'Bad Säckingen',
-      has_campus_subscription: true,
-      has_groovelab_subscription: true,
-      logo_url: 'https://www.musaek.de/wp-content/uploads/2021/03/musaek-logo-black-300x140.png'
-    },
-    {
-      id: 'cc05137f-5904-4774-80be-6a172c52bf99',
-      name: 'Musäk BS',
-      subdomain: 'musaek-bs',
-      city: 'Bad Säckingen',
+      id: '00000000-0000-0000-0000-000000000001',
+      name: 'Demo Musikschule',
+      subdomain: 'demo',
+      city: 'Musterstadt',
       has_campus_subscription: true,
       has_groovelab_subscription: true,
       logo_url: null
@@ -129,7 +120,7 @@ export const Startseite: React.FC<StartseiteProps> = ({
       .replace(/[^a-z0-9]/g, '');
   };
 
-  // Fetch all active schools on mount & store in state & cache
+  // Fetch active schools dynamically via secure search RPC
   useEffect(() => {
     let isMounted = true;
 
@@ -147,13 +138,9 @@ export const Startseite: React.FC<StartseiteProps> = ({
     const fetchSchools = async () => {
       setIsSearching(true);
       try {
-        const { data, error } = await supabase
-          .from('schools')
-          .select('id, name, subdomain, logo_url, city, address, postal_code, has_campus_subscription, has_groovelab_subscription, is_active')
-          .not('is_active', 'eq', false)
-          .order('name', { ascending: true });
+        const { data, error } = await supabase.rpc('search_public_schools', { p_query: '' });
 
-        if (!error && data && data.length > 0) {
+        if (!error && data && Array.isArray(data) && data.length > 0) {
           const cleanData = data.filter((s: any) => !s.name?.toLowerCase().includes('groove academy'));
           if (isMounted) {
             setAllSchools(cleanData);
@@ -163,7 +150,7 @@ export const Startseite: React.FC<StartseiteProps> = ({
           } catch (e) {}
         }
       } catch (err) {
-        console.error('Error fetching schools:', err);
+        console.warn('Could not fetch schools directory:', err);
       } finally {
         if (isMounted) {
           setIsSearching(false);

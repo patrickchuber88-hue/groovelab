@@ -3455,7 +3455,7 @@ export function CampusEventsBoard({
                 room_name: boardRoomName,
                 room: { name: boardRoomName },
                 rooms: { name: boardRoomName },
-                teacher: teacherProfileObj || { first_name: 'Severin', last_name: 'Landenberger', instrument: 'Gitarre' },
+                teacher: teacherProfileObj || { first_name: 'Lehrkraft', last_name: '', instrument: 'Musik' },
                 instrument: boardInstrument,
                 student: matchedStudent || {
                   id: studentId,
@@ -3494,7 +3494,7 @@ export function CampusEventsBoard({
               room_name: schRoomName,
               room: sch.room || { name: schRoomName },
               rooms: sch.rooms || { name: schRoomName },
-              teacher: sch.teacher || teacherProfileObj || studentTeacherObj || { first_name: 'Severin', last_name: 'Landenberger', instrument: 'Gitarre' },
+              teacher: sch.teacher || teacherProfileObj || studentTeacherObj || { first_name: 'Lehrkraft', last_name: '', instrument: 'Musik' },
               instrument: schInstrument
             });
           }
@@ -3621,7 +3621,7 @@ export function CampusEventsBoard({
                     ...actual,
                     start_time: actTime,
                     schedule: sch,
-                    teacher: actual.teacher || sch.teacher || teacherProfileObj || studentTeacherObj || { first_name: 'Severin', last_name: 'Landenberger', instrument: 'Gitarre' },
+                    teacher: actual.teacher || sch.teacher || teacherProfileObj || studentTeacherObj || { first_name: 'Lehrkraft', last_name: '', instrument: 'Musik' },
                     room_name: actRoomName,
                     room: actual.room || sch.room || sch.rooms || { name: actRoomName },
                     rooms: actual.rooms || sch.rooms || sch.room || { name: actRoomName },
@@ -3650,7 +3650,7 @@ export function CampusEventsBoard({
                   duration: sch.duration || 45,
                   status: sch.status === 'canceled_by_teacher_sick' ? 'teacher_sick' : 'scheduled',
                   is_virtual: true,
-                  teacher: sch.teacher || teacherProfileObj || studentTeacherObj || { first_name: 'Severin', last_name: 'Landenberger', instrument: 'Gitarre' },
+                  teacher: sch.teacher || teacherProfileObj || studentTeacherObj || { first_name: 'Lehrkraft', last_name: '', instrument: 'Musik' },
                   student: sch.student,
                   schedule: sch,
                   room_name: virtRoomName,
@@ -3681,7 +3681,7 @@ export function CampusEventsBoard({
             allMergedOccurrences.push({
               ...occ,
               start_time: occTime.includes(':') && occTime.split(':').length === 2 ? `${occTime}:00` : occTime,
-              teacher: occ.teacher || teacherProfileObj || studentTeacherObj || { first_name: 'Severin', last_name: 'Landenberger', instrument: 'Gitarre' },
+              teacher: occ.teacher || teacherProfileObj || studentTeacherObj || { first_name: 'Lehrkraft', last_name: '', instrument: 'Musik' },
               room_name: occRoomName,
               room: occ.room || { name: occRoomName },
               rooms: occ.rooms || { name: occRoomName },

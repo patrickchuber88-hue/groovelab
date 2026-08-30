@@ -2773,8 +2773,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     } catch (e) {
       console.error('Error determining teacher ID:', e);
     }
-    // Valid teacher fallback UUID
-    return '11079eae-664a-49a4-8692-771d83a3193c';
+    // Safe fallback
+    return (student as any)?.teacher_id || '';
   };
 
   const [activeRhythmSong, setActiveRhythmSong] = useState<{ songTitle: string; targetBpm: number; songId?: string } | null>(null);
@@ -7362,7 +7362,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       }
     } catch {}
 
-    const rawTeacher = tName || (student as any)?.teacher_name || (student as any)?.teacher?.name || 'Severin Landenberger';
+    const rawTeacher = tName || (student as any)?.teacher_name || (student as any)?.teacher?.name || 'Lehrkraft';
     const finalTeacher = formatTeacherFullName(rawTeacher);
     const finalSchool = sName || 'Campus-Groovelab Musikschule';
     const finalInstrument = (student as any)?.instrument || (student as any)?.instrument_name || 'Gitarre';

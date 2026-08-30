@@ -12,6 +12,7 @@ import { createMasterSessionLease } from '../utils/masterAuditLogger';
 import { verifyTOTP } from '../utils/totp';
 import { registerClientSessionLease } from '../utils/sessionLeaseManager';
 import { setVaultItem } from '../utils/aesStorageVault';
+import { scrubSensitiveUrlParams } from '../utils/urlSecurityScrubber';
 
 
 
@@ -559,11 +560,6 @@ const getStationColor = (name: string | null | undefined, dbColor?: string | nul
   if (num === 5 || num === 6) return '#3b82f6'; // Blue
   if (num === 7 || num === 8) return '#eab308'; // Yellow
   return '#64748b';
-};
-
-const isMusaekSchool = (id: string | null | undefined) => {
-  if (!id) return false;
-  return id === 'cc05137f-5904-4774-80be-6a172c52bf99' || id === '53e83805-1d5a-4ed8-988e-1fb0b8200b9c';
 };
 
 export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
@@ -1519,9 +1515,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
     if (!schoolData?.id) return [];
     return savedFamilyProfiles.filter((p: any) => {
       if (!p || !p.id) return false;
-      const isDirectMatch = p.school_id === schoolData.id;
-      const isMusaekMatch = isMusaekSchool(p.school_id) && isMusaekSchool(schoolData.id);
-      return isDirectMatch || isMusaekMatch;
+      return p.school_id === schoolData.id;
     });
   }, [savedFamilyProfiles, schoolData?.id]);
 
@@ -1531,9 +1525,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
     return biometricProfiles.filter((p: any) => {
       if (!p) return false;
       if (!p.schoolName) return true; // Generic device credential
-      const schoolNameMatch = p.schoolName.trim().toLowerCase() === (schoolData.name || '').trim().toLowerCase();
-      const musaekMatch = isMusaekSchool(schoolData.id) && p.schoolName.toLowerCase().includes('musaek');
-      return schoolNameMatch || musaekMatch;
+      return p.schoolName.trim().toLowerCase() === (schoolData.name || '').trim().toLowerCase();
     });
   }, [biometricProfiles, schoolData?.name, schoolData?.id]);
 
@@ -1669,12 +1661,11 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
         // 1. Direct school_id parameter match (highest priority)
         if (schoolIdParam) {
-          const { data, error } = await supabase.from('schools').select('*').eq('id', schoolIdParam).maybeSingle();
+          const { data, error } = await supabase.rpc('get_public_school_theme', { p_subdomain: schoolIdParam });
           if (!error && data) {
             setSchoolName(data.name);
             setSchoolData(data);
             localStorage.setItem('groovelab_last_school_id', data.id);
-            if (data.subdomain) localStorage.setItem('groovelab_last_subdomain', data.subdomain);
             return;
           }
         }
@@ -1684,18 +1675,13 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           if (inviteToken) {
             sessionStorage.setItem('groovelab_qr_token', inviteToken);
             localStorage.setItem('groovelab_kiosk_token', inviteToken);
+            scrubSensitiveUrlParams();
           }
-          const { data, error } = await supabase.from('schools').select('*').eq('id', inviteSchoolId).maybeSingle();
+          const { data, error } = await supabase.rpc('get_public_school_theme', { p_subdomain: inviteSchoolId });
           if (!error && data) {
             setSchoolName(data.name);
             setSchoolData(data);
             localStorage.setItem('groovelab_last_school_id', data.id);
-            if (data.subdomain) localStorage.setItem('groovelab_last_subdomain', data.subdomain);
-            const validToken = data.secretary_onboarding_token || data.groovelab_kiosk_token || data.campus_login_token || inviteToken;
-            if (validToken) {
-              sessionStorage.setItem('groovelab_qr_token', validToken);
-              localStorage.setItem('groovelab_kiosk_token', validToken);
-            }
             return;
           }
         }
@@ -1740,43 +1726,13 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         const subdomain = getSubdomain();
 
         if (subdomain) {
-          const { data: allSchools, error: allSchoolsErr } = await supabase.from('schools').select('*');
-          if (!allSchoolsErr && allSchools) {
-            const cleanSub = subdomain.toLowerCase().trim();
-
-            // 1. Try exact ID match or exact subdomain match first
-            let matchedSchool = allSchools.find(s => 
-              s.id === cleanSub || (s.subdomain && s.subdomain.toLowerCase().trim() === cleanSub)
-            );
-
-            // 2. Fallback to slugified name match if exact subdomain match not found
-            if (!matchedSchool) {
-              const slugify = (name: string) => {
-                return name
-                  .toLowerCase()
-                  .trim()
-                  .replace(/[äöüß]/g, (match) => {
-                    const mapping: Record<string, string> = { 'ä': 'ae', 'ö': 'oe', 'ü': 'ue', 'ß': 'ss' };
-                    return mapping[match] || match;
-                  })
-                  .replace(/[^a-z0-9]/g, '-')
-                  .replace(/-+/g, '-')
-                  .replace(/^-+|-+$/g, '');
-              };
-
-              matchedSchool = allSchools.find(s => {
-                const slug = slugify(s.name);
-                return slug === cleanSub || slug.replace(/-/g, '') === cleanSub.replace(/-/g, '');
-              });
-            }
-
-            if (matchedSchool) {
-              setSchoolName(matchedSchool.name);
-              setSchoolData(matchedSchool);
-              localStorage.setItem('groovelab_last_school_id', matchedSchool.id);
-              if (matchedSchool.subdomain) localStorage.setItem('groovelab_last_subdomain', matchedSchool.subdomain);
-              return;
-            }
+          const cleanSub = subdomain.toLowerCase().trim();
+          const { data, error } = await supabase.rpc('get_public_school_theme', { p_subdomain: cleanSub });
+          if (!error && data) {
+            setSchoolName(data.name);
+            setSchoolData(data);
+            localStorage.setItem('groovelab_last_school_id', data.id);
+            return;
           }
         }
 
@@ -1807,11 +1763,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             .maybeSingle() as any;
             
           if (!kError && kData?.school_id) {
-            const { data: sc, error: scErr } = await supabase
-              .from('schools')
-              .select('*')
-              .eq('id', kData.school_id)
-              .maybeSingle();
+            const { data: sc, error: scErr } = await supabase.rpc('get_public_school_theme', { p_subdomain: kData.school_id });
             if (!scErr && sc) {
               setSchoolName(sc.name);
               setSchoolData(sc);
@@ -1953,7 +1905,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             setLoading(false);
             return;
           }
-          const isFinalSchoolMatch = user.school_id === effectiveSchool.id || (isMusaekSchool(user.school_id) && isMusaekSchool(effectiveSchool.id));
+          const isFinalSchoolMatch = user.school_id === effectiveSchool.id;
           if (!isFinalSchoolMatch) {
             alert("Login verweigert. Dieser Login-Link gehört nicht zu deiner Schule. Kiosk-Station wurde zurückgesetzt.");
             localStorage.removeItem('groovelab_station_id');
@@ -3253,7 +3205,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         if (!effectiveSchool?.id) {
           throw new Error('Für den Schüler-Login wird ein zugehöriger Schul-Link benötigt.');
         }
-        const isStudentSchoolMatch = user.school_id === effectiveSchool.id || (isMusaekSchool(user.school_id) && isMusaekSchool(effectiveSchool.id));
+        const isStudentSchoolMatch = user.school_id === effectiveSchool.id;
         if (!isStudentSchoolMatch) {
           throw new Error('Login verweigert. Dieser Login-Link gehört nicht zu deiner Schule.');
         }
@@ -3265,9 +3217,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       const effectiveSchool = schoolData || userSchool;
       const isBypass = !isGroovelabScreen || 
                        !!(schoolData?.opening_hours?.geofence_bypass) || 
-                       !!(userSchool?.opening_hours?.geofence_bypass) ||
-                       isMusaekSchool(schoolData?.id) || 
-                       isMusaekSchool(userSchool?.id);
+                       !!(userSchool?.opening_hours?.geofence_bypass);
 
       // Geolocation is strictly restricted to GrooveLab Kiosk mode (yellow background)
       if (isGroovelabKiosk) {
@@ -3575,7 +3525,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
       const activeSchool = schoolData || userSchool;
       if (activeSchool?.id && user.school_id) {
-        const isSchoolMatch = user.school_id === activeSchool.id || (isMusaekSchool(user.school_id) && isMusaekSchool(activeSchool.id));
+        const isSchoolMatch = user.school_id === activeSchool.id;
         if (!isSchoolMatch) {
           // Auto-align if mismatch
           setSchoolData(userSchool);
@@ -3590,9 +3540,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       const effectiveSchool = schoolData || userSchool;
       const isBypass = !isGroovelabScreen || 
                        !!(schoolData?.opening_hours?.geofence_bypass) || 
-                       !!(userSchool?.opening_hours?.geofence_bypass) ||
-                       isMusaekSchool(schoolData?.id) || 
-                       isMusaekSchool(userSchool?.id);
+                       !!(userSchool?.opening_hours?.geofence_bypass);
 
       const isLocalhost = typeof window !== 'undefined' && (
         window.location.hostname === 'localhost' || 

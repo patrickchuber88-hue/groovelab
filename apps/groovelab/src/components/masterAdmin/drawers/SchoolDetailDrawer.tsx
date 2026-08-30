@@ -202,14 +202,25 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
     } else {
       let targetUserId = '';
       try {
-        const { data: adminUser } = await supabase
-          .from('users')
+        const { data: rawAdmin } = await supabase
+          .from('users_raw')
           .select('id')
           .eq('school_id', school.id)
           .eq('role', 'admin')
           .limit(1)
           .maybeSingle();
-        if (adminUser?.id) targetUserId = adminUser.id;
+        if (rawAdmin?.id) {
+          targetUserId = rawAdmin.id;
+        } else {
+          const { data: adminUser } = await supabase
+            .from('users')
+            .select('id')
+            .eq('school_id', school.id)
+            .eq('role', 'admin')
+            .limit(1)
+            .maybeSingle();
+          if (adminUser?.id) targetUserId = adminUser.id;
+        }
       } catch (e) {}
 
       const userParam = targetUserId ? `&ghost_user_id=${targetUserId}` : '';

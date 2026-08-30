@@ -3,6 +3,8 @@
  * Campus-Groovelab Enterprise+ Architecture (Tier 3 Security Standard)
  */
 
+import { registerClientSessionLease } from './sessionLeaseManager';
+
 export interface MasterSessionLease {
   userId: string;
   authMethod: 'passkey_fido2' | 'master_pin' | 'emergency_key' | 'bypass_dev';
@@ -69,6 +71,9 @@ export async function createMasterSessionLease(
     sessionStorage.setItem(MASTER_LEASE_KEY, JSON.stringify(lease));
     sessionStorage.setItem('groovelab_is_master_admin', 'true');
     sessionStorage.setItem('groovelab_user_id', userId);
+    try {
+      registerClientSessionLease({ id: userId, role: 'admin' }, '00000000-0000-0000-0000-000000000000').catch(() => {});
+    } catch (e) {}
   }
 
   await logMasterAdminEvent({

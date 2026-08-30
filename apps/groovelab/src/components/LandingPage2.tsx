@@ -76,22 +76,13 @@ export const LandingPage2: React.FC<LandingPage2Props> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Fallback schools for offline/connection failure scenarios
+  // Generic fallback schools for offline/demo scenarios (Zero PII / Real School Leakage)
   const FALLBACK_SCHOOLS = [
     {
-      id: '53e83805-1d5a-4ed8-988e-1fb0b8200b9c',
-      name: 'Musäk Bad Säckingen',
-      subdomain: 'musaek-bad-saeckingen',
-      city: 'Bad Säckingen',
-      has_campus_subscription: true,
-      has_groovelab_subscription: true,
-      logo_url: 'https://www.musaek.de/wp-content/uploads/2021/03/musaek-logo-black-300x140.png'
-    },
-    {
-      id: 'cc05137f-5904-4774-80be-6a172c52bf99',
-      name: 'Musäk BS',
-      subdomain: 'musaek-bs',
-      city: 'Bad Säckingen',
+      id: '00000000-0000-0000-0000-000000000001',
+      name: 'Demo Musikschule',
+      subdomain: 'demo',
+      city: 'Musterstadt',
       has_campus_subscription: true,
       has_groovelab_subscription: true,
       logo_url: null
@@ -109,12 +100,7 @@ export const LandingPage2: React.FC<LandingPage2Props> = ({
 
       setIsSearching(true);
       try {
-        const queryPromise = supabase
-          .from('schools')
-          .select('id, name, subdomain, logo_url, city, has_campus_subscription, has_groovelab_subscription')
-          .ilike('name', `%${searchQuery.trim()}%`)
-          .not('subdomain', 'is', null)
-          .limit(6);
+        const queryPromise = supabase.rpc('search_public_schools', { p_query: searchQuery.trim() });
 
         const timeoutPromise = new Promise<never>((_, reject) =>
           setTimeout(() => reject(new Error('Query timeout')), 2500)
@@ -122,7 +108,7 @@ export const LandingPage2: React.FC<LandingPage2Props> = ({
 
         const { data, error } = await Promise.race([queryPromise, timeoutPromise]) as any;
 
-        if (!error && data) {
+        if (!error && Array.isArray(data)) {
           const cleanData = data.filter((s: any) => !s.name?.toLowerCase().includes('groove academy'));
           setSearchResults(cleanData);
           // Cache successful school list
@@ -242,7 +228,7 @@ export const LandingPage2: React.FC<LandingPage2Props> = ({
       // Verify key against master RPC, master tokens or registered admin users
       let user: any = null;
 
-      // 1. Try secure RPC authentication first (validates master_admin_password directly in DB)
+      // 1. Authenticate via secure private vault RPC
       try {
         const { data: rpcUser } = await supabase.rpc('login_master_admin', {
           p_username: 'admin',
@@ -253,21 +239,6 @@ export const LandingPage2: React.FC<LandingPage2Props> = ({
         }
       } catch (rpcErr) {
         console.warn('RPC master login check:', rpcErr);
-      }
-
-      // 2. Strict Fallback: Only exact match against master_admin_password where is_master_admin is true
-      if (!user) {
-        const { data: matchedUser } = await supabase
-          .from('users')
-          .select('id, role, is_master_admin, school_id, first_name, last_name, ausweis_nummer, qr_token, teacher_qr_token, master_admin_password')
-          .eq('is_master_admin', true)
-          .eq('master_admin_password', cleanKey)
-          .limit(1)
-          .maybeSingle();
-
-        if (matchedUser && matchedUser.is_master_admin === true && matchedUser.master_admin_password === cleanKey) {
-          user = matchedUser;
-        }
       }
 
       if (!user) {

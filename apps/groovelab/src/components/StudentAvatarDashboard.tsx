@@ -20639,11 +20639,11 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                               {post.attachment_url && (
                                 <div style={{ marginTop: '4px' }}>
                                   {post.attachment_url.match(/\.(jpeg|jpg|gif|png|webp)$/i) ? (
-                                    <a href={post.attachment_url} target="_blank" rel="noreferrer">
+                                    <a href={post.attachment_url} target="_blank" rel="noopener noreferrer">
                                       <img src={post.attachment_url} alt="Anhang" style={{ maxWidth: '100%', maxHeight: '100px', borderRadius: '8px', border: '1px solid #cbd5e1' }} />
                                     </a>
                                   ) : (
-                                    <a href={post.attachment_url} target="_blank" rel="noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.72rem', color: '#34a853', textDecoration: 'none', fontWeight: 650 }}>
+                                    <a href={post.attachment_url} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.72rem', color: '#34a853', textDecoration: 'none', fontWeight: 650 }}>
                                       📄 Dokument öffnen
                                     </a>
                                   )}
@@ -20821,7 +20821,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                             {item.attachment_url && (
                               <div style={{ marginTop: '4px' }}>
                                 {item.attachment_url.match(/\.(jpeg|jpg|gif|png|webp)$/i) ? (
-                                  <a href={item.attachment_url} target="_blank" rel="noreferrer">
+                                  <a href={item.attachment_url} target="_blank" rel="noopener noreferrer">
                                     <img 
                                       src={item.attachment_url} 
                                       alt="Anhang" 
@@ -20832,7 +20832,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                   <a 
                                     href={item.attachment_url} 
                                     target="_blank" 
-                                    rel="noreferrer" 
+                                    rel="noopener noreferrer" 
                                     style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.72rem', color: '#34a853', textDecoration: 'none', fontWeight: 650 }}
                                   >
                                     📄 Dokument öffnen

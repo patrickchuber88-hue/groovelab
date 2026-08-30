@@ -36,6 +36,13 @@ const customFetch = async (input: RequestInfo | URL, init?: RequestInit): Promis
   let clientInfo = rawHeaders['x-client-info'] || 'supabase-js/2.39.3';
   
   // Dynamically inject security session tokens into x-client-info to avoid CORS preflight (OPTIONS) blocks
+  const sessionToken = typeof window !== 'undefined' 
+    ? (sessionStorage.getItem('gl_active_session_lease_id') || localStorage.getItem('gl_active_session_lease_id') || localStorage.getItem('gl_global_device_key'))
+    : null;
+  if (sessionToken) {
+    clientInfo += `;session_token=${sessionToken}`;
+  }
+
   const userId = typeof window !== 'undefined' ? sessionStorage.getItem('groovelab_user_id') : null;
   if (userId) {
     clientInfo += `;user_id=${userId}`;

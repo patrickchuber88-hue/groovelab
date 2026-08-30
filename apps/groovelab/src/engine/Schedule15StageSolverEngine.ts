@@ -975,14 +975,15 @@ export async function run15StageSolver(params: SolverParams): Promise<SolverResu
       }
     }
 
-    // Track best Wunschzeit Plan (Max Wunschzeiten focus)
-    const wunschPlanScore = (wunschHits * 10000000) - (totalGapCount * 100000) - totalInternalGapMinutes;
+    // Track best Wunschzeit Plan (Max Wunschzeiten focus + 100% Student Placement Priority)
+    const currentAssignedCount = Object.keys(newlyAssignedStudentIds).length;
+    const wunschPlanScore = (currentAssignedCount * 50000000) + (wunschHits * 10000000) - (totalGapCount * 100000) - totalInternalGapMinutes;
     if (wunschPlanScore > bestWunschScore) {
       bestWunschScore = wunschPlanScore;
       bestWunschPlan = {
         boardsState: currentBoards.map(b => recalculateBoardTimesFn(b)),
         newlyAssignedMap: { ...newlyAssignedStudentIds },
-        totalAssignedCount: Object.keys(newlyAssignedStudentIds).length,
+        totalAssignedCount: currentAssignedCount,
         wunschHits,
         studentsWithWunsch: wunschStudents.length,
         theoreticalMaxWunschHits,
@@ -992,13 +993,13 @@ export async function run15StageSolver(params: SolverParams): Promise<SolverResu
     }
 
     // Track best Lückenlos Plan (Zero / Minimum Gaps focus)
-    const lueckenPlanScore = (totalAssignedCount * 10000000) - (totalGapCount * 1000000) - (totalInternalGapMinutes * 5000) + (wunschHits * 10000);
+    const lueckenPlanScore = (currentAssignedCount * 50000000) - (totalGapCount * 1000000) - (totalInternalGapMinutes * 5000) + (wunschHits * 10000);
     if (lueckenPlanScore > bestLueckenScore) {
       bestLueckenScore = lueckenPlanScore;
       bestLueckenPlan = {
         boardsState: currentBoards.map(b => recalculateBoardTimesFn(b)),
         newlyAssignedMap: { ...newlyAssignedStudentIds },
-        totalAssignedCount: Object.keys(newlyAssignedStudentIds).length,
+        totalAssignedCount: currentAssignedCount,
         wunschHits,
         studentsWithWunsch: wunschStudents.length,
         theoreticalMaxWunschHits,
@@ -1018,10 +1019,10 @@ export async function run15StageSolver(params: SolverParams): Promise<SolverResu
     }
 
     // PERFECT SCORE EARLY CONVERGENCE (Perf-Triad Optimization):
-    // If 100% Wunschzeiten and 0 Min Gaps are achieved, exit early!
-    if (wunschHits >= theoreticalMaxWunschHits && totalInternalGapMinutes === 0 && iteration >= 50) {
+    // If 100% of students are assigned AND 100% Wunschzeiten and 0 Min Gaps are achieved, exit early!
+    if (currentAssignedCount === unassignedStudents.length && wunschHits >= theoreticalMaxWunschHits && totalInternalGapMinutes === 0 && iteration >= 50) {
       if (onProgress) {
-        onProgress(90, `⚡ Gold-Standard (100% Wunschzeiten & 0 Min Lücken) in Iteration ${iteration} in Rekordzeit erreicht!`);
+        onProgress(90, `⚡ Gold-Standard (100% Schüler zugeteilt, 100% Wunschzeiten & 0 Min Lücken) in Iteration ${iteration} in Rekordzeit erreicht!`);
       }
       break;
     }

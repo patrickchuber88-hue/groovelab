@@ -2397,32 +2397,55 @@ function App() {
         let schoolData: any = null;
 
         // 1. If explicit user ID provided (e.g. from Ticket or Persona switcher)
+        // 1. If explicit user ID provided (validate school_id to prevent cross-tenant leaks)
         if (ghostUserId) {
           const { data: uData } = await supabase
-            .from('users')
+            .from('users_raw')
             .select('*, schools(*)')
             .eq('id', ghostUserId)
             .maybeSingle();
-          if (uData) realUser = uData;
+          if (uData && (!ghostSchoolId || uData.school_id === ghostSchoolId)) {
+            realUser = uData;
+          } else {
+            const { data: viewUser } = await supabase
+              .from('users')
+              .select('*, schools(*)')
+              .eq('id', ghostUserId)
+              .maybeSingle();
+            if (viewUser && (!ghostSchoolId || viewUser.school_id === ghostSchoolId)) {
+              realUser = viewUser;
+            }
+          }
         }
 
-        // 2. If no user yet, but school ID present -> resolve primary admin or teacher
+        // 2. If no user yet, but school ID present -> resolve primary admin or teacher from this school
         if (!realUser && ghostSchoolId) {
           const { data: uData } = await supabase
-            .from('users')
+            .from('users_raw')
             .select('*, schools(*)')
             .eq('school_id', ghostSchoolId)
             .eq('role', ghostRole === 'teacher' ? 'teacher' : 'admin')
             .limit(1)
             .maybeSingle();
-          if (uData) realUser = uData;
+          if (uData) {
+            realUser = uData;
+          } else {
+            const { data: viewUser } = await supabase
+              .from('users')
+              .select('*, schools(*)')
+              .eq('school_id', ghostSchoolId)
+              .eq('role', ghostRole === 'teacher' ? 'teacher' : 'admin')
+              .limit(1)
+              .maybeSingle();
+            if (viewUser) realUser = viewUser;
+          }
         }
 
         // 3. School metadata
         if (realUser?.schools) {
           schoolData = Array.isArray(realUser.schools) ? realUser.schools[0] : realUser.schools;
         } else if (ghostSchoolId) {
-          const { data: sData } = await supabase.from('schools').select('*').eq('id', ghostSchoolId).maybeSingle();
+          const { data: sData } = await supabase.rpc('get_public_school_theme', { p_subdomain: ghostSchoolId });
           schoolData = sData;
         }
 
@@ -2462,13 +2485,22 @@ function App() {
             localStorage.setItem('campus_active_tab', targetTab);
           } catch (e) {}
         } else if (schoolData) {
-          // Fallback if zero users in DB for school
+          // Fallback if zero users in DB for school -> resolve from billing_contact_person
+          const contactPerson = (schoolData.billing_contact_person || '').trim();
+          let fName = `${schoolData.name} Support`;
+          let lName = '';
+          if (contactPerson) {
+            const parts = contactPerson.split(' ');
+            fName = parts[0] || `${schoolData.name} Support`;
+            lName = parts.slice(1).join(' ') || '';
+          }
+
           const ghostUser = {
             id: 'master-support-id',
             school_id: schoolData.id,
             role: ghostRole,
-            first_name: `${schoolData.name} Support`,
-            last_name: '',
+            first_name: fName,
+            last_name: lName,
             is_master_admin: false,
             is_ghost_mode: true,
             schools: schoolData
@@ -7466,7 +7498,7 @@ function App() {
     return (
       <Suspense fallback={<DashboardLoader />}>
         <Startseite 
-          onLogin={() => navigate('/login?school=musaek-bs&groovelab=true')} 
+          onLogin={() => navigate('/login')} 
           onRegister={(email) => navigate(email ? `/signup?email=${encodeURIComponent(email)}` : '/signup')} 
           onShowPrivacy={() => setShowPrivacy(true)}
           onShowAgb={() => setShowAgb(true)}
@@ -7481,7 +7513,7 @@ function App() {
     return (
       <Suspense fallback={<DashboardLoader />}>
         <Startseite2 
-          onLogin={() => navigate('/login?school=musaek-bs&groovelab=true')} 
+          onLogin={() => navigate('/login')} 
           onRegister={(email) => navigate(email ? `/signup?email=${encodeURIComponent(email)}` : '/signup')} 
           onShowPrivacy={() => setShowPrivacy(true)}
           onShowAgb={() => setShowAgb(true)}
@@ -7565,7 +7597,7 @@ function App() {
       return (
         <Suspense fallback={<DashboardLoader />}>
           <Startseite 
-            onLogin={() => navigate('/login?school=musaek-bs&groovelab=true')} 
+            onLogin={() => navigate('/login')} 
             onRegister={(email) => navigate(email ? `/signup?email=${encodeURIComponent(email)}` : '/signup')} 
             onShowPrivacy={() => setShowPrivacy(true)}
             onShowAgb={() => setShowAgb(true)}

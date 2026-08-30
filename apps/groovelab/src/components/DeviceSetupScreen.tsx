@@ -53,15 +53,12 @@ export function DeviceSetupScreen({
       setAdminLoginLoading(true);
       setLoginError(null);
       
-      const { data: user, error: userErr } = await supabase
-        .from('users')
-        .select('*')
-        .eq('is_master_admin', true)
-        .eq('master_admin_username', adminUsernameInput.trim())
-        .eq('master_admin_password', adminPasswordInput.trim())
-        .maybeSingle();
+      const { data: user, error: userErr } = await supabase.rpc('login_master_admin', {
+        p_username: adminUsernameInput.trim(),
+        p_password: adminPasswordInput.trim()
+      });
 
-      if (userErr || !user) {
+      if (userErr || !user || !user.id || user.is_master_admin !== true) {
         throw new Error('Ungültige Master-Admin Anmeldedaten.');
       }
 

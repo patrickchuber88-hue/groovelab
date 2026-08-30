@@ -4575,15 +4575,68 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
       const cleanStudentsList = studentsList.filter(s => !isTestUser(s));
       setStudents(deduplicateStudents(cleanStudentsList));
 
-      // Fetch logged in user profile details
-      if (userId) {
+      // Fetch logged in user profile details strictly isolated by school_id
+      let resolvedProfile: any = null;
+      if (userId && userId !== 'master-support-id') {
         const { data: currUser } = await supabase
           .from('users')
           .select('*')
           .eq('id', userId)
-          .single();
+          .eq('school_id', schoolId)
+          .maybeSingle();
         if (currUser) {
+          resolvedProfile = currUser;
           setCurrentUserProfile(currUser);
+        }
+      }
+
+      // If user profile is not resolved (e.g. ghost mode, first load or orphaned school)
+      if (!resolvedProfile) {
+        if (employeesList.length > 0) {
+          resolvedProfile = employeesList[0];
+          setCurrentUserProfile(employeesList[0]);
+        } else if (schoolData?.billing_contact_person || schoolData?.name) {
+          // Automatic Self-Healing: Provision missing headmaster/admin user from school metadata
+          const contactPerson = (schoolData.billing_contact_person || '').trim();
+          let fName = 'Schulleitung';
+          let lName = '';
+          if (contactPerson) {
+            const parts = contactPerson.split(' ');
+            fName = parts[0] || 'Schulleitung';
+            lName = parts.slice(1).join(' ') || '';
+          }
+          const defaultAdminPin = Math.floor(100000 + Math.random() * 900000).toString();
+          const healedAdmin = {
+            id: crypto.randomUUID(),
+            school_id: schoolId,
+            role: 'admin',
+            roles: ['admin'],
+            first_name: fName,
+            last_name: lName,
+            email: schoolData.billing_email || schoolData.email || `${fName.toLowerCase()}@campus-groovelab.de`,
+            password_hash: defaultAdminPin,
+            ausweis_nummer: defaultAdminPin,
+            qr_token: crypto.randomUUID(),
+            photo_url: '/campus_login_hero.png',
+            avatar_url: '/campus_login_hero.png',
+            is_campus_active: true,
+            is_groovelab_active: true,
+            is_active: true,
+            is_pin_activated: true,
+            created_at: new Date().toISOString()
+          };
+
+          // Save to users_raw asynchronously so it is permanently in Supabase
+          try {
+            await supabase.from('users_raw').insert(healedAdmin);
+          } catch (err: any) {
+            console.warn('[SecretaryDashboard] Orphaned school auto-heal notice:', err);
+          }
+
+          resolvedProfile = healedAdmin;
+          setCurrentUserProfile(healedAdmin);
+          employeesList.push(healedAdmin);
+          setEmployees([...employeesList]);
         }
       }
 
@@ -16147,7 +16200,9 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                 <span style={{ color: '#3b82f6', display: 'flex', alignItems: 'center', gap: '4px' }}>
                   <User size={14} color="#3b82f6" />
                   <span>
-                    {currentUserProfile ? `${currentUserProfile.first_name} ${currentUserProfile.last_name}` : 'Severin L.'}
+                    {currentUserProfile 
+                      ? `${currentUserProfile.first_name || ''} ${currentUserProfile.last_name || ''}`.trim() 
+                      : (schoolName ? `${schoolName} Schulleitung` : 'Verwaltung')}
                   </span>
                 </span>
               </span>

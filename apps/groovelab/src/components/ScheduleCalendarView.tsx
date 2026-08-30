@@ -6488,6 +6488,24 @@ export function ScheduleCalendarView({
                                   </div>
 
                                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px', flexShrink: 0 }}>
+                                    {isParallelConflict && (
+                                      <span style={{ 
+                                        fontSize: '0.58rem', 
+                                        fontWeight: 900, 
+                                        color: '#b91c1c', 
+                                        background: '#fee2e2', 
+                                        padding: '1px 4px', 
+                                        borderRadius: '3px', 
+                                        display: 'inline-flex', 
+                                        alignItems: 'center', 
+                                        gap: '2px', 
+                                        border: '1px solid rgba(239,68,68,0.25)',
+                                        whiteSpace: 'nowrap'
+                                      }} title="Zeit-Kollision: Dieser Termin überlappt sich mit einem parallelen Termin">
+                                        <AlertCircle size={9} strokeWidth={2.8} />
+                                        <span>Kollision</span>
+                                      </span>
+                                    )}
                                     {isSick && (
                                       <span style={{ fontSize: '0.58rem', fontWeight: 800, color: '#991b1b', background: '#fee2e2', padding: '1px 4px', borderRadius: '3px', textTransform: 'uppercase', letterSpacing: '0.02em', border: '1px solid rgba(239,68,68,0.15)' }}>
                                         Entfällt
