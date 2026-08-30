@@ -91,15 +91,18 @@ ssh "$SERVER" "docker exec -i supabase-db psql -U postgres postgres < $REMOTE_TE
 echo "⚡ Führe Migration 313 aus (Token Hardening, Device Binding & 1-Click Revocation)..."
 ssh "$SERVER" "docker exec -i supabase-db psql -U postgres postgres < $REMOTE_TEMP/313_enterprise_token_hardening_and_revocation.sql"
 
+echo "⚡ Führe Migration 314 aus (Hermetic RPC & Backdoor Elimination)..."
+ssh "$SERVER" "docker exec -i supabase-db psql -U postgres postgres < $REMOTE_TEMP/314_enterprise_hermetic_rpc_and_backdoor_elimination.sql"
+
 echo "🧹 Bereinige temporäre Migrationsdateien..."
 ssh "$SERVER" "rm -rf $REMOTE_TEMP"
 
 echo ""
-echo "✅ Alle 17 Enterprise-Migrationen erfolgreich und fehlerfrei auf dem Produktiv-Container angewendet!"
+echo "✅ Alle 18 Enterprise-Migrationen erfolgreich und fehlerfrei auf dem Produktiv-Container angewendet!"
 ssh "$SERVER" "docker exec -t supabase-db psql -U postgres postgres -c \"NOTIFY pgrst, 'reload schema';\""
 
 # 6. Aufräumen
 ssh "$SERVER" "rm -rf $REMOTE_TEMP"
 
 echo ""
-echo "✅ Alle Enterprise Sicherheitsmigrationen (297-313) erfolgreich auf Live-Datenbank angewendet!"
+echo "✅ Alle Enterprise Sicherheitsmigrationen (297-314) erfolgreich auf Live-Datenbank angewendet!"
