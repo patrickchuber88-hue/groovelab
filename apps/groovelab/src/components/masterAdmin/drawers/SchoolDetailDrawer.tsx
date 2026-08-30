@@ -65,15 +65,14 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
   const [trialEndsAt, setTrialEndsAt] = useState<string>(
     school?.trial_ends_at ? new Date(school.trial_ends_at).toISOString().split('T')[0] : ''
   );
-  const [hasCampus, setHasCampus] = useState<boolean>(school?.has_campus_subscription ?? true);
-  const [hasGroovelab, setHasGroovelab] = useState<boolean>(school?.has_groovelab_subscription ?? true);
+  const [hasCampus, setHasCampus] = useState<boolean>(Boolean(school?.has_campus_subscription));
+  const [hasGroovelab, setHasGroovelab] = useState<boolean>(Boolean(school?.has_groovelab_subscription));
   const [subscriptionBypass, setSubscriptionBypass] = useState<boolean>(school?.subscription_bypass ?? false);
 
   // Audio-Tresor Storage State (Synchronized with Financial Control & SecretaryDashboard)
   const [extraStorageGb, setExtraStorageGb] = useState<number>(() => {
-    if (school?.extra_storage_gb !== undefined && school?.extra_storage_gb !== null) return Number(school.extra_storage_gb);
     if (school?.storage_addon_gb !== undefined && school?.storage_addon_gb !== null) return Number(school.storage_addon_gb);
-    if (school?.extra_billing_option === 'option1') return 20; // 20 GB (5,49 €) legacy option
+    if (school?.extra_storage_gb !== undefined && school?.extra_storage_gb !== null) return Number(school.extra_storage_gb);
     return 0;
   });
 
@@ -90,13 +89,12 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
       setStatus(school.status || 'active');
       setIsTrial(school.is_trial ?? false);
       setTrialEndsAt(school.trial_ends_at ? new Date(school.trial_ends_at).toISOString().split('T')[0] : '');
-      setHasCampus(school.has_campus_subscription ?? true);
-      setHasGroovelab(school.has_groovelab_subscription ?? true);
+      setHasCampus(Boolean(school.has_campus_subscription));
+      setHasGroovelab(Boolean(school.has_groovelab_subscription));
       setSubscriptionBypass(school.subscription_bypass ?? false);
       setExtraStorageGb(() => {
-        if (school.extra_storage_gb !== undefined && school.extra_storage_gb !== null) return Number(school.extra_storage_gb);
         if (school.storage_addon_gb !== undefined && school.storage_addon_gb !== null) return Number(school.storage_addon_gb);
-        if (school.extra_billing_option === 'option1') return 20;
+        if (school.extra_storage_gb !== undefined && school.extra_storage_gb !== null) return Number(school.extra_storage_gb);
         return 0;
       });
     }

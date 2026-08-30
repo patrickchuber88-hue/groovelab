@@ -314,6 +314,8 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
   const [newBoardRoom, setNewBoardRoom] = useState('');
   const [showAddBoardForm, setShowAddBoardForm] = useState(false);
   const [showNewDraftPromptModal, setShowNewDraftPromptModal] = useState<boolean>(false);
+  const [showPartialSubmitModal, setShowPartialSubmitModal] = useState<boolean>(false);
+  const [partialSubmitData, setPartialSubmitData] = useState<{ unassignedStudents: Student[]; totalAssigned: number; totalStudents: number } | null>(null);
 
   const [gridSnapMinutes, setGridSnapMinutes] = useState<number>(() => {
     const saved = localStorage.getItem('groovelab_grid_snap_minutes');
@@ -762,12 +764,31 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
 
   const consolidateDatabaseGroups = (boardsList: DayBoard[], rawPool: Student[]): { boards: DayBoard[], pool: Student[] } => {
     const allStudentsMap = new Map<string, Student>();
+    const nameToCanonicalMap = new Map<string, Student>();
     
     // Initialize the map with fresh metadata from the database (rawPool)
     rawPool.forEach(s => {
       allStudentsMap.set(s.id, { ...s });
+      const fn = (s.first_name || '').trim().toLowerCase();
+      const ln = (s.last_name || '').trim().toLowerCase();
+      const nameKey = `${fn}_${ln}`;
+      if (nameKey !== '_') {
+        nameToCanonicalMap.set(nameKey, s);
+      }
     });
     
+    const resolveCanonicalStudent = (sId: string, sFname?: string, sLname?: string): Student | undefined => {
+      if (allStudentsMap.has(sId)) return allStudentsMap.get(sId);
+      const fn = (sFname || '').trim().toLowerCase();
+      const ln = (sLname || '').trim().toLowerCase();
+      const nameKey = `${fn}_${ln}`;
+      if (nameKey !== '_' && nameToCanonicalMap.has(nameKey)) {
+        const canonical = nameToCanonicalMap.get(nameKey)!;
+        return allStudentsMap.get(canonical.id);
+      }
+      return undefined;
+    };
+
     const assignedStudentIds = new Set<string>();
 
     // Step 1: Scan and clean boardsList of any duplicates. Keep only the first occurrence.
@@ -780,29 +801,42 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
         }
         if (s.isGroup && s.groupStudents) {
           const uniqueMembers = s.groupStudents.filter(gs => {
-            if (assignedStudentIds.has(gs.id)) {
+            const resolved = resolveCanonicalStudent(gs.id, gs.first_name, gs.last_name);
+            const targetId = resolved ? resolved.id : gs.id;
+            if (assignedStudentIds.has(targetId)) {
               return false;
             }
-            assignedStudentIds.add(gs.id);
+            assignedStudentIds.add(targetId);
             return true;
           });
           if (uniqueMembers.length >= 2) {
             nextStudents.push({
               ...s,
-              groupStudents: uniqueMembers
+              groupStudents: uniqueMembers.map(gs => {
+                const resolved = resolveCanonicalStudent(gs.id, gs.first_name, gs.last_name);
+                return resolved ? { ...gs, id: resolved.id, first_name: resolved.first_name, last_name: resolved.last_name } : gs;
+              })
             });
           } else if (uniqueMembers.length === 1) {
-            const _fm0 = allStudentsMap.get(uniqueMembers[0].id);
-            nextStudents.push(_fm0 ? { ...uniqueMembers[0], first_name: _fm0.first_name, last_name: _fm0.last_name } : uniqueMembers[0]);
+            const resolved = resolveCanonicalStudent(uniqueMembers[0].id, uniqueMembers[0].first_name, uniqueMembers[0].last_name);
+            nextStudents.push(resolved ? { ...uniqueMembers[0], id: resolved.id, first_name: resolved.first_name, last_name: resolved.last_name } : uniqueMembers[0]);
           }
         } else {
-          if (assignedStudentIds.has(s.id)) {
+          const resolved = resolveCanonicalStudent(s.id, s.first_name, s.last_name);
+          const targetId = resolved ? resolved.id : s.id;
+          if (assignedStudentIds.has(targetId)) {
             // Already scheduled elsewhere -> remove duplicate card
             return;
           }
-          assignedStudentIds.add(s.id);
-          const _fresh = allStudentsMap.get(s.id);
-          nextStudents.push(_fresh ? { ...s, first_name: _fresh.first_name, last_name: _fresh.last_name } : s);
+          assignedStudentIds.add(targetId);
+          nextStudents.push(resolved ? { 
+            ...s, 
+            id: resolved.id, 
+            first_name: resolved.first_name, 
+            last_name: resolved.last_name, 
+            instrument: resolved.instrument || s.instrument, 
+            duration: resolved.duration || s.duration 
+          } : s);
         }
       });
       return { ...b, students: nextStudents };
@@ -814,7 +848,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
         if (s.isBreak) return;
         if (s.isGroup && s.groupStudents) {
           s.groupStudents.forEach(gs => {
-            const existing = allStudentsMap.get(gs.id);
+            const existing = resolveCanonicalStudent(gs.id, gs.first_name, gs.last_name);
             if (existing) {
               existing.assignedDay = b.dayOfWeek;
               existing.assignedTime = s.assignedTime;
@@ -828,7 +862,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
             }
           });
         } else {
-          const existing = allStudentsMap.get(s.id);
+          const existing = resolveCanonicalStudent(s.id, s.first_name, s.last_name);
           if (existing) {
             existing.assignedDay = b.dayOfWeek;
             existing.assignedTime = s.assignedTime;
@@ -911,8 +945,8 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
               groupStudents: nonGroupMembers
             });
           } else if (nonGroupMembers.length === 1) {
-            const _fm1 = allStudentsMap.get(nonGroupMembers[0].id);
-            nextStudents.push(_fm1 ? { ...nonGroupMembers[0], first_name: _fm1.first_name, last_name: _fm1.last_name } : nonGroupMembers[0]);
+            const _fm1 = resolveCanonicalStudent(nonGroupMembers[0].id, nonGroupMembers[0].first_name, nonGroupMembers[0].last_name) || allStudentsMap.get(nonGroupMembers[0].id);
+            nextStudents.push(_fm1 ? { ...nonGroupMembers[0], id: _fm1.id, first_name: _fm1.first_name, last_name: _fm1.last_name } : nonGroupMembers[0]);
           }
 
           groupMembers.forEach(gs => {
@@ -934,8 +968,8 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
               }
             }
           } else {
-            const _freshS = allStudentsMap.get(s.id);
-            nextStudents.push(_freshS ? { ...s, first_name: _freshS.first_name, last_name: _freshS.last_name } : s);
+            const _freshS = resolveCanonicalStudent(s.id, s.first_name, s.last_name) || allStudentsMap.get(s.id);
+            nextStudents.push(_freshS ? { ...s, id: _freshS.id, first_name: _freshS.first_name, last_name: _freshS.last_name, duration: _freshS.duration || s.duration, instrument: _freshS.instrument || s.instrument } : s);
           }
         }
       });
@@ -1035,11 +1069,12 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
         setNewBoardRoom(defaultRoomId);
       }
       
-      // 2. Fetch assigned student IDs across schedules, occurrences, and bands for selected teacher
-      const [{ data: schedData }, { data: occData }, { data: groupData }] = await Promise.all([
+      // 2. Fetch assigned student IDs across schedules, occurrences, bands, and teacher profile for selected teacher
+      const [{ data: schedData }, { data: occData }, { data: groupData }, { data: teacherProfile }] = await Promise.all([
         supabase.from('schedules').select('*, student:users!schedules_student_id_fkey(*)').eq('school_id', schoolId).eq('teacher_id', selectedTeacherId),
         supabase.from('schedule_occurrences').select('student_id').eq('teacher_id', selectedTeacherId),
-        supabase.from('bands').select('id').eq('coach_id', selectedTeacherId)
+        supabase.from('bands').select('id').eq('coach_id', selectedTeacherId),
+        supabase.from('users').select('*').eq('id', selectedTeacherId).maybeSingle()
       ]);
 
       const schedStudentIds = (schedData || []).map(s => s.student_id).filter(Boolean);
@@ -1051,6 +1086,13 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
         const { data: gsData } = await supabase.from('band_members').select('user_id').in('band_id', groupIds);
         groupStudentIds = (gsData || []).map(gs => gs.user_id).filter(Boolean);
       }
+
+      const rawPlannedEarly = teacherProfile?.planned_boards || (teacherProfile as any)?.campus_räume || (teacherProfile as any)?.groovelab_räume;
+      const savedTeacherStudentIds = new Set<string>(
+        Array.isArray(rawPlannedEarly?.allTeacherStudentIds)
+          ? rawPlannedEarly.allTeacherStudentIds
+          : (Array.isArray(rawPlannedEarly?.unassignedStudentIds) ? rawPlannedEarly.unassignedStudentIds : [])
+      );
 
       const teacherAssignedStudentIds = new Set([...schedStudentIds, ...occStudentIds, ...groupStudentIds]);
 
@@ -1085,27 +1127,101 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
 
       const studentMap = new Map<string, Student>();
       const userToStudentIdMap = new Map<string, string>();
+      const idAliasMap = new Map<string, string>();
+      const nameToCanonicalIdMap = new Map<string, string>();
 
-      // Filter helper: ONLY include students explicitly assigned to selected teacher or via recurring schedules/bands
+      // Filter helper: ONLY include students explicitly assigned to selected teacher or via recurring schedules/bands/draft backups
       const matchesTeacher = (tId?: string | null, sId?: string, isGroup?: boolean) => {
         if (!selectedTeacherId) return false;
         if (isGroup || (sId && sId.startsWith('group-'))) return true;
         if (tId) {
           return tId === selectedTeacherId;
         }
-        if (sId && teacherAssignedStudentIds.has(sId)) {
+        if (sId && (teacherAssignedStudentIds.has(sId) || savedTeacherStudentIds.has(sId))) {
           return true;
         }
         return false;
+      };
+
+      const registerStudentOrMerge = (cand: {
+        id: string;
+        userId?: string | null;
+        fname: string;
+        lname: string;
+        instrument?: string | null;
+        duration?: number;
+        status?: string;
+        sibling_group_id?: string | null;
+        group_id?: string | null;
+        isOnboarded?: boolean;
+      }) => {
+        const fname = cand.fname || 'Schüler';
+        const lname = cand.lname || '';
+        const nameKey = `${fname.toLowerCase().trim()}_${lname.toLowerCase().trim()}`;
+        
+        // Find existing canonical record by userToStudentIdMap, direct ID, alias, or exact name
+        const existingCanonicalId = (cand.userId && userToStudentIdMap.get(cand.userId)) ||
+          idAliasMap.get(cand.id) ||
+          (cand.userId && idAliasMap.get(cand.userId)) ||
+          (nameKey !== '_' && nameToCanonicalIdMap.get(nameKey));
+
+        if (existingCanonicalId && studentMap.has(existingCanonicalId)) {
+          const existing = studentMap.get(existingCanonicalId)!;
+          // Record aliases
+          idAliasMap.set(cand.id, existingCanonicalId);
+          if (cand.userId) idAliasMap.set(cand.userId, existingCanonicalId);
+
+          // Merge metadata
+          if (fname && fname !== 'Schüler' && (existing.first_name === 'Schüler' || !existing.first_name)) {
+            existing.first_name = fname;
+            existing.last_name = lname;
+          }
+          if (cand.isOnboarded) existing.isOnboarded = true;
+          if (cand.instrument && cand.instrument !== 'Musiker' && (!existing.instrument || existing.instrument === 'Musiker')) {
+            existing.instrument = cand.instrument;
+          }
+          if (cand.duration && cand.duration > (existing.duration || 0)) {
+            existing.duration = cand.duration;
+          }
+          if (cand.sibling_group_id && !existing.sibling_group_id) {
+            existing.sibling_group_id = cand.sibling_group_id;
+          }
+          if (cand.group_id && !existing.group_id) {
+            existing.group_id = cand.group_id;
+          }
+          return existingCanonicalId;
+        }
+
+        // Fresh record
+        const canonicalId = cand.userId || cand.id;
+        idAliasMap.set(cand.id, canonicalId);
+        if (cand.userId) {
+          idAliasMap.set(cand.userId, canonicalId);
+          userToStudentIdMap.set(cand.userId, canonicalId);
+        }
+        if (nameKey !== '_') {
+          nameToCanonicalIdMap.set(nameKey, canonicalId);
+        }
+
+        studentMap.set(canonicalId, {
+          id: canonicalId,
+          first_name: fname,
+          last_name: lname,
+          instrument: cand.instrument || 'Musiker',
+          duration: cand.duration || 30,
+          status: (cand.status || 'ausstehend') as any,
+          sibling_group_id: cand.sibling_group_id || undefined,
+          group_id: cand.group_id || null,
+          isOnboarded: Boolean(cand.isOnboarded),
+          hasPreferences: false
+        });
+        return canonicalId;
       };
 
       // A) Add all students from students table (authoritative for lesson duration & teacher assignment)
       allStudentsDb?.forEach(s => {
         if (!matchesTeacher(s.teacher_id, s.id)) return;
         const studentId = s.id;
-        if ((s as any).user_id) {
-          userToStudentIdMap.set((s as any).user_id, studentId);
-        }
         const pendingMatch = pendingData?.find((p: any) => p.id === studentId);
         const userMatch = allSchoolStudentUsers?.find((u: any) => u.id === studentId || u.id === (s as any).user_id);
         const userFname = userMatch ? resolveFirstName(userMatch) : '';
@@ -1121,17 +1237,17 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
         const fname = candidateFname || 'Schüler';
         const lname = (userMatch ? resolveLastName(userMatch) : '') || (pendingMatch ? resolveLastName(pendingMatch) : '') || resolveLastName(s);
         
-        studentMap.set(studentId, {
+        registerStudentOrMerge({
           id: studentId,
-          first_name: fname,
-          last_name: lname,
+          userId: (s as any).user_id || (userMatch ? userMatch.id : null),
+          fname,
+          lname,
           instrument: s.instrument || (userMatch ? userMatch.instrument : null) || (pendingMatch ? pendingMatch.instrument : 'Musiker'),
           duration: s.lesson_duration || 30,
           status: (s.status || 'ausstehend') as any,
           sibling_group_id: s.sibling_group_id,
           group_id: s.group_id,
-          isOnboarded: Boolean(s.is_campus_active || s.is_groovelab_active || s.is_active || s.status === 'aktiv'),
-          hasPreferences: false
+          isOnboarded: Boolean(s.is_campus_active || s.is_groovelab_active || s.is_active || s.status === 'aktiv')
         });
       });
 
@@ -1140,38 +1256,19 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
         if (!matchesTeacher((u as any).teacher_id, u.id)) return;
         const fname = resolveFirstName(u);
         const lname = resolveLastName(u);
-        const existingStudentId = userToStudentIdMap.get(u.id) || u.id;
-        const existing = studentMap.get(existingStudentId) || studentMap.get(u.id);
-
-        if (existing) {
-          if (fname && fname !== 'Schüler' && (existing.first_name === 'Schüler' || !existing.first_name)) {
-            existing.first_name = fname;
-            existing.last_name = lname;
-          }
-          existing.isOnboarded = existing.isOnboarded || Boolean(u.is_campus_active || u.is_groovelab_active || u.is_active);
-          if (!existing.instrument || existing.instrument === 'Musiker') {
-            existing.instrument = u.instrument || 'Musiker';
-          }
-          if (u.sibling_group_id && !existing.sibling_group_id) {
-            existing.sibling_group_id = u.sibling_group_id;
-          }
-          if (u.group_id && !existing.group_id) {
-            existing.group_id = u.group_id;
-          }
-        } else {
-          studentMap.set(u.id, {
-            id: u.id,
-            first_name: fname,
-            last_name: lname,
-            instrument: u.instrument || 'Musiker',
-            duration: u.lesson_duration || 30,
-            status: (statusMap[u.id] || 'ausstehend') as any,
-            sibling_group_id: u.sibling_group_id,
-            group_id: u.group_id,
-            isOnboarded: Boolean(u.is_campus_active || u.is_groovelab_active || u.is_active || statusMap[u.id] === 'aktiv'),
-            hasPreferences: false
-          });
-        }
+        
+        registerStudentOrMerge({
+          id: u.id,
+          userId: u.id,
+          fname,
+          lname,
+          instrument: u.instrument || 'Musiker',
+          duration: u.lesson_duration || 30,
+          status: (statusMap[u.id] || 'ausstehend') as any,
+          sibling_group_id: u.sibling_group_id,
+          group_id: u.group_id,
+          isOnboarded: Boolean(u.is_campus_active || u.is_groovelab_active || u.is_active || statusMap[u.id] === 'aktiv')
+        });
       });
 
       // C) Add pending onboarding students
@@ -1179,54 +1276,41 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
         if (!matchesTeacher(p.teacher_id, p.id)) return;
         const pFname = resolveFirstName(p);
         if (!pFname || pFname === 'Schüler' || ['ausstehender schüler', 'ausstehendes', 'unbekannt', 'onboarding', 'test'].includes(pFname.toLowerCase())) return;
-
-        const existingId = userToStudentIdMap.get(p.id) || p.id;
-        const existing = studentMap.get(existingId) || studentMap.get(p.id);
         const pLname = resolveLastName(p);
 
-        if (existing) {
-          if (pFname && pFname !== 'Schüler' && (existing.first_name === 'Schüler' || !existing.first_name)) {
-            existing.first_name = pFname;
-            existing.last_name = pLname;
-          }
-        } else {
-          studentMap.set(p.id, {
-            id: p.id,
-            first_name: pFname,
-            last_name: pLname,
-            instrument: p.instrument || 'Musiker',
-            duration: p.lesson_duration || 30,
-            status: 'ausstehend',
-            sibling_group_id: p.sibling_group_id,
-            group_id: p.group_id || null,
-            isOnboarded: false,
-            hasPreferences: false
-          });
-        }
+        registerStudentOrMerge({
+          id: p.id,
+          userId: null,
+          fname: pFname,
+          lname: pLname,
+          instrument: p.instrument || 'Musiker',
+          duration: p.lesson_duration || 30,
+          status: 'ausstehend',
+          sibling_group_id: p.sibling_group_id,
+          group_id: p.group_id || null,
+          isOnboarded: false
+        });
       });
 
       // D) Add any students directly assigned to this teacher in schedules table
       (schedData || []).forEach((sched: any) => {
         if (sched.student_id) {
           const sId = sched.student_id;
-          const existingId = userToStudentIdMap.get(sId) || sId;
-          if (!studentMap.has(existingId)) {
-            const stObj = sched.student || {};
-            const fname = resolveFirstName(stObj);
-            const lname = resolveLastName(stObj);
-            studentMap.set(sId, {
-              id: sId,
-              first_name: fname !== 'Schüler' ? fname : 'Schüler',
-              last_name: lname,
-              instrument: stObj.instrument || 'Gitarre',
-              duration: sched.duration || stObj.lesson_duration || 30,
-              status: 'verplant',
-              sibling_group_id: stObj.sibling_group_id,
-              group_id: stObj.group_id || null,
-              isOnboarded: Boolean(stObj.is_campus_active || stObj.is_groovelab_active || stObj.is_active),
-              hasPreferences: false
-            });
-          }
+          const stObj = sched.student || {};
+          const fname = resolveFirstName(stObj);
+          const lname = resolveLastName(stObj);
+          registerStudentOrMerge({
+            id: sId,
+            userId: sId,
+            fname: fname !== 'Schüler' ? fname : 'Schüler',
+            lname,
+            instrument: stObj.instrument || 'Gitarre',
+            duration: sched.duration || stObj.lesson_duration || 30,
+            status: 'verplant',
+            sibling_group_id: stObj.sibling_group_id,
+            group_id: stObj.group_id || null,
+            isOnboarded: Boolean(stObj.is_campus_active || stObj.is_groovelab_active || stObj.is_active)
+          });
         }
       });
 
@@ -1255,16 +1339,10 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
         s.hasPreferences = prefSubmittedSet.has(s.id);
       });
 
-      const { data: teacherProfile } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', selectedTeacherId)
-        .maybeSingle();
-
       setIsOnboardingCompleted(teacherProfile?.teacher_onboarding_completed ?? false);
       setTeacherAvailability(teacherProfile?.teacher_availability ?? {});
 
-      const rawPlanned = teacherProfile?.planned_boards || (teacherProfile as any)?.campus_räume || (teacherProfile as any)?.groovelab_räume;
+      const rawPlanned = rawPlannedEarly;
       const storedDraftState = localStorage.getItem(`groovelab_teacher_draft_state_${activePlatform}_${selectedTeacherId}`);
       const storedBoardsState = localStorage.getItem(`groovelab_teacher_boards_${activePlatform}_${selectedTeacherId}`) || localStorage.getItem(`groovelab_teacher_boards_${selectedTeacherId}`);
       const hasSavedDrafts = !!(
@@ -2274,12 +2352,48 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
         }
         return d;
       });
+      setDrafts(updatedDrafts);
+
+      // ZERO-DATA-LOSS HARDENING: Extract all student IDs belonging to this teacher
+      const allPoolStudents = masterStudentsRef.current.length > 0 ? masterStudentsRef.current : students;
+      const allTeacherStudentIds = Array.from(new Set(
+        allPoolStudents
+          .flatMap(s => s.isGroup && s.groupStudents ? s.groupStudents.map(gs => gs.id) : [s.id])
+          .filter(id => id && !id.startsWith('group-') && !id.startsWith('break-'))
+      ));
+
+      // Harden student ownership in Supabase: ensure teacher_id is set in users and students
+      if (allTeacherStudentIds.length > 0 && selectedTeacherId) {
+        try {
+          await Promise.all([
+            supabase
+              .from('users')
+              .update({ teacher_id: selectedTeacherId })
+              .in('id', allTeacherStudentIds)
+              .eq('school_id', effectiveSchoolId),
+            supabase
+              .from('students')
+              .update({ teacher_id: selectedTeacherId })
+              .in('id', allTeacherStudentIds)
+              .eq('school_id', effectiveSchoolId)
+          ]);
+        } catch (ownershipErr) {
+          console.warn('[ScheduleBoard] Non-blocking ownership hardening note:', ownershipErr);
+        }
+      }
+
+      const unassignedStudentIds = students
+        .filter(s => !s.isBreak && !s.assignedDay)
+        .flatMap(s => s.isGroup && s.groupStudents ? s.groupStudents.map(gs => gs.id) : [s.id])
+        .filter(id => id && !id.startsWith('group-') && !id.startsWith('break-'));
 
       const draftStateToSave = {
         activeDraftId,
         submittedDraftId: activeDraftId,
         submittedAt: new Date().toISOString(),
-        drafts: updatedDrafts
+        drafts: updatedDrafts,
+        allTeacherStudentIds,
+        unassignedStudentIds
       };
 
       await supabase
@@ -3865,18 +3979,29 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
 
   // Lock in schedule and send to Secretariat
   const handleLockAndSend = async () => {
-    const unassignedCount = students.filter(s => !s.assignedDay).length;
-    
+    const unassignedStudentsList = students.filter(s => !s.isBreak && !s.assignedDay);
+    const unassignedCount = unassignedStudentsList.length;
+    const totalAssigned = boards.reduce((acc, b) => acc + b.students.filter(s => !s.isBreak && s.assignedTime).length, 0);
+    const totalStudentsCount = totalAssigned + unassignedCount;
+
     if (unassignedCount > 0) {
-      if (!await showConfirm(`Achtung: Es sind noch ${unassignedCount} Schüler nicht auf deine Unterrichtstage verteilt. Möchtest du den Stundenplan trotzdem einloggen und an die Verwaltung senden?`)) {
-        return;
-      }
-    } else {
-      if (!await showConfirm('Möchtest du diesen Stundenplan final einloggen und an die Verwaltung senden?')) {
-        return;
-      }
+      setPartialSubmitData({
+        unassignedStudents: unassignedStudentsList,
+        totalAssigned,
+        totalStudents: totalStudentsCount
+      });
+      setShowPartialSubmitModal(true);
+      return;
     }
 
+    if (!await showConfirm('Möchtest du diesen vollständigen Stundenplan final einloggen und an die Verwaltung senden?')) {
+      return;
+    }
+
+    await executeLockAndSend();
+  };
+
+  const executeLockAndSend = async () => {
     // Validate if any assigned student in the draft overlaps with wöchentliche Blockierungen
     let hasBlockedConflict = false;
     let conflictStudentName = '';
@@ -3933,12 +4058,19 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
         .single();
 
       const teacherName = teacherProfile ? `${teacherProfile.first_name} ${teacherProfile.last_name}` : 'Lehrkraft';
+      const unassignedStudentsCount = students.filter(s => !s.isBreak && !s.assignedDay).length;
+      const totalAssignedCount = boards.reduce((acc, b) => acc + b.students.filter(s => !s.isBreak && s.assignedTime).length, 0);
+      const totalCount = totalAssignedCount + unassignedStudentsCount;
+
+      const alertMsg = unassignedStudentsCount > 0
+        ? `🗓️ Stundenplan-Review (Teil-Einreichung): Lehrkraft ${teacherName} hat den Stundenplan eingereicht (${totalAssignedCount} von ${totalCount} Schülern eingeteilt, ${unassignedStudentsCount} offen im Pool).`
+        : `🗓️ Stundenplan-Review: Lehrkraft ${teacherName} hat den vollständigen neuen Stundenplan erstellt und zur Freigabe an die Verwaltung gesendet (${totalAssignedCount} Schüler eingeteilt).`;
 
       await supabase.from('system_alerts').insert({
         school_id: schoolId,
         teacher_id: selectedTeacherId,
         type: 'Stundenplan Freigabe',
-        message: `🗓️ Stundenplan-Review: Lehrkraft ${teacherName} hat den neuen Stundenplan erstellt und zur Freigabe an die Verwaltung gesendet.`
+        message: alertMsg
       });
 
       // Generate PDF Backup & Celebration
@@ -4470,11 +4602,11 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                         gap: '8px',
                         padding: '5px 12px',
                         borderRadius: '20px',
-                        background: totalGapsMin === 0 ? '#f0fdf4' : '#fffbeb',
-                        border: `1px solid ${totalGapsMin === 0 ? '#bbf7d0' : '#fde68a'}`,
+                        background: (totalGapsMin === 0 && unassignedCount === 0) ? '#f0fdf4' : '#fffbeb',
+                        border: `1px solid ${(totalGapsMin === 0 && unassignedCount === 0) ? '#bbf7d0' : '#fde68a'}`,
                         fontSize: '0.78rem',
                         fontWeight: 800,
-                        color: totalGapsMin === 0 ? '#15803d' : '#b45309',
+                        color: (totalGapsMin === 0 && unassignedCount === 0) ? '#15803d' : '#b45309',
                         cursor: 'pointer',
                         boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)',
                         transition: 'all 0.15s',
@@ -4484,12 +4616,20 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                       title="Klicken, um die Auswertung & Erfolgsanalyse erneut zu öffnen"
                     >
                       <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <CheckCircle size={13} color={totalGapsMin === 0 ? "#34a853" : "#d97706"} />
-                        <span>{totalAssigned} Schüler eingeteilt</span>
+                        {unassignedCount > 0 ? (
+                          <AlertCircle size={13} color="#d97706" />
+                        ) : (
+                          <CheckCircle size={13} color="#34a853" />
+                        )}
+                        <span>
+                          {unassignedCount > 0 
+                            ? `${totalAssigned}/${totalStudentsCount} Schüler eingeteilt (${unassignedCount} offen)` 
+                            : `${totalAssigned} Schüler eingeteilt`}
+                        </span>
                       </span>
                       <span style={{ color: '#cbd5e1' }}>•</span>
                       <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <Zap size={12} color={totalGapsMin === 0 ? "#16a34a" : "#d97706"} />
+                        <Zap size={12} color={(totalGapsMin === 0 && unassignedCount === 0) ? "#16a34a" : "#d97706"} />
                         <span>{gapCount === 0 ? '0 Min Lücken (Lückenlos)' : `${totalGapsMin} Min ${gapCount === 1 ? 'Lücke' : 'Lücken'}`}</span>
                       </span>
                       <Sparkles size={12} style={{ marginLeft: '2px', opacity: 0.8 }} />
@@ -4982,6 +5122,70 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
               </div>
             </div>
           )}
+
+          {/* Unassigned students warning banner */}
+          {(() => {
+            const currentUnassigned = students.filter(s => !s.isBreak && !s.assignedDay);
+            if (currentUnassigned.length === 0) return null;
+            return (
+              <div className="animation-slide-down" style={{
+                background: 'linear-gradient(135deg, rgba(254, 243, 199, 0.95) 0%, rgba(253, 230, 138, 0.7) 100%)',
+                backdropFilter: 'blur(12px)',
+                WebkitBackdropFilter: 'blur(12px)',
+                border: '1.5px solid rgba(245, 158, 11, 0.5)',
+                borderRadius: '12px',
+                padding: '10px 14px',
+                fontSize: '0.78rem',
+                color: '#92400e',
+                fontWeight: 600,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '12px',
+                marginBottom: '6px',
+                boxShadow: '0 2px 10px rgba(245, 158, 11, 0.08)'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '1.05rem' }}>⚠️</span>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
+                    <span style={{ fontWeight: 800, color: '#78350f' }}>
+                      {currentUnassigned.length === 1
+                        ? `Achtung: Es ist noch 1 Schüler nicht auf deine Unterrichtstage eingeteilt!`
+                        : `Achtung: Es sind noch ${currentUnassigned.length} Schüler nicht auf deine Unterrichtstage eingeteilt!`}
+                    </span>
+                    <span style={{ fontSize: '0.72rem', color: '#92400e', fontWeight: 500 }}>
+                      Du kannst den Stundenplan trotzdem einreichen. Nicht eingeteilte Schüler verbleiben sicher in deinem Schüler-Pool.
+                    </span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSidebarTab('unassigned')}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    background: 'white',
+                    border: '1px solid rgba(245, 158, 11, 0.4)',
+                    padding: '5px 12px',
+                    borderRadius: '8px',
+                    fontSize: '0.72rem',
+                    fontWeight: 700,
+                    color: '#92400e',
+                    cursor: 'pointer',
+                    boxShadow: '0 1px 4px rgba(0, 0, 0, 0.05)',
+                    whiteSpace: 'nowrap',
+                    transition: 'all 0.15s'
+                  }}
+                  onMouseOver={e => e.currentTarget.style.transform = 'translateY(-1px)'}
+                  onMouseOut={e => e.currentTarget.style.transform = 'none'}
+                >
+                  <span>Offene Schüler im Pool ({currentUnassigned.length})</span>
+                  <span>➔</span>
+                </button>
+              </div>
+            );
+          })()}
 
           {/* Info/Guide banner beneath header */}
           <div style={{
@@ -7533,6 +7737,216 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                 >
                   <Sliders size={16} color="#64748b" />
                   <span>Nein, neue Zeiten festlegen</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Partial Submit Enterprise Review Modal */}
+        {showPartialSubmitModal && partialSubmitData && (
+          <div style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 9999,
+            background: 'rgba(0, 0, 0, 0.45)',
+            backdropFilter: 'blur(20px) saturate(180%)',
+            WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px',
+            animation: 'fadeIn 0.25s ease-out'
+          }}>
+            <div style={{
+              background: '#ffffff',
+              borderRadius: '24px',
+              padding: '28px 32px',
+              maxWidth: '540px',
+              width: '100%',
+              boxShadow: '0 25px 70px rgba(0, 0, 0, 0.18)',
+              border: '1px solid rgba(0, 0, 0, 0.08)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '18px',
+              position: 'relative',
+              maxHeight: '90vh',
+              overflowY: 'auto'
+            }}>
+              {/* Header */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                  <div style={{
+                    width: '44px',
+                    height: '44px',
+                    borderRadius: '12px',
+                    background: '#fef3c7',
+                    border: '1px solid #fde68a',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#d97706',
+                    boxShadow: '0 4px 12px rgba(217, 119, 6, 0.15)'
+                  }}>
+                    <AlertCircle size={22} />
+                  </div>
+                  <div>
+                    <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#1d1d1f', margin: 0, letterSpacing: '-0.02em' }}>
+                      Stundenplan mit offenen Schülern einreichen? 🗓️
+                    </h3>
+                    <p style={{ fontSize: '0.78rem', color: '#92400e', margin: '2px 0 0 0', fontWeight: 700 }}>
+                      {partialSubmitData.unassignedStudents.length} von {partialSubmitData.totalStudents} Schülern noch nicht zugeteilt
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowPartialSubmitModal(false)}
+                  style={{
+                    background: '#f5f5f7',
+                    border: 'none',
+                    borderRadius: '50%',
+                    width: '30px',
+                    height: '30px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#86868b',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              {/* Message */}
+              <p style={{ fontSize: '0.86rem', color: '#475569', lineHeight: 1.5, margin: 0, fontWeight: 500 }}>
+                Folgende <strong>{partialSubmitData.unassignedStudents.length} Schüler</strong> sind auf keinem deiner Unterrichtstage eingeteilt:
+              </p>
+
+              {/* Unassigned Students List */}
+              <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '6px',
+                maxHeight: '180px',
+                overflowY: 'auto',
+                padding: '8px',
+                background: '#f8fafc',
+                borderRadius: '12px',
+                border: '1px solid #e2e8f0'
+              }}>
+                {partialSubmitData.unassignedStudents.map((s, idx) => (
+                  <div
+                    key={s.id || idx}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '8px 12px',
+                      background: '#ffffff',
+                      borderRadius: '8px',
+                      border: '1px solid #e2e8f0',
+                      boxShadow: '0 1px 3px rgba(0, 0, 0, 0.02)'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: '#e0f2fe', color: '#0369a1', fontSize: '0.7rem', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        {s.first_name ? s.first_name[0] : 'S'}
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#1e293b' }}>
+                          {s.first_name} {maskLastName(s.last_name, showRealNames)}
+                        </div>
+                        <div style={{ fontSize: '0.68rem', color: '#64748b' }}>
+                          {s.instrument || 'Musiker'} • {s.duration || 30} Min
+                        </div>
+                      </div>
+                    </div>
+                    <div style={{
+                      fontSize: '0.65rem',
+                      fontWeight: 700,
+                      padding: '2px 8px',
+                      borderRadius: '6px',
+                      background: s.hasPreferences ? '#dcfce7' : '#f1f5f9',
+                      color: s.hasPreferences ? '#15803d' : '#64748b'
+                    }}>
+                      {s.hasPreferences ? 'Wunschzeit da' : 'Keine Wunschzeit'}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Explanatory Callout */}
+              <div style={{
+                background: 'rgba(234, 179, 8, 0.08)',
+                border: '1px solid rgba(234, 179, 8, 0.25)',
+                borderRadius: '12px',
+                padding: '10px 14px',
+                fontSize: '0.76rem',
+                color: '#854d0e',
+                lineHeight: 1.45
+              }}>
+                💡 <strong>Zero-Data-Loss Garantie:</strong> Wenn du jetzt einreichst, wird dein aktueller Stand mit {partialSubmitData.totalAssigned} Schülern an die Verwaltung gesendet. Alle offenen Schüler <strong>verbleiben sicher in deinem Schüler-Pool</strong> und fliegen niemals aus der Liste.
+              </div>
+
+              {/* Action Buttons */}
+              <div style={{ display: 'flex', gap: '10px', marginTop: '4px' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowPartialSubmitModal(false);
+                    setSidebarTab('unassigned');
+                  }}
+                  style={{
+                    flex: 1,
+                    padding: '11px 16px',
+                    borderRadius: '12px',
+                    background: '#f1f5f9',
+                    border: '1px solid #cbd5e1',
+                    color: '#334155',
+                    fontSize: '0.82rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    transition: 'all 0.15s'
+                  }}
+                  onMouseOver={e => e.currentTarget.style.background = '#e2e8f0'}
+                  onMouseOut={e => e.currentTarget.style.background = '#f1f5f9'}
+                >
+                  Abbrechen & Zuteilen
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowPartialSubmitModal(false);
+                    executeLockAndSend();
+                  }}
+                  style={{
+                    flex: 1.2,
+                    padding: '11px 16px',
+                    borderRadius: '12px',
+                    background: isCampus
+                      ? 'linear-gradient(135deg, #34a853 0%, #2e7d32 100%)'
+                      : (isGroovelab
+                        ? 'linear-gradient(135deg, #eab308 0%, #d97706 100%)'
+                        : 'linear-gradient(135deg, #ea4335 0%, #c62828 100%)'),
+                    border: 'none',
+                    color: '#ffffff',
+                    fontSize: '0.82rem',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    boxShadow: '0 4px 14px rgba(0,0,0,0.12)',
+                    transition: 'all 0.15s',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px'
+                  }}
+                  onMouseOver={e => e.currentTarget.style.transform = 'translateY(-1px)'}
+                  onMouseOut={e => e.currentTarget.style.transform = 'none'}
+                >
+                  <Send size={13} />
+                  <span>Als Teilplan einreichen ➔</span>
                 </button>
               </div>
             </div>

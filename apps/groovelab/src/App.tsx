@@ -1686,6 +1686,11 @@ function App() {
 
   const [loggedInUserId, setLoggedInUserIdRaw] = useState<string | null>(() => {
     if (typeof window === 'undefined') return null;
+    const isMasterAuth = sessionStorage.getItem('groovelab_is_master_admin') === 'true' || 
+                         localStorage.getItem('groovelab_is_master_admin') === 'true';
+    const ghostAuthToken = localStorage.getItem('groovelab_ghost_auth_token');
+    const isMasterValid = isMasterAuth || Boolean(ghostAuthToken);
+
     const urlParams = new URLSearchParams(window.location.search);
     const isGhost = urlParams.get('support_ghost') === 'true' || 
                     urlParams.get('ghost_session') === 'true' || 
@@ -1693,7 +1698,7 @@ function App() {
     const ghostSchoolId = urlParams.get('school_id') || 
                           urlParams.get('ghost_school_id') || 
                           sessionStorage.getItem('groovelab_ghost_school_id');
-    if (isGhost && ghostSchoolId) {
+    if (isGhost && ghostSchoolId && isMasterValid) {
       return 'master-support-id';
     }
     const storedId = sessionStorage.getItem('groovelab_user_id');
@@ -2218,6 +2223,11 @@ function App() {
   const [user, setUserRaw] = useState<any>(() => {
     if (typeof window === 'undefined') return null;
     try {
+      const isMasterAuth = sessionStorage.getItem('groovelab_is_master_admin') === 'true' || 
+                           localStorage.getItem('groovelab_is_master_admin') === 'true';
+      const ghostAuthToken = localStorage.getItem('groovelab_ghost_auth_token');
+      const isMasterValid = isMasterAuth || Boolean(ghostAuthToken);
+
       const urlParams = new URLSearchParams(window.location.search);
       const isGhost = urlParams.get('support_ghost') === 'true' || 
                       urlParams.get('ghost_session') === 'true' || 
@@ -2229,7 +2239,7 @@ function App() {
                         sessionStorage.getItem('groovelab_ghost_active_role') || 
                         'admin';
 
-      if (isGhost && ghostSchoolId) {
+      if (isGhost && ghostSchoolId && isMasterValid) {
         return {
           id: 'master-support-id',
           school_id: ghostSchoolId,
@@ -2344,7 +2354,28 @@ function App() {
                       sessionStorage.getItem('groovelab_ghost_active_role') || 
                       'admin';
 
+    const isMasterAuth = sessionStorage.getItem('groovelab_is_master_admin') === 'true' || 
+                         localStorage.getItem('groovelab_is_master_admin') === 'true';
+    const ghostAuthToken = localStorage.getItem('groovelab_ghost_auth_token');
+    const isMasterValid = isMasterAuth || Boolean(ghostAuthToken);
+
     if (isGhostParam && (ghostSchoolId || ghostUserId)) {
+      if (!isMasterValid) {
+        console.warn('[Security] Unauthorized Ghost Mode attempt blocked.');
+        sessionStorage.removeItem('groovelab_support_ghost');
+        sessionStorage.removeItem('groovelab_ghost_school_id');
+        sessionStorage.removeItem('groovelab_ghost_impersonated_user_id');
+        sessionStorage.removeItem('groovelab_ghost_active_role');
+        const cleanUrl = window.location.pathname;
+        window.history.replaceState({}, document.title, cleanUrl);
+        return;
+      }
+
+      // Consume one-time ghost token
+      if (ghostAuthToken) {
+        localStorage.removeItem('groovelab_ghost_auth_token');
+      }
+
       sessionStorage.setItem('groovelab_support_ghost', 'true');
       if (ghostSchoolId) sessionStorage.setItem('groovelab_ghost_school_id', ghostSchoolId);
       if (ghostUserId) sessionStorage.setItem('groovelab_ghost_impersonated_user_id', ghostUserId);
@@ -3570,6 +3601,31 @@ function App() {
   }, [user]);
 
   const isKioskMode = (stationIdFromStorage && stationIdFromStorage !== 'skip') || (typeof window !== 'undefined' ? !!localStorage.getItem('groovelab_kiosk_token') : false);
+
+  // Enterprise Kiosk Inactivity Auto-Reset (Schutz vor verwaisten Sessions auf Schul-iPads)
+  useEffect(() => {
+    if (!loggedInUserId || !isKioskMode) return;
+
+    let timeoutId: any;
+    const KIOSK_IDLE_LIMIT_MS = 5 * 60 * 1000; // 5 Minuten Inaktivität
+
+    const resetIdleTimer = () => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        console.log('[Kiosk] Inactivity timeout reached. Resetting session to Kiosk login screen.');
+        handleLogout(true, false);
+      }, KIOSK_IDLE_LIMIT_MS);
+    };
+
+    const events = ['mousedown', 'mousemove', 'keydown', 'touchstart', 'scroll'];
+    events.forEach(ev => window.addEventListener(ev, resetIdleTimer, { passive: true }));
+    resetIdleTimer();
+
+    return () => {
+      clearTimeout(timeoutId);
+      events.forEach(ev => window.removeEventListener(ev, resetIdleTimer));
+    };
+  }, [loggedInUserId, isKioskMode]);
 
   useEffect(() => {
     if (loggedInUserId) {
@@ -9140,9 +9196,9 @@ function App() {
               display: 'flex', 
               flexDirection: 'column',
               alignItems: 'center', 
-              gap: '10px', 
-              padding: '16px', 
-              borderRadius: '20px', 
+              gap: '8px', 
+              padding: '14px 12px', 
+              borderRadius: '16px', 
               border: activeStudentTab === 'profile'
                 ? (activePlatform === 'campus' ? '2.5px solid #34a853' : '2.5px solid #eab308')
                 : '1px solid #e2e8f0', 
@@ -9155,15 +9211,15 @@ function App() {
               boxSizing: 'border-box'
             }}
           >
-            {/* Larger Avatar */}
+            {/* Avatar */}
             <div style={{ position: 'relative' }}>
               <div style={{ 
-                width: '72px', 
-                height: '72px', 
-                borderRadius: '20px', 
+                width: '58px', 
+                height: '58px', 
+                borderRadius: '16px', 
                 overflow: 'hidden', 
-                border: '3px solid white', 
-                boxShadow: '0 8px 20px rgba(0,0,0,0.08)' 
+                border: '2.5px solid white', 
+                boxShadow: '0 4px 12px rgba(0,0,0,0.06)' 
               }}>
                 <StudioAvatar 
                   src={user.photo_url} 
@@ -9189,28 +9245,27 @@ function App() {
               )}
             </div>
 
-            {/* Name & Role centered underneath */}
+            {/* Name & Role centered underneath (Complete readable name, no truncate) */}
             <div style={{ minWidth: 0, width: '100%' }}>
               <div style={{ 
-                fontWeight: 900, 
-                fontSize: '0.95rem', 
+                fontWeight: 800, 
+                fontSize: '0.88rem', 
+                lineHeight: 1.25,
                 color: '#0f172a', 
-                whiteSpace: 'nowrap', 
-                overflow: 'hidden', 
-                textOverflow: 'ellipsis',
-                marginBottom: '2px'
+                whiteSpace: 'normal', 
+                wordBreak: 'break-word',
+                textAlign: 'center',
+                marginBottom: '3px'
               }}>
                 {user.role === 'student' ? 'Mein Profil' : formatTeacherFullName(user.first_name, user.last_name)}
               </div>
               <div style={{ 
-                fontSize: '0.68rem', 
+                fontSize: '0.66rem', 
                 fontWeight: 800, 
                 color: '#64748b', 
                 textTransform: 'uppercase', 
-                whiteSpace: 'nowrap', 
-                overflow: 'hidden', 
-                textOverflow: 'ellipsis',
-                letterSpacing: '0.02em'
+                letterSpacing: '0.04em',
+                textAlign: 'center'
               }}>
                 {activePlatform === 'campus'
                   ? (user.role === 'admin' ? 'Campus Admin' : user.role === 'teacher' ? 'Campus Lehrkraft' : user.role === 'secretary' ? 'Campus Verwaltung' : 'Campus Schüler')
@@ -9229,57 +9284,60 @@ function App() {
               alignItems: 'center', 
               justifyContent: 'center',
               gap: '8px', 
-              padding: '12px 14px', 
-              borderRadius: '14px', 
+              padding: '11px 14px', 
+              borderRadius: '12px', 
               border: '1px solid #e2e8f0', 
               background: '#f8fafc', 
               color: '#334155', 
               fontWeight: 800, 
               fontSize: '0.82rem',
               cursor: 'pointer',
-              boxShadow: '0 2px 6px rgba(0,0,0,0.02)',
-              transition: 'all 0.2s ease'
+              boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+              transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
             }}
             className="hover-scale"
             title="Leitfäden & Akademie öffnen"
             onMouseEnter={(e) => {
               e.currentTarget.style.background = '#f1f5f9';
               e.currentTarget.style.color = '#0f172a';
+              e.currentTarget.style.borderColor = '#cbd5e1';
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.background = '#f8fafc';
               e.currentTarget.style.color = '#334155';
+              e.currentTarget.style.borderColor = '#e2e8f0';
             }}
           >
-            <BookOpen size={16} color="#64748b" /> Leitfäden &amp; Akademie
+            <BookOpen size={16} color="#64748b" strokeWidth={2} /> Leitfäden &amp; Akademie
           </button>
 
-          {/* Ausweis button */}
+          {/* Ausweis button (Hero CTA) */}
           {(user?.qr_token || user?.teacher_qr_token) && (() => {
             const isPureAdminOrSec = (user?.role === 'admin' || user?.role === 'secretary') && (!user?.roles || !user.roles.includes('teacher'));
+            const themeGreen = activePlatform === 'campus' || (!isPureAdminOrSec && activePlatform !== 'ensembles' && activePlatform !== 'groovelab');
             const buttonBorder = isPureAdminOrSec 
-              ? '1.5px solid rgba(234, 67, 53, 0.25)'
-              : activePlatform === 'campus' 
-                ? '1.5px solid rgba(52, 168, 83, 0.25)' 
+              ? '1.2px solid rgba(234, 67, 53, 0.25)'
+              : themeGreen
+                ? '1.2px solid #bbf7d0' 
                 : activePlatform === 'ensembles' 
-                  ? '1.5px solid rgba(59, 130, 246, 0.25)' 
-                  : '1.5px solid rgba(234, 179, 8, 0.3)';
+                  ? '1.2px solid #bfdbfe' 
+                  : '1.2px solid #fef08a';
 
             const buttonBg = isPureAdminOrSec 
-              ? 'rgba(234, 67, 53, 0.08)'
-              : activePlatform === 'campus' 
-                ? 'rgba(52, 168, 83, 0.08)' 
+              ? '#fef2f2'
+              : themeGreen 
+                ? '#f0fdf4' 
                 : activePlatform === 'ensembles' 
-                  ? 'rgba(59, 130, 246, 0.08)' 
-                  : 'rgba(234, 179, 8, 0.08)';
+                  ? '#eff6ff' 
+                  : '#fefce8';
 
             const buttonColor = isPureAdminOrSec 
-              ? '#ea4335'
-              : activePlatform === 'campus' 
-                ? '#34a853' 
+              ? '#b91c1c'
+              : themeGreen 
+                ? '#166534' 
                 : activePlatform === 'ensembles' 
-                  ? '#2563eb' 
-                  : '#a16207';
+                  ? '#1d4ed8' 
+                  : '#854d0e';
 
             return (
               <button 
@@ -9291,25 +9349,26 @@ function App() {
                   alignItems: 'center', 
                   justifyContent: 'center',
                   gap: '8px', 
-                  padding: '12px 14px', 
-                  borderRadius: '14px', 
+                  padding: '11px 14px', 
+                  borderRadius: '12px', 
                   border: buttonBorder, 
                   background: buttonBg, 
                   color: buttonColor, 
                   fontWeight: 800, 
                   fontSize: '0.82rem',
                   cursor: 'pointer',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
-                  transition: 'all 0.2s'
+                  boxShadow: '0 2px 6px rgba(0,0,0,0.02)',
+                  transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
                 }}
                 className="hover-scale"
+                title="Digitalen Ausweis öffnen"
               >
-                <QrCode size={16} color={buttonColor} /> Ausweis zeigen
+                <QrCode size={16} color={buttonColor} strokeWidth={2.2} /> Ausweis zeigen
               </button>
             );
           })()}
 
-          {/* Abmelden button */}
+          {/* Abmelden button (De-escalated Clean Ghost Button) */}
           <button 
             type="button"
             onClick={() => handleLogout(true, true)}
@@ -9318,54 +9377,72 @@ function App() {
               display: 'flex', 
               alignItems: 'center', 
               justifyContent: 'center',
-              gap: '8px', 
-              padding: '12px 14px', 
-              borderRadius: '14px', 
-              border: 'none', 
-              background: '#fef2f2', 
-              color: '#ef4444', 
-              fontWeight: 800, 
-              fontSize: '0.82rem',
+              gap: '7px', 
+              padding: '9px 12px', 
+              borderRadius: '10px', 
+              border: '1px solid transparent', 
+              background: 'transparent', 
+              color: '#94a3b8', 
+              fontWeight: 700, 
+              fontSize: '0.78rem',
               cursor: 'pointer',
-              transition: 'background 0.2s'
+              transition: 'all 0.18s ease'
+            }}
+            title="Sicher von Campus-Groovelab abmelden"
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = '#fef2f2';
+              e.currentTarget.style.color = '#dc2626';
+              e.currentTarget.style.borderColor = '#fecdd3';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'transparent';
+              e.currentTarget.style.color = '#94a3b8';
+              e.currentTarget.style.borderColor = 'transparent';
             }}
           >
-            <LogOut size={16} color="#ef4444" /> Abmelden
+            <LogOut size={14} strokeWidth={2} /> Abmelden
           </button>
           
-          {/* Legal Links under logout */}
+          {/* Legal Links under logout (Single clean balanced row) */}
           <div style={{ 
-            marginTop: '4px', 
-            paddingTop: '10px',
+            marginTop: '2px', 
+            paddingTop: '8px',
             borderTop: '1px solid #f1f5f9',
             display: 'flex', 
-            flexWrap: 'wrap',
+            alignItems: 'center',
             justifyContent: 'center',
-            gap: '8px 12px', 
-            fontSize: '9px', 
-            fontWeight: 800, 
+            gap: '6px', 
+            fontSize: '10px', 
+            fontWeight: 700, 
             color: '#94a3b8',
             textTransform: 'uppercase',
-            letterSpacing: '0.05em',
-            width: '100%'
+            letterSpacing: '0.04em',
+            width: '100%',
+            userSelect: 'none'
           }}>
             <span 
               onClick={() => setShowPrivacy(true)} 
-              style={{ cursor: 'pointer', transition: 'color 0.2s' }}
+              style={{ cursor: 'pointer', transition: 'color 0.15s' }}
+              onMouseEnter={(e) => (e.currentTarget.style.color = '#475569')}
+              onMouseLeave={(e) => (e.currentTarget.style.color = '#94a3b8')}
             >
               Datenschutz
             </span>
-            <span style={{ opacity: 0.5 }}>•</span>
+            <span style={{ opacity: 0.4 }}>·</span>
             <span 
               onClick={() => setShowAgb(true)} 
-              style={{ cursor: 'pointer', transition: 'color 0.2s' }}
+              style={{ cursor: 'pointer', transition: 'color 0.15s' }}
+              onMouseEnter={(e) => (e.currentTarget.style.color = '#475569')}
+              onMouseLeave={(e) => (e.currentTarget.style.color = '#94a3b8')}
             >
               AGB
             </span>
-            <span style={{ opacity: 0.5 }}>•</span>
+            <span style={{ opacity: 0.4 }}>·</span>
             <span 
               onClick={() => setShowImpressum(true)} 
-              style={{ cursor: 'pointer', transition: 'color 0.2s' }}
+              style={{ cursor: 'pointer', transition: 'color 0.15s' }}
+              onMouseEnter={(e) => (e.currentTarget.style.color = '#475569')}
+              onMouseLeave={(e) => (e.currentTarget.style.color = '#94a3b8')}
             >
               Impressum
             </span>
@@ -13629,8 +13706,8 @@ function App() {
         )}
       </main>
 
-      {/* Mobile Native Bottom Navigation Bar (< 1024px Viewports) */}
-      {(windowWidth < 1024 || isMobile) && (
+      {/* Mobile Native Bottom Navigation Bar (Controlled via CSS for Mobile & Simulator) */}
+      {user && (
         <MobileBottomNav
           activeTab={activeStudentTab}
           setActiveTab={setActiveStudentTab}
@@ -14247,7 +14324,24 @@ function App() {
           <HelpCenterModal
             isOpen={isGlobalHelpCenterOpen}
             onClose={() => setIsGlobalHelpCenterOpen(false)}
-            userRole={user?.role || 'admin'}
+            userRole={(() => {
+              // 1. If currently authenticated user is a student, ALWAYS return 'student'
+              if (user?.role?.toLowerCase() === 'student') return 'student';
+              
+              const activeWs = typeof window !== 'undefined'
+                ? (sessionStorage.getItem('groovelab_active_workspace') || localStorage.getItem('groovelab_active_workspace'))
+                : null;
+              
+              // 2. Active workspace overrides for dual-role users (teachers/admins)
+              if (activeWs === 'student') return 'student';
+              if (activeWs === 'teacher') return 'teacher';
+              if (activeWs === 'secretary') return 'secretary';
+              
+              // 3. User role fallbacks
+              if (user?.role?.toLowerCase() === 'teacher') return 'teacher';
+              if (user?.role?.toLowerCase() === 'secretary') return 'secretary';
+              return (user?.role as any) || 'admin';
+            })()}
             activePlatform={activePlatform as any}
             schoolName={school?.name || 'Meine Musikschule'}
           />
@@ -14995,6 +15089,8 @@ function App() {
             </div>
 
             <button 
+              type="button"
+              onClick={() => setSelectedStudentForPreview(null)}
               style={{ width: '100%', padding: '16px', background: '#1e293b', color: 'white', border: 'none', borderRadius: '16px', fontWeight: 900, cursor: 'pointer' }}
             >
               COOL!

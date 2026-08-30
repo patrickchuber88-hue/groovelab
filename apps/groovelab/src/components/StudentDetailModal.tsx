@@ -1894,7 +1894,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
                 <tr>
                   <td>${new Date(student.parental_consent_given_at).toLocaleString('de-DE')}</td>
                   <td><strong>Digitale Eltern-Einwilligung (DSGVO Art. 8)</strong></td>
-                  <td>Modus: ${student.campus_usage_mode === 'eltern_geführt' ? 'Eltern-geführt (Netflix-Modus)' : 'Selbstnutzer (PIN)'} (${student.consent_version || 'v1.0'})</td>
+                  <td>Modus: ${student.campus_usage_mode === 'eltern_geführt' ? 'Eltern-geführt (Familien-Schnellzugriff)' : 'Selbstnutzer (PIN)'} (${student.consent_version || 'v1.0'})</td>
                   <td><span class="badge badge-active">Verifiziert</span></td>
                 </tr>
               ` : ''}

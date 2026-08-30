@@ -12,7 +12,7 @@ import {
   LayoutDashboard, Award, UserPlus, GraduationCap, ZoomIn, ZoomOut, ChevronLeft, X, AlertCircle, MoreVertical, ArrowUp, ArrowDown,
   School, User, DoorOpen, Tag, Wrench, BarChart2, Edit3, Search, Ruler, Eye, EyeOff, Lock, GripVertical, Mail, QrCode, CreditCard, TrendingDown, Info, Lightbulb, Download, Printer, Palette, Zap, Database, Activity, HeartHandshake,
   HardDrive, Cloud, Crown, Rocket, Cpu, Fingerprint, Smartphone, KeyRound, RotateCw, LayoutGrid, Mic, Smile, Radio, Archive,
-  Disc3
+  Disc3, Menu
 } from 'lucide-react';
 import { isWebAuthnSupported, registerUserBiometrics, authenticateUserBiometrics, getStoredBiometricProfiles, removeBiometricProfile, BiometricVaultProfile } from '../utils/webauthn';
 import { TeacherDashboard } from './TeacherDashboard';
@@ -37,6 +37,7 @@ import { ConfirmDeleteStudentModal, StudentToDelete } from './ConfirmDeleteStude
 import { deleteStudentFully } from '../utils/studentDeletionService';
 import { BulkImportModal } from './common/BulkImportModal';
 import { GuidanceCenterModal } from './modals/GuidanceCenterModal';
+import { ParentInfoSheetModal } from './modals/ParentInfoSheetModal';
 import { generateTeacherQuickstartPDF, generateParentQuickstartPDF } from '../utils/pdfGenerator';
 import { getParentOnboardingUrl, isDevEnvironment } from '../utils/tenantUrlHelper';
 import { 
@@ -1682,6 +1683,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
   const [containerWidth, setContainerWidth] = useState(1000);
   const [windowWidth, setWindowWidth] = useState(window.innerWidth);
   const [windowHeight, setWindowHeight] = useState(window.innerHeight);
+  const [mobileSecretaryDrawerOpen, setMobileSecretaryDrawerOpen] = useState(false);
 
   useEffect(() => {
     const handleResize = () => {
@@ -2092,6 +2094,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
   const [showAddStudentModal, setShowAddStudentModal] = useState<boolean>(false);
   const [showBulkImportModal, setShowBulkImportModal] = useState<boolean>(false);
   const [showGuidanceModal, setShowGuidanceModal] = useState<boolean>(false);
+  const [showParentInfoSheetModal, setShowParentInfoSheetModal] = useState<boolean>(false);
   const [guidanceInitialTab, setGuidanceInitialTab] = useState<'teacher' | 'parent'>('teacher');
   const [newStudentFirstName, setNewStudentFirstName] = useState<string>('');
   const [newStudentLastName, setNewStudentLastName] = useState<string>('');
@@ -2107,7 +2110,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
   // Administrative employees list
   const [employees, setEmployees] = useState<any[]>([]);
 
-  // RBAC Goldstandard: Check if the logged-in user possesses an active teacher role (Dual Role)
+  // RBAC Master-Standard: Check if the logged-in user possesses an active teacher role (Dual Role)
   const isCurrentUserTeacher = useMemo(() => {
     const currentEmp = employees.find(e => e.id === userId);
     const roles = Array.isArray(currentEmp?.roles) 
@@ -10943,6 +10946,31 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                   <span>Smarter CSV/Excel Import</span>
                 </button>
 
+                <button
+                  onClick={() => setShowParentInfoSheetModal(true)}
+                  style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '5px', 
+                    borderRadius: '8px', 
+                    padding: '4px 10px', 
+                    fontSize: '0.72rem', 
+                    fontWeight: 800,
+                    background: '#ffffff',
+                    border: '1.5px solid #cbd5e1',
+                    color: '#0f172a',
+                    cursor: 'pointer',
+                    fontFamily: 'Urbanist',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                    transition: 'all 0.2s'
+                  }}
+                  className="hover-scale-mini"
+                  title="Druckfertiges 1-Seiter Eltern-Infoblatt mit Schullogo &amp; QR-Code als PDF herunterladen oder drucken"
+                >
+                  <FileText size={12} color="#059669" />
+                  <span>Eltern-Infoblatt (PDF)</span>
+                </button>
+
                 {/* Sammel-Onboarding (Text/CSV) Toggle Button */}
                 <button
                   onClick={() => setIsStudentCsvExpanded(!isStudentCsvExpanded)}
@@ -15943,7 +15971,8 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
         flexDirection: 'column',
         background: '#f8fafc',
         color: '#1d1d1f',
-        transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
+        transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
+        paddingBottom: windowWidth < 1024 ? '90px' : '0px'
       }}>
         
         {/* Top Header with App Suite Switcher Tabs (Karteireiter) */}
@@ -15951,8 +15980,8 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '0 40px',
-          height: '80px',
+          padding: windowWidth < 768 ? '0 12px' : '0 40px',
+          height: windowWidth < 768 ? '62px' : '80px',
           borderBottom: '1px solid rgba(0,0,0,0.05)',
           background: 'rgba(255, 255, 255, 0.88)',
           backdropFilter: 'var(--glass-blur)',
@@ -16747,7 +16776,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                     const usedMb = usedBytes / (1024 * 1024);
                     const usagePct = currentTotalCapGb > 0 ? (usedGb / currentTotalCapGb) * 100 : 0;
                     
-                    if (usagePct < 85) return null;
+                    if (usagePct < 80) return null;
 
                     const isCritical = usagePct >= 95;
                     const formattedUsed = usedBytes > 0 && usedGb < 0.10 
@@ -17795,6 +17824,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                 </div>
                                 <button
                                   onClick={() => {
+                                    setActiveTab('campus');
                                     setCampusSubTab('schedules');
                                     setSchedulesRoomsViewMode('designer');
                                     setSelectedFilterTeacherId(tId);
@@ -27998,11 +28028,11 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                       <Clock size={20} color="#b45309" />
                                     </div>
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                                      <div style={{ fontSize: '0.88rem', fontWeight: 900, color: '#78350f' }}>
-                                        ⏳ Speicher-Bereitstellung in Bearbeitung (+{pendingGb} GB)
+                                      <div style={{ fontSize: '0.88rem', fontWeight: 900, color: '#166534' }}>
+                                        ⚡ Sofort-Bereitstellung aktiv (+{pendingGb} GB)
                                       </div>
-                                      <div style={{ fontSize: '0.75rem', color: '#92400e', lineHeight: 1.45 }}>
-                                        Dein Auftrag über +{pendingGb} GB Audio-Tresor Cloud-Speicher wird auf dem Server eingerichtet (Bereitstellungszeit: in der Regel 1–2 Werktage). Die monatliche Abrechnung startet erst ab erfolgreicher Freischaltung.
+                                      <div style={{ fontSize: '0.75rem', color: '#15803d', lineHeight: 1.45 }}>
+                                        Dein gebuchtes Speichervolumen (+{pendingGb} GB Audio-Tresor Cloud-Speicher) ist sofort freigeschaltet und für alle Schüler & Lehrkräfte einsatzbereit.
                                       </div>
                                     </div>
                                   </div>
@@ -29409,21 +29439,34 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                             const formattedUsed = usedBytes > 0 && usedGb < 0.10 
                                               ? `${usedMb.toFixed(1).replace('.', ',')} MB` 
                                               : `${usedGb.toFixed(2).replace('.', ',')} GB`;
+                                            const usagePct = totalCapGb > 0 ? Math.min(100, Math.max(0, (usedGb / totalCapGb) * 100)) : 0;
+                                            const isWarning = usagePct >= 80;
+                                            const isCritical = usagePct >= 95;
 
                                             return (
-                                              <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '14px 16px', borderRadius: '16px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '8px' }}>
+                                              <div style={{ background: '#f8fafc', border: `1px solid ${isCritical ? '#fca5a5' : isWarning ? '#fde68a' : '#e2e8f0'}`, padding: '14px 16px', borderRadius: '16px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '8px' }}>
                                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                                                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                    <div style={{ width: '10px', height: '10px', minWidth: '10px', borderRadius: '50%', background: '#10b981', boxShadow: '0 0 0 3px rgba(16, 185, 129, 0.15)' }} />
+                                                    <div style={{ width: '10px', height: '10px', minWidth: '10px', borderRadius: '50%', background: isCritical ? '#dc2626' : isWarning ? '#f59e0b' : '#10b981', boxShadow: `0 0 0 3px ${isCritical ? 'rgba(220, 38, 38, 0.15)' : isWarning ? 'rgba(245, 158, 11, 0.15)' : 'rgba(16, 185, 129, 0.15)'}` }} />
                                                     <div style={{ fontSize: '0.84rem', fontWeight: 700, color: '#0f172a' }}>Audio-Tresor Speicher</div>
                                                   </div>
-                                                  <span style={{ fontSize: '0.68rem', background: addonGb > 0 ? '#dcfce7' : '#f1f5f9', color: addonGb > 0 ? '#166534' : '#475569', padding: '1px 6px', borderRadius: '6px', fontWeight: 700 }}>
-                                                    {addonGb > 0 ? `+${addonGb} GB` : '1 GB Basis'}
+                                                  <span style={{ fontSize: '0.68rem', background: isCritical ? '#fee2e2' : isWarning ? '#fef3c7' : addonGb > 0 ? '#dcfce7' : '#f1f5f9', color: isCritical ? '#991b1b' : isWarning ? '#92400e' : addonGb > 0 ? '#166534' : '#475569', padding: '1px 6px', borderRadius: '6px', fontWeight: 700 }}>
+                                                    {isCritical ? '🚨 95% Belegt' : isWarning ? '⚠️ 80% Belegt' : addonGb > 0 ? `+${addonGb} GB` : '1 GB Basis'}
                                                   </span>
                                                 </div>
+                                                {/* Live Quota Bar */}
+                                                <div style={{ width: '100%', height: '5px', background: '#e2e8f0', borderRadius: '100px', overflow: 'hidden', margin: '2px 0' }}>
+                                                  <div style={{
+                                                    width: `${usedBytes > 0 ? Math.max(3, usagePct) : 0}%`,
+                                                    height: '100%',
+                                                    background: isCritical ? '#dc2626' : isWarning ? '#f59e0b' : 'linear-gradient(90deg, #10b981 0%, #059669 100%)',
+                                                    borderRadius: '100px',
+                                                    transition: 'width 0.3s ease'
+                                                  }} />
+                                                </div>
                                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '2px' }}>
-                                                  <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 500 }}>
-                                                    {formattedUsed} von {totalCapGb} GB {addonGb > 0 ? `• ${addonFee.toFixed(2).replace('.', ',')} € / Mo.` : '• Inklusive'}
+                                                  <div style={{ fontSize: '0.72rem', color: isCritical ? '#dc2626' : isWarning ? '#b45309' : '#64748b', fontWeight: 600 }}>
+                                                    {formattedUsed} von {totalCapGb} GB ({usagePct.toFixed(0)}%) {addonGb > 0 ? `• ${addonFee.toFixed(2).replace('.', ',')} € / Mo.` : '• Inklusive'}
                                                   </div>
                                                   <button
                                                     type="button"
@@ -37072,7 +37115,7 @@ status: status,
                   <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
                     <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#34a853' }}>§ 11 NAMENSANONYMISIERUNG & PROFILAUSWAHL</h4>
                     <p style={{ margin: 0 }}><strong>1. Namensmaskierung:</strong> Schülernamen werden im Lehrer-Dashboard auf „Vorname + Anfangsbuchstabe Nachname“ und im Schüler-Dashboard auf generische Begriffe (z. B. „Hausaufgabenheft“) begrenzt.</p>
-                    <p style={{ margin: '4px 0 0 0' }}><strong>2. Profilauswahl (Familien-Sharing):</strong> Zur Vereinfachung des Zugangs für Familien mit mehreren Kindern im Haushalt wird eine PIN-lose Profil-Schnellwahl (analog dem Netflix-Prinzip) im Campus-Modul gestattet.</p>
+                    <p style={{ margin: '4px 0 0 0' }}><strong>2. Profilauswahl (Familien-Sharing):</strong> Zur Vereinfachung des Zugangs für Familien mit mehreren Kindern im Haushalt wird eine PIN-lose Profil-Schnellwahl (1-Klick Familien-Schnellwechsel) im Campus-Modul gestattet.</p>
                   </div>
                 </div>
               </div>
@@ -37532,6 +37575,528 @@ status: status,
         </>
       )}
 
+      {/* ─── Apple Glass Mobile Bottom Navigation for Administration & Secretariat ─── */}
+      <nav className="cg-mobile-bottom-nav">
+        {activeTab === 'secretary' && (
+          <>
+            <button
+              type="button"
+              className={`cg-bottom-nav-item ${secretarySubTab === 'briefing' ? 'active-admin' : ''}`}
+              onClick={() => {
+                React.startTransition(() => {
+                  setSecretarySubTab('briefing');
+                });
+              }}
+            >
+              <LayoutDashboard size={20} color="currentColor" />
+              <span>Briefing</span>
+            </button>
+            <button
+              type="button"
+              className={`cg-bottom-nav-item ${secretarySubTab === 'rooms' ? 'active-admin' : ''}`}
+              onClick={() => {
+                React.startTransition(() => {
+                  setSecretarySubTab('rooms');
+                });
+              }}
+            >
+              <DoorOpen size={20} color="currentColor" />
+              <span>Räume</span>
+            </button>
+            <button
+              type="button"
+              className={`cg-bottom-nav-item ${secretarySubTab === 'employees' ? 'active-admin' : ''}`}
+              onClick={() => {
+                React.startTransition(() => {
+                  setSecretarySubTab('employees');
+                });
+              }}
+            >
+              <Users size={20} color="currentColor" />
+              <span>Team</span>
+            </button>
+            <button
+              type="button"
+              className={`cg-bottom-nav-item ${secretarySubTab === 'licenses' ? 'active-admin' : ''}`}
+              onClick={() => {
+                React.startTransition(() => {
+                  setSecretarySubTab('licenses');
+                });
+              }}
+            >
+              <Award size={20} color="currentColor" />
+              <span>Gebühren</span>
+            </button>
+          </>
+        )}
+
+        {activeTab === 'campus' && (
+          <>
+            <button
+              type="button"
+              className={`cg-bottom-nav-item ${campusSubTab === 'briefing' ? 'active-campus' : ''}`}
+              onClick={() => setCampusSubTab('briefing')}
+            >
+              <LayoutDashboard size={20} color="currentColor" />
+              <span>Start</span>
+            </button>
+            <button
+              type="button"
+              className={`cg-bottom-nav-item ${campusSubTab === 'schedules' ? 'active-campus' : ''}`}
+              onClick={() => setCampusSubTab('schedules')}
+            >
+              <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Calendar size={20} color="currentColor" />
+                {pendingSchedules.length > 0 && (
+                  <span style={{
+                    position: 'absolute',
+                    top: '-5px',
+                    right: '-7px',
+                    background: '#34a853',
+                    color: 'white',
+                    borderRadius: '999px',
+                    padding: '1px 5px',
+                    fontSize: '9px',
+                    fontWeight: 900,
+                    lineHeight: 1
+                  }}>
+                    {pendingSchedules.length}
+                  </span>
+                )}
+              </div>
+              <span>Pläne</span>
+            </button>
+            <button
+              type="button"
+              className={`cg-bottom-nav-item ${campusSubTab === 'students' ? 'active-campus' : ''}`}
+              onClick={() => setCampusSubTab('students')}
+            >
+              <Users size={20} color="currentColor" />
+              <span>Schüler</span>
+            </button>
+            <button
+              type="button"
+              className={`cg-bottom-nav-item ${campusSubTab === 'rooms' ? 'active-campus' : ''}`}
+              onClick={() => setCampusSubTab('rooms')}
+            >
+              <DoorOpen size={20} color="currentColor" />
+              <span>Räume</span>
+            </button>
+          </>
+        )}
+
+        {activeTab === 'groovelab' && (
+          <>
+            <button
+              type="button"
+              className={`cg-bottom-nav-item ${groovelabSubTab === 'live' ? 'active-groovelab' : ''}`}
+              onClick={() => setGroovelabSubTab('live')}
+            >
+              <Monitor size={20} color="currentColor" />
+              <span>Live Lab</span>
+            </button>
+            <button
+              type="button"
+              className={`cg-bottom-nav-item ${groovelabSubTab === 'coaches' ? 'active-groovelab' : ''}`}
+              onClick={() => setGroovelabSubTab('coaches')}
+            >
+              <GraduationCap size={20} color="currentColor" />
+              <span>Lehrer</span>
+            </button>
+            <button
+              type="button"
+              className={`cg-bottom-nav-item ${groovelabSubTab === 'students' ? 'active-groovelab' : ''}`}
+              onClick={() => setGroovelabSubTab('students')}
+            >
+              <Users size={20} color="currentColor" />
+              <span>Schüler</span>
+            </button>
+            <button
+              type="button"
+              className={`cg-bottom-nav-item ${groovelabSubTab === 'settings' ? 'active-groovelab' : ''}`}
+              onClick={() => setGroovelabSubTab('settings')}
+            >
+              <Settings size={20} color="currentColor" />
+              <span>Setup</span>
+            </button>
+          </>
+        )}
+
+        {/* Universal Menü Drawer Button */}
+        <button
+          type="button"
+          className={`cg-bottom-nav-item ${mobileSecretaryDrawerOpen ? (activeTab === 'secretary' ? 'active-admin' : activeTab === 'campus' ? 'active-campus' : 'active-groovelab') : ''}`}
+          onClick={() => setMobileSecretaryDrawerOpen(true)}
+        >
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Menu size={20} color="currentColor" />
+          </div>
+          <span>Menü</span>
+        </button>
+      </nav>
+
+      {/* ─── Mobile Slide-Over Drawer for Administration & Secretariat ─── */}
+      {mobileSecretaryDrawerOpen && (
+        <div 
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15, 23, 42, 0.65)',
+            backdropFilter: 'blur(12px)',
+            WebkitBackdropFilter: 'blur(12px)',
+            zIndex: 99999,
+            display: 'flex',
+            justifyContent: 'flex-end',
+            animation: 'fadeIn 0.2s ease'
+          }}
+          onClick={() => setMobileSecretaryDrawerOpen(false)}
+        >
+          <div 
+            style={{
+              width: '88%',
+              maxWidth: '380px',
+              height: '100%',
+              background: '#ffffff',
+              boxShadow: '-10px 0 30px rgba(0,0,0,0.2)',
+              padding: '24px 20px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '16px',
+              overflowY: 'auto',
+              boxSizing: 'border-box'
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Drawer Header */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #e2e8f0', paddingBottom: '14px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '1.1rem', fontWeight: 900, color: '#0f172a' }}>Verwaltung Menü</span>
+                <span style={{
+                  padding: '2px 8px',
+                  borderRadius: '100px',
+                  background: activeTab === 'secretary' ? '#fce8e6' : (activeTab === 'campus' ? '#e6f4ea' : '#fefce8'),
+                  color: activeTab === 'secretary' ? '#ea4335' : (activeTab === 'campus' ? '#34a853' : '#ca8a04'),
+                  fontSize: '0.68rem',
+                  fontWeight: 800
+                }}>
+                  {activeTab === 'secretary' ? '🛡️ Verwaltung' : (activeTab === 'campus' ? '🎓 Campus' : '🎵 GrooveLab')}
+                </span>
+              </div>
+              <button 
+                type="button"
+                onClick={() => setMobileSecretaryDrawerOpen(false)}
+                style={{ background: '#f1f5f9', border: 'none', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#64748b' }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* 1-Tap Module Switcher */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Modul wechseln:</span>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveTab('secretary');
+                    sessionStorage.setItem('groovelab_active_workspace', 'secretary');
+                  }}
+                  style={{
+                    padding: '8px 4px',
+                    borderRadius: '10px',
+                    border: activeTab === 'secretary' ? '1.5px solid #ea4335' : '1px solid #e2e8f0',
+                    background: activeTab === 'secretary' ? '#ea4335' : '#f8fafc',
+                    color: activeTab === 'secretary' ? '#ffffff' : '#475569',
+                    fontSize: '0.72rem',
+                    fontWeight: 800,
+                    cursor: 'pointer'
+                  }}
+                >
+                  🛡️ Verwaltung
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveTab('campus');
+                    sessionStorage.setItem('groovelab_active_workspace', 'campus');
+                  }}
+                  style={{
+                    padding: '8px 4px',
+                    borderRadius: '10px',
+                    border: activeTab === 'campus' ? '1.5px solid #34a853' : '1px solid #e2e8f0',
+                    background: activeTab === 'campus' ? '#34a853' : '#f8fafc',
+                    color: activeTab === 'campus' ? '#ffffff' : '#475569',
+                    fontSize: '0.72rem',
+                    fontWeight: 800,
+                    cursor: 'pointer'
+                  }}
+                >
+                  🎓 Campus
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveTab('groovelab');
+                    sessionStorage.setItem('groovelab_active_workspace', 'groovelab');
+                  }}
+                  style={{
+                    padding: '8px 4px',
+                    borderRadius: '10px',
+                    border: activeTab === 'groovelab' ? '1.5px solid #ca8a04' : '1px solid #e2e8f0',
+                    background: activeTab === 'groovelab' ? '#ca8a04' : '#f8fafc',
+                    color: activeTab === 'groovelab' ? '#ffffff' : '#475569',
+                    fontSize: '0.72rem',
+                    fontWeight: 800,
+                    cursor: 'pointer'
+                  }}
+                >
+                  🎵 GrooveLab
+                </button>
+              </div>
+            </div>
+
+            {/* Subtabs list for active module */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1, overflowY: 'auto' }}>
+              <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: '6px' }}>Funktionen &amp; Boards:</span>
+              
+              {activeTab === 'secretary' && [
+                { id: 'briefing', label: 'Briefing', icon: LayoutDashboard },
+                hasCampusSub && { 
+                  id: 'crisis', 
+                  label: 'Krisen-Dashboard', 
+                  icon: ShieldAlert, 
+                  count: (() => {
+                    const todayStart = new Date();
+                    todayStart.setHours(0,0,0,0);
+                    return crisisNotifications.filter(n => {
+                      if (n.status !== 'UNREAD') return false;
+                      if (!n.teacher || !n.teacher.sick_until) return false;
+                      const sickUntilTime = new Date(n.teacher.sick_until).getTime();
+                      if (sickUntilTime < todayStart.getTime()) return false;
+                      const isPast = new Date(n.slot_start_datetime).getTime() < todayStart.getTime();
+                      return !isPast;
+                    }).length;
+                  })()
+                },
+                hasCampusSub && { id: 'duties', label: 'Dienstliche Aufgaben', icon: FileText },
+                { id: 'rooms', label: 'Räume', icon: DoorOpen },
+                hasCampusSub && { id: 'equipment', label: 'Instrumente & Ausstattung', icon: Settings },
+                { id: 'employees', label: 'Mitarbeiter', icon: Users },
+                { id: 'licenses', label: 'Abrechnung & Infrastruktur', icon: Award },
+                { id: 'audit', label: 'Änderungsverlauf', icon: Clock },
+                { id: 'setup', label: 'Einstellungen', icon: Settings }
+              ].filter((item): item is any => !!item).map((item) => {
+                const Icon = item.icon;
+                const isSelected = secretarySubTab === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => {
+                      React.startTransition(() => {
+                        setSecretarySubTab(item.id as any);
+                      });
+                      setMobileSecretaryDrawerOpen(false);
+                    }}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px',
+                      padding: '10px 12px',
+                      borderRadius: '12px',
+                      border: 'none',
+                      background: isSelected ? '#fce8e6' : 'transparent',
+                      color: isSelected ? '#ea4335' : '#334155',
+                      fontWeight: isSelected ? 800 : 600,
+                      fontSize: '0.86rem',
+                      cursor: 'pointer',
+                      textAlign: 'left'
+                    }}
+                  >
+                    <Icon size={18} color={isSelected ? '#ea4335' : '#64748b'} />
+                    <span style={{ flex: 1 }}>{item.label}</span>
+                    {item.count !== undefined && item.count > 0 && (
+                      <span style={{
+                        background: '#ea4335',
+                        color: '#ffffff',
+                        fontSize: '0.68rem',
+                        fontWeight: 900,
+                        padding: '2px 8px',
+                        borderRadius: '100px'
+                      }}>
+                        {item.count}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+
+              {activeTab === 'campus' && [
+                { id: 'briefing', label: 'Startseite', icon: LayoutDashboard },
+                enabledCampusSubjects && { id: 'subjects', label: 'Unterrichtsfächer', icon: BookOpen },
+                { id: 'onboarding', label: 'Lehrer', icon: UserPlus },
+                { id: 'students', label: 'Schüler', icon: Users },
+                enabledCampusCooperations && { id: 'cooperations', label: 'Leihinstrumente', icon: Tag },
+                enabledCampusRooms && { id: 'rooms', label: 'Räume', icon: DoorOpen },
+                enabledCampusEvents && { id: 'events', label: 'Termine', icon: Calendar },
+                enabledCampusSchedules && { id: 'schedules', label: 'Stundenpläne', count: pendingSchedules.length, icon: Calendar },
+                { id: 'status', label: 'Einstellungen', icon: Sliders }
+              ].filter((item): item is any => !!item).map((item) => {
+                const Icon = item.icon;
+                const isSelected = campusSubTab === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => {
+                      setCampusSubTab(item.id as any);
+                      setMobileSecretaryDrawerOpen(false);
+                    }}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px',
+                      padding: '10px 12px',
+                      borderRadius: '12px',
+                      border: 'none',
+                      background: isSelected ? '#e6f4ea' : 'transparent',
+                      color: isSelected ? '#34a853' : '#334155',
+                      fontWeight: isSelected ? 800 : 600,
+                      fontSize: '0.86rem',
+                      cursor: 'pointer',
+                      textAlign: 'left'
+                    }}
+                  >
+                    <Icon size={18} color={isSelected ? '#34a853' : '#64748b'} />
+                    <span style={{ flex: 1 }}>{item.label}</span>
+                    {item.count !== undefined && item.count > 0 && (
+                      <span style={{
+                        background: '#34a853',
+                        color: '#ffffff',
+                        fontSize: '0.68rem',
+                        fontWeight: 900,
+                        padding: '2px 8px',
+                        borderRadius: '100px'
+                      }}>
+                        {item.count}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+
+              {activeTab === 'groovelab' && [
+                { id: 'live', label: 'Live Lab', icon: Monitor },
+                { id: 'coaches', label: 'Lehrer', icon: GraduationCap },
+                { id: 'students', label: 'Schüler', icon: Users },
+                { id: 'settings', label: 'Einstellungen', icon: Settings }
+              ].map((item) => {
+                const Icon = item.icon;
+                const isSelected = groovelabSubTab === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => {
+                      setGroovelabSubTab(item.id as any);
+                      setMobileSecretaryDrawerOpen(false);
+                    }}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px',
+                      padding: '10px 12px',
+                      borderRadius: '12px',
+                      border: 'none',
+                      background: isSelected ? '#fefce8' : 'transparent',
+                      color: isSelected ? '#ca8a04' : '#334155',
+                      fontWeight: isSelected ? 800 : 600,
+                      fontSize: '0.86rem',
+                      cursor: 'pointer',
+                      textAlign: 'left'
+                    }}
+                  >
+                    <Icon size={18} color={isSelected ? '#ca8a04' : '#64748b'} />
+                    <span style={{ flex: 1 }}>{item.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Quick Actions Footer in Drawer */}
+            <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '14px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setMobileSecretaryDrawerOpen(false);
+                  setShowOwnQrModal(true);
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '9px 12px',
+                  borderRadius: '10px',
+                  border: '1px solid rgba(234, 67, 53, 0.25)',
+                  background: 'rgba(234, 67, 53, 0.08)',
+                  color: '#ea4335',
+                  fontSize: '0.80rem',
+                  fontWeight: 800,
+                  cursor: 'pointer'
+                }}
+              >
+                <QrCode size={16} /> <span>Ausweis zeigen</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setMobileSecretaryDrawerOpen(false);
+                  setIsFeedbackModalOpen(true);
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '9px 12px',
+                  borderRadius: '10px',
+                  border: '1px solid #e2e8f0',
+                  background: '#f8fafc',
+                  color: '#475569',
+                  fontSize: '0.80rem',
+                  fontWeight: 700,
+                  cursor: 'pointer'
+                }}
+              >
+                <Lightbulb size={16} /> <span>Feedback &amp; Ideen</span>
+              </button>
+
+              {onLogout && (
+                <button
+                  type="button"
+                  onClick={onLogout}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '9px 12px',
+                    borderRadius: '10px',
+                    border: '1px solid #fee2e2',
+                    background: '#fef2f2',
+                    color: '#ef4444',
+                    fontSize: '0.80rem',
+                    fontWeight: 800,
+                    cursor: 'pointer'
+                  }}
+                >
+                  <LogOut size={16} /> <span>Abmelden</span>
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ─── Approval Toast Notification ─── */}
       {approvalToast && (
         <div style={{ position: 'fixed', bottom: 28, left: '50%', transform: 'translateX(-50%)', zIndex: 9999, background: approvalToast.type === 'success' ? 'linear-gradient(135deg, #34a853, #22c55e)' : 'linear-gradient(135deg, #ea4335, #ef4444)', color: 'white', borderRadius: '16px', padding: '14px 24px', fontWeight: 700, fontSize: '0.9rem', boxShadow: '0 8px 32px rgba(0,0,0,0.2)', display: 'flex', alignItems: 'center', gap: 10, maxWidth: '90vw', whiteSpace: 'nowrap', animation: 'slideInUp 0.3s ease' }}>
@@ -37578,6 +38143,21 @@ status: status,
         onImportComplete={() => {
           fetchDashboardData();
         }}
+      />
+
+      {/* Personalisierbares Eltern-Informationsblatt (PDF) Modal */}
+      <ParentInfoSheetModal
+        isOpen={showParentInfoSheetModal}
+        onClose={() => setShowParentInfoSheetModal(false)}
+        schoolData={{
+          name: schoolName || currentSchoolProfile?.name || 'Unsere Musikschule',
+          subdomain: currentSchoolProfile?.subdomain || '',
+          logo_url: currentSchoolProfile?.logo_url || '',
+          city: currentSchoolProfile?.city || '',
+          student_billing_option: currentSchoolProfile?.student_billing_option || 'school_all',
+          email: currentSchoolProfile?.email || ''
+        }}
+        activePlatformDefault={activeTab === 'campus' ? 'campus' : activeTab === 'groovelab' ? 'groovelab' : 'both'}
       />
 
       {/* Interaktives In-App Leitfaden & Eltern-Info Modal */}

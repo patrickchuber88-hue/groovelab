@@ -143,14 +143,11 @@ Deno.serve(async (req) => {
       },
     })
 
-    // 1. Fetch user associated with this secure QR token or user ID (fallback)
-    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(token || '');
-    let userQuery = supabase.from('users').select('id, first_name, last_name, role, school_id');
-    if (isUuid) {
-      userQuery = userQuery.or(`qr_token.eq.${token},id.eq.${token}`);
-    } else {
-      userQuery = userQuery.eq('qr_token', token);
-    }
+    // 1. Fetch user strictly by their secret QR token or dedicated teacher token (prevent ID guessing)
+    const userQuery = supabase
+      .from('users')
+      .select('id, first_name, last_name, role, school_id')
+      .or(`qr_token.eq.${token},teacher_qr_token.eq.${token}`);
     const { data: user, error: userErr } = await userQuery.maybeSingle();
 
     if (userErr) {

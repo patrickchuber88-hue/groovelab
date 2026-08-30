@@ -16,6 +16,19 @@ serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
     const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+    const expectedAnonKey = Deno.env.get("SUPABASE_ANON_KEY") || "";
+
+    // Enterprise Auth-Guard: Verify caller is authenticated
+    const authHeader = req.headers.get("Authorization") || req.headers.get("apikey") || "";
+    const bearerToken = authHeader.replace("Bearer ", "").trim();
+
+    if (!bearerToken || (bearerToken !== expectedAnonKey && bearerToken !== expectedServiceRoleKey)) {
+      return new Response(JSON.stringify({ error: "Unauthorized: Valid API key or Authorization token required" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
 
     const { userId, title, body, url, notificationId } = await req.json();

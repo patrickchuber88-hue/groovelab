@@ -99,6 +99,36 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
   const [cascadeLink, setCascadeLink] = useState('');
   const [copiedLink, setCopiedLink] = useState(false);
   const [studentForPinReset, setStudentForPinReset] = useState<any>(null);
+  const [pinResetNewPin, setPinResetNewPin] = useState('');
+  const [pinResetSaving, setPinResetSaving] = useState(false);
+  const [pinResetCopied, setPinResetCopied] = useState(false);
+  const [pinResetSuccess, setPinResetSuccess] = useState(false);
+
+  const handleSaveStudentPin = async () => {
+    if (!studentForPinReset || !pinResetNewPin || pinResetNewPin.length !== 4) return;
+    setPinResetSaving(true);
+    try {
+      await supabase
+        .from('users')
+        .update({
+          personal_pin: pinResetNewPin,
+          is_pin_activated: true,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', studentForPinReset.id);
+
+      setPinResetSuccess(true);
+      setTimeout(() => {
+        setPinResetSuccess(false);
+        setStudentForPinReset(null);
+        setPinResetNewPin('');
+      }, 1500);
+    } catch (err) {
+      console.error('[CampusTeacherDashboard] Error resetting student PIN:', err);
+    } finally {
+      setPinResetSaving(false);
+    }
+  };
   const [isListeningVoice, setIsListeningVoice] = useState(false);
 
   // Fast-Track Voice-to-Homework Diktat (Web Speech API)
@@ -3696,6 +3726,140 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
           setIsFeedbackModalOpen(true);
         }}
       />
+
+      {/* Student PIN-Reset & Ausweis-Link Modal */}
+      {studentForPinReset && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fadeIn">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl space-y-6 relative">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-3 bg-emerald-500/10 text-emerald-400 rounded-2xl border border-emerald-500/20">
+                  <KeyRound size={24} />
+                </div>
+                <div>
+                  <h3 className="text-lg font-black text-white">Schüler-PIN & Ausweis</h3>
+                  <p className="text-xs font-bold text-slate-400">
+                    {studentForPinReset.first_name} {maskLastName(studentForPinReset.last_name)} ({studentForPinReset.instrument || 'Musiker'})
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setStudentForPinReset(null);
+                  setPinResetNewPin('');
+                  setPinResetSuccess(false);
+                }}
+                className="p-2 text-slate-400 hover:text-white rounded-xl bg-slate-800 hover:bg-slate-700 transition"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div className="p-4 bg-slate-950/60 border border-slate-800/80 rounded-2xl space-y-2">
+                <div className="flex justify-between items-center text-xs">
+                  <span className="text-slate-400 font-bold uppercase tracking-wider">Ausweis-ID:</span>
+                  <span className="font-mono font-bold text-emerald-400 bg-emerald-950/40 px-2.5 py-1 rounded-lg border border-emerald-800/40">
+                    {studentForPinReset.ausweis_id || studentForPinReset.id?.slice(0, 8).toUpperCase() || '—'}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center text-xs">
+                  <span className="text-slate-400 font-bold uppercase tracking-wider">PIN-Status:</span>
+                  <span className={`font-bold px-2 py-0.5 rounded-lg text-[11px] ${
+                    studentForPinReset.is_pin_activated 
+                      ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
+                      : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                  }`}>
+                    {studentForPinReset.is_pin_activated ? '✓ Eingerichtet' : 'Noch nicht gesetzt'}
+                  </span>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-black text-slate-300 uppercase tracking-wider mb-2">
+                  Neuen 4-stelligen PIN festlegen:
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    maxLength={4}
+                    value={pinResetNewPin}
+                    onChange={(e) => setPinResetNewPin(e.target.value.replace(/\D/g, ''))}
+                    placeholder="z. B. 1234"
+                    className="flex-1 px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-center text-xl font-mono tracking-widest text-white placeholder-slate-600 focus:outline-none focus:border-emerald-500 transition"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const randomPin = Math.floor(1000 + Math.random() * 9000).toString();
+                      setPinResetNewPin(randomPin);
+                    }}
+                    className="px-3.5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl text-xs font-bold flex items-center gap-1.5 border border-slate-700 transition"
+                  >
+                    <RefreshCw size={14} /> Zufall
+                  </button>
+                </div>
+              </div>
+
+              <div className="pt-2 flex flex-col gap-2">
+                <button
+                  type="button"
+                  disabled={pinResetSaving || pinResetNewPin.length !== 4}
+                  onClick={handleSaveStudentPin}
+                  className={`w-full py-3 rounded-2xl text-xs font-black uppercase tracking-wider shadow-lg flex items-center justify-center gap-2 transition ${
+                    pinResetSuccess
+                      ? 'bg-emerald-500 text-slate-950'
+                      : pinResetNewPin.length === 4
+                      ? 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-emerald-500/20'
+                      : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                  }`}
+                >
+                  {pinResetSuccess ? (
+                    <>
+                      <Check size={16} />
+                      <span>PIN erfolgreich gespeichert!</span>
+                    </>
+                  ) : pinResetSaving ? (
+                    <>
+                      <RefreshCw size={16} className="animate-spin" />
+                      <span>Wird gespeichert...</span>
+                    </>
+                  ) : (
+                    <>
+                      <KeyRound size={16} />
+                      <span>PIN jetzt zuweisen</span>
+                    </>
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const directLink = `${window.location.origin}/student-signup?student_id=${studentForPinReset.id}`;
+                    navigator.clipboard.writeText(directLink);
+                    setPinResetCopied(true);
+                    setTimeout(() => setPinResetCopied(false), 2000);
+                  }}
+                  className="w-full py-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-bold border border-slate-700/60 flex items-center justify-center gap-1.5 transition"
+                >
+                  {pinResetCopied ? (
+                    <>
+                      <Check size={14} className="text-emerald-400" />
+                      <span className="text-emerald-400">Ausweis-Link kopiert!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy size={14} />
+                      <span>Direkt-Aktivierungslink kopieren</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

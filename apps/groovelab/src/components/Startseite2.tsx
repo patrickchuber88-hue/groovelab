@@ -250,7 +250,10 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
               onMouseLeave={() => setHoveredMenu(null)}
               style={{ position: 'relative', padding: '8px 0' }}
             >
-              <button style={{
+              <button 
+                type="button"
+                onClick={() => setHoveredMenu(hoveredMenu === 'funktionen' ? null : 'funktionen')}
+                style={{
                 background: 'none',
                 border: 'none',
                 cursor: 'pointer',
@@ -301,7 +304,10 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
               onMouseLeave={() => setHoveredMenu(null)}
               style={{ position: 'relative', padding: '8px 0' }}
             >
-              <button style={{
+              <button 
+                type="button"
+                onClick={() => setHoveredMenu(hoveredMenu === 'zielgruppen' ? null : 'zielgruppen')}
+                style={{
                 background: 'none',
                 border: 'none',
                 cursor: 'pointer',
@@ -2168,7 +2174,7 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
                       <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
                         <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#34a853' }}>§ 11 NAMENSANONYMISIERUNG & PROFILAUSWAHL</h4>
                         <p style={{ margin: 0 }}><strong>1. Namensmaskierung:</strong> Schülernamen werden im Lehrer-Dashboard auf „Vorname + Anfangsbuchstabe Nachname“ und im Schüler-Dashboard auf generische Begriffe (z. B. „Hausaufgabenheft“) begrenzt.</p>
-                        <p style={{ margin: '4px 0 0 0' }}><strong>2. Profilauswahl (Familien-Sharing):</strong> Zur Vereinfachung des Zugangs für Familien mit mehreren Kindern im Haushalt wird eine PIN-lose Profil-Schnellwahl (analog dem Netflix-Prinzip) im Campus-Modul gestattet.</p>
+                        <p style={{ margin: '4px 0 0 0' }}><strong>2. Profilauswahl (Familien-Sharing):</strong> Zur Vereinfachung des Zugangs für Familien mit mehreren Kindern im Haushalt wird eine PIN-lose Profil-Schnellwahl (1-Klick Familien-Schnellwechsel) im Campus-Modul gestattet.</p>
                       </div>
                     </div>
                   </div>

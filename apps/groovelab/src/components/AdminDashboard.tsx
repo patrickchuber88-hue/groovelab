@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase, deleteUserStorageAssets } from '../lib/supabase';
-import { Music, Calendar, AlertCircle, Library, Shield, ShieldCheck, LogOut, Users, User, Monitor, QrCode, Plus, Pencil, Trash2, Box, BarChart as LucideBarChart, Clock, Star, PieChart as LucidePieChart, TrendingUp, Tablet, ExternalLink, Settings, Search, Bell, MapPin, X, Printer, Award, Download, Mic, Check, CheckCircle2, ChevronLeft, ChevronRight, ChevronDown, GripVertical, BookOpen, Maximize2, ArrowLeft, GraduationCap, Lock, Activity, Zap, RefreshCw, Sliders, VolumeX, Copy, Eye, EyeOff, School, Lightbulb, Disc, XCircle, Volume2 } from 'lucide-react';
+import { Music, Calendar, AlertCircle, Library, Shield, ShieldCheck, LogOut, Users, User, Monitor, QrCode, Plus, Pencil, Trash2, Box, BarChart as LucideBarChart, Clock, Star, PieChart as LucidePieChart, TrendingUp, Tablet, ExternalLink, Settings, Search, Bell, MapPin, X, Printer, Award, Download, Mic, Check, CheckCircle2, ChevronLeft, ChevronRight, ChevronDown, GripVertical, BookOpen, Maximize2, ArrowLeft, GraduationCap, Lock, Activity, Zap, RefreshCw, Sliders, VolumeX, Copy, Eye, EyeOff, School, Lightbulb, Disc, XCircle, Volume2, FileText } from 'lucide-react';
 import { 
   ResponsiveContainer,
   BarChart as RechartsBarChart, Bar, XAxis, Tooltip, Cell,
@@ -23,6 +23,7 @@ import { deleteStudentFully } from '../utils/studentDeletionService';
 import { AVVModal } from './AVVModal';
 import { FeedbackHubModal } from './feedback/FeedbackHubModal';
 import { HelpCenterModal } from './help/HelpCenterModal';
+import { ParentInfoSheetModal } from './modals/ParentInfoSheetModal';
 import { 
   fetchSchoolRoster, 
   getTeacherRoster, 
@@ -1679,6 +1680,7 @@ export function AdminDashboard({
   
   const [showAddStudent, setShowAddStudent] = useState(false);
   const [showBulkAddStudents, setShowBulkAddStudents] = useState(false);
+  const [showParentInfoSheetModal, setShowParentInfoSheetModal] = useState(false);
   const [bulkInput, setBulkInput] = useState('');
   const [parsedStudents, setParsedStudents] = useState<{ firstName: string; lastName: string; instrument: string }[]>([]);
   const [defaultInstrumentForBulk, setDefaultInstrumentForBulk] = useState('Gitarre');
@@ -5530,6 +5532,32 @@ export function AdminDashboard({
                   >
                     {showRealNames ? <EyeOff size={14} /> : <Eye size={14} />}
                     <span>{showRealNames ? "Namen maskieren" : "Namen anzeigen"}</span>
+                  </button>
+                  <button
+                    onClick={() => setShowParentInfoSheetModal(true)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px',
+                      borderRadius: '12px',
+                      padding: '8px 14px',
+                      fontSize: '0.82rem',
+                      fontWeight: 800,
+                      background: '#ffffff',
+                      border: '1px solid #cbd5e1',
+                      color: '#0f172a',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      height: '38px',
+                      width: windowWidth < 768 ? '100%' : 'auto',
+                      boxSizing: 'border-box'
+                    }}
+                    className="hover-scale"
+                    title="Druckfertiges 1-Seiter Eltern-Infoblatt mit Schullogo &amp; QR-Code als PDF herunterladen oder drucken"
+                  >
+                    <FileText size={14} color="#059669" />
+                    <span>Eltern-Infoblatt (PDF)</span>
                   </button>
                   {!showAddStudent && (
                     <button
@@ -13046,7 +13074,7 @@ export function AdminDashboard({
         <div style={{ marginTop: '0px', display: 'flex', flexDirection: 'column', gap: isMobile ? '16px' : '24px', width: '100%', maxWidth: '100%', boxSizing: 'border-box', overflowX: 'hidden', paddingBottom: isMobile ? '120px' : '0px' }}>
           {/* Top Section: Header & Contribution */}
           <div className="pwa-adaptive-grid" style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '2.2fr 1.2fr', gap: isMobile ? '16px' : '32px', alignItems: 'stretch', width: '100%', boxSizing: 'border-box' }}>
-            {/* Top Left: Header and 3 Focused Pedagogical Hero Cards (Tier-1 Apple Goldstandard) */}
+            {/* Top Left: Header and 3 Focused Pedagogical Hero Cards (Tier-1 Apple Master-Standard) */}
             <div className="glass-panel" style={{ padding: isMobile ? '16px' : '20px 24px', background: 'white', borderRadius: isMobile ? '24px' : '32px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', width: '100%', boxSizing: 'border-box' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '18px' }}>
                 <div style={{ width: '48px', height: '48px', borderRadius: '14px', background: `${brandColor}15`, color: brandColor, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -15800,6 +15828,22 @@ export function AdminDashboard({
           setStudents(prev => prev.filter(s => s.id !== studentId));
         }}
       />
+      
+      {/* Personalisierbares Eltern-Informationsblatt (PDF) Modal */}
+      <ParentInfoSheetModal
+        isOpen={showParentInfoSheetModal}
+        onClose={() => setShowParentInfoSheetModal(false)}
+        schoolData={{
+          name: schoolObj?.name || (admin?.schools ? (Array.isArray(admin.schools) ? admin.schools[0]?.name : admin.schools?.name) : '') || 'Unsere Musikschule',
+          subdomain: schoolObj?.subdomain || '',
+          logo_url: schoolObj?.logo_url || '',
+          city: schoolObj?.city || '',
+          student_billing_option: schoolObj?.student_billing_option || 'school_all',
+          email: schoolObj?.email || admin?.email || ''
+        }}
+        activePlatformDefault={activePlatform === 'campus' ? 'campus' : activePlatform === 'groovelab' ? 'groovelab' : 'both'}
+      />
+
       {renderQRModal()}
       {selectedTimetableStudent && (
         <StudentScheduleSlotsModal

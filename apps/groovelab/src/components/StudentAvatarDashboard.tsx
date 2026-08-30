@@ -1470,6 +1470,14 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
   const [isAppUser, setIsAppUser] = useState(false);
   const [isPremiumUser, setIsPremiumUser] = useState(false);
   const [avatarFromDb, setAvatar] = useState<Avatar | null>(null);
+  const [hasMasteryCrown, setHasMasteryCrown] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem(`campus_mastery_complete_${studentId}`) === 'true' ||
+        localStorage.getItem(`campus_mastery_complete_${studentUser?.id}`) === 'true';
+    } catch {
+      return false;
+    }
+  });
   const avatar = avatarFromDb || {
     avatar_style: 'standard',
     instrument_type: studentUser?.instrument || 'Guitar',
@@ -5588,13 +5596,18 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
         setAvatar((prev: any) => prev ? { ...prev, xp: (prev.xp || 0) + customEvent.detail.amount } : prev);
       }
     };
+    const handleMasteryCompleteAwarded = () => {
+      setHasMasteryCrown(true);
+    };
     window.addEventListener('homework-updated', handleHomeworkUpdate);
     window.addEventListener('campus-xp-awarded', handleCampusXpAwarded);
+    window.addEventListener('campus_mastery_complete_awarded', handleMasteryCompleteAwarded);
 
     return () => {
       supabase.removeChannel(channel);
       window.removeEventListener('homework-updated', handleHomeworkUpdate);
       window.removeEventListener('campus-xp-awarded', handleCampusXpAwarded);
+      window.removeEventListener('campus_mastery_complete_awarded', handleMasteryCompleteAwarded);
     };
   }, [studentId]);
 
@@ -17860,7 +17873,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                       // 2. Also incorporate items from progressItems (songs, theory, database rows) and songs state
                       const otherActiveHWItems: any[] = [];
                       (progressItems || []).forEach(item => {
-                        if (item.topic_name.startsWith('Hausaufgabe KW ')) return;
+                        if (!item.topic_name || item.topic_name.startsWith('Hausaufgabe KW ')) return;
                         if (item.topic_name.includes(' - Seite ')) {
                           const parts = item.topic_name.split(' - Seite ');
                           const bookTitle = cleanTitle(parts[0].trim());
@@ -17888,13 +17901,14 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                               });
                             }
                           }
+                        } else {
                           const localHw = localStorage.getItem(`song_hw_${studentId}_${item.id}`) ??
                                           (item.song_id ? localStorage.getItem(`song_hw_${studentId}_${item.song_id}`) : null);
                           if (localHw !== 'false') {
                             const isSongHw = (localHw === 'true') || Boolean(item.is_current_homework);
                             if (isSongHw) {
                               const cleanT = cleanTitle(item.topic_name.replace(/\s*\([^)]*\)\s*$/, ''));
-                              if (!otherActiveHWItems.some(existing => cleanTitle(existing.topic_name.replace(/\s*\([^)]*\)\s*$/, '')) === cleanT)) {
+                              if (!otherActiveHWItems.some(existing => cleanTitle((existing.topic_name || existing.title || '').replace(/\s*\([^)]*\)\s*$/, '')) === cleanT)) {
                                 let cachedNote = localStorage.getItem(`song_note_${studentId}_${item.id}`) ||
                                                  localStorage.getItem(`song_note_${studentId}_${item.song_id}`) ||
                                                  item.homework_notes || '';
@@ -17929,6 +17943,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                         if (isHw) {
                           const songArtist = skill.songs?.artist || skill.artist || '';
                           const songTitle = skill.songs?.title || skill.title || skill.song_title || 'Song';
+                          if (songTitle.includes(' - Seite ') || songTitle.startsWith('Hausaufgabe KW ')) return;
                           const songInstrument = skill.instrument ? ` (${skill.instrument})` : '';
                           const fullTitle = songArtist ? `${songArtist} - ${songTitle}${songInstrument}` : `${songTitle}${songInstrument}`;
                           const cleanT = cleanTitle(fullTitle);
@@ -19318,6 +19333,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                         if (isHw) {
                           const songArtist = skill.songs?.artist || skill.artist || '';
                           const songTitle = skill.songs?.title || skill.title || skill.song_title || 'Song';
+                          if (songTitle.includes(' - Seite ') || songTitle.startsWith('Hausaufgabe KW ')) return;
                           const songInstrument = skill.instrument ? ` (${skill.instrument})` : '';
                           const fullTitle = songArtist ? `${songArtist} - ${songTitle}${songInstrument}` : `${songTitle}${songInstrument}`;
                           const cleanT = cleanTitle(fullTitle);
@@ -20943,11 +20959,31 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
               <h3 style={{ fontSize: '28px', fontWeight: 900, color: '#1e293b', margin: 0 }}>
                 Mein Avatar
               </h3>
-              {xpActive && (
-                <span style={{ color: '#0b57d0', fontWeight: 700, fontSize: '0.78rem', textTransform: 'uppercase', display: 'inline-flex', alignItems: 'center', gap: '6px', marginTop: '6px' }}>
-                  <Award size={13} /> {levelTitle}
-                </span>
-              )}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', flexWrap: 'wrap', marginTop: '6px' }}>
+                {xpActive && (
+                  <span style={{ color: '#0b57d0', fontWeight: 700, fontSize: '0.78rem', textTransform: 'uppercase', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                    <Award size={13} /> {levelTitle}
+                  </span>
+                )}
+                {hasMasteryCrown && (
+                  <span style={{
+                    background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
+                    border: '1px solid #f59e0b',
+                    color: '#92400e',
+                    fontWeight: 900,
+                    fontSize: '0.74rem',
+                    padding: '2px 10px',
+                    borderRadius: '100px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    boxShadow: '0 2px 8px rgba(245, 158, 11, 0.2)'
+                  }}>
+                    <span>👑</span>
+                    <span>Meister-Abschluss (10/10)</span>
+                  </span>
+                )}
+              </div>
             </div>
 
             {/* XP Progress Bar */}
@@ -23648,12 +23684,12 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                   Familien-Profile &amp; Geschwister (Schnellwechsel)
                                 </div>
                                 <div style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 500, lineHeight: 1.35, marginTop: '2px' }}>
-                                  Wähle dein Profil – genau wie bei Netflix oder Disney+ ohne erneute PIN-Eingabe.
+                                  Wähle dein Profil: Wechsle per Fingertipp blitzschnell zwischen Geschwisterprofilen – ohne ständige PIN-Eingabe.
                                 </div>
                               </div>
                             </div>
 
-                            {/* Netflix-Style Profile Carousel / Stage */}
+                            {/* Family Profiles Carousel / Stage */}
                             <div style={{ 
                               display: 'flex', 
                               alignItems: 'flex-start',
@@ -28227,6 +28263,15 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
           }}
         />
       )}
+
+      {/* Leitfäden & Akademie Modal für Schüler & Eltern */}
+      <HelpCenterModal
+        isOpen={isHelpCenterOpen}
+        onClose={() => setIsHelpCenterOpen(false)}
+        userRole="student"
+        activePlatform={currentPlatform}
+        schoolName={resolvedSchoolName || 'Meine Musikschule'}
+      />
 
       <TourComponent />
     </div>

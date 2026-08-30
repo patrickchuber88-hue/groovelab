@@ -278,36 +278,25 @@ export const Startseite: React.FC<StartseiteProps> = ({
           p_username: 'admin',
           p_password: cleanKey
         });
-        if (rpcUser && rpcUser.id) {
+        if (rpcUser && rpcUser.id && rpcUser.is_master_admin === true) {
           user = rpcUser;
         }
       } catch (rpcErr) {
         console.warn('RPC master login check:', rpcErr);
       }
 
-      // 2. Token & Keyword Fallback
+      // 2. Strict Fallback: Only exact match against master_admin_password where is_master_admin is true
       if (!user) {
-        if (cleanKey === 'ROOT_KIOSK_A98F72_MSTR' || cleanKey === 'admin' || cleanKey.toLowerCase() === 'master') {
-          const { data: adminData } = await supabase
-            .from('users')
-            .select('id, role, is_master_admin, school_id, first_name, last_name, ausweis_nummer, qr_token, teacher_qr_token')
-            .or('is_master_admin.eq.true,role.eq.admin,first_name.ilike.%Patrick%')
-            .limit(1)
-            .maybeSingle();
-          user = adminData || { id: '51d4611d-091f-4d62-b0ff-4259bb34ac90', role: 'admin', is_master_admin: true };
-        } else {
-          // Safe lookup: Only query UUID columns if cleanKey is a valid UUID
-          const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cleanKey);
-          let query = supabase.from('users').select('id, role, is_master_admin, school_id, first_name, last_name, ausweis_nummer, qr_token, teacher_qr_token, master_admin_password');
-          if (isUuid) {
-            query = query.or(`qr_token.eq.${cleanKey},teacher_qr_token.eq.${cleanKey},id.eq.${cleanKey}`);
-          } else {
-            query = query.or(`ausweis_nummer.eq.${cleanKey},master_admin_password.eq.${cleanKey}`);
-          }
-          const { data: matchedUser } = await query.maybeSingle();
-          if (matchedUser && (matchedUser.is_master_admin === true || matchedUser.role === 'admin' || matchedUser.first_name === 'Patrick' || matchedUser.master_admin_password === cleanKey)) {
-            user = matchedUser;
-          }
+        const { data: matchedUser } = await supabase
+          .from('users')
+          .select('id, role, is_master_admin, school_id, first_name, last_name, ausweis_nummer, qr_token, teacher_qr_token, master_admin_password')
+          .eq('is_master_admin', true)
+          .eq('master_admin_password', cleanKey)
+          .limit(1)
+          .maybeSingle();
+
+        if (matchedUser && matchedUser.is_master_admin === true && matchedUser.master_admin_password === cleanKey) {
+          user = matchedUser;
         }
       }
 

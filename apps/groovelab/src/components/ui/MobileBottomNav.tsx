@@ -468,7 +468,14 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
       <nav className="cg-mobile-bottom-nav">
         {menuItems.map(item => {
           const TabIcon = item.icon;
-          const isActive = activeTab === item.id;
+          const isActive = activeTab === item.id || 
+            (item.id === 'briefing' && (activeTab === 'live' || activeTab === 'compass')) ||
+            (item.id === 'homework_book' && (activeTab === 'tasks' || activeTab === 'homework')) ||
+            (item.id === 'practice_board' && (activeTab === 'practice' || activeTab === 'focus_timer' || activeTab === 'loopstation')) ||
+            (item.id === 'mediathek' && (activeTab === 'songs' || activeTab === 'library')) ||
+            (item.id === 'songs' && activeTab === 'mediathek') ||
+            (item.id === 'events' && (activeTab === 'termine' || activeTab === 'all_appointments')) ||
+            (item.id === 'campus_cup' && (activeTab === 'ranking' || activeTab === 'performance'));
           return (
             <button
               key={item.id}

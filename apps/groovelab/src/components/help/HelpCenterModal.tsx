@@ -4,9 +4,10 @@ import {
   Layers, Lightbulb, HelpCircle, Calendar, Shield, Users, 
   Music, Tablet, Clock, Award, ExternalLink, Copy, Check,
   School, Zap, ChevronDown, ChevronUp, Printer, FileText,
-  Sliders, MessageSquare, Flame, Smartphone, Lock
+  Sliders, MessageSquare, Flame, Smartphone, Lock, Download
 } from 'lucide-react';
 import { LEGAL_MASTER_WORDING } from '../../constants/legalMasterWording';
+import { generateParentQuickstartPDF, generateTeacherQuickstartPDF, generateConsentPDF } from '../../utils/pdfGenerator';
 
 export type HelpUserRole = 'admin' | 'secretary' | 'teacher' | 'student';
 export type HelpPlatform = 'campus' | 'groovelab' | 'admin' | 'admin_desk' | string;
@@ -77,6 +78,55 @@ export const HelpCenterModal: React.FC<HelpCenterModalProps> = ({
     setTimeout(() => setCopiedText(null), 2500);
   };
 
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const [downloadSuccess, setDownloadSuccess] = useState<string | null>(null);
+
+  const handleDownloadParentPdf = async () => {
+    setIsGeneratingPdf(true);
+    try {
+      await generateParentQuickstartPDF({
+        schoolName,
+        activePlatform: activePlatform === 'groovelab' ? 'groovelab' : activePlatform === 'campus' ? 'campus' : 'both',
+        contactEmail: ''
+      });
+      setDownloadSuccess('parent');
+      setTimeout(() => setDownloadSuccess(null), 3000);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  };
+
+  const handleDownloadTeacherPdf = async () => {
+    setIsGeneratingPdf(true);
+    try {
+      await generateTeacherQuickstartPDF(schoolName);
+      setDownloadSuccess('teacher');
+      setTimeout(() => setDownloadSuccess(null), 3000);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  };
+
+  const handleDownloadConsentPdf = async () => {
+    setIsGeneratingPdf(true);
+    try {
+      await generateConsentPDF(
+        schoolName,
+        activePlatform === 'groovelab' ? 'groovelab' : activePlatform === 'campus' ? 'campus' : 'both'
+      );
+      setDownloadSuccess('consent');
+      setTimeout(() => setDownloadSuccess(null), 3000);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  };
+
   // Comprehensive Guide Database
   const GUIDES_DATABASE: GuideItem[] = useMemo(() => [
     // ----------------- QUICKSTART GUIDES -----------------
@@ -84,10 +134,10 @@ export const HelpCenterModal: React.FC<HelpCenterModalProps> = ({
       id: 'qs-admin-school-setup',
       title: 'Musikschule schlüsselfertig einrichten (In 4 Schritten)',
       category: 'quickstart',
-      roles: ['admin', 'secretary'],
-      badge: 'Goldstandard',
-      summary: 'Die offizielle 10-Minuten-Anleitung für Schulleitung und Verwaltung.',
-      tags: ['start', 'schule', 'registrierung', 'räume', 'lehrer', 'schüler', 'pin'],
+      roles: ['admin'],
+      badge: 'Schulleitung',
+      summary: 'Die offizielle 10-Minuten-Anleitung für Schulleitung und Gesamtorganisation.',
+      tags: ['start', 'schule', 'registrierung', 'räume', 'lehrer', 'schüler', 'pin', 'admin'],
       steps: [
         {
           title: '1. Schulleitungs-Identität & Stammdaten sichern',
@@ -108,13 +158,40 @@ export const HelpCenterModal: React.FC<HelpCenterModalProps> = ({
       ]
     },
     {
+      id: 'qs-secretary-workflow',
+      title: 'Sekretariat-Schnellstart: Schülerverwaltung & Tagesbetrieb',
+      category: 'quickstart',
+      roles: ['secretary', 'admin'],
+      badge: 'Sekretariat',
+      summary: 'Schüleraufnahme, Raumbelegungen, Kiosk-Displays & Eltern-Infoblätter.',
+      tags: ['sekretariat', 'verwaltung', 'schüler', 'räume', 'stundenplan', 'kiosk', 'eltern'],
+      steps: [
+        {
+          title: '1. Schüler neu anlegen & Smart Import',
+          desc: 'Schüler einzeln erfassen oder per smarter CSV/Excel-Tabelle mit automatischer Namensmaskierung für DSGVO-Konformität importieren.'
+        },
+        {
+          title: '2. 1-Seiter Eltern-Infoblatt ausgeben',
+          desc: 'Über den Button "Eltern-Infoblatt (PDF)" den druckfertigen DIN A4 1-Seiter mit Schullogo und QR-Code als PDF herunterladen oder direkt drucken.'
+        },
+        {
+          title: '3. Raum-Engine & Kiosk-Tablets',
+          desc: 'Räume zuweisen und Belegungspläne prüfen. Tablets an Proberäumen aktualisieren sich automatisch bei Raumwechseln.'
+        },
+        {
+          title: '4. Rechnungsprüfung & Tarife',
+          desc: 'Im Bereich Verwaltung die monatliche Hosting- und Bereitstellungsaufstellung prüfen (0,00 € Software-Lizenz; reine Cloud-Infrastruktur).'
+        }
+      ]
+    },
+    {
       id: 'qs-teacher-first-lesson',
       title: 'Lehrkraft-Schnellstart: Dein erster Unterrichtstag',
       category: 'quickstart',
       roles: ['teacher', 'admin'],
-      badge: 'Lehrkräfte',
+      badge: 'Lehrkraft',
       summary: 'So nutzt du das Briefing-Board, das Schüler-Protokoll und das Play-Along Studio.',
-      tags: ['lehrer', 'unterricht', 'hausaufgabe', 'notizen', 'audio', 'aufnahme'],
+      tags: ['lehrer', 'unterricht', 'hausaufgabe', 'notizen', 'audio', 'aufnahme', 'playalong'],
       steps: [
         {
           title: '1. Zero-Mail Login',
@@ -130,7 +207,7 @@ export const HelpCenterModal: React.FC<HelpCenterModalProps> = ({
         },
         {
           title: '4. Play-Along Studio (Audio-Aufnahme)',
-          desc: 'Nimm im Play-Along Studio ein kurzes Hörbeispiel auf. Es wird sicher im Audio-Tresor gespeichert und erscheint beim Schüler immer auf der linken Seite.'
+          desc: 'Nimm im Play-Along Studio ein kurzes Hörbeispiel auf (bis zu 7 Minuten mit Audio-Tresor). Es erscheint beim Schüler immer auf der linken Seite.'
         }
       ]
     },
@@ -163,6 +240,87 @@ export const HelpCenterModal: React.FC<HelpCenterModalProps> = ({
     },
 
     // ----------------- FEATURE DEEP DIVES -----------------
+    {
+      id: 'feat-quick-audio',
+      title: '1-Click Audio-Hausaufgaben & 7-Minuten Audio-Tresor',
+      category: 'features',
+      roles: ['teacher', 'admin'],
+      badge: 'Studio',
+      summary: 'Lehrkraft-Aufnahmen, Multi-Takes, Begleitungen & bis zu 7 Minuten Aufnahmedauer.',
+      tags: ['audio', 'aufnahme', 'tresor', 'playalong', 'hausaufgabe', 'multi take'],
+      details: (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', fontSize: '0.86rem', color: '#334155', lineHeight: 1.6 }}>
+          <p>
+            Mit dem 1-Click Audio-Aufnahmewerkzeug im Tagesplan können Lehrkräfte ihren Schülern direkt im Unterricht Hörbeispiele, Begleitstimmen oder Metronom-Zähler mitgeben:
+          </p>
+          <div style={{ background: '#f8fafc', padding: '14px', borderRadius: '14px', border: '1px solid #e2e8f0' }}>
+            <h5 style={{ margin: '0 0 6px 0', color: '#0f172a', fontWeight: 800 }}>🎙️ Highlights für Lehrkräfte:</h5>
+            <ul style={{ margin: 0, paddingLeft: '20px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <li><strong>Multi-Take Recording:</strong> Beliebig viele Takes nacheinander aufnehmen (z. B. <em>Take 1: Melodie</em>, <em>Take 2: Begleitung</em>).</li>
+              <li><strong>Audio-Tresor (7 Minuten):</strong> Bei aktivem Speicher-Addon bis zu 7:00 Minuten pro Take für ganze Stücke und Sonaten.</li>
+              <li><strong>Automatische Zuordnung:</strong> Lehrkraft-Aufnahmen erscheinen beim Schüler immer auf der linken Seite des Aufgabenhefts.</li>
+            </ul>
+          </div>
+        </div>
+      )
+    },
+    {
+      id: 'feat-parent-info-sheet',
+      title: 'Personalisierbarer Elternbrief (PDF & Druck)',
+      category: 'features',
+      roles: ['admin', 'secretary', 'teacher', 'student'],
+      badge: 'Elternbrief',
+      summary: 'Druckfertiger 1-Seiter mit Schullogo, QR-Code & 100% DSGVO-Datenschutzgarantie.',
+      tags: ['eltern', 'elternbrief', 'infoblatt', 'pdf', 'druck', 'schullogo', 'qr', 'onboarding'],
+      details: (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', fontSize: '0.86rem', color: '#334155', lineHeight: 1.6 }}>
+          <p>
+            Der offizielle 1-seitige Elternbrief der Musikschule fasst alle wichtigen Informationen zur App-Nutzung, zum Datenschutz und zur Aktivierung kompakt zusammen:
+          </p>
+          <div style={{ background: '#f8fafc', padding: '14px', borderRadius: '14px', border: '1px solid #e2e8f0' }}>
+            <h5 style={{ margin: '0 0 6px 0', color: '#0f172a', fontWeight: 800 }}>📄 Enthaltene Inhalte:</h5>
+            <ul style={{ margin: 0, paddingLeft: '20px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <li><strong>Schul-Branding:</strong> Automatisches Einbinden des individuellen Musikschullogos und Schulnamens.</li>
+              <li><strong>Scharfer 300 DPI QR-Code:</strong> Führt Eltern direkt auf die schulspezifische Aktivierungsseite.</li>
+              <li><strong>Datenschutz-Garantie:</strong> Erklärung der Zero-Mail-Architektur (keine Passwörter, keine Werbe-Cookies).</li>
+            </ul>
+          </div>
+          <div style={{ display: 'flex', gap: '10px', marginTop: '4px' }}>
+            <button
+              onClick={handleDownloadParentPdf}
+              disabled={isGeneratingPdf}
+              style={{
+                flex: 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                padding: '11px 16px',
+                borderRadius: '12px',
+                background: themeColor,
+                color: '#ffffff',
+                border: 'none',
+                fontWeight: 800,
+                fontSize: '0.84rem',
+                cursor: isGeneratingPdf ? 'wait' : 'pointer',
+                boxShadow: `0 4px 12px ${themeColor}30`,
+                transition: 'all 0.15s ease'
+              }}
+            >
+              {downloadSuccess === 'parent' ? (
+                <>
+                  <Check size={16} /> Elternbrief heruntergeladen!
+                </>
+              ) : (
+                <>
+                  <Download size={16} /> Elternbrief (PDF) herunterladen
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      )
+    },
     {
       id: 'feat-schedule-board',
       title: 'Intelligenter Stundenplan-Designer & Raum-Engine',
@@ -198,7 +356,7 @@ export const HelpCenterModal: React.FC<HelpCenterModalProps> = ({
       details: (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', fontSize: '0.86rem', color: '#334155', lineHeight: 1.6 }}>
           <p>
-            Das Hausaufgabenheft folgt der ergonomischen Apple-Squircle-Blaupause für maximale Übersicht und Lesbarkeit:
+            Das Hausaufgabenheft folgt der ergonomischen Master-Blaupause für maximale Übersicht und Lesbarkeit:
           </p>
           <div style={{ background: '#f8fafc', padding: '14px', borderRadius: '14px', border: '1px solid #e2e8f0' }}>
             <h5 style={{ margin: '0 0 6px 0', color: '#0f172a', fontWeight: 800 }}>🎨 Design & Zuordnungsregeln:</h5>
@@ -260,6 +418,54 @@ export const HelpCenterModal: React.FC<HelpCenterModalProps> = ({
       )
     },
     {
+      id: 'feat-student-streaks-xp',
+      title: 'XP-Punkte, Level-Aufstieg & Übe-Serien',
+      category: 'features',
+      roles: ['student', 'teacher', 'admin'],
+      badge: 'Motivation',
+      summary: 'Wie du deine Flamme anfeuerst, Schutzschilde nutzt und Belohnungen freischaltest.',
+      tags: ['streak', 'xp', 'level', 'avatar', 'flamme', 'schutzschild', 'ferien'],
+      details: (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', fontSize: '0.86rem', color: '#334155', lineHeight: 1.6 }}>
+          <p>
+            Regelmäßiges Üben zahlt sich aus! Für jede Übe-Session mit dem Fokus-Timer erhältst du XP:
+          </p>
+          <div style={{ background: '#f8fafc', padding: '14px', borderRadius: '14px', border: '1px solid #e2e8f0' }}>
+            <h5 style={{ margin: '0 0 6px 0', color: '#0f172a', fontWeight: 800 }}>🔥 Übe-Streak & Schutzschilde:</h5>
+            <ul style={{ margin: 0, paddingLeft: '20px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <li><strong>Täglicher Streak:</strong> Übe täglich mit dem Timer, um deine Serie aufzubauen.</li>
+              <li><strong>3 wöchentliche Schutzschilde:</strong> Verhindern das Erlöschen deiner Flamme, wenn du einmal keine Zeit hast.</li>
+              <li><strong>Ferien-Booster (2× XP):</strong> In den Ferien friert dein Streak automatisch ein – wer freiwillig übt, sammelt doppelte XP!</li>
+            </ul>
+          </div>
+        </div>
+      )
+    },
+    {
+      id: 'feat-student-recordings-studio',
+      title: 'Dein eigenes Übe-Studio: Audio-Aufnahmen & Play-Alongs',
+      category: 'features',
+      roles: ['student', 'teacher', 'admin'],
+      badge: 'Übe-Studio',
+      summary: 'So nimmst du deine Übe-Erfolge auf und spielst zur Begleitung deiner Lehrkraft.',
+      tags: ['studio', 'aufnahme', 'playalong', 'loopstation', 'mikrofon', 'audio'],
+      details: (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', fontSize: '0.86rem', color: '#334155', lineHeight: 1.6 }}>
+          <p>
+            Im Übe-Studio kannst du deine eigenen Fortschritte festhalten und anhören:
+          </p>
+          <div style={{ background: '#f8fafc', padding: '14px', borderRadius: '14px', border: '1px solid #e2e8f0' }}>
+            <h5 style={{ margin: '0 0 6px 0', color: '#0f172a', fontWeight: 800 }}>🎧 Studio-Funktionen:</h5>
+            <ul style={{ margin: 0, paddingLeft: '20px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <li><strong>Eigene Aufnahmen:</strong> Drücke auf Aufnahme, spiele dein Stück ein und speichere es in deiner Liste.</li>
+              <li><strong>Begleit-Playalong:</strong> Spiele die Lehrkraft-Aufnahme (links) ab und nimm deine eigene Stimme (rechts) synchron dazu auf.</li>
+              <li><strong>Audio-Sicherheit:</strong> Deine Aufnahmen sind privat und nur für dich und deine Lehrkraft sichtbar.</li>
+            </ul>
+          </div>
+        </div>
+      )
+    },
+    {
       id: 'feat-groovelab-bands',
       title: 'GrooveLab-Modul: Bands, Songs & Skill-Radar',
       category: 'features',
@@ -285,18 +491,18 @@ export const HelpCenterModal: React.FC<HelpCenterModalProps> = ({
       )
     },
     {
-      id: 'faq-netflix-siblings',
-      title: 'Geschwisterkinder auf einem gemeinsamen iPad (Netflix-Prinzip)',
+      id: 'faq-family-multi-profile',
+      title: 'Familien-Schnellwechsel: Mehrere Geschwister auf einem gemeinsamen Tablet',
       category: 'faq',
       roles: ['student', 'teacher', 'admin'],
       badge: 'Familie',
       summary: 'Schneller 1-Klick Profilwechsel für mehrere Kinder ohne ständige PIN-Eingabe.',
-      tags: ['geschwister', 'familie', 'ipad', 'profil', 'wechsel', 'kinder', 'eltern'],
+      tags: ['geschwister', 'familie', 'tablet', 'profil', 'wechsel', 'kinder', 'eltern'],
       details: (
         <div style={{ fontSize: '0.86rem', color: '#334155', lineHeight: 1.6 }}>
           <p>
             Wenn mehrere Geschwisterkinder dieselbe Musikschule besuchen und sich ein Familien-Tablet teilen, 
-            funktioniert der Profilwechsel nach dem <strong>Netflix-Prinzip</strong>:
+            funktioniert der Profilwechsel über den integrierten <strong>Familien-Schnellwechsel</strong>:
           </p>
           <ul style={{ paddingLeft: '20px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
             <li>Einmal gekoppelte Geschwisterprofile können direkt über das Profil-Icon am oberen Bildschirmrand per Fingertipp gewechselt werden.</li>
@@ -425,6 +631,55 @@ export const HelpCenterModal: React.FC<HelpCenterModalProps> = ({
             Ihre Vereinbarung zur Auftragsverarbeitung (AVV) nach Art. 28 DSGVO ist direkt in der Plattform integriert. 
             Im DPO-Portal können Sie das rechtsgültige Dokument jederzeit einsehen, mit Ihren Schuldaten verknüpfen und als revisionssicheres PDF für Ihre Schulunterlagen exportieren.
           </p>
+        </div>
+      )
+    },
+    {
+      id: 'comp-teacher-gdpr',
+      title: 'DSGVO & Kindersicherheit im Musikunterricht (Art. 8)',
+      category: 'compliance',
+      roles: ['teacher', 'admin'],
+      badge: 'DSGVO Art. 8',
+      summary: 'Schülernamen-Anonymisierung, Zero-Mail & revisionssichere Audio-Isolation.',
+      tags: ['datenschutz', 'dsgvo', 'anonym', 'audio', 'tresor', 'kindersicherheit', 'lehrer'],
+      details: (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '0.86rem', color: '#334155', lineHeight: 1.6 }}>
+          <p>
+            Campus-Groovelab schützt minderjährige Musikschüler nach den strengsten europäischen Datenschutz-Richtlinien:
+          </p>
+          <div style={{ background: '#f8fafc', borderRadius: '14px', padding: '14px', border: '1px solid #e2e8f0' }}>
+            <h5 style={{ margin: '0 0 6px 0', color: '#0f172a', fontWeight: 800 }}>🛡️ Schutzmaßnahmen für Lehrkräfte:</h5>
+            <ul style={{ margin: 0, paddingLeft: '20px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <li><strong>Namens-Anonymisierung:</strong> Schülernamen werden automatisch als <em>„Vorname + N.“</em> dargestellt.</li>
+              <li><strong>Zero-Mail Schutz:</strong> Keine Erfassung von Schüler-E-Mail-Adressen oder Passwörtern erforderlich.</li>
+              <li><strong>Revisionssicherer Audio-Tresor:</strong> Gelöschte Übe-Takes werden physisch und vollständig aus dem Cloud-Speicher entfernt.</li>
+              <li><strong>Hardware-Sicherheit:</strong> Audio- und Mikrofon-Zugriffe stoppen beim Verlassen der Ansicht sofort.</li>
+            </ul>
+          </div>
+        </div>
+      )
+    },
+    {
+      id: 'comp-student-data-safety',
+      title: 'Deine Privatsphäre & Kindersicherheit bei Campus-Groovelab',
+      category: 'compliance',
+      roles: ['student', 'teacher', 'admin'],
+      badge: 'Privatsphäre',
+      summary: '100% werbefrei, keine Tracker, keine Passwörter & deutsches Hosting.',
+      tags: ['datenschutz', 'privatsphäre', 'kindersicherheit', 'pin', 'sicher', 'werbefrei'],
+      details: (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '0.86rem', color: '#334155', lineHeight: 1.6 }}>
+          <p>
+            Wir nehmen deinen Schutz und deine Privatsphäre sehr ernst:
+          </p>
+          <div style={{ background: '#f0fdf4', borderRadius: '14px', padding: '14px', border: '1px solid #bbf7d0' }}>
+            <h5 style={{ margin: '0 0 6px 0', color: '#15803d', fontWeight: 800 }}>🌟 Dein Sicherheits-Versprechen:</h5>
+            <ul style={{ margin: 0, paddingLeft: '20px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <li><strong>100% Werbefrei:</strong> Keine Werbe-Banner, keine Tracking-Cookies und kein Datenverkauf.</li>
+              <li><strong>Geschützte Profil-PIN:</strong> Deine Übe-Zeiten und Notizen sind durch deine 4-stellige PIN vor neugierigen Blicken geschützt.</li>
+              <li><strong>Sichere Server in Deutschland:</strong> Alle Daten werden nach strengen europäischen Datenschutz-Gesetzen (DSGVO) verarbeitet.</li>
+            </ul>
+          </div>
         </div>
       )
     }
@@ -636,7 +891,9 @@ export const HelpCenterModal: React.FC<HelpCenterModalProps> = ({
               { id: 'faq', label: '❓ FAQ & Tipps', count: GUIDES_DATABASE.filter(g => g.category === 'faq' && g.roles.includes(userRole)).length },
               ...(userRole === 'admin' || userRole === 'secretary' ? [
                 { id: 'compliance', label: '🛡️ DSGVO & Preise', count: GUIDES_DATABASE.filter(g => g.category === 'compliance' && g.roles.includes(userRole)).length }
-              ] : [])
+              ] : [
+                { id: 'compliance', label: '🛡️ Datenschutz & Sicherheit', count: GUIDES_DATABASE.filter(g => g.category === 'compliance' && g.roles.includes(userRole)).length }
+              ])
             ].map(tab => (
               <button
                 key={tab.id}
@@ -826,49 +1083,81 @@ export const HelpCenterModal: React.FC<HelpCenterModalProps> = ({
             /* List of Guides */
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               
-              {/* Special First-Time School Banner on Quickstart tab for admins */}
-              {activeTab === 'quickstart' && (userRole === 'admin' || userRole === 'secretary') && !searchQuery && (
-                <div style={{
-                  background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
-                  borderRadius: '18px',
-                  padding: '20px',
-                  color: '#ffffff',
-                  boxShadow: '0 8px 24px rgba(15, 23, 42, 0.15)',
-                  marginBottom: '6px'
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                    <Sparkles size={16} color="#facc15" />
-                    <span style={{ fontSize: '0.72rem', fontWeight: 800, textTransform: 'uppercase', color: '#facc15', letterSpacing: '0.06em' }}>
-                      Tier-1 Enterprise Goldstandard
-                    </span>
+              {/* Role-tailored Quickstart Hero Banner */}
+              {activeTab === 'quickstart' && !searchQuery && (() => {
+                const bannerConfig = userRole === 'teacher' ? {
+                  tag: 'ENTERPRISE MASTER-STANDARD • LEHRKRAFT',
+                  tagColor: '#34d399',
+                  title: 'Dein digitaler Unterrichtsassistent',
+                  desc: 'Hausaufgabenheft, Lehrkraft-Aufnahmen & Fokus-Timer: So begleitest du deine Schüler optimal.',
+                  targetId: 'qs-teacher-first-lesson',
+                  buttonText: 'Lehrkraft-Schnellstart öffnen'
+                } : userRole === 'secretary' ? {
+                  tag: 'ENTERPRISE MASTER-STANDARD • VERWALTUNG',
+                  tagColor: '#f87171',
+                  title: 'Campus-Verwaltung & Sekretariats-Zentrale',
+                  desc: 'Schüleraufnahme, Raumbelegungen, Kiosk-Displays & automatisierte Eltern-Infoblätter.',
+                  targetId: 'qs-secretary-workflow',
+                  buttonText: 'Sekretariats-Schnellstart öffnen'
+                } : userRole === 'student' ? {
+                  tag: 'CAMPUS & GROOVELAB GUIDE • SCHÜLER',
+                  tagColor: '#38bdf8',
+                  title: 'Dein digitaler Campus-Pass',
+                  desc: 'Hausaufgabenheft, Fokus-Timer, Streaks und deine interaktive Loopstation.',
+                  targetId: 'qs-student-onboarding',
+                  buttonText: 'Schüler-Guide öffnen'
+                } : {
+                  tag: 'TIER-1 ENTERPRISE MASTER-STANDARD • SCHULLEITUNG',
+                  tagColor: '#facc15',
+                  title: 'Deine Musikschule in 10 Minuten startklar',
+                  desc: 'Folge dem 4-Schritte-Rollout, um Räume, Kollegium und Schüler ohne Datenstress einzurichten.',
+                  targetId: 'qs-admin-school-setup',
+                  buttonText: 'Schulleitungs-Schnellstart öffnen'
+                };
+
+                return (
+                  <div style={{
+                    background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
+                    borderRadius: '18px',
+                    padding: '20px',
+                    color: '#ffffff',
+                    boxShadow: '0 8px 24px rgba(15, 23, 42, 0.15)',
+                    marginBottom: '6px'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                      <Sparkles size={16} color={bannerConfig.tagColor} />
+                      <span style={{ fontSize: '0.72rem', fontWeight: 800, textTransform: 'uppercase', color: bannerConfig.tagColor, letterSpacing: '0.06em' }}>
+                        {bannerConfig.tag}
+                      </span>
+                    </div>
+                    <h3 style={{ margin: '0 0 6px 0', fontSize: '1.05rem', fontWeight: 900, letterSpacing: '-0.01em' }}>
+                      {bannerConfig.title}
+                    </h3>
+                    <p style={{ margin: '0 0 16px 0', fontSize: '0.8rem', color: '#94a3b8', lineHeight: 1.5 }}>
+                      {bannerConfig.desc}
+                    </p>
+                    <button
+                      onClick={() => setSelectedGuideId(bannerConfig.targetId)}
+                      style={{
+                        background: themeColor,
+                        color: '#ffffff',
+                        border: 'none',
+                        padding: '8px 16px',
+                        borderRadius: '10px',
+                        fontSize: '0.8rem',
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                      }}
+                    >
+                      <span>{bannerConfig.buttonText}</span>
+                      <ChevronRight size={14} />
+                    </button>
                   </div>
-                  <h3 style={{ margin: '0 0 6px 0', fontSize: '1.05rem', fontWeight: 900, letterSpacing: '-0.01em' }}>
-                    Deine Musikschule in 10 Minuten startklar
-                  </h3>
-                  <p style={{ margin: '0 0 16px 0', fontSize: '0.8rem', color: '#94a3b8', lineHeight: 1.5 }}>
-                    Folge dem 4-Schritte-Rollout, um Räume, Kollegium und Schüler ohne Datenstress einzurichten.
-                  </p>
-                  <button
-                    onClick={() => setSelectedGuideId('qs-admin-school-setup')}
-                    style={{
-                      background: themeColor,
-                      color: '#ffffff',
-                      border: 'none',
-                      padding: '8px 16px',
-                      borderRadius: '10px',
-                      fontSize: '0.8rem',
-                      fontWeight: 800,
-                      cursor: 'pointer',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '6px'
-                    }}
-                  >
-                    <span>Schnellstart öffnen</span>
-                    <ChevronRight size={14} />
-                  </button>
-                </div>
-              )}
+                );
+              })()}
 
               {filteredGuides.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '40px 20px' }}>

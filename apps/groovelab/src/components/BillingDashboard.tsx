@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import QRCode from 'react-qr-code';
 import { InvoicePreviewModal } from './InvoicePreviewModal';
+import { ParentInfoSheetModal } from './modals/ParentInfoSheetModal';
 import { generateInvoicePDF } from '../utils/pdfGenerator';
 import { useMasterPricing } from '../context/MasterPricingContext';
 import { calculateSchoolEffectiveRates } from '../domain/pricingEngine';
@@ -152,6 +153,8 @@ export function BillingDashboard({ preselectedSchoolId }: { preselectedSchoolId?
   const [expandedSchoolUsers, setExpandedSchoolUsers] = useState<any[]>([]);
   const [loadingExpandedUsers, setLoadingExpandedUsers] = useState(false);
   const [viewingInvoice, setViewingInvoice] = useState<any>(null);
+  const [showParentInfoSheetModal, setShowParentInfoSheetModal] = useState(false);
+  const [parentInfoSheetSchool, setParentInfoSheetSchool] = useState<any>(null);
   const [operatorCompany, setOperatorCompany] = useState('Patrick Huber (Einzelunternehmer)');
   const [operatorContact, setOperatorContact] = useState('Patrick Huber');
   const [operatorStreet, setOperatorStreet] = useState('Karl-Fürstenberg-Str. 59');
@@ -1944,9 +1947,44 @@ Campus-Groovelab Mahnwesen & Rechtsabteilung`;
                       </div>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', borderBottom: '1px solid rgba(0,0,0,0.04)', paddingBottom: '6px' }}>
                         <span style={{ fontSize: '0.65rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Abrechnungsmodell</span>
-                        <span style={{ fontWeight: 700, color: '#0f172a', fontSize: '0.82rem' }}>
-                          {isSelbstzahler ? 'Direktabrechnung (Eltern)' : 'Sammelzahler (Musikschule)'}
-                        </span>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '4px' }}>
+                          <span style={{ fontWeight: 700, color: '#0f172a', fontSize: '0.82rem' }}>
+                            {isSelbstzahler ? 'Direktabrechnung (Eltern)' : 'Sammelzahler (Musikschule)'}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setParentInfoSheetSchool({
+                                name: inv.schoolName || 'Unsere Musikschule',
+                                subdomain: (inv as any).schoolSubdomain || '',
+                                logo_url: (inv as any).schoolLogoUrl || '',
+                                city: inv.schoolCity || '',
+                                student_billing_option: inv.studentBillingOption || 'school_all',
+                                email: (inv as any).schoolEmail || ''
+                              });
+                              setShowParentInfoSheetModal(true);
+                            }}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              fontSize: '0.68rem',
+                              fontWeight: 800,
+                              color: '#059669',
+                              background: '#ecfdf5',
+                              border: '1px solid #a7f3d0',
+                              borderRadius: '6px',
+                              padding: '2px 6px',
+                              cursor: 'pointer',
+                              fontFamily: 'Urbanist'
+                            }}
+                            className="hover-scale-mini"
+                            title="1-Seiter Eltern-Infoblatt (PDF) mit Schullogo &amp; QR-Code generieren"
+                          >
+                            <FileText size={10} />
+                            <span>Eltern-Infoblatt (PDF)</span>
+                          </button>
+                        </div>
                       </div>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                         <span style={{ fontSize: '0.65rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Kombi-Vorteilsrabatt</span>
@@ -3656,6 +3694,24 @@ Campus-Groovelab Mahnwesen & Rechtsabteilung`;
           <span>{emailSentToast}</span>
         </div>
       )}
+
+      {/* Personalisierbares Eltern-Informationsblatt (PDF) Modal */}
+      <ParentInfoSheetModal
+        isOpen={showParentInfoSheetModal}
+        onClose={() => {
+          setShowParentInfoSheetModal(false);
+          setParentInfoSheetSchool(null);
+        }}
+        schoolData={parentInfoSheetSchool || {
+          name: 'Unsere Musikschule',
+          subdomain: '',
+          logo_url: '',
+          city: '',
+          student_billing_option: 'school_all',
+          email: ''
+        }}
+        activePlatformDefault="campus"
+      />
       
     </div>
   );

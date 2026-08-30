@@ -5,8 +5,9 @@ import {
   Info, Sliders, Music, Zap, Flame, Heart, Upload, MessageSquare, MessageCircle, ChevronRight,
   ChevronLeft, FileText, X, AlertCircle, ChevronDown, ListMusic, SkipForward, SkipBack, Gift, Bell, Lightbulb,
   Sun, Moon, CheckCircle2, History, Plus, Trash2, Edit3, SlidersHorizontal, Radio, Layers, Download,
-  Folder, FolderOpen, BookOpen, Trophy, Maximize2, ArrowLeft, Printer, Home, Landmark
+  Folder, FolderOpen, BookOpen, Trophy, Maximize2, ArrowLeft, Printer, Home, Landmark, Crown
 } from 'lucide-react';
+import Confetti from 'react-confetti';
 
 import { supabase } from '../../lib/supabase';
 import { 
@@ -25,6 +26,7 @@ import {
 import { storeBlob, getBlob, deleteBlob } from '../../utils/blobStorage';
 import { broadcastPracticeUpdate } from '../../utils/studentProgressEngine';
 import { JuniorAudioBiographyWizard } from './JuniorAudioBiographyWizard';
+import JSZip from 'jszip';
 
 
 export interface AudioVersion {
@@ -41,11 +43,11 @@ export interface AudioVersion {
 
 export interface MilestoneData {
   id: string;
-  type: 'first_tone' | 'first_scale' | 'first_song' | 'happy_birthday' | 'family_share' | 'first_christmas_song' | 'first_solo' | 'first_own_song' | 'hardest_piece' | 'favorite_song';
+  type: 'first_tone' | 'first_scale' | 'first_song' | 'happy_birthday' | 'family_share' | 'first_christmas_song' | 'first_solo' | 'first_own_song' | 'hardest_piece' | 'favorite_song' | 'masterpiece';
   title: string;
   subtitle: string;
   stepNumber: number;
-  iconName: 'sparkles' | 'sliders' | 'music' | 'gift' | 'bell' | 'zap' | 'lightbulb' | 'flame' | 'heart';
+  iconName: 'sparkles' | 'sliders' | 'music' | 'gift' | 'bell' | 'zap' | 'lightbulb' | 'flame' | 'heart' | 'crown';
   audioUrl?: string;
   masteredAudioUrl?: string;
   duration?: number;
@@ -700,11 +702,11 @@ const DEFAULT_MILESTONES: Omit<MilestoneData, 'id' | 'visibility' | 'version'>[]
     schoolYear: '2026/2027'
   },
   {
-    type: 'first_song',
+    type: 'masterpiece',
     title: '👑 Mein großes Meisterstück',
     subtitle: 'Dein bühnenreifes Stück für das große Schulkonzert',
     stepNumber: 10,
-    iconName: 'music',
+    iconName: 'crown',
     schoolYear: '2026/2027'
   }
 ];
@@ -947,6 +949,7 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
 
   // Share Modal States
   const [showShareModal, setShowShareModal] = useState<boolean>(false);
+  const [showMasteryCompleteModal, setShowMasteryCompleteModal] = useState<boolean>(false);
   const [sharePin, setSharePin] = useState<string>(() => {
     return getOrInitStableSharePin(student?.id || studentId);
   });
@@ -1731,6 +1734,92 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
       }, 500);
     }
     setActiveDownloadMenuTrack(null);
+  };
+
+  const [isZipExporting, setIsZipExporting] = useState(false);
+  const [zipProgressText, setZipProgressText] = useState('');
+
+  const downloadAllTracksAsZip = async () => {
+    if (isZipExporting) return;
+    setIsZipExporting(true);
+    setZipProgressText('Vorbereitung...');
+    
+    try {
+      const zip = new JSZip();
+      const safeStudent = (student?.first_name || 'Campus').replace(/[^a-zA-Z0-9äöüÄÖÜß_-]/g, '_');
+      const folder = zip.folder(`Audio_Biografie_${safeStudent}`) || zip;
+
+      const allTracks: { title: string; url?: string; masteredUrl?: string; id?: string }[] = [];
+      const seenIds = new Set<string>();
+      
+      (milestones || []).forEach(m => {
+        if ((m.audioUrl || m.masteredAudioUrl) && !seenIds.has(m.id)) {
+          seenIds.add(m.id);
+          allTracks.push({
+            title: m.title || 'Meilenstein',
+            url: m.audioUrl,
+            masteredUrl: m.masteredAudioUrl,
+            id: m.id
+          });
+        }
+      });
+
+      (customPlaylists || []).forEach(pl => {
+        (pl.tracks || []).forEach(t => {
+          if ((t.audioUrl || t.masteredAudioUrl) && !seenIds.has(t.id)) {
+            seenIds.add(t.id);
+            allTracks.push({
+              title: t.title || 'Aufnahme',
+              url: t.audioUrl,
+              masteredUrl: t.masteredAudioUrl,
+              id: t.id
+            });
+          }
+        });
+      });
+
+      if (allTracks.length === 0) {
+        alert('Keine Audio-Aufnahmen zum Exportieren gefunden.');
+        setIsZipExporting(false);
+        return;
+      }
+
+      let count = 0;
+      for (const track of allTracks) {
+        count++;
+        setZipProgressText(`Lade Aufnahme ${count} von ${allTracks.length}...`);
+        try {
+          const playableUrl = await resolvePlayableUrl(track.url, track.masteredUrl, track.id, 'master');
+          if (playableUrl) {
+            const res = await fetch(playableUrl);
+            const blob = await res.blob();
+            const safeTitle = (track.title || `Track_${count}`).replace(/[^a-zA-Z0-9äöüÄÖÜß_-]/g, '_');
+            const ext = blob.type.includes('wav') ? 'wav' : blob.type.includes('mpeg') ? 'mp3' : 'webm';
+            const filename = `${String(count).padStart(2, '0')}_${safeTitle}.${ext}`;
+            folder.file(filename, blob);
+          }
+        } catch (err) {
+          console.warn(`[ZIP Export] Could not download track ${track.title}:`, err);
+        }
+      }
+
+      setZipProgressText('ZIP-Archiv wird erstellt...');
+      const zipBlob = await zip.generateAsync({ type: 'blob' });
+      const downloadUrl = URL.createObjectURL(zipBlob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = `Audio_Biografie_${safeStudent}_${new Date().toISOString().substring(0, 10)}.zip`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setTimeout(() => URL.revokeObjectURL(downloadUrl), 3000);
+    } catch (err) {
+      console.error('[ZIP Export] Error generating ZIP:', err);
+      alert('Fehler beim Erstellen des ZIP-Archivs.');
+    } finally {
+      setIsZipExporting(false);
+      setZipProgressText('');
+    }
   };
 
 
@@ -2854,6 +2943,21 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
       });
 
       saveMilestones(updated);
+      
+      const completedCount = updated.filter(m => !!m.audioUrl).length;
+      const isMasterpieceTrigger = activeUploadModalMilestone?.stepNumber === 10 || activeUploadModalMilestone?.type === 'masterpiece' || completedCount === 10;
+
+      if (isMasterpieceTrigger) {
+        try {
+          localStorage.setItem(`campus_mastery_complete_${studentId}`, 'true');
+          localStorage.setItem(`campus_mastery_date_${studentId}`, new Date().toISOString());
+          window.dispatchEvent(new Event('campus_mastery_complete_awarded'));
+        } catch {}
+        setTimeout(() => {
+          setShowMasteryCompleteModal(true);
+        }, 600);
+      }
+
       setTimeout(() => {
         setActiveUploadModalMilestone(null);
         setPendingDualResult(null);
@@ -5166,28 +5270,56 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={() => setShowShareModal(true)}
-            style={{
-              padding: '11px 20px',
-              borderRadius: '100px',
-              border: 'none',
-              background: '#25D366',
-              color: '#ffffff',
-              fontWeight: 900,
-              fontSize: '0.84rem',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              boxShadow: '0 4px 14px rgba(37, 211, 102, 0.35)'
-            }}
-            className="hover-scale"
-          >
-            <Share2 size={15} />
-            <span>Mit Familie teilen</span>
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              onClick={downloadAllTracksAsZip}
+              disabled={isZipExporting}
+              style={{
+                padding: '11px 18px',
+                borderRadius: '100px',
+                border: `1px solid ${colors.cardBorder}`,
+                background: colors.cardBg,
+                color: colors.textPrimary,
+                fontWeight: 800,
+                fontSize: '0.82rem',
+                cursor: isZipExporting ? 'wait' : 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)',
+                opacity: isZipExporting ? 0.75 : 1
+              }}
+              className="hover-scale"
+              title="Alle Aufnahmen als ZIP-Archiv herunterladen"
+            >
+              <Download size={15} />
+              <span>{isZipExporting ? (zipProgressText || 'ZIP wird erstellt...') : 'Alle Aufnahmen (ZIP)'}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setShowShareModal(true)}
+              style={{
+                padding: '11px 20px',
+                borderRadius: '100px',
+                border: 'none',
+                background: '#25D366',
+                color: '#ffffff',
+                fontWeight: 900,
+                fontSize: '0.84rem',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                boxShadow: '0 4px 14px rgba(37, 211, 102, 0.35)'
+              }}
+              className="hover-scale"
+            >
+              <Share2 size={15} />
+              <span>Mit Familie teilen</span>
+            </button>
+          </div>
         </div>
 
       </div>
@@ -7071,7 +7203,7 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
 
       </div>
 
-      {/* 👏 Live Familien-Applaus & Reaktionen Lounge (Tier-1 SaaS Enterprise+ Goldstandard) */}
+      {/* 👏 Live Familien-Applaus & Reaktionen Lounge (Tier-1 SaaS Enterprise+ Master-Standard) */}
       {(() => {
         const curPlId = effectiveShelfMode === 'playlists' ? (selectedCustomPlaylistId || customPlaylists[0]?.id || 'default') : 'pl_milestones_album';
         const reactions = playlistReactions[curPlId] || (effectiveShelfMode === 'playlists' ? playlistReactions['default'] : null);
@@ -12321,6 +12453,169 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                 <span>✨</span>
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* 👑 10. GOLDENER MEISTER-ABSCHLUSS MODAL (M10 FEIER & KRONE) */}
+      {showMasteryCompleteModal && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 9999999,
+            backgroundColor: 'rgba(15, 23, 42, 0.85)',
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px',
+            animation: 'fadeIn 0.3s ease-out'
+          }}
+          onClick={() => setShowMasteryCompleteModal(false)}
+        >
+          {/* Fullscreen Golden Confetti Celebration */}
+          <Confetti 
+            width={typeof window !== 'undefined' ? window.innerWidth : 800} 
+            height={typeof window !== 'undefined' ? window.innerHeight : 600} 
+            recycle={false} 
+            numberOfPieces={400} 
+            gravity={0.20}
+            colors={['#fbbf24', '#f59e0b', '#d97706', '#10b981', '#ffffff', '#eab308']}
+          />
+
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: 'linear-gradient(135deg, #18181b 0%, #0f172a 100%)',
+              border: '2px solid #ca8a04',
+              borderRadius: '32px',
+              maxWidth: '520px',
+              width: '100%',
+              padding: '36px 30px',
+              textAlign: 'center',
+              boxShadow: '0 25px 60px -15px rgba(202, 138, 4, 0.4), 0 0 40px rgba(251, 191, 36, 0.15)',
+              position: 'relative',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '18px',
+              color: '#ffffff'
+            }}
+          >
+            {/* Glowing Golden Crown Orb */}
+            <div style={{
+              width: '90px',
+              height: '90px',
+              borderRadius: '50%',
+              background: 'linear-gradient(135deg, #fbbf24 0%, #d97706 100%)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 0 35px rgba(251, 191, 36, 0.6), inset 0 2px 4px rgba(255, 255, 255, 0.5)',
+              border: '3px solid #fef08a',
+              fontSize: '44px'
+            }}>
+              👑
+            </div>
+
+            {/* Header / Titles */}
+            <div>
+              <div style={{
+                fontSize: '0.72rem',
+                fontWeight: 900,
+                color: '#fbbf24',
+                letterSpacing: '0.12em',
+                textTransform: 'uppercase',
+                marginBottom: '6px'
+              }}>
+                🌟 Meilenstein 10 Vollbracht
+              </div>
+              <h3 style={{
+                fontSize: '1.65rem',
+                fontWeight: 900,
+                color: '#ffffff',
+                margin: 0,
+                lineHeight: 1.2
+              }}>
+                Großes Meisterstück gemeistert!
+              </h3>
+            </div>
+
+            {/* Description */}
+            <p style={{
+              fontSize: '0.90rem',
+              color: '#cbd5e1',
+              lineHeight: 1.55,
+              margin: 0,
+              maxWidth: '440px'
+            }}>
+              Herzlichen Glückwunsch! Du hast mit <strong style={{ color: '#fbbf24' }}>„Mein großes Meisterstück“</strong> alle 10 Meilensteine deiner musikalischen Audio-Biografie erfolgreich gemeistert.
+            </p>
+
+            {/* Golden Badge Card */}
+            <div style={{
+              background: 'rgba(251, 191, 36, 0.12)',
+              border: '1.5px solid rgba(251, 191, 36, 0.4)',
+              borderRadius: '18px',
+              padding: '14px 20px',
+              width: '100%',
+              boxSizing: 'border-box',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '12px'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span style={{ fontSize: '24px' }}>🏆</span>
+                <div style={{ textAlign: 'left' }}>
+                  <div style={{ fontSize: '0.86rem', fontWeight: 800, color: '#fef08a' }}>
+                    10/10 Meilensteine Vollständig
+                  </div>
+                  <div style={{ fontSize: '0.70rem', color: '#cbd5e1' }}>
+                    Goldene Meister-Krone 👑 freigeschaltet
+                  </div>
+                </div>
+              </div>
+              <span style={{
+                background: '#ca8a04',
+                color: '#ffffff',
+                fontSize: '0.72rem',
+                fontWeight: 900,
+                padding: '4px 10px',
+                borderRadius: '999px'
+              }}>
+                +100 XP
+              </span>
+            </div>
+
+            {/* Action CTA */}
+            <button
+              type="button"
+              onClick={() => setShowMasteryCompleteModal(false)}
+              style={{
+                width: '100%',
+                padding: '15px 24px',
+                borderRadius: '16px',
+                border: 'none',
+                background: 'linear-gradient(135deg, #fbbf24 0%, #d97706 100%)',
+                color: '#18181b',
+                fontWeight: 900,
+                fontSize: '0.98rem',
+                cursor: 'pointer',
+                boxShadow: '0 6px 20px rgba(251, 191, 36, 0.4)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                marginTop: '6px'
+              }}
+              className="hover-scale"
+            >
+              <span>Zurück zur Audio-Biografie</span>
+              <span>👑</span>
+            </button>
           </div>
         </div>
       )}

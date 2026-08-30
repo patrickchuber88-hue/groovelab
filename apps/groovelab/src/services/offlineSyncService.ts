@@ -138,33 +138,37 @@ export const flushOfflineAudioQueue = async (): Promise<{ success: number; faile
     for (const record of records) {
       try {
         const fileExt = record.mimeType?.includes('wav') ? 'wav' : (record.mimeType?.includes('ogg') ? 'ogg' : 'webm');
-        const filename = `offline_${record.context}_${record.studentId || 'unknown'}_${record.id}.${fileExt}`;
-        const filePath = `recordings/${filename}`;
+        const defaultFilename = `offline_${record.context}_${record.studentId || 'unknown'}_${record.id}.${fileExt}`;
+        const filePath = record.metadata?.storagePath || `recordings/${defaultFilename}`;
 
-        // 1. Upload lossless Blob to Supabase Storage bucket 'student-recordings' or 'audio'
-        const { error: uploadError } = await supabase.storage
-          .from('student-recordings')
-          .upload(filePath, record.blob, {
-            contentType: record.mimeType || 'audio/webm',
-            upsert: true
-          });
+        // 1. Upload lossless Blob to Supabase Storage (check 'recordings', then 'student-recordings', then 'audio')
+        let uploadSuccess = false;
+        let publicUrl = '';
 
-        if (uploadError) {
-          console.warn('[OfflineSync] Upload to student-recordings failed, trying fallback bucket:', uploadError);
-          const { error: fallbackErr } = await supabase.storage
-            .from('audio')
-            .upload(filePath, record.blob, {
-              contentType: record.mimeType || 'audio/webm',
-              upsert: true
-            });
-          if (fallbackErr) throw fallbackErr;
+        for (const bucket of ['recordings', 'student-recordings', 'audio']) {
+          try {
+            const { error: uploadError } = await supabase.storage
+              .from(bucket)
+              .upload(filePath, record.blob, {
+                contentType: record.mimeType || 'audio/webm',
+                upsert: true
+              });
+            if (!uploadError) {
+              const { data: urlData } = supabase.storage.from(bucket).getPublicUrl(filePath);
+              publicUrl = urlData?.publicUrl || '';
+              uploadSuccess = true;
+              break;
+            }
+          } catch {
+            // Try next bucket
+          }
         }
 
-        const { data: publicUrlData } = supabase.storage
-          .from('student-recordings')
-          .getPublicUrl(filePath);
+        if (!uploadSuccess) {
+          throw new Error('All storage bucket uploads failed');
+        }
 
-        const finalAudioUrl = publicUrlData?.publicUrl || filePath;
+        const finalAudioUrl = publicUrl || filePath;
 
         // 2. If metadata indicates linked database table (e.g. campus_homework_notes or student_progress)
         if (record.metadata?.syncTable && record.metadata?.syncPayload) {

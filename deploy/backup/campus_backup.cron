@@ -1,0 +1,2 @@
+# Campus-Groovelab Tägliches Verschlüsseltes Backup (03:00 Uhr nachts)
+0 3 * * * /usr/local/bin/backup_campus_db.sh >> /var/log/campus_backup.log 2>&1

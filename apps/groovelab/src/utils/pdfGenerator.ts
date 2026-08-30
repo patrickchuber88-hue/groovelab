@@ -223,11 +223,12 @@ export const generateConsentPDF = async (
   doc.text('Bitte füllen Sie dieses Dokument aus und geben Sie es bei der Lehrkraft oder in der Musikschul-Verwaltung ab.', 20, currentY);
 
   // Save / Trigger Download
+  const cleanSchool = (schoolName || 'Musikschule').replace(/[^a-zA-Z0-9äöüÄÖÜß]/g, '_');
   const filename = activePlatform === 'groovelab' 
-    ? 'Einwilligung_Eltern_GrooveLab.pdf' 
+    ? `Einwilligung_Eltern_GrooveLab_${cleanSchool}.pdf` 
     : activePlatform === 'campus'
-      ? 'Einwilligung_Eltern_Campus.pdf'
-      : 'Einwilligung_Eltern_Campus_Groovelab.pdf';
+      ? `Einwilligung_Eltern_Campus_${cleanSchool}.pdf`
+      : `Einwilligung_Eltern_Campus_Groovelab_${cleanSchool}.pdf`;
   doc.save(filename);
 };
 
@@ -700,135 +701,368 @@ export const generateTeacherQuickstartPDF = async (schoolName: string, schoolSub
   doc.save(filename);
 };
 
+export interface ParentQuickstartPDFOptions {
+  schoolName: string;
+  activePlatform?: 'campus' | 'groovelab' | 'both';
+  schoolSubdomain?: string;
+  schoolLogoUrl?: string;
+  studentBillingOption?: 'school_all' | 'student_full' | 'student_partial' | string;
+  city?: string;
+  contactEmail?: string;
+  returnOnlyBlob?: boolean;
+}
+
 /**
- * Generates a 1-page A4 Quickstart Info Sheet for Parents
+ * Generates an ultra-crisp, printable 1-page DIN A4 Parent Information Sheet PDF
+ * with dynamic School Logo, high-resolution QR Code, and module-specific highlights.
  */
 export const generateParentQuickstartPDF = async (
-  schoolName: string,
-  _activePlatform?: 'campus' | 'groovelab' | 'both',
-  schoolSubdomain?: string
+  schoolNameOrOptions: string | ParentQuickstartPDFOptions,
+  activePlatformArg?: 'campus' | 'groovelab' | 'both',
+  schoolSubdomainArg?: string
 ) => {
-  const cacheKey = `parent_quickstart_${schoolName}_${schoolSubdomain || ''}`;
+  const options: ParentQuickstartPDFOptions = typeof schoolNameOrOptions === 'string'
+    ? {
+        schoolName: schoolNameOrOptions,
+        activePlatform: activePlatformArg || 'both',
+        schoolSubdomain: schoolSubdomainArg
+      }
+    : schoolNameOrOptions;
+
+  const {
+    schoolName = 'Meine Musikschule',
+    activePlatform = 'both',
+    schoolSubdomain,
+    schoolLogoUrl,
+    studentBillingOption = 'school_all',
+    city = '',
+    contactEmail = '',
+    returnOnlyBlob = false
+  } = options;
+
+  const cacheKey = `parent_info_${schoolName}_${activePlatform}_${studentBillingOption}_${schoolSubdomain || ''}_${Boolean(schoolLogoUrl)}`;
   const cached = getCachedPdf(cacheKey);
-  if (cached) {
+  if (cached && !returnOnlyBlob) {
     triggerBlobDownload(cached.blob, cached.filename);
-    return;
+    return { blob: cached.blob, filename: cached.filename };
   }
 
   const { default: jsPDF } = await import('jspdf');
-  const doc = new jsPDF();
-
-  doc.setProperties({
-    title: 'Eltern-Information - Campus-Groovelab',
-    subject: '1-Seiter Informationsblatt für Eltern zum digitalen Hausaufgabenheft',
-    author: 'Campus-Groovelab',
-    creator: 'Campus-Groovelab Platform'
+  const doc = new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: 'a4'
   });
 
-  const primaryGreen = [52, 168, 83];
-  const darkSlate = [15, 23, 42];
-  const mutedText = [100, 116, 139];
-  const borderGray = [226, 232, 240];
+  const platformLabel = activePlatform === 'groovelab'
+    ? 'GrooveLab'
+    : activePlatform === 'campus'
+      ? 'Campus'
+      : 'Campus & GrooveLab';
+
+  doc.setProperties({
+    title: `Elternbrief ${platformLabel} - ${schoolName}`,
+    subject: `Offizieller Elternbrief (${platformLabel}) zur Campus-Groovelab Schul-App`,
+    author: schoolName,
+    creator: 'Campus-Groovelab Enterprise'
+  });
+
+  // Dynamic Theme Colors
+  const primaryColor = activePlatform === 'groovelab'
+    ? [234, 179, 8]      // Gold-Yellow (#eab308)
+    : activePlatform === 'campus'
+      ? [52, 168, 83]    // Campus Green (#34a853)
+      : [5, 150, 105];   // Emerald Green (#059669)
+
+  const darkSlate = [15, 23, 42];     // #0f172a
+  const bodyText = [51, 65, 85];      // #334155
+  const mutedText = [100, 116, 139];  // #64748b
+  const borderGray = [226, 232, 240]; // #e2e8f0
+  const lightBg = [248, 250, 252];    // #f8fafc
+
   const parentOnboardingUrl = getParentOnboardingUrl(schoolName, schoolSubdomain);
 
-  // Top Accent Bar
-  doc.setFillColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
+  // 1. Top Decorative Accent Bar (6mm)
+  doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
   doc.rect(0, 0, 210, 6, 'F');
 
-  let y = 18;
+  let y = 16;
 
-  // Header
+  // 2. Header: Logo & School Meta
+  let headerLeftX = 18;
+  const hasLogo = Boolean(schoolLogoUrl);
+
+  if (hasLogo && schoolLogoUrl) {
+    try {
+      doc.addImage(schoolLogoUrl, 'PNG', 18, y - 2, 24, 14, undefined, 'FAST');
+      headerLeftX = 46;
+    } catch {
+      // Fallback: draw elegant school badge
+      doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+      doc.roundedRect(18, y - 2, 24, 14, 2, 2, 'F');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8);
+      doc.setTextColor(255, 255, 255);
+      doc.text('SCHULE', 30, y + 6, { align: 'center' });
+      headerLeftX = 46;
+    }
+  }
+
+  // School Name and Platform Name
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8);
-  doc.setTextColor(mutedText[0], mutedText[1], mutedText[2]);
-  doc.text((schoolName || 'Meine Musikschule').toUpperCase(), 20, y);
-  y += 7;
+  doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+  const schoolLabel = (schoolName || 'MUSIKSCHULE').toUpperCase() + (city ? ` • ${city.toUpperCase()}` : '');
+  doc.text(schoolLabel, headerLeftX, y + 1);
 
-  doc.setFontSize(18);
+  doc.setFontSize(16);
   doc.setTextColor(darkSlate[0], darkSlate[1], darkSlate[2]);
-  doc.text('Eltern-Info: Das digitale Hausaufgabenheft', 20, y);
-  y += 6;
+  const docMainTitle = activePlatform === 'groovelab' 
+    ? 'Elternbrief: Dein Zugang zu GrooveLab' 
+    : activePlatform === 'campus'
+      ? 'Elternbrief: Das digitale Hausaufgabenheft'
+      : 'Elternbrief: Unser digitaler Schul-Campus';
+  doc.text(docMainTitle, headerLeftX, y + 7.5);
 
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(9);
+  doc.setFontSize(8.5);
   doc.setTextColor(mutedText[0], mutedText[1], mutedText[2]);
-  doc.text('So unterstützt Campus-Groovelab Ihr Kind beim Instrumental- und Ensemble-Unterricht', 20, y);
-  y += 10;
+  const docSubTitle = activePlatform === 'groovelab'
+    ? 'Bandunterricht, Band-Matching, Songs & Live Lab auf Campus-Groovelab'
+    : activePlatform === 'campus'
+      ? 'Unterrichts-Begleitung, Aufgabenheft & Übe-Studio auf Campus-Groovelab'
+      : 'Hausaufgabenheft, Lehrkraft-Aufnahmen & Band-Rooms auf Campus-Groovelab';
+  doc.text(docSubTitle, headerLeftX, y + 12.5);
 
-  // 3 Advantage Cards
-  const features = [
+  y += 20;
+
+  // 3. Intro Lead Box (Squircle)
+  doc.setFillColor(lightBg[0], lightBg[1], lightBg[2]);
+  doc.setDrawColor(borderGray[0], borderGray[1], borderGray[2]);
+  doc.roundedRect(18, y, 174, 18, 3, 3, 'FD');
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8.4);
+  doc.setTextColor(bodyText[0], bodyText[1], bodyText[2]);
+  const introLead = activePlatform === 'groovelab'
+    ? `Liebe Eltern, liebe Schülerinnen und Schüler, unsere Musikschule nutzt für das gemeinsame Musizieren im Ensemble und in Bands das moderne GrooveLab-Modul. Damit fördern wir das Zusammenspiel, das Erlernen echter Songs und die Begeisterung für gemeinsame Bühnenauftritte – digital, kindersicher und geschützt auf Smartphone oder Tablet.`
+    : activePlatform === 'campus'
+      ? `Liebe Eltern, liebe Schülerinnen und Schüler, unsere Musikschule nutzt das digitale Campus-Modul auf Campus-Groovelab. Das digitale Aufgabenheft bringt Struktur, Lehrkraft-Aufnahmen unterstützen das Einstudieren zu Hause und der interaktive Fokus-Timer belohnt regelmäßiges Üben mit Streaks und XP.`
+      : `Liebe Eltern, liebe Schülerinnen und Schüler, unsere Musikschule nutzt die voll integrierte Plattform Campus-Groovelab. Damit verbinden wir das persönliche Instrumental-Hausaufgabenheft mit modernem Band-Musizieren, Lehrkraft-Aufnahmen und interaktiven Songs – digital, kindersicher und geschützt auf Smartphone oder Tablet.`;
+  const splitIntro = doc.splitTextToSize(introLead, 164);
+  doc.text(splitIntro, 23, y + 5.5);
+
+  y += 24;
+
+  // 4. Three Advantage Cards (Editorial Flow)
+  const features = activePlatform === 'groovelab' ? [
     {
-      title: 'Hausaufgaben & Notizen immer griffbereit',
-      desc: 'Vergessene Zettel gehören der Vergangenheit an: Hausaufgaben, Tonleitern und Notizen der Lehrkraft sind direkt auf dem Smartphone oder Tablet abrufbar – übersichtlich und jederzeit synchronisiert.'
+      badge: 'SONGS',
+      title: 'Songs & Band-Repertoire meistern',
+      desc: 'Alle Songs, Ablaufpläne, Chords und Notenblätter des Bandunterrichts sind direkt abrufbar – perfekt für Bandproben, das Üben zu Hause und anstehende Konzerte.'
     },
     {
-      title: 'Spielerischer Übe-Timer & Audio-Begleitung',
-      desc: 'Mit dem interaktiven Übe-Timer und Playalongs der Lehrkraft macht das tägliche Üben zuhause Spaß. Regelmäßigkeit wird durch motivierende Übe-Streaks und XP-Punkte belohnt.'
+      badge: 'MATCHING',
+      title: 'Band-Matching & Band-Rooms',
+      desc: 'Gemeinsam mehr erreichen: Die Musikschule vernetzt passende Musiker zu harmonischen Ensembles. Im digitalen Band-Room teilen Bandmitglieder Setlists und Ideen.'
     },
     {
-      title: '100% Datenschutz: Keine E-Mail, keine Bankdaten',
-      desc: 'Wir schützen die Privatsphäre Ihres Kindes: Es werden weder E-Mail-Adressen, private Telefonnummern noch Zahlungsdaten gespeichert. Schülernamen werden auf Vorname und Initiale maskiert.'
+      badge: 'LIVE LAB',
+      title: 'Synchrones Live Lab & Musiker-Avatare',
+      desc: 'Echtzeit-Synchronisation im Proberaum auf Band-Tablets: Jeder Schüler wählt seinen individuellen Musiker-Avatar und verfolgt seinen Fortschritt im Skill-Radar.'
+    }
+  ] : activePlatform === 'campus' ? [
+    {
+      badge: 'AUFGABEN',
+      title: 'Digitales Aufgabenheft, Notizen & Audios',
+      desc: 'Schluss mit Zettelwirtschaft: Hausaufgaben, Takte, Seitenzahlen und Hinweise der Lehrkraft sind direkt griffbereit. Hörbeispiele unterstützen das Einstudieren zu Hause.'
+    },
+    {
+      badge: 'STUDIO',
+      title: 'Übe-Studio, Loopstation & Play-Alongs',
+      desc: 'Interaktives Mitspielen: Mit der Mehrspur-Loopstation das Timing trainieren, eigene Takes aufnehmen und mit dem Fokus-Timer motivierende Streaks und XP sammeln.'
+    },
+    {
+      badge: 'TERMINE',
+      title: 'Termingekoppelte Mitteilungen & Raum-Updates',
+      desc: 'Immer auf dem neuesten Stand: Raumänderungen, Terminverschiebungen und persönliche Mitteilungen der Lehrkraft landen sofort geschützt und terminsynchron in der App.'
+    }
+  ] : [
+    {
+      badge: 'CAMPUS',
+      title: 'Digitales Aufgabenheft & Lehrkraft-Audios',
+      desc: 'Schluss mit Zettelwirtschaft: Hausaufgaben, Notizen und Audio-Begleitungen der Lehrkraft sind direkt griffbereit – ideal für den wöchentlichen Instrumentalunterricht.'
+    },
+    {
+      badge: 'GROOVELAB',
+      title: 'Band-Rooms, Repertoire & Live Lab',
+      desc: 'Gemeinsam Songs meistern: Interaktive Ablaufpläne, Chords und synchrones Proben-Dashboard auf Proberaum-Tablets für mitreißendes Band-Zusammenspiel.'
+    },
+    {
+      badge: 'MOTIVATION',
+      title: 'Fokus-Timer, Streaks & Musiker-Avatare',
+      desc: 'Spielerische Begeisterung: Schüler wählen ihren Musiker-Avatar, trainieren mit der Loopstation und sammeln für regelmäßiges Üben und Bandproben wertvolle XP-Belohnungen.'
     }
   ];
 
-  features.forEach(feat => {
-    doc.setFillColor(248, 250, 252);
+  features.forEach((feat) => {
+    doc.setFillColor(255, 255, 255);
     doc.setDrawColor(borderGray[0], borderGray[1], borderGray[2]);
-    doc.roundedRect(20, y, 170, 36, 3, 3, 'FD');
+    doc.roundedRect(18, y, 174, 25, 2.5, 2.5, 'FD');
 
-    // Green check badge
-    doc.setFillColor(230, 244, 234);
-    doc.setDrawColor(187, 247, 208);
-    doc.roundedRect(25, y + 6, 7, 7, 2, 2, 'FD');
+    // Badge Pill
+    doc.setFillColor(236, 253, 245);
+    doc.setDrawColor(167, 243, 208);
+    const badgeWidth = feat.badge.length > 7 ? 20 : feat.badge.length > 5 ? 17 : 15;
+    doc.roundedRect(23, y + 4.5, badgeWidth, 5, 1.2, 1.2, 'FD');
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(8);
-    doc.setTextColor(22, 101, 52);
-    doc.text('OK', 26.5, y + 11);
+    doc.setFontSize(6.3);
+    doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+    doc.text(feat.badge, 23 + badgeWidth / 2, y + 8, { align: 'center' });
 
     // Title
-    doc.setFontSize(10.5);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9.6);
     doc.setTextColor(darkSlate[0], darkSlate[1], darkSlate[2]);
-    doc.text(feat.title, 36, y + 11);
+    doc.text(feat.title, 26 + badgeWidth, y + 8);
 
-    // Desc
+    // Description
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(8.2);
-    doc.setTextColor(71, 85, 105);
-    const splitText = doc.splitTextToSize(feat.desc, 150);
-    doc.text(splitText, 25, y + 19);
+    doc.setFontSize(7.8);
+    doc.setTextColor(bodyText[0], bodyText[1], bodyText[2]);
+    const splitDesc = doc.splitTextToSize(feat.desc, 160);
+    doc.text(splitDesc, 23, y + 14.5);
 
-    y += 42;
+    y += 28.5;
   });
 
-  y += 4;
+  y += 2;
 
-  // Login Guide Card
-  doc.setFillColor(239, 246, 255);
-  doc.setDrawColor(191, 219, 254);
-  doc.roundedRect(20, y, 170, 36, 3, 3, 'FD');
+  // 5. Activation Hero Stage (with dynamic QR Code on Right)
+  doc.setFillColor(240, 253, 244);
+  doc.setDrawColor(187, 247, 208);
+  doc.roundedRect(18, y, 174, 46, 3, 3, 'FD');
 
+  // Left column: Steps
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(9.5);
-  doc.setTextColor(29, 78, 216);
-  doc.text('WIE STARTEN SIE & IHR KIND?', 25, y + 8);
+  doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+  doc.text('IN 3 SCHRITTEN DIREKT LOSLEGEN:', 24, y + 8);
 
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8.2);
+  doc.setFontSize(8);
   doc.setTextColor(darkSlate[0], darkSlate[1], darkSlate[2]);
-  doc.text(`1. Öffnen Sie die Plattform im Browser: ${parentOnboardingUrl}`, 25, y + 16);
-  doc.text('2. Scannen Sie den persönlichen QR-Code des Schülers oder geben Sie die Schüler-PIN ein.', 25, y + 23);
-  doc.text('3. Fertig! Ihr Kind ist sofort mit dem digitalen Hausaufgabenheft verbunden.', 25, y + 30);
+  doc.text('1. QR-Code mit dem Smartphone / Tablet scannen oder URL öffnen:', 24, y + 16);
 
-  // Footer
+  // High-contrast URL (Dark Slate for maximum print readability)
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8);
+  doc.setTextColor(darkSlate[0], darkSlate[1], darkSlate[2]);
+  doc.text(parentOnboardingUrl, 28, y + 21.5);
+
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(7.5);
-  doc.setTextColor(mutedText[0], mutedText[1], mutedText[2]);
-  doc.text(`Information für Eltern • ${schoolName} • Campus-Groovelab`, 20, 282);
+  doc.setFontSize(8);
+  doc.setTextColor(darkSlate[0], darkSlate[1], darkSlate[2]);
+  const step2Text = '2. PIN eingeben';
+  const step3Text = activePlatform === 'groovelab'
+    ? '3. Musiker-Avatar wählen, Band-Room beitreten und losgrooven!'
+    : activePlatform === 'campus'
+      ? '3. Hausaufgabenheft öffnen und direkt losüben!'
+      : '3. Aufgabenheft & Band-Rooms auf Smartphone oder Tablet öffnen!';
+  doc.text(step2Text, 24, y + 28.5);
+  doc.text(step3Text, 24, y + 35.5);
 
-  const filename = `Eltern_Information_Campus_Groovelab_${schoolName.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
+  // Right column: Crisp QR Code Box
+  const qrX = 148;
+  const qrY = y + 5;
+  const qrSize = 34;
+
+  doc.setFillColor(255, 255, 255);
+  doc.setDrawColor(167, 243, 208);
+  doc.roundedRect(qrX, qrY, qrSize + 4, qrSize + 6, 2, 2, 'FD');
+
+  // Fetch or render QR Code
+  try {
+    const qrFetchUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&format=png&margin=1&data=${encodeURIComponent(parentOnboardingUrl)}`;
+    const qrRes = await fetch(qrFetchUrl);
+    if (qrRes.ok) {
+      const qrBlob = await qrRes.blob();
+      const qrDataUrl = await new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.onerror = () => resolve('');
+        reader.readAsDataURL(qrBlob);
+      });
+      if (qrDataUrl) {
+        doc.addImage(qrDataUrl, 'PNG', qrX + 2, qrY + 2, qrSize, qrSize);
+      }
+    }
+  } catch {
+    // Fallback QR Placeholder
+    doc.setFillColor(236, 253, 245);
+    doc.rect(qrX + 2, qrY + 2, qrSize, qrSize, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7.5);
+    doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+    doc.text('QR-CODE', qrX + qrSize / 2 + 2, qrY + qrSize / 2 + 2, { align: 'center' });
+  }
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(6.5);
+  doc.setTextColor(mutedText[0], mutedText[1], mutedText[2]);
+  doc.text('KAMERA SCANNEN', qrX + (qrSize + 4) / 2, qrY + qrSize + 4.5, { align: 'center' });
+
+  y += 50;
+
+  // 6. Pricing Transparency Box
+  let pricingText = activePlatform === 'groovelab'
+    ? 'VOLLSTÄNDIG INKLUSIVE: Die Nutzung des GrooveLab-Moduls wird zu 100% von der Musikschule getragen und ist für Schüler kostenfrei.'
+    : '100% KOSTENLOS: Die Musikschule übernimmt alle Cloud- & Bereitstellungsgebühren für Schüler und Eltern.';
+  if (activePlatform !== 'groovelab') {
+    if (studentBillingOption === 'student_full') {
+      pricingText = 'KOSTENTRANSPARENZ: Jahresbeitrag für die Cloud-Bereitstellung: 0,49 € / Mo. (5,88 € / Schuljahr; keine Lizenzkaufgebühren).';
+    } else if (studentBillingOption === 'student_partial') {
+      pricingText = 'KOSTENTRANSPARENZ: Jahres-Eigenanteil: 0,40 € / Mo. (4,80 € / Schuljahr; die Musikschule bezuschusst den Rest; keine Lizenzkaufgebühren).';
+    }
+  }
+
+  doc.setFillColor(lightBg[0], lightBg[1], lightBg[2]);
+  doc.setDrawColor(borderGray[0], borderGray[1], borderGray[2]);
+  doc.roundedRect(18, y, 174, 11, 2, 2, 'FD');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7.2);
+  doc.setTextColor(bodyText[0], bodyText[1], bodyText[2]);
+  doc.text(pricingText, 23, y + 6.8);
+
+  // 7. Official Legal Footer
+  const footerY = 282;
+  doc.setDrawColor(borderGray[0], borderGray[1], borderGray[2]);
+  doc.setLineWidth(0.3);
+  doc.line(18, footerY - 4, 192, footerY - 4);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7);
+  doc.setTextColor(mutedText[0], mutedText[1], mutedText[2]);
+  const footerContact = contactEmail ? ` • Kontakt: ${contactEmail}` : '';
+  doc.text(`${schoolName} • Offizielle Eltern-Information • Powered by Campus-Groovelab${footerContact}`, 18, footerY);
+  doc.text('Seite 1 / 1 • DSGVO-konform', 192, footerY, { align: 'right' });
+
+  const cleanSchool = (schoolName || 'Musikschule').replace(/[^a-zA-Z0-9äöüÄÖÜß]/g, '_');
+  const platformTag = activePlatform === 'groovelab'
+    ? 'GrooveLab'
+    : activePlatform === 'campus'
+      ? 'Campus'
+      : 'Campus_Groovelab';
+  const filename = `Elternbrief_${platformTag}_${cleanSchool}.pdf`;
   const blob = doc.output('blob');
   setCachedPdf(cacheKey, blob, filename);
-  doc.save(filename);
+
+  if (!returnOnlyBlob) {
+    doc.save(filename);
+  }
+
+  return { doc, blob, filename };
 };
 
 export interface ResiliencePDFData {

@@ -1,26 +1,29 @@
-import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef, lazy, Suspense } from 'react';
 import { MUSIC_QUOTES, getQuotesForAudience, getDailyQuote } from '@groovelab/shared';
 import { usePremiumOnboardingTour, TourStartButton, TourStep } from './PremiumOnboardingTour';
 import { supabase, deleteUserStorageAssets } from '../lib/supabase';
 import { Monitor, Music, Award, Box, Plus, AlertCircle, AlertTriangle, User, Users, Star, TrendingUp, Shield, Zap, Play, Info, CheckCircle, Check, Search, Trash2, Bell, X, Clock, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, LayoutDashboard, LogOut, Flame, GraduationCap, UserPlus, Edit3, Calendar, Activity, CheckSquare, Mail, Copy, Sparkles, BookOpen, MessageSquare, Lock, Palmtree, Heart, Settings, Key, Sun, ThumbsUp, Building2, Hourglass, Eye, EyeOff, ShieldCheck, CheckCheck, CalendarX, Send, Lightbulb, Download, Sliders, Mic, Disc, Radio } from 'lucide-react';
 import { TeacherDetailModal } from './TeacherDetailModal';
 import { StudentDetailModal } from './StudentDetailModal';
-import { MeisterwerkDocumentationModal, checkIsAudioTresorActive } from './MeisterwerkDocumentationModal';
-import { FeedbackHubModal } from './feedback/FeedbackHubModal';
-import { HelpCenterModal } from './help/HelpCenterModal';
+import { checkIsAudioTresorActive } from '../domain/stickersAndTresor';
 import { UpdateAnnouncementHero } from './common/UpdateAnnouncementHero';
 import { renderInstrumentIcon } from '../utils/instruments';
 import { getDistanceFromLatLonInM } from '../utils/geo';
 import { useRealNamesVisibility, maskLastName, formatSingleStudentAnonymized, formatGroupStudentsAnonymized, getGroupTypeLabel, sanitizeBirthDateToDayOnly, formatTeacherFullName } from '../utils/nameHelper';
 import { ConfirmDeleteStudentModal, StudentToDelete } from './ConfirmDeleteStudentModal';
-import { LiveStageToolboxModal } from './LiveStageToolboxModal';
 import { deleteStudentFully } from '../utils/studentDeletionService';
 import { MobileBriefingCarousel } from './ui/MobileBriefingCarousel';
 import { BriefingNotesCard } from './notes/BriefingNotesCard';
 import { BriefingToolboxCard } from './campus/BriefingToolboxCard';
 import { TagesplanQuickAudioModal } from './campus/TagesplanQuickAudioModal';
 import { GlobalNotesDrawer } from './notes/GlobalNotesDrawer';
-import { CommandPaletteModal } from './common/CommandPaletteModal';
+
+// Lazy load heavy auxiliary modals on demand for sub-second dashboard initial load & reduced memory footprint
+const MeisterwerkDocumentationModal = lazy(() => import('./MeisterwerkDocumentationModal').then(m => ({ default: m.MeisterwerkDocumentationModal })));
+const LiveStageToolboxModal = lazy(() => import('./LiveStageToolboxModal').then(m => ({ default: m.LiveStageToolboxModal })));
+const FeedbackHubModal = lazy(() => import('./feedback/FeedbackHubModal').then(m => ({ default: m.FeedbackHubModal })));
+const HelpCenterModal = lazy(() => import('./help/HelpCenterModal').then(m => ({ default: m.HelpCenterModal })));
+const CommandPaletteModal = lazy(() => import('./common/CommandPaletteModal').then(m => ({ default: m.CommandPaletteModal })));
 import { 
   fetchSchoolRoster, 
   getTeacherRoster, 
@@ -10378,10 +10381,12 @@ useEffect(() => {
       `}} />
 
       {showStageToolbox && (
-        <LiveStageToolboxModal 
-          initialTab={showStageToolbox} 
-          onClose={() => setShowStageToolbox(null)} 
-        />
+        <Suspense fallback={null}>
+          <LiveStageToolboxModal 
+            initialTab={showStageToolbox} 
+            onClose={() => setShowStageToolbox(null)} 
+          />
+        </Suspense>
       )}
       {selectedCoachProfile && <TeacherDetailModal teacher={selectedCoachProfile} onClose={() => setSelectedCoachProfile(null)} />}
       {selectedStudentProfile && (
@@ -10437,23 +10442,25 @@ useEffect(() => {
         }}
       />
        {docStudent && (
-        <MeisterwerkDocumentationModal 
-          student={{
-            ...docStudent,
-            school_id: teacher?.school_id || docStudent.school_id,
-            schools: schoolData || docStudent.schools,
-            teacher_name: teacher?.first_name ? `${teacher.first_name} ${teacher.last_name || ''}`.trim() : (teacher?.name || '')
-          }} 
-          onClose={() => setDocStudent(null)} 
-          teacherId={userId}
-          teacherName={teacher?.first_name ? `${teacher.first_name} ${teacher.last_name || ''}`.trim() : (teacher?.name || '')}
-          schoolName={schoolData?.name || ''}
-          hasTresorStorage={Number(schoolData?.storage_addon_gb || 0) > 0 || checkIsAudioTresorActive(docStudent)}
-          onProfileClick={(student) => {
-            setDocStudent(null);
-            setSelectedStudentProfile(student);
-          }}
-        />
+        <Suspense fallback={null}>
+          <MeisterwerkDocumentationModal 
+            student={{
+              ...docStudent,
+              school_id: teacher?.school_id || docStudent.school_id,
+              schools: schoolData || docStudent.schools,
+              teacher_name: teacher?.first_name ? `${teacher.first_name} ${teacher.last_name || ''}`.trim() : (teacher?.name || '')
+            }} 
+            onClose={() => setDocStudent(null)} 
+            teacherId={userId}
+            teacherName={teacher?.first_name ? `${teacher.first_name} ${teacher.last_name || ''}`.trim() : (teacher?.name || '')}
+            schoolName={schoolData?.name || ''}
+            hasTresorStorage={Number(schoolData?.storage_addon_gb || 0) > 0 || checkIsAudioTresorActive(docStudent)}
+            onProfileClick={(student) => {
+              setDocStudent(null);
+              setSelectedStudentProfile(student);
+            }}
+          />
+        </Suspense>
       )}
 
       {/* 1-Click Audio-Hausaufgabe Modal */}
@@ -10463,6 +10470,7 @@ useEffect(() => {
           student={quickAudioStudent}
           teacher={teacher}
           dateStr={getSimulatedNow().toISOString()}
+          hasTresorStorage={Number(schoolData?.storage_addon_gb || 0) > 0 || checkIsAudioTresorActive(quickAudioStudent) || checkIsAudioTresorActive(teacher)}
           onClose={() => setQuickAudioStudent(null)}
           onSaved={() => {
             setToastMessage(`✓ Hausaufgabe für ${quickAudioStudent.first_name || quickAudioStudent.name} erfolgreich aktualisiert!`);
@@ -10471,43 +10479,47 @@ useEffect(() => {
       )}
 
       {/* Spotlight Command Palette (⌘K) */}
-      <CommandPaletteModal
-        isOpen={showCommandPalette}
-        onClose={() => setShowCommandPalette(false)}
-        allStudents={allStudents}
-        onOpenNotesBoard={() => {
-          setLeftColumnTab('notes');
-        }}
-        onOpenQuickNote={() => {
-          setLeftColumnTab('notes');
-        }}
-        onOpenStudentHomework={(student) => {
-          setDocStudent({
-            ...student,
-            id: student.id,
-            first_name: student.first_name || student.name?.split(' ')[0],
-            last_name: student.last_name || student.name?.split(' ').slice(1).join(' '),
-            photo_url: student.photo_url || '/avatar_ghost.jpg',
-            is_campus_active: student.is_campus_active ?? false,
-            school_id: student.school_id || teacher?.school_id,
-            schoolId: student.school_id || teacher?.school_id
-          });
-        }}
-        onOpenSchedule={() => {
-          if (onTabChange) onTabChange('schedule');
-        }}
-        onOpenRoomPlanner={() => {
-          if (onTabChange) onTabChange('rooms');
-        }}
-        onOpenMeisterwerk={() => {
-          if (allStudents.length > 0) {
-            setDocStudent(allStudents[0]);
-          }
-        }}
-        onOpenGrooveLab={() => {
-          if (onLocationModeChange) onLocationModeChange('lab');
-        }}
-      />
+      {showCommandPalette && (
+        <Suspense fallback={null}>
+          <CommandPaletteModal
+            isOpen={showCommandPalette}
+            onClose={() => setShowCommandPalette(false)}
+            allStudents={allStudents}
+            onOpenNotesBoard={() => {
+              setLeftColumnTab('notes');
+            }}
+            onOpenQuickNote={() => {
+              setLeftColumnTab('notes');
+            }}
+            onOpenStudentHomework={(student) => {
+              setDocStudent({
+                ...student,
+                id: student.id,
+                first_name: student.first_name || student.name?.split(' ')[0],
+                last_name: student.last_name || student.name?.split(' ').slice(1).join(' '),
+                photo_url: student.photo_url || '/avatar_ghost.jpg',
+                is_campus_active: student.is_campus_active ?? false,
+                school_id: student.school_id || teacher?.school_id,
+                schoolId: student.school_id || teacher?.school_id
+              });
+            }}
+            onOpenSchedule={() => {
+              if (onTabChange) onTabChange('schedule');
+            }}
+            onOpenRoomPlanner={() => {
+              if (onTabChange) onTabChange('rooms');
+            }}
+            onOpenMeisterwerk={() => {
+              if (allStudents.length > 0) {
+                setDocStudent(allStudents[0]);
+              }
+            }}
+            onOpenGrooveLab={() => {
+              if (onLocationModeChange) onLocationModeChange('lab');
+            }}
+          />
+        </Suspense>
+      )}
 
       {/* Invite Student Modal */}
       {showInviteStudent && (
@@ -10673,7 +10685,7 @@ useEffect(() => {
         className="cg-full-height-board fluid-board-scroll-container"
         style={{
           flex: 1,
-          padding: hideHeader ? '0' : ((windowWidth < 768 || isMobileDevice) ? 'max(48px, env(safe-area-inset-top, 48px)) 10px 10px 10px' : '10px'),
+          padding: hideHeader ? ((windowWidth < 768 || isMobileDevice) ? '0 0 100px 0' : '0') : ((windowWidth < 768 || isMobileDevice) ? 'max(48px, env(safe-area-inset-top, 48px)) 10px 100px 10px' : '10px'),
           boxSizing: 'border-box',
           width: '100%'
         }}
@@ -19985,29 +19997,37 @@ useEffect(() => {
       <TourComponent />
 
       {/* Feedback & Ideenschmiede Modal */}
-      <FeedbackHubModal
-        isOpen={isFeedbackModalOpen}
-        onClose={() => setIsFeedbackModalOpen(false)}
-        userRole="teacher"
-        userId={userId}
-        userName={`${teacher?.first_name || ''} ${teacher?.last_name || ''}`.trim() || 'Lehrkraft'}
-        schoolId={teacher?.school_id || (teacher as any)?.schoolId}
-        schoolName={schoolData?.name || (teacher as any)?.school_name}
-        activePlatform={activePlatform}
-      />
+      {isFeedbackModalOpen && (
+        <Suspense fallback={null}>
+          <FeedbackHubModal
+            isOpen={isFeedbackModalOpen}
+            onClose={() => setIsFeedbackModalOpen(false)}
+            userRole="teacher"
+            userId={userId}
+            userName={`${teacher?.first_name || ''} ${teacher?.last_name || ''}`.trim() || 'Lehrkraft'}
+            schoolId={teacher?.school_id || (teacher as any)?.schoolId}
+            schoolName={schoolData?.name || (teacher as any)?.school_name}
+            activePlatform={activePlatform}
+          />
+        </Suspense>
+      )}
 
       {/* Leitfäden & Akademie Modal */}
-      <HelpCenterModal
-        isOpen={isHelpCenterOpen}
-        onClose={() => setIsHelpCenterOpen(false)}
-        userRole="teacher"
-        activePlatform={activePlatform as any}
-        schoolName={schoolData?.name || (teacher as any)?.school_name}
-        onOpenFeedbackHub={() => {
-          setIsHelpCenterOpen(false);
-          setIsFeedbackModalOpen(true);
-        }}
-      />
+      {isHelpCenterOpen && (
+        <Suspense fallback={null}>
+          <HelpCenterModal
+            isOpen={isHelpCenterOpen}
+            onClose={() => setIsHelpCenterOpen(false)}
+            userRole="teacher"
+            activePlatform={activePlatform as any}
+            schoolName={schoolData?.name || (teacher as any)?.school_name}
+            onOpenFeedbackHub={() => {
+              setIsHelpCenterOpen(false);
+              setIsFeedbackModalOpen(true);
+            }}
+          />
+        </Suspense>
+      )}
 
       {/* Global Notes Quick-Drawer (Cmd+J) */}
       <GlobalNotesDrawer

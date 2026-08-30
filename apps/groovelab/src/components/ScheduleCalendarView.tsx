@@ -6303,7 +6303,7 @@ export function ScheduleCalendarView({
 
                                 {!isSelectedForSubCard && (occ.substitute_teacher_id || occ.is_substitute) && (
                                   <div style={{ fontSize: '0.6rem', fontWeight: 800, color: '#3730a3', background: '#e0e7ff', padding: '1px 5px', borderRadius: '4px', border: '1px solid #c7d2fe', marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                    Vertretung: {formatTeacherFullName(occ.substitute_teacher || allSchoolTeachers.find(t => t.id === occ.substitute_teacher_id)) || 'Dozent'}
+                                    Vertretung: {formatTeacherFullName(occ.substitute_teacher || allSchoolTeachers.find(t => t.id === occ.substitute_teacher_id)) || 'Lehrkraft'}
                                   </div>
                                 )}
                               </div>
@@ -7621,7 +7621,7 @@ return (
                           marginBottom: editOccState.substitute_teacher_id ? '8px' : '0'
                         }}
                       >
-                        <option value="">-- Keine Vertretung (Regulärer Dozent) --</option>
+                        <option value="">-- Keine Vertretung (Reguläre Lehrkraft) --</option>
                         {(((teachers && teachers.length > 0) ? teachers : allSchoolTeachers) || []).map((t: any) => (
                           <option key={t.id} value={t.id}>
                             {t.first_name} {t.last_name || ''} {t.instrument ? `(${t.instrument})` : ''}

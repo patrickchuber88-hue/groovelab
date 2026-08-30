@@ -1545,11 +1545,12 @@ select option {
   display: none !important;
 }
 
-/* 1. Real Smartphone Viewports (<= 768px) & Simulator Mobile Canvas */
-@media (max-width: 768px) {
+/* 1. Real Smartphone & Tablet Viewports (<= 1024px) */
+@media (max-width: 1024px) {
   .sidebar-nav,
   .sidebar-container,
-  .desktop-only-sidebar {
+  .desktop-only-sidebar,
+  .glass-sidebar {
     display: none !important;
   }
 
@@ -1575,11 +1576,11 @@ select option {
     width: 100% !important;
     height: calc(62px + env(safe-area-inset-bottom, 0px)) !important;
     padding: 0 12px calc(env(safe-area-inset-bottom, 0px) + 2px) 12px !important;
-    background: rgba(255, 255, 255, 0.96) !important;
+    background: rgba(255, 255, 255, 0.98) !important;
     backdrop-filter: blur(20px) !important;
     -webkit-backdrop-filter: blur(20px) !important;
     border-top: 1px solid rgba(226, 232, 240, 0.8) !important;
-    z-index: 1000 !important;
+    z-index: 10000 !important;
     box-sizing: border-box !important;
     gap: 6px !important;
   }
@@ -1620,15 +1621,28 @@ select option {
 .sim-viewport-mobile .desktop-only-sidebar,
 .sim-viewport-mobile .desktop-only-header,
 .sim-viewport-mobile .main-sidebar,
-.sim-viewport-mobile .desktop-greeting-banner {
+.sim-viewport-mobile .desktop-greeting-banner,
+.sim-viewport-mobile .glass-sidebar {
   display: none !important;
 }
 
-.sim-viewport-mobile .cg-mobile-top-header {
+.sim-viewport-portrait .sidebar-nav,
+.sim-viewport-portrait .sidebar-container,
+.sim-viewport-portrait .desktop-only-sidebar,
+.sim-viewport-portrait .desktop-only-header,
+.sim-viewport-portrait .main-sidebar,
+.sim-viewport-portrait .desktop-greeting-banner,
+.sim-viewport-portrait .glass-sidebar {
+  display: none !important;
+}
+
+.sim-viewport-mobile .cg-mobile-top-header,
+.sim-viewport-portrait .cg-mobile-top-header {
   display: flex !important;
 }
 
-.sim-viewport-mobile .cg-mobile-bottom-nav {
+.sim-viewport-mobile .cg-mobile-bottom-nav,
+.sim-viewport-portrait .cg-mobile-bottom-nav {
   display: flex !important;
   align-items: center !important;
   justify-content: flex-start !important;
@@ -1639,14 +1653,14 @@ select option {
   -webkit-overflow-scrolling: touch !important;
   scrollbar-width: none !important;
   -ms-overflow-style: none !important;
-  position: fixed !important;
+  position: absolute !important;
   bottom: 0 !important;
   left: 0 !important;
   right: 0 !important;
   width: 100% !important;
   height: calc(62px + env(safe-area-inset-bottom, 0px)) !important;
   padding: 0 12px calc(env(safe-area-inset-bottom, 0px) + 2px) 12px !important;
-  background: rgba(255, 255, 255, 0.96) !important;
+  background: rgba(255, 255, 255, 0.98) !important;
   backdrop-filter: blur(20px) !important;
   -webkit-backdrop-filter: blur(20px) !important;
   border-top: 1px solid rgba(226, 232, 240, 0.8) !important;
@@ -1655,8 +1669,45 @@ select option {
   gap: 6px !important;
 }
 
-.sim-viewport-mobile .cg-mobile-bottom-nav::-webkit-scrollbar {
+.sim-viewport-mobile .cg-mobile-bottom-nav::-webkit-scrollbar,
+.sim-viewport-portrait .cg-mobile-bottom-nav::-webkit-scrollbar {
   display: none !important;
+}
+
+.sim-viewport-mobile .cg-bottom-nav-item,
+.sim-viewport-portrait .cg-bottom-nav-item {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex-shrink: 0 !important;
+  min-width: 60px !important;
+  height: 100% !important;
+  background: transparent !important;
+  border: none !important;
+  cursor: pointer !important;
+  gap: 2px !important;
+  padding: 4px 6px !important;
+  color: #64748b;
+  transition: all 0.2s ease;
+}
+
+.sim-viewport-mobile .cg-bottom-nav-item.active-campus,
+.sim-viewport-portrait .cg-bottom-nav-item.active-campus {
+  color: #34a853 !important;
+  font-weight: 800 !important;
+}
+
+.sim-viewport-mobile .cg-bottom-nav-item.active-groovelab,
+.sim-viewport-portrait .cg-bottom-nav-item.active-groovelab {
+  color: #eab308 !important;
+  font-weight: 800 !important;
+}
+
+.sim-viewport-mobile .cg-bottom-nav-item.active-admin,
+.sim-viewport-portrait .cg-bottom-nav-item.active-admin {
+  color: #ea4335 !important;
+  font-weight: 800 !important;
 }
 
 .sim-viewport-mobile .hero-avatar-container {

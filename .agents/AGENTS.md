@@ -110,7 +110,7 @@
 - **Desktop Version Immunity**: All desktop UI layouts, multi-column grids, desktop header tabs, and desktop navigation components across all modules must remain 100% untouched and preserved. Any responsive layout edits, mobile optimizations, or swipe card additions must be strictly scoped to mobile screen sizes (<= 768px) or device simulator classes (.sim-viewport-mobile, .sim-viewport-portrait), with ZERO side-effects on desktop viewports.
 
 ## Future Plans & Notes (Zukünftige Vorhaben)
-- **Profilauswahl-Sicherheit im Campus-Modul**: Das Netflix-Prinzip (Schnellwahl lokaler Profile ohne PIN-Abfrage) ist für Familien mit mehreren Kindern im Campus-Modul gewollt. Im GrooveLab-Modul wird dies nicht benötigt. Bei zukünftigen Modifikationen des Campus-Moduls soll dieses Prinzip dort verankert und gepflegt werden.
+- **Profilauswahl-Sicherheit im Campus-Modul**: Der Familien-Schnellwechsel (Schnellwahl lokaler Profile ohne PIN-Abfrage) ist für Familien mit mehreren Kindern im Campus-Modul gewollt. Im GrooveLab-Modul wird dies nicht benötigt. Bei zukünftigen Modifikationen des Campus-Moduls soll dieses Prinzip dort verankert und gepflegt werden.
 
 ## PWA & Deployment Rules
 - **PWA Auto-Update Mechanism**: Ensure the automatic Service Worker update checker (`reg.update()`) remains active in `App.tsx` and checks every 5 minutes.

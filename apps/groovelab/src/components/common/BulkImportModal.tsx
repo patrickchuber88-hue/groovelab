@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { 
   Upload, FileText, Check, AlertTriangle, X, RefreshCw, 
   ShieldCheck, ArrowRight, Download, Users, CheckCircle2,
-  GraduationCap, HelpCircle, Eye, Info
+  GraduationCap, HelpCircle, Eye, Info, Calendar, MapPin
 } from 'lucide-react';
 import { normalizeInstrument } from '../../utils/instruments';
 import { executeResilientBatch, BatchProgress } from '../../lib/batchOperations';
@@ -24,6 +24,11 @@ interface ExistingStudent {
   teacher_id?: string;
 }
 
+interface ExistingRoom {
+  id: string;
+  name: string;
+}
+
 interface ParsedRow {
   originalFirstName: string;
   originalLastName: string;
@@ -32,6 +37,13 @@ interface ParsedRow {
   teacherName?: string;
   teacherId?: string;
   email?: string;
+  dayOfWeek?: number;
+  dayName?: string;
+  startTime?: string;
+  duration?: number;
+  endTime?: string;
+  roomName?: string;
+  roomId?: string;
   status: 'NEW' | 'EXISTING' | 'INVALID';
   existingStudentId?: string;
   error?: string;
@@ -53,15 +65,17 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
   const [importCount, setImportCount] = useState(0);
   const [existingPreservedCount, setExistingPreservedCount] = useState(0);
   const [importErrors, setImportErrors] = useState<string[]>([]);
-  const [targetType, setTargetType] = useState<'STUDENT' | 'TEACHER'>('STUDENT');
+  const [targetType, setTargetType] = useState<'STUDENT' | 'TEACHER' | 'SCHEDULE'>('STUDENT');
   const [existingStudents, setExistingStudents] = useState<ExistingStudent[]>([]);
+  const [existingRooms, setExistingRooms] = useState<ExistingRoom[]>([]);
   const [isLoadingExisting, setIsLoadingExisting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Fetch existing students from Supabase to enable Smart Delta-Sync (Optimierung 4)
+  // Fetch existing students and rooms from Supabase to enable Smart Delta-Sync (Optimierung 4 & 5)
   useEffect(() => {
     if (isOpen && schoolId) {
       fetchExistingStudents();
+      fetchExistingRooms();
     }
   }, [isOpen, schoolId]);
 
@@ -81,6 +95,20 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
       console.warn('[BulkImportModal] Could not fetch existing students for delta sync:', err);
     } finally {
       setIsLoadingExisting(false);
+    }
+  };
+
+  const fetchExistingRooms = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('rooms')
+        .select('id, name')
+        .eq('school_id', schoolId);
+      if (!error && data) {
+        setExistingRooms(data as ExistingRoom[]);
+      }
+    } catch (err) {
+      console.warn('[BulkImportModal] Could not fetch existing rooms:', err);
     }
   };
 
@@ -116,6 +144,18 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
     return `${cleanFirst} ${cleanLast.charAt(0).toUpperCase()}.`;
   };
 
+  const parseDayOfWeek = (raw: string): { num: number; label: string } => {
+    const clean = raw.toLowerCase().trim();
+    if (/mo|montag|mon|1/i.test(clean)) return { num: 1, label: 'Montag' };
+    if (/di|dienstag|tue|2/i.test(clean)) return { num: 2, label: 'Dienstag' };
+    if (/mi|mittwoch|wed|3/i.test(clean)) return { num: 3, label: 'Mittwoch' };
+    if (/do|donnerstag|thu|4/i.test(clean)) return { num: 4, label: 'Donnerstag' };
+    if (/fr|freitag|fri|5/i.test(clean)) return { num: 5, label: 'Freitag' };
+    if (/sa|samstag|sat|6/i.test(clean)) return { num: 6, label: 'Samstag' };
+    if (/so|sonntag|sun|7/i.test(clean)) return { num: 7, label: 'Sonntag' };
+    return { num: 1, label: 'Montag' };
+  };
+
   // Parse CSV / TSV text with bulletproof delimiter detection & data minimization
   const parseCSVContent = (rawText: string) => {
     const text = fixMojibakeAndEncoding(rawText);
@@ -145,6 +185,12 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
     let instrIdx = rawHeaders.findIndex(h => /instrument|fach|kurs|modul|hauptfach/i.test(h));
     let teacherIdx = rawHeaders.findIndex(h => /lehrer|lehrkraft|dozent|teacher|coach|dozent_name|lehrkraft_kuerzel/i.test(h));
     let emailIdx = rawHeaders.findIndex(h => /mail|e-mail/i.test(h));
+
+    // Schedule-Specific Columns
+    let dayIdx = rawHeaders.findIndex(h => /wochentag|tag|day/i.test(h));
+    let timeIdx = rawHeaders.findIndex(h => /zeit|uhrzeit|start|beginn|time/i.test(h));
+    let durIdx = rawHeaders.findIndex(h => /dauer|minuten|duration|min/i.test(h));
+    let roomIdx = rawHeaders.findIndex(h => /raum|room|ort|saal/i.test(h));
 
     // Fallback if only one "Name" or "Schüler" column exists
     if (firstIdx === -1 && lastIdx === -1) {
@@ -197,11 +243,25 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
       const rawTeacher = teacherIdx !== -1 ? fixMojibakeAndEncoding(row[teacherIdx] || '') : '';
       const email = emailIdx !== -1 ? row[emailIdx] || '' : '';
 
+      // Schedule parsing
+      const rawDay = dayIdx !== -1 ? fixMojibakeAndEncoding(row[dayIdx] || '') : 'Montag';
+      const dayParsed = parseDayOfWeek(rawDay);
+      const rawTime = timeIdx !== -1 ? fixMojibakeAndEncoding(row[timeIdx] || '') : '14:00';
+      const rawDur = durIdx !== -1 ? Number(row[durIdx]) || 30 : 30;
+      const rawRoom = roomIdx !== -1 ? fixMojibakeAndEncoding(row[roomIdx] || '') : 'Raum 1';
+
       // Match teacher if available
       let matchedTeacherId: string | undefined;
       if (rawTeacher && teachers.length > 0) {
         const found = teachers.find(t => t.name.toLowerCase().includes(rawTeacher.toLowerCase()) || rawTeacher.toLowerCase().includes(t.name.toLowerCase()));
         if (found) matchedTeacherId = found.id;
+      }
+
+      // Match room if available
+      let matchedRoomId: string | undefined;
+      if (rawRoom && existingRooms.length > 0) {
+        const foundRoom = existingRooms.find(r => r.name.toLowerCase() === rawRoom.toLowerCase());
+        if (foundRoom) matchedRoomId = foundRoom.id;
       }
 
       const sanitizedName = sanitizeStudentName(firstName, lastName);
@@ -213,12 +273,12 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
 
       if (!isValid) {
         rowStatus = 'INVALID';
-      } else if (targetType === 'STUDENT') {
+      } else if (targetType === 'STUDENT' || targetType === 'SCHEDULE') {
         const lookupKeyWithInstr = `${sanitizedName.toLowerCase()}|${instrument.toLowerCase()}`;
         const lookupKeyNameOnly = sanitizedName.toLowerCase();
         existingMatch = existingMap.get(lookupKeyWithInstr) || existingMap.get(lookupKeyNameOnly);
 
-        if (existingMatch) {
+        if (existingMatch && targetType === 'STUDENT') {
           rowStatus = 'EXISTING';
         }
       }
@@ -231,6 +291,12 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
         teacherName: rawTeacher,
         teacherId: matchedTeacherId,
         email,
+        dayOfWeek: dayParsed.num,
+        dayName: dayParsed.label,
+        startTime: rawTime,
+        duration: rawDur,
+        roomName: rawRoom,
+        roomId: matchedRoomId,
         status: rowStatus,
         existingStudentId: existingMatch?.id,
         error: !isValid ? 'Vorname fehlt' : undefined
@@ -255,15 +321,25 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
   };
 
   const handleDownloadSampleCSV = () => {
-    const csv = targetType === 'STUDENT'
-      ? 'Vorname;Nachname;Instrument;Lehrkraft\nMax;Mustermann;Klavier;Herr Schmidt\nAnna;Müller;Gitarre;Frau Weber\nLeon;Bauer;Schlagzeug;Herr Schmidt\n'
-      : 'Vorname;Nachname;Instrument;E-Mail\nThomas;Schmidt;Klavier;schmidt@musikschule.de\nSarah;Weber;Gitarre;weber@musikschule.de\n';
+    let csv = '';
+    let filename = '';
+
+    if (targetType === 'SCHEDULE') {
+      csv = 'Wochentag;Uhrzeit;Dauer;Raum;Lehrkraft;Schüler;Instrument\nMontag;14:00;30;Raum 1;Severin Landenberger;Max Mustermann;Klavier\nMontag;14:30;45;Raum 1;Severin Landenberger;Anna Schmidt;Klavier\nDienstag;15:00;30;Schlagzeugraum;Patrick Huber;Felix Wagner;Schlagzeug\n';
+      filename = 'Muster_Stundenplan_Raumbelegung.csv';
+    } else if (targetType === 'STUDENT') {
+      csv = 'Vorname;Nachname;Instrument;Lehrkraft\nMax;Mustermann;Klavier;Herr Schmidt\nAnna;Müller;Gitarre;Frau Weber\nLeon;Bauer;Schlagzeug;Herr Schmidt\n';
+      filename = 'Muster_Schuelerliste.csv';
+    } else {
+      csv = 'Vorname;Nachname;Instrument;E-Mail\nThomas;Schmidt;Klavier;schmidt@musikschule.de\nSarah;Weber;Gitarre;weber@musikschule.de\n';
+      filename = 'Muster_Lehrerliste.csv';
+    }
     
     const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `Muster_${targetType === 'STUDENT' ? 'Schuelerliste' : 'Lehrerliste'}.csv`;
+    a.download = filename;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -279,11 +355,74 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
 
     let createdCount = 0;
 
-    if (newRows.length > 0) {
+    if (newRows.length > 0 || (targetType === 'SCHEDULE' && parsedRows.length > 0)) {
+      const rowsToProcess = targetType === 'SCHEDULE' ? parsedRows.filter(r => r.status !== 'INVALID') : newRows;
+
       const batchResult = await executeResilientBatch<ParsedRow, any>(
-        newRows,
+        rowsToProcess,
         async (row) => {
-          if (targetType === 'STUDENT') {
+          if (targetType === 'SCHEDULE') {
+            // 1. Ensure Room
+            let effectiveRoomId = row.roomId;
+            if (!effectiveRoomId && row.roomName) {
+              const cleanRName = row.roomName.trim();
+              const existingR = existingRooms.find(r => r.name.toLowerCase() === cleanRName.toLowerCase());
+              if (existingR) {
+                effectiveRoomId = existingR.id;
+              } else {
+                const { data: newR } = await supabase
+                  .from('rooms')
+                  .insert([{ school_id: schoolId, name: cleanRName }])
+                  .select()
+                  .single();
+                if (newR) {
+                  effectiveRoomId = newR.id;
+                  setExistingRooms(prev => [...prev, newR]);
+                }
+              }
+            }
+
+            // 2. Ensure Student
+            let effectiveStudentId = row.existingStudentId;
+            if (!effectiveStudentId) {
+              const { data: newStd } = await supabase
+                .from('users')
+                .insert([{
+                  school_id: schoolId,
+                  name: row.sanitizedName,
+                  role: 'student',
+                  instrument: row.instrument,
+                  teacher_id: row.teacherId || null,
+                  status: 'active',
+                  is_campus_active: true,
+                  is_groovelab_active: false,
+                  created_at: new Date().toISOString()
+                }])
+                .select()
+                .single();
+              if (newStd) effectiveStudentId = newStd.id;
+            }
+
+            // 3. Upsert Schedule Preference / Slot
+            if (effectiveStudentId) {
+              await supabase
+                .from('student_schedule_preferences')
+                .upsert({
+                  student_id: effectiveStudentId,
+                  school_id: schoolId,
+                  teacher_id: row.teacherId || null,
+                  preferred_day: row.dayOfWeek || 1,
+                  start_time: row.startTime || '14:00',
+                  end_time: row.endTime || '14:30',
+                  duration_minutes: row.duration || 30,
+                  room_id: effectiveRoomId || null,
+                  status: 'CONFIRMED',
+                  updated_at: new Date().toISOString()
+                });
+            }
+
+            return { studentId: effectiveStudentId, roomId: effectiveRoomId };
+          } else if (targetType === 'STUDENT') {
             const { data, error } = await supabase.from('users').insert([{
               school_id: schoolId,
               name: row.sanitizedName,
@@ -392,7 +531,7 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
                 ONBOARDING-BOOSTER • {schoolName}
               </span>
               <h3 style={{ margin: '2px 0 0 0', fontSize: '1.2rem', fontWeight: 900, color: '#0f172a' }}>
-                {targetType === 'STUDENT' ? 'Schülerliste importieren (CSV/Excel)' : 'Lehrkräfte importieren (CSV/Excel)'}
+                {targetType === 'STUDENT' ? 'Schülerliste importieren (CSV/Excel)' : (targetType === 'SCHEDULE' ? 'Stundenplan & Raumbelegung importieren (CSV/Excel)' : 'Lehrkräfte importieren (CSV/Excel)')}
               </h3>
             </div>
           </div>
@@ -421,12 +560,13 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
               
               {/* Type Switcher with 100% Monochrome Icons */}
-              <div style={{ display: 'flex', gap: '8px', background: '#f1f5f9', padding: '4px', borderRadius: '14px' }}>
+              <div style={{ display: 'flex', gap: '8px', background: '#f1f5f9', padding: '4px', borderRadius: '14px', flexWrap: 'wrap' }}>
                 <button
                   type="button"
                   onClick={() => setTargetType('STUDENT')}
                   style={{
                     flex: 1,
+                    minWidth: '150px',
                     padding: '10px 16px',
                     borderRadius: '10px',
                     border: 'none',
@@ -443,13 +583,40 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
                   }}
                 >
                   <GraduationCap size={16} />
-                  <span>Schüler-Import (mit DSGVO-Maskierung)</span>
+                  <span>Schüler-Import (DSGVO)</span>
                 </button>
+
+                <button
+                  type="button"
+                  onClick={() => setTargetType('SCHEDULE')}
+                  style={{
+                    flex: 1,
+                    minWidth: '150px',
+                    padding: '10px 16px',
+                    borderRadius: '10px',
+                    border: 'none',
+                    background: targetType === 'SCHEDULE' ? '#ffffff' : 'transparent',
+                    color: targetType === 'SCHEDULE' ? '#0f172a' : '#64748b',
+                    fontWeight: 800,
+                    fontSize: '0.82rem',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    boxShadow: targetType === 'SCHEDULE' ? '0 2px 8px rgba(0,0,0,0.06)' : 'none'
+                  }}
+                >
+                  <Calendar size={16} />
+                  <span>Stundenplan &amp; Räume</span>
+                </button>
+
                 <button
                   type="button"
                   onClick={() => setTargetType('TEACHER')}
                   style={{
                     flex: 1,
+                    minWidth: '150px',
                     padding: '10px 16px',
                     borderRadius: '10px',
                     border: 'none',
@@ -617,13 +784,24 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
               <div style={{ maxHeight: '360px', overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: '16px' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.80rem', textAlign: 'left' }}>
                   <thead style={{ background: '#f8fafc', position: 'sticky', top: 0, borderBottom: '1.5px solid #e2e8f0' }}>
-                    <tr style={{ color: '#64748b', fontWeight: 800, fontSize: '0.70rem', textTransform: 'uppercase' }}>
-                      <th style={{ padding: '10px 14px' }}>#</th>
-                      <th style={{ padding: '10px 14px' }}>ORIGINAL-NAME</th>
-                      <th style={{ padding: '10px 14px', color: '#16a34a' }}>DSGVO-NAME (IN APP)</th>
-                      <th style={{ padding: '10px 14px' }}>INSTRUMENT</th>
-                      <th style={{ padding: '10px 14px' }}>STATUS &amp; DELTA-SYNC</th>
-                    </tr>
+                    {targetType === 'SCHEDULE' ? (
+                      <tr style={{ color: '#64748b', fontWeight: 800, fontSize: '0.70rem', textTransform: 'uppercase' }}>
+                        <th style={{ padding: '10px 14px' }}>#</th>
+                        <th style={{ padding: '10px 14px', color: '#16a34a' }}>SCHÜLER</th>
+                        <th style={{ padding: '10px 14px' }}>WOCHENTAG &amp; ZEIT</th>
+                        <th style={{ padding: '10px 14px' }}>RAUM</th>
+                        <th style={{ padding: '10px 14px' }}>LEHRKRAFT</th>
+                        <th style={{ padding: '10px 14px' }}>STATUS</th>
+                      </tr>
+                    ) : (
+                      <tr style={{ color: '#64748b', fontWeight: 800, fontSize: '0.70rem', textTransform: 'uppercase' }}>
+                        <th style={{ padding: '10px 14px' }}>#</th>
+                        <th style={{ padding: '10px 14px' }}>ORIGINAL-NAME</th>
+                        <th style={{ padding: '10px 14px', color: '#16a34a' }}>DSGVO-NAME (IN APP)</th>
+                        <th style={{ padding: '10px 14px' }}>INSTRUMENT</th>
+                        <th style={{ padding: '10px 14px' }}>STATUS &amp; DELTA-SYNC</th>
+                      </tr>
+                    )}
                   </thead>
                   <tbody>
                     {parsedRows.map((row, idx) => (
@@ -632,23 +810,52 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
                         background: row.status === 'INVALID' ? '#fff1f2' : (row.status === 'EXISTING' ? '#f8fafc' : '#ffffff') 
                       }}>
                         <td style={{ padding: '10px 14px', color: '#94a3b8' }}>{idx + 1}</td>
-                        <td style={{ padding: '10px 14px', color: '#64748b' }}>{row.originalFirstName} {row.originalLastName}</td>
-                        <td style={{ padding: '10px 14px', fontWeight: 800, color: '#0f172a' }}>
-                          <span style={{ 
-                            background: row.status === 'EXISTING' ? '#eff6ff' : '#f0fdf4', 
-                            color: row.status === 'EXISTING' ? '#1d4ed8' : '#166534', 
-                            padding: '2px 8px', 
-                            borderRadius: '6px', 
-                            border: row.status === 'EXISTING' ? '1px solid #bfdbfe' : '1px solid #bbf7d0' 
-                          }}>
-                            {row.sanitizedName}
-                          </span>
-                        </td>
-                        <td style={{ padding: '10px 14px', color: '#475569' }}>{row.instrument}</td>
+                        {targetType === 'SCHEDULE' ? (
+                          <>
+                            <td style={{ padding: '10px 14px', fontWeight: 800, color: '#0f172a' }}>
+                              <span style={{ 
+                                background: '#f0fdf4', 
+                                color: '#166534', 
+                                padding: '2px 8px', 
+                                borderRadius: '6px', 
+                                border: '1px solid #bbf7d0' 
+                              }}>
+                                {row.sanitizedName} ({row.instrument})
+                              </span>
+                            </td>
+                            <td style={{ padding: '10px 14px', color: '#0f172a', fontWeight: 700 }}>
+                              {row.dayName || 'Montag'}, {row.startTime} <span style={{ color: '#64748b', fontWeight: 500 }}>({row.duration} Min.)</span>
+                            </td>
+                            <td style={{ padding: '10px 14px', color: '#475569', fontWeight: 700 }}>
+                              <span style={{ background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px' }}>
+                                {row.roomName || 'Raum 1'}
+                              </span>
+                            </td>
+                            <td style={{ padding: '10px 14px', color: '#475569' }}>
+                              {row.teacherName || '–'}
+                            </td>
+                          </>
+                        ) : (
+                          <>
+                            <td style={{ padding: '10px 14px', color: '#64748b' }}>{row.originalFirstName} {row.originalLastName}</td>
+                            <td style={{ padding: '10px 14px', fontWeight: 800, color: '#0f172a' }}>
+                              <span style={{ 
+                                background: row.status === 'EXISTING' ? '#eff6ff' : '#f0fdf4', 
+                                color: row.status === 'EXISTING' ? '#1d4ed8' : '#166534', 
+                                padding: '2px 8px', 
+                                borderRadius: '6px', 
+                                border: row.status === 'EXISTING' ? '1px solid #bfdbfe' : '1px solid #bbf7d0' 
+                              }}>
+                                {row.sanitizedName}
+                              </span>
+                            </td>
+                            <td style={{ padding: '10px 14px', color: '#475569' }}>{row.instrument}</td>
+                          </>
+                        )}
                         <td style={{ padding: '10px 14px' }}>
                           {row.status === 'NEW' && (
                             <span style={{ color: '#16a34a', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 700 }}>
-                              <Check size={14} /> Neu anlegen
+                              <Check size={14} /> Bereit zum Import
                             </span>
                           )}
                           {row.status === 'EXISTING' && (

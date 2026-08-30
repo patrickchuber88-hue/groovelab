@@ -8,7 +8,7 @@ export interface StorageTier {
 }
 
 export const DEFAULT_STORAGE_TIERS: StorageTier[] = [
-  { gb: 0, price: 0, label: '1 GB Basis', sublabel: 'Bis 15 Schüler', desc: '0,00 € / Mo.', recommendedFor: 'Kleine Dozenten-Klassen' },
+  { gb: 0, price: 0, label: '1 GB Basis', sublabel: 'Bis 15 Schüler', desc: '0,00 € / Mo.', recommendedFor: 'Kleine Lehrkraft-Klassen' },
   { gb: 10, price: 1.99, label: '+10 GB', sublabel: 'Bis 100 Schüler', desc: '1,99 € / Mo.', recommendedFor: 'Kleine Musikschulen' },
   { gb: 25, price: 3.99, label: '+25 GB', sublabel: 'Bis 250 Schüler', desc: '3,99 € / Mo.', recommendedFor: 'Mittelgroße Musikschulen' },
   { gb: 50, price: 6.99, label: '+50 GB', sublabel: 'Bis 500 Schüler', desc: '6,99 € / Mo.', recommendedFor: 'Große Musikschulen' },

@@ -12,6 +12,20 @@ serve(async (req) => {
   }
 
   try {
+    const expectedAnonKey = Deno.env.get("SUPABASE_ANON_KEY") || "";
+    const expectedServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+
+    // Enterprise Auth-Guard: Verify caller is authenticated
+    const authHeader = req.headers.get("Authorization") || req.headers.get("apikey") || "";
+    const bearerToken = authHeader.replace("Bearer ", "").trim();
+
+    if (!bearerToken || (bearerToken !== expectedAnonKey && bearerToken !== expectedServiceKey)) {
+      return new Response(JSON.stringify({ error: "Unauthorized: Valid API key or Authorization token required" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const geminiApiKey = Deno.env.get("GEMINI_API_KEY") || "";
     
     if (!geminiApiKey) {

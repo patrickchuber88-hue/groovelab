@@ -49,7 +49,7 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
   const [newSchoolZip, setNewSchoolZip] = useState('');
   const [newSchoolCity, setNewSchoolCity] = useState('');
   const [newSchoolEmail, setNewSchoolEmail] = useState('');
-  const [newSchoolModule, setNewSchoolModule] = useState<'kombi' | 'campus' | 'groovelab'>('kombi');
+  const [newSchoolModule, setNewSchoolModule] = useState<'none' | 'kombi' | 'campus' | 'groovelab'>('none');
   const [newSchoolTrialMode, setNewSchoolTrialMode] = useState<'trial_30' | 'trial_14' | 'trial_60' | 'bypass' | 'paid'>('trial_30');
   const [provisioning, setProvisioning] = useState(false);
   const [inviteCopied, setInviteCopied] = useState(false);
@@ -284,6 +284,11 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
         billing_email: newSchoolEmail.trim() || null,
         has_campus_subscription: newSchoolModule === 'campus' || newSchoolModule === 'kombi',
         has_groovelab_subscription: newSchoolModule === 'groovelab' || newSchoolModule === 'kombi',
+        storage_addon_gb: 0,
+        storage_addon_monthly_fee: 0.00,
+        storage_addon_status: 'none',
+        extra_billing_option: null,
+        is_billing_booked: false,
         is_trial: isTrialMode,
         trial_until: trialUntil,
         subscription_bypass: newSchoolTrialMode === 'bypass',
@@ -1244,8 +1249,9 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
                 <label style={{ display: 'block', fontSize: '0.70rem', color: '#64748b', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase' }}>
                   Modulpaket
                 </label>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(75px, 1fr))', gap: '6px' }}>
                   {[
+                    { id: 'none', label: 'Ungebucht' },
                     { id: 'kombi', label: 'Kombi' },
                     { id: 'campus', label: 'Campus' },
                     { id: 'groovelab', label: 'GrooveLab' }

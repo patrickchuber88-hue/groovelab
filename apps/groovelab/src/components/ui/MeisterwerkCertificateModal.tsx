@@ -1,6 +1,8 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Printer, Award, Sparkles, Music, ShieldCheck } from 'lucide-react';
+import { X, Printer, Award, Sparkles, Music, ShieldCheck, Download, Loader2, Share2, Check } from 'lucide-react';
+import { toPng } from 'html-to-image';
+import jsPDF from 'jspdf';
 
 export interface MeisterwerkCertificateProps {
   studentName: string;
@@ -24,6 +26,8 @@ export const MeisterwerkCertificateModal: React.FC<MeisterwerkCertificateProps> 
   onClose
 }) => {
   const certificateRef = useRef<HTMLDivElement>(null);
+  const [isExporting, setIsExporting] = useState(false);
+  const [isCopied, setIsCopied] = useState(false);
 
   const formattedDate = masteredDate 
     ? new Date(masteredDate).toLocaleDateString('de-DE', { day: '2-digit', month: 'long', year: 'numeric' })
@@ -31,8 +35,80 @@ export const MeisterwerkCertificateModal: React.FC<MeisterwerkCertificateProps> 
 
   const effectiveCertId = certificateId || `MW-${new Date().getFullYear()}-${Math.random().toString(36).substring(2, 7).toUpperCase()}-100`;
 
+  const handleShareMasterpiece = async () => {
+    const shareTitle = `🏆 Meisterwerk-Urkunde: ${songTitle}`;
+    const shareText = `🎵 ${studentName} hat das musikalische Meisterwerk »${songTitle}« (${instrument}) mit Bravour an der ${schoolName} gemeistert!`;
+    const shareUrl = typeof window !== 'undefined' ? window.location.href : '';
+
+    if (typeof navigator !== 'undefined' && (navigator as any).share) {
+      try {
+        await (navigator as any).share({
+          title: shareTitle,
+          text: shareText,
+          url: shareUrl
+        });
+      } catch (err: any) {
+        if (err.name !== 'AbortError') {
+          console.warn('[MeisterwerkCertificateModal] WebShare error:', err);
+        }
+      }
+    } else if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      try {
+        await navigator.clipboard.writeText(`${shareText}\n${shareUrl}`);
+        setIsCopied(true);
+        setTimeout(() => setIsCopied(false), 2500);
+      } catch {
+        // Fallback ignored
+      }
+    }
+  };
+
   const handlePrint = () => {
     window.print();
+  };
+
+  const handleDownloadPdf = async () => {
+    if (!certificateRef.current || isExporting) return;
+    setIsExporting(true);
+    try {
+      const dataUrl = await toPng(certificateRef.current, {
+        quality: 0.98,
+        pixelRatio: 2.5,
+        backgroundColor: '#ffffff'
+      });
+
+      const pdf = new jsPDF({
+        orientation: 'landscape',
+        unit: 'mm',
+        format: 'a4'
+      });
+
+      const imgProps = pdf.getImageProperties(dataUrl);
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+
+      const imgRatio = imgProps.width / imgProps.height;
+      let renderWidth = pdfWidth;
+      let renderHeight = pdfWidth / imgRatio;
+
+      if (renderHeight > pdfHeight) {
+        renderHeight = pdfHeight;
+        renderWidth = pdfHeight * imgRatio;
+      }
+
+      const posX = (pdfWidth - renderWidth) / 2;
+      const posY = (pdfHeight - renderHeight) / 2;
+
+      pdf.addImage(dataUrl, 'PNG', posX, posY, renderWidth, renderHeight, undefined, 'FAST');
+      
+      const cleanStudent = studentName.replace(/\s+/g, '_');
+      const cleanSong = songTitle.replace(/\s+/g, '_');
+      pdf.save(`Meisterwerk_Urkunde_${cleanStudent}_${cleanSong}.pdf`);
+    } catch (err) {
+      console.error('[MeisterwerkCertificateModal] PDF generation error:', err);
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   const modalContent = (
@@ -120,6 +196,55 @@ export const MeisterwerkCertificateModal: React.FC<MeisterwerkCertificateProps> 
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <button
               type="button"
+              onClick={handleDownloadPdf}
+              disabled={isExporting}
+              style={{
+                background: '#ca8a04',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: '10px',
+                padding: '7px 16px',
+                fontSize: '0.80rem',
+                fontWeight: 800,
+                cursor: isExporting ? 'wait' : 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                boxShadow: '0 2px 8px rgba(202, 138, 4, 0.3)',
+                opacity: isExporting ? 0.75 : 1
+              }}
+              title="Urkunde als druckfähige PDF-Datei herunterladen"
+            >
+              {isExporting ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}
+              <span>{isExporting ? 'PDF wird erstellt...' : 'PDF herunterladen'}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleShareMasterpiece}
+              style={{
+                background: isCopied ? '#15803d' : '#2563eb',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: '10px',
+                padding: '7px 16px',
+                fontSize: '0.80rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                boxShadow: isCopied ? '0 2px 8px rgba(21, 128, 61, 0.3)' : '0 2px 8px rgba(37, 99, 235, 0.3)',
+                transition: 'all 0.2s ease'
+              }}
+              title="Urkunde & Meisterwerk-Erfolg mit Familie teilen (WhatsApp / Messenger / Link)"
+            >
+              {isCopied ? <Check size={15} /> : <Share2 size={15} />}
+              <span>{isCopied ? 'Link kopiert!' : 'Teilen'}</span>
+            </button>
+
+            <button
+              type="button"
               onClick={handlePrint}
               style={{
                 background: '#16a34a',
@@ -137,7 +262,7 @@ export const MeisterwerkCertificateModal: React.FC<MeisterwerkCertificateProps> 
               }}
             >
               <Printer size={15} />
-              <span>Urkunde drucken / AirPrint</span>
+              <span>Drucken / AirPrint</span>
             </button>
 
             <button

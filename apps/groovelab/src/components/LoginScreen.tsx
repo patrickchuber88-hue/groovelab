@@ -555,6 +555,34 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
   // Manual PIN Login and Kiosk Activator States
   const [pinInput, setPinInput] = useState('');
+  const [pinFailedAttempts, setPinFailedAttempts] = useState<number>(() => {
+    if (typeof window === 'undefined') return 0;
+    const stored = sessionStorage.getItem('campus_pin_failed_attempts');
+    return stored ? parseInt(stored, 10) : 0;
+  });
+  const [pinLockoutSeconds, setPinLockoutSeconds] = useState<number>(() => {
+    if (typeof window === 'undefined') return 0;
+    const until = parseInt(sessionStorage.getItem('campus_pin_lockout_until') || '0', 10);
+    const diff = Math.ceil((until - Date.now()) / 1000);
+    return diff > 0 ? diff : 0;
+  });
+
+  // Countdown timer for PIN brute-force lockout
+  useEffect(() => {
+    if (pinLockoutSeconds <= 0) return;
+    const timer = setInterval(() => {
+      setPinLockoutSeconds((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          sessionStorage.removeItem('campus_pin_lockout_until');
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [pinLockoutSeconds]);
+
   const [kioskRooms, setKioskRooms] = useState<any[]>([]);
   const [kioskStations, setKioskStations] = useState<any[]>([]);
   const kioskMapRef = useRef<HTMLDivElement>(null);
@@ -2989,6 +3017,10 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
   const handlePinLogin = async (pin: string) => {
     if (!pin.trim() || loading) return;
+    if (pinLockoutSeconds > 0) {
+      setError(`Sicherheitssperre: Zu viele Fehlversuche. Bitte warte noch ${pinLockoutSeconds} Sekunden.`);
+      return;
+    }
     if (!loginConsentAccepted) {
       alert("Bitte bestätige die Datenschutzerklärung vor dem Login.");
       return;
@@ -2996,15 +3028,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
     setLoading(true);
     setError(null);
     try {
-      console.log('[Login] Attempting manual PIN login for:', pin);
+      console.log('[Login] Attempting manual PIN login...');
       const cleanPin = pin.trim();
-
-      // DSB PIN Check (E-Mail-Freier DSB Zugang nach Art. 38 DSGVO)
-      if (cleanPin === '8492') {
-        setLoading(false);
-        setShowDpoPortalModal(true);
-        return;
-      }
 
       sessionStorage.setItem('groovelab_qr_token', cleanPin);
 
@@ -3045,8 +3070,23 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       }
 
       if (userErr || !user) {
+        const nextAttempts = pinFailedAttempts + 1;
+        setPinFailedAttempts(nextAttempts);
+        sessionStorage.setItem('campus_pin_failed_attempts', nextAttempts.toString());
+        if (nextAttempts >= 5) {
+          const lockDuration = nextAttempts >= 8 ? 60 : 30;
+          const until = Date.now() + lockDuration * 1000;
+          sessionStorage.setItem('campus_pin_lockout_until', until.toString());
+          setPinLockoutSeconds(lockDuration);
+          throw new Error(`Sicherheitssperre: Zu viele Fehlversuche. PIN-Eingabe für ${lockDuration}s gesperrt.`);
+        }
         throw new Error('Ungültiger Ausweis-PIN oder QR-Token.');
       }
+
+      // Successful login resets attempt counter
+      setPinFailedAttempts(0);
+      sessionStorage.removeItem('campus_pin_failed_attempts');
+      sessionStorage.removeItem('campus_pin_lockout_until');
 
       if (!user.is_master_admin && schoolData?.id && user.school_id && user.school_id !== schoolData.id) {
         throw new Error(`Dieser Zugangs-PIN gehört nicht zu der ausgewählten Musikschule (${schoolData?.name || 'Schule'}).`);
@@ -3326,19 +3366,12 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
     } catch (e) {
       console.warn("Failed to parse scanned URL", e);
     }
-    console.log('[Login] handleScan scannedValue:', scannedValue, '-> parsed qrToken:', qrToken);
+    console.log('[Login] handleScan received token');
 
     // Camera stream will be naturally released on page reload, avoiding browser locks.
 
     try {
-      console.log('[Login] Starting scan for token:', qrToken);
-
-      // DSB QR-Ausweis Check (E-Mail-Freier DSB Zugang nach Art. 38 DSGVO)
-      if (qrToken === '8492' || qrToken.toUpperCase().includes('DSB') || qrToken.toUpperCase().includes('AUDIT')) {
-        setLoading(false);
-        setShowDpoPortalModal(true);
-        return;
-      }
+      console.log('[Login] Processing QR login token...');
 
       // 1. User finden
       sessionStorage.setItem('groovelab_qr_token', qrToken);
@@ -5674,7 +5707,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               type="text"
               value={pinInput}
               onChange={(e) => setPinInput(e.target.value)}
-              placeholder="Ausweis ID..."
+              placeholder={pinLockoutSeconds > 0 ? `Gesperrt (${pinLockoutSeconds}s)` : "Ausweis ID..."}
+              disabled={loading || pinLockoutSeconds > 0}
               style={{
                 flex: 1,
                 padding: '14px 18px',
@@ -5685,26 +5719,27 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 outline: 'none',
                 transition: 'all 0.2s',
                 background: isGroovelabKiosk ? '#ffffff' : 'rgba(255, 255, 255, 0.05)',
-                color: isGroovelabKiosk ? '#0f172a' : '#ffffff'
+                color: isGroovelabKiosk ? '#0f172a' : '#ffffff',
+                opacity: pinLockoutSeconds > 0 ? 0.6 : 1
               }}
             />
             <button
               type="submit"
-              disabled={loading || !pinInput.trim()}
+              disabled={loading || !pinInput.trim() || pinLockoutSeconds > 0}
               style={{
                 padding: '14px 24px',
                 borderRadius: '16px',
                 border: 'none',
-                background: isGroovelabKiosk ? '#eab308' : (schoolData?.primary_color || '#e6f4ea'),
-                color: isGroovelabKiosk ? '#713f12' : (schoolData?.primary_color ? '#ffffff' : '#062413'),
+                background: pinLockoutSeconds > 0 ? '#64748b' : (isGroovelabKiosk ? '#eab308' : (schoolData?.primary_color || '#e6f4ea')),
+                color: pinLockoutSeconds > 0 ? '#ffffff' : (isGroovelabKiosk ? '#713f12' : (schoolData?.primary_color ? '#ffffff' : '#062413')),
                 fontWeight: 800,
                 fontSize: '14px',
-                cursor: 'pointer',
+                cursor: pinLockoutSeconds > 0 ? 'not-allowed' : 'pointer',
                 transition: 'all 0.2s',
-                opacity: !pinInput.trim() ? 0.6 : 1
+                opacity: (!pinInput.trim() || pinLockoutSeconds > 0) ? 0.6 : 1
               }}
             >
-              Login
+              {pinLockoutSeconds > 0 ? `Gesperrt (${pinLockoutSeconds}s)` : 'Login'}
             </button>
           </div>
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginTop: '4px' }}>

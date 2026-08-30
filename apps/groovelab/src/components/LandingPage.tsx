@@ -169,7 +169,10 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
               onMouseLeave={() => setHoveredMenu(null)}
               style={{ position: 'relative', padding: '8px 0' }}
             >
-              <button style={{
+              <button 
+                type="button"
+                onClick={() => setHoveredMenu(hoveredMenu === 'funktionen' ? null : 'funktionen')}
+                style={{
                 background: 'none',
                 border: 'none',
                 cursor: 'pointer',
@@ -220,7 +223,10 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
               onMouseLeave={() => setHoveredMenu(null)}
               style={{ position: 'relative', padding: '8px 0' }}
             >
-              <button style={{
+              <button 
+                type="button"
+                onClick={() => setHoveredMenu(hoveredMenu === 'zielgruppen' ? null : 'zielgruppen')}
+                style={{
                 background: 'none',
                 border: 'none',
                 cursor: 'pointer',
@@ -1508,11 +1514,10 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                   alignItems: 'center',
                   justifyContent: 'center',
                   fontWeight: 900,
-                  fontSize: '20px',
                   flexShrink: 0,
                   boxShadow: '0 2px 8px rgba(22, 165, 74, 0.3)'
                 }}>
-                  🛡️
+                  <ShieldCheck size={22} color="#ffffff" />
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                   <div style={{ fontSize: '16px', fontWeight: 900, color: '#14532d', display: 'flex', alignItems: 'center', gap: '8px' }}>

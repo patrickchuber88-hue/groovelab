@@ -2603,6 +2603,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
       } catch (e) {}
 
       const userParam = targetUserId ? `&ghost_user_id=${targetUserId}` : '';
+      localStorage.setItem('groovelab_ghost_auth_token', Date.now().toString());
       const url = `${window.location.origin}/?school_id=${school.id}&support_ghost=true&role=admin${userParam}&ts=${Date.now()}`;
       window.open(url, '_blank');
       setSaveSuccessToast(`Ghost-Sitzung für „${school.name}“ im neuen Tab geöffnet (Kürzel: ⌥+Q).`);
@@ -4044,7 +4045,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1.35fr', gap: '10px' }}>
                         <div style={{ background: '#f8fafc', padding: '10px 12px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
                           <label style={{ display: 'block', fontSize: '0.66rem', color: '#64748b', fontWeight: 800, marginBottom: '4px', textTransform: 'uppercase' }}>
-                            Lehrer / Dozent
+                            Lehrkraft
                           </label>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
                             <input

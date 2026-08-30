@@ -830,6 +830,36 @@ export async function run15StageSolver(params: SolverParams): Promise<SolverResu
       assignStudents(remainingUnassigned, true, true);
     }
 
+    // STUFE 11b: ZERO-STUDENT-LEFT-BEHIND ULTRA SWEEP (Guarantee 100% Placement)
+    const stillUnassigned = unassignedStudents.filter(s => !newlyAssignedStudentIds[s.id]);
+    if (stillUnassigned.length > 0) {
+      for (const student of stillUnassigned) {
+        let chosenBoard = currentBoards[0];
+        let minStudentCount = Infinity;
+        for (const b of currentBoards) {
+          const nonBreakCount = b.students.filter(s => !s.isBreak).length;
+          if (nonBreakCount < minStudentCount) {
+            minStudentCount = nonBreakCount;
+            chosenBoard = b;
+          }
+        }
+
+        if (chosenBoard) {
+          const bIdx = currentBoards.findIndex(b => b.id === chosenBoard.id);
+          const nextStudents = [...chosenBoard.students, {
+            ...student,
+            assignedDay: chosenBoard.dayOfWeek,
+            customStartTime: undefined
+          }];
+          currentBoards[bIdx] = recalculateBoardTimesFn({ ...chosenBoard, students: nextStudents });
+          const placed = currentBoards[bIdx].students.find(s => s.id === student.id);
+          if (placed && placed.assignedTime) {
+            newlyAssignedStudentIds[student.id] = { day: chosenBoard.dayOfWeek, time: placed.assignedTime };
+          }
+        }
+      }
+    }
+
     // Checkpoint 1 (Stufe 11): Inter-Board Deep Cross-Swap Rescue
     performDeepCrossSwapRescue(currentBoards, newlyAssignedStudentIds);
 

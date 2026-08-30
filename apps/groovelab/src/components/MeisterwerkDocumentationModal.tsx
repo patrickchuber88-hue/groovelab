@@ -7057,7 +7057,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 </div>
               )}
 
-              {/* Didaktischer Wochen-Leitfaden (Tier-1 Enterprise+ Goldstandard) */}
+              {/* Didaktischer Wochen-Leitfaden (Tier-1 Enterprise+ Master-Standard) */}
               {(() => {
                 const currentWeekStr = getISOWeek();
                 const currentItem = (progressItems || []).find((item: any) => 
@@ -15981,7 +15981,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                   )}
                                 </button>
 
-                                {/* ↗ Unified Share & Print Action Hub (Apple-Grade 2026 Goldstandard) */}
+                                {/* ↗ Unified Share & Print Action Hub (Apple-Grade 2026 Master-Standard) */}
                                 <div ref={shareMenuRef} style={{ position: 'relative' }}>
                                   <button
                                     type="button"
