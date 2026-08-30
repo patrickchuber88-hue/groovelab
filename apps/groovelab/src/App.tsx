@@ -7284,8 +7284,7 @@ function App() {
   // 2. Active workspace is 'master_admin' (never 'teacher', 'secretary', 'admin', 'student')
   // 3. User is not in support-ghost session mode
   const isMasterAdminSession = Boolean(
-    isMasterSessionFlag && 
-    currentActiveWorkspace === 'master_admin'
+    isMasterSessionFlag
   ) && !(isGhostParam && ghostSchoolId);
 
   // Enterprise+ Tier 3: Master Admin Ephemeral Session Lease TTL Guard (Zero Standing Privileges)
@@ -7678,6 +7677,27 @@ function App() {
     );
   }
 
+  // 2.5 MASTER ADMIN PORTAL — nur via is_master_admin DB-Flag
+  // SECURITY: Niemals per Vorname oder Rolle erkennen — ausschließlich das is_master_admin-Flag aus der DB ist maßgeblich.
+  if (isMasterAdminSession) {
+    return (
+      <>
+        <Suspense fallback={<DashboardLoader />}>
+          <MasterAdminDashboard onLogout={handleLogout} currentUser={{ ...user, is_master_admin: true }} />
+        </Suspense>
+        {showSchoolOnboardingModal && (
+          <SchoolSelfOnboardingModal
+            onClose={() => setShowSchoolOnboardingModal(false)}
+            onSuccess={(schoolData, userData) => {
+              setShowSchoolOnboardingModal(false);
+              window.location.reload();
+            }}
+          />
+        )}
+      </>
+    );
+  }
+
   if (loading || !user) {
     const debugError = typeof window !== 'undefined' ? (window as any).fetchDashboardDataError : null;
     const debugStack = typeof window !== 'undefined' ? (window as any).fetchDashboardDataStack : null;
@@ -7729,8 +7749,8 @@ function App() {
                 fontSize: '10px', 
                 color: '#f87171', 
                 textAlign: 'left', 
-                whiteSpace: 'pre-wrap',
-                maxHeight: '150px',
+                whiteSpace: 'pre-wrap', 
+                maxHeight: '150px', 
                 overflowY: 'auto'
               }}>{debugStack}</pre>
             )}
@@ -7781,27 +7801,6 @@ function App() {
           </button>
         )}
       </div>
-    );
-  }
-
-  // 2.5 MASTER ADMIN PORTAL — nur via is_master_admin DB-Flag
-  // SECURITY: Niemals per Vorname oder Rolle erkennen — ausschließlich das is_master_admin-Flag aus der DB ist maßgeblich.
-  if (isMasterAdminSession) {
-    return (
-      <>
-        <Suspense fallback={<DashboardLoader />}>
-          <MasterAdminDashboard onLogout={handleLogout} currentUser={{ ...user, is_master_admin: true }} />
-        </Suspense>
-        {showSchoolOnboardingModal && (
-          <SchoolSelfOnboardingModal
-            onClose={() => setShowSchoolOnboardingModal(false)}
-            onSuccess={(schoolData, userData) => {
-              setShowSchoolOnboardingModal(false);
-              window.location.reload();
-            }}
-          />
-        )}
-      </>
     );
   }
 
