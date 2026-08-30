@@ -66,6 +66,8 @@ import { runStorageJanitor, runClientStorageJanitor } from './services/storageJa
 import { verifyMasterSessionLease, revokeMasterSessionLease } from './utils/masterAuditLogger';
 import { scrubSensitiveUrlParams } from './utils/urlSecurityScrubber';
 import { executeSessionZeroize } from './utils/sessionZeroize';
+import { initAuthBroadcastListener } from './utils/authBroadcastSync';
+import { useInactivityTimeout } from './hooks/useInactivityTimeout';
 import './App.css';
 
 // --- GLOBAL CAMERA KILL SWITCH ---
@@ -1594,6 +1596,18 @@ function App() {
     }, 1500);
     return () => clearTimeout(timer);
   }, [location.pathname, searchParams]);
+
+  // Multi-tab logout synchronization (Zero-Trust Session Invalidation)
+  useEffect(() => {
+    const cleanup = initAuthBroadcastListener();
+    return cleanup;
+  }, []);
+
+  // Inactivity auto-lockout (30 minutes of idle time)
+  useInactivityTimeout({
+    timeoutMs: 30 * 60 * 1000,
+    enabled: Boolean(currentView === 'dashboard')
+  });
 
   useEffect(() => {
     if (typeof window === 'undefined') return;

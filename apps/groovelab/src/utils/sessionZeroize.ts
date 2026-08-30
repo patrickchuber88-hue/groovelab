@@ -6,15 +6,20 @@
  */
 
 import { removeSecureCookie } from './cookieAuthBridge';
+import { broadcastLogoutToPeerTabs } from './authBroadcastSync';
 
 /**
  * Performs complete cryptographic memory wipe and storage zeroization upon logout or tenant switch.
  */
-export function executeSessionZeroize(options: { preserveDeviceKey?: boolean; redirectUrl?: string } = {}): void {
-  const { preserveDeviceKey = true, redirectUrl = '/' } = options;
+export function executeSessionZeroize(options: { preserveDeviceKey?: boolean; redirectUrl?: string; broadcast?: boolean } = {}): void {
+  const { preserveDeviceKey = true, redirectUrl = '/', broadcast = true } = options;
 
   try {
     console.info('[Security] Initiating complete session zeroization...');
+
+    if (broadcast) {
+      broadcastLogoutToPeerTabs();
+    }
 
     // 1. Wipe sensitive localStorage items
     const keysToPreserve = new Set(
