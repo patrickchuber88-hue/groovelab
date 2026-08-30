@@ -4,15 +4,21 @@ import { subscribePendingOfflineCount, flushOfflineSyncQueue } from '../../servi
 
 interface MobileTopHeaderProps {
   user: any;
+  school?: any;
   activePlatform: 'campus' | 'groovelab' | 'admin';
   setActivePlatform: (platform: 'campus' | 'groovelab' | 'admin') => void;
+  hasCampusActive?: boolean;
+  hasGrooveLabActive?: boolean;
   unreadCount?: number;
 }
 
 export const MobileTopHeader: React.FC<MobileTopHeaderProps> = ({
   user,
+  school,
   activePlatform,
   setActivePlatform,
+  hasCampusActive,
+  hasGrooveLabActive,
   unreadCount = 0
 }) => {
   const [pendingCount, setPendingCount] = useState<number>(0);
@@ -23,6 +29,15 @@ export const MobileTopHeader: React.FC<MobileTopHeaderProps> = ({
     return sessionStorage.getItem('groovelab_parent_unlocked_global') === 'true' ||
            (user?.id ? sessionStorage.getItem(`groovelab_parent_unlocked_${user.id}`) === 'true' : false);
   });
+
+  const hasCampusSub = Boolean(school?.has_campus_subscription || !school?.is_billing_booked || school?.subscription_bypass);
+  const hasGrooveLabSub = Boolean(school?.has_groovelab_subscription || !school?.is_billing_booked || school?.subscription_bypass);
+  const isStaff = user?.role === 'admin' || user?.role === 'secretary';
+
+  const isCampusEligible = hasCampusActive !== undefined ? hasCampusActive : Boolean((isStaff || user?.is_campus_active) && hasCampusSub);
+  const isGrooveLabEligible = hasGrooveLabActive !== undefined ? hasGrooveLabActive : Boolean((isStaff || user?.is_groovelab_active) && hasGrooveLabSub);
+
+  const showDualModuleSwitcher = isCampusEligible && isGrooveLabEligible;
 
   useEffect(() => {
     const handleParentModeChange = (e: any) => {
@@ -152,61 +167,48 @@ export const MobileTopHeader: React.FC<MobileTopHeaderProps> = ({
         )}
       </div>
 
-      {/* Center: iOS Segmented Control Toggle [ Campus | GrooveLab ] */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          background: '#f1f5f9',
-          borderRadius: '100px',
-          padding: '3px',
-          border: '1px solid rgba(226, 232, 240, 0.8)'
-        }}
-      >
+      {/* Center: Camera-Safe 1-Tap Direkttoggle (Rendered ONLY when BOTH modules are active) */}
+      {showDualModuleSwitcher && (
         <button
-          onClick={() => setActivePlatform('campus')}
-          style={{
-            padding: '6px 14px',
-            borderRadius: '100px',
-            border: 'none',
-            background: activePlatform === 'campus' ? '#ffffff' : 'transparent',
-            color: activePlatform === 'campus' ? '#34a853' : '#64748b',
-            fontWeight: activePlatform === 'campus' ? 800 : 600,
-            fontSize: '0.78rem',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '5px',
-            cursor: 'pointer',
-            boxShadow: activePlatform === 'campus' ? '0 2px 8px rgba(0, 0, 0, 0.08)' : 'none',
-            transition: 'all 0.2s ease'
+          type="button"
+          onClick={() => {
+            const nextPlatform = activePlatform === 'campus' ? 'groovelab' : 'campus';
+            setActivePlatform(nextPlatform);
           }}
-        >
-          <GraduationCap size={14} />
-          <span>Campus</span>
-        </button>
-
-        <button
-          onClick={() => setActivePlatform('groovelab')}
           style={{
-            padding: '6px 14px',
-            borderRadius: '100px',
-            border: 'none',
-            background: activePlatform === 'groovelab' ? '#ffffff' : 'transparent',
-            color: activePlatform === 'groovelab' ? '#ca8a04' : '#64748b',
-            fontWeight: activePlatform === 'groovelab' ? 800 : 600,
-            fontSize: '0.78rem',
-            display: 'flex',
+            display: 'inline-flex',
             alignItems: 'center',
-            gap: '5px',
+            gap: '6px',
+            padding: '5px 12px',
+            borderRadius: '100px',
+            background: activePlatform === 'campus' ? '#e6f4ea' : '#fef9c3',
+            border: activePlatform === 'campus' ? '1.5px solid #34a853' : '1.5px solid #eab308',
+            color: activePlatform === 'campus' ? '#166534' : '#854d0e',
+            fontSize: '0.76rem',
+            fontWeight: 800,
             cursor: 'pointer',
-            boxShadow: activePlatform === 'groovelab' ? '0 2px 8px rgba(0, 0, 0, 0.08)' : 'none',
-            transition: 'all 0.2s ease'
+            boxShadow: '0 2px 6px rgba(0, 0, 0, 0.04)',
+            transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+            outline: 'none',
+            whiteSpace: 'nowrap'
           }}
+          title="Tippen für 1-Tap Direktwechsel zwischen Campus und GrooveLab"
         >
-          <Music size={14} />
-          <span>GrooveLab</span>
+          {activePlatform === 'campus' ? (
+            <>
+              <GraduationCap size={13} color="#166534" />
+              <span>Campus</span>
+              <span style={{ fontSize: '0.72rem', color: '#34a853', fontWeight: 900, marginLeft: '2px' }}>⇄</span>
+            </>
+          ) : (
+            <>
+              <Music size={13} color="#854d0e" />
+              <span>GrooveLab</span>
+              <span style={{ fontSize: '0.72rem', color: '#ca8a04', fontWeight: 900, marginLeft: '2px' }}>⇄</span>
+            </>
+          )}
         </button>
-      </div>
+      )}
 
       {/* Right: Offline Indicator, Notifications & Profile Avatar */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>

@@ -9475,12 +9475,55 @@ function App() {
       </aside>
 
       <div className={`main-wrapper ${activeStudentTab === 'live' ? 'live-tab-active' : ''}`} style={{ paddingTop: '0' }}>
-        <MobileTopHeader
-          user={user}
-          activePlatform={activePlatform as 'campus' | 'groovelab' | 'admin'}
-          setActivePlatform={(p) => setActivePlatform(p)}
-          unreadCount={campusUnreadCount}
-        />
+        {(() => {
+          const hasCampusSub = Boolean(school && (school.has_campus_subscription || !school.is_billing_booked || school.subscription_bypass));
+          const hasGrooveLabSub = Boolean(school && (school.has_groovelab_subscription || !school.is_billing_booked || school.subscription_bypass));
+          const isStaff = user?.role === 'admin' || user?.role === 'secretary';
+          const hasCampusActive = Boolean((isStaff || user?.is_campus_active) && hasCampusSub);
+          const hasGrooveLabActive = Boolean((isStaff || user?.is_groovelab_active) && hasGrooveLabSub);
+
+          return (
+            <MobileTopHeader
+              user={user}
+              school={school}
+              activePlatform={activePlatform as 'campus' | 'groovelab' | 'admin'}
+              setActivePlatform={(p) => {
+                if (p === 'campus') {
+                  const isStudent = user?.role === 'student';
+                  if (isStudent && locationMode === 'lab' && isKioskMode && !isCampusUnlocked) {
+                    setShowCampusPinPrompt(true);
+                    return;
+                  }
+                  if (user?.role === 'teacher') {
+                    sessionStorage.setItem('groovelab_active_workspace', 'teacher');
+                  }
+                  setActivePlatform('campus');
+                  const startTab = user?.role === 'teacher' 
+                    ? (sessionStorage.getItem('campus_active_tab') || 'briefing') 
+                    : (isStaff || user?.role === 'teacher' ? 'live' : 'briefing');
+                  setActiveStudentTab(startTab);
+                  sessionStorage.setItem('campus_active_tab', startTab);
+                } else if (p === 'groovelab') {
+                  if (user?.role === 'teacher') {
+                    sessionStorage.setItem('groovelab_active_workspace', 'teacher');
+                  }
+                  setActivePlatform('groovelab');
+                  if (isStaff || user?.role === 'teacher') {
+                    setLocationMode('lab');
+                    sessionStorage.setItem('groovelab_location_mode', 'lab');
+                  }
+                  const startTab = sessionStorage.getItem('groovelab_active_tab') || 'live';
+                  setActiveStudentTab(startTab);
+                } else {
+                  setActivePlatform(p);
+                }
+              }}
+              hasCampusActive={hasCampusActive}
+              hasGrooveLabActive={hasGrooveLabActive}
+              unreadCount={campusUnreadCount}
+            />
+          );
+        })()}
         <header className="header desktop-only-header" style={{ display: windowWidth <= 768 ? 'none' : 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 10px', height: '56px', background: 'transparent' }}>
           {/* App Switcher Tabs */}
           <div style={{ 
@@ -13731,16 +13774,26 @@ function App() {
       </main>
 
       {/* Mobile Native Bottom Navigation Bar (Controlled via CSS for Mobile & Simulator) */}
-      {user && (
-        <MobileBottomNav
-          activeTab={activeStudentTab}
-          setActiveTab={setActiveStudentTab}
-          activePlatform={activePlatform as 'campus' | 'groovelab' | 'admin'}
-          setActivePlatform={(p) => setActivePlatform(p)}
-          userRole={user?.role?.toLowerCase() || 'student'}
-          unreadCount={campusUnreadCount}
-        />
-      )}
+      {user && (() => {
+        const hasCampusSub = Boolean(school && (school.has_campus_subscription || !school.is_billing_booked || school.subscription_bypass));
+        const hasGrooveLabSub = Boolean(school && (school.has_groovelab_subscription || !school.is_billing_booked || school.subscription_bypass));
+        const isStaff = user?.role === 'admin' || user?.role === 'secretary';
+        const hasCampusActive = Boolean((isStaff || user?.is_campus_active) && hasCampusSub);
+        const hasGrooveLabActive = Boolean((isStaff || user?.is_groovelab_active) && hasGrooveLabSub);
+
+        return (
+          <MobileBottomNav
+            activeTab={activeStudentTab}
+            setActiveTab={setActiveStudentTab}
+            activePlatform={activePlatform as 'campus' | 'groovelab' | 'admin'}
+            setActivePlatform={(p) => setActivePlatform(p)}
+            userRole={user?.role?.toLowerCase() || 'student'}
+            hasCampusActive={hasCampusActive}
+            hasGrooveLabActive={hasGrooveLabActive}
+            unreadCount={campusUnreadCount}
+          />
+        );
+      })()}
 
 
 

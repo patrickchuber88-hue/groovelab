@@ -29,6 +29,8 @@ interface MobileBottomNavProps {
   activePlatform: 'campus' | 'groovelab' | 'admin';
   setActivePlatform: (platform: 'campus' | 'groovelab' | 'admin') => void;
   userRole?: string;
+  hasCampusActive?: boolean;
+  hasGrooveLabActive?: boolean;
   unreadCount?: number;
 }
 
@@ -69,10 +71,14 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
   activePlatform,
   setActivePlatform,
   userRole = 'student',
+  hasCampusActive,
+  hasGrooveLabActive,
   unreadCount = 0
 }) => {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [touchStartX, setTouchStartX] = useState<number | null>(null);
+
+  const showDualModuleSwitcher = (hasCampusActive ?? true) && (hasGrooveLabActive ?? true);
 
   const [campusStudentUiLevel, setCampusStudentUiLevel] = useState<string>(() => {
     if (typeof window === 'undefined') return 'junior';
@@ -324,59 +330,61 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
               </button>
             </div>
 
-            {/* Instagram Swipecard Segmented Platform Switcher */}
-            <div style={{ background: '#f8fafc', borderRadius: '18px', padding: '6px', border: '1px solid #e2e8f0' }}>
-              <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px', textAlign: 'center' }}>
-                Modul wechseln
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
-                <button
-                  type="button"
-                  onClick={() => setActivePlatform('campus')}
-                  style={{
-                    padding: '10px 8px',
-                    borderRadius: '14px',
-                    border: activePlatform === 'campus' ? '2px solid #34a853' : '1px solid transparent',
-                    background: activePlatform === 'campus' ? '#34a853' : '#ffffff',
-                    color: activePlatform === 'campus' ? '#ffffff' : '#64748b',
-                    fontWeight: 800,
-                    fontSize: '0.82rem',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '6px',
-                    transition: 'all 0.2s',
-                    boxShadow: activePlatform === 'campus' ? '0 3px 10px rgba(52, 168, 83, 0.25)' : 'none'
-                  }}
-                >
-                  <GraduationCap size={16} /> Campus
-                </button>
+            {/* Instagram Swipecard Segmented Platform Switcher - Rendered ONLY when both modules are eligible */}
+            {showDualModuleSwitcher && (
+              <div style={{ background: '#f8fafc', borderRadius: '18px', padding: '6px', border: '1px solid #e2e8f0' }}>
+                <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px', textAlign: 'center' }}>
+                  Modul wechseln
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setActivePlatform('campus')}
+                    style={{
+                      padding: '10px 8px',
+                      borderRadius: '14px',
+                      border: activePlatform === 'campus' ? '2px solid #34a853' : '1px solid transparent',
+                      background: activePlatform === 'campus' ? '#34a853' : '#ffffff',
+                      color: activePlatform === 'campus' ? '#ffffff' : '#64748b',
+                      fontWeight: 800,
+                      fontSize: '0.82rem',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px',
+                      transition: 'all 0.2s',
+                      boxShadow: activePlatform === 'campus' ? '0 3px 10px rgba(52, 168, 83, 0.25)' : 'none'
+                    }}
+                  >
+                    <GraduationCap size={16} /> Campus
+                  </button>
 
-                <button
-                  type="button"
-                  onClick={() => setActivePlatform('groovelab')}
-                  style={{
-                    padding: '10px 8px',
-                    borderRadius: '14px',
-                    border: activePlatform === 'groovelab' ? '2px solid #eab308' : '1px solid transparent',
-                    background: activePlatform === 'groovelab' ? '#eab308' : '#ffffff',
-                    color: activePlatform === 'groovelab' ? '#ffffff' : '#64748b',
-                    fontWeight: 800,
-                    fontSize: '0.82rem',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '6px',
-                    transition: 'all 0.2s',
-                    boxShadow: activePlatform === 'groovelab' ? '0 3px 10px rgba(234, 179, 8, 0.25)' : 'none'
-                  }}
-                >
-                  <Music size={16} /> GrooveLab
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => setActivePlatform('groovelab')}
+                    style={{
+                      padding: '10px 8px',
+                      borderRadius: '14px',
+                      border: activePlatform === 'groovelab' ? '2px solid #eab308' : '1px solid transparent',
+                      background: activePlatform === 'groovelab' ? '#eab308' : '#ffffff',
+                      color: activePlatform === 'groovelab' ? '#ffffff' : '#64748b',
+                      fontWeight: 800,
+                      fontSize: '0.82rem',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px',
+                      transition: 'all 0.2s',
+                      boxShadow: activePlatform === 'groovelab' ? '0 3px 10px rgba(234, 179, 8, 0.25)' : 'none'
+                    }}
+                  >
+                    <Music size={16} /> GrooveLab
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
 
             {/* 1:1 Navigation Items Swipecard List */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '6px', flex: 1 }}>
