@@ -138,15 +138,36 @@ export const Startseite: React.FC<StartseiteProps> = ({
     const fetchSchools = async () => {
       setIsSearching(true);
       try {
-        const { data, error } = await supabase.rpc('search_public_schools', { p_query: '' });
+        let cleanData: any[] = [];
 
-        if (!error && data && Array.isArray(data) && data.length > 0) {
-          const cleanData = data.filter((s: any) => !s.name?.toLowerCase().includes('groove academy'));
+        // 1. Try search_public_schools RPC
+        try {
+          const { data: rpcData, error: rpcErr } = await supabase.rpc('search_public_schools', { p_query: '' });
+          if (!rpcErr && Array.isArray(rpcData) && rpcData.length > 0) {
+            cleanData = rpcData;
+          }
+        } catch (e) {}
+
+        // 2. Resilient fallback to direct select from schools table
+        if (cleanData.length === 0) {
+          const { data: directData, error: directErr } = await supabase
+            .from('schools')
+            .select('id, name, subdomain, logo_url, city, address, postal_code, has_campus_subscription, has_groovelab_subscription, is_active')
+            .not('is_active', 'eq', false)
+            .order('name', { ascending: true });
+
+          if (!directErr && Array.isArray(directData) && directData.length > 0) {
+            cleanData = directData;
+          }
+        }
+
+        if (cleanData.length > 0) {
+          const filtered = cleanData.filter((s: any) => !s.name?.toLowerCase().includes('groove academy'));
           if (isMounted) {
-            setAllSchools(cleanData);
+            setAllSchools(filtered);
           }
           try {
-            localStorage.setItem('groovelab_cached_schools', JSON.stringify(cleanData));
+            localStorage.setItem('groovelab_cached_schools', JSON.stringify(filtered));
           } catch (e) {}
         }
       } catch (err) {

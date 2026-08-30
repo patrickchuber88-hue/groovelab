@@ -100,24 +100,38 @@ export const LandingPage2: React.FC<LandingPage2Props> = ({
 
       setIsSearching(true);
       try {
-        const queryPromise = supabase.rpc('search_public_schools', { p_query: searchQuery.trim() });
+        let cleanData: any[] = [];
 
-        const timeoutPromise = new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('Query timeout')), 2500)
-        );
+        // 1. Try search_public_schools RPC
+        try {
+          const { data, error } = await supabase.rpc('search_public_schools', { p_query: searchQuery.trim() });
+          if (!error && Array.isArray(data) && data.length > 0) {
+            cleanData = data;
+          }
+        } catch (e) {}
 
-        const { data, error } = await Promise.race([queryPromise, timeoutPromise]) as any;
+        // 2. Direct select fallback from schools table
+        if (cleanData.length === 0) {
+          const query = searchQuery.trim().toLowerCase();
+          const { data: directSchools } = await supabase
+            .from('schools')
+            .select('id, name, subdomain, logo_url, city, has_campus_subscription, has_groovelab_subscription, is_active')
+            .not('is_active', 'eq', false);
 
-        if (!error && Array.isArray(data)) {
-          const cleanData = data.filter((s: any) => !s.name?.toLowerCase().includes('groove academy'));
-          setSearchResults(cleanData);
-          // Cache successful school list
-          try {
-            localStorage.setItem('groovelab_cached_schools', JSON.stringify(cleanData));
-          } catch (e) {}
-        } else {
-          throw error || new Error('No data');
+          if (Array.isArray(directSchools)) {
+            cleanData = directSchools.filter((s: any) => 
+              (s.name || '').toLowerCase().includes(query) || 
+              (s.city || '').toLowerCase().includes(query) ||
+              (s.subdomain || '').toLowerCase().includes(query)
+            );
+          }
         }
+
+        const filtered = cleanData.filter((s: any) => !s.name?.toLowerCase().includes('groove academy'));
+        setSearchResults(filtered);
+        try {
+          localStorage.setItem('groovelab_cached_schools', JSON.stringify(filtered));
+        } catch (e) {}
       } catch (err) {
         console.error('Search error, using fallback:', err);
         // Load from local storage cache if available
