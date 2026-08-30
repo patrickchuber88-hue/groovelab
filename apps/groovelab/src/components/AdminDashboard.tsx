@@ -24,6 +24,7 @@ import { AVVModal } from './AVVModal';
 import { FeedbackHubModal } from './feedback/FeedbackHubModal';
 import { HelpCenterModal } from './help/HelpCenterModal';
 import { ParentInfoSheetModal } from './modals/ParentInfoSheetModal';
+import { revokeStudentToken } from '../utils/tokenSigner';
 import { 
   fetchSchoolRoster, 
   getTeacherRoster, 
@@ -14755,6 +14756,32 @@ export function AdminDashboard({
       let newToken: string;
 
       if (isStudent) {
+        try {
+          // Use Tier-1 Emergency Revocation RPC
+          const revResult = await revokeStudentToken(selectedQRUser.id);
+          if (revResult.success && revResult.newQrToken) {
+            newToken = revResult.newQrToken;
+            setSelectedQRUser({
+              ...selectedQRUser,
+              qr_token: newToken,
+              ausweis_nummer: revResult.newAusweisNummer || selectedQRUser.ausweis_nummer,
+              is_campus_active: true,
+              is_groovelab_active: true
+            });
+            setStudents(prev => prev.map(u => u.id === selectedQRUser.id ? { 
+              ...u, 
+              qr_token: newToken, 
+              ausweis_nummer: revResult.newAusweisNummer || u.ausweis_nummer,
+              is_campus_active: true, 
+              is_groovelab_active: true 
+            } : u));
+            alert('Ausweis-Token und alle aktiven Sitzungen erfolgreich widerrufen und neu ausgestellt!');
+            return;
+          }
+        } catch (revErr) {
+          console.warn('[AdminDashboard] revokeStudentToken failed, falling back to direct update:', revErr);
+        }
+
         if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
           newToken = crypto.randomUUID();
         } else {
