@@ -6792,8 +6792,9 @@ function App() {
     if (typeof window !== 'undefined' && userId) {
       sessionStorage.setItem('groovelab_user_id', userId);
     }
+    setLoggedInUserIdRaw(userId);
 
-    const { data: userToLogin } = await supabase.from('users').select('role, roles, contract_ends_at, contract_decision_made, is_external_vocalist, is_campus_active, is_groovelab_active, schools(has_campus_subscription, has_groovelab_subscription)').eq('id', userId).single();
+    const { data: userToLogin } = await supabase.from('users').select('role, roles, contract_ends_at, contract_decision_made, is_external_vocalist, is_campus_active, is_groovelab_active, is_master_admin, schools(has_campus_subscription, has_groovelab_subscription)').eq('id', userId).single();
     if (userToLogin?.role === 'student' && userToLogin.contract_ends_at) {
       const endsAt = new Date(userToLogin.contract_ends_at).getTime();
       if (Date.now() > endsAt) {
@@ -6811,26 +6812,27 @@ function App() {
 
     const existingWorkspace = typeof window !== 'undefined' ? sessionStorage.getItem('groovelab_active_workspace') : null;
     const currentRole = userToLogin?.role?.toLowerCase() || 'teacher';
-    const isMasterAdmin = typeof window !== 'undefined' && (
-      sessionStorage.getItem('groovelab_is_master_admin') === 'true' || 
-      localStorage.getItem('groovelab_is_master_admin') === 'true' ||
-      existingWorkspace === 'master_admin'
+    const isMasterAdmin = Boolean(
+      (userToLogin?.is_master_admin === true) &&
+      (sessionStorage.getItem('groovelab_is_master_admin') === 'true' || existingWorkspace === 'master_admin')
     );
 
     if (isMasterAdmin) {
       sessionStorage.setItem('groovelab_active_workspace', 'master_admin');
       sessionStorage.setItem('groovelab_is_master_admin', 'true');
-    } else if (currentRole === 'admin' || currentRole === 'secretary') {
-      sessionStorage.setItem('groovelab_active_workspace', 'secretary');
-      if (currentRole === 'secretary') {
-        sessionStorage.setItem('groovelab_secretary_subtab', 'briefing');
-      }
-    } else if (existingWorkspace === 'teacher') {
-      sessionStorage.setItem('groovelab_active_workspace', 'teacher');
-    } else if (currentRole === 'student') {
-      sessionStorage.setItem('groovelab_active_workspace', 'student');
     } else {
-      sessionStorage.setItem('groovelab_active_workspace', 'teacher');
+      sessionStorage.removeItem('groovelab_is_master_admin');
+      localStorage.removeItem('groovelab_is_master_admin');
+      if (currentRole === 'admin' || currentRole === 'secretary') {
+        sessionStorage.setItem('groovelab_active_workspace', 'secretary');
+        if (currentRole === 'secretary') {
+          sessionStorage.setItem('groovelab_secretary_subtab', 'briefing');
+        }
+      } else if (currentRole === 'student') {
+        sessionStorage.setItem('groovelab_active_workspace', 'student');
+      } else {
+        sessionStorage.setItem('groovelab_active_workspace', 'teacher');
+      }
     }
 
     // Determine module availability for user & school
@@ -7305,15 +7307,17 @@ function App() {
   const ghostSchoolId = ghostUrlParams.get('school_id') || (typeof window !== 'undefined' ? sessionStorage.getItem('groovelab_ghost_school_id') : null);
 
   const currentActiveWorkspace = typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_active_workspace') || localStorage.getItem('groovelab_active_workspace')) : null;
-  const isMasterSessionFlag = typeof window !== 'undefined' && (sessionStorage.getItem('groovelab_is_master_admin') === 'true' || localStorage.getItem('groovelab_is_master_admin') === 'true');
 
   // SECURITY ISOLATION:
   // MasterAdminDashboard (Leitstand) is exclusively accessible if:
-  // 1. Session was explicitly authenticated via Master-Admin login / Leitstand bypass (isMasterSessionFlag === true)
-  // 2. Active workspace is 'master_admin' (never 'teacher', 'secretary', 'admin', 'student')
-  // 3. User is not in support-ghost session mode
+  // 1. User is verified in the DB as is_master_admin === true
+  // 2. Session was explicitly authenticated via Master-Admin login / Leitstand bypass (sessionStorage.getItem('groovelab_is_master_admin') === 'true')
+  // 3. Active workspace is 'master_admin' (never 'teacher', 'secretary', 'admin', 'student')
+  // 4. User is not in support-ghost session mode
   const isMasterAdminSession = Boolean(
-    isMasterSessionFlag
+    user?.is_master_admin === true &&
+    currentActiveWorkspace === 'master_admin' &&
+    sessionStorage.getItem('groovelab_is_master_admin') === 'true'
   ) && !(isGhostParam && ghostSchoolId);
 
   // Enterprise+ Tier 3: Master Admin Ephemeral Session Lease TTL Guard (Zero Standing Privileges)

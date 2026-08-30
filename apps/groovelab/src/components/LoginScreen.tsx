@@ -4571,6 +4571,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                       sessionStorage.setItem('campus_active_tab', 'briefing');
                       sessionStorage.setItem('groovelab_active_tab', 'briefing');
                       sessionStorage.removeItem('groovelab_is_master_admin');
+                      localStorage.removeItem('groovelab_is_master_admin');
                       sessionStorage.removeItem('groovelab_support_ghost');
                       onLogin(p.id, true);
                     }}
@@ -7009,6 +7010,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                   const targetUser = bypassUserCounts.adminUser!;
                   console.log('[Bypass] Logging in as Verwaltung:', targetUser.name);
                   sessionStorage.removeItem('groovelab_is_master_admin');
+                  localStorage.removeItem('groovelab_is_master_admin');
                   sessionStorage.removeItem('groovelab_support_ghost');
                   sessionStorage.setItem('groovelab_active_workspace', targetUser.role === 'secretary' ? 'secretary' : 'admin');
                   sessionStorage.setItem('groovelab_active_platform', 'campus');
@@ -7049,6 +7051,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                   const targetUser = bypassUserCounts.teacherUser!;
                   console.log('[Bypass] Logging in as Lehrer:', targetUser.name);
                   sessionStorage.removeItem('groovelab_is_master_admin');
+                  localStorage.removeItem('groovelab_is_master_admin');
                   sessionStorage.removeItem('groovelab_support_ghost');
                   sessionStorage.setItem('groovelab_active_workspace', 'teacher');
                   sessionStorage.setItem('groovelab_active_platform', 'campus');
@@ -7089,6 +7092,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                   const targetUser = bypassUserCounts.studentUser!;
                   console.log('[Bypass] Logging in as Schüler:', targetUser.name);
                   sessionStorage.removeItem('groovelab_is_master_admin');
+                  localStorage.removeItem('groovelab_is_master_admin');
                   sessionStorage.removeItem('groovelab_support_ghost');
                   sessionStorage.setItem('groovelab_active_workspace', 'student');
                   sessionStorage.setItem('groovelab_active_platform', 'campus');

@@ -46,6 +46,7 @@ scp supabase/migrations/297_tier1_enterprise_goldstandard_security.sql \
     supabase/migrations/318_complete_users_view_columns.sql \
     supabase/migrations/319_fix_audit_log_hash_chain_columns.sql \
     supabase/migrations/320_tier1_goldstandard_optimizations.sql \
+    supabase/migrations/321_safe_pgp_sym_decrypt_and_resilient_users_view.sql \
     "$SERVER:$REMOTE_TEMP/"
 
 # 4. Führe Migrationen nacheinander in supabase-db aus
@@ -121,15 +122,18 @@ ssh "$SERVER" "docker exec -i supabase-db psql -U postgres postgres < $REMOTE_TE
 echo "⚡ Führe Migration 320 aus (Tier-1 Goldstandard Optimizations: Vault Key, PIN Rate-Limiting & CSP Reports)..."
 ssh "$SERVER" "docker exec -i supabase-db psql -U postgres postgres < $REMOTE_TEMP/320_tier1_goldstandard_optimizations.sql"
 
+echo "⚡ Führe Migration 321 aus (Safe PGP Decryption & Resilient Users View)..."
+ssh "$SERVER" "docker exec -i supabase-db psql -U postgres postgres < $REMOTE_TEMP/321_safe_pgp_sym_decrypt_and_resilient_users_view.sql"
+
 echo "🧹 Bereinige temporäre Migrationsdateien..."
 ssh "$SERVER" "rm -rf $REMOTE_TEMP"
 
 echo ""
-echo "✅ Alle 24 Enterprise-Migrationen erfolgreich und fehlerfrei auf dem Produktiv-Container angewendet!"
+echo "✅ Alle 25 Enterprise-Migrationen erfolgreich und fehlerfrei auf dem Produktiv-Container angewendet!"
 ssh "$SERVER" "docker exec -t supabase-db psql -U postgres postgres -c \"NOTIFY pgrst, 'reload schema';\""
 
 # 6. Aufräumen
 ssh "$SERVER" "rm -rf $REMOTE_TEMP"
 
 echo ""
-echo "✅ Alle Enterprise Sicherheitsmigrationen (297-320) erfolgreich auf Live-Datenbank angewendet!"
+echo "✅ Alle Enterprise Sicherheitsmigrationen (297-321) erfolgreich auf Live-Datenbank angewendet!"
