@@ -7300,13 +7300,15 @@ useEffect(() => {
   );
 
   const renderHausaufgabenWidget = () => (
-    (!teacher?.sick_until || bypassSickView) && !isFreeDay && !isWeekend && (
+    (!teacher?.sick_until || bypassSickView) && (isTourDemoScheduleActive || (!isFreeDay && !isWeekend)) && (
       <div className="google-card" style={{ 
         width: '100%', 
         flex: 1,
         display: 'flex',
         flexDirection: 'column',
-        borderLeft: widgetState === 'VORBEREITUNG' 
+        borderLeft: isTourDemoScheduleActive 
+          ? '4px solid #34a853' 
+          : widgetState === 'VORBEREITUNG' 
           ? '4px solid #fbbc05' 
           : widgetState === 'ACTIVE' 
           ? '4px solid #34a853' 
@@ -7318,6 +7320,102 @@ useEffect(() => {
         boxSizing: 'border-box' 
       }}>
         {(() => {
+          if (isTourDemoScheduleActive) {
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                {/* Header: Student Info & Profile Button */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: '1 1 200px' }}>
+                    <div style={{
+                      width: '42px',
+                      height: '42px',
+                      borderRadius: '50%',
+                      background: '#34a853',
+                      color: '#ffffff',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontWeight: 900,
+                      fontSize: '1.1rem',
+                      fontFamily: "'Plus Jakarta Sans', sans-serif",
+                      flexShrink: 0
+                    }}>
+                      J
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                      <h4 style={{ margin: 0, fontSize: '0.96rem', fontWeight: 900, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                        Justus G.
+                      </h4>
+                      <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 600 }}>Aktueller Schüler</span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    style={{
+                      background: '#ffffff',
+                      border: '1px solid #cbd5e1',
+                      borderRadius: '10px',
+                      padding: '6px 12px',
+                      fontSize: '0.74rem',
+                      fontWeight: 700,
+                      color: '#0f172a',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <User size={13} color="#64748b" />
+                    <span>Profil</span>
+                  </button>
+                </div>
+
+                {/* Homework / Notes Section */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', background: '#fafafa', borderRadius: '16px', padding: '16px 18px' }}>
+                  <div>
+                    <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                      KW 34 (VORWOCHE)
+                    </span>
+                    <p style={{ margin: '4px 0 0 0', fontSize: '0.78rem', color: '#64748b', fontStyle: 'italic' }}>
+                      Keine Hausaufgaben erfasst.
+                    </p>
+                  </div>
+                  <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '10px' }}>
+                    <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                      KW 35 (HEUTE / DIESE WOCHE)
+                    </span>
+                    <p style={{ margin: '4px 0 0 0', fontSize: '0.78rem', color: '#64748b', fontStyle: 'italic' }}>
+                      Noch keine Hausaufgaben erfasst.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Action CTA Button */}
+                <button
+                  type="button"
+                  style={{
+                    background: '#34a853',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '12px',
+                    padding: '12px 18px',
+                    fontSize: '0.85rem',
+                    fontWeight: 800,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    cursor: 'pointer',
+                    boxShadow: '0 4px 12px rgba(52, 168, 83, 0.25)'
+                  }}
+                >
+                  <Edit3 size={15} color="#ffffff" />
+                  <span>Hausaufgabe / Notiz erfassen</span>
+                </button>
+              </div>
+            );
+          }
+
           if (widgetState === 'VORBEREITUNG') {
             const activeLessonsCount = briefingData?.timeline 
               ? briefingData.timeline.filter((s: any) => s.student && s.status !== 'canceled_by_student' && s.status !== 'teacher_sick' && s.status !== 'cancelled' && s.status !== 'canceled_by_teacher_sick' && s.status !== 'rescheduled_away').length 
@@ -8267,121 +8365,210 @@ useEffect(() => {
     )
   );
 
-  const renderTagesplanWidget = () => (
-    isTourDemoScheduleActive ? (
-      <div id="tour-teacher-schedule" className="google-card animation-slide-up" style={{ 
-        flex: '1.2 1 450px', 
-        minWidth: '300px', 
-        padding: '20px 24px', 
-        borderRadius: '20px', 
-        border: '2px solid rgba(52, 168, 83, 0.4)', 
-        boxShadow: '0 12px 36px -4px rgba(52, 168, 83, 0.18)', 
-        background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)', 
-        boxSizing: 'border-box',
-        display: 'flex',
-        flexDirection: 'column',
-        maxHeight: '620px'
-      }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <Clock size={20} color="#34a853" />
-            <strong style={{ fontSize: '1.05rem', fontWeight: 900, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Tagesplan – Unterrichte Heute</strong>
-          </div>
+  const renderTourDemoScheduleJSX = () => (
+    <div id="tour-teacher-schedule" className="google-card animation-slide-up" style={{ 
+      flex: isFreeDay ? '0.8 1 300px' : '1.2 1 450px', 
+      minWidth: '300px', 
+      padding: '20px 24px', 
+      borderRadius: '20px', 
+      border: '1px solid #f1f5f9', 
+      boxShadow: '0 2px 12px rgba(0,0,0,0.04)', 
+      background: 'white', 
+      boxSizing: 'border-box',
+      display: 'flex',
+      flexDirection: 'column',
+      height: '100%',
+      maxHeight: windowWidth >= 768 ? '700px' : undefined
+    }}>
+      {/* 1:1 Live Header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', color: '#1f2937' }}>
+          <Clock size={20} color="#0b57d0" />
+          <strong style={{ fontSize: '1.05rem', fontWeight: 800, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+            Tagesplan – {getSimulatedNow().toLocaleDateString('de-DE')} (Unterrichte Heute)
+          </strong>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <span style={{
-            fontSize: '0.68rem',
+            fontSize: '0.72rem',
             fontWeight: 800,
-            padding: '4px 10px',
+            padding: '4px 12px',
             borderRadius: '100px',
-            background: '#e6f4ea',
-            color: '#34a853',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '4px',
-            border: '1px solid rgba(52, 168, 83, 0.25)'
+            background: '#e8f0fe',
+            color: '#0b57d0',
+            fontFamily: 'Inter'
           }}>
-            <Sparkles size={11} />
-            Interaktive Vorschau
+            LIVE
           </span>
-        </div>
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          {/* Demo Item 1 */}
-          <div style={{
-            background: '#ffffff',
-            border: '1px solid #e2e8f0',
-            borderRadius: '16px',
-            padding: '14px 16px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.03)'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-              <div style={{
-                background: '#f1f5f9',
-                padding: '6px 10px',
-                borderRadius: '10px',
-                fontWeight: 900,
-                fontSize: '0.85rem',
-                color: '#0f172a',
-                fontFamily: 'monospace'
-              }}>
-                14:30
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ fontWeight: 900, fontSize: '0.95rem', color: '#0f172a' }}>Max M.</span>
-                  <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#16a34a', background: '#dcfce7', padding: '1px 6px', borderRadius: '6px' }}>45 Min</span>
-                </div>
-                <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600 }}>Akustische Gitarre • Raum 2</span>
-              </div>
-            </div>
-            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#475569', background: '#f8fafc', border: '1px solid #e2e8f0', padding: '4px 8px', borderRadius: '8px' }}>
-              📖 S. 14 Noten
-            </span>
-          </div>
-
-          {/* Demo Item 2 */}
-          <div style={{
-            background: '#ffffff',
-            border: '1px solid #e2e8f0',
-            borderRadius: '16px',
-            padding: '14px 16px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.03)'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-              <div style={{
-                background: '#f1f5f9',
-                padding: '6px 10px',
-                borderRadius: '10px',
-                fontWeight: 900,
-                fontSize: '0.85rem',
-                color: '#0f172a',
-                fontFamily: 'monospace'
-              }}>
-                15:15
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ fontWeight: 900, fontSize: '0.95rem', color: '#0f172a' }}>Sophie B.</span>
-                  <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#16a34a', background: '#dcfce7', padding: '1px 6px', borderRadius: '6px' }}>30 Min</span>
-                </div>
-                <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600 }}>Gesang & Vocal Lab • Studio 1</span>
-              </div>
-            </div>
-            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#34a853', background: '#e6f4ea', border: '1px solid rgba(52, 168, 83, 0.2)', padding: '4px 8px', borderRadius: '8px' }}>
-              🎙️ Audio bereit
-            </span>
-          </div>
-        </div>
-
-        <div style={{ marginTop: '14px', padding: '10px 14px', background: 'rgba(52, 168, 83, 0.08)', borderRadius: '12px', border: '1px dashed rgba(52, 168, 83, 0.3)', fontSize: '0.74rem', color: '#15803d', fontWeight: 700, textAlign: 'center' }}>
-          💡 Hier erscheinen automatisch deine Schüler, sobald Stunden im Stundenplan eingetragen sind.
+          <button
+            type="button"
+            onClick={() => toggleRealNames()}
+            title={showRealNames ? "Auge an: Datenschutz aktiv (Vorname N.)" : "Auge aus: Klarnamen aktiv (Vorname Nachname)"}
+            style={{
+              border: 'none',
+              background: showRealNames ? '#e6f4ea' : '#f1f5f9',
+              color: showRealNames ? '#34a853' : '#64748b',
+              width: '28px',
+              height: '28px',
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              transition: 'all 0.2s'
+            }}
+          >
+            {showRealNames ? <Eye size={14} /> : <EyeOff size={14} />}
+          </button>
         </div>
       </div>
+
+      {/* 1:1 Live Timeline Stream */}
+      <div style={{ 
+        display: 'flex', 
+        flexDirection: 'column', 
+        gap: '8px', 
+        position: 'relative',
+        overflowY: 'auto',
+        paddingRight: '6px',
+        flex: 1,
+        minHeight: 0
+      }}>
+        <div style={{ position: 'absolute', top: '16px', bottom: '16px', left: '9px', width: '2px', background: '#e2e8f0' }} />
+
+        {/* Slot 1: 13:30 Jonah K. (Past) */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '14px', position: 'relative', zIndex: 1 }}>
+          <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: '#34a853', margin: '0 4px', flexShrink: 0, boxShadow: '0 0 0 3px #ffffff' }} />
+          <div style={{
+            flex: 1,
+            background: '#ffffff',
+            border: '1.5px solid #e2e8f0',
+            borderLeft: '5px solid #34a853',
+            borderRadius: '16px',
+            padding: '12px 18px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            boxShadow: '0 2px 6px rgba(0,0,0,0.02)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
+              <span style={{ fontWeight: 800, fontSize: '0.92rem', color: '#0f172a', fontFamily: 'monospace' }}>13:30 Uhr</span>
+              <span style={{ color: '#cbd5e1', fontSize: '0.85rem' }}>|</span>
+              <span style={{ fontWeight: 800, fontSize: '0.92rem', color: '#16a34a' }}>Jonah K.</span>
+              <span style={{ color: '#64748b', fontSize: '0.84rem', fontWeight: 600 }}>• Gitarre • Raum 4</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <Mic size={17} color="#94a3b8" />
+              <MessageSquare size={17} color="#94a3b8" />
+            </div>
+          </div>
+        </div>
+
+        {/* Slot 2: 14:00 Justus G. (Active Highlight) */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '14px', position: 'relative', zIndex: 1 }}>
+          <div style={{ width: '14px', height: '14px', borderRadius: '50%', border: '3px solid #34a853', background: '#ffffff', margin: '0 3px', flexShrink: 0, boxShadow: '0 0 0 3px #ffffff' }} />
+          <div style={{
+            flex: 1,
+            background: '#f0fdf4',
+            border: '1.5px solid #bbf7d0',
+            borderLeft: '5px solid #34a853',
+            borderRadius: '16px',
+            padding: '12px 18px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            boxShadow: '0 4px 12px rgba(34, 197, 94, 0.08)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
+              <span style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
+                background: '#ffffff',
+                border: '1.5px solid #34a853',
+                borderRadius: '8px',
+                padding: '3px 8px',
+                fontWeight: 800,
+                fontSize: '0.86rem',
+                color: '#166534',
+                fontFamily: 'monospace'
+              }}>
+                <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#34a853' }} />
+                14:00 Uhr
+              </span>
+              <span style={{ color: '#cbd5e1', fontSize: '0.85rem' }}>|</span>
+              <span style={{ fontWeight: 900, fontSize: '0.94rem', color: '#0f172a' }}>Justus G.</span>
+              <span style={{ color: '#64748b', fontSize: '0.84rem', fontWeight: 600 }}>• Gitarre • Raum 4</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <Mic size={17} color="#94a3b8" />
+              <MessageSquare size={17} color="#94a3b8" />
+            </div>
+          </div>
+        </div>
+
+        {/* Slot 3: 14:30 Celina S. (Upcoming) */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '14px', position: 'relative', zIndex: 1 }}>
+          <div style={{ width: '12px', height: '12px', borderRadius: '50%', border: '2px solid #cbd5e1', background: '#ffffff', margin: '0 4px', flexShrink: 0, boxShadow: '0 0 0 3px #ffffff' }} />
+          <div style={{
+            flex: 1,
+            background: '#ffffff',
+            border: '1.5px solid #e2e8f0',
+            borderLeft: '5px solid #cbd5e1',
+            borderRadius: '16px',
+            padding: '12px 18px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            boxShadow: '0 2px 6px rgba(0,0,0,0.02)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
+              <span style={{ fontWeight: 800, fontSize: '0.92rem', color: '#0f172a', fontFamily: 'monospace' }}>14:30 Uhr</span>
+              <span style={{ color: '#cbd5e1', fontSize: '0.85rem' }}>|</span>
+              <span style={{ fontWeight: 800, fontSize: '0.92rem', color: '#0f172a' }}>Celina S.</span>
+              <span style={{ color: '#64748b', fontSize: '0.84rem', fontWeight: 600 }}>• Gitarre • Raum 4</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <Mic size={17} color="#94a3b8" />
+              <MessageSquare size={17} color="#94a3b8" />
+            </div>
+          </div>
+        </div>
+
+        {/* Slot 4: 15:00 Marlene F. (Upcoming) */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '14px', position: 'relative', zIndex: 1 }}>
+          <div style={{ width: '12px', height: '12px', borderRadius: '50%', border: '2px solid #cbd5e1', background: '#ffffff', margin: '0 4px', flexShrink: 0, boxShadow: '0 0 0 3px #ffffff' }} />
+          <div style={{
+            flex: 1,
+            background: '#ffffff',
+            border: '1.5px solid #e2e8f0',
+            borderLeft: '5px solid #cbd5e1',
+            borderRadius: '16px',
+            padding: '12px 18px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            boxShadow: '0 2px 6px rgba(0,0,0,0.02)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
+              <span style={{ fontWeight: 800, fontSize: '0.92rem', color: '#0f172a', fontFamily: 'monospace' }}>15:00 Uhr</span>
+              <span style={{ color: '#cbd5e1', fontSize: '0.85rem' }}>|</span>
+              <span style={{ fontWeight: 800, fontSize: '0.92rem', color: '#0f172a' }}>Marlene F.</span>
+              <span style={{ color: '#64748b', fontSize: '0.84rem', fontWeight: 600 }}>• Gitarre • Raum 4</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <Mic size={17} color="#94a3b8" />
+              <MessageSquare size={17} color="#94a3b8" />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderTagesplanWidget = () => (
+    isTourDemoScheduleActive ? (
+      renderTourDemoScheduleJSX()
     ) : !(isWeekend || isFreeDay) && (
       teacher?.sick_until && !bypassSickView ? (
         <div style={{
@@ -11740,7 +11927,7 @@ useEffect(() => {
                       display: 'flex', 
                       flexDirection: 'column', 
                       gap: '20px', 
-                      flex: (isWeekend || isFreeDay) ? '1 1 100%' : '1 1 350px', 
+                      flex: (isWeekend || isFreeDay) && !isTourDemoScheduleActive ? '1 1 100%' : '1 1 350px', 
                       minWidth: '300px',
                       maxHeight: windowWidth >= 768 ? '700px' : undefined,
                       boxSizing: 'border-box'
@@ -11759,15 +11946,15 @@ useEffect(() => {
                           boxShadow: '0 8px 32px rgba(15, 23, 42, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.6)',
                           transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
                           width: '100%',
-                          minHeight: windowWidth < 768 ? 'auto' : ((isWeekend || isFreeDay) ? '300px' : '200px'),
-                          flex: (isFreeDay || isWeekend) ? 1 : '0 1 auto',
+                          minHeight: windowWidth < 768 ? 'auto' : (((isWeekend || isFreeDay) && !isTourDemoScheduleActive) ? '300px' : '200px'),
+                          flex: (isFreeDay || isWeekend) && !isTourDemoScheduleActive ? 1 : '0 1 auto',
                           boxSizing: 'border-box',
                           overflow: 'hidden'
                         }}>
                           <div style={{ display: 'flex', alignItems: 'center', flex: 1, minWidth: 0 }}>
                             {/* Avatar: Compact Circle on mobile, Full height on desktop */}
                             <div style={{
-                              width: windowWidth < 768 ? '54px' : ((isWeekend || isFreeDay) ? '420px' : '190px'),
+                              width: windowWidth < 768 ? '54px' : (((isWeekend || isFreeDay) && !isTourDemoScheduleActive) ? '420px' : '190px'),
                               height: windowWidth < 768 ? '54px' : '100%',
                               borderRadius: windowWidth < 768 ? '50%' : '0',
                               margin: windowWidth < 768 ? '12px 0 12px 14px' : '0',
@@ -11793,11 +11980,11 @@ useEffect(() => {
                             </div>
                             
                             <div style={{ 
-                              padding: windowWidth < 768 ? '12px 14px' : (isWeekend ? '32px 48px' : '24px 32px'), 
+                              padding: windowWidth < 768 ? '12px 14px' : ((isWeekend && !isTourDemoScheduleActive) ? '32px 48px' : '24px 32px'), 
                               display: 'flex', 
                               flexDirection: 'column', 
-                              justifyContent: 'center',
-                              minWidth: 0,
+                              justifyContent: 'center', 
+                              minWidth: 0, 
                               flex: 1 
                             }}>
                               {/* Live Clock Badge above Hey */}
@@ -11822,13 +12009,13 @@ useEffect(() => {
 
                               <h3 style={{ 
                                 margin: 0, 
-                                fontSize: windowWidth < 768 ? '1.25rem' : (isWeekend ? '36px' : '30px'), 
+                                fontSize: windowWidth < 768 ? '1.25rem' : ((isWeekend && !isTourDemoScheduleActive) ? '36px' : '30px'), 
                                 fontWeight: 950, 
                                 color: '#0f172a', 
                                 fontFamily: "'Plus Jakarta Sans', sans-serif", 
                                 lineHeight: 1.2
                               }}>
-                                {isWeekend ? 'Schönes Wochenende,' : `${dynamicGreeting.greeting},`}{' '}
+                                {(isWeekend && !isTourDemoScheduleActive) ? 'Schönes Wochenende,' : `${dynamicGreeting.greeting},`}{' '}
                                 <span style={{ 
                                   color: '#007aff', 
                                   fontWeight: 900,
@@ -11837,10 +12024,10 @@ useEffect(() => {
                                 }}>{formatTeacherFullName(teacher) || teacher?.first_name || 'Coach'}</span>!
                               </h3>
                               {windowWidth >= 768 && (
-                                <p style={{ margin: isWeekend ? '14px 0 0 0' : '6px 0 0 0', fontSize: isWeekend ? '1rem' : '0.82rem', color: isWeekend ? '#4b5563' : '#64748b', fontWeight: 600, lineHeight: isWeekend ? 1.5 : 1.25, maxWidth: isWeekend ? '650px' : undefined }}>
-                                  {isWeekend 
+                                <p style={{ margin: (isWeekend && !isTourDemoScheduleActive) ? '14px 0 0 0' : '6px 0 0 0', fontSize: (isWeekend && !isTourDemoScheduleActive) ? '1rem' : '0.82rem', color: (isWeekend && !isTourDemoScheduleActive) ? '#4b5563' : '#64748b', fontWeight: 600, lineHeight: (isWeekend && !isTourDemoScheduleActive) ? 1.5 : 1.25, maxWidth: (isWeekend && !isTourDemoScheduleActive) ? '650px' : undefined }}>
+                                  {(isWeekend && !isTourDemoScheduleActive)
                                     ? 'Genieße deine wohlverdiente Pause! Keine Termine, kein Schulstress. Erhole dich gut und tanke Kraft für neue musikalische Abenteuer in der kommenden Woche. ✨'
-                                    : (isFreeDay ? 'Heute hast du frei! Genieße deinen freien Tag. ✨' : dynamicGreeting.subtitle)
+                                    : ((isFreeDay && !isTourDemoScheduleActive) ? 'Heute hast du frei! Genieße deinen freien Tag. ✨' : (isTourDemoScheduleActive ? 'Bereit für einen produktiven Tag? Hier ist deine Übersicht.' : dynamicGreeting.subtitle))
                                   }
                                 </p>
                               )}
@@ -11969,120 +12156,7 @@ useEffect(() => {
 
                     {/* RIGHT COLUMN: TAGESPLAN */}
                     {isTourDemoScheduleActive ? (
-                      <div id="tour-teacher-schedule" className="google-card animation-slide-up" style={{ 
-                        flex: '1.2 1 450px', 
-                        minWidth: '300px', 
-                        padding: '20px 24px', 
-                        borderRadius: '24px', 
-                        border: '2px solid rgba(52, 168, 83, 0.4)', 
-                        boxShadow: '0 12px 36px -4px rgba(52, 168, 83, 0.18)', 
-                        background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)', 
-                        boxSizing: 'border-box',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        height: '100%',
-                        maxHeight: windowWidth >= 768 ? '700px' : undefined
-                      }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', color: '#1f2937' }}>
-                            <Clock size={20} color="#34a853" />
-                            <strong style={{ fontSize: '1.05rem', fontWeight: 900, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Tagesplan – Unterrichte Heute</strong>
-                          </div>
-                          <span style={{
-                            fontSize: '0.68rem',
-                            fontWeight: 800,
-                            padding: '4px 10px',
-                            borderRadius: '100px',
-                            background: '#e6f4ea',
-                            color: '#34a853',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '4px',
-                            border: '1px solid rgba(52, 168, 83, 0.25)'
-                          }}>
-                            <Sparkles size={11} />
-                            Interaktive Vorschau
-                          </span>
-                        </div>
-
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                          {/* Demo Item 1 */}
-                          <div style={{
-                            background: '#ffffff',
-                            border: '1px solid #e2e8f0',
-                            borderRadius: '16px',
-                            padding: '14px 16px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            boxShadow: '0 2px 8px rgba(0,0,0,0.03)'
-                          }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-                              <div style={{
-                                background: '#f1f5f9',
-                                padding: '6px 10px',
-                                borderRadius: '10px',
-                                fontWeight: 900,
-                                fontSize: '0.85rem',
-                                color: '#0f172a',
-                                fontFamily: 'monospace'
-                              }}>
-                                14:30
-                              </div>
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                  <span style={{ fontWeight: 900, fontSize: '0.95rem', color: '#0f172a' }}>Max M.</span>
-                                  <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#16a34a', background: '#dcfce7', padding: '1px 6px', borderRadius: '6px' }}>45 Min</span>
-                                </div>
-                                <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600 }}>Akustische Gitarre • Raum 2</span>
-                              </div>
-                            </div>
-                            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#475569', background: '#f8fafc', border: '1px solid #e2e8f0', padding: '4px 8px', borderRadius: '8px' }}>
-                              📖 S. 14 Noten
-                            </span>
-                          </div>
-
-                          {/* Demo Item 2 */}
-                          <div style={{
-                            background: '#ffffff',
-                            border: '1px solid #e2e8f0',
-                            borderRadius: '16px',
-                            padding: '14px 16px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            boxShadow: '0 2px 8px rgba(0,0,0,0.03)'
-                          }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-                              <div style={{
-                                background: '#f1f5f9',
-                                padding: '6px 10px',
-                                borderRadius: '10px',
-                                fontWeight: 900,
-                                fontSize: '0.85rem',
-                                color: '#0f172a',
-                                fontFamily: 'monospace'
-                              }}>
-                                15:15
-                              </div>
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                  <span style={{ fontWeight: 900, fontSize: '0.95rem', color: '#0f172a' }}>Sophie B.</span>
-                                  <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#16a34a', background: '#dcfce7', padding: '1px 6px', borderRadius: '6px' }}>30 Min</span>
-                                </div>
-                                <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600 }}>Gesang & Vocal Lab • Studio 1</span>
-                              </div>
-                            </div>
-                            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#34a853', background: '#e6f4ea', border: '1px solid rgba(52, 168, 83, 0.2)', padding: '4px 8px', borderRadius: '8px' }}>
-                              🎙️ Audio bereit
-                            </span>
-                          </div>
-                        </div>
-
-                        <div style={{ marginTop: '16px', padding: '10px 14px', background: 'rgba(52, 168, 83, 0.08)', borderRadius: '12px', border: '1px dashed rgba(52, 168, 83, 0.3)', fontSize: '0.74rem', color: '#15803d', fontWeight: 700, textAlign: 'center' }}>
-                          💡 Hier erscheinen automatisch deine Schüler, sobald Stunden im Stundenplan eingetragen sind.
-                        </div>
-                      </div>
+                      renderTourDemoScheduleJSX()
                     ) : !(isWeekend || isFreeDay) && (
                       teacher?.sick_until && !bypassSickView ? (
                       <div style={{
