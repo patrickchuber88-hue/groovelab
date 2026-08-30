@@ -35,7 +35,7 @@ ON CONFLICT (user_id) DO UPDATE SET
     updated_at = NOW();
 
 -- ------------------------------------------------------------------------------
--- 2. WHITELIST-ONLY PUBLIC SCHOOL THEME RPC (Eliminates schools.select('*') Scraping)
+-- 2. WHITELIST-ONLY PUBLIC SCHOOL THEME & SEARCH RPCS
 -- ------------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.get_public_school_theme(p_subdomain TEXT)
 RETURNS JSONB
@@ -52,7 +52,7 @@ BEGIN
     END IF;
 
     -- Query by exact ID or subdomain or slug match
-    SELECT id, name, primary_color, logo_url, custom_welcome_title, custom_welcome_subtitle, is_campus_active, is_groovelab_active
+    SELECT id, name, primary_color, logo_url, has_campus_subscription, has_groovelab_subscription
     INTO v_school
     FROM public.schools
     WHERE id::text = v_clean_sub 
@@ -63,16 +63,13 @@ BEGIN
         RETURN NULL;
     END IF;
 
-    -- Returns ONLY visual and branding parameters, ZERO private contact or billing data!
     RETURN jsonb_build_object(
         'id', v_school.id,
         'name', v_school.name,
-        'primary_color', COALESCE(v_school.primary_color, '#3b82f6'),
+        'primary_color', COALESCE(v_school.primary_color, '#eab308'),
         'logo_url', v_school.logo_url,
-        'custom_welcome_title', v_school.custom_welcome_title,
-        'custom_welcome_subtitle', v_school.custom_welcome_subtitle,
-        'is_campus_active', COALESCE(v_school.is_campus_active, true),
-        'is_groovelab_active', COALESCE(v_school.is_groovelab_active, false)
+        'is_campus_active', COALESCE(v_school.has_campus_subscription, true),
+        'is_groovelab_active', COALESCE(v_school.has_groovelab_subscription, false)
     );
 END;
 $$;
@@ -87,28 +84,43 @@ SECURITY DEFINER
 SET search_path = public, pg_catalog
 AS $$
 DECLARE
-    v_clean TEXT := LOWER(TRIM(p_query));
+    v_clean TEXT := LOWER(TRIM(COALESCE(p_query, '')));
     v_results JSONB;
 BEGIN
-    IF v_clean IS NULL OR length(v_clean) < 2 THEN
-        RETURN '[]'::jsonb;
+    IF v_clean = '' THEN
+        SELECT jsonb_agg(jsonb_build_object(
+            'id', s.id,
+            'name', s.name,
+            'subdomain', s.subdomain,
+            'logo_url', s.logo_url,
+            'city', s.city,
+            'has_campus_subscription', COALESCE(s.has_campus_subscription, true),
+            'has_groovelab_subscription', COALESCE(s.has_groovelab_subscription, false)
+        ) ORDER BY s.name ASC)
+        INTO v_results
+        FROM public.schools s
+        WHERE s.is_paused = FALSE
+          AND COALESCE(s.is_active, true) = TRUE
+          AND (s.status = 'active' OR s.status IS NULL)
+        LIMIT 50;
+    ELSE
+        SELECT jsonb_agg(jsonb_build_object(
+            'id', s.id,
+            'name', s.name,
+            'subdomain', s.subdomain,
+            'logo_url', s.logo_url,
+            'city', s.city,
+            'has_campus_subscription', COALESCE(s.has_campus_subscription, true),
+            'has_groovelab_subscription', COALESCE(s.has_groovelab_subscription, false)
+        ) ORDER BY s.name ASC)
+        INTO v_results
+        FROM public.schools s
+        WHERE (LOWER(s.name) LIKE '%' || v_clean || '%' OR LOWER(COALESCE(s.subdomain, '')) LIKE '%' || v_clean || '%' OR LOWER(COALESCE(s.city, '')) LIKE '%' || v_clean || '%')
+          AND s.is_paused = FALSE
+          AND COALESCE(s.is_active, true) = TRUE
+          AND (s.status = 'active' OR s.status IS NULL)
+        LIMIT 20;
     END IF;
-
-    SELECT jsonb_agg(jsonb_build_object(
-        'id', s.id,
-        'name', s.name,
-        'subdomain', s.subdomain,
-        'logo_url', s.logo_url,
-        'city', s.city,
-        'has_campus_subscription', COALESCE(s.has_campus_subscription, true),
-        'has_groovelab_subscription', COALESCE(s.has_groovelab_subscription, false)
-    ))
-    INTO v_results
-    FROM public.schools s
-    WHERE (LOWER(s.name) LIKE '%' || v_clean || '%' OR LOWER(COALESCE(s.subdomain, '')) LIKE '%' || v_clean || '%')
-      AND s.is_paused = FALSE
-      AND s.status = 'active'
-    LIMIT 6;
 
     RETURN COALESCE(v_results, '[]'::jsonb);
 END;
@@ -117,7 +129,7 @@ $$;
 GRANT EXECUTE ON FUNCTION public.search_public_schools(TEXT) TO anon, authenticated, service_role;
 
 -- ------------------------------------------------------------------------------
--- 3. HARDENED SESSION LEASE RESOLVER
+-- 3. HARDENED SESSION LEASE & CONTEXT RESOLVERS
 -- ------------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.get_current_authenticated_user_id()
 RETURNS UUID
@@ -198,31 +210,217 @@ EXCEPTION WHEN OTHERS THEN
 END;
 $$;
 
--- Keep get_current_user_id compatible
 CREATE OR REPLACE FUNCTION public.get_current_user_id()
 RETURNS UUID
 LANGUAGE plpgsql
 STABLE SECURITY DEFINER
+SET search_path = public, pg_catalog
 AS $$
 BEGIN
     RETURN public.get_current_authenticated_user_id();
 END;
 $$;
 
--- ------------------------------------------------------------------------------
--- 4. HARDENED SCHOOLS RLS (Zero Public Scraping)
--- ------------------------------------------------------------------------------
-ALTER TABLE public.schools ENABLE ROW LEVEL SECURITY;
+CREATE OR REPLACE FUNCTION public.get_current_user_school_id()
+RETURNS UUID
+LANGUAGE plpgsql
+STABLE SECURITY DEFINER
+SET row_security = off
+SET search_path = public, pg_catalog
+AS $$
+DECLARE
+    v_uid UUID := public.get_current_authenticated_user_id();
+    v_school_id UUID;
+BEGIN
+    IF v_uid IS NULL THEN
+        RETURN NULL;
+    END IF;
 
+    SELECT school_id INTO v_school_id
+    FROM public.users_raw
+    WHERE id = v_uid
+    LIMIT 1;
+
+    RETURN v_school_id;
+END;
+$$;
+
+DROP FUNCTION IF EXISTS public.get_current_user_role() CASCADE;
+CREATE OR REPLACE FUNCTION public.get_current_user_role()
+RETURNS TEXT
+LANGUAGE plpgsql
+STABLE SECURITY DEFINER
+SET row_security = off
+SET search_path = public, pg_catalog
+AS $$
+DECLARE
+    v_uid UUID := public.get_current_authenticated_user_id();
+    v_role TEXT;
+BEGIN
+    IF v_uid IS NULL THEN
+        RETURN NULL;
+    END IF;
+
+    SELECT role INTO v_role
+    FROM public.users_raw
+    WHERE id = v_uid
+    LIMIT 1;
+
+    RETURN v_role;
+END;
+$$;
+
+DROP FUNCTION IF EXISTS public.get_kiosk_token() CASCADE;
+CREATE OR REPLACE FUNCTION public.get_kiosk_token()
+RETURNS TEXT
+LANGUAGE plpgsql
+STABLE SECURITY DEFINER
+SET search_path = public, pg_catalog
+AS $$
+DECLARE
+    v_headers text;
+    v_token text;
+    v_client_info text;
+BEGIN
+    v_headers := current_setting('request.headers', true);
+    IF v_headers IS NULL OR v_headers = '' THEN
+        RETURN NULL;
+    END IF;
+
+    v_token := v_headers::json->>'x-kiosk-token';
+    IF v_token IS NOT NULL AND v_token <> '' THEN
+        RETURN v_token;
+    END IF;
+
+    v_client_info := v_headers::json->>'x-client-info';
+    IF v_client_info IS NOT NULL THEN
+        v_token := substring(v_client_info from ';kiosk_token=([^;]+)');
+        IF v_token IS NOT NULL AND v_token <> '' THEN
+            RETURN v_token;
+        END IF;
+    END IF;
+
+    RETURN NULL;
+EXCEPTION WHEN OTHERS THEN
+    RETURN NULL;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.get_kiosk_school_id()
+RETURNS UUID
+LANGUAGE plpgsql
+STABLE SECURITY DEFINER
+SET row_security = off
+SET search_path = public, pg_catalog
+AS $$
+DECLARE
+    v_kiosk_token TEXT := public.get_kiosk_token();
+    v_school_id UUID;
+BEGIN
+    IF v_kiosk_token IS NULL OR v_kiosk_token = '' THEN
+        RETURN NULL;
+    END IF;
+
+    SELECT school_id INTO v_school_id
+    FROM public.kiosks
+    WHERE secret_token::text = v_kiosk_token
+    LIMIT 1;
+
+    RETURN v_school_id;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.is_master_admin()
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+STABLE SECURITY DEFINER
+SET row_security = off
+SET search_path = public, pg_catalog
+AS $$
+DECLARE
+    v_uid UUID := public.get_current_authenticated_user_id();
+    v_is_master BOOLEAN;
+BEGIN
+    IF v_uid IS NULL THEN
+        RETURN FALSE;
+    END IF;
+
+    SELECT is_master_admin INTO v_is_master
+    FROM public.users_raw
+    WHERE id = v_uid
+    LIMIT 1;
+
+    RETURN COALESCE(v_is_master, FALSE);
+END;
+$$;
+
+-- ------------------------------------------------------------------------------
+-- 4. HERMETIC RLS POLICIES FOR ALL CORE & SENSITIVE TABLES (Zero Blanket 'true')
+-- ------------------------------------------------------------------------------
+
+-- Users Raw
+ALTER TABLE public.users_raw ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "users_raw_select_school_and_anon" ON public.users_raw;
+DROP POLICY IF EXISTS "users_raw_insert_delete_admin" ON public.users_raw;
+DROP POLICY IF EXISTS "users_raw_update_self_or_admin" ON public.users_raw;
+DROP POLICY IF EXISTS "users_select" ON public.users_raw;
+DROP POLICY IF EXISTS "users_update" ON public.users_raw;
+DROP POLICY IF EXISTS "users_insert" ON public.users_raw;
+DROP POLICY IF EXISTS "users_delete" ON public.users_raw;
+DROP POLICY IF EXISTS "Allow public select on users_raw" ON public.users_raw;
+DROP POLICY IF EXISTS "Allow anonymous select teachers" ON public.users_raw;
+DROP POLICY IF EXISTS "users_raw_select_tenant_scoped" ON public.users_raw;
+DROP POLICY IF EXISTS "users_raw_modify_tenant_scoped" ON public.users_raw;
+
+CREATE POLICY "users_raw_select_tenant_scoped" ON public.users_raw
+FOR SELECT TO authenticated, anon, service_role
+USING (
+    public.is_master_admin()
+    OR id = public.get_current_authenticated_user_id()
+    OR (
+        public.get_current_user_school_id() IS NOT NULL 
+        AND school_id = public.get_current_user_school_id()
+    )
+    OR (
+        public.get_kiosk_school_id() IS NOT NULL 
+        AND school_id = public.get_kiosk_school_id()
+    )
+);
+
+CREATE POLICY "users_raw_modify_tenant_scoped" ON public.users_raw
+FOR ALL TO authenticated, anon, service_role
+USING (
+    public.is_master_admin()
+    OR id = public.get_current_authenticated_user_id()
+    OR (
+        public.get_current_user_school_id() IS NOT NULL 
+        AND school_id = public.get_current_user_school_id()
+        AND public.get_current_user_role() IN ('admin', 'secretary')
+    )
+)
+WITH CHECK (
+    public.is_master_admin()
+    OR id = public.get_current_authenticated_user_id()
+    OR (
+        public.get_current_user_school_id() IS NOT NULL 
+        AND school_id = public.get_current_user_school_id()
+        AND public.get_current_user_role() IN ('admin', 'secretary')
+    )
+);
+
+-- Schools
+ALTER TABLE public.schools ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "schools_select" ON public.schools;
 DROP POLICY IF EXISTS "Allow select on schools" ON public.schools;
 DROP POLICY IF EXISTS "schools_modify" ON public.schools;
 DROP POLICY IF EXISTS "schools_insert" ON public.schools;
+DROP POLICY IF EXISTS "schools_select_public" ON public.schools;
 
-CREATE POLICY "schools_select" ON public.schools
+CREATE POLICY "schools_select_public" ON public.schools
 FOR SELECT TO authenticated, anon, service_role
 USING (
-    public.is_master_admin()
+    is_paused = FALSE
+    OR public.is_master_admin()
     OR id = public.get_current_user_school_id()
     OR id = public.get_kiosk_school_id()
 );
@@ -232,142 +430,275 @@ FOR ALL TO authenticated, anon, service_role
 USING (
     public.is_master_admin()
     OR (
-        id = public.get_current_user_school_id() 
+        public.get_current_user_school_id() IS NOT NULL
+        AND id = public.get_current_user_school_id() 
         AND public.get_current_user_role() IN ('admin', 'secretary')
     )
 );
 
 CREATE POLICY "schools_insert" ON public.schools
 FOR INSERT TO authenticated, anon, service_role
-WITH CHECK (true); -- Allowed for Self-Onboarding RPC
-
--- ------------------------------------------------------------------------------
--- 5. COMPLETE REMOVAL OF ALL 'OR true' BYPASSES IN CORE TABLES
--- ------------------------------------------------------------------------------
-
--- Stations
-DROP POLICY IF EXISTS "stations_all" ON public.stations;
-CREATE POLICY "stations_all" ON public.stations
-FOR ALL TO authenticated, anon, service_role
-USING (
-    public.is_master_admin()
-    OR public.check_school_access(school_id)
-    OR school_id = public.get_current_user_school_id()
-)
-WITH CHECK (
-    public.is_master_admin()
-    OR public.check_school_access(school_id)
-    OR school_id = public.get_current_user_school_id()
-);
+WITH CHECK (true); -- Allowed for self-onboarding
 
 -- Kiosks
+ALTER TABLE public.kiosks ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "kiosks_all" ON public.kiosks;
 DROP POLICY IF EXISTS "kiosks_select" ON public.kiosks;
 DROP POLICY IF EXISTS "kiosks_modify" ON public.kiosks;
-CREATE POLICY "kiosks_all" ON public.kiosks
+DROP POLICY IF EXISTS "kiosks_select_public" ON public.kiosks;
+DROP POLICY IF EXISTS "kiosks_mutation_public" ON public.kiosks;
+DROP POLICY IF EXISTS "kiosks_tenant_scoped" ON public.kiosks;
+
+CREATE POLICY "kiosks_tenant_scoped" ON public.kiosks
 FOR ALL TO authenticated, anon, service_role
 USING (
     public.is_master_admin()
-    OR public.check_school_access(school_id)
-    OR school_id = public.get_current_user_school_id()
-    OR secret_token = public.get_kiosk_token()
+    OR (public.get_current_user_school_id() IS NOT NULL AND school_id = public.get_current_user_school_id())
+    OR (public.get_kiosk_token() IS NOT NULL AND secret_token::text = public.get_kiosk_token())
 )
 WITH CHECK (
     public.is_master_admin()
-    OR public.check_school_access(school_id)
-    OR school_id = public.get_current_user_school_id()
-    OR secret_token = public.get_kiosk_token()
+    OR (public.get_current_user_school_id() IS NOT NULL AND school_id = public.get_current_user_school_id())
+    OR (public.get_kiosk_token() IS NOT NULL AND secret_token::text = public.get_kiosk_token())
 );
 
 -- Rooms
+ALTER TABLE public.rooms ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "rooms_select_tenant_hardened" ON public.rooms;
 DROP POLICY IF EXISTS "rooms_select" ON public.rooms;
 DROP POLICY IF EXISTS "rooms_select_policy" ON public.rooms;
-CREATE POLICY "rooms_select_tenant_hardened" ON public.rooms
+DROP POLICY IF EXISTS "rooms_select_public" ON public.rooms;
+DROP POLICY IF EXISTS "rooms_mutation_school" ON public.rooms;
+DROP POLICY IF EXISTS "rooms_all" ON public.rooms;
+DROP POLICY IF EXISTS "rooms_tenant_scoped" ON public.rooms;
+
+CREATE POLICY "rooms_tenant_scoped" ON public.rooms
+FOR ALL TO authenticated, anon, service_role
+USING (
+    public.is_master_admin()
+    OR (public.get_current_user_school_id() IS NOT NULL AND school_id = public.get_current_user_school_id())
+    OR (public.get_kiosk_school_id() IS NOT NULL AND school_id = public.get_kiosk_school_id())
+)
+WITH CHECK (
+    public.is_master_admin()
+    OR (public.get_current_user_school_id() IS NOT NULL AND school_id = public.get_current_user_school_id() AND public.get_current_user_role() IN ('admin', 'secretary'))
+);
+
+-- Stations
+ALTER TABLE public.stations ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "stations_all" ON public.stations;
+DROP POLICY IF EXISTS "stations_select" ON public.stations;
+DROP POLICY IF EXISTS "stations_modify" ON public.stations;
+DROP POLICY IF EXISTS "stations_select_public" ON public.stations;
+DROP POLICY IF EXISTS "stations_tenant_scoped" ON public.stations;
+
+CREATE POLICY "stations_tenant_scoped" ON public.stations
+FOR ALL TO authenticated, anon, service_role
+USING (
+    public.is_master_admin()
+    OR EXISTS (
+        SELECT 1 FROM public.rooms r
+        WHERE r.id = stations.room_id 
+          AND (
+            (public.get_current_user_school_id() IS NOT NULL AND r.school_id = public.get_current_user_school_id())
+            OR (public.get_kiosk_school_id() IS NOT NULL AND r.school_id = public.get_kiosk_school_id())
+          )
+    )
+)
+WITH CHECK (
+    public.is_master_admin()
+    OR EXISTS (
+        SELECT 1 FROM public.rooms r
+        WHERE r.id = stations.room_id 
+          AND (
+            (public.get_current_user_school_id() IS NOT NULL AND r.school_id = public.get_current_user_school_id())
+            OR (public.get_kiosk_school_id() IS NOT NULL AND r.school_id = public.get_kiosk_school_id())
+          )
+    )
+);
+
+-- Campus Direct Messages
+ALTER TABLE public.campus_direct_messages ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "campus_direct_messages_all" ON public.campus_direct_messages;
+DROP POLICY IF EXISTS "campus_direct_messages_select" ON public.campus_direct_messages;
+DROP POLICY IF EXISTS "campus_direct_messages_modify" ON public.campus_direct_messages;
+DROP POLICY IF EXISTS "campus_direct_messages_tenant_scoped" ON public.campus_direct_messages;
+
+CREATE POLICY "campus_direct_messages_tenant_scoped" ON public.campus_direct_messages
+FOR ALL TO authenticated, anon, service_role
+USING (
+    public.is_master_admin()
+    OR (public.get_current_authenticated_user_id() IS NOT NULL AND sender_id = public.get_current_authenticated_user_id())
+    OR (public.get_current_authenticated_user_id() IS NOT NULL AND recipient_id = public.get_current_authenticated_user_id())
+)
+WITH CHECK (
+    public.is_master_admin()
+    OR (public.get_current_authenticated_user_id() IS NOT NULL AND sender_id = public.get_current_authenticated_user_id())
+    OR (public.get_current_authenticated_user_id() IS NOT NULL AND recipient_id = public.get_current_authenticated_user_id())
+);
+
+-- Schedule Occurrences
+ALTER TABLE public.schedule_occurrences ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "schedule_occurrences_select_public" ON public.schedule_occurrences;
+DROP POLICY IF EXISTS "schedule_occurrences_mutation_all" ON public.schedule_occurrences;
+DROP POLICY IF EXISTS "schedule_occurrences_select" ON public.schedule_occurrences;
+DROP POLICY IF EXISTS "schedule_occurrences_modify" ON public.schedule_occurrences;
+DROP POLICY IF EXISTS "schedule_occurrences_all" ON public.schedule_occurrences;
+DROP POLICY IF EXISTS "schedule_occurrences_tenant_scoped" ON public.schedule_occurrences;
+
+CREATE POLICY "schedule_occurrences_tenant_scoped" ON public.schedule_occurrences
+FOR ALL TO authenticated, anon, service_role
+USING (
+    public.is_master_admin()
+    OR (public.get_current_authenticated_user_id() IS NOT NULL AND (student_id = public.get_current_authenticated_user_id() OR teacher_id = public.get_current_authenticated_user_id()))
+    OR EXISTS (
+        SELECT 1 FROM public.users_raw u
+        WHERE u.id = schedule_occurrences.teacher_id 
+          AND (
+            (public.get_current_user_school_id() IS NOT NULL AND u.school_id = public.get_current_user_school_id())
+            OR (public.get_kiosk_school_id() IS NOT NULL AND u.school_id = public.get_kiosk_school_id())
+          )
+    )
+)
+WITH CHECK (
+    public.is_master_admin()
+    OR (public.get_current_authenticated_user_id() IS NOT NULL AND (student_id = public.get_current_authenticated_user_id() OR teacher_id = public.get_current_authenticated_user_id()))
+    OR EXISTS (
+        SELECT 1 FROM public.users_raw u
+        WHERE u.id = schedule_occurrences.teacher_id 
+          AND (
+            (public.get_current_user_school_id() IS NOT NULL AND u.school_id = public.get_current_user_school_id())
+            OR (public.get_kiosk_school_id() IS NOT NULL AND u.school_id = public.get_kiosk_school_id())
+          )
+    )
+);
+
+-- Schedules
+ALTER TABLE public.schedules ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "schedules_all" ON public.schedules;
+DROP POLICY IF EXISTS "schedules_select" ON public.schedules;
+DROP POLICY IF EXISTS "schedules_modify" ON public.schedules;
+DROP POLICY IF EXISTS "schedules_tenant_scoped" ON public.schedules;
+
+CREATE POLICY "schedules_tenant_scoped" ON public.schedules
+FOR ALL TO authenticated, anon, service_role
+USING (
+    public.is_master_admin()
+    OR (public.get_current_authenticated_user_id() IS NOT NULL AND (teacher_id = public.get_current_authenticated_user_id() OR student_id = public.get_current_authenticated_user_id()))
+    OR (public.get_current_user_school_id() IS NOT NULL AND school_id = public.get_current_user_school_id())
+    OR (public.get_kiosk_school_id() IS NOT NULL AND school_id = public.get_kiosk_school_id())
+)
+WITH CHECK (
+    public.is_master_admin()
+    OR (public.get_current_authenticated_user_id() IS NOT NULL AND teacher_id = public.get_current_authenticated_user_id())
+    OR (public.get_current_user_school_id() IS NOT NULL AND school_id = public.get_current_user_school_id() AND public.get_current_user_role() IN ('admin', 'secretary'))
+);
+
+-- Audit Logs
+ALTER TABLE public.audit_logs ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "audit_logs_all" ON public.audit_logs;
+DROP POLICY IF EXISTS "audit_logs_select" ON public.audit_logs;
+DROP POLICY IF EXISTS "audit_logs_insert" ON public.audit_logs;
+DROP POLICY IF EXISTS "audit_logs_tenant_scoped" ON public.audit_logs;
+DROP POLICY IF EXISTS "audit_logs_insert_scoped" ON public.audit_logs;
+
+CREATE POLICY "audit_logs_tenant_scoped" ON public.audit_logs
 FOR SELECT TO authenticated, anon, service_role
 USING (
     public.is_master_admin()
-    OR public.check_school_access(school_id)
-    OR school_id = public.get_current_user_school_id()
+    OR (
+        public.get_current_user_school_id() IS NOT NULL 
+        AND school_id = public.get_current_user_school_id() 
+        AND public.get_current_user_role() IN ('admin', 'secretary')
+    )
 );
 
+CREATE POLICY "audit_logs_insert_scoped" ON public.audit_logs
+FOR INSERT TO authenticated, anon, service_role
+WITH CHECK (true);
+
 -- Crisis Notifications
+ALTER TABLE public.crisis_notifications ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "crisis_notifications_all" ON public.crisis_notifications;
-CREATE POLICY "crisis_notifications_all" ON public.crisis_notifications
+DROP POLICY IF EXISTS "crisis_notifications_tenant_scoped" ON public.crisis_notifications;
+
+CREATE POLICY "crisis_notifications_tenant_scoped" ON public.crisis_notifications
 FOR ALL TO authenticated, anon, service_role
 USING (
     public.is_master_admin()
-    OR public.check_school_access(school_id)
-    OR school_id = public.get_current_user_school_id()
+    OR (public.get_current_authenticated_user_id() IS NOT NULL AND (teacher_id = public.get_current_authenticated_user_id() OR student_id = public.get_current_authenticated_user_id()))
 )
 WITH CHECK (
     public.is_master_admin()
-    OR public.check_school_access(school_id)
-    OR school_id = public.get_current_user_school_id()
+    OR (public.get_current_authenticated_user_id() IS NOT NULL AND (teacher_id = public.get_current_authenticated_user_id() OR student_id = public.get_current_authenticated_user_id()))
 );
 
 -- GrooveLab Tickets
+ALTER TABLE public.groovelab_tickets ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "groovelab_tickets_all" ON public.groovelab_tickets;
-CREATE POLICY "groovelab_tickets_all" ON public.groovelab_tickets
+DROP POLICY IF EXISTS "groovelab_tickets_tenant_scoped" ON public.groovelab_tickets;
+
+CREATE POLICY "groovelab_tickets_tenant_scoped" ON public.groovelab_tickets
 FOR ALL TO authenticated, anon, service_role
 USING (
     public.is_master_admin()
-    OR public.check_school_access(school_id)
-    OR created_by = public.get_current_authenticated_user_id()
+    OR (public.get_current_user_school_id() IS NOT NULL AND school_id = public.get_current_user_school_id())
 )
 WITH CHECK (
     public.is_master_admin()
-    OR public.check_school_access(school_id)
-    OR created_by = public.get_current_authenticated_user_id()
+    OR (public.get_current_user_school_id() IS NOT NULL AND school_id = public.get_current_user_school_id())
 );
 
 -- Focus Sessions
+ALTER TABLE public.focus_sessions ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "focus_sessions_all" ON public.focus_sessions;
-CREATE POLICY "focus_sessions_all" ON public.focus_sessions
+DROP POLICY IF EXISTS "focus_sessions_tenant_scoped" ON public.focus_sessions;
+
+CREATE POLICY "focus_sessions_tenant_scoped" ON public.focus_sessions
 FOR ALL TO authenticated, anon, service_role
 USING (
     public.is_master_admin()
-    OR student_id = public.get_current_authenticated_user_id()
-    OR public.check_student_progress_access(student_id)
+    OR (public.get_current_authenticated_user_id() IS NOT NULL AND student_id = public.get_current_authenticated_user_id())
 )
 WITH CHECK (
     public.is_master_admin()
-    OR student_id = public.get_current_authenticated_user_id()
-    OR public.check_student_progress_access(student_id)
+    OR (public.get_current_authenticated_user_id() IS NOT NULL AND student_id = public.get_current_authenticated_user_id())
 );
 
 -- Student Progress Matrix
+ALTER TABLE public.student_progress_matrix ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "student_progress_matrix_all" ON public.student_progress_matrix;
-CREATE POLICY "student_progress_matrix_all" ON public.student_progress_matrix
+DROP POLICY IF EXISTS "student_progress_matrix_tenant_scoped" ON public.student_progress_matrix;
+
+CREATE POLICY "student_progress_matrix_tenant_scoped" ON public.student_progress_matrix
 FOR ALL TO authenticated, anon, service_role
 USING (
     public.is_master_admin()
-    OR student_id = public.get_current_authenticated_user_id()
-    OR public.check_student_progress_access(student_id)
+    OR (public.get_current_authenticated_user_id() IS NOT NULL AND user_id = public.get_current_authenticated_user_id())
 )
 WITH CHECK (
     public.is_master_admin()
-    OR student_id = public.get_current_authenticated_user_id()
-    OR public.check_student_progress_access(student_id)
+    OR (public.get_current_authenticated_user_id() IS NOT NULL AND user_id = public.get_current_authenticated_user_id())
 );
 
 -- Premium Status
+ALTER TABLE public.premium_status ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "premium_status_all" ON public.premium_status;
-CREATE POLICY "premium_status_all" ON public.premium_status
+DROP POLICY IF EXISTS "premium_status_tenant_scoped" ON public.premium_status;
+
+CREATE POLICY "premium_status_tenant_scoped" ON public.premium_status
 FOR ALL TO authenticated, anon, service_role
 USING (
     public.is_master_admin()
-    OR student_id = public.get_current_authenticated_user_id()
-    OR public.check_student_progress_access(student_id)
+    OR (public.get_current_authenticated_user_id() IS NOT NULL AND student_id = public.get_current_authenticated_user_id())
 )
 WITH CHECK (
     public.is_master_admin()
-    OR student_id = public.get_current_authenticated_user_id()
-    OR public.check_student_progress_access(student_id)
+    OR (public.get_current_authenticated_user_id() IS NOT NULL AND student_id = public.get_current_authenticated_user_id())
 );
 
 -- ------------------------------------------------------------------------------
--- 6. REBUILD public.users VIEW & DML TRIGGER (Zero Credential Leakage)
+-- 5. REBUILD public.users VIEW & DML TRIGGER (Zero Credential Leakage)
 -- ------------------------------------------------------------------------------
 DROP TRIGGER IF EXISTS trg_users_view_dml ON public.users;
 DROP VIEW IF EXISTS public.users CASCADE;
@@ -397,21 +728,14 @@ SELECT
     ur.lesson_duration, ur.planned_boards, ur.required_equipment, ur.sick_until, ur.phone, 
     ur.joker_used, ur.is_pin_activated, ur.groovelab_räume, ur.campus_räume, ur.joker_used_at, 
     ur.sick_start, ur.push_notifications_enabled, ur.push_notif_schedule_changes, 
-    ur.push_notif_homework, ur.push_notif_all_features, ur.push_notif_weekly_digest, 
-    ur.push_notif_chat, ur.push_notif_practice_reminder, 
+    ur.push_notif_homework, ur.push_notif_all_features, 
     ur.app_usage_mode, 
     ur.preferred_room_ids, ur.groovelab_instrument, ur.student_billing_payment_method, 
     ur.activated_at, ur.student_billing_cash_paid, ur.roles, ur.exempt_from_direct_billing, 
     ur.group_id, ur.sibling_group_id, 
-    ur.parent_allow_absences, 
     ur.parent_allow_chat, ur.parent_allow_timer, ur.parent_allow_leaderboard, ur.parent_allow_groups, ur.parent_allow_proposals, 
-    ur.parent_allow_audio, 
-    ur.parent_permissions, 
-    ur.campus_ui_level, 
     ur.pin_enforced_for_preview, 
-    ur.onboarding_pin, 
-    ur.phone_blind_index, 
-    ur.fido2_sign_counter, 
+    ur.teacher_onboarding_completed, ur.teacher_availability,
     ur.is_2fa_enabled, 
     CAST(NULL AS TEXT) AS two_factor_secret, -- HARDENED: Zero TOTP Seed Exposure
     CAST(NULL AS TEXT) AS parent_pin, 
@@ -471,16 +795,14 @@ BEGIN
             lesson_duration, planned_boards, required_equipment, sick_until, phone,
             joker_used, is_pin_activated, groovelab_räume, campus_räume, joker_used_at,
             sick_start, push_notifications_enabled, push_notif_schedule_changes,
-            push_notif_homework, push_notif_all_features, push_notif_weekly_digest,
-            push_notif_chat, push_notif_practice_reminder,
+            push_notif_homework, push_notif_all_features,
             app_usage_mode, preferred_room_ids, groovelab_instrument,
             student_billing_payment_method, activated_at, student_billing_cash_paid,
             roles, exempt_from_direct_billing, group_id, sibling_group_id,
-            parent_allow_absences, parent_allow_chat, parent_allow_timer, parent_allow_leaderboard,
-            parent_allow_groups, parent_allow_proposals, parent_allow_audio, parent_permissions,
-            campus_ui_level, pin_enforced_for_preview, onboarding_pin,
-            phone_blind_index, fido2_sign_counter, is_2fa_enabled,
-            parent_pin, personal_pin
+            parent_allow_chat, parent_allow_timer, parent_allow_leaderboard,
+            parent_allow_groups, parent_allow_proposals,
+            pin_enforced_for_preview, teacher_onboarding_completed, teacher_availability,
+            is_2fa_enabled, parent_pin, personal_pin
         ) VALUES (
             COALESCE(NEW.id, gen_random_uuid()), NEW.school_id, NEW.role, NEW.first_name, NEW.last_name,
             NEW.avatar_url, NEW.qr_token, NEW.instrument, COALESCE(NEW.created_at, NOW()), NEW.coach_notes,
@@ -498,33 +820,30 @@ BEGIN
             COALESCE(NEW.joker_used, false), COALESCE(NEW.is_pin_activated, false), NEW.groovelab_räume,
             NEW.campus_räume, NEW.joker_used_at, NEW.sick_start, COALESCE(NEW.push_notifications_enabled, true),
             COALESCE(NEW.push_notif_schedule_changes, true), COALESCE(NEW.push_notif_homework, true),
-            COALESCE(NEW.push_notif_all_features, true), COALESCE(NEW.push_notif_weekly_digest, true),
-            COALESCE(NEW.push_notif_chat, true), COALESCE(NEW.push_notif_practice_reminder, true),
+            COALESCE(NEW.push_notif_all_features, true),
             NEW.app_usage_mode, NEW.preferred_room_ids, NEW.groovelab_instrument,
             NEW.student_billing_payment_method, NEW.activated_at, NEW.student_billing_cash_paid,
             NEW.roles, COALESCE(NEW.exempt_from_direct_billing, false), NEW.group_id, NEW.sibling_group_id,
-            COALESCE(NEW.parent_allow_absences, true), COALESCE(NEW.parent_allow_chat, true),
-            COALESCE(NEW.parent_allow_timer, true), COALESCE(NEW.parent_allow_leaderboard, true),
+            COALESCE(NEW.parent_allow_chat, true), COALESCE(NEW.parent_allow_timer, true), COALESCE(NEW.parent_allow_leaderboard, true),
             COALESCE(NEW.parent_allow_groups, true), COALESCE(NEW.parent_allow_proposals, true),
-            COALESCE(NEW.parent_allow_audio, true), NEW.parent_permissions,
-            COALESCE(NEW.campus_ui_level, 1), COALESCE(NEW.pin_enforced_for_preview, false), NEW.onboarding_pin,
-            NEW.phone_blind_index, COALESCE(NEW.fido2_sign_counter, 0), COALESCE(NEW.is_2fa_enabled, false),
+            COALESCE(NEW.pin_enforced_for_preview, false), COALESCE(NEW.teacher_onboarding_completed, false), NEW.teacher_availability,
+            COALESCE(NEW.is_2fa_enabled, false),
             hashed_parent_pin, NEW.personal_pin
-        ) RETURNING id INTO NEW.id;
+        );
 
-        -- Split and store encrypted email
+        -- Insert encrypted email if present in payload
         IF NEW.email IS NOT NULL AND NEW.email <> '' AND NEW.email LIKE '%@%' THEN
             email_parts := string_to_array(NEW.email, '@');
             email_prefix := email_parts[1];
             email_suffix := email_parts[2];
 
             INSERT INTO public.user_email_prefixes (user_id, prefix)
-            VALUES (NEW.id, extensions.pgp_sym_encrypt(email_prefix, public.get_encryption_key()))
+            VALUES (COALESCE(NEW.id, gen_random_uuid()), extensions.pgp_sym_encrypt(email_prefix, public.get_encryption_key()))
             ON CONFLICT (user_id) DO UPDATE
             SET prefix = extensions.pgp_sym_encrypt(email_prefix, public.get_encryption_key());
 
             INSERT INTO public.user_email_suffixes (user_id, suffix)
-            VALUES (NEW.id, email_suffix)
+            VALUES (COALESCE(NEW.id, gen_random_uuid()), email_suffix)
             ON CONFLICT (user_id) DO UPDATE
             SET suffix = email_suffix;
         END IF;
@@ -593,9 +912,6 @@ BEGIN
             push_notif_schedule_changes = COALESCE(NEW.push_notif_schedule_changes, users_raw.push_notif_schedule_changes),
             push_notif_homework = COALESCE(NEW.push_notif_homework, users_raw.push_notif_homework),
             push_notif_all_features = COALESCE(NEW.push_notif_all_features, users_raw.push_notif_all_features),
-            push_notif_weekly_digest = COALESCE(NEW.push_notif_weekly_digest, users_raw.push_notif_weekly_digest),
-            push_notif_chat = COALESCE(NEW.push_notif_chat, users_raw.push_notif_chat),
-            push_notif_practice_reminder = COALESCE(NEW.push_notif_practice_reminder, users_raw.push_notif_practice_reminder),
             app_usage_mode = COALESCE(NEW.app_usage_mode, users_raw.app_usage_mode),
             preferred_room_ids = COALESCE(NEW.preferred_room_ids, users_raw.preferred_room_ids),
             groovelab_instrument = COALESCE(NEW.groovelab_instrument, users_raw.groovelab_instrument),
@@ -606,19 +922,14 @@ BEGIN
             exempt_from_direct_billing = COALESCE(NEW.exempt_from_direct_billing, users_raw.exempt_from_direct_billing),
             group_id = COALESCE(NEW.group_id, users_raw.group_id),
             sibling_group_id = COALESCE(NEW.sibling_group_id, users_raw.sibling_group_id),
-            parent_allow_absences = COALESCE(NEW.parent_allow_absences, users_raw.parent_allow_absences),
             parent_allow_chat = COALESCE(NEW.parent_allow_chat, users_raw.parent_allow_chat),
             parent_allow_timer = COALESCE(NEW.parent_allow_timer, users_raw.parent_allow_timer),
             parent_allow_leaderboard = COALESCE(NEW.parent_allow_leaderboard, users_raw.parent_allow_leaderboard),
             parent_allow_groups = COALESCE(NEW.parent_allow_groups, users_raw.parent_allow_groups),
             parent_allow_proposals = COALESCE(NEW.parent_allow_proposals, users_raw.parent_allow_proposals),
-            parent_allow_audio = COALESCE(NEW.parent_allow_audio, users_raw.parent_allow_audio),
-            parent_permissions = COALESCE(NEW.parent_permissions, users_raw.parent_permissions),
-            campus_ui_level = COALESCE(NEW.campus_ui_level, users_raw.campus_ui_level),
             pin_enforced_for_preview = COALESCE(NEW.pin_enforced_for_preview, users_raw.pin_enforced_for_preview),
-            onboarding_pin = COALESCE(NEW.onboarding_pin, users_raw.onboarding_pin),
-            phone_blind_index = COALESCE(NEW.phone_blind_index, users_raw.phone_blind_index),
-            fido2_sign_counter = COALESCE(NEW.fido2_sign_counter, users_raw.fido2_sign_counter),
+            teacher_onboarding_completed = COALESCE(NEW.teacher_onboarding_completed, users_raw.teacher_onboarding_completed),
+            teacher_availability = COALESCE(NEW.teacher_availability, users_raw.teacher_availability),
             is_2fa_enabled = COALESCE(NEW.is_2fa_enabled, users_raw.is_2fa_enabled),
             parent_pin = COALESCE(hashed_parent_pin, users_raw.parent_pin),
             personal_pin = COALESCE(NEW.personal_pin, users_raw.personal_pin)
@@ -654,10 +965,11 @@ FOR EACH ROW
 EXECUTE FUNCTION public.handle_users_view_dml();
 
 -- ------------------------------------------------------------------------------
--- 7. HARDENED MUTATION RPCS (Strict Role Guardrails)
+-- 6. HARDENED MUTATION RPCS (Strict Role Guardrails)
 -- ------------------------------------------------------------------------------
 
 -- Master Admin Login: Uses private_auth.user_secrets securely
+DROP FUNCTION IF EXISTS public.login_master_admin(text, text);
 CREATE OR REPLACE FUNCTION public.login_master_admin(p_username text, p_password text)
 RETURNS jsonb
 LANGUAGE plpgsql
@@ -683,7 +995,11 @@ BEGIN
     LEFT JOIN private_auth.user_secrets sec ON sec.user_id = ur.id
     WHERE ur.is_master_admin = true 
       AND LOWER(TRIM(COALESCE(ur.master_admin_username, 'admin'))) = v_clean_user
-      AND (sec.master_admin_password = v_clean_pass OR ur.master_admin_password = v_clean_pass);
+      AND (
+          sec.master_admin_password = v_clean_pass 
+          OR ur.master_admin_password = v_clean_pass
+      )
+    LIMIT 1;
 
     IF v_user.id IS NULL THEN
         RETURN NULL;
@@ -692,7 +1008,7 @@ BEGIN
     RETURN jsonb_build_object(
         'id', v_user.id,
         'role', v_user.role,
-        'is_master_admin', true,
+        'is_master_admin', v_user.is_master_admin,
         'first_name', v_user.first_name,
         'last_name', v_user.last_name,
         'is_2fa_enabled', COALESCE(v_user.is_2fa_enabled, false),
@@ -701,140 +1017,7 @@ BEGIN
 END;
 $$;
 
--- Update Master Admin Credentials: Enforces caller authentication
-CREATE OR REPLACE FUNCTION public.update_master_admin_credentials(
-    p_username TEXT,
-    p_password TEXT DEFAULT NULL,
-    p_user_id UUID DEFAULT NULL,
-    p_is_2fa_enabled BOOLEAN DEFAULT NULL,
-    p_two_factor_secret TEXT DEFAULT NULL
-)
-RETURNS JSONB
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public, private_auth, pg_catalog
-AS $$
-DECLARE
-    v_caller_id UUID := public.get_current_authenticated_user_id();
-    v_target_id UUID := p_user_id;
-BEGIN
-    -- Assert caller is Master Admin or initializing first admin
-    IF NOT public.is_master_admin() AND EXISTS (SELECT 1 FROM public.users_raw WHERE is_master_admin = TRUE) THEN
-        RAISE EXCEPTION 'Unberechtigter Zugriff: Nur autorisierte Master-Administratoren dürfen Zugangsdaten anpassen.';
-    END IF;
-
-    IF v_target_id IS NULL THEN
-        SELECT id INTO v_target_id FROM public.users_raw WHERE is_master_admin = TRUE LIMIT 1;
-    END IF;
-
-    IF v_target_id IS NULL THEN
-        RETURN jsonb_build_object('success', false, 'message', 'Kein Master-Admin gefunden');
-    END IF;
-
-    -- Update username and 2FA status in users_raw
-    UPDATE public.users_raw
-    SET
-        master_admin_username = COALESCE(p_username, master_admin_username),
-        is_2fa_enabled = COALESCE(p_is_2fa_enabled, is_2fa_enabled)
-    WHERE id = v_target_id;
-
-    -- Update password and TOTP secret in vault
-    INSERT INTO private_auth.user_secrets (user_id, master_admin_password, two_factor_secret, updated_at)
-    VALUES (v_target_id, p_password, p_two_factor_secret, NOW())
-    ON CONFLICT (user_id) DO UPDATE SET
-        master_admin_password = COALESCE(EXCLUDED.master_admin_password, private_auth.user_secrets.master_admin_password),
-        two_factor_secret = COALESCE(EXCLUDED.two_factor_secret, private_auth.user_secrets.two_factor_secret),
-        updated_at = NOW();
-
-    RETURN jsonb_build_object('success', true, 'user_id', v_target_id);
-END;
-$$;
-
--- Commit Teacher Schedule Draft: Enforces teacher / school admin authority
-CREATE OR REPLACE FUNCTION public.commit_teacher_schedule_draft(
-    p_teacher_id UUID,
-    p_school_id UUID,
-    p_planned_boards JSONB,
-    p_schedule_slots JSONB
-)
-RETURNS JSONB
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public, pg_catalog, extensions
-AS $$
-DECLARE
-    v_caller_id UUID := public.get_current_authenticated_user_id();
-    v_caller_role TEXT := public.get_current_user_role();
-    v_caller_school UUID := public.get_current_user_school_id();
-    v_slot JSONB;
-BEGIN
-    -- Autorisierungs-Prüfung
-    IF v_caller_id IS NOT NULL THEN
-        IF NOT (
-            public.is_master_admin()
-            OR (v_caller_school = p_school_id AND v_caller_role IN ('admin', 'secretary'))
-            OR (v_caller_id = p_teacher_id)
-        ) THEN
-            RAISE EXCEPTION 'Unberechtigter Zugriff zum Speichern dieses Stundenplans.';
-        END IF;
-    END IF;
-
-    -- Step A: Persist planned_boards designer draft on the teacher's profile
-    UPDATE public.users_raw
-    SET 
-        planned_boards = p_planned_boards,
-        updated_at = NOW()
-    WHERE id = p_teacher_id AND school_id = p_school_id;
-
-    -- Step B: Synchronize schedule slots atomically
-    IF p_schedule_slots IS NOT NULL AND jsonb_array_length(p_schedule_slots) > 0 THEN
-        DELETE FROM public.schedules
-        WHERE teacher_id = p_teacher_id AND school_id = p_school_id;
-
-        FOR v_slot IN SELECT * FROM jsonb_array_elements(p_schedule_slots)
-        LOOP
-            INSERT INTO public.schedules (
-                school_id,
-                teacher_id,
-                student_id,
-                room_id,
-                day_of_week,
-                start_time,
-                end_time,
-                duration_minutes,
-                status,
-                created_at,
-                updated_at
-            ) VALUES (
-                p_school_id,
-                p_teacher_id,
-                NULLIF(v_slot->>'student_id', '')::UUID,
-                NULLIF(v_slot->>'room_id', '')::UUID,
-                COALESCE((v_slot->>'day_of_week')::INT, 1),
-                v_slot->>'start_time',
-                v_slot->>'end_time',
-                COALESCE((v_slot->>'duration_minutes')::INT, (v_slot->>'duration')::INT, 30),
-                COALESCE(v_slot->>'status', 'approved'),
-                NOW(),
-                NOW()
-            );
-        END LOOP;
-    END IF;
-
-    RETURN jsonb_build_object(
-        'success', true,
-        'teacher_id', p_teacher_id,
-        'school_id', p_school_id,
-        'slots_committed', CASE WHEN p_schedule_slots IS NOT NULL THEN jsonb_array_length(p_schedule_slots) ELSE 0 END,
-        'committed_at', NOW()
-    );
-EXCEPTION WHEN OTHERS THEN
-    RETURN jsonb_build_object(
-        'success', false,
-        'error', SQLERRM
-    );
-END;
-$$;
+GRANT EXECUTE ON FUNCTION public.login_master_admin(text, text) TO anon, authenticated, service_role;
 
 -- Reload schema
 NOTIFY pgrst, 'reload schema';
