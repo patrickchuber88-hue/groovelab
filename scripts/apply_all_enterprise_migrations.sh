@@ -21,7 +21,7 @@ ssh "$SERVER" "docker exec -t supabase-db pg_dump -U postgres postgres | gzip > 
 echo "  ✓ Pre-Migration Backup erfolgreich gesichert."
 
 # 3. Kopiere SQL-Migrationsdateien auf den Server
-echo "🚀 Übertrage Migrationen 297, 298, 299, 300, 301, 302, 303, 304, 305, 306..."
+echo "🚀 Übertrage Migrationen 297, 298, 299, 300, 301, 302, 303, 304, 305, 306, 307..."
 scp supabase/migrations/297_tier1_enterprise_goldstandard_security.sql \
     supabase/migrations/298_enterprise_incident_response_and_waf_shield.sql \
     supabase/migrations/299_enterprise_bff_dto_suite.sql \
@@ -32,6 +32,7 @@ scp supabase/migrations/297_tier1_enterprise_goldstandard_security.sql \
     supabase/migrations/304_enterprise_high_concurrency_indexes.sql \
     supabase/migrations/305_enterprise_idempotency_and_rfc7807.sql \
     supabase/migrations/306_enterprise_rbac_and_room_confirmation.sql \
+    supabase/migrations/307_enterprise_privilege_timeout_and_audit.sql \
     "$SERVER:$REMOTE_TEMP/"
 
 # 4. Führe Migrationen nacheinander in supabase-db aus
@@ -64,6 +65,9 @@ ssh "$SERVER" "docker exec -i supabase-db psql -U postgres postgres < $REMOTE_TE
 
 echo "⚡ Führe Migration 306 aus (RBAC Triggers & Room Confirmation Enforcement)..."
 ssh "$SERVER" "docker exec -i supabase-db psql -U postgres postgres < $REMOTE_TEMP/306_enterprise_rbac_and_room_confirmation.sql"
+
+echo "⚡ Führe Migration 307 aus (Statement Timeouts & Security Posture Audit)..."
+ssh "$SERVER" "docker exec -i supabase-db psql -U postgres postgres < $REMOTE_TEMP/307_enterprise_privilege_timeout_and_audit.sql"
 
 # 5. Schema Cache in PostgREST neu laden
 echo "🔄 Lade PostgREST Schema Cache neu..."
