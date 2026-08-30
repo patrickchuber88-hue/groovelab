@@ -39,7 +39,7 @@ export const MobileBriefingCarousel: React.FC<MobileBriefingCarouselProps> = ({
       label: 'Cockpit',
       icon: LayoutDashboard,
       content: (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', paddingBottom: 'calc(140px + env(safe-area-inset-bottom, 20px))', width: '100%', maxWidth: '100%', boxSizing: 'border-box', animation: 'fadeIn 0.25s ease-out' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', paddingBottom: 'calc(170px + env(safe-area-inset-bottom, 24px))', width: '100%', maxWidth: '100%', boxSizing: 'border-box', animation: 'fadeIn 0.25s ease-out' }}>
           {heroBanner}
           {kpisGrid}
           {sickWidget}
@@ -51,7 +51,7 @@ export const MobileBriefingCarousel: React.FC<MobileBriefingCarouselProps> = ({
       label: 'Tagesplan',
       icon: Clock,
       content: (
-        <div style={{ paddingBottom: 'calc(140px + env(safe-area-inset-bottom, 20px))', width: '100%', boxSizing: 'border-box', animation: 'fadeIn 0.25s ease-out' }}>
+        <div style={{ paddingBottom: 'calc(170px + env(safe-area-inset-bottom, 24px))', width: '100%', boxSizing: 'border-box', animation: 'fadeIn 0.25s ease-out' }}>
           {tagesplanWidget}
         </div>
       )
@@ -61,7 +61,7 @@ export const MobileBriefingCarousel: React.FC<MobileBriefingCarouselProps> = ({
       label: 'Hausaufgaben',
       icon: BookOpen,
       content: (
-        <div style={{ paddingBottom: 'calc(140px + env(safe-area-inset-bottom, 20px))', width: '100%', boxSizing: 'border-box', animation: 'fadeIn 0.25s ease-out' }}>
+        <div style={{ paddingBottom: 'calc(170px + env(safe-area-inset-bottom, 24px))', width: '100%', boxSizing: 'border-box', animation: 'fadeIn 0.25s ease-out' }}>
           {hausaufgabenWidget}
         </div>
       )
@@ -71,7 +71,7 @@ export const MobileBriefingCarousel: React.FC<MobileBriefingCarouselProps> = ({
       label: 'Feed',
       icon: Bell,
       content: (
-        <div style={{ paddingBottom: 'calc(140px + env(safe-area-inset-bottom, 20px))', width: '100%', boxSizing: 'border-box', animation: 'fadeIn 0.25s ease-out' }}>
+        <div style={{ paddingBottom: 'calc(170px + env(safe-area-inset-bottom, 24px))', width: '100%', boxSizing: 'border-box', animation: 'fadeIn 0.25s ease-out' }}>
           {mitteilungenWidget}
         </div>
       )

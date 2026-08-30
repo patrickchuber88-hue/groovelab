@@ -1760,11 +1760,33 @@ select option {
   }
 }
 
-.sim-viewport-mobile .main-wrapper {
+.sim-viewport-mobile .main-wrapper,
+.sim-viewport-portrait .main-wrapper {
   margin-left: 0 !important;
   padding-left: 0 !important;
   padding-right: 0 !important;
   padding-bottom: 110px !important;
+}
+
+.sim-viewport-mobile .main-content,
+.sim-viewport-portrait .main-content {
+  padding-left: 4px !important;
+  padding-right: 4px !important;
+  padding-bottom: 120px !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+@media (max-width: 768px) {
+  .main-content {
+    padding-left: 4px !important;
+    padding-right: 4px !important;
+    padding-bottom: 120px !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
 }
 
 /* Single-Page Mobile Scroll Engine: Eliminates inner nested scrollbars across ALL boards on smartphones */

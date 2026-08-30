@@ -10348,14 +10348,15 @@ function App() {
 
 
       <main className="main-content" style={{ 
-        overflow: activeStudentTab === 'live' ? 'hidden' : 'auto', 
+        overflow: (windowWidth <= 768 || activeStudentTab !== 'live') ? 'auto' : 'hidden', 
         flex: 1, 
         display: 'flex', 
         flexDirection: 'column', 
-        height: activeStudentTab === 'live' ? '100%' : 'auto',
-        padding: windowWidth <= 768 ? '10px 10px 90px 10px' : '10px',
+        height: (windowWidth <= 768 || activeStudentTab !== 'live') ? 'auto' : '100%',
+        padding: windowWidth <= 768 ? '4px 4px 100px 4px' : '10px',
         boxSizing: 'border-box',
-        minWidth: 0
+        minWidth: 0,
+        width: '100%'
       }}>
         {/* 🛡️ Persistent Sticky Safety Banner when Parent Mode is active */}
         {parentUnlocked && user?.role?.toLowerCase() === 'student' && (

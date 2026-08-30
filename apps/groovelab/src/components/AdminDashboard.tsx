@@ -15717,9 +15717,9 @@ export function AdminDashboard({
   return (
     <div style={{ 
       flex: 1, 
-      padding: hideHeader ? '0px' : (activeTab === 'live' ? '0px 10px 10px 10px' : '10px'), 
-      overflowY: activeTab === 'live' ? 'hidden' : 'auto',
-      height: activeTab === 'live' ? '100%' : 'auto',
+      padding: hideHeader ? '0px' : (activeTab === 'live' ? (windowWidth <= 768 ? '0px' : '0px 10px 10px 10px') : (windowWidth <= 768 ? '0px' : '10px')), 
+      overflowY: activeTab === 'live' ? (windowWidth <= 768 ? 'visible' : 'hidden') : 'auto',
+      height: activeTab === 'live' ? (windowWidth <= 768 ? 'auto' : '100%') : 'auto',
       display: 'flex',
       flexDirection: 'column',
       minWidth: 0,

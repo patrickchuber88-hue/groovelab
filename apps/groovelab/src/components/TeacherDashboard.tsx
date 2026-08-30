@@ -11190,7 +11190,7 @@ useEffect(() => {
         className="cg-full-height-board fluid-board-scroll-container"
         style={{
           flex: 1,
-          padding: hideHeader ? ((windowWidth < 768 || isMobileDevice) ? '0 0 100px 0' : '0') : ((windowWidth < 768 || isMobileDevice) ? 'max(48px, env(safe-area-inset-top, 48px)) 10px 100px 10px' : '10px'),
+          padding: hideHeader ? ((windowWidth < 768 || isMobileDevice) ? '0 0 100px 0' : '0') : ((windowWidth < 768 || isMobileDevice) ? 'max(48px, env(safe-area-inset-top, 48px)) 0px 100px 0px' : '10px'),
           boxSizing: 'border-box',
           width: '100%'
         }}
@@ -11371,15 +11371,16 @@ useEffect(() => {
             
             <div style={{ 
               flex: isTeacherBriefingSidebarCollapsed ? '1 1 100%' : '1 1 600px',
-              minWidth: '320px',
+              minWidth: (windowWidth < 768 || isMobileDevice) ? '0px' : '320px',
               maxWidth: '100%',
+              width: '100%',
               display: 'flex', 
               flexDirection: 'column', 
               gap: '10px',
-              maxHeight: 'calc(100vh - 60px)',
-              overflowY: 'auto',
-              paddingRight: (isTeacherBriefingSidebarCollapsed && !isMobileDevice) ? '56px' : '10px',
-              paddingBottom: '80px',
+              maxHeight: (windowWidth < 768 || isMobileDevice) ? 'none' : 'calc(100vh - 60px)',
+              overflowY: (windowWidth < 768 || isMobileDevice) ? 'visible' : 'auto',
+              paddingRight: (isTeacherBriefingSidebarCollapsed && !isMobileDevice) ? '56px' : ((windowWidth < 768 || isMobileDevice) ? '0px' : '10px'),
+              paddingBottom: (windowWidth < 768 || isMobileDevice) ? '20px' : '80px',
               boxSizing: 'border-box',
               transition: 'padding-right 0.3s cubic-bezier(0.4, 0, 0.2, 1), flex 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
             }}>
