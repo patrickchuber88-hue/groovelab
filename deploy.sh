@@ -50,7 +50,7 @@ ssh "$SERVER" "WEB_CONTAINER=\$(docker ps --format '{{.Names}}' | grep -v 'supab
 # 5. Synchronisiere Enterprise Server-Skripte nach /root/scripts
 echo "⚙️  Synchronisiere Enterprise Server-Skripte..."
 ssh "$SERVER" "mkdir -p /root/scripts"
-scp scripts/backup_supabase_enterprise.sh scripts/nightly_secops_audit.sh scripts/server_health_watchdog.sh scripts/server_maintenance_weekly.sh "$SERVER:/root/scripts/" || true
+scp scripts/backup_supabase_enterprise.sh scripts/sync_offsite_backup.sh scripts/nightly_secops_audit.sh scripts/server_health_watchdog.sh scripts/server_maintenance_weekly.sh "$SERVER:/root/scripts/" || true
 ssh "$SERVER" "chmod +x /root/scripts/*.sh 2>/dev/null || true"
 echo "  ✓ Server-Skripte synchronisiert & ausführbar."
 
