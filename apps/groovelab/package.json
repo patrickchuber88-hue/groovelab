@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build && node ../../scripts/inject_sri_hashes.mjs",
+    "build": "tsc && vite build && node ../../scripts/inject_sri_hashes.mjs && node ../../scripts/precompress_assets.mjs",
     "test:billing": "tsx src/domain/__tests__/runBillingInvariantTests.ts",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview"
