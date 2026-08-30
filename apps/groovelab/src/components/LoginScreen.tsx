@@ -4529,7 +4529,6 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               {savedFamilyProfiles.map((p) => {
                 const avatarSrc = getInstrumentAvatarUrl(p.instrument || p.groovelab_instrument || '');
                 const displayLastName = p.last_name ? (p.last_name.trim().length > 1 ? `${p.last_name.trim()[0]}.` : p.last_name) : '';
-                const formattedBadge = formatInstrumentBadge(p.instrument || p.groovelab_instrument);
                 return (
                   <div
                     key={p.id}
@@ -4543,12 +4542,12 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                     aria-label={`Als ${p.first_name} anmelden`}
                     style={{
                       flex: '0 0 auto',
-                      width: '108px',
+                      width: '104px',
                       scrollSnapAlign: 'center',
                       background: 'rgba(255, 255, 255, 0.07)',
                       border: '1px solid rgba(255, 255, 255, 0.14)',
                       borderRadius: '20px',
-                      padding: '12px 6px 10px 6px',
+                      padding: '12px 6px 12px 6px',
                       display: 'flex',
                       flexDirection: 'column',
                       alignItems: 'center',
@@ -4645,9 +4644,9 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                       />
                     </div>
 
-                    {/* Name */}
+                    {/* Name (Vorname + N.) */}
                     <span style={{
-                      fontSize: '0.82rem',
+                      fontSize: '0.84rem',
                       fontWeight: 850,
                       color: '#ffffff',
                       marginTop: '8px',
@@ -4659,25 +4658,6 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                       letterSpacing: '-0.01em'
                     }}>
                       {p.first_name} {displayLastName}
-                    </span>
-
-                    {/* Formatted Instrument Badge */}
-                    <span style={{
-                      fontSize: '0.64rem',
-                      fontWeight: 750,
-                      color: '#a7f3d0',
-                      background: 'rgba(52, 168, 83, 0.22)',
-                      border: '1px solid rgba(52, 168, 83, 0.35)',
-                      borderRadius: '6px',
-                      padding: '1.5px 6px',
-                      marginTop: '4px',
-                      whiteSpace: 'nowrap',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      maxWidth: '100%',
-                      textAlign: 'center'
-                    }}>
-                      {formattedBadge}
                     </span>
                   </div>
                 );
