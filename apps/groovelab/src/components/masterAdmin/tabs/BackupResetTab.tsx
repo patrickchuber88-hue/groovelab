@@ -2145,7 +2145,7 @@ export const BackupResetTab: React.FC<BackupResetTabProps> = ({
             <div style={{ fontSize: '0.82rem', color: '#475569', lineHeight: '1.6' }}>
               Gemäß <strong>Art. 20 DSGVO</strong> haben Mandanten jederzeit das Recht, ihre Daten in einem gängigen und maschinenlesbaren Format zu erhalten.
               <br /><br />
-              Alle Exporte werden mit einem <strong>SHA-256 Hash</strong> signiert und im Revisions-Audit-Trail unveränderlich protokolliert.
+              Alle Exporte werden mit einem <strong>SHA-512 / SHA-256 Hash</strong> signiert und im Revisions-Audit-Trail unveränderlich protokolliert.
             </div>
 
             <div style={{ marginTop: 'auto', padding: '14px', borderRadius: '14px', background: '#ecfdf5', border: '1px solid #a7f3d0', color: '#065f46', fontSize: '0.76rem', fontWeight: 800 }}>

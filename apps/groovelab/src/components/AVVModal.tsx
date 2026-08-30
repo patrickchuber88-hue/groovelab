@@ -339,7 +339,7 @@ export const AVVModal: React.FC<AVVModalProps> = ({ isOpen, onClose, school, onA
             § 5 Technisch-Organisatorische Maßnahmen / TOMs (Art. 32 DSGVO)
           </h4>
           <p style={{ margin: '4px 0 12px 0' }}>
-            Der Auftragnehmer gewährleistet ein dem Risiko angemessenes Schutzniveau durch moderne Sicherheitsmaßnahmen: Durchgehende TLS 1.3 Transportverschlüsselung mit Perfect Forward Secrecy, clientseitige <strong>AES-256-GCM Hardware-Vaults</strong> (Web Crypto API) für Offline-Caches, <strong>OWASP-konformes PBKDF2 Zero-Knowledge PIN-Hashing (100.000 SHA-256 Runden)</strong>, strikte PostgreSQL <strong>Row-Level Security (RLS)</strong> Mandantentrennung, <strong>Zero-Trust Session-Leasing mit 1-Click Remote-Logout</strong>, manipulationssichere <strong>SHA-256 Merkle-Chain Audit-Ledger</strong> (GoBD-konform) sowie <strong>FIDO2 / WebAuthn Hardware-Passkeys mit Klon-Schutz</strong>.
+            Der Auftragnehmer gewährleistet ein dem Risiko angemessenes Schutzniveau durch moderne Sicherheitsmaßnahmen: Durchgehende TLS 1.3 Transportverschlüsselung mit Perfect Forward Secrecy, clientseitige <strong>AES-256-GCM Hardware-Vaults</strong> (Web Crypto API) für Offline-Caches, <strong>BSI- und OWASP-konformes PBKDF2 Zero-Knowledge Hashing (100.000 SHA-512 / SHA-256 Runden)</strong>, strikte PostgreSQL <strong>Row-Level Security (RLS)</strong> Mandantentrennung, <strong>Zero-Trust Session-Leasing mit 1-Click Remote-Logout</strong>, manipulationssichere <strong>SHA-512 / SHA-256 Merkle-Chain Audit-Ledger</strong> (GoBD-konform) sowie <strong>FIDO2 / WebAuthn Hardware-Passkeys mit Klon-Schutz</strong>.
           </p>
 
 

@@ -6,6 +6,8 @@ import {
 import { LegalTextModal } from './LegalTextModal';
 import { supabase } from '../lib/supabase';
 import { useMasterPricing } from '../context/MasterPricingContext';
+import { RegistrationAccessModal } from './RegistrationAccessModal';
+import { isRegistrationUnlocked } from '../utils/cryptoAuth';
 
 interface LandingPageProps {
   onLogin: () => void;
@@ -19,10 +21,17 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
   const [hoveredMenu, setHoveredMenu] = useState<string | null>(null);
   const [activeDocument, setActiveDocument] = useState<'none' | 'terms' | 'privacy'>('none');
+  const [showAccessModal, setShowAccessModal] = useState<boolean>(false);
+  const [pendingEmail, setPendingEmail] = useState<string | undefined>(undefined);
   const [calcCampus, setCalcCampus] = useState<boolean>(true);
   const [calcGroovelab, setCalcGroovelab] = useState<boolean>(true);
   const [calcStudents, setCalcStudents] = useState<number>(80);
   const [calcTeachers, setCalcTeachers] = useState<number>(8);
+
+  const triggerProtectedRegistration = (targetEmail?: string) => {
+    setPendingEmail(targetEmail);
+    setShowAccessModal(true);
+  };
   const [calcBillingModel, setCalcBillingModel] = useState<'parent' | 'school'>('parent');
   const [showPrivacyAudits, setShowPrivacyAudits] = useState<boolean>(false);
   const [showFullTomCatalog, setShowFullTomCatalog] = useState<boolean>(false);
@@ -63,7 +72,9 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
   const handleCTASubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (email) {
-      onRegister(email.trim().toLowerCase());
+      triggerProtectedRegistration(email.trim().toLowerCase());
+    } else {
+      triggerProtectedRegistration();
     }
   };
 
@@ -326,7 +337,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
               Anmelden
             </button>
             <button 
-              onClick={() => onRegister()}
+              onClick={() => triggerProtectedRegistration()}
               style={{
                 backgroundColor: '#34a853',
                 color: '#ffffff',
@@ -423,7 +434,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                 Anmelden
               </button>
               <button 
-                onClick={() => onRegister()}
+                onClick={() => triggerProtectedRegistration()}
                 style={{
                   width: '100%',
                   padding: '12px',
@@ -1582,8 +1593,8 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                       Entlaste das Schulbudget auf <strong>0,00 € Schülergebühren</strong>. Die Eltern übernehmen den Kleinstbetrag direkt über die Plattform.
                     </div>
                     <div style={{ fontSize: '12px', color: '#475569', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      <span>• <strong>Vollständig:</strong> Eltern zahlen {pricing.student.toFixed(2).replace('.', ',')} €/Mo. Schule zahlt 0,00 € Schülergebühr.</span>
-                      <span>• <strong>Teilweise:</strong> Eltern zahlen {Math.max(0, pricing.student - (pricing.passiveStudent ?? 0.09)).toFixed(2).replace('.', ',')} €/Mo, Schule stützt mit {(pricing.passiveStudent ?? 0.09).toFixed(2).replace('.', ',')} €/Mo.</span>
+                      <span>• <strong>Vollständig:</strong> Eltern zahlen den Jahresbeitrag von {(pricing.student * 12).toFixed(2).replace('.', ',')} € (umgerechnet {pricing.student.toFixed(2).replace('.', ',')} €/Mo.). Schule zahlt 0,00 € Schülergebühr.</span>
+                      <span>• <strong>Teilweise:</strong> Eltern zahlen den Jahresbeitrag von {(Math.max(0, pricing.student - (pricing.passiveStudent ?? 0.09)) * 12).toFixed(2).replace('.', ',')} € (umgerechnet {Math.max(0, pricing.student - (pricing.passiveStudent ?? 0.09)).toFixed(2).replace('.', ',')} €/Mo.), Schule stützt mit {(pricing.passiveStudent ?? 0.09).toFixed(2).replace('.', ',')} €/Mo.</span>
                     </div>
 
                     {/* Solidaritätsversprechen Highlight Box */}
@@ -1628,7 +1639,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                 💡 Großschulen &amp; Vereine: Unsere Server-Flatrates und fairen Rabatt-Staffeln skalieren vollautomatisch mit der Größe deiner Musikschule – 100% transparent ohne Verhandlungsaufwand.
               </div>
               <button 
-                onClick={() => onRegister()}
+                onClick={() => triggerProtectedRegistration()}
                 style={{
                   alignSelf: 'center',
                   padding: '16px 40px',
@@ -2025,6 +2036,17 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
           </div>
         </div>
       )}
+
+      {/* Protected Registration Access Modal */}
+      <RegistrationAccessModal
+        isOpen={showAccessModal}
+        onClose={() => setShowAccessModal(false)}
+        onSuccess={(em) => {
+          setShowAccessModal(false);
+          onRegister(em);
+        }}
+        initialEmail={pendingEmail}
+      />
 
       {/* Global CSS Inject to handle responsive menus and simple styles */}
       <style>{`

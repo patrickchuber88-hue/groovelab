@@ -4,6 +4,8 @@ import { supabase } from '../lib/supabase';
 import { isWebAuthnSupported, isMasterPasskeyRegistered, registerMasterPasskey, authenticateMasterPasskey } from '../utils/webauthn';
 import { createMasterSessionLease, logMasterAdminEvent } from '../utils/masterAuditLogger';
 import { verifyTOTP } from '../utils/totp';
+import { RegistrationAccessModal } from './RegistrationAccessModal';
+import { isRegistrationUnlocked } from '../utils/cryptoAuth';
 
 interface StartseiteProps {
   onLogin: () => void;
@@ -25,6 +27,11 @@ export const Startseite: React.FC<StartseiteProps> = ({
   const [isSearching, setIsSearching] = useState(false);
   const [showResults, setShowResults] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
+  const [showAccessModal, setShowAccessModal] = useState(false);
+
+  const triggerProtectedRegistration = (targetEmail?: string) => {
+    setShowAccessModal(true);
+  };
 
   // Hardened Master Admin Auth State (Enterprise+ Stufe 3)
   const [showMasterModal, setShowMasterModal] = useState(false);
@@ -751,7 +758,7 @@ export const Startseite: React.FC<StartseiteProps> = ({
         padding: '0 24px',
         flexWrap: 'wrap'
       }}>
-        <div className="footer-link" onClick={() => onRegister()}>
+        <div className="footer-link" onClick={() => triggerProtectedRegistration()}>
           <School size={14} />
           Als Schule registrieren
         </div>
@@ -1151,6 +1158,15 @@ export const Startseite: React.FC<StartseiteProps> = ({
           </div>
         </div>
       )}
+      {/* Protected Registration Access Modal */}
+      <RegistrationAccessModal
+        isOpen={showAccessModal}
+        onClose={() => setShowAccessModal(false)}
+        onSuccess={() => {
+          setShowAccessModal(false);
+          onRegister();
+        }}
+      />
     </div>
   );
 };

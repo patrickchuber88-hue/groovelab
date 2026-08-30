@@ -6,6 +6,8 @@ import {
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useMasterPricing } from '../context/MasterPricingContext';
+import { RegistrationAccessModal } from './RegistrationAccessModal';
+import { isRegistrationUnlocked } from '../utils/cryptoAuth';
 
 interface Startseite2Props {
   onLogin: () => void;
@@ -22,10 +24,17 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
   const [hoveredMenu, setHoveredMenu] = useState<string | null>(null);
   const [activeDocument, setActiveDocument] = useState<'none' | 'terms' | 'privacy'>('none');
+  const [showAccessModal, setShowAccessModal] = useState<boolean>(false);
+  const [pendingEmail, setPendingEmail] = useState<string | undefined>(undefined);
   const [calcCampus, setCalcCampus] = useState<boolean>(true);
   const [calcGroovelab, setCalcGroovelab] = useState<boolean>(true);
   const [calcStudents, setCalcStudents] = useState<number>(80);
   const [calcTeachers, setCalcTeachers] = useState<number>(8);
+
+  const triggerProtectedRegistration = (targetEmail?: string) => {
+    setPendingEmail(targetEmail);
+    setShowAccessModal(true);
+  };
 
   const pricing = {
     campus: masterPricing.priceCampus,
@@ -140,7 +149,9 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
   const handleCTASubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (email) {
-      onRegister(email.trim().toLowerCase());
+      triggerProtectedRegistration(email.trim().toLowerCase());
+    } else {
+      triggerProtectedRegistration();
     }
   };
 
@@ -407,7 +418,7 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
               Anmelden
             </button>
             <button 
-              onClick={() => onRegister()}
+              onClick={() => triggerProtectedRegistration()}
               style={{
                 backgroundColor: '#34a853',
                 color: '#ffffff',
@@ -504,7 +515,7 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
                 Anmelden
               </button>
               <button 
-                onClick={() => onRegister()}
+                onClick={() => triggerProtectedRegistration()}
                 style={{
                   width: '100%',
                   padding: '12px',
@@ -1673,8 +1684,8 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
                       Entlaste das Schulbudget auf <strong>0,00 € Schülergebühren</strong>. Die Eltern übernehmen den Kleinstbetrag direkt über die Plattform.
                     </div>
                     <div style={{ fontSize: '12px', color: '#475569', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      <span>• <strong>Vollständig:</strong> Eltern zahlen {pricing.student.toFixed(2).replace('.', ',')} €/Mo. Schule zahlt 0,00 € Schülergebühr.</span>
-                      <span>• <strong>Teilweise:</strong> Eltern zahlen {Math.max(0, pricing.student - (pricing.passiveStudent ?? 0.09)).toFixed(2).replace('.', ',')} €/Mo, Schule stützt mit {(pricing.passiveStudent ?? 0.09).toFixed(2).replace('.', ',')} €/Mo.</span>
+                      <span>• <strong>Vollständig:</strong> Eltern zahlen den Jahresbeitrag von {(pricing.student * 12).toFixed(2).replace('.', ',')} € (umgerechnet {pricing.student.toFixed(2).replace('.', ',')} €/Mo.). Schule zahlt 0,00 € Schülergebühr.</span>
+                      <span>• <strong>Teilweise:</strong> Eltern zahlen den Jahresbeitrag von {(Math.max(0, pricing.student - (pricing.passiveStudent ?? 0.09)) * 12).toFixed(2).replace('.', ',')} € (umgerechnet {Math.max(0, pricing.student - (pricing.passiveStudent ?? 0.09)).toFixed(2).replace('.', ',')} €/Mo.), Schule stützt mit {(pricing.passiveStudent ?? 0.09).toFixed(2).replace('.', ',')} €/Mo.</span>
                     </div>
 
                     {/* Solidaritätsversprechen Highlight Box */}
@@ -1721,7 +1732,7 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
                 💡 Großschulen &amp; Vereine: Unsere Server-Flatrates und fairen Rabatt-Staffeln skalieren vollautomatisch mit der Größe deiner Musikschule – 100% transparent ohne Verhandlungsaufwand.
               </div>
               <button 
-                onClick={() => onRegister()}
+                onClick={() => triggerProtectedRegistration()}
                 style={{
                   alignSelf: 'center',
                   padding: '16px 40px',
@@ -2138,7 +2149,7 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
                         <p style={{ margin: '4px 0 0 0' }}><strong>3. Modulpreise &amp; Kombi-Vorteil:</strong> Die monatliche Server-Hosting-Pauschale pro Musikschule beträgt für das Modul „Campus“ {pricing.campus.toFixed(2).replace('.', ',')} € und für das Modul „GrooveLab“ {pricing.groovelab.toFixed(2).replace('.', ',')} €. Werden beide Module gebucht, gilt der Kombi-Vorteil von {pricing.kombi.toFixed(2).replace('.', ',')} € (Ersparnis von {pricing.kombiSavings.toFixed(2).replace('.', ',')} €/Monat). Administrations- und Sekretariats-Nutzer sind inklusive. Jede aktive Lehrkraft bzw. jeder Verwaltungs-Mitarbeiter wird mit {pricing.teacher.toFixed(2).replace('.', ',')} €/Monat berechnet.</p>
                         <p style={{ margin: '4px 0 0 0' }}><strong>4. Schüleraktivierungs-Modelle (Campus-Modul):</strong> Für Schülerfreischaltungen stehen zwei Zahlungswege zur Verfügung:
                           <br />a) <em>Sammelzahler (Schule trägt Kosten):</em> Abrechnung über die Musikschule mit {pricing.student.toFixed(2).replace('.', ',')} €/Monat je aktivem Schüler. Bei Nicht-Nutzung von über 2 Monaten erfolgt eine automatische Inaktivierung zur Kostenvermeidung. Alternativ wird ein Jahresbeitrag bei Aktivierung mit 10 % Rabatt oder eine Einmal-Aktivierung zum Schuljahresstart im September mit 20 % Rabatt angeboten.
-                          <br />b) <em>Direktabrechnung (Eltern/Schüler zahlen):</em> Die Abrechnung erfolgt direkt mit den Eltern/Schülern ({pricing.student.toFixed(2).replace('.', ',')} €/Monat bzw. {(pricing.student * 12).toFixed(2).replace('.', ',')} € Jahresbeitrag) oder teilsubventioniert (Eltern zahlen {Math.max(0, pricing.student - (pricing.passiveStudent ?? 0.09)).toFixed(2).replace('.', ',')} €/Monat, Schule trägt {(pricing.passiveStudent ?? 0.09).toFixed(2).replace('.', ',')} €/Monat). <strong>Geschwister-Vorteil:</strong> Bei Verknüpfung von Geschwisterkindern sind alle weiteren Kinder ab dem 3. Kind für die Eltern 100 % kostenlos (0,00 €/Monat; die Schule trägt lediglich den passiven Server-Beitrag von {(pricing.passiveStudent ?? 0.09).toFixed(2).replace('.', ',')} €/Monat). Härtefälle können von der Schule manuell befreit werden.
+                          <br />b) <em>Direktabrechnung (Eltern/Schüler zahlen):</em> Die Abrechnung erfolgt ausnahmslos als einmaliger Jahresbeitrag direkt mit den Eltern/Schülern ({(pricing.student * 12).toFixed(2).replace('.', ',')} € pro Schuljahr – umgerechnet {pricing.student.toFixed(2).replace('.', ',')} €/Monat) oder teilsubventioniert (Eltern zahlen {(Math.max(0, pricing.student - (pricing.passiveStudent ?? 0.09)) * 12).toFixed(2).replace('.', ',')} €/Jahr, Schule trägt {(pricing.passiveStudent ?? 0.09).toFixed(2).replace('.', ',')} €/Monat). Monatliche Einzelbuchungen sind ausgeschlossen. <strong>Geschwister-Vorteil:</strong> Bei Verknüpfung von Geschwisterkindern sind alle weiteren Kinder ab dem 3. Kind für die Eltern 100 % kostenlos (0,00 €; die Schule trägt lediglich den passiven Server-Beitrag von {(pricing.passiveStudent ?? 0.09).toFixed(2).replace('.', ',')} €/Monat). Härtefälle können von der Schule manuell befreit werden.
                           <br /><em>Hinweis:</em> GrooveLab-Schülerfreischaltungen werden immer vollumfänglich von der Musikschule getragen (keine Direktabrechnung mit Eltern).
                         </p>
                         <p style={{ margin: '4px 0 0 0' }}><strong>5. Schüler-Deaktivierung:</strong> Bei monatlicher Abrechnung entfällt die Gebühr ab dem Folgemonat der Deaktivierung. Bei jährlicher Vorauszahlung verbleiben das Profil und alle Funktionen bis zum Ende des laufenden Schuljahres aktiv und erlöschen erst zum Schuljahreswechsel.</p>
@@ -2614,6 +2625,17 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
           </div>
         </div>
       )}
+
+      {/* Protected Registration Access Modal */}
+      <RegistrationAccessModal
+        isOpen={showAccessModal}
+        onClose={() => setShowAccessModal(false)}
+        onSuccess={(em) => {
+          setShowAccessModal(false);
+          onRegister(em);
+        }}
+        initialEmail={pendingEmail}
+      />
 
       {/* Global CSS Inject to handle responsive menus and simple styles */}
       <style>{`

@@ -29,13 +29,13 @@ const MASTER_AUDIT_LOG_KEY = 'gl_master_audit_trail_vault';
 const DEFAULT_TTL_MINUTES = 45;
 
 /**
- * Generates a cryptographic SHA-256 signature for the lease data
+ * Generates a high-entropy cryptographic SHA-512 signature for the master lease data (Tier-1 Enterprise Standard)
  */
 async function generateLeaseSignature(userId: string, issuedAt: number, expiresAt: number, nonce: string): Promise<string> {
-  const payload = `${userId}:${issuedAt}:${expiresAt}:${nonce}:campus_groovelab_master_vault_v3`;
+  const payload = `${userId}:${issuedAt}:${expiresAt}:${nonce}:campus_groovelab_master_vault_v3_sha512`;
   const encoder = new TextEncoder();
   const data = encoder.encode(payload);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashBuffer = await crypto.subtle.digest('SHA-512', data);
   const hashArray = Array.from(new Uint8Array(hashBuffer));
   return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }

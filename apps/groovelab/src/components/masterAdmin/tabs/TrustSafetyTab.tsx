@@ -780,7 +780,7 @@ export function TrustSafetyTab() {
               Rechtsverbindliches Takedown-Protokoll (DSA & UrhDaG Audit Trail)
             </h3>
             <span style={{ fontSize: '0.76rem', color: '#64748b' }}>
-              Manipulationssichere Protokollierung mit Zeitstempel (MESZ) und SHA-256 Prüfsumme
+              Manipulationssichere Protokollierung mit Zeitstempel (MESZ) und SHA-512 / SHA-256 Prüfsumme
             </span>
           </div>
 
@@ -814,7 +814,7 @@ export function TrustSafetyTab() {
                 <th style={{ padding: '12px 16px' }}>Schüler & Schule</th>
                 <th style={{ padding: '12px 16px' }}>Grund & Rechtsgrundlage</th>
                 <th style={{ padding: '12px 16px' }}>Status</th>
-                <th style={{ padding: '12px 16px' }}>SHA-256 Prüfsumme</th>
+                <th style={{ padding: '12px 16px' }}>Kryptografische Prüfsumme</th>
                 <th style={{ padding: '12px 16px', textAlign: 'right' }}>Aktionen</th>
               </tr>
             </thead>
@@ -868,7 +868,7 @@ export function TrustSafetyTab() {
                         alignItems: 'center',
                         gap: '4px'
                       }}
-                      title="SHA-256 Hash für Anwalt kopieren"
+                      title="Kryptografischen Prüfsummen-Hash kopieren"
                     >
                       <span>{rec.sha256Hash.slice(0, 10)}...</span>
                       {copiedHashId === rec.id ? <Check size={11} color="#10b981" /> : <Copy size={11} />}

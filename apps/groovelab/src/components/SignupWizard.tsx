@@ -9,7 +9,8 @@ import { isWebAuthnSupported, registerUserBiometrics } from '../utils/webauthn';
 import { inlineAllImagesInElement } from './IDBadgeCard';
 import { isSubdomainReserved } from '../constants/reservedSubdomains';
 import { sanitizeSchoolName, sanitizeAddress, sanitizePersonName } from '../utils/inputSanitizer';
-import { generateHandoverUrl } from '../utils/cryptoAuth';
+import { generateHandoverUrl, isRegistrationUnlocked } from '../utils/cryptoAuth';
+import { RegistrationAccessModal } from './RegistrationAccessModal';
 
 
 interface SignupWizardProps {
@@ -18,6 +19,7 @@ interface SignupWizardProps {
 }
 
 export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardProps) {
+  const [isUnlocked, setIsUnlocked] = useState<boolean>(() => isRegistrationUnlocked());
   const cardRef = useRef<HTMLDivElement>(null);
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
@@ -546,6 +548,27 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
     boxShadow: '0 0 0 4px rgba(52, 168, 83, 0.15)',
     background: 'rgba(255, 255, 255, 0.08)'
   };
+
+  if (!isUnlocked) {
+    return (
+      <div style={{
+        position: 'fixed',
+        inset: 0,
+        background: '#0f172a',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '20px',
+        zIndex: 9999
+      }}>
+        <RegistrationAccessModal
+          isOpen={true}
+          onClose={onBackToLogin}
+          onSuccess={() => setIsUnlocked(true)}
+        />
+      </div>
+    );
+  }
 
   return (
     <div style={{

@@ -81,13 +81,14 @@ export interface SchoolYearCalculation {
   paidEndMonthName: string;
   paidEndYear: number;
   remainingPaidMonths: number;
-  monthlyRate: number; // 0.49
+  monthlyRate: number; // 0.49 EUR or 0.80 CHF
   totalAmount: number; // e.g. 5.39 for 11 months, 4.90 for 10 months
-  totalAmountStr: string; // "5,39"
+  totalAmountStr: string; // "5,39" or "8.80"
   periodDescription: string; // "01.10.2026 – 31.08.2027"
+  currency: 'EUR' | 'CHF';
 }
 
-export function calculateSchoolYearDirectBilling(nowDate?: Date): SchoolYearCalculation {
+export function calculateSchoolYearDirectBilling(nowDate?: Date, currency: 'EUR' | 'CHF' = 'EUR', customMonthlyRate?: number): SchoolYearCalculation {
   const date = nowDate || new Date();
   const currentMonth = date.getMonth() + 1; // 1 = Jan, 9 = Sept, 12 = Dec
   const currentYear = date.getFullYear();
@@ -130,9 +131,11 @@ export function calculateSchoolYearDirectBilling(nowDate?: Date): SchoolYearCalc
     remainingPaidMonths = 12;
   }
 
-  const monthlyRate = 0.49;
+  const isChf = currency === 'CHF';
+  const defaultRate = isChf ? 1.00 : 0.49;
+  const monthlyRate = typeof customMonthlyRate === 'number' ? customMonthlyRate : defaultRate;
   const totalAmount = Math.round(remainingPaidMonths * monthlyRate * 100) / 100;
-  const totalAmountStr = totalAmount.toFixed(2).replace('.', ',');
+  const totalAmountStr = isChf ? totalAmount.toFixed(2) : totalAmount.toFixed(2).replace('.', ',');
 
   const startFormatted = `01.${String(nextMonth).padStart(2, '0')}.${nextMonthYear}`;
   const endFormatted = `31.08.${endYear}`;
@@ -148,6 +151,7 @@ export function calculateSchoolYearDirectBilling(nowDate?: Date): SchoolYearCalc
     monthlyRate,
     totalAmount,
     totalAmountStr,
-    periodDescription
+    periodDescription,
+    currency
   };
 }

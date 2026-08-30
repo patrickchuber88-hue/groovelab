@@ -1130,7 +1130,7 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
                   DSB- &amp; Audit-Portal (Behörden- und Trägercockpit)
                 </h4>
                 <p style={{ margin: 0, fontSize: '0.80rem', color: '#64748b', lineHeight: 1.5 }}>
-                  Öffne das vollständige Audit-Cockpit für diese Schule: WORM-Fahrtenbuch (SHA-256 Hashes), Art. 32 TOM-Nachweise, Art. 15 Datenauskunft und AVV-PDF.
+                  Öffne das vollständige Audit-Cockpit für diese Schule: WORM-Fahrtenbuch (SHA-512 / SHA-256 Hashes), Art. 32 TOM-Nachweise, Art. 15 Datenauskunft und AVV-PDF.
                 </p>
               </div>
 

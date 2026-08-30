@@ -51,17 +51,25 @@ export const InvoicePDFTemplate: React.FC<InvoicePDFTemplateProps> = ({
   onClose
 }) => {
   const masterPricing = useMasterPricing();
+  const isChf = (school as any)?.currency === 'CHF' || (school as any)?.country === 'CH' || masterPricing.currency === 'CHF';
+  const currency: 'EUR' | 'CHF' = isChf ? 'CHF' : 'EUR';
+  const fmt = (amt: number) => masterPricing.formatPrice(amt, currency);
+
   const isInf = invoice.type === 'INF' || !invoice.type;
   const isAkt = invoice.type === 'AKT';
   const isManual = !isInf && !isAkt;
 
+  const currentRates = isChf ? masterPricing.ratesCHF : masterPricing.ratesEUR;
   const billedCampus = school.hasCampus;
   const billedGroovelab = school.hasGroovelab;
-  const campusCost = billedCampus ? masterPricing.priceCampus : 0;
-  const groovelabCost = billedGroovelab ? masterPricing.priceGroovelab : 0;
+  const campusCost = billedCampus ? currentRates.priceCampus : 0;
+  const groovelabCost = billedGroovelab ? currentRates.priceGroovelab : 0;
   const hasKombi = billedCampus && billedGroovelab;
   const isPartial = school.studentBillingOption === 'student_partial';
-  const activeStudentDiscount = isPartial ? 0 : (Number(school.premiumStudents) || 0) * 0.09;
+  const passiveRate = currentRates.pricePassiveStudent;
+  const teacherRate = currentRates.priceTeacher;
+  const studentRate = currentRates.priceStudent;
+  const activeStudentDiscount = isPartial ? 0 : (Number(school.premiumStudents) || 0) * passiveRate;
 
   const schoolShareTotal = isInf ? invoice.amount : 0;
   const studentShareTotal = isAkt ? invoice.amount : 0;
@@ -262,13 +270,13 @@ export const InvoicePDFTemplate: React.FC<InvoicePDFTemplateProps> = ({
                   <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
                     <td style={{ padding: dynamicTdPadding }}>
                       <strong style={{ display: 'block', color: '#0f172a' }}>Campus-Groovelab Software-Bereitstellung</strong>
-                      <span style={{ fontSize: '0.68rem', color: '#34a853', fontWeight: 700 }}>0,00 € (Inklusive)</span>
+                      <span style={{ fontSize: '0.68rem', color: '#34a853', fontWeight: 700 }}>{fmt(0)} (Inklusive)</span>
                     </td>
                     <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
                       1 Monat
                     </td>
-                    <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>0,00 €</td>
-                    <td style={{ padding: dynamicTdPadding, textAlign: 'right', color: '#34a853', fontWeight: 700 }}>0,00 €</td>
+                    <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>{fmt(0)}</td>
+                    <td style={{ padding: dynamicTdPadding, textAlign: 'right', color: '#34a853', fontWeight: 700 }}>{fmt(0)}</td>
                   </tr>
 
                   {/* Position 2: Campus platform access */}
@@ -282,10 +290,10 @@ export const InvoicePDFTemplate: React.FC<InvoicePDFTemplateProps> = ({
                         1 Monat
                       </td>
                       <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
-                        {campusCost.toFixed(2).replace('.', ',')} €
+                        {fmt(campusCost)}
                       </td>
                       <td style={{ padding: dynamicTdPadding, textAlign: 'right', fontWeight: 600 }}>
-                        {campusCost.toFixed(2).replace('.', ',')} €
+                        {fmt(campusCost)}
                       </td>
                     </tr>
                   )}
@@ -301,10 +309,10 @@ export const InvoicePDFTemplate: React.FC<InvoicePDFTemplateProps> = ({
                         1 Monat
                       </td>
                       <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
-                        {groovelabCost.toFixed(2).replace('.', ',')} €
+                        {fmt(groovelabCost)}
                       </td>
                       <td style={{ padding: dynamicTdPadding, textAlign: 'right', fontWeight: 600 }}>
-                        {groovelabCost.toFixed(2).replace('.', ',')} €
+                        {fmt(groovelabCost)}
                       </td>
                     </tr>
                   )}
@@ -314,16 +322,16 @@ export const InvoicePDFTemplate: React.FC<InvoicePDFTemplateProps> = ({
                     <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
                       <td style={{ padding: dynamicTdPadding }}>
                         <strong style={{ display: 'block', color: '#0f172a' }}>Service- &amp; Administrationspauschale</strong>
-                        <span style={{ fontSize: '0.68rem', color: '#64748b' }}>{school.totalTeachers} Lehrkräfte ({masterPricing.priceTeacher.toFixed(2).replace('.', ',')} € / Mo. pro User)</span>
+                        <span style={{ fontSize: '0.68rem', color: '#64748b' }}>{school.totalTeachers} Lehrkräfte ({fmt(teacherRate)} / Mo. pro User)</span>
                       </td>
                       <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
                         1 Monat
                       </td>
                       <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
-                        {(school.totalTeachers * masterPricing.priceTeacher).toFixed(2).replace('.', ',')} €
+                        {fmt(school.totalTeachers * teacherRate)}
                       </td>
                       <td style={{ padding: dynamicTdPadding, textAlign: 'right', fontWeight: 600 }}>
-                        {(school.totalTeachers * masterPricing.priceTeacher).toFixed(2).replace('.', ',')} €
+                        {fmt(school.totalTeachers * teacherRate)}
                       </td>
                     </tr>
                   )}
@@ -335,16 +343,16 @@ export const InvoicePDFTemplate: React.FC<InvoicePDFTemplateProps> = ({
                       <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
                         <td style={{ padding: dynamicTdPadding }}>
                           <strong style={{ display: 'block', color: '#0f172a' }}>Cloud- & Modul-Bereitstellung: Campus</strong>
-                          <span style={{ fontSize: '0.68rem', color: '#64748b' }}>{campusCnt} aktive Campus-Schüler ({masterPricing.priceStudent.toFixed(2).replace('.', ',')} € / Mo. pro Profil)</span>
+                          <span style={{ fontSize: '0.68rem', color: '#64748b' }}>{campusCnt} aktive Campus-Schüler ({fmt(studentRate)} / Mo. pro Profil)</span>
                         </td>
                         <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
                           1 Monat
                         </td>
                         <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
-                          {(campusCnt * masterPricing.priceStudent).toFixed(2).replace('.', ',')} €
+                          {fmt(campusCnt * studentRate)}
                         </td>
                         <td style={{ padding: dynamicTdPadding, textAlign: 'right', fontWeight: 600 }}>
-                          {(campusCnt * masterPricing.priceStudent).toFixed(2).replace('.', ',')} €
+                          {fmt(campusCnt * studentRate)}
                         </td>
                       </tr>
                     );
@@ -357,16 +365,16 @@ export const InvoicePDFTemplate: React.FC<InvoicePDFTemplateProps> = ({
                       <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
                         <td style={{ padding: dynamicTdPadding }}>
                           <strong style={{ display: 'block', color: '#0f172a' }}>Cloud- & Modul-Bereitstellung: GrooveLab</strong>
-                          <span style={{ fontSize: '0.68rem', color: '#64748b' }}>{glCnt} aktive GrooveLab-Schüler ({masterPricing.priceStudent.toFixed(2).replace('.', ',')} € / Mo. pro Profil)</span>
+                          <span style={{ fontSize: '0.68rem', color: '#64748b' }}>{glCnt} aktive GrooveLab-Schüler ({fmt(studentRate)} / Mo. pro Profil)</span>
                         </td>
                         <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
                           1 Monat
                         </td>
                         <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
-                          {(glCnt * masterPricing.priceStudent).toFixed(2).replace('.', ',')} €
+                          {fmt(glCnt * studentRate)}
                         </td>
                         <td style={{ padding: dynamicTdPadding, textAlign: 'right', fontWeight: 600 }}>
-                          {(glCnt * masterPricing.priceStudent).toFixed(2).replace('.', ',')} €
+                          {fmt(glCnt * studentRate)}
                         </td>
                       </tr>
                     );
@@ -379,16 +387,16 @@ export const InvoicePDFTemplate: React.FC<InvoicePDFTemplateProps> = ({
                       <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
                         <td style={{ padding: dynamicTdPadding }}>
                           <strong style={{ display: 'block', color: '#0f172a' }}>Basis-Bereitstellung</strong>
-                          <span style={{ fontSize: '0.68rem', color: '#64748b' }}>Cloud-Speicher, Termin-/Hausaufgaben-Sync & QR-Schnittstelle ({passCnt} Schüler × 0,09 € / Mo.)</span>
+                          <span style={{ fontSize: '0.68rem', color: '#64748b' }}>Cloud-Speicher, Termin-/Hausaufgaben-Sync & QR-Schnittstelle ({passCnt} Schüler × {fmt(passiveRate)} / Mo.)</span>
                         </td>
                         <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
                           1 Monat
                         </td>
                         <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
-                          {(passCnt * 0.09).toFixed(2).replace('.', ',')} €
+                          {fmt(passCnt * passiveRate)}
                         </td>
                         <td style={{ padding: dynamicTdPadding, textAlign: 'right', fontWeight: 600 }}>
-                          {(passCnt * 0.09).toFixed(2).replace('.', ',')} €
+                          {fmt(passCnt * passiveRate)}
                         </td>
                       </tr>
                     );
@@ -404,9 +412,9 @@ export const InvoicePDFTemplate: React.FC<InvoicePDFTemplateProps> = ({
                       <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right' }}>
                         1 Monat
                       </td>
-                      <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right' }}>-{masterPricing.kombiSavings.toFixed(2).replace('.', ',')} €</td>
+                      <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right' }}>-{fmt(currentRates.kombiSavings)}</td>
                       <td style={{ padding: dynamicTdPadding, textAlign: 'right', fontWeight: 700 }}>
-                        -{masterPricing.kombiSavings.toFixed(2).replace('.', ',')} €
+                        -{fmt(currentRates.kombiSavings)}
                       </td>
                     </tr>
                   )}
@@ -416,14 +424,14 @@ export const InvoicePDFTemplate: React.FC<InvoicePDFTemplateProps> = ({
                     <tr style={{ borderBottom: '1px solid #f1f5f9', color: '#34a853' }}>
                       <td style={{ padding: dynamicTdPadding }}>
                         <strong style={{ display: 'block' }}>Direktabrechnungs-Vorteil</strong>
-                        <span style={{ fontSize: '0.68rem', color: '#34a853' }}>Deduction für {school.premiumStudents || 0} aktive Selbstzahler-Schüler (0,09 € / Mo. pro User)</span>
+                        <span style={{ fontSize: '0.68rem', color: '#34a853' }}>Deduction für {school.premiumStudents || 0} aktive Selbstzahler-Schüler ({fmt(passiveRate)} / Mo. pro User)</span>
                       </td>
                       <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right' }}>
                         1 Monat
                       </td>
-                      <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right' }}>-0,09 €</td>
+                      <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right' }}>-{fmt(passiveRate)}</td>
                       <td style={{ padding: dynamicTdPadding, textAlign: 'right', fontWeight: 700 }}>
-                        {(-activeStudentDiscount).toFixed(2).replace('.', ',')} €
+                        -{fmt(activeStudentDiscount)}
                       </td>
                     </tr>
                   )}
@@ -437,7 +445,7 @@ export const InvoicePDFTemplate: React.FC<InvoicePDFTemplateProps> = ({
                     <td style={{ padding: dynamicTdPadding }}>
                       <strong style={{ display: 'block', color: '#0f172a' }}>Cloud- &amp; Modul-Bereitstellung: Modul Campus (Sammelabrechnung)</strong>
                       <span style={{ fontSize: '0.68rem', color: '#64748b' }}>
-                        Jahrespauschale für die Cloud-Bereitstellung aktiver Schüler-Profile (Umlagesatz = 0,40 € / Mo. für {invoice.restmonate || 12} Restmonate). Keine gesonderten Lizenzkaufgebühren.
+                        Jahrespauschale für die Cloud-Bereitstellung aktiver Schüler-Profile (Umlagesatz = {fmt(isChf ? 0.80 : 0.40)} / Mo. für {invoice.restmonate || 12} Restmonate). Keine gesonderten Lizenzkaufgebühren.
                         {school.studentBillingOption === 'option3_2' && <strong style={{ color: '#34a853', marginLeft: '6px' }}>(inkl. 10% Rabatt für Jahrespauschale)</strong>}
                         {school.studentBillingOption === 'option3_3' && <strong style={{ color: '#34a853', marginLeft: '6px' }}>(inkl. 20% Rabatt für Komplett-Jahrespauschale)</strong>}
                       </span>
@@ -446,10 +454,10 @@ export const InvoicePDFTemplate: React.FC<InvoicePDFTemplateProps> = ({
                       {invoice.activationsCount || 0} Schüler
                     </td>
                     <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
-                      {(invoice.studentFee || 4.80).toFixed(2).replace('.', ',')} €
+                      {fmt(invoice.studentFee || (isChf ? 9.60 : 4.80))}
                     </td>
                     <td style={{ padding: dynamicTdPadding, textAlign: 'right', fontWeight: 600 }}>
-                      {invoice.amount.toFixed(2).replace('.', ',')} €
+                      {fmt(invoice.amount)}
                     </td>
                   </tr>
                 </>
@@ -462,8 +470,8 @@ export const InvoicePDFTemplate: React.FC<InvoicePDFTemplateProps> = ({
                     <span style={{ fontSize: '0.68rem', color: '#64748b' }}>Korrektur- oder Zusatzposten</span>
                   </td>
                   <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right' }}>1</td>
-                  <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right' }}>{Number(invoice.amount).toFixed(2).replace('.', ',')} €</td>
-                  <td style={{ padding: dynamicTdPadding, textAlign: 'right', fontWeight: 700 }}>{Number(invoice.amount).toFixed(2).replace('.', ',')} €</td>
+                  <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right' }}>{fmt(Number(invoice.amount))}</td>
+                  <td style={{ padding: dynamicTdPadding, textAlign: 'right', fontWeight: 700 }}>{fmt(Number(invoice.amount))}</td>
                 </tr>
               )}
             </tbody>
@@ -476,13 +484,13 @@ export const InvoicePDFTemplate: React.FC<InvoicePDFTemplateProps> = ({
                 {isInf && (
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.74rem', color: '#64748b', marginBottom: '4px' }}>
                     <span>• Träger Musikschule (Betrieb &amp; Infrastruktur):</span>
-                    <span style={{ fontWeight: 650, color: '#0f172a', whiteSpace: 'nowrap' }}>{schoolShareTotal.toFixed(2).replace('.', ',')} €</span>
+                    <span style={{ fontWeight: 650, color: '#0f172a', whiteSpace: 'nowrap' }}>{fmt(schoolShareTotal)}</span>
                   </div>
                 )}
                 {isAkt && (
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.74rem', color: '#64748b', marginBottom: '4px' }}>
                     <span>{school.billingPayer === 'student' ? '• Durchlaufender Posten (Umlage an Schüler):' : '• Direktabrechnung Schüler-Bereitstellung (Träger):'}</span>
-                    <span style={{ fontWeight: 650, color: school.billingPayer === 'student' ? '#34a853' : '#ea580c', whiteSpace: 'nowrap' }}>{studentShareTotal.toFixed(2).replace('.', ',')} €</span>
+                    <span style={{ fontWeight: 650, color: school.billingPayer === 'student' ? '#34a853' : '#ea580c', whiteSpace: 'nowrap' }}>{fmt(studentShareTotal)}</span>
                   </div>
                 )}
                 <div style={{ borderTop: '1px dashed #e2e8f0', margin: '8px 0' }}></div>
@@ -493,20 +501,20 @@ export const InvoicePDFTemplate: React.FC<InvoicePDFTemplateProps> = ({
                   const vatAmount = isStandardVat ? (netAmount * 0.19) : 0;
                   const grossAmount = netAmount + vatAmount;
 
-                  if (isStandardVat) {
+                  if (isStandardVat && !isChf) {
                     return (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: '#475569' }}>
                           <span>Nettobetrag:</span>
-                          <span style={{ fontWeight: 700, whiteSpace: 'nowrap' }}>{netAmount.toFixed(2).replace('.', ',')} €</span>
+                          <span style={{ fontWeight: 700, whiteSpace: 'nowrap' }}>{fmt(netAmount)}</span>
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: '#0369a1' }}>
                           <span>zzgl. 19% Umsatzsteuer:</span>
-                          <span style={{ fontWeight: 700, whiteSpace: 'nowrap' }}>{vatAmount.toFixed(2).replace('.', ',')} €</span>
+                          <span style={{ fontWeight: 700, whiteSpace: 'nowrap' }}>{fmt(vatAmount)}</span>
                         </div>
                         <div style={{ borderTop: '1px solid #cbd5e1', marginTop: '4px', paddingTop: '4px', display: 'flex', justifyContent: 'space-between', fontSize: '0.94rem', color: '#0f172a' }}>
                           <span style={{ fontWeight: 900 }}>Gesamtbetrag (Brutto):</span>
-                          <strong style={{ fontWeight: 900, color: isInf ? '#0369a1' : '#34a853', whiteSpace: 'nowrap' }}>{grossAmount.toFixed(2).replace('.', ',')} €</strong>
+                          <strong style={{ fontWeight: 900, color: isInf ? '#0369a1' : '#34a853', whiteSpace: 'nowrap' }}>{fmt(grossAmount)}</strong>
                         </div>
                       </div>
                     );
@@ -515,7 +523,7 @@ export const InvoicePDFTemplate: React.FC<InvoicePDFTemplateProps> = ({
                   return (
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.92rem', color: '#0f172a' }}>
                       <span style={{ fontWeight: 800 }}>Gesamtbetrag dieser Rechnung:</span>
-                      <strong style={{ fontWeight: 900, color: isInf ? '#0369a1' : '#34a853', whiteSpace: 'nowrap' }}>{invoice.amount.toFixed(2).replace('.', ',')} €</strong>
+                      <strong style={{ fontWeight: 900, color: isInf ? '#0369a1' : '#34a853', whiteSpace: 'nowrap' }}>{fmt(invoice.amount)}</strong>
                     </div>
                   );
                 })()}
@@ -531,14 +539,20 @@ export const InvoicePDFTemplate: React.FC<InvoicePDFTemplateProps> = ({
                 </div>
               )}
               <div style={{ fontSize: '0.68rem', color: '#64748b', marginTop: '12px', textAlign: 'right', fontStyle: 'italic', fontWeight: 600 }}>
-                {typeof window !== 'undefined' && localStorage.getItem('cg_tax_mode') === 'standard_vat' ? (
+                {isChf ? (
                   <>
-                    Die Campus-Groovelab Software-Nutzung ist 100% dauerhaft kostenlos. Das Entgelt wird ausschließlich für die Miete und Bereitstellung der Cloud-, Server- und Datenbank-Infrastruktur erhoben. Rechnungsstellung nach §§ 14, 14a UStG. Umsatzsteuer-Identifikationsnummer: <strong>{localStorage.getItem('cg_vat_id') || 'DE345678901'}</strong>.
+                    Die Campus-Groovelab Software-Nutzung ist {fmt(0)} inklusive. Das Entgelt wird ausschließlich für die Miete und Bereitstellung der Cloud-, Server- und Datenbank-Infrastruktur erhoben. Leistungsort Schweiz (nicht im Inland steuerbare Leistung gem. Art. 8 Abs. 1 MWSTG).
                   </>
                 ) : (
-                  <>
-                    Die Campus-Groovelab Software-Nutzung ist 100% dauerhaft kostenlos. Das Entgelt wird ausschließlich für die Miete und Bereitstellung der Cloud-, Server- und Datenbank-Infrastruktur erhoben. Gemäß § 19 UStG wird keine Umsatzsteuer berechnet (Kleinunternehmerregelung).
-                  </>
+                  typeof window !== 'undefined' && localStorage.getItem('cg_tax_mode') === 'standard_vat' ? (
+                    <>
+                      Die Campus-Groovelab Software-Nutzung ist 100% dauerhaft kostenlos. Das Entgelt wird ausschließlich für die Miete und Bereitstellung der Cloud-, Server- und Datenbank-Infrastruktur erhoben. Rechnungsstellung nach §§ 14, 14a UStG. Umsatzsteuer-Identifikationsnummer: <strong>{localStorage.getItem('cg_vat_id') || 'DE345678901'}</strong>.
+                    </>
+                  ) : (
+                    <>
+                      Die Campus-Groovelab Software-Nutzung ist 100% dauerhaft kostenlos. Das Entgelt wird ausschließlich für die Miete und Bereitstellung der Cloud-, Server- und Datenbank-Infrastruktur erhoben. Gemäß § 19 UStG wird keine Umsatzsteuer berechnet (Kleinunternehmerregelung).
+                    </>
+                  )
                 )}
               </div>
               

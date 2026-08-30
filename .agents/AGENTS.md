@@ -26,8 +26,9 @@
     - *Jahresbeitrag bei Aktivierung (10% Rabatt)*: Active students billed as an annual fee in a separate monthly bill, offering a 10% discount.
     - *Einmalige Komplett-Aktivierung zum Schuljahresstart (September) (20% Rabatt)*: The school activates all students at the school year start, billed once for the entire school year with a 20% discount.
   - **Direktabrechnung mit Eltern/Schülern (Zahlungsüberwachung)** (Direct billing with parents/students; only available for the Campus module; GrooveLab activations are always covered by the school):
-    - *Vollständige Direktabrechnung*: Student/parent pays the full amount of 0,49 € / Mo. (annual fee: 5,88 €). School is relieved of the passive database fee (school pays 0,00 €).
-    - *Teilweise Direktabrechnung*: Student/parent pays 0,40 € / Mo. (annual fee: 4,80 €). School covers the passive database fee of 0,09 € / Mo. per student.
+    - **Ausschließliche Jahresbeitragszahlung**: Schüler-Direktabrechnungen dürfen **immer nur als Jahresbeitragszahlung (einmalige Schuljahresgebühr)** gebucht und eingezogen werden – **niemals monatlich** (zur Vermeidung von unverhältnismäßigen Banktransaktions- und Buchungsgebühren).
+    - *Vollständige Direktabrechnung*: Einmaliger Jahresbeitrag von 5,88 € / Jahr (DE/AT) bzw. CHF 12.00 / Jahr (CH) (umgerechnet 0,49 € / CHF 1.00 / Mo.). Schule wird um die passive Datenbankgebühr komplett entlastet (Schule zahlt 0,00 € / CHF 0.00).
+    - *Teilweise Direktabrechnung*: Einmaliger Jahresbeitrag von 4,80 € / Jahr (DE/AT) bzw. CHF 9.60 / Jahr (CH) (umgerechnet 0,40 € / CHF 0.80 / Mo.). Schule deckt den passiven Beitrag (0,09 € / CHF 0.20 / Mo.).
     - *Härtefälle & Geschwisterrabatte*: Individual students can be manually marked in the student administration to exempt them from direct billing (costs remain with the school, no contribution is collected).
 ## Canonical Billing Sequence & Legal SaaS Nomenclature (Verbindlicher Standard)
 - **Plattformweites Master-Wording**: Für alle Gebührenaufstellungen, Gebühren-Vorschauen, Ratenübersichten, Rechnungs-PDFs, Onboarding-Karten und Modals innerhalb der gesamten Plattform MUSS immer die exakt gleiche kanonische Reihenfolge und das gleiche juristisch wasserdichte Wording verwendet werden:

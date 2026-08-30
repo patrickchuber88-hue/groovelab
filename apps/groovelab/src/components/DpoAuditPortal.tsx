@@ -711,11 +711,11 @@ export function DpoAuditPortal({ onClose, schoolName = 'Stadtmusikschule', schoo
                   {[
                     {
                       title: 'I. Art. 32 Abs. 1 lit. a DSGVO – Pseudonymisierung & Verschlüsselung',
-                      desc: 'TLS 1.3 HSTS Verschlüsselung, clientseitige AES-256-GCM Hardware-Vaults (Web Crypto API), OWASP-konformes PBKDF2 PIN-Hashing (100.000 SHA-256 Runden), HMAC-SHA256 Blind Indexing, DSGVO-Nachnamensmaskierung als Privacy-Default.'
+                      desc: 'TLS 1.3 HSTS Verschlüsselung, clientseitige AES-256-GCM Hardware-Vaults (Web Crypto API), OWASP- und BSI-konformes PBKDF2 Hashing (100.000 SHA-512 / SHA-256 Runden), HMAC Blind Indexing, DSGVO-Nachnamensmaskierung als Privacy-Default.'
                     },
                     {
                       title: 'II. Art. 32 Abs. 1 lit. b DSGVO – Vertraulichkeit & Integrität',
-                      desc: 'Strikte PostgreSQL Row-Level Security (RLS) Mandantentrennung, Zero-Trust Session-Leasing mit 1-Click Remote-Logout, FIDO2/WebAuthn Klon-Schutz, serverseitiges Brute-Force Lockout, Mikrofonschutz auf OS-Ebene, manipulationssichere SHA-256 Merkle-Chain Audit-Ledger.'
+                      desc: 'Strikte PostgreSQL Row-Level Security (RLS) Mandantentrennung, Zero-Trust Session-Leasing mit 1-Click Remote-Logout, FIDO2/WebAuthn Klon-Schutz, serverseitiges Brute-Force Lockout, Mikrofonschutz auf OS-Ebene, manipulationssichere SHA-512 / SHA-256 Merkle-Chain Audit-Ledger.'
                     },
                     {
                       title: 'III. Art. 32 Abs. 1 lit. c DSGVO – Verfügbarkeit & Belastbarkeit',

@@ -27889,10 +27889,10 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                       />
                                       <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
                                         <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#1e293b' }}>
-                                          1. Vollständige Direktabrechnung (Schüler zahlt {effectiveSchoolRates.priceStudent.toFixed(2).replace('.', ',')} € / Monat)
+                                          1. Vollständige Direktabrechnung (Einmaliger Jahresbeitrag: {(effectiveSchoolRates.priceStudent * 12).toFixed(2).replace('.', ',')} € – umgerechnet {effectiveSchoolRates.priceStudent.toFixed(2).replace('.', ',')} € / Monat)
                                         </span>
                                         <span style={{ fontSize: '0.7rem', color: '#64748b', lineHeight: '1.3' }}>
-                                          Der Schüler/Eltern zahlen den vollen Betrag (Jahresbeitrag: {(effectiveSchoolRates.priceStudent * 12).toFixed(2).replace('.', ',')} €). Die Musikschule wird um die passive Datenbankgebühr von 0,09 €/Monat komplett entlastet (0,00 € Kosten).
+                                          Der Schüler/Eltern zahlen den Jahresbeitrag als Einmalzahlung ({(effectiveSchoolRates.priceStudent * 12).toFixed(2).replace('.', ',')} € pro Schuljahr). Monatliche Buchungen sind ausgeschlossen. Die Musikschule wird komplett entlastet (0,00 € Kosten).
                                         </span>
                                       </div>
                                     </label>
@@ -27923,10 +27923,10 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                       />
                                       <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
                                         <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#1e293b' }}>
-                                          2. Teilweise Direktabrechnung (Schüler zahlt 0,40 € / Monat, Schule zahlt 0,09 €)
+                                          2. Teilweise Direktabrechnung (Einmaliger Jahresbeitrag: 4,80 € / CHF 9.60 – umgerechnet 0,40 € / CHF 0.80 / Monat)
                                         </span>
                                         <span style={{ fontSize: '0.7rem', color: '#64748b', lineHeight: '1.3' }}>
-                                          Der Schüler/Eltern zahlen 0,40 € pro Monat (Jahresbeitrag: 4,80 €). Die Schule trägt weiterhin die passive Datenbankgebühr von 0,09 € pro Monat für diesen Schüler.
+                                          Der Schüler/Eltern zahlen den reduzierten Jahresbeitrag von 4,80 € (bzw. CHF 9.60). Monatliche Buchungen sind ausgeschlossen. Die Schule trägt weiterhin die passive Datenbankgebühr.
                                         </span>
                                       </div>
                                     </label>
@@ -37101,7 +37101,7 @@ status: status,
                     <p style={{ margin: '4px 0 0 0' }}><strong>3. Modulpreise &amp; Kombi-Vorteil:</strong> Die monatliche Server-Hosting-Pauschale pro Musikschule beträgt für das Modul „Campus“ {masterRates.campus.toFixed(2).replace('.', ',')} € und für das Modul „GrooveLab“ {masterRates.groovelab.toFixed(2).replace('.', ',')} €. Werden beide Module gebucht, gilt der Kombi-Vorteil von {masterRates.kombi.toFixed(2).replace('.', ',')} € (Ersparnis von {(masterRates.campus + masterRates.groovelab - masterRates.kombi).toFixed(2).replace('.', ',')} €/Monat). Administrations- und Sekretariats-Nutzer sind inklusive. Jede aktive Lehrkraft bzw. jeder Verwaltungs-Mitarbeiter wird mit {masterRates.teacher.toFixed(2).replace('.', ',')} €/Monat berechnet.</p>
                     <p style={{ margin: '4px 0 0 0' }}><strong>4. Schüleraktivierungs-Modelle (Campus-Modul):</strong> Für Schülerfreischaltungen stehen zwei Zahlungswege zur Verfügung:
                       <br />a) <em>Sammelzahler (Schule trägt Kosten):</em> Abrechnung über die Musikschule mit {masterRates.student.toFixed(2).replace('.', ',')} €/Monat je aktivem Schüler. Bei Nicht-Nutzung von über 2 Monaten erfolgt eine automatische Inaktivierung zur Kostenvermeidung. Alternativ wird ein Jahresbeitrag bei Aktivierung mit 10 % Rabatt oder eine Einmal-Aktivierung zum Schuljahresstart im September mit 20 % Rabatt angeboten.
-                      <br />b) <em>Direktabrechnung (Eltern/Schüler zahlen):</em> Die Abrechnung erfolgt direkt mit den Eltern/Schülern ({masterRates.student.toFixed(2).replace('.', ',')} €/Monat bzw. {(masterRates.student * 12).toFixed(2).replace('.', ',')} € Jahresbeitrag) oder teilsubventioniert (Eltern zahlen {(masterRates.student - 0.09).toFixed(2).replace('.', ',')} €/Monat, Schule trägt 0,09 €/Monat). Härtefälle/Geschwisterrabatte können von der Schule manuell befreit werden.
+                      <br />b) <em>Direktabrechnung (Eltern/Schüler zahlen):</em> Die Abrechnung erfolgt ausnahmslos als einmaliger Jahresbeitrag direkt mit den Eltern/Schülern ({(masterRates.student * 12).toFixed(2).replace('.', ',')} € pro Schuljahr – umgerechnet {masterRates.student.toFixed(2).replace('.', ',')} €/Monat) oder teilsubventioniert (Eltern zahlen {((masterRates.student - 0.09) * 12).toFixed(2).replace('.', ',')} €/Jahr, Schule trägt 0,09 €/Monat). Monatliche Einzelbuchungen sind ausgeschlossen. Härtefälle/Geschwisterrabatte können von der Schule manuell befreit werden.
                       <br /><em>Hinweis:</em> GrooveLab-Schülerfreischaltungen werden immer vollumfänglich von der Musikschule getragen (keine Direktabrechnung mit Eltern).
                     </p>
                     <p style={{ margin: '4px 0 0 0' }}><strong>5. Schüler-Deaktivierung:</strong> Bei monatlicher Abrechnung entfällt die Gebühr ab dem Folgemonat der Deaktivierung. Bei jährlicher Vorauszahlung verbleiben das Profil und alle Funktionen bis zum Ende des laufenden Schuljahres aktiv und erlöschen erst zum Schuljahreswechsel.</p>

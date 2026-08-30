@@ -274,12 +274,12 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
 
               <div>
                 <strong style={{ color: '#0f172a' }}>4. Eltern-Einwilligung bei Minderjährigen (Art. 8 DSGVO / Art. 6 CH-nDSG)</strong><br />
-                Für Schüler unter 16 Jahren (DE/AT) bzw. 13 Jahren (CH) ist die Zustimmung der Erziehungsberechtigten erforderlich. Diese wird im digitalen Onboarding-Flow abgefragt und serverseitig in einem revisionssicheren, manipulationsgeschützten <strong>SHA-256 Merkle-Chain Audit-Ledger</strong> mit Zeitstempel, Einwilligungsversion und Eltern-E-Mail protokolliert.
+                Für Schüler unter 16 Jahren (DE/AT) bzw. 13 Jahren (CH) ist die Zustimmung der Erziehungsberechtigten erforderlich. Diese wird im digitalen Onboarding-Flow abgefragt und serverseitig in einem revisionssicheren, manipulationsgeschützten <strong>SHA-512 / SHA-256 Merkle-Chain Audit-Ledger</strong> mit Zeitstempel, Einwilligungsversion und Eltern-E-Mail protokolliert.
               </div>
 
               <div>
                 <strong style={{ color: '#0f172a' }}>5. Zero-Trust Session-Leasing, Audio-Tresor &amp; Hardware-Sicherheit</strong><br />
-                Audiodaten aus der In-App Loopstation und dem Meisterwerk-Protokoll werden verschlüsselt im EU-Cloud-Speicher abgelegt und sind durch mandanten- und schülerspezifische Storage-RLS-Policies geschützt. Nach dem Löschen einer Aufnahme wird die Datei physisch und vollständig aus dem Cloud-Speicher entfernt. PINs werden mit <strong>OWASP-konformem PBKDF2 Zero-Knowledge Hashing (100.000 Runden)</strong> verarbeitet. Das integrierte <strong>Zero-Trust Session-Leasing</strong> ermöglicht Schulleitung und Lehrkräften jederzeit den 1-Click Remote-Logout aktiver Geräte. Bei Verlassen des Moduls oder Tab-Wechsel schaltet ein automatischer Guard alle Mikrofon-Tracks (<code style={{ background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px' }}>MediaStreamTrack.stop()</code>) ab.
+                Audiodaten aus der In-App Loopstation und dem Meisterwerk-Protokoll werden verschlüsselt im EU-Cloud-Speicher abgelegt und sind durch mandanten- und schülerspezifische Storage-RLS-Policies geschützt. Nach dem Löschen einer Aufnahme wird die Datei physisch und vollständig aus dem Cloud-Speicher entfernt. PINs und Zugangsschlüssel werden mit <strong>OWASP- und BSI-konformem PBKDF2 Zero-Knowledge Hashing (100.000 SHA-512 / SHA-256 Runden)</strong> verarbeitet. Das integrierte <strong>Zero-Trust Session-Leasing</strong> ermöglicht Schulleitung und Lehrkräften jederzeit den 1-Click Remote-Logout aktiver Geräte. Bei Verlassen des Moduls oder Tab-Wechsel schaltet ein automatischer Guard alle Mikrofon-Tracks (<code style={{ background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px' }}>MediaStreamTrack.stop()</code>) ab.
               </div>
 
               <div>
@@ -313,15 +313,15 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
                 </div>
 
                 <div>
-                  <strong style={{ color: '#0f172a' }}>2. Bereitstellungsmodell &amp; Hosting-Pauschalen (§ 19 UStG)</strong><br />
-                  - <strong>Software-Bereitstellung:</strong> Die Software wird im Rahmen des gebuchten Cloud-Infrastruktur-Pakets ohne gesonderte Lizenzkaufgebühren bereitgestellt (0,00 €).<br />
-                  - <strong>Campus-Modul Hosting:</strong> {masterPricing.priceCampus.toFixed(2).replace('.', ',')} € / Mo. (Server-Hosting, Datenbank &amp; Webspace-Flatrate per Musikschule).<br />
-                  - <strong>GrooveLab-Modul Hosting:</strong> {masterPricing.priceGroovelab.toFixed(2).replace('.', ',')} € / Mo. (Server-Hosting, Datenbank &amp; Webspace-Flatrate per Musikschule).<br />
-                  - <strong>Kombi-Vorteil Hosting:</strong> {masterPricing.priceKombi.toFixed(2).replace('.', ',')} € / Mo. (Infrastruktur-Bündel für beide Module, Ersparnis von {masterPricing.kombiSavings.toFixed(2).replace('.', ',')} € / Mo.).<br />
-                  - <strong>Infrastruktur-Service-Fee:</strong> {masterPricing.priceTeacher.toFixed(2).replace('.', ',')} € / Mo. je aktivem Lehrer-Profil. Verwaltungs- und Sekretariats-User (<code style={{ background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px' }}>admin</code> und <code style={{ background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px' }}>secretary</code>) sind inklusive.<br />
-                  - <strong>Schüler-Infrastruktur-Fee:</strong> {masterPricing.priceStudent.toFixed(2).replace('.', ',')} € / Mo. je aktiver Schülerin / aktivem Schüler.<br />
-                  - <strong>Sammelzahler vs. Direktabrechnung:</strong> GrooveLab-Aktivierungen werden immer zu 100 % von der Musikschule getragen. Für das Campus-Modul kann wahlweise Direktabrechnung mit Eltern vereinbart werden.<br />
-                  - <strong>Steuerlicher Hinweis (§ 19 UStG):</strong> <em>Gemäß § 19 UStG wird keine Umsatzsteuer berechnet (Kleinunternehmerregelung).</em>
+                  <strong style={{ color: '#0f172a' }}>2. Bereitstellungsmodell &amp; Hosting-Pauschalen (DACH-Region)</strong><br />
+                  - <strong>Software-Bereitstellung:</strong> Die Software wird im Rahmen des gebuchten Cloud-Infrastruktur-Pakets ohne gesonderte Lizenzkaufgebühren bereitgestellt (0,00 € / CHF 0.00).<br />
+                  - <strong>Campus-Modul Hosting:</strong> 14,90 € / Mo. (DE/AT) bzw. CHF 19.90 / Mo. (CH) (Server-Hosting, Datenbank &amp; Webspace-Flatrate per Musikschule).<br />
+                  - <strong>GrooveLab-Modul Hosting:</strong> 9,90 € / Mo. (DE/AT) bzw. CHF 14.90 / Mo. (CH) (Server-Hosting, Datenbank &amp; Webspace-Flatrate per Musikschule).<br />
+                  - <strong>Kombi-Vorteil Hosting:</strong> 19,90 € / Mo. (DE/AT) bzw. CHF 29.90 / Mo. (CH) (Infrastruktur-Bündel für beide Module, Ersparnis von 4,90 € / CHF 4.90 / Mo.).<br />
+                  - <strong>Infrastruktur-Service-Fee:</strong> 0,49 € / Mo. (DE/AT) bzw. CHF 0.80 / Mo. (CH) je aktivem Lehrer-Profil. Verwaltungs- und Sekretariats-User (<code style={{ background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px' }}>admin</code> und <code style={{ background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px' }}>secretary</code>) sind inklusive.<br />
+                  - <strong>Schüler-Infrastruktur-Fee:</strong> 0,49 € / Mo. (DE/AT) bzw. CHF 1.00 / Mo. (CH) je aktiver Schülerin / aktivem Schüler.<br />
+                  - <strong>Sammelzahler vs. Direktabrechnung:</strong> GrooveLab-Aktivierungen werden immer zu 100 % von der Musikschule getragen. Für das Campus-Modul kann wahlweise Direktabrechnung mit Eltern vereinbart werden. Schüler-Direktabrechnungen werden ausnahmslos als einmaliger Jahresbeitrag (5,88 € in DE/AT bzw. CHF 12.00 in CH pro Schuljahr) abgerechnet – niemals monatlich.<br />
+                  - <strong>Steuerliche Hinweise:</strong> In Deutschland und Österreich gemäß § 19 UStG umsatzsteuerbefreit (Kleinunternehmerregelung). Für die Schweiz gilt Leistungsort Schweiz (nicht im Inland steuerbar gem. Art. 8 Abs. 1 MWSTG).
                 </div>
 
                 <div>
@@ -347,8 +347,8 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
                 </span>
 
                 <div>
-                  <strong style={{ color: '#0f172a' }}>6. Kostenfreier Schnuppermonat &amp; Schuljahres-Bereitstellung</strong><br />
-                  Eltern, die das interaktive Campus-Modul für ihr Kind aktivieren, erhalten den laufenden Anmeldemonat zu 100% kostenfrei zum Kennenlernen. Für die verbleibenden Monate bis zum Schuljahresende (31. August) fällt der dynamisch errechnete Betrag von 0,49 € / Monat an.
+                  <strong style={{ color: '#0f172a' }}>6. Kostenfreier Schnuppermonat &amp; Schuljahres-Bereitstellung (Ausschließliche Jahresbeitragszahlung)</strong><br />
+                  Eltern, die das interaktive Campus-Modul für ihr Kind aktivieren, erhalten den laufenden Anmeldemonat zu 100% kostenfrei zum Kennenlernen. Für die verbleibenden Monate bis zum Schuljahresende (31. August) wird die Bereitstellung als einmaliger Jahresbeitrag (errechnet aus 0,49 € in DE/AT bzw. CHF 1.00 in CH pro bezahltem Monat) abgerechnet. Eine monatliche Einzelabrechnung ist ausgeschlossen.
                 </div>
 
                 <div>

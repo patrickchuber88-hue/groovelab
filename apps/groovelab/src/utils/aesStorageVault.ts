@@ -38,14 +38,14 @@ async function getOrCreateVaultKey(): Promise<CryptoKey> {
     ['deriveKey']
   );
 
-  // Derive AES-GCM 256-bit key
+  // Derive AES-GCM 256-bit key with Tier-1 Goldstandard PBKDF2-512 (100.000 rounds)
   const salt = enc.encode(VAULT_SALT);
   const derivedKey = await window.crypto.subtle.deriveKey(
     {
       name: 'PBKDF2',
       salt: salt,
-      iterations: 10000,
-      hash: 'SHA-256'
+      iterations: 100_000,
+      hash: 'SHA-512'
     },
     baseKey,
     { name: 'AES-GCM', length: 256 },

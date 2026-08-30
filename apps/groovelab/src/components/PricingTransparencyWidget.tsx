@@ -7,22 +7,28 @@ interface PricingTransparencyWidgetProps {
   activePlatform?: 'campus' | 'groovelab' | 'kombi';
 }
 
-export const PricingTransparencyWidget: React.FC<PricingTransparencyWidgetProps> = () => {
+export const PricingTransparencyWidget: React.FC<PricingTransparencyWidgetProps> = ({ school }) => {
   const pricing = useMasterPricing();
+  const isChf = school?.currency === 'CHF' || school?.country === 'CH' || pricing.currency === 'CHF';
+  const currency = isChf ? 'CHF' : 'EUR';
+  const currentRates = isChf ? pricing.ratesCHF : pricing.ratesEUR;
+  const fmt = (amt: number) => pricing.formatPrice(amt, currency);
+
   const [calcStudents, setCalcStudents] = useState<number>(150);
   const [calcTeachers, setCalcTeachers] = useState<number>(12);
   const [calcPlan, setCalcPlan] = useState<'kombi' | 'campus' | 'groovelab'>('kombi');
 
   // Hosting base price
   const baseMonthly = calcPlan === 'kombi' 
-    ? pricing.priceKombi 
-    : (calcPlan === 'campus' ? pricing.priceCampus : pricing.priceGroovelab);
+    ? currentRates.priceKombi 
+    : (calcPlan === 'campus' ? currentRates.priceCampus : currentRates.priceGroovelab);
 
   // Annual cost Campus-Groovelab (12 months base hosting + active teachers)
-  const annualCampusGroovelab = (baseMonthly + (calcTeachers * pricing.priceTeacher)) * 12;
+  const annualCampusGroovelab = (baseMonthly + (calcTeachers * currentRates.priceTeacher)) * 12;
 
   // Typical legacy music school ERP cost (Average ~180 €/Mo. base + software licenses ~2.800 € / year)
-  const estimatedLegacyAnnual = Math.max(2200, Math.round(1400 + (calcStudents * 6.5) + (calcTeachers * 45)));
+  const multiplier = isChf ? 1.4 : 1.0;
+  const estimatedLegacyAnnual = Math.max(isChf ? 3200 : 2200, Math.round((1400 + (calcStudents * 6.5) + (calcTeachers * 45)) * multiplier));
   const annualSavings = Math.max(0, estimatedLegacyAnnual - Math.round(annualCampusGroovelab));
 
   return (
@@ -54,7 +60,7 @@ export const PricingTransparencyWidget: React.FC<PricingTransparencyWidgetProps>
           </div>
           <div>
             <h4 style={{ margin: 0, fontSize: '0.94rem', fontWeight: 800, color: '#0f172a' }}>
-              Transparente Cloud- &amp; Hostingkonditionen
+              Transparente Cloud- &amp; Hostingkonditionen {isChf ? '(Schweiz • CHF)' : '(Deutschland & Österreich • EUR)'}
             </h4>
             <p style={{ margin: 0, fontSize: '0.74rem', color: '#64748b' }}>
               Campus-Groovelab Fair-Use Tarifübersicht für Musikschulen
@@ -81,10 +87,10 @@ export const PricingTransparencyWidget: React.FC<PricingTransparencyWidgetProps>
             Server-Hosting Flatrate
           </div>
           <div style={{ fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', margin: '4px 0' }}>
-            {pricing.priceKombi.toFixed(2).replace('.', ',')} € <span style={{ fontSize: '0.76rem', fontWeight: 600, color: '#64748b' }}>/ Mo. Kombi</span>
+            {fmt(currentRates.priceKombi)} <span style={{ fontSize: '0.76rem', fontWeight: 600, color: '#64748b' }}>/ Mo. Kombi</span>
           </div>
           <div style={{ fontSize: '0.72rem', color: '#475569', lineHeight: 1.4 }}>
-            Campus ({pricing.priceCampus.toFixed(2).replace('.', ',')} €) + GrooveLab ({pricing.priceGroovelab.toFixed(2).replace('.', ',')} €) im Kombi-Vorteil. Sparen Sie {pricing.kombiSavings.toFixed(2).replace('.', ',')} € / Mo.
+            Campus ({fmt(currentRates.priceCampus)}) + GrooveLab ({fmt(currentRates.priceGroovelab)}) im Kombi-Vorteil. Sparen Sie {fmt(currentRates.kombiSavings)} / Mo.
           </div>
         </div>
 
@@ -94,10 +100,10 @@ export const PricingTransparencyWidget: React.FC<PricingTransparencyWidgetProps>
             Lehrer &amp; Verwaltung
           </div>
           <div style={{ fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', margin: '4px 0' }}>
-            {pricing.priceTeacher.toFixed(2).replace('.', ',')} € <span style={{ fontSize: '0.76rem', fontWeight: 600, color: '#64748b' }}>/ Lehrer / Mo.</span>
+            {fmt(currentRates.priceTeacher)} <span style={{ fontSize: '0.76rem', fontWeight: 600, color: '#64748b' }}>/ Lehrer / Mo.</span>
           </div>
           <div style={{ fontSize: '0.72rem', color: '#475569', lineHeight: 1.4 }}>
-            Verwaltungs- &amp; Sekretariatskonten sind zu 100% inklusive (0,00 € Gebühr).
+            Verwaltungs- &amp; Sekretariatskonten sind zu 100% inklusive ({fmt(0)} Gebühr).
           </div>
         </div>
 
@@ -107,7 +113,7 @@ export const PricingTransparencyWidget: React.FC<PricingTransparencyWidgetProps>
             Schüler-Aktivierungen
           </div>
           <div style={{ fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', margin: '4px 0' }}>
-            {pricing.priceStudent.toFixed(2).replace('.', ',')} € <span style={{ fontSize: '0.76rem', fontWeight: 600, color: '#64748b' }}>/ aktiv. Schüler / Mo.</span>
+            {fmt(currentRates.priceStudent)} <span style={{ fontSize: '0.76rem', fontWeight: 600, color: '#64748b' }}>/ aktiv. Schüler / Mo.</span>
           </div>
           <div style={{ fontSize: '0.72rem', color: '#475569', lineHeight: 1.4 }}>
             Nur tatsächlich eingeloggte Schüler werden berechnet. Auto-Passivierung nach 2 Monaten Inaktivität.
@@ -189,7 +195,7 @@ export const PricingTransparencyWidget: React.FC<PricingTransparencyWidgetProps>
               Campus-Groovelab Jahresinfrastruktur
             </div>
             <div style={{ fontSize: '1.1rem', fontWeight: 900, color: '#0f172a' }}>
-              {annualCampusGroovelab.toFixed(2).replace('.', ',')} € <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 600 }}>/ Jahr</span>
+              {fmt(annualCampusGroovelab)} <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 600 }}>/ Jahr</span>
             </div>
           </div>
 
@@ -208,7 +214,7 @@ export const PricingTransparencyWidget: React.FC<PricingTransparencyWidgetProps>
                 Ihre geschätzte Ersparnis vs. Altsystemen
               </div>
               <div style={{ fontSize: '1.05rem', fontWeight: 900, color: '#15803d' }}>
-                ca. {annualSavings.toLocaleString('de-DE')} € / Jahr
+                ca. {isChf ? `CHF ${annualSavings.toLocaleString('de-CH')}` : `${annualSavings.toLocaleString('de-DE')} €`} / Jahr
               </div>
             </div>
           </div>
@@ -234,7 +240,9 @@ export const PricingTransparencyWidget: React.FC<PricingTransparencyWidgetProps>
           </span>
         </div>
         <div style={{ fontSize: '0.7rem', color: '#64748b', textAlign: 'center', fontStyle: 'italic', fontWeight: 600 }}>
-          Gemäß § 19 UStG wird keine Umsatzsteuer berechnet (Kleinunternehmerregelung).
+          {isChf 
+            ? 'Leistungsort Schweiz (nicht im Inland steuerbare Leistung gem. Art. 8 Abs. 1 MWSTG).'
+            : 'Gemäß § 19 UStG wird keine Umsatzsteuer berechnet (Kleinunternehmerregelung).'}
         </div>
       </div>
     </div>

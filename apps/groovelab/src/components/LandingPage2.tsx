@@ -4,6 +4,8 @@ import { supabase } from '../lib/supabase';
 import { isWebAuthnSupported, isMasterPasskeyRegistered, registerMasterPasskey, authenticateMasterPasskey } from '../utils/webauthn';
 import { createMasterSessionLease, logMasterAdminEvent } from '../utils/masterAuditLogger';
 import { verifyTOTP } from '../utils/totp';
+import { RegistrationAccessModal } from './RegistrationAccessModal';
+import { isRegistrationUnlocked } from '../utils/cryptoAuth';
 
 interface LandingPage2Props {
   onLogin: () => void;
@@ -25,6 +27,11 @@ export const LandingPage2: React.FC<LandingPage2Props> = ({
   const [isSearching, setIsSearching] = useState(false);
   const [showResults, setShowResults] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
+  const [showAccessModal, setShowAccessModal] = useState(false);
+
+  const triggerProtectedRegistration = (targetEmail?: string) => {
+    setShowAccessModal(true);
+  };
 
   // Hardened Master Admin Auth State (Enterprise+ Stufe 3)
   const [showMasterModal, setShowMasterModal] = useState(false);
@@ -709,7 +716,7 @@ export const LandingPage2: React.FC<LandingPage2Props> = ({
         padding: '0 24px',
         flexWrap: 'wrap'
       }}>
-        <div className="footer-link" onClick={() => onRegister()}>
+        <div className="footer-link" onClick={() => triggerProtectedRegistration()}>
           <School size={14} />
           Als Schule registrieren
         </div>
@@ -1109,6 +1116,15 @@ export const LandingPage2: React.FC<LandingPage2Props> = ({
           </div>
         </div>
       )}
+      {/* Protected Registration Access Modal */}
+      <RegistrationAccessModal
+        isOpen={showAccessModal}
+        onClose={() => setShowAccessModal(false)}
+        onSuccess={() => {
+          setShowAccessModal(false);
+          onRegister();
+        }}
+      />
     </div>
   );
 };

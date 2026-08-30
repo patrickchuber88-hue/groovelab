@@ -53,13 +53,19 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
   const [showHardshipConfirm, setShowHardshipConfirm] = useState(false);
   const [agreeWithdrawalWaiver, setAgreeWithdrawalWaiver] = useState(true);
 
-  // Dynamic School Year Calculation (Registration month = 0.00 € free, remaining months until August 31st)
-  const schoolYearCalc = calculateSchoolYearDirectBilling();
-  const effectiveAnnualFee = annualFee !== 5.88 ? annualFee : schoolYearCalc.totalAmount;
+  // Dynamic School Year Calculation (Registration month = free, remaining months until August 31st)
+  const isChf = schoolData?.currency === 'CHF' || schoolData?.country === 'CH';
+  const activeCurrency = isChf ? 'CHF' : 'EUR';
+  const schoolYearCalc = calculateSchoolYearDirectBilling(undefined, activeCurrency);
+  const effectiveAnnualFee = annualFee !== 5.88 && annualFee !== 12.00 && annualFee !== 9.60 ? annualFee : schoolYearCalc.totalAmount;
   const totalAmountStr = schoolYearCalc.totalAmountStr;
-  const monthlyRate = schoolYearCalc.monthlyRate.toFixed(2).replace('.', ',');
+  const monthlyRate = isChf ? 'CHF 1.00' : '0,49 €';
+  const freeMonthDisplay = isChf ? 'CHF 0.00' : '0,00 €';
   const remainingMonths = schoolYearCalc.remainingPaidMonths;
   const periodDescription = schoolYearCalc.periodDescription;
+  const taxDisclaimer = isChf 
+    ? 'Endpreis (Leistungsort Schweiz, gem. Art. 8 Abs. 1 MWSTG)' 
+    : 'Endpreis gem. § 19 UStG (steuerbefreit)';
 
   // Generate stable GoBD Reference Code: CG-[HASH8]-[YYMM]
   const referenceCode = generateStudentGoBdCode(student.id || 'TEMP-ID');
@@ -196,7 +202,8 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
       doc.setFontSize(11);
       doc.setTextColor(15, 23, 42);
       doc.setFont('helvetica', 'bold');
-      doc.text(`${totalAmountStr} EUR (0,49 EUR/Mo. • ${schoolYearCalc.freeMonthName} gratis • Endpreis gem. § 19 UStG)`, 28, 146);
+      const currencySuffix = isChf ? 'CHF' : 'EUR';
+      doc.text(`${totalAmountStr} ${currencySuffix} (${monthlyRate}/Mo. • ${schoolYearCalc.freeMonthName} gratis • ${taxDisclaimer})`, 28, 146);
 
       // Instructions
       doc.setFont('helvetica', 'bold');
@@ -207,8 +214,8 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(9);
       doc.setTextColor(71, 85, 105);
-      doc.text('1. Öffnen Sie Ihre gewohnte Banking-App (z. B. Sparkasse, VR-Banking, ING, DKB, N26).', 22, 178);
-      doc.text(`2. Überweisen Sie den Betrag von ${totalAmountStr} EUR auf die oben genannte IBAN.`, 22, 185);
+      doc.text('1. Öffnen Sie Ihre gewohnte Banking-App (z. B. Sparkasse, VR-Banking, PostFinance, Kantonalbank, Raiffeisen).', 22, 178);
+      doc.text(`2. Überweisen Sie den Betrag von ${totalAmountStr} ${currencySuffix} auf die oben genannte IBAN.`, 22, 185);
       doc.text(`3. Geben Sie als Verwendungszweck exakt ${referenceCode} an.`, 22, 192);
       doc.text('4. Sobald der Zahlungseingang verbucht ist, wird der Campus-Zugang vollautomatisch freigeschaltet.', 22, 199);
 
@@ -349,13 +356,13 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
             </div>
             <div style={{ textAlign: 'right' }}>
               <div style={{ fontSize: '1.35rem', fontWeight: 900, color: '#059669', letterSpacing: '-0.03em' }}>
-                0,00 € <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#64748b' }}>({schoolYearCalc.freeMonthName})</span>
+                {freeMonthDisplay} <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#64748b' }}>({schoolYearCalc.freeMonthName})</span>
               </div>
               <span style={{ fontSize: '0.70rem', color: '#64748b', fontWeight: 600, display: 'block' }}>
-                ab 01.{schoolYearCalc.paidStartMonthName.slice(0,3)}: {totalAmountStr} € ({remainingMonths} × 0,49 €)
+                ab 01.{schoolYearCalc.paidStartMonthName.slice(0,3)}: {isChf ? `CHF ${totalAmountStr}` : `${totalAmountStr} €`} ({remainingMonths} × {monthlyRate})
               </span>
               <span style={{ fontSize: '0.64rem', color: '#94a3b8', fontWeight: 600, display: 'block', marginTop: '1px' }}>
-                Endpreis gem. § 19 UStG (steuerbefreit)
+                {taxDisclaimer}
               </span>
             </div>
           </div>

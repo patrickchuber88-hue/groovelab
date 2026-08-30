@@ -40,16 +40,16 @@ export async function hashPinPbkdf2(pin: string): Promise<string> {
       name: 'PBKDF2',
       salt: salt,
       iterations: PBKDF2_ITERATIONS,
-      hash: 'SHA-256'
+      hash: 'SHA-512'
     },
     baseKey,
-    256 // 256-bit hash
+    512 // 512-bit hash
   );
 
   const saltHex = Array.from(salt).map(b => b.toString(16).padStart(2, '0')).join('');
   const hashHex = Array.from(new Uint8Array(derivedBits)).map(b => b.toString(16).padStart(2, '0')).join('');
 
-  return `pbkdf2:v1:${PBKDF2_ITERATIONS}:${saltHex}:${hashHex}`;
+  return `pbkdf2:v2:${PBKDF2_ITERATIONS}:${saltHex}:${hashHex}`;
 }
 
 /**
@@ -58,12 +58,13 @@ export async function hashPinPbkdf2(pin: string): Promise<string> {
 export async function verifyPinPbkdf2(enteredPin: string, storedHash: string): Promise<boolean> {
   if (!enteredPin || !storedHash) return false;
 
-  const cleanPin = enteredPin.trim();
-  const cleanStored = storedHash.trim();
+  const cleanPin = String(enteredPin || '').trim();
+  const cleanStored = String(storedHash || '').trim();
 
-  // 1. PBKDF2 Multi-Round Verification
-  if (cleanStored.startsWith('pbkdf2:v1:')) {
+  // 1. PBKDF2 Multi-Round Verification (v2: SHA-512, v1: SHA-256)
+  if (cleanStored.startsWith('pbkdf2:v2:') || cleanStored.startsWith('pbkdf2:v1:')) {
     try {
+      const isV2 = cleanStored.startsWith('pbkdf2:v2:');
       const parts = cleanStored.split(':');
       if (parts.length !== 5) return false;
 
@@ -88,10 +89,10 @@ export async function verifyPinPbkdf2(enteredPin: string, storedHash: string): P
           name: 'PBKDF2',
           salt: salt,
           iterations: iterations,
-          hash: 'SHA-256'
+          hash: isV2 ? 'SHA-512' : 'SHA-256'
         },
         baseKey,
-        256
+        isV2 ? 512 : 256
       );
 
       const computedHashHex = Array.from(new Uint8Array(derivedBits)).map(b => b.toString(16).padStart(2, '0')).join('');

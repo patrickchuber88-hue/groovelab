@@ -6,10 +6,19 @@ import {
   SchoolPricingProfile, 
   StorageTier, 
   DEFAULT_STORAGE_TIERS, 
-  getStorageTierByGb 
+  getStorageTierByGb,
+  CurrencyCode,
+  CurrencyPricingRates,
+  MASTER_CURRENCY_RATES,
+  formatCurrency
 } from '../domain/pricingEngine';
 
 export interface MasterPricingData {
+  currency: CurrencyCode;
+  setCurrency: (c: CurrencyCode) => void;
+  formatPrice: (amount: number, currencyOverride?: CurrencyCode) => string;
+  ratesEUR: CurrencyPricingRates;
+  ratesCHF: CurrencyPricingRates;
   priceCampus: number;
   priceGroovelab: number;
   priceKombi: number;
@@ -36,17 +45,22 @@ export interface MasterPricingData {
   isLoading: boolean;
   refetchPricing: () => Promise<void>;
   getSchoolRates: (school: SchoolPricingProfile | null | undefined) => EffectiveSchoolRates;
-  getStorageTier: (gb: number) => StorageTier;
+  getStorageTier: (gb: number, customCurrency?: CurrencyCode) => StorageTier;
 }
 
 const defaultPricing: MasterPricingData = {
+  currency: 'EUR',
+  setCurrency: () => {},
+  formatPrice: (amount, curr) => formatCurrency(amount, curr || 'EUR'),
+  ratesEUR: MASTER_CURRENCY_RATES.EUR,
+  ratesCHF: MASTER_CURRENCY_RATES.CHF,
   priceCampus: 14.90,
   priceGroovelab: 9.90,
   priceKombi: 19.90,
   priceTeacher: 0.49,
   priceStudent: 0.49,
   pricePassiveStudent: 0.09,
-  priceStorageAddon: 2.99,
+  priceStorageAddon: 1.99,
   storageTiers: DEFAULT_STORAGE_TIERS,
   campus: 14.90,
   groovelab: 9.90,
@@ -54,7 +68,7 @@ const defaultPricing: MasterPricingData = {
   teacher: 0.49,
   student: 0.49,
   passiveStudent: 0.09,
-  storageAddon: 2.99,
+  storageAddon: 1.99,
   freeMonthsPerYear: 0,
   billingMonthsPerYear: 12,
   singleModulesTotal: 24.80,
@@ -74,14 +88,42 @@ const defaultPricing: MasterPricingData = {
     pricePassiveStudent: 0.09,
     priceStorageAddon: 1.99,
     priceChangeScope: 'new_only',
+    currency: 'EUR'
   }),
-  getStorageTier: (gb) => getStorageTierByGb(gb, DEFAULT_STORAGE_TIERS),
+  getStorageTier: (gb, curr) => getStorageTierByGb(gb, DEFAULT_STORAGE_TIERS, curr || 'EUR'),
 };
 
 const MasterPricingContext = createContext<MasterPricingData>(defaultPricing);
 
 export const MasterPricingProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [pricing, setPricing] = useState<MasterPricingData>(defaultPricing);
+  const [currency, setCurrencyState] = useState<CurrencyCode>(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('groovelab_currency') as CurrencyCode;
+      if (stored === 'CHF' || stored === 'EUR') return stored;
+    }
+    return 'EUR';
+  });
+
+  const setCurrency = (c: CurrencyCode) => {
+    setCurrencyState(c);
+    try {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('groovelab_currency', c);
+        window.dispatchEvent(new Event('groovelab_currency_updated'));
+      }
+    } catch (e) {}
+  };
+
+  const formatPrice = (amount: number, currencyOverride?: CurrencyCode) => {
+    return formatCurrency(amount, currencyOverride || currency);
+  };
+
+  const [pricing, setPricing] = useState<MasterPricingData>({
+    ...defaultPricing,
+    currency,
+    setCurrency,
+    formatPrice
+  });
 
   const fetchMasterPricing = async () => {
     try {
@@ -139,9 +181,15 @@ export const MasterPricingProvider: React.FC<{ children: React.ReactNode }> = ({
           storageTiers: tiers,
           priceChangeScope: scope,
           priceChangeAnnouncedAt: announcedAt,
+          currency,
         };
 
         setPricing({
+          currency,
+          setCurrency,
+          formatPrice,
+          ratesEUR: MASTER_CURRENCY_RATES.EUR,
+          ratesCHF: MASTER_CURRENCY_RATES.CHF,
           priceCampus: c,
           priceGroovelab: g,
           priceKombi: k,
@@ -168,14 +216,32 @@ export const MasterPricingProvider: React.FC<{ children: React.ReactNode }> = ({
           isLoading: false,
           refetchPricing: fetchMasterPricing,
           getSchoolRates: (schoolProfile: SchoolPricingProfile | null | undefined) => calculateEffectiveSchoolRates(schoolProfile, masterSettings),
-          getStorageTier: (gb: number) => getStorageTierByGb(gb, tiers),
+          getStorageTier: (gb: number, customCurrency?: CurrencyCode) => getStorageTierByGb(gb, tiers, customCurrency || currency),
         });
       } else {
-        setPricing((prev: MasterPricingData) => ({ ...prev, isLoading: false, refetchPricing: fetchMasterPricing }));
+        setPricing((prev: MasterPricingData) => ({ 
+          ...prev, 
+          currency,
+          setCurrency,
+          formatPrice,
+          ratesEUR: MASTER_CURRENCY_RATES.EUR,
+          ratesCHF: MASTER_CURRENCY_RATES.CHF,
+          isLoading: false, 
+          refetchPricing: fetchMasterPricing 
+        }));
       }
     } catch (err) {
       console.warn('MasterPricingProvider fetch error:', err);
-      setPricing((prev: MasterPricingData) => ({ ...prev, isLoading: false, refetchPricing: fetchMasterPricing }));
+      setPricing((prev: MasterPricingData) => ({ 
+        ...prev, 
+        currency,
+        setCurrency,
+        formatPrice,
+        ratesEUR: MASTER_CURRENCY_RATES.EUR,
+        ratesCHF: MASTER_CURRENCY_RATES.CHF,
+        isLoading: false, 
+        refetchPricing: fetchMasterPricing 
+      }));
     }
   };
 

@@ -1,3 +1,58 @@
+export type CurrencyCode = 'EUR' | 'CHF';
+
+export interface CurrencyPricingRates {
+  currency: CurrencyCode;
+  symbol: string;
+  priceCampus: number;
+  priceGroovelab: number;
+  priceKombi: number;
+  priceTeacher: number;
+  priceStudent: number;
+  pricePassiveStudent: number;
+  priceStorageAddon: number;
+  kombiSavings: number;
+}
+
+export const MASTER_CURRENCY_RATES: Record<CurrencyCode, CurrencyPricingRates> = {
+  EUR: {
+    currency: 'EUR',
+    symbol: '€',
+    priceCampus: 14.90,
+    priceGroovelab: 9.90,
+    priceKombi: 19.90,
+    priceTeacher: 0.49,
+    priceStudent: 0.49,
+    pricePassiveStudent: 0.09,
+    priceStorageAddon: 1.99,
+    kombiSavings: 4.90,
+  },
+  CHF: {
+    currency: 'CHF',
+    symbol: 'CHF',
+    priceCampus: 19.90,
+    priceGroovelab: 14.90,
+    priceKombi: 29.90,
+    priceTeacher: 0.80,
+    priceStudent: 1.00,
+    pricePassiveStudent: 0.20,
+    priceStorageAddon: 2.90,
+    kombiSavings: 4.90,
+  },
+};
+
+/**
+ * Formats monetary amounts with strict localization standards:
+ * - EUR: "14,90 €" / "0,49 €" (German comma formatting)
+ * - CHF: "CHF 19.90" / "CHF 0.80" (Official Swiss dot & prefix standard)
+ */
+export function formatCurrency(amount: number, currency: CurrencyCode = 'EUR'): string {
+  const num = typeof amount === 'number' && !isNaN(amount) ? amount : 0;
+  if (currency === 'CHF') {
+    return `CHF ${num.toFixed(2)}`;
+  }
+  return `${num.toFixed(2).replace('.', ',')} €`;
+}
+
 export interface StorageTier {
   gb: number;
   price: number;
@@ -16,17 +71,27 @@ export const DEFAULT_STORAGE_TIERS: StorageTier[] = [
   { gb: 250, price: 24.99, label: '+250 GB', sublabel: '1.000 bis 2.500+ Schüler', desc: '24,99 € / Mo.', recommendedFor: 'Großschulen & Konservatorien' }
 ];
 
-export const getStorageTierByGb = (gb: number, customTiers?: StorageTier[]): StorageTier => {
+export const getStorageTierByGb = (gb: number, customTiers?: StorageTier[], currency: CurrencyCode = 'EUR'): StorageTier => {
   const tiers = customTiers && customTiers.length > 0 ? customTiers : DEFAULT_STORAGE_TIERS;
   const match = tiers.find(t => t.gb === gb);
-  if (match) return match;
-  const fallbackPrice = gb === 0 ? 0 : Number((gb * 0.25).toFixed(2));
+  if (match) {
+    if (currency === 'CHF') {
+      const chfPrice = match.price === 0 ? 0 : Number((match.price * 1.45).toFixed(2));
+      return {
+        ...match,
+        price: chfPrice,
+        desc: `${formatCurrency(chfPrice, 'CHF')} / Mo.`
+      };
+    }
+    return match;
+  }
+  const fallbackPrice = gb === 0 ? 0 : Number((gb * (currency === 'CHF' ? 0.35 : 0.25)).toFixed(2));
   return {
     gb,
     price: fallbackPrice,
     label: `+${gb} GB`,
     sublabel: 'Individuell',
-    desc: `${fallbackPrice.toFixed(2).replace('.', ',')} € / Mo.`
+    desc: `${formatCurrency(fallbackPrice, currency)} / Mo.`
   };
 };
 
@@ -41,11 +106,14 @@ export interface MasterPricingRates {
   storageTiers?: StorageTier[];
   priceChangeScope?: 'new_only' | 'school_year_start' | 'immediate' | string;
   priceChangeAnnouncedAt?: string | null;
+  currency?: CurrencyCode;
 }
 
 export interface SchoolPricingData {
   id?: string;
   created_at?: string;
+  country?: string | null;
+  currency?: CurrencyCode | string | null;
   school_year_start_month?: number | string | null;
   school_year_start_day?: number | string | null;
   custom_price_campus?: number | null;
@@ -134,14 +202,27 @@ export function calculateSchoolEffectiveRates(
   school: SchoolPricingData | null | undefined,
   masterPricing: MasterPricingRates
 ): EffectiveRates {
+  const schoolCurrency: CurrencyCode = (school?.currency === 'CHF' || school?.country === 'CH') 
+    ? 'CHF' 
+    : (masterPricing.currency || 'EUR');
+  const currencyMaster = MASTER_CURRENCY_RATES[schoolCurrency] || MASTER_CURRENCY_RATES.EUR;
+
+  const baseCampus = (schoolCurrency === 'CHF' && masterPricing.priceCampus === 14.90) ? currencyMaster.priceCampus : masterPricing.priceCampus;
+  const baseGroovelab = (schoolCurrency === 'CHF' && masterPricing.priceGroovelab === 9.90) ? currencyMaster.priceGroovelab : masterPricing.priceGroovelab;
+  const baseKombi = (schoolCurrency === 'CHF' && masterPricing.priceKombi === 19.90) ? currencyMaster.priceKombi : masterPricing.priceKombi;
+  const baseTeacher = (schoolCurrency === 'CHF' && masterPricing.priceTeacher === 0.49) ? currencyMaster.priceTeacher : masterPricing.priceTeacher;
+  const baseStudent = (schoolCurrency === 'CHF' && masterPricing.priceStudent === 0.49) ? currencyMaster.priceStudent : masterPricing.priceStudent;
+  const basePassive = (schoolCurrency === 'CHF' && (masterPricing.pricePassiveStudent ?? 0.09) === 0.09) ? currencyMaster.pricePassiveStudent : (masterPricing.pricePassiveStudent ?? 0.09);
+  const baseStorage = (schoolCurrency === 'CHF' && (masterPricing.priceStorageAddon ?? 1.99) === 1.99) ? currencyMaster.priceStorageAddon : (masterPricing.priceStorageAddon ?? 2.99);
+
   const defaultRates: EffectiveRates = {
-    priceCampus: masterPricing.priceCampus,
-    priceGroovelab: masterPricing.priceGroovelab,
-    priceKombi: masterPricing.priceKombi,
-    priceTeacher: masterPricing.priceTeacher,
-    priceStudent: masterPricing.priceStudent,
-    pricePassiveStudent: masterPricing.pricePassiveStudent ?? 0.09,
-    priceStorageAddon: masterPricing.priceStorageAddon ?? 2.99,
+    priceCampus: baseCampus,
+    priceGroovelab: baseGroovelab,
+    priceKombi: baseKombi,
+    priceTeacher: baseTeacher,
+    priceStudent: baseStudent,
+    pricePassiveStudent: basePassive,
+    priceStorageAddon: baseStorage,
     storageAddonGb: 0,
     storageUsedBytes: 0,
     isGrandfatheredRateActive: false,
