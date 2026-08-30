@@ -670,7 +670,37 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
     setBiometricError(null);
     try {
       const profile = await authenticateUserBiometrics(targetId);
-      onLogin(profile.userId);
+      
+      // Ensure user ID is primed in sessionStorage for authorized RLS fetching
+      if (profile.userId) {
+        sessionStorage.setItem('groovelab_user_id', profile.userId);
+      }
+
+      // Fetch full user and school record
+      const { data: user, error: userErr } = await supabase
+        .from('users')
+        .select('*, schools(*)')
+        .eq('id', profile.userId)
+        .maybeSingle();
+
+      if (user) {
+        await finalizeLogin(user, loginStationId, false);
+      } else {
+        // Fallback user object using biometric vault profile
+        const fallbackUser = {
+          id: profile.userId,
+          first_name: profile.firstName,
+          last_name: profile.lastName,
+          role: profile.role || 'admin',
+          roles: [profile.role || 'admin'],
+          email: profile.email,
+          photo_url: profile.photoUrl || '/campus_login_hero.png',
+          avatar_url: profile.photoUrl || '/campus_login_hero.png',
+          is_campus_active: true,
+          is_groovelab_active: true
+        };
+        await finalizeLogin(fallbackUser, loginStationId, false);
+      }
     } catch (err: any) {
       console.error('Biometrics login error:', err);
       if (err.name !== 'NotAllowedError' && err.name !== 'AbortError') {

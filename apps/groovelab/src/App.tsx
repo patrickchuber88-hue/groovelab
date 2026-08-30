@@ -6715,6 +6715,11 @@ function App() {
     const currentStationId = stationId !== undefined ? stationId : stationIdFromStorage;
     const localIsKioskMode = (currentStationId && currentStationId !== 'skip') || (typeof window !== 'undefined' ? !!localStorage.getItem('groovelab_kiosk_token') : false);
 
+    // Prime sessionStorage immediately so customFetch interceptor injects user_id into x-client-info
+    if (typeof window !== 'undefined' && userId) {
+      sessionStorage.setItem('groovelab_user_id', userId);
+    }
+
     const { data: userToLogin } = await supabase.from('users').select('role, roles, contract_ends_at, contract_decision_made, is_external_vocalist, is_campus_active, is_groovelab_active, schools(has_campus_subscription, has_groovelab_subscription)').eq('id', userId).single();
     if (userToLogin?.role === 'student' && userToLogin.contract_ends_at) {
       const endsAt = new Date(userToLogin.contract_ends_at).getTime();
@@ -6756,7 +6761,15 @@ function App() {
     const isCampusActive = Boolean(schoolHasCampus && userToLogin?.is_campus_active);
     const isGroovelabActive = Boolean(schoolHasGroove && userToLogin?.is_groovelab_active);
 
-    if (isCampusActive) {
+    if (currentRole === 'admin' || currentRole === 'secretary') {
+      // Admins & Secretaries always land in Campus Briefing
+      sessionStorage.setItem('groovelab_active_workspace', 'secretary');
+      sessionStorage.setItem('groovelab_active_platform', 'campus');
+      sessionStorage.setItem('campus_active_tab', 'briefing');
+      sessionStorage.setItem('groovelab_secretary_subtab', 'briefing');
+      setActivePlatform('campus');
+      setActiveStudentTab('briefing');
+    } else if (isCampusActive) {
       // 1. Campus -> Briefing Board
       sessionStorage.setItem('groovelab_active_platform', 'campus');
       sessionStorage.setItem('campus_active_tab', 'briefing');
