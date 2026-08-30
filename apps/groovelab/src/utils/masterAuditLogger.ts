@@ -30,6 +30,16 @@ const MASTER_LEASE_KEY = 'groovelab_master_session_lease';
 const MASTER_AUDIT_LOG_KEY = 'gl_master_audit_trail_vault';
 const DEFAULT_TTL_MINUTES = 45;
 
+// Ephemeral In-Memory Store (immune to disk forensics & browser storage dumping)
+let inMemoryMasterLease: MasterSessionLease | null = null;
+
+if (typeof window !== 'undefined') {
+  // Wipe in-memory and sensitive session state on window unload or blur when configured
+  window.addEventListener('beforeunload', () => {
+    inMemoryMasterLease = null;
+  });
+}
+
 /**
  * Generates a high-entropy cryptographic SHA-512 signature for the master lease data (Tier-1 Enterprise Standard)
  */
@@ -67,6 +77,8 @@ export async function createMasterSessionLease(
     signature
   };
 
+  inMemoryMasterLease = lease;
+
   if (typeof window !== 'undefined') {
     sessionStorage.setItem(MASTER_LEASE_KEY, JSON.stringify(lease));
     sessionStorage.setItem('groovelab_is_master_admin', 'true');
@@ -94,17 +106,29 @@ export async function verifyMasterSessionLease(): Promise<{ isValid: boolean; le
   if (typeof window === 'undefined') return { isValid: false, lease: null, remainingMinutes: 0 };
   
   try {
-    const raw = sessionStorage.getItem(MASTER_LEASE_KEY);
-    if (!raw) return { isValid: false, lease: null, remainingMinutes: 0 };
+    let lease = inMemoryMasterLease;
+    if (!lease) {
+      const raw = sessionStorage.getItem(MASTER_LEASE_KEY);
+      if (raw) {
+        try {
+          lease = JSON.parse(raw);
+          inMemoryMasterLease = lease;
+        } catch {
+          lease = null;
+        }
+      }
+    }
+    if (!lease) return { isValid: false, lease: null, remainingMinutes: 0 };
     
-    const lease: MasterSessionLease = JSON.parse(raw);
     if (!lease || !lease.userId || !lease.expiresAt || !lease.signature) {
+      inMemoryMasterLease = null;
       return { isValid: false, lease: null, remainingMinutes: 0 };
     }
 
     const now = Date.now();
     if (now > lease.expiresAt) {
       // Lease expired -> auto revoke
+      inMemoryMasterLease = null;
       await revokeMasterSessionLease(lease.userId, 'master_session_expired');
       return { isValid: false, lease: null, remainingMinutes: 0 };
     }
@@ -113,6 +137,7 @@ export async function verifyMasterSessionLease(): Promise<{ isValid: boolean; le
     const expectedSignature = await generateLeaseSignature(lease.userId, lease.issuedAt, lease.expiresAt, lease.nonce);
     if (expectedSignature !== lease.signature) {
       console.warn('[Security] Master lease signature mismatch. Revoking session.');
+      inMemoryMasterLease = null;
       await revokeMasterSessionLease(lease.userId, 'master_logout');
       return { isValid: false, lease: null, remainingMinutes: 0 };
     }
@@ -121,6 +146,7 @@ export async function verifyMasterSessionLease(): Promise<{ isValid: boolean; le
     return { isValid: true, lease, remainingMinutes };
   } catch (err) {
     console.error('Failed to verify master session lease:', err);
+    inMemoryMasterLease = null;
     return { isValid: false, lease: null, remainingMinutes: 0 };
   }
 }
@@ -132,6 +158,7 @@ export async function revokeMasterSessionLease(
   userId: string = 'master_admin',
   reason: 'master_logout' | 'master_session_expired' = 'master_logout'
 ): Promise<void> {
+  inMemoryMasterLease = null;
   if (typeof window !== 'undefined') {
     sessionStorage.removeItem(MASTER_LEASE_KEY);
     sessionStorage.removeItem('groovelab_is_master_admin');

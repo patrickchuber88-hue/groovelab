@@ -17,6 +17,29 @@ if (typeof window !== 'undefined' && window.top !== window.self) {
   }
 }
 
+// Real-Time CSP Violation & Threat Telemetry (ASVS Level 3)
+if (typeof document !== 'undefined') {
+  let lastCspReportTime = 0;
+  document.addEventListener('securitypolicyviolation', (e: SecurityPolicyViolationEvent) => {
+    const now = Date.now();
+    if (now - lastCspReportTime < 5000) return; // Rate-limit client telemetry to prevent flooding
+    lastCspReportTime = now;
+
+    console.warn('[Security Shield] CSP Violation intercepted:', e.blockedURI, e.violatedDirective);
+    import('./lib/supabase').then(async ({ supabase }) => {
+      try {
+        await (supabase.rpc as any)('report_csp_violation', {
+          p_document_uri: e.documentURI || window.location.href,
+          p_blocked_uri: e.blockedURI || '',
+          p_violated_directive: e.violatedDirective || '',
+          p_original_policy: (e.originalPolicy || '').substring(0, 1000),
+          p_sample: (e.sample || '').substring(0, 500)
+        });
+      } catch {}
+    }).catch(() => {});
+  });
+}
+
 // Automatically redirect localhost subdomains to the main localhost origin with query parameters to bypass CORS and script import errors.
 if (typeof window !== 'undefined' && window.location.hostname.includes('localhost') && window.location.hostname !== 'localhost') {
   const parts = window.location.hostname.split('.');
