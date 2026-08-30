@@ -11632,7 +11632,7 @@ useEffect(() => {
                               overflow: 'hidden'
                             }}>
                               <div style={{
-                                padding: '24px 20px',
+                                padding: '18px 16px',
                                 display: 'flex',
                                 flexDirection: 'column',
                                 justifyContent: 'space-between',
@@ -11664,18 +11664,20 @@ useEffect(() => {
                                   </div>
                                   <h2 style={{
                                     margin: 0,
-                                    fontSize: '1.65rem',
+                                    fontSize: 'clamp(1.18rem, 4vw, 1.45rem)',
                                     fontWeight: 900,
                                     fontFamily: "'Outfit', 'Plus Jakarta Sans', sans-serif",
                                     color: '#0f172a',
-                                    lineHeight: 1.15,
-                                    letterSpacing: '-0.02em'
+                                    lineHeight: 1.2,
+                                    letterSpacing: '-0.02em',
+                                    wordBreak: 'break-word',
+                                    overflowWrap: 'break-word'
                                   }}>
                                     Hi, <span style={{ color: activePlatform === 'campus' ? '#34a853' : '#eab308' }}>{formatTeacherFullName(teacher) || teacher?.first_name || 'Lehrer'}</span>!
                                   </h2>
                                   <p style={{
                                     margin: '6px 0 0 0',
-                                    fontSize: '0.82rem',
+                                    fontSize: '0.80rem',
                                     color: '#64748b',
                                     fontWeight: 600,
                                     lineHeight: 1.35
@@ -11687,7 +11689,7 @@ useEffect(() => {
 
                               {/* Hero Instrument Image Box */}
                               <div style={{
-                                width: '130px',
+                                width: 'clamp(90px, 26%, 115px)',
                                 position: 'relative',
                                 display: 'flex',
                                 alignItems: 'center',
@@ -12017,7 +12019,7 @@ useEffect(() => {
                               }}>
                                 {(isWeekend && !isTourDemoScheduleActive) ? 'Schönes Wochenende,' : `${dynamicGreeting.greeting},`}{' '}
                                 <span style={{ 
-                                  color: '#007aff', 
+                                  color: activePlatform === 'campus' ? '#34a853' : '#eab308', 
                                   fontWeight: 900,
                                   letterSpacing: '-0.01em',
                                   display: 'inline'
