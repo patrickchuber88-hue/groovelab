@@ -2050,6 +2050,23 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       alert("Limit erreicht! Du hast bereits 12 Sprachaufnahmen in diesem Protokoll. Bitte lösche eine alte Sprachaufnahme, bevor du eine neue aufnimmst.");
       return;
     }
+
+    // 🎙️ Check if school Audio-Tresor storage quota is exceeded
+    const targetSchoolId = student?.school_id || (student as any)?.schoolId || (typeof window !== 'undefined' ? (localStorage.getItem('groovelab_school_id') || localStorage.getItem('campus_school_id')) : null);
+    if (targetSchoolId) {
+      try {
+        const overridesStr = typeof window !== 'undefined' ? localStorage.getItem('groovelab_school_overrides') : null;
+        const overrides = overridesStr ? JSON.parse(overridesStr) : {};
+        const schoolObj = overrides[targetSchoolId] || {};
+        const storageUsed = Number(schoolObj.storage_used_bytes || 0);
+        const storageAddon = Number(schoolObj.storage_addon_gb || 0);
+        const totalCapBytes = (1.0 + storageAddon) * 1024 * 1024 * 1024;
+        if (storageUsed > 0 && storageUsed >= totalCapBytes) {
+          alert('Der Audio-Tresor deiner Musikschule hat das Speichervolumen erreicht. Neue Aufnahmen sind vorübergehend pausiert. Bitte wende dich an die Schulleitung für eine Speichererweiterung oder lösche alte Aufnahmen.');
+          return;
+        }
+      } catch (e) {}
+    }
     let durationInSeconds = 0;
     try {
       const stream = await navigator.mediaDevices.getUserMedia({

@@ -16786,74 +16786,88 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                     
                     if (usagePct < 80) return null;
 
+                    const isFull = usagePct >= 100;
                     const isCritical = usagePct >= 95;
                     const formattedUsed = usedBytes > 0 && usedGb < 0.10 
                       ? `${usedMb.toFixed(1).replace('.', ',')} MB` 
                       : `${usedGb.toFixed(2).replace('.', ',')} GB`;
-                    const nextTierGb = activeAddonGb < 5 ? 5 : activeAddonGb < 10 ? 10 : activeAddonGb < 20 ? 20 : activeAddonGb < 50 ? 50 : activeAddonGb < 100 ? 100 : 250;
+                    const nextTierGb = activeAddonGb < 10 ? 10 : activeAddonGb < 25 ? 25 : activeAddonGb < 50 ? 50 : activeAddonGb < 100 ? 100 : 250;
 
                     return (
                       <div style={{
-                        background: isCritical ? 'linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)' : 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)',
-                        border: isCritical ? '1.5px solid #fecaca' : '1.5px solid #fde68a',
+                        background: isFull 
+                          ? 'linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)' 
+                          : isCritical 
+                            ? 'linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%)' 
+                            : 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)',
+                        border: isFull ? '1.5px solid #f87171' : isCritical ? '1.5px solid #fdba74' : '1.5px solid #fde68a',
                         borderRadius: '24px',
                         padding: '20px 24px',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'space-between',
                         gap: '16px',
-                        boxShadow: isCritical ? '0 10px 25px -5px rgba(239, 68, 68, 0.12)' : '0 10px 25px -5px rgba(245, 158, 11, 0.10)'
+                        boxShadow: isFull 
+                          ? '0 10px 25px -5px rgba(239, 68, 68, 0.16)' 
+                          : '0 10px 25px -5px rgba(245, 158, 11, 0.10)'
                       }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                           <div style={{
-                            background: isCritical ? '#fee2e2' : '#fef3c7',
+                            background: isFull ? '#fee2e2' : isCritical ? '#ffedd5' : '#fef3c7',
                             borderRadius: '16px',
                             padding: '12px',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            border: isCritical ? '1px solid #fca5a5' : '1px solid #fcd34d'
+                            border: isFull ? '1px solid #fca5a5' : isCritical ? '1px solid #fed7aa' : '1px solid #fcd34d'
                           }}>
-                            <HardDrive size={24} style={{ color: isCritical ? '#dc2626' : '#d97706' }} />
+                            <HardDrive size={24} style={{ color: isFull ? '#dc2626' : isCritical ? '#ea580c' : '#d97706' }} />
                           </div>
                           <div>
-                            <strong style={{ display: 'block', fontSize: '1rem', color: isCritical ? '#991b1b' : '#92400e', marginBottom: '4px' }}>
-                              {isCritical 
-                                ? `🚨 Kritische Speicherauslastung: Audio-Tresor zu ${Math.round(usagePct)}% belegt!`
-                                : `⚠️ Speicher-Vorwarnung: Audio-Tresor zu ${Math.round(usagePct)}% belegt`
+                            <strong style={{ display: 'block', fontSize: '1rem', color: isFull ? '#991b1b' : isCritical ? '#9a3412' : '#92400e', marginBottom: '4px' }}>
+                              {isFull
+                                ? `🚨 Audio-Tresor voll: 100% Speicher belegt (${formattedUsed} von ${currentTotalCapGb} GB)`
+                                : isCritical 
+                                  ? `⚠️ Kritische Speicherauslastung: Audio-Tresor zu ${Math.round(usagePct)}% belegt!`
+                                  : `⚠️ Speicher-Vorwarnung: Audio-Tresor zu ${Math.round(usagePct)}% belegt`
                               }
                             </strong>
-                            <span style={{ fontSize: '0.84rem', color: isCritical ? '#7f1d1d' : '#78350f', lineHeight: '1.4' }}>
-                              {formattedUsed} von {currentTotalCapGb} GB belegt. {isCritical 
-                                ? 'Der 5% Kulanz-Puffer ist aktiv. Bitte erweitere jetzt dein Speichervolumen, um Unterbrechungen im Unterricht zu vermeiden.' 
-                                : 'Erweitere rechtzeitig dein Speichervolumen, damit Schüler und Lehrkräfte weiterhin nahtlos in Studio-Qualität aufnehmen können.'
+                            <span style={{ fontSize: '0.84rem', color: isFull ? '#7f1d1d' : isCritical ? '#7c2d12' : '#78350f', lineHeight: '1.4' }}>
+                              {formattedUsed} von {currentTotalCapGb} GB belegt. {isFull
+                                ? 'Neue Audioaufnahmen sind vorübergehend pausiert. Alle bestehenden Aufnahmen bleiben 100% geschützt und abspielbar.'
+                                : isCritical 
+                                  ? 'Der Kulanz-Puffer ist aktiv. Bitte erweitere jetzt dein Speichervolumen, um Unterbrechungen im Unterricht zu vermeiden.' 
+                                  : 'Erweitere rechtzeitig dein Speichervolumen, damit Schüler und Lehrkräfte weiterhin nahtlos in Studio-Qualität aufnehmen können.'
                               }
                             </span>
                           </div>
                         </div>
-                        <button
-                          onClick={() => {
-                            setSelectedStorageAddonGb(nextTierGb);
-                            setShowStorageManagerModal(true);
-                          }}
-                          style={{
-                            background: isCritical ? '#dc2626' : '#d97706',
-                            color: '#ffffff',
-                            border: 'none',
-                            borderRadius: '12px',
-                            padding: '10px 20px',
-                            fontWeight: 800,
-                            fontSize: '0.84rem',
-                            cursor: 'pointer',
-                            whiteSpace: 'nowrap',
-                            boxShadow: isCritical ? '0 4px 12px rgba(220, 38, 38, 0.25)' : '0 4px 12px rgba(217, 119, 6, 0.25)',
-                            transition: 'transform 0.15s, background-color 0.15s'
-                          }}
-                          onMouseEnter={(e) => e.currentTarget.style.background = isCritical ? '#b91c1c' : '#b45309'}
-                          onMouseLeave={(e) => e.currentTarget.style.background = isCritical ? '#dc2626' : '#d97706'}
-                        >
-                          {isCritical ? `Jetzt auf +${nextTierGb} GB erweitern` : 'Speicher anpassen'}
-                        </button>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedStorageAddonGb(nextTierGb);
+                              setShowStorageManagerModal(true);
+                            }}
+                            style={{
+                              background: isFull ? '#dc2626' : isCritical ? '#ea580c' : '#d97706',
+                              color: '#ffffff',
+                              border: 'none',
+                              borderRadius: '12px',
+                              padding: '10px 18px',
+                              fontWeight: 800,
+                              fontSize: '0.84rem',
+                              cursor: 'pointer',
+                              whiteSpace: 'nowrap',
+                              boxShadow: isFull ? '0 4px 12px rgba(220, 38, 38, 0.25)' : '0 4px 12px rgba(217, 119, 6, 0.25)',
+                              transition: 'transform 0.15s, background-color 0.15s'
+                            }}
+                            onMouseEnter={(e) => e.currentTarget.style.background = isFull ? '#b91c1c' : isCritical ? '#c2410c' : '#b45309'}
+                            onMouseLeave={(e) => e.currentTarget.style.background = isFull ? '#dc2626' : isCritical ? '#ea580c' : '#d97706'}
+                          >
+                            {isFull ? `🚀 Auf +${nextTierGb} GB erweitern` : `Auf +${nextTierGb} GB erweitern`}
+                          </button>
+                        </div>
                       </div>
                     );
                   })()}

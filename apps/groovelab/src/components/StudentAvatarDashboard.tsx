@@ -3644,6 +3644,24 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       return;
     }
 
+    // 🎙️ Check if school Audio-Tresor storage quota is exceeded
+    const studentSchoolId = (studentUser as any)?.school_id;
+    if (studentSchoolId) {
+      try {
+        const overridesStr = typeof window !== 'undefined' ? localStorage.getItem('groovelab_school_overrides') : null;
+        const overrides = overridesStr ? JSON.parse(overridesStr) : {};
+        const schoolObj = overrides[studentSchoolId] || {};
+        const storageUsed = Number(schoolObj.storage_used_bytes || 0);
+        const storageAddon = Number(schoolObj.storage_addon_gb || 0);
+        const totalCapBytes = (1.0 + storageAddon) * 1024 * 1024 * 1024;
+        if (storageUsed > 0 && storageUsed >= totalCapBytes) {
+          alert('Der Audio-Tresor deiner Musikschule hat das Speicherlimit erreicht. Bitte wende dich an deine Lehrkraft.');
+          setShowJuniorRecordModal(false);
+          return;
+        }
+      } catch (e) {}
+    }
+
     // 1. Request microphone permission FIRST before starting any visual countdown
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ 
