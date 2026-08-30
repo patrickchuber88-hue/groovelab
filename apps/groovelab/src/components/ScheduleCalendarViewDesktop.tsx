@@ -27,7 +27,8 @@ import {
   MoreVertical,
   ArrowLeftRight,
   RefreshCw,
-  UserCheck
+  UserCheck,
+  Sparkles
 } from 'lucide-react';
 import { useRealNamesVisibility, maskLastName, formatTeacherFullName, formatDisplaySubjectOrInstrument } from '../utils/nameHelper';
 import { MeisterwerkDocumentationModal, checkIsAudioTresorActive } from './MeisterwerkDocumentationModal';
@@ -4731,24 +4732,129 @@ export function ScheduleCalendarViewDesktop({
         </div>
       </div>
 
-      {!hasSubmittedSchedule && (currentUserRole === 'admin' || currentUserRole === 'secretary') && (
-        <div style={{
-          background: 'rgba(245, 158, 11, 0.08)',
-          border: '1px solid rgba(245, 158, 11, 0.15)',
-          color: '#b45309',
-          borderRadius: '16px',
-          padding: '12px 20px',
-          fontSize: '0.82rem',
-          fontWeight: 650,
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          boxShadow: '0 2px 8px rgba(245, 158, 11, 0.03)'
-        }}>
-          <AlertCircle size={16} />
-          <span>Diese Lehrkraft hat ihren Stundenplan noch nicht eingereicht (nur Entwurf). Die Raumzuteilung ist gesperrt.</span>
-        </div>
-      )}
+      {/* Smart Context-Sensitive Banner */}
+      {(() => {
+        const hasAnySchedules = (cachedWeekSchedules || []).some((s: any) => (userId ? s.teacher_id === userId : true));
+        const isSelfView = !selectedTeacherId || selectedTeacherId === userId;
+        const targetTeacher = teachers?.find((t: any) => t.id === (selectedTeacherId || userId));
+        const teacherName = targetTeacher ? (targetTeacher.name || `${targetTeacher.first_name} ${targetTeacher.last_name}`.trim()) : 'Diese Lehrkraft';
+
+        // Case 1: Empty board (0 lessons)
+        if (!hasAnySchedules) {
+          return (
+            <div style={{
+              background: 'linear-gradient(135deg, rgba(248, 250, 252, 0.95) 0%, rgba(241, 245, 249, 0.85) 100%)',
+              border: '1px solid #e2e8f0',
+              color: '#475569',
+              borderRadius: '16px',
+              padding: '12px 20px',
+              fontSize: '0.82rem',
+              fontWeight: 600,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '12px',
+              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.02)',
+              flexWrap: 'wrap'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Sparkles size={16} color="#34a853" />
+                <span>
+                  {isSelfView 
+                    ? 'Noch keine Unterrichtsstunden eingetragen. Nutze den Stundenplan-Designer, um deine ersten Unterrichtszeiten anzulegen.'
+                    : `Für ${teacherName} wurden noch keine Unterrichtsstunden im Stundenplan angelegt.`
+                  }
+                </span>
+              </div>
+              {isSelfView && setActiveTab && (
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('designer')}
+                  style={{
+                    background: '#34a853',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '10px',
+                    padding: '6px 14px',
+                    fontSize: '0.76rem',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    transition: 'all 0.2s',
+                    boxShadow: '0 2px 6px rgba(52, 168, 83, 0.25)'
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.filter = 'brightness(1.05)'}
+                  onMouseLeave={e => e.currentTarget.style.filter = 'none'}
+                >
+                  <span>Zum Stundenplan Designer</span>
+                  <ChevronRight size={13} />
+                </button>
+              )}
+            </div>
+          );
+        }
+
+        // Case 2: Draft exists but not submitted yet
+        if (!hasSubmittedSchedule && (currentUserRole === 'admin' || currentUserRole === 'secretary' || isSelfView)) {
+          return (
+            <div style={{
+              background: 'rgba(245, 158, 11, 0.08)',
+              border: '1px solid rgba(245, 158, 11, 0.18)',
+              color: '#b45309',
+              borderRadius: '16px',
+              padding: '12px 20px',
+              fontSize: '0.82rem',
+              fontWeight: 650,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '12px',
+              boxShadow: '0 2px 8px rgba(245, 158, 11, 0.03)',
+              flexWrap: 'wrap'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <AlertCircle size={16} color="#d97706" />
+                <span>
+                  {isSelfView
+                    ? 'Dein Stundenplan befindet sich im Entwurfsmodus. Reiche ihn ein, um die finale Raumzuteilung zu aktivieren.'
+                    : `Der Stundenplan von ${teacherName} befindet sich noch im Entwurfsmodus.`
+                  }
+                </span>
+              </div>
+              {isSelfView && setActiveTab && (
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('designer')}
+                  style={{
+                    background: '#d97706',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '10px',
+                    padding: '6px 14px',
+                    fontSize: '0.76rem',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    transition: 'all 0.2s',
+                    boxShadow: '0 2px 6px rgba(217, 119, 6, 0.25)'
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.filter = 'brightness(1.05)'}
+                  onMouseLeave={e => e.currentTarget.style.filter = 'none'}
+                >
+                  <span>Im Designer einreichen</span>
+                  <ChevronRight size={13} />
+                </button>
+              )}
+            </div>
+          );
+        }
+
+        return null;
+      })()}
 
       <div style={{ position: 'relative' }}>
         

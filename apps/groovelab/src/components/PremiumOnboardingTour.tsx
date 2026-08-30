@@ -648,7 +648,7 @@ export function usePremiumOnboardingTour({ tourKey, steps, platformTheme = 'camp
     };
   }, []);
 
-  return { isTourActive, startTour, endTour, TourComponent };
+  return { isTourActive, currentTourStep, startTour, endTour, TourComponent };
 }
 
 export function TourStartButton({ onClick, platformTheme = 'campus' }: { onClick: () => void, platformTheme?: 'campus' | 'groovelab' | 'admin' }) {

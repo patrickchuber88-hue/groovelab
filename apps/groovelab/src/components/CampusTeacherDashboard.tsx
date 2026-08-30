@@ -33,7 +33,8 @@ import {
   Lightbulb,
   Printer,
   Mic,
-  KeyRound
+  KeyRound,
+  Timer
 } from 'lucide-react';
 import { useRealNamesVisibility, maskLastName, formatTeacherFullName } from '../utils/nameHelper';
 import { FeedbackHubModal } from './feedback/FeedbackHubModal';
@@ -2119,7 +2120,7 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
                 </div>
               </div>
 
-              {/* Card 2: Ø Übe-Streak (Green) */}
+              {/* Card 2: Ø Übe-Zeit (Green) */}
               <div style={{
                 position: 'relative', overflow: 'hidden',
                 background: 'linear-gradient(135deg, #34a853 0%, #34a853 100%)', color: 'white',
@@ -2130,14 +2131,15 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
                 border: '1px solid rgba(255, 255, 255, 0.12)'
               }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <span style={{ fontSize: '0.65rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Ø Übe-Streak</span>
+                  <span style={{ fontSize: '0.65rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Ø Übe-Zeit</span>
                   <div style={{ background: 'rgba(255,255,255,0.18)', padding: '5px', borderRadius: '9px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <Flame size={14} color="white" />
+                    <Timer size={14} color="white" />
                   </div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '6px' }}>
-                  <span style={{ fontSize: '1.6rem', fontWeight: 950, letterSpacing: '-0.02em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>0.0</span>
-                  <span style={{ fontSize: '0.7rem', fontWeight: 800, opacity: 0.85 }}>Tage</span>
+                  <span style={{ fontSize: '1.6rem', fontWeight: 950, letterSpacing: '-0.02em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>0</span>
+                  <span style={{ fontSize: '0.7rem', fontWeight: 800, opacity: 0.85 }}>Min</span>
+                  <span style={{ fontSize: '0.62rem', fontWeight: 700, opacity: 0.75, marginLeft: '2px' }}>/ Woche</span>
                 </div>
               </div>
 

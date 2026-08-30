@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback, useRef, lazy, Suspens
 import { MUSIC_QUOTES, getQuotesForAudience, getDailyQuote } from '@groovelab/shared';
 import { usePremiumOnboardingTour, TourStartButton, TourStep } from './PremiumOnboardingTour';
 import { supabase, deleteUserStorageAssets } from '../lib/supabase';
-import { Monitor, Music, Award, Box, Plus, AlertCircle, AlertTriangle, User, Users, Star, TrendingUp, Shield, Zap, Play, Info, CheckCircle, Check, Search, Trash2, Bell, X, Clock, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, LayoutDashboard, LogOut, Flame, GraduationCap, UserPlus, Edit3, Calendar, Activity, CheckSquare, Mail, Copy, Sparkles, BookOpen, MessageSquare, Lock, Palmtree, Heart, Settings, Key, Sun, ThumbsUp, Building2, Hourglass, Eye, EyeOff, ShieldCheck, CheckCheck, CalendarX, Send, Lightbulb, Download, Sliders, Mic, Disc, Radio } from 'lucide-react';
+import { Monitor, Music, Award, Box, Plus, AlertCircle, AlertTriangle, User, Users, Star, TrendingUp, Shield, Zap, Play, Info, CheckCircle, Check, Search, Trash2, Bell, X, Clock, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, LayoutDashboard, LogOut, Flame, GraduationCap, UserPlus, Edit3, Calendar, Activity, CheckSquare, Mail, Copy, Sparkles, BookOpen, MessageSquare, Lock, Palmtree, Heart, Settings, Key, Sun, ThumbsUp, Building2, Hourglass, Eye, EyeOff, ShieldCheck, CheckCheck, CalendarX, Send, Lightbulb, Download, Sliders, Mic, Disc, Radio, Timer } from 'lucide-react';
 import { TeacherDetailModal } from './TeacherDetailModal';
 import { StudentDetailModal } from './StudentDetailModal';
 import { checkIsAudioTresorActive } from '../domain/stickersAndTresor';
@@ -1327,7 +1327,7 @@ export function TeacherDashboard({
       case 'briefing':
         return [
           { title: "Dein Briefing 👋", description: "Hier findest du eine Übersicht über deinen Tag und alle wichtigen Kennzahlen.", selector: "tour-teacher-briefing" },
-          { title: "Kennzahlen 📊", description: "Diese Karten zeigen dir auf einen Blick, wie viele Schüler du heute hast und wie lange deine durchschnittliche Übe-Streak ist.", selector: "tour-teacher-kpis" },
+          { title: "Kennzahlen 📊", description: "Diese Karten zeigen dir auf einen Blick, wie viele Schüler du heute hast und wie viel deine Schüler im Schnitt diese Woche geübt haben.", selector: "tour-teacher-kpis" },
           { title: "Dein Tagesplan 📅", description: "Hier siehst du deine anstehenden Unterrichtstermine für heute.", selector: "tour-teacher-schedule" }
         ];
       case 'live':
@@ -1344,7 +1344,7 @@ export function TeacherDashboard({
     }
   }, [activeTab]);
 
-  const { TourComponent, startTour } = usePremiumOnboardingTour({
+  const { TourComponent, startTour, isTourActive, currentTourStep } = usePremiumOnboardingTour({
     tourKey: `campus_groovelab_tour_completed_${activeTab}_${userId}`,
     steps: tourSteps,
     platformTheme: activePlatform === 'campus' ? 'campus' : 'groovelab'
@@ -3038,6 +3038,31 @@ export function TeacherDashboard({
     return (totalStreak / activeTimelineStudents.length).toFixed(1);
   }, [briefingData?.timeline]);
 
+  const avgPracticeTime = useMemo(() => {
+    if (!briefingData?.timeline) return { value: '0', unit: 'Min' };
+    const activeTimelineStudents = briefingData.timeline.filter((s: any) => 
+      (s.student || (s.students && s.students.length > 0) || s.isGroup) && 
+      !s.is_room_booking &&
+      !s.isRoomBooking &&
+      s.status !== 'canceled_by_student' && 
+      s.status !== 'teacher_sick' && 
+      s.status !== 'cancelled' && 
+      s.status !== 'canceled_by_teacher_sick' && 
+      s.status !== 'rescheduled_away'
+    );
+    if (activeTimelineStudents.length === 0) return { value: '0', unit: 'Min' };
+    const totalMins = activeTimelineStudents.reduce((acc: number, s: any) => {
+      const studentObj = s.student || (s.students?.[0]);
+      const focusMins = studentObj?.weekly_focus_minutes || studentObj?.total_focus_minutes || (studentObj?.streakFlame ? studentObj.streakFlame * 15 : 0);
+      return acc + focusMins;
+    }, 0);
+    const avgMins = Math.round(totalMins / activeTimelineStudents.length);
+    if (avgMins >= 60) {
+      return { value: (avgMins / 60).toFixed(1), unit: 'Std' };
+    }
+    return { value: String(avgMins), unit: 'Min' };
+  }, [briefingData?.timeline]);
+
   const workloadMinutes = useMemo(() => {
     if (!briefingData?.timeline) return 0;
     // Calculate total minutes of teaching for unique time slots (excluding room bookings and cancellations)
@@ -3859,6 +3884,15 @@ export function TeacherDashboard({
   const isFreeDay = useMemo(() => {
     return !isWeekend && (!briefingData?.timeline || briefingData.timeline.length === 0);
   }, [isWeekend, briefingData?.timeline]);
+
+  const isTourDemoScheduleActive = useMemo(() => {
+    return Boolean(
+      isTourActive &&
+      activeTab === 'briefing' &&
+      currentTourStep === 2 &&
+      (isWeekend || isFreeDay || !briefingData?.timeline || briefingData.timeline.length === 0)
+    );
+  }, [isTourActive, activeTab, currentTourStep, isWeekend, isFreeDay, briefingData?.timeline]);
 
   // Stable daily choices (hellos, subtitles) based on date-based seed
   const dailyBriefingStableChoices = useMemo(() => {
@@ -5351,6 +5385,17 @@ export function TeacherDashboard({
               localStorage.setItem('campus_storage_addon_active', 'true');
               localStorage.setItem('groovelab_storage_addon_gb', String(sd.storage_addon_gb));
               localStorage.setItem('campus_storage_addon_gb', String(sd.storage_addon_gb));
+              localStorage.setItem(`groovelab_storage_addon_gb_${sd.id}`, String(sd.storage_addon_gb));
+              localStorage.setItem(`campus_storage_addon_gb_${sd.id}`, String(sd.storage_addon_gb));
+            } else {
+              localStorage.removeItem('groovelab_storage_addon_active');
+              localStorage.removeItem('campus_storage_addon_active');
+              localStorage.removeItem('groovelab_storage_addon_gb');
+              localStorage.removeItem('campus_storage_addon_gb');
+              localStorage.removeItem(`groovelab_storage_addon_gb_${sd.id}`);
+              localStorage.removeItem(`campus_storage_addon_gb_${sd.id}`);
+              localStorage.removeItem(`groovelab_storage_addon_active_${sd.id}`);
+              localStorage.removeItem(`campus_storage_addon_active_${sd.id}`);
             }
           }
         });
@@ -8223,7 +8268,121 @@ useEffect(() => {
   );
 
   const renderTagesplanWidget = () => (
-    !(isWeekend || isFreeDay) && (
+    isTourDemoScheduleActive ? (
+      <div id="tour-teacher-schedule" className="google-card animation-slide-up" style={{ 
+        flex: '1.2 1 450px', 
+        minWidth: '300px', 
+        padding: '20px 24px', 
+        borderRadius: '20px', 
+        border: '2px solid rgba(52, 168, 83, 0.4)', 
+        boxShadow: '0 12px 36px -4px rgba(52, 168, 83, 0.18)', 
+        background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)', 
+        boxSizing: 'border-box',
+        display: 'flex',
+        flexDirection: 'column',
+        maxHeight: '620px'
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <Clock size={20} color="#34a853" />
+            <strong style={{ fontSize: '1.05rem', fontWeight: 900, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Tagesplan – Unterrichte Heute</strong>
+          </div>
+          <span style={{
+            fontSize: '0.68rem',
+            fontWeight: 800,
+            padding: '4px 10px',
+            borderRadius: '100px',
+            background: '#e6f4ea',
+            color: '#34a853',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '4px',
+            border: '1px solid rgba(52, 168, 83, 0.25)'
+          }}>
+            <Sparkles size={11} />
+            Interaktive Vorschau
+          </span>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          {/* Demo Item 1 */}
+          <div style={{
+            background: '#ffffff',
+            border: '1px solid #e2e8f0',
+            borderRadius: '16px',
+            padding: '14px 16px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.03)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+              <div style={{
+                background: '#f1f5f9',
+                padding: '6px 10px',
+                borderRadius: '10px',
+                fontWeight: 900,
+                fontSize: '0.85rem',
+                color: '#0f172a',
+                fontFamily: 'monospace'
+              }}>
+                14:30
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontWeight: 900, fontSize: '0.95rem', color: '#0f172a' }}>Max M.</span>
+                  <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#16a34a', background: '#dcfce7', padding: '1px 6px', borderRadius: '6px' }}>45 Min</span>
+                </div>
+                <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600 }}>Akustische Gitarre • Raum 2</span>
+              </div>
+            </div>
+            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#475569', background: '#f8fafc', border: '1px solid #e2e8f0', padding: '4px 8px', borderRadius: '8px' }}>
+              📖 S. 14 Noten
+            </span>
+          </div>
+
+          {/* Demo Item 2 */}
+          <div style={{
+            background: '#ffffff',
+            border: '1px solid #e2e8f0',
+            borderRadius: '16px',
+            padding: '14px 16px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.03)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+              <div style={{
+                background: '#f1f5f9',
+                padding: '6px 10px',
+                borderRadius: '10px',
+                fontWeight: 900,
+                fontSize: '0.85rem',
+                color: '#0f172a',
+                fontFamily: 'monospace'
+              }}>
+                15:15
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontWeight: 900, fontSize: '0.95rem', color: '#0f172a' }}>Sophie B.</span>
+                  <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#16a34a', background: '#dcfce7', padding: '1px 6px', borderRadius: '6px' }}>30 Min</span>
+                </div>
+                <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600 }}>Gesang & Vocal Lab • Studio 1</span>
+              </div>
+            </div>
+            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#34a853', background: '#e6f4ea', border: '1px solid rgba(52, 168, 83, 0.2)', padding: '4px 8px', borderRadius: '8px' }}>
+              🎙️ Audio bereit
+            </span>
+          </div>
+        </div>
+
+        <div style={{ marginTop: '14px', padding: '10px 14px', background: 'rgba(52, 168, 83, 0.08)', borderRadius: '12px', border: '1px dashed rgba(52, 168, 83, 0.3)', fontSize: '0.74rem', color: '#15803d', fontWeight: 700, textAlign: 'center' }}>
+          💡 Hier erscheinen automatisch deine Schüler, sobald Stunden im Stundenplan eingetragen sind.
+        </div>
+      </div>
+    ) : !(isWeekend || isFreeDay) && (
       teacher?.sick_until && !bypassSickView ? (
         <div style={{
           flex: '1.2 1 450px',
@@ -8252,7 +8411,7 @@ useEffect(() => {
            </p>
         </div>
       ) : (
-        <div className="google-card" style={{ 
+        <div id="tour-teacher-schedule" className="google-card" style={{ 
           flex: isFreeDay ? '0.8 1 300px' : '1.2 1 450px', 
           minWidth: '300px', 
           padding: '20px 24px', 
@@ -11397,7 +11556,7 @@ useEffect(() => {
                                 </div>
                               </div>
 
-                              {/* Card 2: Ø Übe-Streak Heute */}
+                              {/* Card 2: Ø Übe-Zeit Heute */}
                               <div style={{
                                 position: 'relative', overflow: 'hidden',
                                 background: 'linear-gradient(135deg, #34a853 0%, #34a853 100%)', color: 'white',
@@ -11408,14 +11567,15 @@ useEffect(() => {
                                 border: '1px solid rgba(255, 255, 255, 0.1)'
                               }} className="hover-scale">
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                                  <span style={{ fontSize: '0.68rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Ø Übe-Streak</span>
+                                  <span style={{ fontSize: '0.68rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Ø Übe-Zeit</span>
                                   <div style={{ background: 'rgba(255, 255, 255, 0.15)', padding: '6px', borderRadius: '10px' }}>
-                                    <Flame size={14} color="white" />
+                                    <Timer size={14} color="white" />
                                   </div>
                                 </div>
                                 <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '8px' }}>
-                                  <span style={{ fontSize: '1.6rem', fontWeight: 950, letterSpacing: '-0.02em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{avgStreak}</span>
-                                  <span style={{ fontSize: '0.72rem', fontWeight: 800, opacity: 0.9 }}>Tage</span>
+                                  <span style={{ fontSize: '1.6rem', fontWeight: 950, letterSpacing: '-0.02em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{avgPracticeTime.value}</span>
+                                  <span style={{ fontSize: '0.72rem', fontWeight: 800, opacity: 0.9 }}>{avgPracticeTime.unit}</span>
+                                  <span style={{ fontSize: '0.65rem', fontWeight: 700, opacity: 0.75, marginLeft: '2px' }}>/ Woche</span>
                                 </div>
                               </div>
 
@@ -11503,7 +11663,7 @@ useEffect(() => {
                         </div>
                       </div>
 
-                      {/* Card 2: Ø Übe-Streak Heute */}
+                      {/* Card 2: Ø Übe-Zeit Heute */}
                       <div style={{
                         position: 'relative', overflow: 'hidden',
                         background: 'linear-gradient(135deg, #34a853 0%, #34a853 100%)', color: 'white',
@@ -11514,14 +11674,15 @@ useEffect(() => {
                         border: '1px solid rgba(255, 255, 255, 0.1)'
                       }} className="hover-scale">
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                          <span style={{ fontSize: '0.68rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Ø Übe-Streak</span>
+                          <span style={{ fontSize: '0.68rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Ø Übe-Zeit</span>
                           <div style={{ background: 'rgba(255, 255, 255, 0.15)', padding: '6px', borderRadius: '10px' }}>
-                            <Flame size={14} color="white" />
+                            <Timer size={14} color="white" />
                           </div>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '8px' }}>
-                          <span style={{ fontSize: '1.6rem', fontWeight: 950, letterSpacing: '-0.02em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{avgStreak}</span>
-                          <span style={{ fontSize: '0.72rem', fontWeight: 800, opacity: 0.9 }}>Tage</span>
+                          <span style={{ fontSize: '1.6rem', fontWeight: 950, letterSpacing: '-0.02em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{avgPracticeTime.value}</span>
+                          <span style={{ fontSize: '0.72rem', fontWeight: 800, opacity: 0.9 }}>{avgPracticeTime.unit}</span>
+                          <span style={{ fontSize: '0.65rem', fontWeight: 700, opacity: 0.75, marginLeft: '2px' }}>/ Woche</span>
                         </div>
                       </div>
 
@@ -11807,7 +11968,122 @@ useEffect(() => {
                     </div>
 
                     {/* RIGHT COLUMN: TAGESPLAN */}
-                    {!(isWeekend || isFreeDay) && (
+                    {isTourDemoScheduleActive ? (
+                      <div id="tour-teacher-schedule" className="google-card animation-slide-up" style={{ 
+                        flex: '1.2 1 450px', 
+                        minWidth: '300px', 
+                        padding: '20px 24px', 
+                        borderRadius: '24px', 
+                        border: '2px solid rgba(52, 168, 83, 0.4)', 
+                        boxShadow: '0 12px 36px -4px rgba(52, 168, 83, 0.18)', 
+                        background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)', 
+                        boxSizing: 'border-box',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        height: '100%',
+                        maxHeight: windowWidth >= 768 ? '700px' : undefined
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', color: '#1f2937' }}>
+                            <Clock size={20} color="#34a853" />
+                            <strong style={{ fontSize: '1.05rem', fontWeight: 900, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Tagesplan – Unterrichte Heute</strong>
+                          </div>
+                          <span style={{
+                            fontSize: '0.68rem',
+                            fontWeight: 800,
+                            padding: '4px 10px',
+                            borderRadius: '100px',
+                            background: '#e6f4ea',
+                            color: '#34a853',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            border: '1px solid rgba(52, 168, 83, 0.25)'
+                          }}>
+                            <Sparkles size={11} />
+                            Interaktive Vorschau
+                          </span>
+                        </div>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                          {/* Demo Item 1 */}
+                          <div style={{
+                            background: '#ffffff',
+                            border: '1px solid #e2e8f0',
+                            borderRadius: '16px',
+                            padding: '14px 16px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            boxShadow: '0 2px 8px rgba(0,0,0,0.03)'
+                          }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                              <div style={{
+                                background: '#f1f5f9',
+                                padding: '6px 10px',
+                                borderRadius: '10px',
+                                fontWeight: 900,
+                                fontSize: '0.85rem',
+                                color: '#0f172a',
+                                fontFamily: 'monospace'
+                              }}>
+                                14:30
+                              </div>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  <span style={{ fontWeight: 900, fontSize: '0.95rem', color: '#0f172a' }}>Max M.</span>
+                                  <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#16a34a', background: '#dcfce7', padding: '1px 6px', borderRadius: '6px' }}>45 Min</span>
+                                </div>
+                                <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600 }}>Akustische Gitarre • Raum 2</span>
+                              </div>
+                            </div>
+                            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#475569', background: '#f8fafc', border: '1px solid #e2e8f0', padding: '4px 8px', borderRadius: '8px' }}>
+                              📖 S. 14 Noten
+                            </span>
+                          </div>
+
+                          {/* Demo Item 2 */}
+                          <div style={{
+                            background: '#ffffff',
+                            border: '1px solid #e2e8f0',
+                            borderRadius: '16px',
+                            padding: '14px 16px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            boxShadow: '0 2px 8px rgba(0,0,0,0.03)'
+                          }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                              <div style={{
+                                background: '#f1f5f9',
+                                padding: '6px 10px',
+                                borderRadius: '10px',
+                                fontWeight: 900,
+                                fontSize: '0.85rem',
+                                color: '#0f172a',
+                                fontFamily: 'monospace'
+                              }}>
+                                15:15
+                              </div>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  <span style={{ fontWeight: 900, fontSize: '0.95rem', color: '#0f172a' }}>Sophie B.</span>
+                                  <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#16a34a', background: '#dcfce7', padding: '1px 6px', borderRadius: '6px' }}>30 Min</span>
+                                </div>
+                                <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600 }}>Gesang & Vocal Lab • Studio 1</span>
+                              </div>
+                            </div>
+                            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#34a853', background: '#e6f4ea', border: '1px solid rgba(52, 168, 83, 0.2)', padding: '4px 8px', borderRadius: '8px' }}>
+                              🎙️ Audio bereit
+                            </span>
+                          </div>
+                        </div>
+
+                        <div style={{ marginTop: '16px', padding: '10px 14px', background: 'rgba(52, 168, 83, 0.08)', borderRadius: '12px', border: '1px dashed rgba(52, 168, 83, 0.3)', fontSize: '0.74rem', color: '#15803d', fontWeight: 700, textAlign: 'center' }}>
+                          💡 Hier erscheinen automatisch deine Schüler, sobald Stunden im Stundenplan eingetragen sind.
+                        </div>
+                      </div>
+                    ) : !(isWeekend || isFreeDay) && (
                       teacher?.sick_until && !bypassSickView ? (
                       <div style={{
                         flex: '1.2 1 450px',
@@ -11836,7 +12112,7 @@ useEffect(() => {
                          </p>
                       </div>
                     ) : (
-                      <div className="google-card" style={{ 
+                      <div id="tour-teacher-schedule" className="google-card" style={{ 
                         flex: isFreeDay ? '0.8 1 300px' : '1.2 1 450px', 
                         minWidth: '300px', 
                         padding: '20px 24px', 

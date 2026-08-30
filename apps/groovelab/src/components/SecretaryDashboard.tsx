@@ -2792,7 +2792,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
   const groovelabActivationFeeTotal_global = activeGroovelabStudentsCount_global * effectiveSchoolRates.priceStudent;
   const passiveStudentFeeTotal_global = passiveStudentsCount_global * 0.09;
   const teacherServiceFeeTotal_global = billableTeachersCount * effectiveSchoolRates.priceTeacher;
-  const storageAddonFee_global = selectedStorageAddonFee || Number(currentSchoolProfile?.storage_addon_monthly_fee || 0);
+  const storageAddonFee_global = selectedStorageAddonGb > 0 ? (selectedStorageAddonFee || Number(currentSchoolProfile?.storage_addon_monthly_fee || 0)) : 0;
 
   const baseB2B_global = subscriptionBypass
     ? 0
@@ -4035,6 +4035,17 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
           localStorage.setItem('campus_storage_addon_active', 'true');
           localStorage.setItem('groovelab_storage_addon_gb', String(schoolData.storage_addon_gb));
           localStorage.setItem('campus_storage_addon_gb', String(schoolData.storage_addon_gb));
+          localStorage.setItem(`groovelab_storage_addon_gb_${schoolId}`, String(schoolData.storage_addon_gb));
+          localStorage.setItem(`campus_storage_addon_gb_${schoolId}`, String(schoolData.storage_addon_gb));
+        } else {
+          localStorage.removeItem('groovelab_storage_addon_active');
+          localStorage.removeItem('campus_storage_addon_active');
+          localStorage.removeItem('groovelab_storage_addon_gb');
+          localStorage.removeItem('campus_storage_addon_gb');
+          localStorage.removeItem(`groovelab_storage_addon_gb_${schoolId}`);
+          localStorage.removeItem(`campus_storage_addon_gb_${schoolId}`);
+          localStorage.removeItem(`groovelab_storage_addon_active_${schoolId}`);
+          localStorage.removeItem(`campus_storage_addon_active_${schoolId}`);
         }
         setSchoolName(schoolData.name);
         setSchoolSubdomain(schoolData.subdomain || '');
@@ -4088,11 +4099,6 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
         setGlCoachModerationRequired(op.gl_coach_moderation_required === true);
         setGlJamRecordingCompression(op.gl_jam_recording_compression !== false);
 
-        setSchoolZipCode(schoolData.zip_code || '');
-        setSchoolCity(schoolData.city || '');
-        setSchoolStreet(schoolData.street || '');
-        setSchoolHouseNumber(schoolData.house_number || '');
-        setSchoolPhoneNumber(schoolData.phone_number || '');
         setSchoolEmail(schoolData.email || '');
         setEditColor(schoolData.primary_color || '#1a73e8');
         const dbIsBooked = schoolData.is_billing_booked === true;
@@ -4106,11 +4112,11 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
         setSubscriptionBypass(isSchoolBypassActive(schoolData));
 
         const storageGbFromDb = Number(schoolData.storage_addon_gb || 0);
-        const storageGbFromLocal = typeof window !== 'undefined' ? Number(localStorage.getItem(`groovelab_storage_addon_gb_${schoolId}`) || localStorage.getItem('groovelab_storage_addon_gb') || 0) : 0;
+        const storageGbFromLocal = typeof window !== 'undefined' ? Number(localStorage.getItem(`groovelab_storage_addon_gb_${schoolId}`) || 0) : 0;
         const effectiveStorageGb = storageGbFromDb > 0 ? storageGbFromDb : storageGbFromLocal;
         const storageFeeFromDb = Number(schoolData.storage_addon_monthly_fee || 0);
         const storageFeeDefault = (effectiveStorageGb === 5 ? 1.49 : effectiveStorageGb === 10 ? 1.99 : effectiveStorageGb === 20 ? 3.99 : effectiveStorageGb === 25 ? 3.99 : effectiveStorageGb === 50 ? 6.99 : effectiveStorageGb === 100 ? 11.99 : effectiveStorageGb === 250 ? 24.99 : 0);
-        const effectiveStorageFee = storageFeeFromDb > 0 ? storageFeeFromDb : storageFeeDefault;
+        const effectiveStorageFee = storageFeeFromDb > 0 ? storageFeeFromDb : (effectiveStorageGb > 0 ? storageFeeDefault : 0);
 
         setSelectedStorageAddonGb(effectiveStorageGb);
         setSelectedStorageAddonFee(effectiveStorageFee);
@@ -27472,9 +27478,9 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                     padding: '20px',
                                     borderRadius: '20px',
                                     border: '2px solid',
-                                    background: '#ffffff',
-                                    borderColor: hasCampusSub ? '#34a853' : 'rgba(0,0,0,0.06)',
-                                    boxShadow: hasCampusSub ? '0 10px 25px rgba(52, 168, 83, 0.05)' : 'none',
+                                    background: hasCampusSub ? '#f0fdf4' : '#ffffff',
+                                    borderColor: hasCampusSub ? '#34a853' : '#e2e8f0',
+                                    boxShadow: hasCampusSub ? '0 10px 25px rgba(52, 168, 83, 0.08)' : '0 2px 8px rgba(0,0,0,0.02)',
                                     cursor: 'pointer',
                                     transition: 'all 0.2s',
                                     minHeight: '170px'
@@ -27487,17 +27493,18 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                         Campus
                                       </strong>
                                       <span style={{
-                                        width: '18px',
-                                        height: '18px',
+                                        width: '20px',
+                                        height: '20px',
                                         borderRadius: '50%',
                                         border: '2px solid',
                                         borderColor: hasCampusSub ? '#34a853' : '#cbd5e1',
-                                        background: hasCampusSub ? '#34a853' : 'transparent',
+                                        background: hasCampusSub ? '#34a853' : '#f8fafc',
                                         display: 'inline-flex',
                                         alignItems: 'center',
                                         justifyContent: 'center',
                                         color: '#ffffff',
-                                        fontSize: '0.65rem'
+                                        fontSize: '0.7rem',
+                                        fontWeight: 900
                                       }}>
                                         {hasCampusSub && '✓'}
                                       </span>
@@ -27526,9 +27533,9 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                     padding: '20px',
                                     borderRadius: '20px',
                                     border: '2px solid',
-                                    background: '#ffffff',
-                                    borderColor: hasGroovelabSub ? '#eab308' : 'rgba(0,0,0,0.06)',
-                                    boxShadow: hasGroovelabSub ? '0 10px 25px rgba(234, 179, 8, 0.05)' : 'none',
+                                    background: hasGroovelabSub ? '#fefce8' : '#ffffff',
+                                    borderColor: hasGroovelabSub ? '#eab308' : '#e2e8f0',
+                                    boxShadow: hasGroovelabSub ? '0 10px 25px rgba(234, 179, 8, 0.08)' : '0 2px 8px rgba(0,0,0,0.02)',
                                     cursor: 'pointer',
                                     transition: 'all 0.2s',
                                     minHeight: '170px'
@@ -27541,17 +27548,18 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                         GrooveLab
                                       </strong>
                                       <span style={{
-                                        width: '18px',
-                                        height: '18px',
+                                        width: '20px',
+                                        height: '20px',
                                         borderRadius: '50%',
                                         border: '2px solid',
                                         borderColor: hasGroovelabSub ? '#eab308' : '#cbd5e1',
-                                        background: hasGroovelabSub ? '#eab308' : 'transparent',
+                                        background: hasGroovelabSub ? '#eab308' : '#f8fafc',
                                         display: 'inline-flex',
                                         alignItems: 'center',
                                         justifyContent: 'center',
                                         color: '#ffffff',
-                                        fontSize: '0.65rem'
+                                        fontSize: '0.7rem',
+                                        fontWeight: 900
                                       }}>
                                         {hasGroovelabSub && '✓'}
                                       </span>
@@ -27580,10 +27588,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                               <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '8px' }}>
                                 <button 
                                   onClick={() => {
-                                    if (!hasCampusSub && !hasGroovelabSub) {
-                                      setHasCampusSub(true);
-                                      setHasGroovelabSub(true);
-                                    }
+                                    if (!hasCampusSub && !hasGroovelabSub) return;
                                     setCheckoutStep(2);
                                   }}
                                   disabled={!hasCampusSub && !hasGroovelabSub}
@@ -27603,8 +27608,8 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                     transition: 'all 0.2s'
                                   }}
                                 >
-                                  Weiter zum Kostenträger
-                                  <span>➔</span>
+                                  {!hasCampusSub && !hasGroovelabSub ? 'Wähle mindestens 1 Modul' : 'Weiter zum Kostenträger'}
+                                  {(hasCampusSub || hasGroovelabSub) && <span>➔</span>}
                                 </button>
                               </div>
                             </div>
@@ -28507,7 +28512,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                             const passiveStudentCost = (billingPayer === 'student' && studentBillingOption === 'student_partial')
                               ? (students.length * 0.09)
                               : (passiveStudents * 0.09);
-                            const storageAddonCost = selectedStorageAddonFee || Number(currentSchoolProfile?.storage_addon_monthly_fee || 0);
+                            const storageAddonCost = selectedStorageAddonGb > 0 ? (selectedStorageAddonFee || Number(currentSchoolProfile?.storage_addon_monthly_fee || 0)) : 0;
                             const totalInvoiceA_monthly = baseModuleCost + teacherCost + passiveStudentCost + storageAddonCost;
                             const totalInvoiceA_restYear = totalInvoiceA_monthly * remainingMonths;
 
