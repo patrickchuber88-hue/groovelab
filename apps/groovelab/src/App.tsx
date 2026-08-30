@@ -12221,7 +12221,7 @@ function App() {
               key={`admin-dashboard-${activePlatform}`}
               userId={user.id} 
               onLogout={handleLogout} 
-              forceTab={['schedule', 'students', 'team', 'rooms', 'songs', 'stats', 'gallery', 'setup', 'bands', 'events', 'briefing', showMissionsFeature ? 'missions' : ''].includes(activeStudentTab) ? activeStudentTab : undefined}
+              forceTab={['schedule', 'students', 'team', 'rooms', 'songs', 'stats', 'gallery', 'setup', 'bands', 'events', 'briefing', 'live', showMissionsFeature ? 'missions' : ''].includes(activeStudentTab) ? activeStudentTab : undefined}
               activePlatform={activePlatform as any}
               onTabChange={(tabId: any) => setActiveStudentTab(tabId)}
               onSwitchPlatform={(platform) => setActivePlatform(platform)}

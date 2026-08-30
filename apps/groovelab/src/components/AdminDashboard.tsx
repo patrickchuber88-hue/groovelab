@@ -4892,7 +4892,7 @@ export function AdminDashboard({
         hideSidebar={true}
         viewMode="admin" 
         activePlatform={activePlatform as any}
-        initialTab={activePlatform === 'campus' ? 'briefing' : 'live'}
+        initialTab={activeTab === 'live' ? 'live' : (activeTab === 'briefing' ? 'briefing' : (activePlatform === 'campus' ? 'briefing' : 'live'))}
         onTabChange={(id) => onTabChange?.(id)}
         isSidebarCollapsed={isSidebarCollapsed}
         setIsSidebarCollapsed={setIsSidebarCollapsed}

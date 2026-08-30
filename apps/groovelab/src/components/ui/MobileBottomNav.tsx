@@ -167,7 +167,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
       // Teacher / Admin / Secretary
       if (activePlatform === 'campus') {
         return [
-          { id: 'live', label: 'Briefing', icon: Monitor },
+          { id: 'briefing', label: 'Briefing', icon: Monitor },
           { id: 'schedule', label: 'Stundenplan', icon: Calendar },
           { id: 'events', label: 'Termine', icon: Calendar },
           { id: 'messages', label: 'Nachrichten', icon: Mail, badge: unreadCount },
@@ -188,7 +188,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
           { id: 'songs', label: 'Songs', icon: Library },
           { id: 'bands', label: 'Bands', icon: Box },
           { id: 'stats', label: 'Statistik', icon: BarChart2 },
-          { id: 'id_gallery', label: 'ID Galerie', icon: QrCode },
+          { id: 'gallery', label: 'ID Galerie', icon: QrCode },
           { id: 'setup', label: 'Einstellungen', icon: Settings },
         ];
       }
@@ -226,7 +226,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
     } else {
       return activePlatform === 'campus'
         ? [
-            { id: 'live', label: 'Briefing', icon: Monitor },
+            { id: 'briefing', label: 'Briefing', icon: Monitor },
             { id: 'schedule', label: 'Stundenplan', icon: Calendar },
             { id: 'songs', label: 'Mediathek', icon: Library },
             { id: 'messages', label: 'Chat', icon: Mail, badge: unreadCount }
