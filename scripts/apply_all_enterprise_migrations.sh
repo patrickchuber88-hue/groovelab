@@ -35,6 +35,7 @@ scp supabase/migrations/297_tier1_enterprise_goldstandard_security.sql \
     supabase/migrations/307_enterprise_privilege_timeout_and_audit.sql \
     supabase/migrations/308_enterprise_force_rls_suite.sql \
     supabase/migrations/309_session_leases_and_master_auth_resolver.sql \
+    supabase/migrations/310_harden_session_leases_policy.sql \
     "$SERVER:$REMOTE_TEMP/"
 
 # 4. Führe Migrationen nacheinander in supabase-db aus
@@ -77,8 +78,14 @@ ssh "$SERVER" "docker exec -i supabase-db psql -U postgres postgres < $REMOTE_TE
 echo "⚡ Führe Migration 309 aus (Session Leases & Robust Master Auth Resolver)..."
 ssh "$SERVER" "docker exec -i supabase-db psql -U postgres postgres < $REMOTE_TEMP/309_session_leases_and_master_auth_resolver.sql"
 
-# 5. Schema Cache in PostgREST neu laden
-echo "🔄 Lade PostgREST Schema Cache neu..."
+echo "⚡ Führe Migration 310 aus (Granular Hardening of Session Leases Policies)..."
+ssh "$SERVER" "docker exec -i supabase-db psql -U postgres postgres < $REMOTE_TEMP/310_harden_session_leases_policy.sql"
+
+echo "🧹 Bereinige temporäre Migrationsdateien..."
+ssh "$SERVER" "rm -rf $REMOTE_TEMP"
+
+echo ""
+echo "✅ Alle 14 Enterprise-Migrationen erfolgreich und fehlerfrei auf dem Produktiv-Container angewendet!"
 ssh "$SERVER" "docker exec -t supabase-db psql -U postgres postgres -c \"NOTIFY pgrst, 'reload schema';\""
 
 # 6. Aufräumen
