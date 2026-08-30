@@ -1291,21 +1291,14 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           return null;
         };
 
-        // Stage 1: Try combined OR query
+        // Stage 1: Try combined OR query by authenticatable credentials ONLY
         if (isUuid) {
           userData = await executeUserQuery(fields => 
-            supabase.from('users').select(fields).or(`id.eq.${token},qr_token.eq.${token},teacher_qr_token.eq.${token}`)
+            supabase.from('users').select(fields).or(`qr_token.eq.${token},teacher_qr_token.eq.${token}`)
           );
         } else {
           userData = await executeUserQuery(fields => 
             supabase.from('users').select(fields).or(`teacher_qr_token.eq.${token},ausweis_nummer.eq.${token},ausweis_nummer.eq.${upperToken}`)
-          );
-        }
-
-        // Stage 2: Fallback direct query by ID (if UUID)
-        if (!userData && isUuid) {
-          userData = await executeUserQuery(fields => 
-            supabase.from('users').select(fields).eq('id', token)
           );
         }
 

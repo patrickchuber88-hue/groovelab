@@ -21,7 +21,8 @@ export function scrubSensitiveUrlParams(): void {
       'exp',
       'pin',
       'temp_key',
-      'onboarding_token'
+      'onboarding_token',
+      'ghost_token'
     ];
 
     let hasSensitive = false;
@@ -40,5 +41,26 @@ export function scrubSensitiveUrlParams(): void {
     }
   } catch (err) {
     console.warn('[Security] Failed to scrub URL params:', err);
+  }
+}
+
+/**
+ * Scrubs sensitive path-based tokens (e.g., /qr/:token or /onboarding/:token) 
+ * once the token has been safely extracted into memory/sessionStorage.
+ */
+export function scrubSensitiveUrlPath(cleanReplacementPath: string = '/'): void {
+  if (typeof window === 'undefined') return;
+
+  try {
+    const currentPath = window.location.pathname;
+    const isSensitivePath = /^\/(qr|onboarding|device-onboarding)\/[0-9a-fA-F-]{10,}/.test(currentPath);
+
+    if (isSensitivePath) {
+      const cleanUrl = cleanReplacementPath + (window.location.search || '') + (window.location.hash || '');
+      window.history.replaceState(null, '', cleanUrl);
+      console.log('[Security] Sensitive path token successfully scrubbed from address bar.');
+    }
+  } catch (err) {
+    console.warn('[Security] Failed to scrub URL path:', err);
   }
 }

@@ -144,26 +144,12 @@ export const StudentOnboardingPage: React.FC<StudentOnboardingPageProps> = ({ to
     const fetchOnboardingDetails = async () => {
       try {
         setLoading(true);
-        // Find user by qr_token first, then try id as fallback
+        // Find user by secure qr_token or ausweis_nummer ONLY (Never by internal database ID)
         let { data: userData, error: userErr } = await supabase
           .from('users')
           .select('*, schools(*)')
-          .eq('qr_token', token)
+          .or(`qr_token.eq.${token},ausweis_nummer.eq.${token},ausweis_nummer.eq.${token.toUpperCase()}`)
           .maybeSingle();
-
-        if (!userData && !userErr && token && token.length === 36) {
-          const { data: fallbackData, error: fallbackErr } = await supabase
-            .from('users')
-            .select('*, schools(*)')
-            .eq('id', token)
-            .maybeSingle();
-          if (fallbackData) {
-            userData = fallbackData;
-            userErr = null;
-          } else if (fallbackErr) {
-            userErr = fallbackErr;
-          }
-        }
 
         if (userErr) throw userErr;
 

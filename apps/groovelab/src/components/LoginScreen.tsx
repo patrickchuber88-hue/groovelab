@@ -3146,7 +3146,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       const upperPin = cleanPin.toUpperCase();
 
       if (isUuid) {
-        query = query.or(`id.eq.${cleanPin},qr_token.eq.${cleanPin},teacher_qr_token.eq.${cleanPin}`);
+        query = query.or(`qr_token.eq.${cleanPin},teacher_qr_token.eq.${cleanPin}`);
       } else {
         query = query.or(`teacher_qr_token.eq.${cleanPin},ausweis_nummer.eq.${cleanPin},ausweis_nummer.eq.${upperPin}`);
       }
@@ -3487,7 +3487,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       const upperToken = qrToken.toUpperCase();
 
       if (isUuid) {
-        query = query.or(`id.eq.${qrToken},qr_token.eq.${qrToken},teacher_qr_token.eq.${qrToken}`);
+        query = query.or(`qr_token.eq.${qrToken},teacher_qr_token.eq.${qrToken}`);
       } else {
         query = query.or(`teacher_qr_token.eq.${qrToken},ausweis_nummer.eq.${qrToken},ausweis_nummer.eq.${upperToken}`);
       }

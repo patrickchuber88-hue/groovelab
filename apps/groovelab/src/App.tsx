@@ -69,7 +69,7 @@ import { initGlobalErrorSanitizer } from './utils/errorSanitizer';
 import { initAntiTamperShield } from './utils/antiTamper';
 import { runStorageJanitor, runClientStorageJanitor } from './services/storageJanitorService';
 import { verifyMasterSessionLease, revokeMasterSessionLease } from './utils/masterAuditLogger';
-import { scrubSensitiveUrlParams } from './utils/urlSecurityScrubber';
+import { scrubSensitiveUrlParams, scrubSensitiveUrlPath } from './utils/urlSecurityScrubber';
 import { executeSessionZeroize } from './utils/sessionZeroize';
 import { initAuthBroadcastListener } from './utils/authBroadcastSync';
 import { useInactivityTimeout } from './hooks/useInactivityTimeout';
@@ -1602,6 +1602,10 @@ function App() {
     // Proactive URL token scrubbing to protect user history and referrers
     const timer = setTimeout(() => {
       scrubSensitiveUrlParams();
+      // If user is already loaded/logged in on /qr/ or /onboarding/, scrub the path to protect history
+      if (sessionStorage.getItem('groovelab_user_id') || sessionStorage.getItem('gl_active_session_lease_id')) {
+        scrubSensitiveUrlPath('/');
+      }
     }, 1500);
     return () => clearTimeout(timer);
   }, [location.pathname, searchParams]);
@@ -3405,7 +3409,7 @@ function App() {
             .from('users')
             .select('id, first_name, last_name, role, email, instrument, qr_token, photo_url, school_id, ausweis_id, ausweis_nummer');
           if (isUuid) {
-            passQuery = passQuery.or(`id.eq.${urlCampusPassToken},qr_token.eq.${urlCampusPassToken},teacher_qr_token.eq.${urlCampusPassToken}`);
+            passQuery = passQuery.or(`qr_token.eq.${urlCampusPassToken},teacher_qr_token.eq.${urlCampusPassToken}`);
           } else {
             passQuery = passQuery.or(`teacher_qr_token.eq.${urlCampusPassToken},ausweis_nummer.eq.${urlCampusPassToken},ausweis_nummer.eq.${upperToken}`);
           }
