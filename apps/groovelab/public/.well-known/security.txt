@@ -1,9 +1,18 @@
-# Campus-Groovelab Security & Vulnerability Disclosure Policy
-# RFC 9116 Compliant Security Contact Information
+# ==============================================================================
+# Campus-Groovelab Responsible Disclosure & Security Contact
+# Standard: RFC 9116 (A File Format to Aid in Security Vulnerability Disclosure)
+# ==============================================================================
 
 Contact: mailto:security@campus-groovelab.de
-Canonical: https://campus-groovelab.de/.well-known/security.txt
-Preferred-Languages: de, en
-Policy: https://campus-groovelab.de/security
+Contact: https://campus-groovelab.de
 Expires: 2027-12-31T23:59:59.000Z
-Encryption: https://campus-groovelab.de/pgp-key.txt
+Preferred-Languages: de, en
+Canonical: https://campus-groovelab.de/.well-known/security.txt
+Policy: https://campus-groovelab.de
+Acknowledgments: https://campus-groovelab.de
+
+# Security Principles & BSI Compliance:
+# • Zero-Mail IAM & FIDO2 WebAuthn Passkeys
+# • 100% German Sovereign Cloud Hosting (ISO 27001)
+# • Row-Level Security (RLS) & AES-256-GCM Vaulting
+# • Strict GDPR Article 25 & 32 Compliance
