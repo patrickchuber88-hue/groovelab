@@ -7092,6 +7092,9 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                   sessionStorage.removeItem('groovelab_support_ghost');
                   sessionStorage.setItem('groovelab_active_workspace', 'student');
                   sessionStorage.setItem('groovelab_active_platform', 'campus');
+                  sessionStorage.setItem('campus_active_tab', 'briefing');
+                  sessionStorage.setItem('groovelab_active_tab', 'briefing');
+                  sessionStorage.setItem('groovelab_location_mode', 'home');
                   sessionStorage.setItem('groovelab_user_id', targetUser.id);
                   sessionStorage.removeItem('groovelab_qr_token');
                   onLogin(targetUser.id, true);

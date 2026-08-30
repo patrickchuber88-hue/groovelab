@@ -3980,7 +3980,7 @@ function App() {
 
       // STRICT DB SESSION VERIFICATION (Closing the backdoor):
       const isStudent = userData.role?.toLowerCase() === 'student';
-      if (isStudent && locationMode === 'lab') {
+      if (isStudent && locationMode === 'lab' && activePlatform === 'groovelab') {
         const storedStationId = localStorage.getItem('groovelab_station_id');
         const hasNoSession = !sessionRes.data && !sessionRes.error;
         const hasDifferentStation = sessionRes.data && storedStationId && sessionRes.data.station_id !== storedStationId;
@@ -7008,6 +7008,18 @@ function App() {
             if (typeof window !== 'undefined') {
               sessionStorage.setItem('groovelab_active_tab', 'live');
               localStorage.setItem('groovelab_active_tab', 'live');
+            }
+          }
+        }
+        // Auto-correct if a student on campus has an invalid groovelab tab saved (e.g. 'live' or 'bands')
+        if (isStudent && activePlatform === 'campus') {
+          const validCampusStudentTabs = ['briefing', 'homework_book', 'mediathek', 'practice_board', 'campus_cup', 'events', 'profile', 'all_appointments', 'settings'];
+          if (!validCampusStudentTabs.includes(activeStudentTab)) {
+            console.log('[Tab Sync] Auto-correcting invalid campus student tab to briefing:', activeStudentTab);
+            setActiveStudentTab('briefing');
+            if (typeof window !== 'undefined') {
+              sessionStorage.setItem('campus_active_tab', 'briefing');
+              localStorage.setItem('campus_active_tab', 'briefing');
             }
           }
         }
@@ -10649,7 +10661,7 @@ function App() {
         {/* Student Campus Dashboard Tabs (Kept mounted for instant platform switching) */}
         {user.role?.toLowerCase() === 'student' && (
           <div style={{ 
-            display: ((activePlatform === 'campus' || (activePlatform === 'groovelab' && activeStudentTab !== 'profile')) && ['briefing', 'homework_book', 'mediathek', 'practice_board', 'campus_cup', 'events', 'profile', 'all_appointments', 'settings'].includes(activeStudentTab)) ? 'block' : 'none',
+            display: (activePlatform === 'campus' || (activePlatform === 'groovelab' && activeStudentTab !== 'profile')) ? 'block' : 'none',
             width: '100%'
           }}>
             <ErrorBoundary>

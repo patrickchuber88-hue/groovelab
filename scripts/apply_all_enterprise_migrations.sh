@@ -44,6 +44,7 @@ scp supabase/migrations/297_tier1_enterprise_goldstandard_security.sql \
     supabase/migrations/316_dev_bypass_school_users.sql \
     supabase/migrations/317_grant_get_encryption_key_execute.sql \
     supabase/migrations/318_complete_users_view_columns.sql \
+    supabase/migrations/319_fix_audit_log_hash_chain_columns.sql \
     "$SERVER:$REMOTE_TEMP/"
 
 # 4. Führe Migrationen nacheinander in supabase-db aus
@@ -113,15 +114,18 @@ ssh "$SERVER" "docker exec -i supabase-db psql -U postgres postgres < $REMOTE_TE
 echo "⚡ Führe Migration 318 aus (Complete users view columns with contract_decision_made)..."
 ssh "$SERVER" "docker exec -i supabase-db psql -U postgres postgres < $REMOTE_TEMP/318_complete_users_view_columns.sql"
 
+echo "⚡ Führe Migration 319 aus (Fix calculate_audit_log_hash_chain column references)..."
+ssh "$SERVER" "docker exec -i supabase-db psql -U postgres postgres < $REMOTE_TEMP/319_fix_audit_log_hash_chain_columns.sql"
+
 echo "🧹 Bereinige temporäre Migrationsdateien..."
 ssh "$SERVER" "rm -rf $REMOTE_TEMP"
 
 echo ""
-echo "✅ Alle 22 Enterprise-Migrationen erfolgreich und fehlerfrei auf dem Produktiv-Container angewendet!"
+echo "✅ Alle 23 Enterprise-Migrationen erfolgreich und fehlerfrei auf dem Produktiv-Container angewendet!"
 ssh "$SERVER" "docker exec -t supabase-db psql -U postgres postgres -c \"NOTIFY pgrst, 'reload schema';\""
 
 # 6. Aufräumen
 ssh "$SERVER" "rm -rf $REMOTE_TEMP"
 
 echo ""
-echo "✅ Alle Enterprise Sicherheitsmigrationen (297-318) erfolgreich auf Live-Datenbank angewendet!"
+echo "✅ Alle Enterprise Sicherheitsmigrationen (297-319) erfolgreich auf Live-Datenbank angewendet!"
