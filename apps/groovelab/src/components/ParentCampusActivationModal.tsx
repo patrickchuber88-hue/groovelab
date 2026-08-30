@@ -655,8 +655,9 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
           {/* Legal Compliance Footer (UWG / PAngV) */}
           <div style={{ textAlign: 'center', borderTop: '1px solid rgba(15, 23, 42, 0.05)', paddingTop: '14px' }}>
             <span style={{ fontSize: '0.68rem', color: '#94a3b8', lineHeight: '1.4', display: 'block' }}>
-              Campus-Groovelab • Transparentes Cloud-Hosting statt teurer Software-Lizenzen (0,00 € Lizenzgebühren). Keine Mindestvertragslaufzeit über das Schuljahr hinaus.
+              Campus-Groovelab • Transparentes Cloud-Hosting statt teurer Software-Lizenzen (Keine Lizenzkaufgebühren: 0,00 €). Keine Mindestvertragslaufzeit über das Schuljahr hinaus.
             </span>
+
           </div>
 
         </div>

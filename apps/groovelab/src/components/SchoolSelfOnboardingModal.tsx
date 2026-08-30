@@ -11,6 +11,10 @@ import { isWebAuthnSupported, registerUserBiometrics } from '../utils/webauthn';
 import { inlineAllImagesInElement } from './IDBadgeCard';
 import { LegalTextModal } from './LegalTextModal';
 import { LEGAL_MASTER_WORDING } from '../constants/legalMasterWording';
+import { isSubdomainReserved } from '../constants/reservedSubdomains';
+import { sanitizeSchoolName, sanitizeAddress, sanitizePersonName } from '../utils/inputSanitizer';
+import { generateHandoverUrl } from '../utils/cryptoAuth';
+
 
 interface SchoolSelfOnboardingModalProps {
   onClose: () => void;
@@ -27,33 +31,8 @@ export const SchoolSelfOnboardingModal: React.FC<SchoolSelfOnboardingModalProps>
   const [showLegalModal, setShowLegalModal] = useState<boolean>(false);
   const [legalModalTab, setLegalModalTab] = useState<'terms' | 'privacy' | 'impressum' | 'cancellation'>('terms');
 
-  // Beta Entwickler-Schutz (Passwort: campus-test)
-  const [isAccessGranted, setIsAccessGranted] = useState<boolean>(() => {
-    try {
-      return sessionStorage.getItem('cg_beta_dev_access') === 'true';
-    } catch (e) {
-      return false;
-    }
-  });
-  const [accessCodeInput, setAccessCodeInput] = useState<string>('');
-  const [accessCodeError, setAccessCodeError] = useState<string | null>(null);
-  const [showAccessPassword, setShowAccessPassword] = useState<boolean>(false);
-
-  const handleVerifyAccessCode = (e: React.FormEvent) => {
-    e.preventDefault();
-    const clean = accessCodeInput.trim().toLowerCase();
-    if (clean === 'campus-test' || clean === 'campustest') {
-      try {
-        sessionStorage.setItem('cg_beta_dev_access', 'true');
-      } catch (err) {}
-      setIsAccessGranted(true);
-      setAccessCodeError(null);
-    } else {
-      setAccessCodeError('Ungültiges Entwickler-Passwort. Bitte wende dich an das Campus-Groovelab Team.');
-    }
-  };
-
-  // Step 1: Ultra-Lean Core Fields
+  // Step 1: Ultra-Lean Core Fields & DACH Country
+  const [country, setCountry] = useState<'Deutschland' | 'Österreich' | 'Schweiz'>('Deutschland');
   const [schoolName, setSchoolName] = useState<string>('');
   const [firstName, setFirstName] = useState<string>('');
   const [lastName, setLastName] = useState<string>('');
@@ -74,14 +53,21 @@ export const SchoolSelfOnboardingModal: React.FC<SchoolSelfOnboardingModalProps>
   const [biometricsStatus, setBiometricsStatus] = useState<'idle' | 'registering' | 'success' | 'error'>('idle');
   const [biometricsErrorMessage, setBiometricsErrorMessage] = useState('');
 
+  // Clean Zip Code Helper
+  const cleanZip = zipCode.trim().replace(/^(DE|D|AT|A|CH)-?/i, '').trim();
+
   // Form Validation (5 core essentials)
+  const isZipValid = country === 'Deutschland' 
+    ? /^[0-9]{5}$/.test(cleanZip) 
+    : /^[0-9]{4}$/.test(cleanZip);
+
   const isFormValid = 
     schoolName.trim().length >= 3 && 
     firstName.trim().length >= 2 && 
     lastName.trim().length >= 2 && 
     email.trim().includes('@') && email.trim().includes('.') &&
     street.trim().length >= 2 &&
-    zipCode.trim().length >= 4 &&
+    isZipValid &&
     city.trim().length >= 2;
 
   const handleRegisterSchool = async (e: React.FormEvent) => {
@@ -93,7 +79,7 @@ export const SchoolSelfOnboardingModal: React.FC<SchoolSelfOnboardingModalProps>
       setError(null);
 
       // Auto-generate subdomain slug
-      const slug = schoolName
+      let slug = schoolName
         .toLowerCase()
         .trim()
         .replace(/[äöüß]/g, (match) => {
@@ -103,6 +89,10 @@ export const SchoolSelfOnboardingModal: React.FC<SchoolSelfOnboardingModalProps>
         .replace(/[^a-z0-9]/g, '-')
         .replace(/-+/g, '-')
         .replace(/^-+|-+$/g, '') || `schule-${Math.floor(1000 + Math.random() * 9000)}`;
+
+      if (isSubdomainReserved(slug)) {
+        slug = `${slug}-musikschule`;
+      }
 
       // Sanitize session headers
       try {
@@ -115,23 +105,33 @@ export const SchoolSelfOnboardingModal: React.FC<SchoolSelfOnboardingModalProps>
       const candidatePin = Math.floor(100000 + Math.random() * 900000).toString();
       const qrToken = crypto.randomUUID();
 
+      const cleanSchoolName = sanitizeSchoolName(schoolName);
+      const cleanStreet = sanitizeAddress(street);
+      const cleanHouseNumber = sanitizeAddress(houseNumber);
+      const cleanCity = sanitizeAddress(city);
+      const cleanFirst = sanitizePersonName(firstName);
+      const cleanLast = sanitizePersonName(lastName);
+      const cleanEmail = email.trim().toLowerCase();
+
       let schoolRecord: any = null;
       let userRecord: any = null;
       let effectivePin = candidatePin;
 
       // 1. Try atomic RPC first (Bypasses all client-side RLS and transaction conflicts)
       const { data: rpcData, error: rpcErr } = await supabase.rpc('register_school_and_admin', {
-        p_school_name: schoolName.trim(),
+        p_school_name: cleanSchoolName,
         p_subdomain: slug,
-        p_street: street.trim(),
-        p_house_number: houseNumber.trim() || null,
-        p_zip_code: zipCode.trim(),
-        p_city: city.trim(),
+        p_street: cleanStreet,
+        p_house_number: cleanHouseNumber || null,
+        p_zip_code: cleanZip,
+        p_city: cleanCity,
         p_phone: null,
-        p_school_email: email.trim().toLowerCase(),
-        p_admin_first_name: firstName.trim(),
-        p_admin_last_name: lastName.trim()
+        p_school_email: cleanEmail,
+        p_admin_first_name: cleanFirst,
+        p_admin_last_name: cleanLast,
+        p_country: country
       });
+
 
       if (!rpcErr && rpcData?.success) {
         effectivePin = rpcData.pin;
@@ -143,9 +143,9 @@ export const SchoolSelfOnboardingModal: React.FC<SchoolSelfOnboardingModalProps>
           primary_color: '#34a853',
           street: street.trim(),
           house_number: houseNumber.trim() || null,
-          zip_code: zipCode.trim(),
+          zip_code: cleanZip,
           city: city.trim(),
-          country: 'Deutschland'
+          country: country
         };
         userRecord = {
           id: rpcData.admin_id,
@@ -176,9 +176,9 @@ export const SchoolSelfOnboardingModal: React.FC<SchoolSelfOnboardingModalProps>
             email: email.trim().toLowerCase(),
             street: street.trim(),
             house_number: houseNumber.trim() || null,
-            zip_code: zipCode.trim(),
+            zip_code: cleanZip,
             city: city.trim(),
-            country: 'Deutschland',
+            country: country,
             primary_color: '#34a853',
             has_campus_subscription: false,
             has_groovelab_subscription: false,
@@ -298,13 +298,21 @@ export const SchoolSelfOnboardingModal: React.FC<SchoolSelfOnboardingModalProps>
     setTimeout(() => setCopiedPin(false), 2500);
   };
 
-  const handleCopyDirectLink = () => {
+  const handleCopyDirectLink = async () => {
     if (!createdData) return;
-    const directUrl = `${window.location.origin}/qr/${createdData.user.qr_token}`;
-    navigator.clipboard.writeText(directUrl);
-    setCopiedLink(true);
-    setTimeout(() => setCopiedLink(false), 2500);
+    try {
+      const directUrl = await generateHandoverUrl(createdData.user.qr_token);
+      navigator.clipboard.writeText(directUrl);
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 2500);
+    } catch (e) {
+      const fallbackUrl = `${window.location.origin}/qr/${createdData.user.qr_token}`;
+      navigator.clipboard.writeText(fallbackUrl);
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 2500);
+    }
   };
+
 
   const downloadQrCode = async () => {
     if (!createdData || !cardRef.current) return;
@@ -502,144 +510,52 @@ export const SchoolSelfOnboardingModal: React.FC<SchoolSelfOnboardingModalProps>
             </div>
           )}
 
-          {!isAccessGranted ? (
-            <div style={{ textAlign: 'center', padding: '12px 4px 6px' }}>
-              <div style={{
-                width: '52px',
-                height: '52px',
-                borderRadius: '16px',
-                background: 'rgba(52, 168, 83, 0.1)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                margin: '0 auto 16px',
-                color: '#34a853'
-              }}>
-                <Lock size={26} />
-              </div>
-
-              <div style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-                fontSize: '0.72rem',
-                fontWeight: 800,
-                color: '#34a853',
-                background: 'rgba(52, 168, 83, 0.08)',
-                border: '1px solid rgba(52, 168, 83, 0.25)',
-                padding: '4px 12px',
-                borderRadius: '100px',
-                textTransform: 'uppercase',
-                letterSpacing: '0.08em',
-                marginBottom: '12px'
-              }}>
-                <ShieldCheck size={13} />
-                Geschlossene Entwickler-Beta
-              </div>
-
-              <h2 style={{ fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', margin: '0 0 8px 0', letterSpacing: '-0.02em' }}>
-                Entwickler-Schutz aktiv
-              </h2>
-
-              <p style={{ fontSize: '0.82rem', color: '#64748b', margin: '0 0 20px 0', lineHeight: 1.55 }}>
-                Die Neuregistrierung von Musikschulen ist während der aktuellen Beta-Phase passwortgeschützt.
-              </p>
-
-              {accessCodeError && (
-                <div style={{
-                  background: '#fef2f2',
-                  border: '1px solid #fecaca',
-                  padding: '10px 14px',
-                  borderRadius: '12px',
-                  color: '#b91c1c',
-                  fontSize: '0.78rem',
-                  fontWeight: 700,
-                  marginBottom: '16px',
-                  textAlign: 'left'
-                }}>
-                  {accessCodeError}
-                </div>
-              )}
-
-              <form onSubmit={handleVerifyAccessCode} style={{ display: 'flex', flexDirection: 'column', gap: '14px', textAlign: 'left' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.7rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', marginBottom: '6px', letterSpacing: '0.04em' }}>
-                    Entwickler-Passwort
-                  </label>
-                  <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                    <input
-                      type={showAccessPassword ? 'text' : 'password'}
-                      required
-                      value={accessCodeInput}
-                      onChange={(e) => {
-                        setAccessCodeInput(e.target.value);
-                        if (accessCodeError) setAccessCodeError(null);
-                      }}
-                      placeholder="Passwort eingeben..."
-                      className="lean-input"
-                      style={{ paddingRight: '44px' }}
-                      autoFocus
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowAccessPassword(!showAccessPassword)}
-                      style={{
-                        position: 'absolute',
-                        right: '12px',
-                        background: 'transparent',
-                        border: 'none',
-                        color: '#94a3b8',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        padding: '4px'
-                      }}
-                    >
-                      {showAccessPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                    </button>
-                  </div>
-                </div>
-
-                <button
-                  type="submit"
-                  className="lean-btn-primary"
-                  style={{
-                    width: '100%',
-                    marginTop: '4px',
-                    fontSize: '0.92rem',
-                    padding: '13px 18px'
-                  }}
-                >
-                  <span>Freischalten &amp; Weiter</span>
-                  <ArrowRight size={17} />
-                </button>
-
-                <button
-                  type="button"
-                  onClick={onClose}
-                  style={{
-                    background: 'transparent',
-                    color: '#64748b',
-                    border: 'none',
-                    padding: '8px',
-                    fontSize: '0.80rem',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    marginTop: '2px'
-                  }}
-                >
-                  ✕ Abbrechen &amp; Schließen
-                </button>
-              </form>
-            </div>
-          ) : (
-            <>
           {/* ═══════════════════════════════════════════════════════════════════════════
               STAGE 1: ULTRA-LEAN INPUT (5 ESSENZIELLE FELDER INKL. § 14 UStG ANSCHRIFT)
               ═══════════════════════════════════════════════════════════════════════════ */}
           {step === 1 && (
             <form onSubmit={handleRegisterSchool} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              {/* Land / Country Selector (DACH-Region) */}
+              <div>
+                <label style={{ display: 'block', fontSize: '0.7rem', color: '#64748b', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  Land *
+                </label>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+                  {[
+                    { id: 'Deutschland', label: 'Deutschland', flag: '🇩🇪' },
+                    { id: 'Österreich', label: 'Österreich', flag: '🇦🇹' },
+                    { id: 'Schweiz', label: 'Schweiz', flag: '🇨🇭' }
+                  ].map((c) => {
+                    const isSelected = country === c.id;
+                    return (
+                      <button
+                        key={c.id}
+                        type="button"
+                        onClick={() => setCountry(c.id as any)}
+                        style={{
+                          padding: '9px 4px',
+                          borderRadius: '12px',
+                          border: isSelected ? '2px solid #34a853' : '1px solid #e2e8f0',
+                          background: isSelected ? 'rgba(52, 168, 83, 0.08)' : '#ffffff',
+                          color: isSelected ? '#15803d' : '#475569',
+                          fontWeight: isSelected ? 800 : 600,
+                          fontSize: '0.80rem',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '6px',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        <span>{c.flag}</span>
+                        <span>{c.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
               {/* Musikschul-Name */}
               <div>
                 <label style={{ display: 'block', fontSize: '0.7rem', color: '#64748b', fontWeight: 800, marginBottom: '5px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
@@ -734,14 +650,14 @@ export const SchoolSelfOnboardingModal: React.FC<SchoolSelfOnboardingModalProps>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '12px' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.7rem', color: '#64748b', fontWeight: 800, marginBottom: '5px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                    PLZ *
+                    PLZ ({country === 'Deutschland' ? '5 Ziffern' : '4 Ziffern'}) *
                   </label>
                   <input
                     type="text"
                     required
                     value={zipCode}
                     onChange={(e) => setZipCode(e.target.value)}
-                    placeholder="12345"
+                    placeholder={country === 'Deutschland' ? '12345' : (country === 'Österreich' ? '1010' : '8001')}
                     className="lean-input"
                   />
                 </div>
@@ -1051,8 +967,6 @@ export const SchoolSelfOnboardingModal: React.FC<SchoolSelfOnboardingModalProps>
                 <ArrowRight size={17} />
               </button>
             </div>
-          )}
-          </>
           )}
         </div>
       </div>

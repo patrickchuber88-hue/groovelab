@@ -43,6 +43,8 @@ const GhostSupportCapsule = lazy(() => import('./components/masterAdmin/GhostSup
 const SharedAudioBiographyPage = lazy(() => import('./components/campus/SharedAudioBiographyPage').then(m => ({ default: m.SharedAudioBiographyPage })));
 const HelpCenterModal = lazy(() => import('./components/help/HelpCenterModal').then(m => ({ default: m.HelpCenterModal })));
 const TrialInfoModal = lazy(() => import('./components/TrialInfoModal').then(m => ({ default: m.TrialInfoModal })));
+const AdminSecuritySuiteModal = lazy(() => import('./components/AdminSecuritySuiteModal').then(m => ({ default: m.AdminSecuritySuiteModal })));
+
 
 import { MobileBottomNav } from './components/ui/MobileBottomNav';
 import ConfettiModal from './components/ConfettiModal';
@@ -2212,6 +2214,14 @@ function App() {
            window.location.search.includes('invite=school_onboarding');
   });
 
+  const [showAdminSecuritySuiteModal, setShowAdminSecuritySuiteModal] = useState(false);
+
+  useEffect(() => {
+    const handleOpenSecuritySuite = () => setShowAdminSecuritySuiteModal(true);
+    window.addEventListener('open_admin_security_suite', handleOpenSecuritySuite);
+    return () => window.removeEventListener('open_admin_security_suite', handleOpenSecuritySuite);
+  }, []);
+
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
@@ -2220,6 +2230,7 @@ function App() {
       }
     }
   }, [location.search]);
+
   const [user, setUserRaw] = useState<any>(() => {
     if (typeof window === 'undefined') return null;
     try {
@@ -15595,6 +15606,17 @@ function App() {
           }}
         />
       )}
+
+      {showAdminSecuritySuiteModal && (school?.id || user?.school_id || (Array.isArray(user?.schools) ? user?.schools[0]?.id : user?.schools?.id)) && (
+        <Suspense fallback={null}>
+          <AdminSecuritySuiteModal
+            schoolId={school?.id || user?.school_id || (Array.isArray(user?.schools) ? user?.schools[0]?.id : user?.schools?.id)}
+            onClose={() => setShowAdminSecuritySuiteModal(false)}
+          />
+        </Suspense>
+      )}
+
+
 
     </div>
   </div>

@@ -10,6 +10,14 @@ import { AudioTrackCarousel } from './AudioTrackCarousel';
 import { useMasterPricing } from '../context/MasterPricingContext';
 import { computeGroundTruthMetrics, broadcastPracticeUpdate, DEFAULT_FOKUS_LEVELS, getEngineEffectiveLevel, getEngineTargetMinutes, getEngineFlameCategory } from '../utils/studentProgressEngine';
 import { ParentCampusActivationModal } from './ParentCampusActivationModal';
+import { validateHandoverUrl } from '../utils/cryptoAuth';
+import { registerClientSessionLease } from '../utils/sessionLeaseManager';
+import { setVaultItem } from '../utils/aesStorageVault';
+import { verifyPinPbkdf2 } from '../utils/argonPinEngine';
+
+
+
+
 
 // ─── Helper: Device Key Storage ──────────────────────────────────────────────
 const DEVICE_KEY_PREFIX = 'gl_device_key_';
@@ -102,13 +110,14 @@ const getSimulatedNow = (): Date => {
 const registerProfileLocally = (userData: any) => {
   if (typeof window === 'undefined' || !userData || !userData.id) return;
   try {
-    const registry = JSON.parse(localStorage.getItem('groovelab_local_profiles') || '[]');
+    const registry = JSON.parse(localStorage.getItem('groovelab_local_profiles') || localStorage.getItem('campus_family_profiles') || '[]');
     const existingIdx = registry.findIndex((p: any) => p.id === userData.id);
     const entry = {
       id: userData.id,
       first_name: userData.first_name || '',
       last_name: userData.last_name || '',
       photo_url: userData.photo_url || userData.avatar_url || null,
+      instrument: userData.instrument || userData.groovelab_instrument || null,
       role: userData.role || 'student',
       school_id: userData.school_id || null,
       qr_token: userData.qr_token || null
@@ -119,10 +128,13 @@ const registerProfileLocally = (userData: any) => {
       registry.push(entry);
     }
     localStorage.setItem('groovelab_local_profiles', JSON.stringify(registry));
+    localStorage.setItem('campus_family_profiles', JSON.stringify(registry));
+    setVaultItem('groovelab_vault_profiles', registry).catch(e => console.warn('[AESVault] notice:', e));
   } catch (e) {
     console.error('[QRLandingPage] Failed to register profile locally:', e);
   }
 };
+
 
 const computeSha256Hex = async (str: string): Promise<string> => {
   try {
@@ -149,13 +161,12 @@ const verifyParentPinClient = async (studentId: string, inputPin: string, profil
     }
   } catch (e) {}
 
-  // 2. Client-side SHA-256 hash or plaintext check against in-memory profile
+  // 2. Client-side PBKDF2-100k / SHA-256 / plaintext check against in-memory profile
   if (profileParentPin) {
-    const cleanProfilePin = profileParentPin.trim();
-    if (cleanProfilePin === cleanInput) return true;
-    const inputHash = await computeSha256Hex(cleanInput);
-    if (inputHash && cleanProfilePin.toLowerCase() === inputHash.toLowerCase()) return true;
+    const isMatched = await verifyPinPbkdf2(cleanInput, profileParentPin);
+    if (isMatched) return true;
   }
+
 
   // 3. LocalStorage parent PIN backup check
   const cachedParentPin = localStorage.getItem(`groovelab_parent_pin_${studentId}`);
@@ -218,7 +229,8 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
   const [errorMsg, setErrorMsg] = useState<string>('');
   const masterPricing = useMasterPricing();
 
-  const redirectToCampus = async (userData: { id: string; role: string; roles?: string[]; is_campus_active?: boolean; is_groovelab_active?: boolean; schools?: any }) => {
+  const redirectToCampus = async (userData: { id: string; role: string; roles?: string[]; is_campus_active?: boolean; is_groovelab_active?: boolean; schools?: any; school_id?: string | null }) => {
+
     const rolesArray = Array.isArray(userData.roles) ? userData.roles : [];
     const hasAdminRole = rolesArray.includes('admin');
     const hasSecretaryRole = rolesArray.includes('secretary');
@@ -239,12 +251,21 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
     sessionStorage.removeItem('groovelab_qr_token');
     localStorage.removeItem('groovelab_last_qr_token');
 
-    // Register profile locally for Netflix family profile selector
+    // Register profile locally for family 1-tap profile selector
     registerProfileLocally(userData);
 
     sessionStorage.setItem('groovelab_user_id', userData.id);
 
     const schoolObj = Array.isArray(userData.schools) ? userData.schools[0] : userData.schools;
+
+    // Zero-Trust Session Lease Registration
+    try {
+      const targetSchoolId = schoolObj?.id || userData.school_id;
+      if (targetSchoolId) {
+        await registerClientSessionLease(userData, targetSchoolId);
+      }
+    } catch (e) {}
+
     const schoolHasCampus = schoolObj?.has_campus_subscription ?? true;
     const schoolHasGroove = schoolObj?.has_groovelab_subscription ?? true;
 
@@ -1224,9 +1245,28 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
 
         // Auto-pairing from query parameters if requested from a logged-in PWA session
         const urlParams = new URLSearchParams(window.location.search);
+        const expParam = urlParams.get('exp');
+        const sigParam = urlParams.get('sig');
+        if (expParam && sigParam) {
+          const { valid, expired } = await validateHandoverUrl(token, expParam, sigParam);
+          if (expired) {
+            sessionStorage.removeItem('groovelab_qr_token');
+            setErrorMsg('Dieser temporäre Übergabelink ist abgelaufen (Gültigkeit: 15 Minuten). Bitte öffne deinen QR-Code auf deinem Hauptgerät erneut.');
+            setPageState('error');
+            return;
+          }
+          if (!valid) {
+            sessionStorage.removeItem('groovelab_qr_token');
+            setErrorMsg('Ungültige oder manipulierte Übergabe-Signatur.');
+            setPageState('error');
+            return;
+          }
+        }
+
         if (urlParams.get('auto_pair') === 'true') {
           localStorage.setItem(`${DEVICE_KEY_PREFIX}${token}`, 'paired');
         }
+
 
         // Vorab Namen des Schülers/Lehrers/Admins holen
         const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(token);
@@ -7764,8 +7804,9 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                 Bereitstellungsgebühr: {price ? price.toFixed(2).replace('.', ',') : '5,88'} € (0,49 € / Monat für 12 Monate)
               </div>
               <span style={{ fontSize: '0.7rem', color: '#047857', display: 'block', marginTop: '4px', fontWeight: 600 }}>
-                Transparentes Cloud-Hosting • Keine Einrichtungsgebühr, keine Software-Lizenzgebühren.
+                Transparentes Cloud-Hosting statt teurer Software-Lizenzen • Keine Einrichtungsgebühr, keine Lizenzkaufgebühren.
               </span>
+
             </div>
 
             <form onSubmit={(e) => { e.preventDefault(); handleActivateContract(); }} style={{display: 'flex', flexDirection: 'column', gap: '16px'}}>

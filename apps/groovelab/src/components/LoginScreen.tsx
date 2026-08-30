@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { Music, Tablet, ShieldCheck, FileText, X, Check, School, AlertCircle, ArrowRight, Download, User, Upload, Key, KeyRound, RotateCw, HelpCircle, Lock, Calendar, Clock, ArrowLeft, Mail, Users, Plus, Fingerprint, Timer, Trophy, Smartphone, Camera, CameraOff, Unlink, SwitchCamera, Star, Ban } from 'lucide-react';
+import { Music, Tablet, ShieldCheck, FileText, X, Check, School, AlertCircle, ArrowRight, Download, User, Upload, Key, KeyRound, RotateCw, HelpCircle, Lock, Calendar, Clock, ArrowLeft, Mail, Users, Plus, Fingerprint, Timer, Trophy, Smartphone, Camera, CameraOff, Unlink, SwitchCamera, Star, Ban, Sparkles } from 'lucide-react';
 import { getDistanceFromLatLonInM } from '../utils/geo';
 import { isWebAuthnSupported, registerBiometrics, authenticateUserBiometrics, getStoredBiometricProfiles, saveBiometricProfile, removeBiometricProfile, BiometricVaultProfile } from '../utils/webauthn';
 import { StudentMobileScheduleWizard } from './StudentMobileScheduleWizard';
@@ -10,20 +10,61 @@ import { DpoAuditPortal } from './DpoAuditPortal';
 import { validateNewPin } from '../utils/pinValidation';
 import { createMasterSessionLease } from '../utils/masterAuditLogger';
 import { verifyTOTP } from '../utils/totp';
+import { registerClientSessionLease } from '../utils/sessionLeaseManager';
+import { setVaultItem } from '../utils/aesStorageVault';
+
+
 
 const isIOS = typeof window !== 'undefined' && (/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
 const isStandalone = typeof window !== 'undefined' && (window.matchMedia('(display-mode: standalone)').matches || (navigator as any).standalone);
 
 const getInstrumentAvatarUrl = (instr: string) => {
-  const low = (instr || '').toLowerCase();
-  if (low.includes('gitarre') || low.includes('guitar')) return '/gitarre_avatar_new.png';
-  if (low.includes('bass') || low.includes('kontrabass') || low.includes('contrabass')) return '/bass_avatar.png';
-  if (low.includes('schlagzeug') || low.includes('drums')) return '/schlagzeug_avatar.png';
-  if (low.includes('klavier') || low.includes('piano')) return '/klavier_avatar_new.png';
-  if (low.includes('gesang') || low.includes('vocals') || low.includes('vocal')) return '/gesang_avatar.png';
-  if (low.includes('trompete') || low.includes('trumpet')) return '/trompete_avatar_new.png';
-  if (low.includes('posaune') || low.includes('trombone')) return '/posaune_avatar.png';
-  return '/avatar_ghost.jpg';
+  const low = (instr || '').toLowerCase().trim();
+  if (low.includes('e-gitarre')) return '/avatars/egitarre_avatar.png';
+  if (low.includes('gitarre') || low.includes('guitar')) return '/avatars/gitarre_avatar_new.png';
+  if (low.includes('e-bass')) return '/avatars/ebass_avatar.png';
+  if (low.includes('kontrabass') || low.includes('double bass')) return '/avatars/kontrabass_avatar.png';
+  if (low.includes('bass')) return '/avatars/bass_avatar.png';
+  if (low.includes('drum') || low.includes('schlagzeug')) return '/avatars/schlagzeug_avatar.png';
+  if (low.includes('piano') || low.includes('keys') || low.includes('klavier') || low.includes('keyboard')) return '/avatars/klavier_avatar_new.png';
+  if (low.includes('vocal') || low.includes('gesang') || low.includes('stimme') || low.includes('singer')) return '/avatars/gesang_avatar.png';
+  if (low.includes('trompete') || low.includes('trumpet')) return '/avatars/trompete_avatar_new.png';
+  if (low.includes('posaune') || low.includes('trombone')) return '/avatars/posaune_avatar.png';
+  if (low.includes('horn')) return '/avatars/horn_avatar_new.png';
+  if (low.includes('cello')) return '/avatars/cello_avatar_new.png';
+  if (low.includes('geige') || low.includes('violin') || low.includes('violine')) return '/avatars/violine_avatar_new.png';
+  if (low.includes('klarinette') || low.includes('clarinet')) return '/avatars/klarinette_avatar_new.png';
+  if (low.includes('querflöte') || low.includes('flute') || low.includes('querfloete')) return '/avatars/querfloete_avatar.png';
+  if (low.includes('saxofon') || low.includes('saxophone') || low.includes('sax')) return '/avatars/saxophon_avatar_new.png';
+  if (low.includes('blockflöte') || low.includes('recorder') || low.includes('blockfloete')) return '/avatars/blockfloete_avatar.png';
+  if (low.includes('bariton') || low.includes('baritone')) return '/avatars/bariton_avatar.png';
+  if (low.includes('oboe')) return '/avatars/oboe_avatar.png';
+  return '/avatars/gitarre_avatar_new.png';
+};
+
+const formatInstrumentBadge = (instr?: string) => {
+  const low = (instr || '').toLowerCase().trim();
+  if (low.includes('e-gitarre')) return '🎸 E-Gitarre';
+  if (low.includes('gitarre') || low.includes('guitar')) return '🎸 Gitarre';
+  if (low.includes('e-bass')) return '🎸 E-Bass';
+  if (low.includes('kontrabass')) return '🎻 Kontrabass';
+  if (low.includes('bass')) return '🎸 Bass';
+  if (low.includes('schlagzeug') || low.includes('drum')) return '🥁 Drums';
+  if (low.includes('klavier') || low.includes('piano') || low.includes('keyboard') || low.includes('keys')) return '🎹 Klavier';
+  if (low.includes('gesang') || low.includes('vocal') || low.includes('stimme') || low.includes('sing')) return '🎤 Gesang';
+  if (low.includes('trompete')) return '🎺 Trompete';
+  if (low.includes('posaune')) return '🎺 Posaune';
+  if (low.includes('horn')) return '📯 Horn';
+  if (low.includes('cello')) return '🎻 Cello';
+  if (low.includes('geige') || low.includes('violine')) return '🎻 Violine';
+  if (low.includes('klarinette')) return '🎵 Klarinette';
+  if (low.includes('querflöte') || low.includes('flöte') || low.includes('flute')) return '🎶 Flöte';
+  if (low.includes('sax')) return '🎷 Saxophon';
+  if (low.includes('blockflöte') || low.includes('recorder')) return '🎶 Blockflöte';
+  if (low.includes('oboe')) return '🎵 Oboe';
+  if (low.includes('bariton')) return '🎺 Bariton';
+  if (instr && instr !== 'Schüler' && instr !== 'schueler') return instr;
+  return '🌱 Musikschüler';
 };
 
 let jsQRInstance: any = null;
@@ -601,7 +642,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
   const [biometricLoading, setBiometricLoading] = useState(false);
   const [biometricError, setBiometricError] = useState<string | null>(null);
 
-  // Netflix-Family Local Profiles State
+  // Family Local Profiles Vault State
   const [savedFamilyProfiles, setSavedFamilyProfiles] = useState<any[]>(() => {
     if (typeof window === 'undefined') return [];
     try {
@@ -2077,9 +2118,50 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
       sessionStorage.setItem('groovelab_user_id', user.id);
       sessionStorage.setItem('groovelab_location_mode', isHome ? 'home' : 'lab');
+
+      // Automatically register/update student profile in local vault with their instrument avatar
+      if (user.role === 'student' && typeof window !== 'undefined') {
+        try {
+          const raw = localStorage.getItem('groovelab_local_profiles') || localStorage.getItem('campus_family_profiles') || '[]';
+          const profiles = JSON.parse(raw);
+          const existingIdx = profiles.findIndex((p: any) => p.id === user.id);
+          const entry = {
+            id: user.id,
+            first_name: user.first_name || '',
+            last_name: user.last_name || '',
+            photo_url: user.photo_url || user.avatar_url || null,
+            instrument: user.instrument || user.groovelab_instrument || null,
+            role: 'student',
+            school_id: user.school_id || null,
+            qr_token: user.qr_token || null
+          };
+          if (existingIdx !== -1) {
+            profiles[existingIdx] = { ...profiles[existingIdx], ...entry };
+          } else {
+            profiles.push(entry);
+          }
+          localStorage.setItem('groovelab_local_profiles', JSON.stringify(profiles));
+          localStorage.setItem('campus_family_profiles', JSON.stringify(profiles));
+          setVaultItem('groovelab_vault_profiles', profiles).catch(e => console.warn('[AESVault] notice:', e));
+          setSavedFamilyProfiles(profiles.filter((p: any) => p.role === 'student' || !p.role));
+        } catch (e) {
+          console.warn('[Login] Local profile registration warning:', e);
+        }
+
+      }
+
+      // Zero-Trust Session Lease Registration
+      try {
+        const targetSchoolId = effectiveSchool?.id || user.school_id;
+        if (targetSchoolId) {
+          registerClientSessionLease(user, targetSchoolId).catch(err => console.warn('[SessionLease] Async registration notice:', err));
+        }
+      } catch (e) {}
+
       setLoading(false);
       
-       onLogin(user.id, isHome, finalStationId);
+      onLogin(user.id, isHome, finalStationId);
+
     } catch (err: any) {
       console.error('[Login] Finalize error:', err.message);
       sessionStorage.removeItem('groovelab_user_id');
@@ -2979,7 +3061,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       const blobUrl = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = blobUrl;
-      link.download = `groovelab-login-${verifiedStudentDetails?.first_name || 'schueler'}.png`;
+      link.download = `campus-groovelab-login-${verifiedStudentDetails?.first_name || 'schueler'}.png`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -2991,12 +3073,12 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
   const downloadWalletPass = () => {
     const passContent = JSON.stringify({
-      passTypeIdentifier: "pass.de.groovelab.student",
+      passTypeIdentifier: "pass.de.campus-groovelab.student",
       serialNumber: verifiedStudentDetails?.qr_token || verifiedStudentId,
-      teamIdentifier: "GROOVELAB",
-      organizationName: "GrooveLab Music School",
-      description: "GrooveLab Student Access Pass",
-      logoText: "GrooveLab",
+      teamIdentifier: "CAMPUS_GROOVELAB",
+      organizationName: "Campus-Groovelab",
+      description: "Campus-Groovelab Student Access Pass",
+      logoText: "Campus-Groovelab",
       foregroundColor: "rgb(255, 255, 255)",
       backgroundColor: "rgb(10, 54, 28)",
       labelColor: "rgb(230, 244, 234)",
@@ -3009,7 +3091,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
     const blobUrl = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = blobUrl;
-    link.download = `groovelab-pass-${verifiedStudentDetails?.first_name || 'schueler'}.pkpass`;
+    link.download = `campus-groovelab-pass-${verifiedStudentDetails?.first_name || 'schueler'}.pkpass`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -3367,6 +3449,9 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       console.warn("Failed to parse scanned URL", e);
     }
     console.log('[Login] handleScan received token');
+    if (typeof navigator !== 'undefined' && navigator.vibrate) {
+      try { navigator.vibrate(50); } catch (e) {}
+    }
 
     // Camera stream will be naturally released on page reload, avoiding browser locks.
 
@@ -4388,94 +4473,105 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           </div>
         )}
 
-        {/* ─── NETFLIX-STYLE FAMILY PROFILES VAULT (1-TAP SIBLING LOGIN) ─── */}
+        {/* ─── 1-TAP FAMILY AVATAR STAGE (SIBLING QUICKSTART - SCALABLE 1-10+ PROFILES) ─── */}
         {savedFamilyProfiles.length > 0 && !isGroovelabKiosk && (
           <div style={{
             width: '100%',
-            marginBottom: '20px',
-            background: 'rgba(255, 255, 255, 0.04)',
-            border: '1px solid rgba(255, 255, 255, 0.1)',
+            marginBottom: '16px',
+            background: 'rgba(255, 255, 255, 0.05)',
+            border: '1px solid rgba(255, 255, 255, 0.12)',
             borderRadius: '24px',
-            padding: '16px',
+            padding: '14px 12px',
             boxSizing: 'border-box',
             display: 'flex',
             flexDirection: 'column',
-            gap: '12px'
+            gap: '10px'
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div style={{ fontSize: '0.80rem', fontWeight: 800, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 4px' }}>
+              <div style={{ fontSize: '0.78rem', fontWeight: 900, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '8px', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
                 <Users size={15} color="#4ade80" />
-                <span>Gespeicherte Profile auf diesem Gerät</span>
+                <span>Wer übt heute?</span>
               </div>
-              <span style={{ fontSize: '0.68rem', color: 'rgba(255, 255, 255, 0.5)', fontWeight: 600 }}>
-                1-Tap Schnellstart
+              <span style={{ 
+                fontSize: '0.66rem', 
+                color: '#4ade80', 
+                background: 'rgba(34, 197, 94, 0.15)', 
+                border: '1px solid rgba(74, 222, 128, 0.25)', 
+                padding: '2px 8px', 
+                borderRadius: '100px', 
+                fontWeight: 800,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}>
+                <Sparkles size={10} />
+                {savedFamilyProfiles.length > 1 ? `${savedFamilyProfiles.length} Profile` : '1-Tap Start'}
               </span>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {savedFamilyProfiles.map((p) => (
-                <div
-                  key={p.id}
-                  style={{
-                    background: 'rgba(255, 255, 255, 0.08)',
-                    border: '1px solid rgba(255, 255, 255, 0.12)',
-                    borderRadius: '16px',
-                    padding: '10px 14px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: '12px',
-                    transition: 'all 0.15s ease'
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
-                    <img 
-                      src={p.photo_url || getInstrumentAvatarUrl(p.instrument)} 
-                      alt={p.first_name}
-                      style={{
-                        width: '36px',
-                        height: '36px',
-                        borderRadius: '10px',
-                        objectFit: 'cover',
-                        border: '1px solid rgba(255,255,255,0.2)'
-                      }}
-                    />
-                    <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-                      <span style={{ fontSize: '0.84rem', fontWeight: 800, color: '#ffffff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {p.first_name} {p.last_name ? `${p.last_name[0]}.` : ''}
-                      </span>
-                      <span style={{ fontSize: '0.70rem', color: '#94a3b8', fontWeight: 600 }}>
-                        {p.instrument || 'Schüler'}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        sessionStorage.setItem('groovelab_user_id', p.id);
-                        sessionStorage.setItem('groovelab_location_mode', 'home');
-                        onLogin(p.id, true);
-                      }}
-                      style={{
-                        background: '#16a34a',
-                        color: '#ffffff',
-                        border: 'none',
-                        borderRadius: '10px',
-                        padding: '7px 14px',
-                        fontSize: '0.76rem',
-                        fontWeight: 800,
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '5px',
-                        boxShadow: '0 2px 8px rgba(22, 163, 74, 0.3)'
-                      }}
-                    >
-                      <span>Starten</span>
-                      <ArrowRight size={13} />
-                    </button>
+            {/* Horizontal Snap-Stream Carousel (Smooth swipe on iOS/iPad & trackpad on Mac) */}
+            <div style={{ 
+              display: 'flex', 
+              gap: '10px', 
+              justifyContent: savedFamilyProfiles.length <= 2 ? 'center' : 'flex-start', 
+              alignItems: 'stretch', 
+              overflowX: 'auto',
+              scrollSnapType: 'x mandatory',
+              WebkitOverflowScrolling: 'touch',
+              scrollbarWidth: 'none',
+              padding: '4px 6px 6px 6px',
+              maskImage: savedFamilyProfiles.length > 2 
+                ? 'linear-gradient(to right, transparent 0%, black 14px, black calc(100% - 14px), transparent 100%)' 
+                : 'none',
+              width: '100%',
+              boxSizing: 'border-box'
+            }}>
+              {savedFamilyProfiles.map((p) => {
+                const avatarSrc = getInstrumentAvatarUrl(p.instrument || p.groovelab_instrument || '');
+                const displayLastName = p.last_name ? (p.last_name.trim().length > 1 ? `${p.last_name.trim()[0]}.` : p.last_name) : '';
+                const formattedBadge = formatInstrumentBadge(p.instrument || p.groovelab_instrument);
+                return (
+                  <div
+                    key={p.id}
+                    onClick={() => {
+                      sessionStorage.setItem('groovelab_user_id', p.id);
+                      sessionStorage.setItem('groovelab_location_mode', 'home');
+                      onLogin(p.id, true);
+                    }}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`Als ${p.first_name} anmelden`}
+                    style={{
+                      flex: '0 0 auto',
+                      width: '108px',
+                      scrollSnapAlign: 'center',
+                      background: 'rgba(255, 255, 255, 0.07)',
+                      border: '1px solid rgba(255, 255, 255, 0.14)',
+                      borderRadius: '20px',
+                      padding: '12px 6px 10px 6px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      cursor: 'pointer',
+                      position: 'relative',
+                      boxSizing: 'border-box',
+                      transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+                      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.15)'
+                    }}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.transform = 'translateY(-3px) scale(1.03)';
+                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.13)';
+                      e.currentTarget.style.borderColor = 'rgba(74, 222, 128, 0.5)';
+                      e.currentTarget.style.boxShadow = '0 10px 24px -4px rgba(34, 197, 94, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.3)';
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.transform = 'none';
+                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.07)';
+                      e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.14)';
+                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.15)';
+                    }}
+                  >
+                    {/* Delete / Remove Profile Button (floating on top right corner) */}
                     <button
                       type="button"
                       onClick={(e) => {
@@ -4486,53 +4582,156 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                         localStorage.setItem('campus_family_profiles', JSON.stringify(updated));
                       }}
                       title="Profil von diesem Gerät entfernen"
+                      aria-label={`${p.first_name} von diesem Gerät entfernen`}
                       style={{
-                        background: 'transparent',
-                        border: 'none',
-                        color: 'rgba(255, 255, 255, 0.35)',
-                        cursor: 'pointer',
-                        padding: '6px',
-                        borderRadius: '8px',
+                        position: 'absolute',
+                        top: '-4px',
+                        right: '-4px',
+                        width: '19px',
+                        height: '19px',
+                        borderRadius: '50%',
+                        background: 'rgba(15, 23, 42, 0.75)',
+                        backdropFilter: 'blur(8px)',
+                        border: '1px solid rgba(255, 255, 255, 0.30)',
                         display: 'flex',
                         alignItems: 'center',
-                        justifyContent: 'center'
+                        justifyContent: 'center',
+                        color: 'rgba(255, 255, 255, 0.65)',
+                        cursor: 'pointer',
+                        padding: 0,
+                        zIndex: 5,
+                        boxShadow: '0 2px 6px rgba(0,0,0,0.35)',
+                        transition: 'all 0.15s ease'
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.background = '#ef4444';
+                        e.currentTarget.style.color = '#ffffff';
+                        e.currentTarget.style.borderColor = '#ef4444';
+                        e.currentTarget.style.transform = 'scale(1.15)';
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.background = 'rgba(15, 23, 42, 0.75)';
+                        e.currentTarget.style.color = 'rgba(255, 255, 255, 0.65)';
+                        e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.30)';
+                        e.currentTarget.style.transform = 'none';
                       }}
                     >
-                      <X size={14} />
+                      <X size={10} />
                     </button>
+
+                    {/* Apple Squircle Avatar with glowing border */}
+                    <div style={{
+                      position: 'relative',
+                      width: '54px',
+                      height: '54px',
+                      borderRadius: '16px',
+                      overflow: 'hidden',
+                      border: '1.5px solid rgba(255, 255, 255, 0.45)',
+                      boxShadow: '0 6px 14px rgba(0,0,0,0.30), inset 0 1px 0 rgba(255,255,255,0.5)',
+                      background: '#0c0f12',
+                      flexShrink: 0
+                    }}>
+                      <img 
+                        src={avatarSrc} 
+                        alt={p.first_name}
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          objectFit: 'cover'
+                        }}
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = '/avatar_ghost.jpg';
+                        }}
+                      />
+                    </div>
+
+                    {/* Name */}
+                    <span style={{
+                      fontSize: '0.82rem',
+                      fontWeight: 850,
+                      color: '#ffffff',
+                      marginTop: '8px',
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      width: '100%',
+                      textAlign: 'center',
+                      letterSpacing: '-0.01em'
+                    }}>
+                      {p.first_name} {displayLastName}
+                    </span>
+
+                    {/* Formatted Instrument Badge */}
+                    <span style={{
+                      fontSize: '0.64rem',
+                      fontWeight: 750,
+                      color: '#a7f3d0',
+                      background: 'rgba(52, 168, 83, 0.22)',
+                      border: '1px solid rgba(52, 168, 83, 0.35)',
+                      borderRadius: '6px',
+                      padding: '1.5px 6px',
+                      marginTop: '4px',
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      maxWidth: '100%',
+                      textAlign: 'center'
+                    }}>
+                      {formattedBadge}
+                    </span>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}
 
-        <div style={{ fontSize: '11px', fontWeight: 800, color: isGroovelabKiosk ? 'rgba(0, 0, 0, 0.6)' : 'rgba(255, 255, 255, 0.6)', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px', width: '100%', justifyContent: 'center' }}>
-          <Tablet size={14} style={{ color: isGroovelabKiosk ? '#78350f' : '#e6f4ea' }} />
-          {isGroovelabKiosk 
-            ? (effectiveStationId ? 'GROOVELAB QR-CODE SCANNEN' : 'Groovelab Kiosk einrichten') 
-            : 'Standard Login über Groovelab QR-Ausweis'}
+        {/* Elegant Apple Section Divider */}
+        <div style={{
+          width: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px',
+          margin: '10px 0 16px 0'
+        }}>
+          <div style={{ flex: 1, height: '1px', background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.15))' }} />
+          <span style={{
+            fontSize: '10px',
+            fontWeight: 800,
+            color: isGroovelabKiosk ? 'rgba(0, 0, 0, 0.6)' : 'rgba(255, 255, 255, 0.55)',
+            textTransform: 'uppercase',
+            letterSpacing: '0.08em',
+            whiteSpace: 'nowrap',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px'
+          }}>
+            <Tablet size={12} style={{ color: isGroovelabKiosk ? '#78350f' : '#4ade80' }} />
+            {isGroovelabKiosk 
+              ? (effectiveStationId ? 'GROOVELAB QR-CODE SCANNEN' : 'GrooveLab Kiosk einrichten') 
+              : 'ODER QR-AUSWEIS SCANNEN'}
+          </span>
+          <div style={{ flex: 1, height: '1px', background: 'linear-gradient(90deg, rgba(255,255,255,0.15), transparent)' }} />
         </div>
 
-        {/* Standard Camera Box (for standard login) */}
+        {/* Standard Camera Box (Apple Liquid-Glass Viewfinder) */}
         {!isGroovelabKiosk && (
           <div style={{
             width: '100%',
             aspectRatio: '1/1',
             borderRadius: '32px',
             overflow: 'hidden',
-            background: '#ffffff',
+            background: 'rgba(255, 255, 255, 0.08)',
             position: 'relative',
-            boxShadow: 'inset 0 3px 10px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.05), 0 16px 36px rgba(0, 0, 0, 0.07)',
-            border: '1px solid #e2e8f0',
-            borderBottomColor: '#cbd5e1', // Skeuomorphic top-down light border
-            padding: '4.5px',
+            boxShadow: '0 20px 50px -10px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.25)',
+            border: '1px solid rgba(255, 255, 255, 0.18)',
+            padding: '5px',
             boxSizing: 'border-box'
           }}>
             <div style={{
               width: '100%',
               height: '100%',
-              borderRadius: '26px',
+              borderRadius: '27px',
               overflow: 'hidden',
               position: 'relative',
               background: '#0c0f12'
@@ -4541,11 +4740,37 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               <div style={{
                 position: 'absolute',
                 inset: 0,
-                boxShadow: 'inset 0 5px 15px rgba(0, 0, 0, 0.4)',
-                borderRadius: '26px',
+                boxShadow: 'inset 0 6px 20px rgba(0, 0, 0, 0.45)',
+                borderRadius: '27px',
                 pointerEvents: 'none',
                 zIndex: 9
               }} />
+
+              {/* Apple Live Status Pill */}
+              <div style={{
+                position: 'absolute',
+                top: '12px',
+                left: '12px',
+                zIndex: 15,
+                background: 'rgba(0, 0, 0, 0.50)',
+                backdropFilter: 'blur(10px)',
+                WebkitBackdropFilter: 'blur(10px)',
+                border: '1px solid rgba(255, 255, 255, 0.22)',
+                borderRadius: '100px',
+                padding: '3.5px 9px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                fontSize: '9.5px',
+                fontWeight: 800,
+                color: '#ffffff',
+                letterSpacing: '0.04em',
+                pointerEvents: 'none'
+              }}>
+                <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#4ade80', boxShadow: '0 0 8px #4ade80' }} />
+                <span>LIVE</span>
+              </div>
+
               {isCameraActive && !cameraHasError ? (
                 <>
                   <CustomQRScanner
@@ -4565,7 +4790,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                     facingMode={facingMode}
                   />
   
-                  {/* Scanner UI Overlay: Animated scan laser and bounding target corners */}
+                  {/* Scanner UI Overlay: Apple VisionKit Reticle & Laser */}
                   <div style={{
                     position: 'absolute',
                     inset: 0,
@@ -4573,10 +4798,10 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                     zIndex: 10
                   }}>
                     {/* 4 Corner brackets for scanner target */}
-                    <div style={{ position: 'absolute', top: '20px', left: '20px', width: '24px', height: '24px', borderTop: '3px solid #eab308', borderLeft: '3px solid #eab308', borderTopLeftRadius: '8px' }} />
-                    <div style={{ position: 'absolute', top: '20px', right: '20px', width: '24px', height: '24px', borderTop: '3px solid #eab308', borderRight: '3px solid #eab308', borderTopRightRadius: '8px' }} />
-                    <div style={{ position: 'absolute', bottom: '20px', left: '20px', width: '24px', height: '24px', borderBottom: '3px solid #eab308', borderLeft: '3px solid #eab308', borderBottomLeftRadius: '8px' }} />
-                    <div style={{ position: 'absolute', bottom: '20px', right: '20px', width: '24px', height: '24px', borderBottom: '3px solid #eab308', borderRight: '3px solid #eab308', borderBottomRightRadius: '8px' }} />
+                    <div style={{ position: 'absolute', top: '22px', left: '22px', width: '26px', height: '26px', borderTop: '3.5px solid #4ade80', borderLeft: '3.5px solid #4ade80', borderTopLeftRadius: '10px' }} />
+                    <div style={{ position: 'absolute', top: '22px', right: '22px', width: '26px', height: '26px', borderTop: '3.5px solid #4ade80', borderRight: '3.5px solid #4ade80', borderTopRightRadius: '10px' }} />
+                    <div style={{ position: 'absolute', bottom: '22px', left: '22px', width: '26px', height: '26px', borderBottom: '3.5px solid #4ade80', borderLeft: '3.5px solid #4ade80', borderBottomLeftRadius: '10px' }} />
+                    <div style={{ position: 'absolute', bottom: '22px', right: '22px', width: '26px', height: '26px', borderBottom: '3.5px solid #4ade80', borderRight: '3.5px solid #4ade80', borderBottomRightRadius: '10px' }} />
                     
                     {/* Animated Laser line */}
                     <div style={{
@@ -4584,8 +4809,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                       left: 0,
                       width: '100%',
                       height: '80px',
-                      background: 'linear-gradient(180deg, rgba(234, 179, 8, 0) 0%, rgba(234, 179, 8, 0.08) 50%, rgba(234, 179, 8, 0) 100%)',
-                      filter: 'blur(6px)',
+                      background: 'linear-gradient(180deg, rgba(74, 222, 128, 0) 0%, rgba(74, 222, 128, 0.12) 50%, rgba(74, 222, 128, 0) 100%)',
+                      filter: 'blur(5px)',
                       animation: 'scanLaser 4s ease-in-out infinite',
                       pointerEvents: 'none'
                     }} />
@@ -4614,21 +4839,21 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                       width: '38px',
                       height: '38px',
                       borderRadius: '50%',
-                      background: 'rgba(255, 255, 255, 0.15)',
+                      background: 'rgba(0, 0, 0, 0.45)',
                       backdropFilter: 'blur(10px)',
                       WebkitBackdropFilter: 'blur(10px)',
-                      border: '1px solid rgba(255, 255, 255, 0.25)',
+                      border: '1px solid rgba(255, 255, 255, 0.35)',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
                       cursor: 'pointer',
                       color: 'white',
-                      boxShadow: '0 4px 10px rgba(0,0,0,0.15)',
+                      boxShadow: '0 4px 10px rgba(0,0,0,0.25)',
                       transition: 'all 0.2s ease',
                       outline: 'none'
                     }}
-                    onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)'; }}
-                    onMouseOut={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)'; }}
+                    onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(0, 0, 0, 0.65)'; }}
+                    onMouseOut={(e) => { e.currentTarget.style.background = 'rgba(0, 0, 0, 0.45)'; }}
                     title="Kamera wechseln"
                   >
                     <RotateCw size={18} />
@@ -5272,7 +5497,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               ) : (
                 <>
                   <Tablet size={16} color="#e6f4ea" />
-                  Im GrooveLab anmelden
+                  GrooveLab Kiosk-Modus
                 </>
               )}
             </button>
@@ -5583,35 +5808,52 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       </div>
       )}
 
-      {/* Passwort Anmeldung & Eltern-Onboarding buttons under the card if available */}
+      {/* Passwort Anmeldung & Biometrie Horizontal Apple Glass Dock */}
       {expandedSection === 'none' && !isGroovelabKiosk && (
-        <div style={{ marginTop: '24px', display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center' }}>
+        <div style={{ 
+          marginTop: '20px', 
+          display: 'flex', 
+          flexDirection: 'row', 
+          flexWrap: 'wrap', 
+          gap: '10px', 
+          alignItems: 'center', 
+          justifyContent: 'center',
+          maxWidth: '420px',
+          width: '100%'
+        }}>
           {biometricsAvailable && (
             <button 
               onClick={handleBiometricsLogin}
               style={{ 
-                background: isGroovelabKiosk ? 'rgba(0, 0, 0, 0.06)' : 'rgba(255, 255, 255, 0.08)', 
-                border: isGroovelabKiosk ? '1px solid rgba(0, 0, 0, 0.12)' : '1px solid rgba(255, 255, 255, 0.15)', 
-                padding: '10px 24px',
+                background: 'rgba(255, 255, 255, 0.08)', 
+                border: '1px solid rgba(255, 255, 255, 0.15)', 
+                padding: '9px 18px',
                 borderRadius: '100px',
-                color: isGroovelabKiosk ? '#062413' : '#ffffff', 
-                fontSize: '12px', 
+                color: '#ffffff', 
+                fontSize: '11.5px', 
                 fontWeight: 800, 
                 textTransform: 'uppercase', 
                 letterSpacing: '0.05em', 
                 cursor: 'pointer', 
-                transition: 'all 0.2s',
-                backdropFilter: 'blur(10px)',
-                WebkitBackdropFilter: 'blur(10px)',
-                display: 'flex',
+                transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                backdropFilter: 'blur(12px)',
+                WebkitBackdropFilter: 'blur(12px)',
+                display: 'inline-flex',
                 alignItems: 'center',
-                gap: '8px'
+                gap: '7px',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.15), inset 0 1px 0 rgba(255,255,255,0.2)'
               }}
-              onMouseOver={(e) => { e.currentTarget.style.background = isGroovelabKiosk ? 'rgba(0, 0, 0, 0.12)' : 'rgba(255, 255, 255, 0.16)'; }}
-              onMouseOut={(e) => { e.currentTarget.style.background = isGroovelabKiosk ? 'rgba(0, 0, 0, 0.06)' : 'rgba(255, 255, 255, 0.08)'; }}
+              onMouseOver={(e) => { 
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.16)'; 
+                e.currentTarget.style.transform = 'translateY(-1px)';
+              }}
+              onMouseOut={(e) => { 
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'; 
+                e.currentTarget.style.transform = 'none';
+              }}
             >
-              <Fingerprint size={14} color={isGroovelabKiosk ? '#062413' : '#e6f4ea'} />
-              Fingerabdruck Login
+              <Fingerprint size={13} color="#4ade80" />
+              Fingerabdruck
             </button>
           )}
 
@@ -5621,26 +5863,33 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               style={{ 
                 background: 'rgba(255, 255, 255, 0.08)', 
                 border: '1px solid rgba(255, 255, 255, 0.15)', 
-                padding: '10px 24px',
+                padding: '9px 18px',
                 borderRadius: '100px',
                 color: '#ffffff', 
-                fontSize: '12px', 
+                fontSize: '11.5px', 
                 fontWeight: 800, 
                 textTransform: 'uppercase', 
                 letterSpacing: '0.05em', 
                 cursor: 'pointer', 
-                transition: 'all 0.2s',
-                backdropFilter: 'blur(10px)',
-                WebkitBackdropFilter: 'blur(10px)',
-                display: 'flex',
+                transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                backdropFilter: 'blur(12px)',
+                WebkitBackdropFilter: 'blur(12px)',
+                display: 'inline-flex',
                 alignItems: 'center',
-                gap: '8px'
+                gap: '7px',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.15), inset 0 1px 0 rgba(255,255,255,0.2)'
               }}
-              onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.16)'; }}
-              onMouseOut={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'; }}
+              onMouseOver={(e) => { 
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.16)'; 
+                e.currentTarget.style.transform = 'translateY(-1px)';
+              }}
+              onMouseOut={(e) => { 
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'; 
+                e.currentTarget.style.transform = 'none';
+              }}
             >
-              <KeyRound size={14} color="#e6f4ea" />
-              Passwort Anmeldung
+              <KeyRound size={13} color="#4ade80" />
+              Passwort Login
             </button>
           )}
         </div>
@@ -6938,33 +7187,33 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         gap: '16px', 
         fontSize: '11px', 
         fontWeight: 800, 
-        color: '#34a853',
+        color: isGroovelabKiosk ? '#854d0e' : '#4ade80',
         textTransform: 'uppercase',
         letterSpacing: '0.05em'
       }}>
         <span 
           onClick={() => setLegalModalTab('privacy')} 
           style={{ cursor: 'pointer', transition: 'color 0.2s' }} 
-          onMouseOver={(e) => { e.currentTarget.style.color = '#34a853'; }}
-          onMouseOut={(e) => { e.currentTarget.style.color = '#34a853'; }}
+          onMouseOver={(e) => { e.currentTarget.style.color = isGroovelabKiosk ? '#713f12' : '#ffffff'; }}
+          onMouseOut={(e) => { e.currentTarget.style.color = isGroovelabKiosk ? '#854d0e' : '#4ade80'; }}
         >
           Datenschutz
         </span>
-        <span style={{ opacity: 0.3 }}>•</span>
+        <span style={{ opacity: 0.4 }}>•</span>
         <span 
           onClick={() => setLegalModalTab('terms')} 
           style={{ cursor: 'pointer', transition: 'color 0.2s' }} 
-          onMouseOver={(e) => { e.currentTarget.style.color = '#34a853'; }}
-          onMouseOut={(e) => { e.currentTarget.style.color = '#34a853'; }}
+          onMouseOver={(e) => { e.currentTarget.style.color = isGroovelabKiosk ? '#713f12' : '#ffffff'; }}
+          onMouseOut={(e) => { e.currentTarget.style.color = isGroovelabKiosk ? '#854d0e' : '#4ade80'; }}
         >
           AGB
         </span>
-        <span style={{ opacity: 0.3 }}>•</span>
+        <span style={{ opacity: 0.4 }}>•</span>
         <span 
           onClick={() => setLegalModalTab('impressum')} 
           style={{ cursor: 'pointer', transition: 'color 0.2s' }} 
-          onMouseOver={(e) => { e.currentTarget.style.color = '#34a853'; }}
-          onMouseOut={(e) => { e.currentTarget.style.color = '#34a853'; }}
+          onMouseOver={(e) => { e.currentTarget.style.color = isGroovelabKiosk ? '#713f12' : '#ffffff'; }}
+          onMouseOut={(e) => { e.currentTarget.style.color = isGroovelabKiosk ? '#854d0e' : '#4ade80'; }}
         >
           Impressum
         </span>

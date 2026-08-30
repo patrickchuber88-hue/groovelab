@@ -711,20 +711,21 @@ export function DpoAuditPortal({ onClose, schoolName = 'Stadtmusikschule', schoo
                   {[
                     {
                       title: 'I. Art. 32 Abs. 1 lit. a DSGVO – Pseudonymisierung & Verschlüsselung',
-                      desc: 'TLS 1.3 HSTS Verschlüsselung, AES-256 At-Rest, Client-Side Data Minimization (Geburtsmonat/-jahr Filterung im Browser), DSGVO-Nachnamensmaskierung als Privacy-Default.'
+                      desc: 'TLS 1.3 HSTS Verschlüsselung, clientseitige AES-256-GCM Hardware-Vaults (Web Crypto API), OWASP-konformes PBKDF2 PIN-Hashing (100.000 SHA-256 Runden), HMAC-SHA256 Blind Indexing, DSGVO-Nachnamensmaskierung als Privacy-Default.'
                     },
                     {
                       title: 'II. Art. 32 Abs. 1 lit. b DSGVO – Vertraulichkeit & Integrität',
-                      desc: 'Strikte Row-Level Security (RLS) Mandantentrennung, Brute-Force Lockout, Mikrofonschutz auf OS-Ebene, 48h Chat-Freeze für Dienstaufsicht, WORM Audit-Logs in deutscher Ortszeit.'
+                      desc: 'Strikte PostgreSQL Row-Level Security (RLS) Mandantentrennung, Zero-Trust Session-Leasing mit 1-Click Remote-Logout, FIDO2/WebAuthn Klon-Schutz, serverseitiges Brute-Force Lockout, Mikrofonschutz auf OS-Ebene, manipulationssichere SHA-256 Merkle-Chain Audit-Ledger.'
                     },
                     {
                       title: 'III. Art. 32 Abs. 1 lit. c DSGVO – Verfügbarkeit & Belastbarkeit',
-                      desc: 'Automatisierte tägliche Offsite-Backups im RZ Falkenstein (Deutschland), 99.9% Uptime SLA, Disaster Recovery Notfallplan.'
+                      desc: 'Automatisierte tägliche Offsite-Backups im RZ Falkenstein (Deutschland), 99.9% Uptime SLA, Disaster Recovery Notfallplan, automatischer Maintenance-Janitor.'
                     },
                     {
                       title: 'IV. Art. 32 Abs. 1 lit. d DSGVO – Überprüfung & Evaluierung',
-                      desc: 'Jährliche externe Penetration-Tests, automatisierte Schwachstellen-Scans in CI/CD, regelmäßige DSB-Audit-Freigaben.'
+                      desc: 'Laufende automatisierte CI/CD Sicherheits-Audits, Rate-Limit Monitoring, 1-Click Ausweis-Sofortsperre und transparentes DSB-Audit-Cockpit.'
                     }
+
                   ].map((item, idx) => (
                     <div key={idx} style={{
                       background: '#f8fafc',

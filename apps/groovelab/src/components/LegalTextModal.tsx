@@ -268,24 +268,25 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
               </div>
 
               <div>
-                <strong style={{ color: '#0f172a' }}>3. Einsatz von technisch notwendigen Speichermedien (§ 25 Abs. 2 Nr. 2 TDDDG)</strong><br />
-                Es werden ausschließlich technisch zwingend erforderliche LocalStorage- und SessionStorage-Einträge zur Aufrechterhaltung der Session und zur sicheren Kiosk-Kopplung (z. B. <code style={{ background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px' }}>groovelab_kiosk_token</code>) verwendet. <strong>Es werden keine Tracking-Cookies, Werbe-Cookies oder Drittanbieter-Analyse-Tools eingesetzt.</strong>
+                <strong style={{ color: '#0f172a' }}>3. Einsatz von technisch notwendigen Speichermedien &amp; AES-256-GCM Vault (§ 25 Abs. 2 Nr. 2 TDDDG)</strong><br />
+                Es werden ausschließlich technisch zwingend erforderliche LocalStorage- und SessionStorage-Einträge zur Aufrechterhaltung der Session und zur sicheren Kiosk-Kopplung verwendet. Lokale Profil- und PIN-Caches werden auf dem Endgerät mit <strong>AES-256-GCM (Web Crypto API)</strong> hardware-gebunden verschlüsselt abgelegt. <strong>Es werden keine Tracking-Cookies, Werbe-Cookies oder Drittanbieter-Analyse-Tools eingesetzt.</strong>
               </div>
 
               <div>
                 <strong style={{ color: '#0f172a' }}>4. Eltern-Einwilligung bei Minderjährigen (Art. 8 DSGVO / Art. 6 CH-nDSG)</strong><br />
-                Für Schüler unter 16 Jahren (DE/AT) bzw. 13 Jahren (CH) ist die Zustimmung der Erziehungsberechtigten erforderlich. Diese wird im digitalen Onboarding-Flow abgefragt und serverseitig mit Zeitstempel, Einwilligungsversion und Eltern-E-Mail protokolliert.
+                Für Schüler unter 16 Jahren (DE/AT) bzw. 13 Jahren (CH) ist die Zustimmung der Erziehungsberechtigten erforderlich. Diese wird im digitalen Onboarding-Flow abgefragt und serverseitig in einem revisionssicheren, manipulationsgeschützten <strong>SHA-256 Merkle-Chain Audit-Ledger</strong> mit Zeitstempel, Einwilligungsversion und Eltern-E-Mail protokolliert.
               </div>
 
               <div>
-                <strong style={{ color: '#0f172a' }}>5. Audio-Loopstation, Aufnahmen & Hardware-Sicherheit</strong><br />
-                Audiodaten aus der In-App Loopstation werden lokal verarbeitet und verschlüsselt im EU-Cloud-Speicher abgelegt. Nach dem Löschen einer Aufnahme wird die Datei physisch aus dem Storage entfernt. Bei Verlassen des Moduls oder Tab-Wechsel schaltet ein automatischer Guard alle Mikrofon-Tracks (<code style={{ background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px' }}>MediaStreamTrack.stop()</code>) ab.
+                <strong style={{ color: '#0f172a' }}>5. Zero-Trust Session-Leasing, Audio-Tresor &amp; Hardware-Sicherheit</strong><br />
+                Audiodaten aus der In-App Loopstation und dem Meisterwerk-Protokoll werden verschlüsselt im EU-Cloud-Speicher abgelegt und sind durch mandanten- und schülerspezifische Storage-RLS-Policies geschützt. Nach dem Löschen einer Aufnahme wird die Datei physisch und vollständig aus dem Cloud-Speicher entfernt. PINs werden mit <strong>OWASP-konformem PBKDF2 Zero-Knowledge Hashing (100.000 Runden)</strong> verarbeitet. Das integrierte <strong>Zero-Trust Session-Leasing</strong> ermöglicht Schulleitung und Lehrkräften jederzeit den 1-Click Remote-Logout aktiver Geräte. Bei Verlassen des Moduls oder Tab-Wechsel schaltet ein automatischer Guard alle Mikrofon-Tracks (<code style={{ background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px' }}>MediaStreamTrack.stop()</code>) ab.
               </div>
 
               <div>
-                <strong style={{ color: '#0f172a' }}>6. Hosting in ISO 27001-zertifizierten Rechenzentren (§ 28 DSGVO)</strong><br />
-                Das Hosting von App und Datenbank erfolgt zu 100% in ISO 27001-zertifizierten deutschen Rechenzentren (Hetzner Online GmbH, Falkenstein, DE & Supabase EU, Frankfurt) mit Auftragsverarbeitungsverträgen (AVV) nach Art. 28 DSGVO.
+                <strong style={{ color: '#0f172a' }}>6. Hosting in ISO 27001-zertifizierten Rechenzentren (Art. 28 DSGVO)</strong><br />
+                Das Hosting von App und Datenbank erfolgt zu 100% in ISO 27001-zertifizierten deutschen Rechenzentren (Hetzner Online GmbH, Falkenstein/DE &amp; Supabase EU, Frankfurt am Main) mit Auftragsverarbeitungsverträgen (AVV) nach Art. 28 DSGVO.
               </div>
+
 
               <div>
                 <strong style={{ color: '#0f172a' }}>7. Betroffenenrechte (Art. 15 bis 22 DSGVO)</strong><br />

@@ -180,8 +180,9 @@ export const HelpCenterModal: React.FC<HelpCenterModalProps> = ({
         },
         {
           title: '4. Rechnungsprüfung & Tarife',
-          desc: 'Im Bereich Verwaltung die monatliche Hosting- und Bereitstellungsaufstellung prüfen (0,00 € Software-Lizenz; reine Cloud-Infrastruktur).'
+          desc: 'Im Bereich Verwaltung die monatliche Hosting- und Bereitstellungsaufstellung prüfen (0,00 € Software-Bereitstellung; reine Cloud- & Hosting-Infrastruktur).'
         }
+
       ]
     },
     {

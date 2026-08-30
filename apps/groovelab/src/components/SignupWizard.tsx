@@ -7,6 +7,10 @@ import {
 } from 'lucide-react';
 import { isWebAuthnSupported, registerUserBiometrics } from '../utils/webauthn';
 import { inlineAllImagesInElement } from './IDBadgeCard';
+import { isSubdomainReserved } from '../constants/reservedSubdomains';
+import { sanitizeSchoolName, sanitizeAddress, sanitizePersonName } from '../utils/inputSanitizer';
+import { generateHandoverUrl } from '../utils/cryptoAuth';
+
 
 interface SignupWizardProps {
   onBackToLogin: () => void;
@@ -26,18 +30,19 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
     last_name: string;
     qr_token: string;
     ausweis_nummer: string;
+    pin?: string;
     schoolName: string;
-    birthDay?: number;
     parent_pin?: string;
   } | null>(null);
 
   const handleCopyCredentials = () => {
     if (!createdUser) return;
-    const text = `Campus-Groovelab Zugangsdaten für ${createdUser.first_name} ${createdUser.last_name}:\nAusweis-PIN: ${createdUser.ausweis_nummer}\nGeräte-PIN: ${String(createdUser.birthDay || '').padStart(2, '0')}`;
+    const text = `Campus-Groovelab Zugangsdaten für ${createdUser.first_name} ${createdUser.last_name}:\nMaster-PIN: ${createdUser.pin || createdUser.ausweis_nummer}`;
     navigator.clipboard.writeText(text);
     setCopiedCredentials(true);
     setTimeout(() => setCopiedCredentials(false), 2500);
   };
+
 
   // Biometrische Login-States
   const [biometricsStatus, setBiometricsStatus] = useState<'idle' | 'registering' | 'success' | 'error'>('idle');
@@ -83,7 +88,8 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
     }
   };
 
-  // Step 1: School Info
+  // Step 1: School Info & DACH Country Selection
+  const [country, setCountry] = useState<'Deutschland' | 'Österreich' | 'Schweiz'>('Deutschland');
   const [schoolName, setSchoolName] = useState('');
   const [subdomain, setSubdomain] = useState('');
   const [subdomainAvailable, setSubdomainAvailable] = useState<boolean | null>(null);
@@ -95,36 +101,12 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
   const [city, setCity] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [schoolEmail, setSchoolEmail] = useState('');
-  const [isAccessGranted, setIsAccessGranted] = useState<boolean>(() => {
-    try {
-      return sessionStorage.getItem('cg_beta_dev_access') === 'true';
-    } catch (e) {
-      return false;
-    }
-  });
-  const [accessCodeInput, setAccessCodeInput] = useState('');
-  const [accessCodeError, setAccessCodeError] = useState<string | null>(null);
-  const [showAccessPassword, setShowAccessPassword] = useState(false);
-
-  const handleVerifyAccessCode = (e: React.FormEvent) => {
-    e.preventDefault();
-    const clean = accessCodeInput.trim().toLowerCase();
-    if (clean === 'campus-test' || clean === 'campustest') {
-      try {
-        sessionStorage.setItem('cg_beta_dev_access', 'true');
-      } catch (err) {}
-      setIsAccessGranted(true);
-      setAccessCodeError(null);
-    } else {
-      setAccessCodeError('Ungültiges Entwickler-Passwort. Bitte wende dich an das Campus-Groovelab Team.');
-    }
-  };
 
   // Step 2: Owner Info
   const [adminFirstName, setAdminFirstName] = useState('');
   const [adminLastName, setAdminLastName] = useState('');
-  const [adminBirthDay, setAdminBirthDay] = useState('');
   const [adminEmail, setAdminEmail] = useState('');
+
 
   // Step 3: OTP
   const [otpCode, setOtpCode] = useState('');
@@ -176,13 +158,20 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
       return;
     }
 
+    const cleanSlug = subdomain.trim().toLowerCase();
+    if (isSubdomainReserved(cleanSlug)) {
+      setSubdomainAvailable(false);
+      setCheckingSubdomain(false);
+      return;
+    }
+
     const delayDebounceFn = setTimeout(async () => {
       setCheckingSubdomain(true);
       try {
         const { data, error } = await supabase
           .from('schools')
           .select('id')
-          .eq('subdomain', subdomain.trim().toLowerCase())
+          .eq('subdomain', cleanSlug)
           .maybeSingle();
 
         if (error) throw error;
@@ -197,6 +186,7 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
 
     return () => clearTimeout(delayDebounceFn);
   }, [subdomain]);
+
 
   // Generate OTP code when entering step 3
   useEffect(() => {
@@ -244,21 +234,30 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
           let adminId = '';
           let generatedAdminPin = '';
           let qrToken = '';
-          const dummyEmail = schoolEmail.trim().toLowerCase() || `${subdomain.trim().toLowerCase()}@campus-groovelab.de`;
+          const cleanSchoolName = sanitizeSchoolName(schoolName);
+          const cleanStreet = sanitizeAddress(street);
+          const cleanHouseNumber = sanitizeAddress(houseNumber);
+          const cleanCity = sanitizeAddress(city);
+          const cleanAdminFirst = sanitizePersonName(adminFirstName);
+          const cleanAdminLast = sanitizePersonName(adminLastName);
+          const cleanEmail = schoolEmail.trim().toLowerCase();
+          const cleanSubdomain = subdomain.trim().toLowerCase();
 
           // 1. Try atomic RPC first (Bypasses all client-side RLS and transaction conflicts)
           const { data: rpcData, error: rpcErr } = await supabase.rpc('register_school_and_admin', {
-            p_school_name: schoolName.trim(),
-            p_subdomain: subdomain.trim().toLowerCase(),
-            p_street: street.trim(),
-            p_house_number: houseNumber.trim() || null,
+            p_school_name: cleanSchoolName,
+            p_subdomain: cleanSubdomain,
+            p_street: cleanStreet,
+            p_house_number: cleanHouseNumber || null,
             p_zip_code: zipCode.trim(),
-            p_city: city.trim(),
+            p_city: cleanCity,
             p_phone: phoneNumber.trim() || null,
-            p_school_email: schoolEmail.trim().toLowerCase(),
-            p_admin_first_name: adminFirstName.trim(),
-            p_admin_last_name: adminLastName.trim()
+            p_school_email: cleanEmail,
+            p_admin_first_name: cleanAdminFirst,
+            p_admin_last_name: cleanAdminLast,
+            p_country: country || 'Deutschland'
           });
+
 
           if (!rpcErr && rpcData?.success) {
             schoolId = rpcData.school_id;
@@ -287,7 +286,7 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
                 email: schoolEmail.trim().toLowerCase(),
                 billing_email: schoolEmail.trim().toLowerCase(),
                 billing_contact_person: `${adminFirstName.trim()} ${adminLastName.trim()}`,
-                country: 'Deutschland',
+                country: country || 'Deutschland',
                 has_campus_subscription: false,
                 has_groovelab_subscription: false,
                 storage_addon_gb: 0,
@@ -319,9 +318,9 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
                 school_id: schoolId,
                 role: 'admin',
                 roles: ['admin'],
-                first_name: adminFirstName.trim(),
-                last_name: adminLastName.trim(),
-                email: dummyEmail,
+                first_name: cleanAdminFirst,
+                last_name: cleanAdminLast,
+                email: cleanEmail,
                 password_hash: generatedAdminPin, // Auto-generated admin login PIN
                 qr_token: qrToken,
                 ausweis_nummer: generatedAdminPin,
@@ -339,26 +338,27 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
           // Automatically set complete session in localStorage & sessionStorage for immediate access
           const schoolObj = {
             id: schoolId,
-            name: schoolName.trim(),
-            subdomain: subdomain.trim().toLowerCase(),
+            name: cleanSchoolName,
+            subdomain: cleanSubdomain,
             primary_color: primaryColor,
-            street: street.trim(),
-            house_number: houseNumber.trim(),
+            street: cleanStreet,
+            house_number: cleanHouseNumber,
             zip_code: zipCode.trim(),
-            city: city.trim(),
-            country: 'Deutschland'
+            city: cleanCity,
+            country: country || 'Deutschland'
           };
           const userObj = {
             id: adminId,
             school_id: schoolId,
             role: 'admin',
             roles: ['admin'],
-            first_name: adminFirstName.trim(),
-            last_name: adminLastName.trim(),
-            email: dummyEmail,
+            first_name: cleanAdminFirst,
+            last_name: cleanAdminLast,
+            email: cleanEmail,
             photo_url: '/campus_login_hero.png',
             avatar_url: '/campus_login_hero.png'
           };
+
           localStorage.setItem('groovelab_session', JSON.stringify({ user: userObj, school: schoolObj, role: 'admin', token: adminId }));
           localStorage.setItem('groovelab_user', JSON.stringify(userObj));
           localStorage.setItem('groovelab_school', JSON.stringify(schoolObj));
@@ -374,9 +374,10 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
             last_name: adminLastName.trim(),
             qr_token: qrToken,
             ausweis_nummer: generatedAdminPin,
-            schoolName: schoolName.trim(),
-            birthDay: adminBirthDay ? parseInt(adminBirthDay, 10) : undefined
+            pin: generatedAdminPin,
+            schoolName: schoolName.trim()
           });
+
 
           // Transition to Step 3 success view
           setTimeout(() => {
@@ -460,7 +461,7 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
     document.body.removeChild(link);
   };
 
-  const handleNextStep1 = (e: React.FormEvent) => {
+  const handleNextStep1 = async (e: React.FormEvent) => {
     e.preventDefault();
     const trimmedSubdomain = subdomain.trim().toLowerCase();
     if (trimmedSubdomain.length < 3) {
@@ -471,15 +472,56 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
       setError('Die Wunsch-Subdomain darf nicht nur aus Bindestrichen bestehen.');
       return;
     }
-    if (!subdomainAvailable) {
-      setError('Bitte wähle eine verfügbare Wunsch-Subdomain.');
+    if (isSubdomainReserved(trimmedSubdomain)) {
+      setError('Diese Wunsch-Subdomain ist ein geschützter Systemname. Bitte wähle eine andere.');
       return;
     }
-    const zipRegex = /^[0-9]{5}$/;
-    if (!zipRegex.test(zipCode.trim())) {
-      setError('Die Postleitzahl (PLZ) muss aus genau 5 Ziffern bestehen.');
+
+
+    // Active synchronous check if check was not completed or in-flight
+    let isAvailable = subdomainAvailable;
+    if (isAvailable === null || checkingSubdomain) {
+      try {
+        const { data: existing, error: err } = await supabase
+          .from('schools')
+          .select('id')
+          .eq('subdomain', trimmedSubdomain)
+          .maybeSingle();
+        if (!err) {
+          isAvailable = existing ? false : true;
+          setSubdomainAvailable(isAvailable);
+        } else {
+          isAvailable = true; // Fallback
+        }
+      } catch (err) {
+        isAvailable = true;
+      }
+    }
+
+    if (isAvailable === false) {
+      setError('Diese Wunsch-Subdomain ist leider bereits vergeben. Bitte wähle eine andere.');
       return;
     }
+
+    // Country-specific PLZ validation & sanitization
+    const cleanZip = zipCode.trim().replace(/^(DE|D|AT|A|CH)-?/i, '').trim();
+    if (country === 'Deutschland') {
+      if (!/^[0-9]{5}$/.test(cleanZip)) {
+        setError('Die deutsche Postleitzahl (PLZ) muss aus genau 5 Ziffern bestehen (z.B. 10115).');
+        return;
+      }
+    } else if (country === 'Österreich') {
+      if (!/^[0-9]{4}$/.test(cleanZip)) {
+        setError('Die österreichische Postleitzahl (PLZ) muss aus genau 4 Ziffern bestehen (z.B. 1010).');
+        return;
+      }
+    } else if (country === 'Schweiz') {
+      if (!/^[0-9]{4}$/.test(cleanZip)) {
+        setError('Die Schweizer Postleitzahl (PLZ) muss aus genau 4 Ziffern bestehen (z.B. 8001).');
+        return;
+      }
+    }
+    setZipCode(cleanZip);
     setError(null);
     setStep(2);
   };
@@ -564,10 +606,10 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
 
       <div style={{
         width: '100%',
-        maxWidth: (step === 4 || step === 3 || !isAccessGranted) ? '440px' : '580px',
+        maxWidth: (step === 4 || step === 3) ? '440px' : '580px',
         background: 'rgba(255, 255, 255, 0.94)',
         borderRadius: '24px',
-        padding: (step === 3 || !isAccessGranted) ? '24px' : '38px',
+        padding: step === 3 ? '24px' : '36px',
         boxShadow: '0 30px 60px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.8)',
         border: '1px solid rgba(0, 0, 0, 0.08)',
         display: 'flex',
@@ -580,175 +622,75 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
         overflowY: 'auto',
         color: '#1e293b'
       }}>
-        {!isAccessGranted ? (
-          <div style={{ textAlign: 'center', padding: '8px 0 4px' }}>
-            <div style={{
-              width: '54px',
-              height: '54px',
-              borderRadius: '16px',
-              background: 'rgba(52, 168, 83, 0.1)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              margin: '0 auto 16px',
-              color: '#34a853'
-            }}>
-              <Lock size={26} />
-            </div>
-
-            <div style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              fontSize: '0.72rem',
-              fontWeight: 800,
-              color: '#34a853',
-              background: 'rgba(52, 168, 83, 0.08)',
-              border: '1px solid rgba(52, 168, 83, 0.25)',
-              padding: '4px 12px',
-              borderRadius: '100px',
-              textTransform: 'uppercase',
-              letterSpacing: '0.08em',
-              marginBottom: '12px'
-            }}>
-              <ShieldCheck size={13} />
-              Geschlossene Entwickler-Beta
-            </div>
-
-            <h2 style={{ fontSize: '1.35rem', fontWeight: 900, color: '#0f172a', margin: '0 0 8px 0', letterSpacing: '-0.02em' }}>
-              Entwickler-Schutz aktiv
-            </h2>
-
-            <p style={{ fontSize: '0.84rem', color: '#64748b', margin: '0 0 22px 0', lineHeight: 1.55 }}>
-              Die Neuregistrierung von Musikschulen ist während der aktuellen Beta-Phase passwortgeschützt.
-            </p>
-
-            {accessCodeError && (
-              <div style={{
-                background: '#fef2f2',
-                border: '1px solid #fecaca',
-                padding: '10px 14px',
-                borderRadius: '12px',
-                color: '#b91c1c',
-                fontSize: '0.78rem',
-                fontWeight: 700,
-                marginBottom: '16px',
-                textAlign: 'left'
-              }}>
-                {accessCodeError}
+        {/* Header (except for provisioning step) */}
+        {step < 3 && (
+          <div style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid rgba(0, 0, 0, 0.08)', paddingBottom: '18px', marginBottom: '22px', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: 'rgba(52, 168, 83, 0.1)', display: 'flex', alignItems: 'center', color: '#34a853', justifyContent: 'center' }}>
+                <School size={22} />
               </div>
-            )}
-
-            <form onSubmit={handleVerifyAccessCode} style={{ display: 'flex', flexDirection: 'column', gap: '14px', textAlign: 'left' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '11px', color: '#475569', fontWeight: 800, textTransform: 'uppercase', marginBottom: '6px', letterSpacing: '0.04em' }}>
-                  Entwickler-Passwort
-                </label>
-                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                  <input
-                    type={showAccessPassword ? 'text' : 'password'}
-                    required
-                    value={accessCodeInput}
-                    onChange={(e) => {
-                      setAccessCodeInput(e.target.value);
-                      if (accessCodeError) setAccessCodeError(null);
-                    }}
-                    placeholder="Passwort eingeben..."
-                    style={{ ...inputStyle, paddingRight: '44px' }}
-                    className="signup-input"
-                    autoFocus
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowAccessPassword(!showAccessPassword)}
-                    style={{
-                      position: 'absolute',
-                      right: '12px',
-                      background: 'transparent',
-                      border: 'none',
-                      color: '#94a3b8',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      padding: '4px'
-                    }}
-                  >
-                    {showAccessPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                  </button>
-                </div>
+              <div style={{ textAlign: 'left' }}>
+                <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#64748b', display: 'block', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Campus-Groovelab</span>
+                <span style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a', display: 'block', letterSpacing: '-0.02em' }}>Musikschule registrieren</span>
               </div>
-
-              <button
-                type="submit"
-                style={{
-                  background: 'linear-gradient(135deg, #34a853 0%, #2e7d32 100%)',
-                  color: '#ffffff',
-                  border: 'none',
-                  borderRadius: '14px',
-                  padding: '14px 20px',
-                  fontSize: '0.92rem',
-                  fontWeight: 800,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '8px',
-                  boxShadow: '0 4px 14px rgba(52, 168, 83, 0.25)',
-                  marginTop: '4px'
-                }}
-              >
-                <span>Freischalten &amp; Weiter</span>
-                <ArrowRight size={18} />
-              </button>
-
-              <button
-                type="button"
-                onClick={onBackToLogin}
-                style={{
-                  background: 'transparent',
-                  color: '#64748b',
-                  border: 'none',
-                  padding: '8px',
-                  fontSize: '0.80rem',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  marginTop: '2px'
-                }}
-              >
-                ← Zurück zur Startseite
-              </button>
-            </form>
+            </div>
+            <span style={{ fontSize: '0.78rem', fontWeight: 700, background: 'rgba(0, 0, 0, 0.05)', color: '#334155', padding: '6px 14px', borderRadius: '100px', border: '1px solid rgba(0, 0, 0, 0.03)' }}>
+              Schritt {step} von 2
+            </span>
           </div>
-        ) : (
-          <>
-            {/* Header (except for provisioning step) */}
-            {step < 3 && (
-              <div style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid rgba(0, 0, 0, 0.08)', paddingBottom: '20px', marginBottom: '24px', justifyContent: 'space-between' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: 'rgba(52, 168, 83, 0.1)', display: 'flex', alignItems: 'center', color: '#34a853', justifyContent: 'center' }}>
-                    <School size={22} />
-                  </div>
-                  <div style={{ textAlign: 'left' }}>
-                    <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#64748b', display: 'block', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Campus-Groovelab</span>
-                    <span style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a', display: 'block', letterSpacing: '-0.02em' }}>Musikschule registrieren</span>
-                  </div>
-                </div>
-                <span style={{ fontSize: '0.78rem', fontWeight: 700, background: 'rgba(0, 0, 0, 0.05)', color: '#334155', padding: '6px 14px', borderRadius: '100px', border: '1px solid rgba(0, 0, 0, 0.03)' }}>
-                  Schritt {step} von 2
-                </span>
-              </div>
-            )}
+        )}
 
-            {error && (
-              <div style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)', padding: '14px', borderRadius: '16px', color: '#b91c1c', fontSize: '13px', fontWeight: 700, marginBottom: '20px', textAlign: 'left' }}>
-                {error}
-              </div>
-            )}
+        {error && (
+          <div style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)', padding: '14px', borderRadius: '16px', color: '#b91c1c', fontSize: '13px', fontWeight: 700, marginBottom: '20px', textAlign: 'left' }}>
+            {error}
+          </div>
+        )}
 
         {/* STEP 1: SCHOOL INFO */}
         {step === 1 && (
-          <form onSubmit={handleNextStep1} style={{ display: 'flex', flexDirection: 'column', gap: '20px', textAlign: 'left' }}>
+          <form onSubmit={handleNextStep1} style={{ display: 'flex', flexDirection: 'column', gap: '18px', textAlign: 'left' }}>
+            {/* Country Selector (DACH Region) */}
+            <div>
+              <label style={{ display: 'block', fontSize: '11px', color: '#475569', fontWeight: 700, textTransform: 'uppercase', marginBottom: '8px', letterSpacing: '0.04em' }}>
+                Land *
+              </label>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+                {[
+                  { id: 'Deutschland', label: 'Deutschland', flag: '🇩🇪' },
+                  { id: 'Österreich', label: 'Österreich', flag: '🇦🇹' },
+                  { id: 'Schweiz', label: 'Schweiz', flag: '🇨🇭' }
+                ].map((c) => {
+                  const isSelected = country === c.id;
+                  return (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => setCountry(c.id as any)}
+                      style={{
+                        padding: '10px 6px',
+                        borderRadius: '14px',
+                        border: isSelected ? '2px solid #34a853' : '1px solid #e2e8f0',
+                        background: isSelected ? 'rgba(52, 168, 83, 0.08)' : '#ffffff',
+                        color: isSelected ? '#15803d' : '#475569',
+                        fontWeight: isSelected ? 800 : 600,
+                        fontSize: '0.82rem',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px',
+                        transition: 'all 0.15s ease',
+                        boxShadow: isSelected ? '0 2px 8px rgba(52, 168, 83, 0.15)' : 'none'
+                      }}
+                    >
+                      <span style={{ fontSize: '1.05rem' }}>{c.flag}</span>
+                      <span>{c.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
             <div>
               <label style={{ display: 'block', fontSize: '11px', color: '#475569', fontWeight: 700, textTransform: 'uppercase', marginBottom: '6px', letterSpacing: '0.04em' }}>Name der Musikschule *</label>
               <input
@@ -764,17 +706,42 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
 
             <div>
               <label style={{ display: 'block', fontSize: '11px', color: '#475569', fontWeight: 700, textTransform: 'uppercase', marginBottom: '6px', letterSpacing: '0.04em' }}>Wunsch-Subdomain *</label>
-              <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+              <div style={{ 
+                position: 'relative', 
+                display: 'flex', 
+                alignItems: 'center',
+                background: '#f8fafc',
+                border: '1px solid #e2e8f0',
+                borderRadius: '14px',
+                overflow: 'hidden'
+              }}>
                 <input
                   type="text"
                   required
                   value={subdomain}
                   onChange={(e) => setSubdomain(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
                   placeholder="musterschule"
-                  style={{ ...inputStyle, paddingRight: '160px' }}
+                  style={{
+                    flex: 1,
+                    minWidth: 0,
+                    border: 'none',
+                    background: 'transparent',
+                    padding: '12px 14px',
+                    fontSize: '14px',
+                    fontWeight: 700,
+                    color: '#0f172a',
+                    outline: 'none'
+                  }}
                   className="signup-input"
                 />
-                <span style={{ position: 'absolute', right: '16px', fontSize: '13px', fontWeight: 600, color: '#94a3b8', pointerEvents: 'none' }}>
+                <span style={{ 
+                  paddingRight: '14px', 
+                  fontSize: '12.5px', 
+                  fontWeight: 700, 
+                  color: '#64748b', 
+                  whiteSpace: 'nowrap',
+                  pointerEvents: 'none'
+                }}>
                   .campus-groovelab.de
                 </span>
               </div>
@@ -819,13 +786,15 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '12px' }}>
               <div>
-                <label style={{ display: 'block', fontSize: '11px', color: '#475569', fontWeight: 700, textTransform: 'uppercase', marginBottom: '6px' }}>PLZ *</label>
+                <label style={{ display: 'block', fontSize: '11px', color: '#475569', fontWeight: 700, textTransform: 'uppercase', marginBottom: '6px' }}>
+                  PLZ ({country === 'Deutschland' ? '5 Ziffern' : '4 Ziffern'}) *
+                </label>
                 <input
                   type="text"
                   required
                   value={zipCode}
                   onChange={(e) => setZipCode(e.target.value)}
-                  placeholder="12345"
+                  placeholder={country === 'Deutschland' ? '12345' : (country === 'Österreich' ? '1010' : '8001')}
                   style={inputStyle}
                   className="signup-input"
                 />
@@ -851,7 +820,7 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
                 required
                 value={phoneNumber}
                 onChange={(e) => setPhoneNumber(e.target.value)}
-                placeholder="+49 123 456789"
+                placeholder={country === 'Schweiz' ? '+41 44 123 45 67' : (country === 'Österreich' ? '+43 1 2345678' : '+49 123 456789')}
                 style={inputStyle}
                 className="signup-input"
               />
@@ -909,27 +878,8 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
               </div>
             </div>
 
-            <div>
-              <label style={{ display: 'block', fontSize: '11px', color: '#475569', fontWeight: 700, textTransform: 'uppercase', marginBottom: '6px' }}>Tag des Geburtstags (Geräte-PIN für QR-Anmeldung) *</label>
-              <select
-                required
-                value={adminBirthDay}
-                onChange={(e) => setAdminBirthDay(e.target.value)}
-                style={inputStyle}
-                className="signup-input"
-              >
-                <option value="">Bitte wählen...</option>
-                {Array.from({ length: 31 }, (_, i) => i + 1).map((day) => (
-                  <option key={day} value={day}>
-                    {String(day).padStart(2, '0')}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
 
-
-
-            <div style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>
               <button type="button" onClick={() => setStep(1)} style={backButtonStyle} className="signup-btn-back">Zurück</button>
               <button type="submit" style={nextButtonStyle} className="signup-btn-next">
                 Konto kostenlos erstellen <ArrowRight size={16} />
@@ -1087,15 +1037,14 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
                   {copiedCredentials ? 'Kopiert!' : 'Kopieren'}
                 </button>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px dashed #fde68a', paddingBottom: '3px' }}>
-                <span style={{ fontWeight: 700 }}>Ausweis-PIN:</span>
-                <span style={{ fontFamily: 'monospace', fontWeight: 900, fontSize: '0.85rem' }}>{createdUser.ausweis_nummer}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ fontWeight: 700 }}>Geräte-PIN:</span>
-                <span style={{ fontFamily: 'monospace', fontWeight: 900, fontSize: '0.85rem' }}>{String(createdUser.birthDay || '').padStart(2, '0')} (Tag des Geburtstags)</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontWeight: 700 }}>Master-PIN:</span>
+                <span style={{ fontFamily: 'monospace', fontWeight: 900, fontSize: '0.95rem', letterSpacing: '0.08em', color: '#92400e' }}>
+                  {createdUser.pin || createdUser.ausweis_nummer}
+                </span>
               </div>
             </div>
+
 
             {/* Action Stack (2-Column Grid for Downloads) */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%', maxWidth: '280px', marginTop: '2px' }}>
@@ -1204,8 +1153,6 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
               </button>
             </div>
           </div>
-        )}
-        </>
         )}
       </div>
     </div>

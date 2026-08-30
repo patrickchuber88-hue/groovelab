@@ -610,8 +610,9 @@ function StudentBillingInvoicesSection({ studentUser, studentId }: { studentUser
       }}>
         <ShieldCheck size={20} color="#15803d" style={{ flexShrink: 0 }} />
         <div style={{ fontSize: '0.78rem', color: '#475569', lineHeight: 1.4 }}>
-          <strong style={{ color: '#0f172a' }}>Keine Lizenzgebühren:</strong> Campus-Groovelab wird ohne Software-Lizenzkaufgebühren bereitgestellt. Es fallen ausschließlich transparente Cloud-Hosting- und Bereitstellungsgebühren an.
+          <strong style={{ color: '#0f172a' }}>Keine Lizenzkaufgebühren (0,00 €):</strong> Campus-Groovelab wird ohne Software-Lizenzkaufgebühren bereitgestellt. Es fallen ausschließlich transparente Cloud-Hosting- und Bereitstellungsgebühren an.
         </div>
+
       </div>
     </div>
   );

@@ -34012,7 +34012,28 @@ status: status,
                             </div>
                           </div>
 
-                          <div style={{ display: 'flex', gap: '10px' }}>
+                          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                            <button
+                              type="button"
+                              onClick={() => window.dispatchEvent(new CustomEvent('open_admin_security_suite'))}
+                              style={{
+                                background: '#ea4335',
+                                color: '#ffffff',
+                                border: 'none',
+                                padding: '8px 16px',
+                                borderRadius: '10px',
+                                fontWeight: 800,
+                                fontSize: '0.78rem',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                boxShadow: '0 4px 12px rgba(234, 67, 53, 0.25)'
+                              }}
+                              className="hover-scale"
+                            >
+                              <ShieldCheck size={14} /> Sicherheits- & Geräte-Zentrale
+                            </button>
                             <button
                               type="button"
                               onClick={() => setShowDpoPortalModal(true)}
@@ -34048,6 +34069,7 @@ status: status,
                                 display: 'flex',
                                 alignItems: 'center',
                                 gap: '6px',
+
                                 boxShadow: '0 4px 12px rgba(52, 168, 83, 0.25)'
                               }}
                               className="hover-scale"

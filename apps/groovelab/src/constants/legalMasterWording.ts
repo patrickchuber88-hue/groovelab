@@ -56,5 +56,16 @@ export const LEGAL_MASTER_WORDING = {
     onboardingConsent: 'Mit Klick auf „Kostenfrei freischalten“ akzeptieren Sie unsere AGB für Bildungseinrichtungen sowie die Vereinbarung zur Auftragsverarbeitung (AVV nach Art. 28 DSGVO).',
     b2bContractNature: 'Software-as-a-Service (SaaS)-Mietvertrag gemäß § 535 ff. BGB über schlüsselfertige Cloud-Infrastruktur.',
     kleinunternehmerUStG19: 'Gemäß § 19 UStG wird keine Umsatzsteuer berechnet (Kleinunternehmerregelung).'
+  },
+
+  // 5. Tier-1 Enterprise+ Sicherheits- & Kryptographie-Standards
+  securityStandards: {
+    clientVaultEncryption: 'Hardware-gebundene AES-256-GCM Verschlüsselung für alle lokalen Gerätedaten & PIN-Caches (Web Crypto API).',
+    zeroKnowledgeHashing: 'OWASP-konformes PBKDF2 Zero-Knowledge PIN-Hashing mit 100.000 SHA-256 Runden & kryptografischem Salz.',
+    sessionLeasing: 'Zero-Trust Session-Leasing mit hardware-gebundenem Fingerprinting und 1-Click Remote-Logout.',
+    immutableAuditLedger: 'Revisionssicheres, manipulationsgeschütztes Audit-Ledger mit kryptografischer SHA-256 Merkle-Chain (GoBD & DSGVO konform).',
+    fido2HardwareProtection: 'FIDO2 / WebAuthn Hardware Passkeys mit kryptografischem Signatur-Zähler zum Schutz vor Klon-Angriffen.',
+    dataMinimization: '100% DSGVO-konforme Datenminimierung: Keine Speicherung von SEPA-, Bank- oder Kreditkartendaten, keine E-Mail-Adressen Minderjähriger, automatische Nachnamensmaskierung.',
+    hostingInfrastructure: '100% Hosting in ISO 27001-zertifizierten deutschen Rechenzentren (Hetzner Falkenstein & Supabase Frankfurt).'
   }
 } as const;
