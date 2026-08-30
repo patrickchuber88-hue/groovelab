@@ -4176,8 +4176,8 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
         setAllowMessagesGlobal(schoolData.allow_messages_global ?? true);
         const hasCampus = schoolData.has_campus_subscription ?? false;
         const hasGroove = schoolData.has_groovelab_subscription ?? false;
-        setHasCampusSub(hasCampus);
-        setHasGroovelabSub(hasGroove);
+        setHasCampusSub(isBooked ? hasCampus : false);
+        setHasGroovelabSub(isBooked ? hasGroove : false);
         setCampusActivatedThisMonth(schoolData.campus_activated_this_month ?? false);
         setGroovelabActivatedThisMonth(schoolData.groovelab_activated_this_month ?? false);
         
@@ -4238,6 +4238,8 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
           if (typeof window !== 'undefined' && storedIsBookedStr !== 'false') {
             localStorage.removeItem(`isBillingBooked_${schoolId}`);
           }
+          setHasCampusSub(false);
+          setHasGroovelabSub(false);
         }
         
         setPendingUserQuota(schoolData.pending_user_quota);
