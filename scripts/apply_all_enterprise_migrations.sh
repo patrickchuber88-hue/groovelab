@@ -36,6 +36,7 @@ scp supabase/migrations/297_tier1_enterprise_goldstandard_security.sql \
     supabase/migrations/308_enterprise_force_rls_suite.sql \
     supabase/migrations/309_session_leases_and_master_auth_resolver.sql \
     supabase/migrations/310_harden_session_leases_policy.sql \
+    supabase/migrations/311_include_trial_schools_in_search.sql \
     "$SERVER:$REMOTE_TEMP/"
 
 # 4. Führe Migrationen nacheinander in supabase-db aus
@@ -81,15 +82,18 @@ ssh "$SERVER" "docker exec -i supabase-db psql -U postgres postgres < $REMOTE_TE
 echo "⚡ Führe Migration 310 aus (Granular Hardening of Session Leases Policies)..."
 ssh "$SERVER" "docker exec -i supabase-db psql -U postgres postgres < $REMOTE_TEMP/310_harden_session_leases_policy.sql"
 
+echo "⚡ Führe Migration 311 aus (Include Trial & Active Schools in Public Discovery RPC)..."
+ssh "$SERVER" "docker exec -i supabase-db psql -U postgres postgres < $REMOTE_TEMP/311_include_trial_schools_in_search.sql"
+
 echo "🧹 Bereinige temporäre Migrationsdateien..."
 ssh "$SERVER" "rm -rf $REMOTE_TEMP"
 
 echo ""
-echo "✅ Alle 14 Enterprise-Migrationen erfolgreich und fehlerfrei auf dem Produktiv-Container angewendet!"
+echo "✅ Alle 15 Enterprise-Migrationen erfolgreich und fehlerfrei auf dem Produktiv-Container angewendet!"
 ssh "$SERVER" "docker exec -t supabase-db psql -U postgres postgres -c \"NOTIFY pgrst, 'reload schema';\""
 
 # 6. Aufräumen
 ssh "$SERVER" "rm -rf $REMOTE_TEMP"
 
 echo ""
-echo "✅ Alle Enterprise Sicherheitsmigrationen (297-301) erfolgreich auf Live-Datenbank angewendet!"
+echo "✅ Alle Enterprise Sicherheitsmigrationen (297-311) erfolgreich auf Live-Datenbank angewendet!"
