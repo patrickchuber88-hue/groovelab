@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback, useRef, lazy, Suspens
 import { MUSIC_QUOTES, getQuotesForAudience, getDailyQuote } from '@groovelab/shared';
 import { usePremiumOnboardingTour, TourStartButton, TourStep } from './PremiumOnboardingTour';
 import { supabase, deleteUserStorageAssets } from '../lib/supabase';
-import { Monitor, Music, Award, Box, Plus, AlertCircle, AlertTriangle, User, Users, Star, TrendingUp, Shield, Zap, Play, Info, CheckCircle, Check, Search, Trash2, Bell, X, Clock, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, LayoutDashboard, LogOut, Flame, GraduationCap, UserPlus, Edit3, Calendar, Activity, CheckSquare, Mail, Copy, Sparkles, BookOpen, MessageSquare, Lock, Palmtree, Heart, Settings, Key, Sun, ThumbsUp, Building2, Hourglass, Eye, EyeOff, ShieldCheck, CheckCheck, CalendarX, Send, Lightbulb, Download, Sliders, Mic, Disc, Radio, Timer } from 'lucide-react';
+import { Monitor, Music, Award, Box, Plus, AlertCircle, AlertTriangle, User, Users, Star, TrendingUp, Shield, Zap, Play, Info, CheckCircle, Check, Search, Trash2, Bell, X, Clock, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, LayoutDashboard, LogOut, Flame, GraduationCap, UserPlus, Edit3, Calendar, Activity, CheckSquare, Mail, Copy, Sparkles, BookOpen, MessageSquare, Lock, Palmtree, Heart, Settings, Key, Sun, ThumbsUp, Building2, Hourglass, Eye, EyeOff, ShieldCheck, CheckCheck, CalendarX, Send, Lightbulb, Download, Sliders, Mic, Disc, Radio, Timer, ArrowRight } from 'lucide-react';
 import { TeacherDetailModal } from './TeacherDetailModal';
 import { StudentDetailModal } from './StudentDetailModal';
 import { checkIsAudioTresorActive } from '../domain/stickersAndTresor';
@@ -3191,6 +3191,8 @@ export function TeacherDashboard({
     return tomorrow.toLocaleDateString('sv-SE');
   });
   const [showCustomStart, setShowCustomStart] = useState(false);
+  const [showSickModal, setShowSickModal] = useState(false);
+  const [quickSickPreset, setQuickSickPreset] = useState<'today' | 'friday' | 'next_friday' | 'custom'>('today');
   const [reportingSick, setReportingSick] = useState(false);
   const [bypassSickView, setBypassSickView] = useState(false);
   const [sickSuccessShown, setSickSuccessShown] = useState(false);
@@ -6958,126 +6960,117 @@ useEffect(() => {
     return `${minutes}Min übrig`;
   };
 
-  const renderSickCardWidget = () => (
-    <div 
-      className="sick-card-container"
-      style={{ 
-        padding: isSickWidgetExpanded ? '18px 20px' : '12px 18px', 
-        borderRadius: '20px',
-        background: 'linear-gradient(135deg, #fff1f2 0%, #fff5f5 100%)',
-        boxShadow: '0 4px 20px rgba(239,68,68,0.10)',
-        border: '1.5px solid #fecaca',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '12px',
-        width: '100%',
-        boxSizing: 'border-box',
-        transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
-      }}
-    >
-      {/* Success / Gute Besserung screen */}
-      {sickSuccessShown ? (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', padding: '8px 0', textAlign: 'center' }}>
-          <span style={{ fontSize: '2.2rem', lineHeight: 1 }}>🌡️</span>
-          <div style={{ fontSize: '1.05rem', fontWeight: 900, color: '#b91c1c' }}>Krankmeldung eingereicht!</div>
-          <div style={{ fontSize: '0.82rem', fontWeight: 600, color: '#dc2626', lineHeight: 1.4 }}>
-            Die Verwaltung wurde benachrichtigt &amp; betroffene Stunden storniert.
+  const renderSickCardWidget = () => {
+    const isSick = Boolean(teacher?.sick_until);
+    const sickUntilFormatted = isSick ? new Date(teacher.sick_until).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '';
+
+    return (
+      <div 
+        className="sick-card-container hover-scale"
+        onClick={() => {
+          if (!isSick) {
+            setShowSickModal(true);
+          }
+        }}
+        style={{ 
+          padding: '14px 18px', 
+          borderRadius: '20px',
+          background: isSick 
+            ? 'linear-gradient(135deg, #fef2f2 0%, #fff1f2 100%)' 
+            : 'linear-gradient(135deg, #ffffff 0%, #fff5f5 100%)',
+          boxShadow: isSick 
+            ? '0 6px 20px -4px rgba(239, 68, 68, 0.18)' 
+            : '0 4px 16px -2px rgba(239, 68, 68, 0.08)',
+          border: isSick ? '1.5px solid #fca5a5' : '1.5px solid #fecaca',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '12px',
+          width: '100%',
+          boxSizing: 'border-box',
+          cursor: isSick ? 'default' : 'pointer',
+          transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0, flex: 1 }}>
+          <div style={{
+            width: '40px',
+            height: '40px',
+            borderRadius: '12px',
+            background: isSick ? 'linear-gradient(135deg, #ef4444, #dc2626)' : 'rgba(239, 68, 68, 0.1)',
+            color: isSick ? '#ffffff' : '#dc2626',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+            boxShadow: isSick ? '0 4px 12px rgba(239, 68, 68, 0.3)' : 'none'
+          }}>
+            {isSick ? <AlertTriangle size={20} /> : <Activity size={20} />}
           </div>
-          <div style={{ marginTop: '6px', fontSize: '1.0rem', fontWeight: 800, color: '#ef4444', background: '#fee2e2', borderRadius: '12px', padding: '8px 18px' }}>
-            Gute Besserung! 💊
-          </div>
-        </div>
-      ) : (
-        <>
-          <div 
-            onClick={(e) => {
-              const next = !isSickWidgetExpanded;
-              setIsSickWidgetExpanded(next);
-              if (next) {
-                const target = e.currentTarget.closest('.sick-card-container') || e.currentTarget;
-                setTimeout(() => {
-                  target.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-                }, 100);
-              }
-            }}
-            style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', gap: '8px', width: '100%' }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
-              <span style={{ fontSize: '1.1rem', flexShrink: 0, display: 'flex', alignItems: 'center' }}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#b91c1c" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/>
-                  <line x1="12" y1="9" x2="12" y2="13"/>
-                  <line x1="12" y1="17" x2="12.01" y2="17"/>
-                </svg>
-              </span>
+          <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <h3 style={{ 
-                fontSize: '1rem', fontWeight: 855, margin: 0,
-                color: '#7f1d1d',
+                fontSize: '0.95rem', fontWeight: 800, margin: 0,
+                color: isSick ? '#991b1b' : '#7f1d1d',
+                letterSpacing: '-0.01em',
                 whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
               }}>
-                {teacher?.sick_until ? 'Krankmeldungs-Status' : 'Krankmelden'}
+                {isSick ? 'Krankgemeldet' : 'Krankmelden'}
               </h3>
+              {isSick && (
+                <span style={{ 
+                  background: '#fee2e2', 
+                  color: '#b91c1c', 
+                  fontSize: '0.68rem', 
+                  fontWeight: 800, 
+                  padding: '2px 8px', 
+                  borderRadius: '100px',
+                  border: '1px solid #fca5a5'
+                }}>
+                  Aktiv
+                </span>
+              )}
             </div>
-            
-            {!isSickWidgetExpanded && !teacher?.sick_until && (
+            <p style={{ 
+              margin: '2px 0 0 0', 
+              fontSize: '0.75rem', 
+              color: isSick ? '#b91c1c' : '#94a3b8', 
+              fontWeight: 500,
+              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
+            }}>
+              {isSick 
+                ? `Bis ${sickUntilFormatted} (${cancellationsCount} Ausfälle heute)` 
+                : 'Stunden stornieren & Verwaltung informieren'}
+            </p>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+          {isSick ? (
+            <>
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  setIsSickWidgetExpanded(true);
+                  setShowSickModal(true);
                 }}
                 style={{
-                  background: '#b91c1c',
-                  color: '#ffffff',
-                  border: 'none',
-                  padding: '7px 18px',
-                  borderRadius: '24px',
+                  background: '#ffffff',
+                  color: '#b91c1c',
+                  border: '1.5px solid #fca5a5',
+                  padding: '7px 12px',
+                  borderRadius: '12px',
                   fontWeight: 800,
-                  fontSize: '0.8rem',
+                  fontSize: '0.72rem',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '6px',
-                  boxShadow: '0 2px 8px rgba(185,28,28,0.3)',
-                  flexShrink: 0
+                  gap: '4px',
+                  boxShadow: '0 2px 6px rgba(0,0,0,0.04)'
                 }}
               >
-                <Activity size={14} />
-                <span>Jetzt krankmelden</span>
+                <Calendar size={12} />
+                <span>Anpassen</span>
               </button>
-            )}
-
-            {isSickWidgetExpanded && (
-              <ChevronDown 
-                size={16} 
-                color="#b91c1c"
-                style={{ 
-                  transform: 'rotate(180deg)', 
-                  transition: 'transform 0.2s ease',
-                  flexShrink: 0
-                }} 
-              />
-            )}
-
-            {teacher?.sick_until && !isSickWidgetExpanded && (
-              <ChevronDown 
-                size={16} 
-                color="#b91c1c"
-                style={{ 
-                  transform: 'rotate(0deg)', 
-                  transition: 'transform 0.2s ease',
-                  flexShrink: 0
-                }} 
-              />
-            )}
-          </div>
-
-          {teacher?.sick_until && !isSickWidgetExpanded && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingLeft: '32px', marginTop: '6px' }}>
-              <div style={{ fontSize: '0.75rem', color: '#b91c1c', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                <span style={{ color: '#dc2626', fontWeight: 650 }}>Von: {teacher.sick_start ? new Date(teacher.sick_start).toLocaleDateString('de-DE') : 'Sofort'}</span>
-                <span style={{ color: '#7f1d1d' }}>–</span>
-                <span>Bis: {new Date(teacher.sick_until).toLocaleDateString('de-DE')}</span>
-              </div>
               <button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -7085,224 +7078,53 @@ useEffect(() => {
                 }}
                 disabled={reportingSick}
                 style={{
-                  background: 'linear-gradient(135deg, #34a853 0%, #34a853 100%)',
+                  background: 'linear-gradient(135deg, #34a853 0%, #2e8b57 100%)',
                   color: '#ffffff',
                   border: 'none',
-                  padding: '8px 16px',
-                  borderRadius: '10px',
+                  padding: '7px 12px',
+                  borderRadius: '12px',
                   fontWeight: 800,
-                  fontSize: '0.75rem',
+                  fontSize: '0.72rem',
                   cursor: reportingSick ? 'not-allowed' : 'pointer',
-                  transition: 'all 0.2s',
-                  width: '100%',
-                  boxShadow: '0 4px 12px rgba(52, 168, 83, 0.35)',
-                  marginTop: '6px',
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '6px',
-                  opacity: reportingSick ? 0.7 : 1
+                  gap: '4px',
+                  boxShadow: '0 3px 10px rgba(52, 168, 83, 0.3)'
                 }}
-                className="hover-scale"
               >
-                <Check size={14} strokeWidth={3} />
-                Wieder gesund melden
+                <Check size={13} strokeWidth={3} />
+                <span>Gesundmelden</span>
               </button>
-            </div>
+            </>
+          ) : (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowSickModal(true);
+              }}
+              style={{
+                background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                color: '#ffffff',
+                border: 'none',
+                padding: '8px 16px',
+                borderRadius: '14px',
+                fontWeight: 800,
+                fontSize: '0.78rem',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                boxShadow: '0 3px 12px rgba(239, 68, 68, 0.28)'
+              }}
+            >
+              <span>Jetzt melden</span>
+              <ArrowRight size={13} strokeWidth={2.5} />
+            </button>
           )}
-
-          {isSickWidgetExpanded && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', paddingTop: '8px', borderTop: '1px solid #fecaca' }}>
-              {teacher?.sick_until ? (
-                <div style={{ fontSize: '0.78rem', color: '#7f1d1d', fontWeight: 550, lineHeight: 1.4, display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <div>Zeitraum der Krankmeldung:</div>
-                  <div style={{ fontSize: '0.8rem', color: '#991b1b', fontWeight: 600 }}>
-                    Von: <strong style={{ color: '#000' }}>{teacher.sick_start ? new Date(teacher.sick_start).toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' }) : 'Sofort'}</strong>
-                  </div>
-                  <div style={{ fontSize: '0.85rem', color: '#991b1b', fontWeight: 600 }}>
-                    Bis: <strong style={{ color: '#b91c1c', fontWeight: 800 }}>{new Date(teacher.sick_until).toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' })}</strong>
-                  </div>
-                </div>
-              ) : (
-                <p style={{ margin: 0, fontSize: '0.78rem', color: '#9f1239', lineHeight: 1.4, fontWeight: 500 }}>
-                  Trage dein voraussichtliches Enddatum ein. Stunden werden storniert und die Verwaltung benachrichtigt.
-                </p>
-              )}
-
-              {!showCustomStart ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <label style={{ fontSize: '0.7rem', fontWeight: 700, color: '#ef4444', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    {teacher?.sick_until ? 'Krankmeldung anpassen (bis):' : 'Krank bis einschließlich:'}
-                  </label>
-                  <input 
-                    type="date"
-                    value={sickUntilDate}
-                    onChange={(e) => setSickUntilDate(e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      borderRadius: '12px',
-                      border: '1px solid #fca5a5',
-                      background: '#fff',
-                      fontSize: '0.8rem',
-                      fontFamily: 'inherit',
-                      outline: 'none',
-                      color: '#7f1d1d',
-                      boxSizing: 'border-box'
-                    }}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowCustomStart(true)}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      color: '#be123c',
-                      textDecoration: 'underline',
-                      cursor: 'pointer',
-                      fontSize: '0.68rem',
-                      fontWeight: 700,
-                      textAlign: 'left',
-                      padding: '2px 0 0 0',
-                      width: 'fit-content',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px'
-                    }}
-                  >
-                    <Calendar size={12} color="#be123c" />
-                    Startdatum anpassen (Standard: Heute)
-                  </button>
-                </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <label style={{ fontSize: '0.7rem', fontWeight: 700, color: '#ef4444', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    Krankmeldungs-Zeitraum:
-                  </label>
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    padding: '8px 12px',
-                    borderRadius: '12px',
-                    border: '1px solid #fca5a5',
-                    background: '#fff',
-                    fontSize: '0.8rem',
-                    color: '#7f1d1d',
-                    boxSizing: 'border-box'
-                  }}>
-                    <span style={{ color: '#991b1b', fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase' }}>von</span>
-                    <input 
-                      type="date"
-                      value={sickStartDate}
-                      onChange={(e) => setSickStartDate(e.target.value)}
-                      style={{
-                        background: 'transparent',
-                        border: 'none',
-                        outline: 'none',
-                        width: '100%',
-                        color: '#7f1d1d',
-                        fontFamily: 'inherit'
-                      }}
-                    />
-                    <span style={{ color: '#991b1b', fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase' }}>- bis</span>
-                    <input 
-                      type="date"
-                      value={sickUntilDate}
-                      onChange={(e) => setSickUntilDate(e.target.value)}
-                      style={{
-                        background: 'transparent',
-                        border: 'none',
-                        outline: 'none',
-                        width: '100%',
-                        color: '#7f1d1d',
-                        fontFamily: 'inherit'
-                      }}
-                    />
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowCustomStart(false);
-                      const today = new Date();
-                      setSickStartDate(today.toLocaleDateString('sv-SE'));
-                    }}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      color: '#64748b',
-                      textDecoration: 'underline',
-                      cursor: 'pointer',
-                      fontSize: '0.68rem',
-                      fontWeight: 700,
-                      textAlign: 'left',
-                      padding: '2px 0 0 0',
-                      width: 'fit-content'
-                    }}
-                  >
-                    Standard-Startdatum verwenden (Heute)
-                  </button>
-                </div>
-              )}
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '4px' }}>
-                <button
-                  onClick={handleReportSick}
-                  disabled={reportingSick}
-                  style={{
-                    background: '#dc2626',
-                    color: '#ffffff',
-                    border: 'none',
-                    padding: '10px 14px',
-                    borderRadius: '12px',
-                    fontWeight: 700,
-                    fontSize: '0.78rem',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
-                    boxShadow: '0 4px 12px rgba(220,38,38,0.25)'
-                  }}
-                  className="hover-scale"
-                >
-                  <span>🌡️</span>
-                  {reportingSick ? 'Speichert...' : teacher?.sick_until ? 'Zeitraum anpassen' : 'Krankmeldung absenden'}
-                </button>
-
-                {teacher?.sick_until && (
-                  <button
-                    onClick={handleEndSick}
-                    disabled={reportingSick}
-                    style={{
-                      background: 'linear-gradient(135deg, #34a853 0%, #34a853 100%)',
-                      color: '#ffffff',
-                      border: 'none',
-                      padding: '12px 14px',
-                      borderRadius: '12px',
-                      fontWeight: 800,
-                      fontSize: '0.82rem',
-                      cursor: reportingSick ? 'not-allowed' : 'pointer',
-                      transition: 'all 0.2s',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '8px',
-                      boxShadow: '0 6px 18px rgba(52, 168, 83, 0.4)',
-                      opacity: reportingSick ? 0.7 : 1,
-                      letterSpacing: '-0.01em'
-                    }}
-                    className="hover-scale"
-                  >
-                    <Check size={16} strokeWidth={3} />
-                    ☀️ Wieder gesund melden
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
-        </>
-      )}
-    </div>
-  );
+        </div>
+      </div>
+    );
+  };
 
   const renderHausaufgabenWidget = () => (
     (!teacher?.sick_until || bypassSickView) && (isTourDemoScheduleActive || (!isFreeDay && !isWeekend)) && (
@@ -13409,337 +13231,8 @@ useEffect(() => {
                 </button>
               </div>
               
-              {/* SICKNESS CARD – always red */}
-              <div style={{ 
-                padding: isSickWidgetExpanded ? '20px 24px' : '12px 20px', 
-                borderRadius: '24px',
-                background: 'linear-gradient(135deg, #fff1f2 0%, #fff5f5 100%)',
-                boxShadow: '0 4px 20px rgba(239,68,68,0.10)',
-                border: '1.5px solid #fecaca',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '12px',
-                transition: 'all 0.35s ease'
-              }}>
-
-                {/* Success / Gute Besserung screen */}
-                {sickSuccessShown ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', padding: '8px 0', textAlign: 'center' }}>
-                    <span style={{ fontSize: '2.2rem', lineHeight: 1 }}>🌡️</span>
-                    <div style={{ fontSize: '1.05rem', fontWeight: 900, color: '#b91c1c' }}>Krankmeldung eingereicht!</div>
-                    <div style={{ fontSize: '0.82rem', fontWeight: 600, color: '#dc2626', lineHeight: 1.4 }}>
-                      Die Verwaltung wurde benachrichtigt &amp; betroffene Stunden storniert.
-                    </div>
-                    <div style={{ marginTop: '6px', fontSize: '1.0rem', fontWeight: 800, color: '#ef4444', background: '#fee2e2', borderRadius: '12px', padding: '8px 18px' }}>
-                      Gute Besserung! 💊
-                    </div>
-                  </div>
-                ) : (
-                  <>
-                    <div 
-                      onClick={() => setIsSickWidgetExpanded(!isSickWidgetExpanded)}
-                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', gap: '8px' }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
-                        <span style={{ fontSize: '1.1rem', flexShrink: 0, display: 'flex', alignItems: 'center' }}>
-                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#b91c1c" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/>
-                            <line x1="12" y1="9" x2="12" y2="13"/>
-                            <line x1="12" y1="17" x2="12.01" y2="17"/>
-                          </svg>
-                        </span>
-                        <h3 style={{ 
-                          fontSize: '1rem', fontWeight: 855, margin: 0,
-                          color: '#7f1d1d',
-                          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
-                        }}>
-                          {teacher?.sick_until ? 'Krankmeldungs-Status' : 'Krankmelden'}
-                        </h3>
-                      </div>
-                      
-                      {!isSickWidgetExpanded && !teacher?.sick_until && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setIsSickWidgetExpanded(true);
-                          }}
-                          style={{
-                            background: '#b91c1c',
-                            color: '#ffffff',
-                            border: 'none',
-                            padding: '7px 18px',
-                            borderRadius: '24px',
-                            fontWeight: 800,
-                            fontSize: '0.8rem',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '6px',
-                            boxShadow: '0 2px 8px rgba(185,28,28,0.3)',
-                            flexShrink: 0
-                          }}
-                        >
-                          <Activity size={14} />
-                          <span>Jetzt krankmelden</span>
-                        </button>
-                      )}
-
-                      {isSickWidgetExpanded && (
-                        <ChevronDown 
-                          size={16} 
-                          color="#b91c1c"
-                          style={{ 
-                            transform: 'rotate(180deg)', 
-                            transition: 'transform 0.2s ease',
-                            flexShrink: 0
-                          }} 
-                        />
-                      )}
-
-                      {teacher?.sick_until && !isSickWidgetExpanded && (
-                        <ChevronDown 
-                          size={16} 
-                          color="#b91c1c"
-                          style={{ 
-                            transform: 'rotate(0deg)', 
-                            transition: 'transform 0.2s ease',
-                            flexShrink: 0
-                          }} 
-                        />
-                      )}
-                    </div>
-
-                    {teacher?.sick_until && !isSickWidgetExpanded && (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingLeft: '32px', marginTop: '6px' }}>
-                        <div style={{ fontSize: '0.75rem', color: '#b91c1c', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                          <span style={{ color: '#dc2626', fontWeight: 650 }}>Von: {teacher.sick_start ? new Date(teacher.sick_start).toLocaleDateString('de-DE') : 'Sofort'}</span>
-                          <span style={{ color: '#7f1d1d' }}>–</span>
-                          <span>Bis: {new Date(teacher.sick_until).toLocaleDateString('de-DE')}</span>
-                        </div>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleEndSick();
-                          }}
-                          disabled={reportingSick}
-                          style={{
-                            background: 'linear-gradient(135deg, #34a853 0%, #34a853 100%)',
-                            color: '#ffffff',
-                            border: 'none',
-                            padding: '8px 16px',
-                            borderRadius: '10px',
-                            fontWeight: 800,
-                            fontSize: '0.75rem',
-                            cursor: reportingSick ? 'not-allowed' : 'pointer',
-                            transition: 'all 0.2s',
-                            width: '100%',
-                            boxShadow: '0 4px 12px rgba(52, 168, 83, 0.35)',
-                            marginTop: '6px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '6px',
-                            opacity: reportingSick ? 0.7 : 1
-                          }}
-                          className="hover-scale"
-                        >
-                          <Check size={14} strokeWidth={3} />
-                          ☀️ Wieder gesund melden
-                        </button>
-                      </div>
-                    )}
-
-                    {isSickWidgetExpanded && (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', paddingTop: '8px', borderTop: '1px solid #fecaca' }}>
-                        {teacher?.sick_until ? (
-                          <div style={{ fontSize: '0.78rem', color: '#7f1d1d', fontWeight: 550, lineHeight: 1.4, display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                            <div>Zeitraum der Krankmeldung:</div>
-                            <div style={{ fontSize: '0.8rem', color: '#991b1b', fontWeight: 600 }}>
-                              Von: <strong style={{ color: '#000' }}>{teacher.sick_start ? new Date(teacher.sick_start).toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' }) : 'Sofort'}</strong>
-                            </div>
-                            <div style={{ fontSize: '0.85rem', color: '#991b1b', fontWeight: 600 }}>
-                              Bis: <strong style={{ color: '#b91c1c', fontWeight: 800 }}>{new Date(teacher.sick_until).toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' })}</strong>
-                            </div>
-                          </div>
-                        ) : (
-                          <p style={{ margin: 0, fontSize: '0.78rem', color: '#9f1239', lineHeight: 1.4, fontWeight: 500 }}>
-                            Trage dein voraussichtliches Enddatum ein. Stunden werden storniert und die Verwaltung benachrichtigt.
-                          </p>
-                        )}
-
-                        {!showCustomStart ? (
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                            <label style={{ fontSize: '0.7rem', fontWeight: 700, color: '#ef4444', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                              {teacher?.sick_until ? 'Krankmeldung anpassen (bis):' : 'Krank bis einschließlich:'}
-                            </label>
-                            <input 
-                              type="date"
-                              value={sickUntilDate}
-                              onChange={(e) => setSickUntilDate(e.target.value)}
-                              style={{
-                                width: '100%',
-                                padding: '8px 12px',
-                                borderRadius: '12px',
-                                border: '1px solid #fca5a5',
-                                background: '#fff',
-                                fontSize: '0.8rem',
-                                fontFamily: 'inherit',
-                                outline: 'none',
-                                color: '#7f1d1d',
-                                boxSizing: 'border-box'
-                              }}
-                            />
-                            <button
-                              type="button"
-                              onClick={() => setShowCustomStart(true)}
-                              style={{
-                                background: 'none',
-                                border: 'none',
-                                color: '#be123c',
-                                textDecoration: 'underline',
-                                cursor: 'pointer',
-                                fontSize: '0.68rem',
-                                fontWeight: 700,
-                                textAlign: 'left',
-                                padding: '2px 0 0 0',
-                                width: 'fit-content',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '4px'
-                              }}
-                            >
-                              <Calendar size={12} color="#be123c" />
-                              Startdatum anpassen (Standard: Heute)
-                            </button>
-                          </div>
-                        ) : (
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                            <label style={{ fontSize: '0.7rem', fontWeight: 700, color: '#ef4444', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                              Krankmeldungs-Zeitraum:
-                            </label>
-                            <div style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '8px',
-                              padding: '8px 12px',
-                              borderRadius: '12px',
-                              border: '1px solid #fca5a5',
-                              background: '#fff',
-                              fontSize: '0.8rem',
-                              color: '#7f1d1d',
-                              boxSizing: 'border-box'
-                            }}>
-                              <span style={{ color: '#991b1b', fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase' }}>von</span>
-                              <input 
-                                type="date"
-                                value={sickStartDate}
-                                onChange={(e) => setSickStartDate(e.target.value)}
-                                style={{
-                                  background: 'transparent',
-                                  border: 'none',
-                                  outline: 'none',
-                                  width: '100%',
-                                  color: '#7f1d1d',
-                                  fontFamily: 'inherit'
-                                }}
-                              />
-                              <span style={{ color: '#991b1b', fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase' }}>- bis</span>
-                              <input 
-                                type="date"
-                                value={sickUntilDate}
-                                onChange={(e) => setSickUntilDate(e.target.value)}
-                                style={{
-                                  background: 'transparent',
-                                  border: 'none',
-                                  outline: 'none',
-                                  width: '100%',
-                                  color: '#7f1d1d',
-                                  fontFamily: 'inherit'
-                                }}
-                              />
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setShowCustomStart(false);
-                                const today = new Date();
-                                setSickStartDate(today.toLocaleDateString('sv-SE'));
-                              }}
-                              style={{
-                                background: 'none',
-                                border: 'none',
-                                color: '#64748b',
-                                textDecoration: 'underline',
-                                cursor: 'pointer',
-                                fontSize: '0.68rem',
-                                fontWeight: 700,
-                                textAlign: 'left',
-                                padding: '2px 0 0 0',
-                                width: 'fit-content'
-                              }}
-                            >
-                              Standard-Startdatum verwenden (Heute)
-                            </button>
-                          </div>
-                        )}
-
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '4px' }}>
-                          <button
-                            onClick={handleReportSick}
-                            disabled={reportingSick}
-                            style={{
-                              background: '#dc2626',
-                              color: '#ffffff',
-                              border: 'none',
-                              padding: '10px 14px',
-                              borderRadius: '12px',
-                              fontWeight: 700,
-                              fontSize: '0.78rem',
-                              cursor: 'pointer',
-                              transition: 'all 0.2s',
-                              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
-                              boxShadow: '0 4px 12px rgba(220,38,38,0.25)'
-                            }}
-                            className="hover-scale"
-                          >
-                            <span>🌡️</span>
-                            {reportingSick ? 'Speichert...' : teacher?.sick_until ? 'Zeitraum anpassen' : 'Krankmeldung absenden'}
-                          </button>
-
-                          {teacher?.sick_until && (
-                            <button
-                              onClick={handleEndSick}
-                              disabled={reportingSick}
-                              style={{
-                                background: 'linear-gradient(135deg, #34a853 0%, #34a853 100%)',
-                                color: '#ffffff',
-                                border: 'none',
-                                padding: '12px 14px',
-                                borderRadius: '12px',
-                                fontWeight: 800,
-                                fontSize: '0.82rem',
-                                cursor: reportingSick ? 'not-allowed' : 'pointer',
-                                transition: 'all 0.2s',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                gap: '8px',
-                                boxShadow: '0 6px 18px rgba(52, 168, 83, 0.4)',
-                                opacity: reportingSick ? 0.7 : 1,
-                                letterSpacing: '-0.01em'
-                              }}
-                              className="hover-scale"
-                            >
-                              <Check size={16} strokeWidth={3} />
-                              ☀️ Wieder gesund melden
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
+              {/* SICKNESS CARD – 1:1 Unified Apple Squircle Card */}
+              {renderSickCardWidget()}
 
 
 
@@ -19927,6 +19420,446 @@ useEffect(() => {
                 <p style={{ color: '#64748b', fontWeight: 600 }}>Es gibt aktuell keine ausstehenden Challenges.</p>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ── TIER-1 APPLE BOTTOM SHEET KRANKMELDUNG MODAL ── */}
+      {showSickModal && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 99999,
+            background: 'rgba(15, 23, 42, 0.65)',
+            backdropFilter: 'blur(12px)',
+            WebkitBackdropFilter: 'blur(12px)',
+            display: 'flex',
+            alignItems: windowWidth <= 768 ? 'flex-end' : 'center',
+            justifyContent: 'center',
+            padding: windowWidth <= 768 ? '0px' : '20px',
+            animation: 'fadeIn 0.2s ease-out'
+          }}
+          onClick={() => setShowSickModal(false)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: '#ffffff',
+              borderRadius: windowWidth <= 768 ? '28px 28px 0 0' : '28px',
+              width: '100%',
+              maxWidth: '520px',
+              maxHeight: windowWidth <= 768 ? '90vh' : '85vh',
+              display: 'flex',
+              flexDirection: 'column',
+              boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.3)',
+              overflow: 'hidden',
+              boxSizing: 'border-box'
+            }}
+          >
+            {/* Apple Drag Indicator for Mobile Viewports */}
+            {windowWidth <= 768 && (
+              <div style={{ width: '40px', height: '5px', background: '#cbd5e1', borderRadius: '100px', margin: '12px auto 4px auto' }} />
+            )}
+
+            {/* Header */}
+            <div style={{
+              padding: '20px 24px 16px 24px',
+              borderBottom: '1px solid #f1f5f9',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '12px'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{
+                  width: '42px',
+                  height: '42px',
+                  borderRadius: '14px',
+                  background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                  color: '#ffffff',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '0 4px 14px rgba(239, 68, 68, 0.3)'
+                }}>
+                  <AlertTriangle size={22} />
+                </div>
+                <div>
+                  <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                    {teacher?.sick_until ? 'Krankmeldung anpassen' : 'Krankmeldung einreichen'}
+                  </h2>
+                  <p style={{ margin: '2px 0 0 0', fontSize: '0.78rem', color: '#64748b', fontWeight: 500 }}>
+                    Storniert Stunden & alarmiert das Sekretariat
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowSickModal(false)}
+                style={{
+                  background: '#f1f5f9',
+                  border: 'none',
+                  borderRadius: '12px',
+                  padding: '8px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#64748b',
+                  transition: 'all 0.15s'
+                }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Scrollable Body Content */}
+            <div style={{ padding: '20px 24px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '18px', flex: 1 }}>
+              
+              {/* Notice Banner */}
+              <div style={{
+                background: '#fff5f5',
+                border: '1.5px solid #fecaca',
+                borderRadius: '16px',
+                padding: '12px 16px',
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '10px'
+              }}>
+                <span style={{ fontSize: '1.2rem', lineHeight: 1 }}>ℹ️</span>
+                <span style={{ fontSize: '0.78rem', color: '#991b1b', lineHeight: 1.45, fontWeight: 550 }}>
+                  Alle betroffenen Stundenplandaten im Zeitraum werden automatisch storniert. Das Sekretariat erhält ein Notfall-Ticket und betreut die Schüler.
+                </span>
+              </div>
+
+              {/* 1-Tap Quick-Selection Chips */}
+              <div>
+                <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: '8px' }}>
+                  Schnell-Auswahl (1-Tap):
+                </label>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const today = new Date().toLocaleDateString('sv-SE');
+                      setSickStartDate(today);
+                      setSickUntilDate(today);
+                      setQuickSickPreset('today');
+                      setShowCustomStart(false);
+                    }}
+                    style={{
+                      padding: '12px 14px',
+                      borderRadius: '14px',
+                      border: quickSickPreset === 'today' ? '2px solid #ef4444' : '1.5px solid #e2e8f0',
+                      background: quickSickPreset === 'today' ? '#fee2e2' : '#f8fafc',
+                      color: quickSickPreset === 'today' ? '#b91c1c' : '#334155',
+                      fontWeight: quickSickPreset === 'today' ? 800 : 600,
+                      fontSize: '0.82rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s'
+                    }}
+                  >
+                    <span>⚡</span>
+                    <span>Nur Heute</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const today = new Date().toLocaleDateString('sv-SE');
+                      const fri = (() => {
+                        const d = new Date();
+                        const day = d.getDay();
+                        const diffToFri = (5 - day + 7) % 7;
+                        d.setDate(d.getDate() + diffToFri);
+                        return d.toLocaleDateString('sv-SE');
+                      })();
+                      setSickStartDate(today);
+                      setSickUntilDate(fri);
+                      setQuickSickPreset('friday');
+                      setShowCustomStart(false);
+                    }}
+                    style={{
+                      padding: '12px 14px',
+                      borderRadius: '14px',
+                      border: quickSickPreset === 'friday' ? '2px solid #ef4444' : '1.5px solid #e2e8f0',
+                      background: quickSickPreset === 'friday' ? '#fee2e2' : '#f8fafc',
+                      color: quickSickPreset === 'friday' ? '#b91c1c' : '#334155',
+                      fontWeight: quickSickPreset === 'friday' ? 800 : 600,
+                      fontSize: '0.82rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s'
+                    }}
+                  >
+                    <span>📅</span>
+                    <span>Bis Freitag</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const today = new Date().toLocaleDateString('sv-SE');
+                      const nextFri = (() => {
+                        const d = new Date();
+                        const day = d.getDay();
+                        const diffToFri = (5 - day + 7) % 7;
+                        d.setDate(d.getDate() + diffToFri + 7);
+                        return d.toLocaleDateString('sv-SE');
+                      })();
+                      setSickStartDate(today);
+                      setSickUntilDate(nextFri);
+                      setQuickSickPreset('next_friday');
+                      setShowCustomStart(false);
+                    }}
+                    style={{
+                      padding: '12px 14px',
+                      borderRadius: '14px',
+                      border: quickSickPreset === 'next_friday' ? '2px solid #ef4444' : '1.5px solid #e2e8f0',
+                      background: quickSickPreset === 'next_friday' ? '#fee2e2' : '#f8fafc',
+                      color: quickSickPreset === 'next_friday' ? '#b91c1c' : '#334155',
+                      fontWeight: quickSickPreset === 'next_friday' ? 800 : 600,
+                      fontSize: '0.82rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s'
+                    }}
+                  >
+                    <span>🗓️</span>
+                    <span>Nächste Woche Fr</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setQuickSickPreset('custom');
+                      setShowCustomStart(true);
+                    }}
+                    style={{
+                      padding: '12px 14px',
+                      borderRadius: '14px',
+                      border: quickSickPreset === 'custom' ? '2px solid #ef4444' : '1.5px solid #e2e8f0',
+                      background: quickSickPreset === 'custom' ? '#fee2e2' : '#f8fafc',
+                      color: quickSickPreset === 'custom' ? '#b91c1c' : '#334155',
+                      fontWeight: quickSickPreset === 'custom' ? 800 : 600,
+                      fontSize: '0.82rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s'
+                    }}
+                  >
+                    <span>✏️</span>
+                    <span>Individuell</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Visual Period Display Card */}
+              <div style={{
+                background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+                border: '1.5px solid #e2e8f0',
+                borderRadius: '18px',
+                padding: '16px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '10px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    Gewählter Zeitraum
+                  </span>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#ef4444', background: '#fee2e2', padding: '2px 8px', borderRadius: '100px' }}>
+                    {(() => {
+                      if (!sickStartDate || !sickUntilDate) return '1 Tag';
+                      const s = new Date(sickStartDate);
+                      const u = new Date(sickUntilDate);
+                      s.setHours(0,0,0,0);
+                      u.setHours(0,0,0,0);
+                      const diff = Math.round((u.getTime() - s.getTime()) / (24*3600*1000)) + 1;
+                      return diff > 1 ? `${diff} Tage` : '1 Tag';
+                    })()}
+                  </span>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    <span style={{ fontSize: '0.68rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase' }}>Von</span>
+                    <strong style={{ fontSize: '0.92rem', color: '#0f172a', fontWeight: 800 }}>
+                      {sickStartDate ? new Date(sickStartDate).toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' }) : 'Sofort'}
+                    </strong>
+                  </div>
+                  <div style={{ color: '#cbd5e1' }}>➔</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', textAlign: 'right' }}>
+                    <span style={{ fontSize: '0.68rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase' }}>Bis einschließlich</span>
+                    <strong style={{ fontSize: '0.92rem', color: '#b91c1c', fontWeight: 800 }}>
+                      {sickUntilDate ? new Date(sickUntilDate).toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' }) : 'Nicht gewählt'}
+                    </strong>
+                  </div>
+                </div>
+
+                {/* Custom Date Pickers */}
+                {(quickSickPreset === 'custom' || showCustomStart) && (
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', paddingTop: '10px', borderTop: '1px solid #e2e8f0', marginTop: '4px' }}>
+                    <div>
+                      <label style={{ fontSize: '0.68rem', fontWeight: 700, color: '#64748b', display: 'block', marginBottom: '4px' }}>Startdatum:</label>
+                      <input 
+                        type="date"
+                        value={sickStartDate}
+                        onChange={(e) => {
+                          setSickStartDate(e.target.value);
+                          setQuickSickPreset('custom');
+                        }}
+                        style={{
+                          width: '100%',
+                          padding: '10px 12px',
+                          borderRadius: '12px',
+                          border: '1.5px solid #cbd5e1',
+                          background: '#ffffff',
+                          fontSize: '0.85rem',
+                          color: '#0f172a',
+                          fontWeight: 700,
+                          outline: 'none',
+                          boxSizing: 'border-box'
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '0.68rem', fontWeight: 700, color: '#64748b', display: 'block', marginBottom: '4px' }}>Enddatum:</label>
+                      <input 
+                        type="date"
+                        value={sickUntilDate}
+                        onChange={(e) => {
+                          setSickUntilDate(e.target.value);
+                          setQuickSickPreset('custom');
+                        }}
+                        style={{
+                          width: '100%',
+                          padding: '10px 12px',
+                          borderRadius: '12px',
+                          border: '1.5px solid #cbd5e1',
+                          background: '#ffffff',
+                          fontSize: '0.85rem',
+                          color: '#0f172a',
+                          fontWeight: 700,
+                          outline: 'none',
+                          boxSizing: 'border-box'
+                        }}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Live Lesson Impact Counter */}
+              <div style={{
+                background: '#f8fafc',
+                border: '1px solid #e2e8f0',
+                borderRadius: '14px',
+                padding: '10px 14px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px'
+              }}>
+                <Clock size={16} color="#64748b" />
+                <span style={{ fontSize: '0.78rem', color: '#475569', fontWeight: 600 }}>
+                  {cancellationsCount > 0 
+                    ? `Heute sind ${cancellationsCount} Unterrichtseinheiten betroffen.` 
+                    : 'Alle geplanten Termine im Zeitraum werden storniert.'}
+                </span>
+              </div>
+            </div>
+
+            {/* Sticky Bottom Action Footer */}
+            <div style={{
+              padding: '16px 24px',
+              paddingBottom: 'calc(16px + env(safe-area-inset-bottom, 0px))',
+              borderTop: '1px solid #f1f5f9',
+              background: '#ffffff',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '10px'
+            }}>
+              <button
+                onClick={handleReportSick}
+                disabled={reportingSick}
+                style={{
+                  background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                  color: '#ffffff',
+                  border: 'none',
+                  padding: '14px',
+                  borderRadius: '16px',
+                  fontWeight: 900,
+                  fontSize: '0.92rem',
+                  cursor: reportingSick ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  boxShadow: '0 4px 18px rgba(239, 68, 68, 0.35)',
+                  opacity: reportingSick ? 0.7 : 1,
+                  letterSpacing: '-0.01em',
+                  transition: 'all 0.15s'
+                }}
+                className="hover-scale"
+              >
+                <span>🌡️</span>
+                <span>{reportingSick ? 'Wird übermittelt...' : (teacher?.sick_until ? 'Krankmeldung anpassen' : 'Krankmeldung jetzt absenden')}</span>
+              </button>
+
+              {teacher?.sick_until && (
+                <button
+                  onClick={() => {
+                    handleEndSick();
+                    setShowSickModal(false);
+                  }}
+                  disabled={reportingSick}
+                  style={{
+                    background: 'linear-gradient(135deg, #34a853 0%, #2e8b57 100%)',
+                    color: '#ffffff',
+                    border: 'none',
+                    padding: '12px',
+                    borderRadius: '14px',
+                    fontWeight: 800,
+                    fontSize: '0.85rem',
+                    cursor: reportingSick ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    boxShadow: '0 4px 14px rgba(52, 168, 83, 0.3)'
+                  }}
+                  className="hover-scale"
+                >
+                  <Check size={16} strokeWidth={3} />
+                  <span>☀️ Wieder gesund melden</span>
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={() => setShowSickModal(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#64748b',
+                  fontSize: '0.82rem',
+                  fontWeight: 700,
+                  padding: '4px',
+                  cursor: 'pointer'
+                }}
+              >
+                Abbrechen
+              </button>
+            </div>
           </div>
         </div>
       )}

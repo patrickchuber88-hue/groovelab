@@ -1593,7 +1593,7 @@ select option {
     margin-left: 0 !important;
     padding-left: 0 !important;
     padding-right: 0 !important;
-    padding-bottom: 110px !important;
+    padding-bottom: 0 !important;
   }
 }
 
@@ -1671,7 +1671,7 @@ select option {
 
 .sim-viewport-mobile,
 .sim-viewport-portrait {
-  padding-bottom: calc(68px + env(safe-area-inset-bottom, 0px)) !important;
+  padding-bottom: 0 !important;
 }
 
 .sim-viewport-mobile .cg-mobile-bottom-nav::-webkit-scrollbar,
@@ -1688,11 +1688,6 @@ select option {
   flex-shrink: 0 !important;
   min-width: 60px !important;
   height: 100% !important;
-  background: transparent !important;
-  border: none !important;
-  cursor: pointer !important;
-  gap: 2px !important;
-  padding: 4px 6px !important;
   color: #64748b;
   font-size: 11px !important;
   font-weight: 750 !important;
@@ -1765,14 +1760,14 @@ select option {
   margin-left: 0 !important;
   padding-left: 0 !important;
   padding-right: 0 !important;
-  padding-bottom: 110px !important;
+  padding-bottom: 0 !important;
 }
 
 .sim-viewport-mobile .main-content,
 .sim-viewport-portrait .main-content {
   padding-left: 4px !important;
   padding-right: 4px !important;
-  padding-bottom: 120px !important;
+  padding-bottom: calc(74px + env(safe-area-inset-bottom, 16px)) !important;
   width: 100% !important;
   max-width: 100% !important;
   box-sizing: border-box !important;
@@ -1782,7 +1777,7 @@ select option {
   .main-content {
     padding-left: 4px !important;
     padding-right: 4px !important;
-    padding-bottom: 120px !important;
+    padding-bottom: calc(74px + env(safe-area-inset-bottom, 16px)) !important;
     width: 100% !important;
     max-width: 100% !important;
     box-sizing: border-box !important;
