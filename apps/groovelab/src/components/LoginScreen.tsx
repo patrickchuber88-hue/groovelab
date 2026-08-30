@@ -6968,7 +6968,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                   }
                 }
 
-                const targetId = targetUser?.id || 'master_admin';
+                const targetId = targetUser?.id || '51d4611d-091f-4d62-b0ff-4259bb34ac90';
                 await createMasterSessionLease(targetId, 'bypass_dev');
                 sessionStorage.setItem('groovelab_is_master_admin', 'true');
                 sessionStorage.setItem('groovelab_active_workspace', 'master_admin');

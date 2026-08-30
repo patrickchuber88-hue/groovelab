@@ -6854,11 +6854,13 @@ function App() {
       setActivePlatform('campus');
       setActiveStudentTab('briefing');
     } else if (isCampusActive) {
-      // 1. Campus -> Briefing Board
+      // 1. Campus -> Briefing Board for students, Live Lab for teachers
       sessionStorage.setItem('groovelab_active_platform', 'campus');
-      sessionStorage.setItem('campus_active_tab', 'briefing');
+      const startCampusTab = (currentRole === 'teacher') ? 'live' : 'briefing';
+      sessionStorage.setItem('campus_active_tab', startCampusTab);
+      sessionStorage.setItem('groovelab_active_tab', startCampusTab);
       setActivePlatform('campus');
-      setActiveStudentTab('briefing');
+      setActiveStudentTab(startCampusTab);
     } else if (isGroovelabActive) {
       // 2. GrooveLab -> Live Lab Board
       sessionStorage.setItem('groovelab_active_platform', 'groovelab');
@@ -6958,8 +6960,8 @@ function App() {
     // media streams from the browser are destroyed.
     // If there are search parameters (like qr_token or teacher_qr_token), reload to the clean origin page to prevent infinite loops.
     setTimeout(() => {
-      if (window.location.search) {
-        window.location.replace(window.location.origin + window.location.pathname);
+      if (window.location.search || window.location.pathname === '/login') {
+        window.location.replace(window.location.origin + '/');
       } else {
         window.location.reload();
       }
