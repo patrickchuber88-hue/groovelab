@@ -11818,7 +11818,7 @@ useEffect(() => {
                                   </div>
                                   <h2 style={{
                                     margin: 0,
-                                    fontSize: 'clamp(1.18rem, 4vw, 1.45rem)',
+                                    fontSize: 'clamp(1.25rem, 4.2vw, 1.55rem)',
                                     fontWeight: 900,
                                     fontFamily: "'Outfit', 'Plus Jakarta Sans', sans-serif",
                                     color: '#0f172a',
@@ -11827,11 +11827,11 @@ useEffect(() => {
                                     wordBreak: 'break-word',
                                     overflowWrap: 'break-word'
                                   }}>
-                                    Hi, <span style={{ color: activePlatform === 'campus' ? '#34a853' : '#eab308' }}>{formatTeacherFullName(teacher) || teacher?.first_name || 'Lehrer'}</span>!
+                                    Hi, <span style={{ color: '#007aff' }}>{formatTeacherFullName(teacher) || teacher?.first_name || 'Lehrer'}</span>!
                                   </h2>
                                   <p style={{
                                     margin: '6px 0 0 0',
-                                    fontSize: '0.80rem',
+                                    fontSize: '0.84rem',
                                     color: '#64748b',
                                     fontWeight: 600,
                                     lineHeight: 1.35
@@ -12173,7 +12173,7 @@ useEffect(() => {
                               }}>
                                 {(isWeekend && !isTourDemoScheduleActive) ? 'Schönes Wochenende,' : `${dynamicGreeting.greeting},`}{' '}
                                 <span style={{ 
-                                  color: activePlatform === 'campus' ? '#34a853' : '#eab308', 
+                                  color: '#007aff', 
                                   fontWeight: 900,
                                   letterSpacing: '-0.01em',
                                   display: 'inline'

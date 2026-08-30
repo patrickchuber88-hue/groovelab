@@ -136,8 +136,8 @@ export const MobileBriefingCarousel: React.FC<MobileBriefingCarouselProps> = ({
         {tabs.map((tab, idx) => {
           const isActive = activeIndex === idx;
           const IconComponent = tab.icon;
-          const iconSize = tab.id === 'cockpit' ? 11 : 12;
-          const iconDimension = tab.id === 'cockpit' ? '11px' : '12px';
+          const iconSize = 13;
+          const iconDimension = '13px';
 
           return (
             <button
@@ -147,20 +147,21 @@ export const MobileBriefingCarousel: React.FC<MobileBriefingCarouselProps> = ({
               style={{
                 width: '100%',
                 minWidth: 0,
-                padding: '6px 1px',
+                minHeight: '34px',
+                padding: '6px 3px',
                 borderRadius: '100px',
                 border: 'none',
                 background: isActive ? themeColor : 'transparent',
                 color: isActive ? '#ffffff' : '#64748b',
                 fontWeight: isActive ? 800 : 700,
-                fontSize: '0.62rem',
+                fontSize: '0.74rem',
                 cursor: 'pointer',
                 transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
                 whiteSpace: 'nowrap',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: '2px',
+                gap: '4px',
                 boxSizing: 'border-box'
               }}
             >
