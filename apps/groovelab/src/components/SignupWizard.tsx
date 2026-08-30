@@ -246,7 +246,8 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
           const cleanSubdomain = subdomain.trim().toLowerCase();
 
           // 1. Try atomic RPC first (Bypasses all client-side RLS and transaction conflicts)
-          const { data: rpcData, error: rpcErr } = await supabase.rpc('register_school_and_admin', {
+          let rpcSuccess = false;
+          let { data: rpcData, error: rpcErr } = await supabase.rpc('register_school_and_admin', {
             p_school_name: cleanSchoolName,
             p_subdomain: cleanSubdomain,
             p_street: cleanStreet,
@@ -260,8 +261,28 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
             p_country: country || 'Deutschland'
           });
 
+          // Dual-Signature Fallback: If 11-param RPC fails with 42883 (does not exist), retry with 10-param signature
+          if (rpcErr && (rpcErr.code === '42883' || rpcErr.message?.includes('does not exist') || rpcErr.message?.includes('p_country'))) {
+            const { data: legacyData, error: legacyErr } = await supabase.rpc('register_school_and_admin', {
+              p_school_name: cleanSchoolName,
+              p_subdomain: cleanSubdomain,
+              p_street: cleanStreet,
+              p_house_number: cleanHouseNumber || null,
+              p_zip_code: zipCode.trim(),
+              p_city: cleanCity,
+              p_phone: phoneNumber.trim() || null,
+              p_school_email: cleanEmail,
+              p_admin_first_name: cleanAdminFirst,
+              p_admin_last_name: cleanAdminLast
+            });
+            if (!legacyErr && legacyData?.success) {
+              rpcData = legacyData;
+              rpcErr = null;
+            }
+          }
 
           if (!rpcErr && rpcData?.success) {
+            rpcSuccess = true;
             schoolId = rpcData.school_id;
             adminId = rpcData.admin_id;
             generatedAdminPin = rpcData.pin;
@@ -269,6 +290,10 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
           } else {
             if (rpcErr) {
               console.warn('[SignupWizard] RPC attempt notice:', rpcErr);
+              // If RPC threw a custom domain/validation exception, rethrow to surface friendly message
+              if (rpcErr.message && !rpcErr.message.includes('permission denied') && !rpcErr.message.includes('does not exist')) {
+                throw rpcErr;
+              }
             }
             // Fallback: Direct table insertion
             schoolId = crypto.randomUUID();
@@ -398,14 +423,16 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
           }
 
           let friendlyError = err.message || 'Onboarding fehlgeschlagen. Bitte versuche es erneut.';
-          if (err.code === '23505') {
-            if (err.message?.includes('subdomain') || err.details?.includes('subdomain')) {
-              friendlyError = 'Diese Wunsch-Subdomain wurde leider gerade von einer anderen Musikschule belegt. Bitte wähle eine andere Subdomain.';
-            } else if (err.message?.includes('ausweis_nummer') || err.details?.includes('ausweis_nummer')) {
-              friendlyError = 'Generierung einer einzigartigen PIN fehlgeschlagen. Bitte versuche es erneut.';
-            }
+          if (err.code === '23505' || err.message?.includes('vergeben') || err.message?.includes('existiert bereits')) {
+            friendlyError = 'Diese Wunsch-Subdomain ist leider bereits vergeben. Bitte wähle in Schritt 1 eine andere Subdomain.';
+          } else if (err.message?.includes('geschützter Systemname')) {
+            friendlyError = 'Diese Subdomain ist ein geschützter Systemname. Bitte wähle in Schritt 1 eine andere.';
+          } else if (err.message?.includes('mindestens 3 Zeichen')) {
+            friendlyError = 'Die Wunsch-Subdomain muss mindestens 3 Zeichen lang sein.';
           } else if (err.message?.toLowerCase().includes('unauthorized') || err.code === '42501' || err.status === 401 || err.status === 403) {
-            friendlyError = 'Die Registrierung konnte nicht abgeschlossen werden. Bitte überprüfe deine Eingaben und versuche es erneut.';
+            friendlyError = err.message && !err.message.includes('permission denied') && !err.message.includes('unauthorized')
+              ? err.message
+              : 'Die Registrierung konnte nicht abgeschlossen werden. Bitte überprüfe deine Eingaben und versuche es erneut.';
           }
           setError(friendlyError);
           setStep(2);

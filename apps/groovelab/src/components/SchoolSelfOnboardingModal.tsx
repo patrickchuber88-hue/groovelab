@@ -118,7 +118,7 @@ export const SchoolSelfOnboardingModal: React.FC<SchoolSelfOnboardingModalProps>
       let effectivePin = candidatePin;
 
       // 1. Try atomic RPC first (Bypasses all client-side RLS and transaction conflicts)
-      const { data: rpcData, error: rpcErr } = await supabase.rpc('register_school_and_admin', {
+      let { data: rpcData, error: rpcErr } = await supabase.rpc('register_school_and_admin', {
         p_school_name: cleanSchoolName,
         p_subdomain: slug,
         p_street: cleanStreet,
@@ -131,6 +131,26 @@ export const SchoolSelfOnboardingModal: React.FC<SchoolSelfOnboardingModalProps>
         p_admin_last_name: cleanLast,
         p_country: country
       });
+
+      // Dual-Signature Fallback: If 11-param RPC fails with 42883 (does not exist), retry with 10-param signature
+      if (rpcErr && (rpcErr.code === '42883' || rpcErr.message?.includes('does not exist') || rpcErr.message?.includes('p_country'))) {
+        const { data: legacyData, error: legacyErr } = await supabase.rpc('register_school_and_admin', {
+          p_school_name: cleanSchoolName,
+          p_subdomain: slug,
+          p_street: cleanStreet,
+          p_house_number: cleanHouseNumber || null,
+          p_zip_code: cleanZip,
+          p_city: cleanCity,
+          p_phone: null,
+          p_school_email: cleanEmail,
+          p_admin_first_name: cleanFirst,
+          p_admin_last_name: cleanLast
+        });
+        if (!legacyErr && legacyData?.success) {
+          rpcData = legacyData;
+          rpcErr = null;
+        }
+      }
 
 
       if (!rpcErr && rpcData?.success) {
