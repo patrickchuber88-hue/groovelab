@@ -1427,6 +1427,26 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
     }
   }, [logoClicks]);
 
+  // Master Admin shortcut & URL trigger (Option+M, Alt+M, ?master=true, /master-admin)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('master') === 'true' || params.get('admin') === 'true' || window.location.pathname === '/master-admin') {
+      setShowAdminModal(true);
+    }
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Option+M / Alt+M or Ctrl+Alt+M
+      if ((e.altKey && (e.key === 'm' || e.key === 'M' || e.code === 'KeyM')) || (e.ctrlKey && e.altKey && (e.key === 'm' || e.key === 'M'))) {
+        e.preventDefault();
+        setShowAdminModal(prev => !prev);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   const handleAdminLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!adminUsernameInput.trim() || !adminPasswordInput.trim()) return;

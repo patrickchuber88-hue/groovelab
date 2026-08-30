@@ -1585,7 +1585,7 @@ function App() {
   });
 
   const isSignup = location.pathname === '/signup';
-  const currentView = (location.pathname === '/login' || location.pathname === '/signup')
+  const currentView = (location.pathname === '/login' || location.pathname === '/signup' || location.pathname === '/master-admin' || location.pathname === '/admin')
     ? 'login'
     : (location.pathname === '/' ? 'landing' : 'dashboard');
 
@@ -2352,6 +2352,8 @@ function App() {
       location.pathname === '/starseite2' || 
       location.pathname === '/login' || 
       location.pathname === '/signup' || 
+      location.pathname === '/master-admin' || 
+      location.pathname === '/admin' || 
       location.pathname.startsWith('/qr/') ||
       location.pathname.startsWith('/onboarding/') ||
       location.pathname.startsWith('/device-onboarding/') ||
@@ -6794,15 +6796,22 @@ function App() {
 
     const existingWorkspace = typeof window !== 'undefined' ? sessionStorage.getItem('groovelab_active_workspace') : null;
     const currentRole = userToLogin?.role?.toLowerCase() || 'teacher';
-    if (currentRole === 'admin' || currentRole === 'secretary') {
+    const isMasterAdmin = typeof window !== 'undefined' && (
+      sessionStorage.getItem('groovelab_is_master_admin') === 'true' || 
+      localStorage.getItem('groovelab_is_master_admin') === 'true' ||
+      existingWorkspace === 'master_admin'
+    );
+
+    if (isMasterAdmin) {
+      sessionStorage.setItem('groovelab_active_workspace', 'master_admin');
+      sessionStorage.setItem('groovelab_is_master_admin', 'true');
+    } else if (currentRole === 'admin' || currentRole === 'secretary') {
       sessionStorage.setItem('groovelab_active_workspace', 'secretary');
       if (currentRole === 'secretary') {
         sessionStorage.setItem('groovelab_secretary_subtab', 'briefing');
       }
     } else if (existingWorkspace === 'teacher') {
       sessionStorage.setItem('groovelab_active_workspace', 'teacher');
-    } else if (existingWorkspace === 'master_admin') {
-      sessionStorage.setItem('groovelab_active_workspace', 'master_admin');
     } else if (currentRole === 'student') {
       sessionStorage.setItem('groovelab_active_workspace', 'student');
     } else {
@@ -6817,7 +6826,11 @@ function App() {
     const isCampusActive = Boolean(schoolHasCampus && userToLogin?.is_campus_active);
     const isGroovelabActive = Boolean(schoolHasGroove && userToLogin?.is_groovelab_active);
 
-    if (currentRole === 'admin' || currentRole === 'secretary') {
+    if (isMasterAdmin) {
+      sessionStorage.setItem('groovelab_active_workspace', 'master_admin');
+      sessionStorage.setItem('groovelab_active_platform', 'campus');
+      setActivePlatform('campus');
+    } else if (currentRole === 'admin' || currentRole === 'secretary') {
       // Admins & Secretaries always land in Campus Briefing
       sessionStorage.setItem('groovelab_active_workspace', 'secretary');
       sessionStorage.setItem('groovelab_active_platform', 'campus');
@@ -7631,7 +7644,7 @@ function App() {
         </Suspense>
       );
     }
-    if (location.pathname === '/login') {
+    if (location.pathname === '/login' || location.pathname === '/master-admin' || location.pathname === '/admin') {
       return (
         <Suspense fallback={<DashboardLoader />}>
           <LoginScreen onLogin={handleLogin} kioskStationId={isKioskMode ? stationIdFromStorage : null} />
