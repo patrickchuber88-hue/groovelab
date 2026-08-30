@@ -85,15 +85,18 @@ ssh "$SERVER" "docker exec -i supabase-db psql -U postgres postgres < $REMOTE_TE
 echo "⚡ Führe Migration 311 aus (Include Trial & Active Schools in Public Discovery RPC)..."
 ssh "$SERVER" "docker exec -i supabase-db psql -U postgres postgres < $REMOTE_TEMP/311_include_trial_schools_in_search.sql"
 
+echo "⚡ Führe Migration 312 aus (Event-Sourced Activation Ledger Engine)..."
+ssh "$SERVER" "docker exec -i supabase-db psql -U postgres postgres < $REMOTE_TEMP/312_enterprise_event_sourced_activation_ledger.sql"
+
 echo "🧹 Bereinige temporäre Migrationsdateien..."
 ssh "$SERVER" "rm -rf $REMOTE_TEMP"
 
 echo ""
-echo "✅ Alle 15 Enterprise-Migrationen erfolgreich und fehlerfrei auf dem Produktiv-Container angewendet!"
+echo "✅ Alle 16 Enterprise-Migrationen erfolgreich und fehlerfrei auf dem Produktiv-Container angewendet!"
 ssh "$SERVER" "docker exec -t supabase-db psql -U postgres postgres -c \"NOTIFY pgrst, 'reload schema';\""
 
 # 6. Aufräumen
 ssh "$SERVER" "rm -rf $REMOTE_TEMP"
 
 echo ""
-echo "✅ Alle Enterprise Sicherheitsmigrationen (297-311) erfolgreich auf Live-Datenbank angewendet!"
+echo "✅ Alle Enterprise Sicherheitsmigrationen (297-312) erfolgreich auf Live-Datenbank angewendet!"

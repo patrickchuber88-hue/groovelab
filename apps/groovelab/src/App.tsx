@@ -63,6 +63,9 @@ import { GlobalBroadcastBanner } from './components/GlobalBroadcastBanner';
 import { PwaUpdateToast } from './components/ui/PwaUpdateToast';
 import { OfflineStatusBadge } from './components/ui/OfflineStatusBadge';
 import { OfflineSyncIndicator } from './components/ui/OfflineSyncIndicator';
+import { PrivacyShieldOverlay } from './components/ui/PrivacyShieldOverlay';
+import { usePrivacyShield } from './hooks/usePrivacyShield';
+import { initGlobalErrorSanitizer } from './utils/errorSanitizer';
 import { runStorageJanitor, runClientStorageJanitor } from './services/storageJanitorService';
 import { verifyMasterSessionLease, revokeMasterSessionLease } from './utils/masterAuditLogger';
 import { scrubSensitiveUrlParams } from './utils/urlSecurityScrubber';
@@ -70,6 +73,9 @@ import { executeSessionZeroize } from './utils/sessionZeroize';
 import { initAuthBroadcastListener } from './utils/authBroadcastSync';
 import { useInactivityTimeout } from './hooks/useInactivityTimeout';
 import './App.css';
+
+// Initialize FinTech Zero-PII Crash Telemetry Sanitizer
+initGlobalErrorSanitizer();
 
 // --- GLOBAL CAMERA KILL SWITCH ---
 // This guarantees that any third-party scanner library like react-qr-scanner
@@ -2334,6 +2340,8 @@ function App() {
       return nextVal;
     });
   }, []);
+
+  const { isShielded, dismissShield } = usePrivacyShield(Boolean(user));
 
   useEffect(() => {
     if (loading) return; // wait until supabase auth/session loading is complete
@@ -8352,6 +8360,11 @@ function App() {
       )}
       <GlobalBroadcastBanner announcement={broadcastAnnouncement} currentRole={user?.role} />
       <OfflineSyncIndicator />
+      <PrivacyShieldOverlay 
+        isActive={isShielded} 
+        onUnlock={dismissShield} 
+        schoolName={user?.schools?.name || (Array.isArray(user?.schools) ? user.schools[0]?.name : undefined)} 
+      />
       {/* Soft Trial Pre-Expiry Warning Banner for Admin/Secretary (Days 27-30) */}
       {(user?.role === 'admin' || user?.role === 'secretary') && school?.is_trial && !school?.subscription_bypass && trialDaysLeft !== null && trialDaysLeft <= 3 && trialDaysLeft > 0 && (
         <div style={{
