@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   ShieldCheck, Smartphone, Lock, RefreshCw, X, AlertTriangle, 
-  CheckCircle, Trash2, Shield, Key, Search, UserCheck, Check
+  CheckCircle, Trash2, Shield, Key, Search, UserCheck, Check, FileText
 } from 'lucide-react';
 import { 
   fetchSchoolSecurityOverview, 
@@ -10,6 +10,7 @@ import {
   revokeAndRegenerateQRToken 
 } from '../utils/sessionLeaseManager';
 import { supabase } from '../lib/supabase';
+import { generateEnterpriseSecurityWhitepaperPDF } from '../utils/securityWhitepaperGenerator';
 
 interface AdminSecuritySuiteModalProps {
   schoolId: string;
@@ -194,24 +195,49 @@ export const AdminSecuritySuiteModal: React.FC<AdminSecuritySuiteModalProps> = (
             </div>
           </div>
 
-          <button
-            onClick={onClose}
-            style={{
-              background: '#f8fafc',
-              border: 'none',
-              borderRadius: '10px',
-              width: '32px',
-              height: '32px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer',
-              color: '#64748b',
-              transition: 'background 0.15s'
-            }}
-          >
-            <X size={18} />
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <button
+              type="button"
+              onClick={() => generateEnterpriseSecurityWhitepaperPDF()}
+              title="Offizielles BSI A+ / ISO 27001 Sicherheits-Whitepaper als PDF herunterladen"
+              style={{
+                background: '#f8fafc',
+                border: '1px solid #e2e8f0',
+                borderRadius: '10px',
+                padding: '6px 12px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                fontSize: '0.78rem',
+                fontWeight: 700,
+                color: '#0f172a',
+                cursor: 'pointer',
+                transition: 'all 0.15s'
+              }}
+            >
+              <FileText size={14} color="#34a853" />
+              Whitepaper (PDF)
+            </button>
+
+            <button
+              onClick={onClose}
+              style={{
+                background: '#f8fafc',
+                border: 'none',
+                borderRadius: '10px',
+                width: '32px',
+                height: '32px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                color: '#64748b',
+                transition: 'background 0.15s'
+              }}
+            >
+              <X size={18} />
+            </button>
+          </div>
         </div>
 
         {/* Navigation Tabs */}

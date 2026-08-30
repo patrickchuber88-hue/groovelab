@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, CheckCircle2, ShieldCheck, Download, FileText, Printer } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { generateEnterpriseSecurityWhitepaperPDF } from '../utils/securityWhitepaperGenerator';
 
 interface AVVModalProps {
   isOpen: boolean;
@@ -233,25 +234,50 @@ export const AVVModal: React.FC<AVVModalProps> = ({ isOpen, onClose, school, onA
               </p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            aria-label="Modal schließen"
-            style={{
-              border: 'none',
-              background: '#f1f5f9',
-              width: '32px',
-              height: '32px',
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer',
-              color: '#64748b',
-              transition: 'all 0.15s'
-            }}
-          >
-            <X size={18} />
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <button
+              type="button"
+              onClick={() => generateEnterpriseSecurityWhitepaperPDF()}
+              title="Offizielles BSI A+ / ISO 27001 Sicherheits-Whitepaper als PDF herunterladen"
+              style={{
+                background: '#ffffff',
+                border: '1px solid #cbd5e1',
+                borderRadius: '10px',
+                padding: '6px 12px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                fontSize: '0.78rem',
+                fontWeight: 800,
+                color: '#0f172a',
+                cursor: 'pointer',
+                transition: 'all 0.15s'
+              }}
+            >
+              <FileText size={14} color="#34a853" />
+              Sicherheits-Whitepaper (PDF)
+            </button>
+
+            <button
+              onClick={onClose}
+              aria-label="Modal schließen"
+              style={{
+                border: 'none',
+                background: '#f1f5f9',
+                width: '32px',
+                height: '32px',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                color: '#64748b',
+                transition: 'all 0.15s'
+              }}
+            >
+              <X size={18} />
+            </button>
+          </div>
         </div>
 
         {/* Legal Text Scroll Container */}
