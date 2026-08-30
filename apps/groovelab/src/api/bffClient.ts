@@ -117,6 +117,60 @@ export async function recordPracticeSessionDTO(
   return data as PracticeSessionResultDTO;
 }
 
+export interface SchoolProfileDTO {
+  id: string;
+  name: string;
+  subdomain: string;
+  logoUrl: string | null;
+  city: string | null;
+  street?: string | null;
+  zipCode?: string | null;
+  email?: string | null;
+  representedBy?: string | null;
+  hasCampusSubscription: boolean;
+  hasGroovelabSubscription: boolean;
+}
+
+/**
+ * Fetches sanitized school profile DTO with resilient fallback.
+ */
+export async function getSchoolProfileDTO(schoolId: string): Promise<SchoolProfileDTO | null> {
+  if (!schoolId) return null;
+  try {
+    const { data: rpcData, error: rpcErr } = await supabase.rpc('get_school_profile_dto', { p_school_id: schoolId });
+    if (!rpcErr && rpcData) {
+      return rpcData as SchoolProfileDTO;
+    }
+  } catch (e) {}
+
+  // Resilient fallback to direct select
+  try {
+    const { data, error } = await supabase
+      .from('schools')
+      .select('id, name, subdomain, logo_url, city, street, zip_code, email, represented_by, has_campus_subscription, has_groovelab_subscription')
+      .eq('id', schoolId)
+      .maybeSingle();
+
+    if (error || !data) return null;
+    return {
+      id: data.id,
+      name: data.name,
+      subdomain: data.subdomain,
+      logoUrl: data.logo_url,
+      city: data.city,
+      street: data.street,
+      zipCode: data.zip_code,
+      email: data.email,
+      representedBy: data.represented_by,
+      hasCampusSubscription: Boolean(data.has_campus_subscription),
+      hasGroovelabSubscription: Boolean(data.has_groovelab_subscription)
+    };
+  } catch (err) {
+    console.warn('[BFF] getSchoolProfileDTO notice:', err);
+    return null;
+  }
+}
+
 /**
  * Fetches canonical SaaS invoice preview calculated 100% on the server.
  */
@@ -129,3 +183,4 @@ export async function getInvoicePreviewDTO(schoolId: string): Promise<InvoicePre
   }
   return data as InvoicePreviewDTO;
 }
+

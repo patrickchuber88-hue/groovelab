@@ -6,6 +6,7 @@ import { StudioAvatar } from './StudioAvatar';
 import { StudentMobileScheduleWizard } from './StudentMobileScheduleWizard';
 import { IDBadgeCard, inlineAllImagesInElement } from './IDBadgeCard';
 import { isDevEnvironment } from '../utils/tenantUrlHelper';
+import { getSchoolProfileDTO } from '../api/bffClient';
 
 interface QRCodeModalProps {
   user: {
@@ -200,16 +201,12 @@ export function QRCodeModal({ user, activePlatform, onClose }: QRCodeModalProps)
 
       if (resolvedSchoolId) {
         try {
-          const { data, error } = await supabase
-            .from('schools')
-            .select('name')
-            .eq('id', resolvedSchoolId)
-            .single();
-          if (data) {
-            setSchoolNameAndCity(data.name || 'Campus Musikschule');
+          const schoolDto = await getSchoolProfileDTO(resolvedSchoolId);
+          if (schoolDto) {
+            setSchoolNameAndCity(schoolDto.name || 'Campus Musikschule');
           }
         } catch (err) {
-          console.error('Error fetching school details:', err);
+          console.warn('Error fetching school details:', err);
         }
       } else {
         setSchoolNameAndCity('Campus Musikschule');
