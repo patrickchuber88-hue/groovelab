@@ -21,7 +21,7 @@ ssh "$SERVER" "docker exec -t supabase-db pg_dump -U postgres postgres | gzip > 
 echo "  ✓ Pre-Migration Backup erfolgreich gesichert."
 
 # 3. Kopiere SQL-Migrationsdateien auf den Server
-echo "🚀 Übertrage Migrationen 297, 298, 299, 300, 301, 302, 303..."
+echo "🚀 Übertrage Migrationen 297, 298, 299, 300, 301, 302, 303, 304..."
 scp supabase/migrations/297_tier1_enterprise_goldstandard_security.sql \
     supabase/migrations/298_enterprise_incident_response_and_waf_shield.sql \
     supabase/migrations/299_enterprise_bff_dto_suite.sql \
@@ -29,6 +29,7 @@ scp supabase/migrations/297_tier1_enterprise_goldstandard_security.sql \
     supabase/migrations/301_enterprise_audit_chain_and_optimizations.sql \
     supabase/migrations/302_enterprise_absolute_zero_leak_purge.sql \
     supabase/migrations/303_enterprise_school_secrets_isolation.sql \
+    supabase/migrations/304_enterprise_high_concurrency_indexes.sql \
     "$SERVER:$REMOTE_TEMP/"
 
 # 4. Führe Migrationen nacheinander in supabase-db aus
@@ -52,6 +53,9 @@ ssh "$SERVER" "docker exec -i supabase-db psql -U postgres postgres < $REMOTE_TE
 
 echo "⚡ Führe Migration 303 aus (School Secrets Isolation & Hermetic RLS)..."
 ssh "$SERVER" "docker exec -i supabase-db psql -U postgres postgres < $REMOTE_TEMP/303_enterprise_school_secrets_isolation.sql"
+
+echo "⚡ Führe Migration 304 aus (High-Concurrency Composite Indexes)..."
+ssh "$SERVER" "docker exec -i supabase-db psql -U postgres postgres < $REMOTE_TEMP/304_enterprise_high_concurrency_indexes.sql"
 
 # 5. Schema Cache in PostgREST neu laden
 echo "🔄 Lade PostgREST Schema Cache neu..."
