@@ -63,8 +63,12 @@ export const LEGAL_MASTER_WORDING = {
     kleinunternehmerUStG19: 'In DE/AT gemäß § 19 UStG umsatzsteuerbefreit (Kleinunternehmerregelung). In der Schweiz gilt Leistungsort Schweiz (nicht im Inland steuerbar gem. Art. 8 Abs. 1 MWSTG).'
   },
 
-  // 5. Tier-1 Enterprise+ Sicherheits- & Kryptographie-Standards
+  // 5. Tier-1 Enterprise+ Sicherheits- & Kryptographie-Standards (Banking Goldstandard)
   securityStandards: {
+    bffArchitecture: 'Backend-for-Frontend (BFF) Gateway-Architektur mit strikter Trennung von Client und internen Datenbank-Tokens (Zero-Token-Leakage in LocalStorage / SessionStorage).',
+    jweSessionEncryption: 'Vollverschlüsselte JWE-Sessions mit AES-256-GCM (A256GCM) und strikten __Host-session Cookies (HttpOnly, Secure, SameSite=Strict, Path=/).',
+    proactiveSilentRefresh: 'Proaktive Token-Rotation (Silent Refresh) mit 60s-Schwellenwert für unterbrechungsfreie, sichere Unterrichtssitzungen ohne Client-Zutun.',
+    antiCsrfOriginGuard: 'Fail-Closed Anti-CSRF & Origin-Guard mit browser-nativem Sec-Fetch-Site Filtering, Referer-Fallback und Host-Header-Poisoning-Schutz.',
     clientVaultEncryption: 'Hardware-gebundene AES-256-GCM Verschlüsselung für alle lokalen Gerätedaten & PIN-Caches (Web Crypto API).',
     zeroKnowledgeHashing: 'OWASP- & BSI-konformes PBKDF2 Zero-Knowledge Hashing mit 100.000 Runden (SHA-512 / SHA-256) & kryptografischem Salz.',
     registrationGate: 'Kryptografisch geschützter Schulanmeldungszugang mit PBKDF2-HMAC-SHA-512 (100.000 Runden) und progressivem 3-Strike Rate-Limiting.',
@@ -72,6 +76,7 @@ export const LEGAL_MASTER_WORDING = {
     immutableAuditLedger: 'Revisionssicheres, manipulationsgeschütztes Audit-Ledger mit kryptografischer SHA-512 / SHA-256 Merkle-Chain (GoBD & DSGVO konform).',
     fido2HardwareProtection: 'FIDO2 / WebAuthn Hardware Passkeys mit kryptografischem Signatur-Zähler zum Schutz vor Klon-Angriffen.',
     dataMinimization: '100% DSGVO-konforme Datenminimierung: Keine Speicherung von SEPA-, Bank- oder Kreditkartendaten, keine E-Mail-Adressen Minderjähriger, automatische Nachnamensmaskierung.',
-    hostingInfrastructure: '100% Hosting in ISO 27001-zertifizierten deutschen Rechenzentren (Hetzner Falkenstein & Supabase Frankfurt).'
+    hostingInfrastructure: '100% Hosting in ISO 27001-zertifizierten deutschen Rechenzentren (Hetzner Cloud Falkenstein/Nürnberg & Supabase EU Frankfurt) mit stündlichen verschlüsselten Backups.',
+    indexedDbAudioVault: 'Lokaler IndexedDB Audio-Tresor (groovelab_audio_vault) für 0ms Offline-Playback und bandbreitenfreie Proberaumnutzung.'
   }
 } as const;

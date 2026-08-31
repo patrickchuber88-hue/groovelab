@@ -365,7 +365,17 @@ export const AVVModal: React.FC<AVVModalProps> = ({ isOpen, onClose, school, onA
             § 5 Technisch-Organisatorische Maßnahmen / TOMs (Art. 32 DSGVO)
           </h4>
           <p style={{ margin: '4px 0 12px 0' }}>
-            Der Auftragnehmer gewährleistet ein dem Risiko angemessenes Schutzniveau durch moderne Sicherheitsmaßnahmen: Durchgehende TLS 1.3 Transportverschlüsselung mit Perfect Forward Secrecy, clientseitige <strong>AES-256-GCM Hardware-Vaults</strong> (Web Crypto API) für Offline-Caches, <strong>BSI- und OWASP-konformes PBKDF2 Zero-Knowledge Hashing (100.000 SHA-512 / SHA-256 Runden)</strong>, strikte PostgreSQL <strong>Row-Level Security (RLS)</strong> Mandantentrennung, <strong>Zero-Trust Session-Leasing mit 1-Click Remote-Logout</strong>, manipulationssichere <strong>SHA-512 / SHA-256 Merkle-Chain Audit-Ledger</strong> (GoBD-konform) sowie <strong>FIDO2 / WebAuthn Hardware-Passkeys mit Klon-Schutz</strong>.
+            Der Auftragnehmer gewährleistet ein dem Risiko angemessenes Schutzniveau durch modernste Tier-1 Enterprise Sicherheitsmaßnahmen:
+            <br />
+            1. <strong>Backend-for-Frontend (BFF) &amp; JWE-Verschlüsselung:</strong> Alle Sitzungen werden über ein geschütztes BFF-Gateway mit <strong>AES-256-GCM (A256GCM)</strong> verschlüsselt in <code style={{ background: '#f1f5f9', padding: '1px 5px', borderRadius: '4px' }}>__Host-session</code> HttpOnly-Cookies geführt. Es befinden sich zu keinem Zeitpunkt Tokens im ungeschützten Browser-Speicher.
+            <br />
+            2. <strong>Proaktiver Silent Refresh &amp; Anti-CSRF Origin-Guard:</strong> Automatisierte Token-Rotation ohne Unterrichtsunterbrechung, striktes Fail-Closed Filtering mittels browser-nativem <code style={{ background: '#f1f5f9', padding: '1px 5px', borderRadius: '4px' }}>Sec-Fetch-Site</code> und Host-Header-Poisoning-Schutz.
+            <br />
+            3. <strong>PostgreSQL FORCE Row-Level Security (RLS):</strong> Kernel-erzwungene Mandantentrennung auf allen 97 Datenbanktabellen mit transaktional isoliertem Mandantenkontext (<code style={{ background: '#f1f5f9', padding: '1px 5px', borderRadius: '4px' }}>is_local = true</code>) und automatisierter Vitest-Sicherheits-Gate-Testsuite.
+            <br />
+            4. <strong>Kryptografische Absicherung &amp; Passkeys:</strong> <strong>BSI- und OWASP-konformes PBKDF2 Zero-Knowledge Hashing (100.000 SHA-512 / SHA-256 Runden)</strong>, <strong>FIDO2 / WebAuthn Hardware-Passkeys mit Klon-Schutz</strong> und clientseitige <strong>AES-256-GCM Hardware-Vaults (Web Crypto API)</strong> für Offline-Caches.
+            <br />
+            5. <strong>Revisionssicherheit &amp; Backups:</strong> Manipulationssicheres <strong>SHA-512 / SHA-256 Merkle-Chain Audit-Ledger</strong> (GoBD-konform) sowie <strong>stündlich verschlüsselte Backups</strong> auf unabhängigen Datenträgern mit Desaster-Recovery-RTO &lt; 15 Minuten.
           </p>
 
 

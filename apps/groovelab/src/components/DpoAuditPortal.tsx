@@ -711,19 +711,19 @@ export function DpoAuditPortal({ onClose, schoolName = 'Stadtmusikschule', schoo
                   {[
                     {
                       title: 'I. Art. 32 Abs. 1 lit. a DSGVO – Pseudonymisierung & Verschlüsselung',
-                      desc: 'TLS 1.3 HSTS Verschlüsselung, clientseitige AES-256-GCM Hardware-Vaults (Web Crypto API), OWASP- und BSI-konformes PBKDF2 Hashing (100.000 SHA-512 / SHA-256 Runden), HMAC Blind Indexing, DSGVO-Nachnamensmaskierung als Privacy-Default.'
+                      desc: 'TLS 1.3 Transportverschlüsselung mit HSTS Preload, Backend-for-Frontend (BFF) Gateway mit JWE AES-256-GCM verschlüsselten __Host-session HttpOnly-Cookies (Zero Tokens im Browser-Speicher), proaktiver Silent Refresh, clientseitige AES-256-GCM Hardware-Vaults (Web Crypto API), OWASP- und BSI-konformes PBKDF2 Hashing (100.000 SHA-512 / SHA-256 Runden), DSGVO-Nachnamensmaskierung als Privacy-Default.'
                     },
                     {
                       title: 'II. Art. 32 Abs. 1 lit. b DSGVO – Vertraulichkeit & Integrität',
-                      desc: 'Strikte PostgreSQL Row-Level Security (RLS) Mandantentrennung, Zero-Trust Session-Leasing mit 1-Click Remote-Logout, FIDO2/WebAuthn Klon-Schutz, serverseitiges Brute-Force Lockout, Mikrofonschutz auf OS-Ebene, manipulationssichere SHA-512 / SHA-256 Merkle-Chain Audit-Ledger.'
+                      desc: 'Strikte PostgreSQL FORCE Row-Level Security (RLS) Mandantentrennung auf allen Tabellen mit transaktionalem Kontext (is_local = true), Fail-Closed Anti-CSRF Origin-Guard (Sec-Fetch-Site), Zero-Trust Session-Leasing mit 1-Click Remote-Logout, FIDO2/WebAuthn Klon-Schutz, serverseitiges Brute-Force Lockout, Mikrofonschutz auf OS-Ebene, manipulationssichere SHA-512 / SHA-256 Merkle-Chain Audit-Ledger.'
                     },
                     {
                       title: 'III. Art. 32 Abs. 1 lit. c DSGVO – Verfügbarkeit & Belastbarkeit',
-                      desc: 'Automatisierte tägliche Offsite-Backups im RZ Falkenstein (Deutschland), 99.9% Uptime SLA, Disaster Recovery Notfallplan, automatischer Maintenance-Janitor.'
+                      desc: 'Automatisierte stündliche verschlüsselte Datenbank-Dumps im RZ Falkenstein (Hetzner Deutschland), 99.9% Uptime SLA, Disaster Recovery Notfallplan (RTO < 15 Min), lokaler IndexedDB Audio-Tresor für unterbrechungsfreien Offline-Betrieb in Proberäumen.'
                     },
                     {
                       title: 'IV. Art. 32 Abs. 1 lit. d DSGVO – Überprüfung & Evaluierung',
-                      desc: 'Laufende automatisierte CI/CD Sicherheits-Audits, Rate-Limit Monitoring, 1-Click Ausweis-Sofortsperre und transparentes DSB-Audit-Cockpit.'
+                      desc: 'Laufende automatisierte CI/CD Sicherheits-Audits mit Vitest Tenant-Isolation Tests, Rate-Limit Monitoring mit Sicherheits-Telemetrie, 1-Click Ausweis-Sofortsperre und transparentes DSB-Audit-Cockpit.'
                     }
 
                   ].map((item, idx) => (

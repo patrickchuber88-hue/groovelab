@@ -268,8 +268,11 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
               </div>
 
               <div>
-                <strong style={{ color: '#0f172a' }}>3. Einsatz von technisch notwendigen Speichermedien &amp; AES-256-GCM Vault (§ 25 Abs. 2 Nr. 2 TDDDG)</strong><br />
-                Es werden ausschließlich technisch zwingend erforderliche LocalStorage- und SessionStorage-Einträge zur Aufrechterhaltung der Session und zur sicheren Kiosk-Kopplung verwendet. Lokale Profil- und PIN-Caches werden auf dem Endgerät mit <strong>AES-256-GCM (Web Crypto API)</strong> hardware-gebunden verschlüsselt abgelegt. <strong>Es werden keine Tracking-Cookies, Werbe-Cookies oder Drittanbieter-Analyse-Tools eingesetzt.</strong>
+                <strong style={{ color: '#0f172a' }}>3. Backend-for-Frontend (BFF) Architektur &amp; JWE-Session-Cookies (§ 25 Abs. 2 Nr. 2 TDDDG)</strong><br />
+                Zur Gewährleistung des Banking-Goldstandards setzt Campus-Groovelab eine <strong>Backend-for-Frontend (BFF) Gateway-Architektur</strong> ein. Der Browser speichert zu <strong>0% Zugriffs- oder Refresh-Tokens</strong> im ungeschützten Speicher (LocalStorage / SessionStorage). Stattdessen wird die Authentifizierung über ein rein serverseitig entschlüsselbares, mit <strong>AES-256-GCM (A256GCM)</strong> verschlüsseltes Session-Cookie (<code style={{ background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px' }}>__Host-session</code>) mit den Schutzattributen <code style={{ background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px' }}>HttpOnly</code>, <code style={{ background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px' }}>Secure</code>, <code style={{ background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px' }}>SameSite=Strict</code> und <code style={{ background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px' }}>Path=/</code> verwaltet.<br />
+                - <strong>Proaktiver Silent Refresh:</strong> Tokens werden 60 Sekunden vor Ablauf im Hintergrund auf dem Server ausgetauscht, ohne dass Unterrichtssitzungen unterbrochen werden.<br />
+                - <strong>Fail-Closed Anti-CSRF Guard:</strong> Alle schreibenden Anfragen werden serverseitig über <code style={{ background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px' }}>Sec-Fetch-Site</code> und strikte Origin/Host-Validierung vor Cross-Site Request Forgery und Host-Header-Poisoning geschützt.<br />
+                - <strong>Tracking-Verzicht:</strong> <strong>Es werden keine Tracking-Cookies, Werbe-Cookies oder Drittanbieter-Analyse-Tools eingesetzt.</strong>
               </div>
 
               <div>
@@ -278,15 +281,14 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
               </div>
 
               <div>
-                <strong style={{ color: '#0f172a' }}>5. Zero-Trust Session-Leasing, Audio-Tresor &amp; Hardware-Sicherheit</strong><br />
-                Audiodaten aus der In-App Loopstation und dem Meisterwerk-Protokoll werden verschlüsselt im EU-Cloud-Speicher abgelegt und sind durch mandanten- und schülerspezifische Storage-RLS-Policies geschützt. Nach dem Löschen einer Aufnahme wird die Datei physisch und vollständig aus dem Cloud-Speicher entfernt. PINs und Zugangsschlüssel werden mit <strong>OWASP- und BSI-konformem PBKDF2 Zero-Knowledge Hashing (100.000 SHA-512 / SHA-256 Runden)</strong> verarbeitet. Das integrierte <strong>Zero-Trust Session-Leasing</strong> ermöglicht Schulleitung und Lehrkräften jederzeit den 1-Click Remote-Logout aktiver Geräte. Bei Verlassen des Moduls oder Tab-Wechsel schaltet ein automatischer Guard alle Mikrofon-Tracks (<code style={{ background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px' }}>MediaStreamTrack.stop()</code>) ab.
+                <strong style={{ color: '#0f172a' }}>5. Zero-Trust Session-Leasing, IndexedDB Audio-Tresor &amp; Hardware-Sicherheit</strong><br />
+                Audiodaten aus der In-App Loopstation und dem Meisterwerk-Protokoll werden verschlüsselt im EU-Cloud-Speicher abgelegt und sind durch mandanten- und schülerspezifische Storage-RLS-Policies geschützt. Nach dem Löschen einer Aufnahme wird die Datei physisch und vollständig aus dem Cloud-Speicher entfernt. Für Offline-Übephasen in Proberäumen steht ein lokaler, hardware-geschützter <strong>IndexedDB Audio-Tresor (<code style={{ background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px' }}>groovelab_audio_vault</code>)</strong> zur Verfügung. PINs und Zugangsschlüssel werden mit <strong>OWASP- und BSI-konformem PBKDF2 Zero-Knowledge Hashing (100.000 SHA-512 / SHA-256 Runden)</strong> verarbeitet. Das integrierte <strong>Zero-Trust Session-Leasing</strong> ermöglicht Schulleitung und Lehrkräften jederzeit den 1-Click Remote-Logout aktiver Geräte. Bei Verlassen des Moduls oder Tab-Wechsel schaltet ein automatischer Guard alle Mikrofon-Tracks (<code style={{ background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px' }}>MediaStreamTrack.stop()</code>) ab.
               </div>
 
               <div>
-                <strong style={{ color: '#0f172a' }}>6. Hosting in ISO 27001-zertifizierten Rechenzentren (Art. 28 DSGVO)</strong><br />
-                Das Hosting von App und Datenbank erfolgt zu 100% in ISO 27001-zertifizierten deutschen Rechenzentren (Hetzner Online GmbH, Falkenstein/DE &amp; Supabase EU, Frankfurt am Main) mit Auftragsverarbeitungsverträgen (AVV) nach Art. 28 DSGVO.
+                <strong style={{ color: '#0f172a' }}>6. Hosting in ISO 27001-zertifizierten Rechenzentren &amp; Stündliche Backups (Art. 28 &amp; 32 DSGVO)</strong><br />
+                Das Hosting von App, BFF-Gateway und PostgreSQL-Datenbank erfolgt zu 100% in ISO 27001-zertifizierten deutschen Rechenzentren (Hetzner Online GmbH, Falkenstein/Nürnberg, Deutschland) mit Auftragsverarbeitungsverträgen (AVV) nach Art. 28 DSGVO. Sämtliche Datenbankbestände werden durch ein stündlich automatisiertes, verschlüsseltes Backup-System auf dedizierten Volumes vor Datenverlust geschützt.
               </div>
-
 
               <div>
                 <strong style={{ color: '#0f172a' }}>7. Betroffenenrechte (Art. 15 bis 22 DSGVO)</strong><br />

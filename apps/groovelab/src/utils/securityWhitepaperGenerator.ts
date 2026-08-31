@@ -77,24 +77,24 @@ export async function generateEnterpriseSecurityWhitepaperPDF(): Promise<void> {
 
     const pillars = [
       {
-        title: 'A. Zero-Mail IAM & Phishing-Immunität',
-        desc: 'Vollständiger Verzicht auf E-Mail-Server. Logins erfolgen über biometrische FIDO2/WebAuthn Passkeys, unvorhersehbare QR-Tokens (2^122 Entropie) und Argon2id-Hashes. Schüler- und Lehrerkonten können nicht durch E-Mail-Phishing kompromittiert werden.'
+        title: 'A. BFF Gateway & JWE A256GCM Token-Isolation',
+        desc: 'Vollständige Entkopplung von Browser und Datenbank-Tokens. Sessions werden rein serverseitig mit AES-256-GCM verschlüsselt in __Host-session Cookies geführt (Zero-Token-Leakage in LocalStorage / SessionStorage) inklusive proaktivem Silent Refresh.'
       },
       {
-        title: 'B. PGP-Kernel-Verschlüsselung (Zero-Knowledge)',
-        desc: 'Schülervornamen sind hardwarenah im PostgreSQL-Datenbank-Kernel mittels PGP verschlüsselt. Die Entschlüsselungsfunktion get_encryption_key() ist hermetisch gegen Client-Zugriffe gesperrt (REVOKE ALL FROM PUBLIC, anon, authenticated).'
+        title: 'B. Zero-Mail IAM & Biometrische Passkeys',
+        desc: 'Vollständiger Verzicht auf anfällige E-Mail-Server. Authentifizierung über FIDO2/WebAuthn Passkeys, unvorhersehbare QR-Tokens und PBKDF2/Argon2id-Hashes. Konten sind 100% phishing-immun.'
       },
       {
         title: 'C. 100% PostgreSQL FORCE Row-Level Security (RLS)',
-        desc: 'Alle 97 Datenbanktabellen erzwingen zwingende Mandantenisolation auf Kernel-Ebene (school_id = get_current_user_school_id()). Unautorisierte Anfragen liefern serverseitig 0 Zeilen (HTTP 401).'
+        desc: 'Alle 97 Datenbanktabellen erzwingen zwingende Mandantenisolation auf Kernel-Ebene mit isoliertem Transaktions-Kontext (is_local = true). Unautorisierte Cross-Tenant Zugriffe werden serverseitig abgewiesen.'
       },
       {
-        title: 'D. Subresource Integrity (SRI SHA-384) & NIST SBOM',
-        desc: 'Alle JavaScript- und CSS-Bundles sind in dist/index.html mit kryptografischen SHA-384 Hashes versiegelt. Vollständige Software Bill of Materials (SBOM nach NIST SP 800-161) auditiert alle Open-Source-Abhängigkeiten.'
+        title: 'D. Fail-Closed Anti-CSRF & Origin-Guard',
+        desc: 'Schutz aller schreibenden Operationen durch browser-native Fetch Metadata (Sec-Fetch-Site), Origin- und Host-Header-Validierung sowie dynamisches IP-Rate-Limiting (3-Strike-Sperre).'
       },
       {
-        title: 'E. FinTech Client-Shield & Anti-Tampering',
-        desc: 'Produktions-Builds sind gegen DevTools-Inspektion geschützt (Stummschaltung aller Konsolenausgaben, F12-Blockade auf Kiosken, automatischer PrivacyBlur-Schutz bei Tab-Wechsel und vollständige RAM-Zeroization beim Logout).'
+        title: 'E. Subresource Integrity (SRI) & Deutsche ISO 27001 Cloud',
+        desc: 'Alle Bundles sind mit SHA-384 Hashes versiegelt. 100% Hosting in Deutschland (Hetzner Falkenstein/Nürnberg) mit stündlich automatisierten, verschlüsselten Backups.'
       }
     ];
 
