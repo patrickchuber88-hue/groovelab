@@ -1265,7 +1265,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                 fontWeight: 500,
                 paddingLeft: '8px'
               }}>
-                <strong>Sicherheit, die im Code lebt:</strong> Dieses reale Datenbank-Protokoll garantiert, dass Abfragen direkt auf Serverebene isoliert werden. Unberechtigte Datenzugriffe auf Datenbankebene werden damit wirksam nach dem Zero-Trust-Prinzip verhindert.
+                <strong>Sicherheit, die im Datenbankkern lebt:</strong> Diese reale Sicherheits-Policy garantiert, dass alle Datenabfragen direkt auf Kernel-Ebene mandantenisoliert werden. Unberechtigte mandantenübergreifende Zugriffe sind durch das Zero-Trust-Prinzip technisch ausgeschlossen.
               </p>
             </div>
           </div>
