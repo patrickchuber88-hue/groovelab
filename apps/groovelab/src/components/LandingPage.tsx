@@ -1919,9 +1919,9 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                         sectionBadge: 'Kryptografie & Maskierung',
                         items: [
                           { title: '1. Verschlüsselung in Transit & At-Rest', desc: 'TLS 1.3 Transport-Verschlüsselung mit HSTS. Datenbank- & Storage-Verschlüsselung im Ruhezustand nach AES-256.' },
-                          { title: '2. Client-Side Data Minimization (Lokal-Filterung)', desc: 'Geburtsdaten werden bei der Eingabe noch auf dem lokalen Endgerät verarbeitet; Monat und Jahr werden vor dem Senden an den Server verworfen. Es existieren zu keinem Zeitpunkt vollständige Geburtsdaten im System.' },
+                          { title: '2. Strikte Datenminimierung (Privacy by Design)', desc: 'Es werden keine sensiblen Profildaten wie Schüler-E-Mails, Bank-/SEPA-Daten oder vollständige Geburtsdaten im System gespeichert. Daten werden bereits auf dem Endgerät minimiert.' },
                           { title: '3. DSGVO-konforme Nachnamensmaskierung', desc: 'Standardmäßige Kürzung von Schülernamen auf „Max M.“ (Privacy by Default) gegen Schulterblick und unbefugtes Mitlesen im Unterricht.' },
-                          { title: '4. Dynamischer PIN-Lifecycle & Server-Pepper Hashing', desc: 'Der initiale Tagesschlüssel dient ausschließlich der Erstanmeldung. Er wird bei der ersten Nutzung zwingend durch eine benutzerdefinierte 4-stellige PIN ersetzt, welche serverseitig mit Pepper und dynamischem Salt irreversibel gehasht wird.' },
+                          { title: '4. Zero-Knowledge Authentifizierung & PBKDF2 Hashing', desc: 'Authentifizierungs-Geheimnisse und PINs werden serverseitig mittels robustem PBKDF2/SHA-512 (100.000 Runden) mit dynamischem Salt irreversibel gehasht. Einmal-Aktivierungstoken verfallen nach der Erstanmeldung sofort und unwiderruflich.' },
                           { title: '5. Lokale Zero-Cloud Biometrie- & Kameraverarbeitung', desc: 'Kamera-Feeds für QR-Logins und TouchID/FaceID-Passkeys verbleiben zu 100% lokal auf dem Endgerät des Nutzers.' }
                         ]
                       },
