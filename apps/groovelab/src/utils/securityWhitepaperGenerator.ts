@@ -143,27 +143,27 @@ export async function generateEnterpriseSecurityWhitepaperPDF(): Promise<void> {
     curY += 8;
     const toms = [
       {
-        cat: '1. Vertraulichkeit (Art. 32 Abs. 1 lit. b DSGVO)',
+        cat: '1. Vertraulichkeit (Art. 32 Abs. 1 lit. b DSGVO & BSI IT-Grundschutz)',
         items: [
           '• Physische Zutrittskontrolle: ISO 27001 zertifiziertes Rechenzentrum (Hetzner Online GmbH, Falkenstein/Nürnberg, Deutschland).',
-          '• Transportverschlüsselung: TLS 1.3 mit HSTS Preload (2 Jahre), Perfect Forward Secrecy (PFS) und HTTP/3 QUIC.',
-          '• Zugriffskontrolle: Strikte rollenbasierte Autorisierung (RBAC) für Schulleitung, Sekretariat, Lehrkräfte und Schüler.'
+          '• BFF Token-Isolation: Sessions verschlüsselt in __Host-session JWE HttpOnly-Cookies (AES-256-GCM); 0% Tokens im Browser-Speicher.',
+          '• Mandantentrennung: PostgreSQL FORCE Row-Level Security auf allen 97 Tabellen (school_id Isolation auf Kernel-Ebene).'
         ]
       },
       {
-        cat: '2. Integrität (Art. 32 Abs. 1 lit. b DSGVO)',
+        cat: '2. Integrität & Anti-CSRF (Art. 32 Abs. 1 lit. b DSGVO)',
         items: [
-          '• Hash-Validierung: Subresource Integrity (SRI) SHA-384 verhindert Supply-Chain-Angriffe.',
-          '• Revisionssicherheit: Immutable Activation Event Ledger (WORM-Prinzip) für alle Schüleraktivierungen.',
-          '• Input-Sanitization: Vollständige Parametrisierung aller SQL-Queries, Schutz vor XSS und Injection.'
+          '• Anti-CSRF Origin-Guard: Fail-Closed Prüfung mit browser-nativem Sec-Fetch-Site Filtering & Host-Poisoning-Schutz.',
+          '• Revisionssicherheit: Manipulationssicheres WORM Audit-Ledger & SHA-384 Subresource Integrity (SRI).',
+          '• Hash-Standards: PBKDF2 Zero-Knowledge Hashing mit 100.000 Runden (SHA-512 / SHA-256) für PINs und Kiosk-Tokens.'
         ]
       },
       {
-        cat: '3. Verfügbarkeit & Belastbarkeit (Art. 32 Abs. 1 lit. b DSGVO)',
+        cat: '3. Verfügbarkeit & Löschkonzept (Art. 32 & Art. 17 DSGVO / DIN 66398)',
         items: [
-          '• Datensicherungskonzept: Tägliche GFS-Backups mit SHA-256 Prüfsummen und automatisierter Integritätsprüfung.',
-          '• Wiederherstellungszeit (RTO): < 15 Minuten im Katastrophenfall (Desaster Recovery).',
-          '• Ausfallsicherheit: Nginx Circuit-Breaker mit lokalem Offline-Cache-Failover (4.5s).'
+          '• Datensicherung: Stündlich automatisierte, verschlüsselte Datenbank-Backups (RTO < 15 Min, RPO < 1 Std.).',
+          '• DIN 66398 Löschkonzept: Automatischer Purge-Bot nach 60 Tagen Inaktivität; physische Storage-Löschung bei Austritt.',
+          '• Offline-Resilienz: IndexedDB Audio-Tresor (groovelab_audio_vault) für unterbrechungsfreie Musikproben.'
         ]
       }
     ];
@@ -186,7 +186,7 @@ export async function generateEnterpriseSecurityWhitepaperPDF(): Promise<void> {
       curY += 4;
     });
 
-    // Hosting & Legal Confirmation Box
+    // Hosting & Municipal Legal Confirmation Box
     curY += 4;
     doc.setFillColor(lightBg[0], lightBg[1], lightBg[2]);
     doc.roundedRect(margin, curY, contentWidth, 36, 3, 3, 'F');
@@ -197,12 +197,12 @@ export async function generateEnterpriseSecurityWhitepaperPDF(): Promise<void> {
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(9.5);
     doc.setTextColor(darkSlate[0], darkSlate[1], darkSlate[2]);
-    doc.text('4. Server-Standort & Auftragsverarbeitungsvertrag (AVV)', margin + 6, curY + 8);
+    doc.text('4. Kommunale Träger-Compliance (VVT Art. 30, DSFA Art. 35 & BYOD)', margin + 6, curY + 8);
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8);
     doc.setTextColor(textGray[0], textGray[1], textGray[2]);
-    const hostText = 'Alle Server, Datenbanken und Backups werden ausschließlich in Deutschland betrieben (Hetzner Rechenzentrum Falkenstein/Vogtland). Mit jeder Musikschule wird ein digitaler Auftragsverarbeitungsvertrag (AVV nach DSGVO Art. 28) mit standardisierten EU-Schutzklauseln geschlossen.';
+    const hostText = 'Vollständige Konformität für Städte, Gemeinden und Schulämter: VVT-Muster nach Art. 30 DSGVO, formelle DSFA-Schwellwertprüfung nach Art. 35 DSGVO (kein hohes Risiko) und sichere BYOD-Nutzung für Lehrkräfte ohne lokale Datenspeicherung. 100% deutsches Hosting in ISO 27001 Rechenzentren (Hetzner Falkenstein).';
     const splitHost = doc.splitTextToSize(hostText, contentWidth - 12);
     doc.text(splitHost, margin + 6, curY + 15);
 

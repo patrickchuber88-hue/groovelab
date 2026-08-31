@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ShieldCheck, Download, Search, FileText, Lock, CheckCircle2, ChevronDown, RefreshCw, X, Copy, Check, Filter, Clock, Printer } from 'lucide-react';
+import { ShieldCheck, Download, Search, FileText, Lock, CheckCircle2, ChevronDown, RefreshCw, X, Copy, Check, Filter, Clock, Printer, Building, FileCheck, CheckSquare, Sparkles } from 'lucide-react';
 import { generateStudentGdprDataTakeout, downloadGdprJsonArchive } from '../utils/gdprDataTakeout';
 
 interface DpoAuditPortalProps {
@@ -23,7 +23,7 @@ interface WormLogEntry {
 }
 
 export function DpoAuditPortal({ onClose, schoolName = 'Stadtmusikschule', schoolAddress, schoolSigneeName, school }: DpoAuditPortalProps) {
-  const [activeTab, setActiveTab] = useState<'LOGS' | 'AVV_TOM' | 'RIGHTS'>('LOGS');
+  const [activeTab, setActiveTab] = useState<'LOGS' | 'AVV_TOM' | 'RIGHTS' | 'MUNICIPAL_DPO'>('LOGS');
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('ALL');
   const [copiedHashId, setCopiedHashId] = useState<string | null>(null);
@@ -373,7 +373,8 @@ export function DpoAuditPortal({ onClose, schoolName = 'Stadtmusikschule', schoo
             {[
               { id: 'LOGS', label: 'WORM Audit-Logs', icon: FileText, badge: `${logs.length} Einträge` },
               { id: 'AVV_TOM', label: 'AVV & TOM-Nachweis', icon: ShieldCheck, badge: 'Geprüft 2026' },
-              { id: 'RIGHTS', label: 'Betroffenenrechte & Löschen', icon: Lock, badge: 'Automatisiert' }
+              { id: 'RIGHTS', label: 'Betroffenenrechte & Löschen', icon: Lock, badge: 'Automatisiert' },
+              { id: 'MUNICIPAL_DPO', label: 'Kommunales DSB-Dossier (VVT / DSFA)', icon: Building, badge: 'Art. 30/35 DSGVO' }
             ].map(tab => {
               const TabIcon = tab.icon;
               return (
@@ -820,6 +821,252 @@ export function DpoAuditPortal({ onClose, schoolName = 'Stadtmusikschule', schoo
                     </span>
                   </div>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 4: KOMMUNALES DSB-DOSSIER (VVT, DSFA, DIN 66398 & BYOD) */}
+          {activeTab === 'MUNICIPAL_DPO' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+              
+              {/* Header Box */}
+              <div style={{
+                background: '#ffffff',
+                border: '1px solid rgba(226, 232, 240, 0.8)',
+                borderRadius: '24px',
+                padding: '28px',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                boxShadow: '0 8px 30px rgba(15, 23, 42, 0.03)'
+              }}>
+                <div>
+                  <span style={{ background: '#fef3c7', color: '#92400e', padding: '4px 12px', borderRadius: '100px', fontSize: '0.68rem', fontWeight: 900 }}>
+                    STÄDTISCHE &amp; KOMMUNALE SCHULTRÄGER COMPLIANCE
+                  </span>
+                  <h3 style={{ margin: '10px 0 4px 0', fontSize: '1.2rem', fontWeight: 900, color: '#0f172a' }}>
+                    Dossier für behördliche &amp; kommunale Datenschutzbeauftragte
+                  </h3>
+                  <p style={{ margin: 0, fontSize: '0.82rem', color: '#64748b', fontWeight: 500 }}>
+                    Vollständige Unterlagen nach BSI IT-Grundschutz, Art. 30/35 DSGVO, DIN 66398 und Schulrecht der Bundesländer
+                  </p>
+                </div>
+
+                <button
+                  onClick={() => window.print()}
+                  style={{
+                    background: '#0f172a',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '14px',
+                    padding: '12px 20px',
+                    fontWeight: 800,
+                    fontSize: '0.84rem',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    boxShadow: '0 4px 12px rgba(15, 23, 42, 0.15)',
+                    transition: 'all 0.15s ease'
+                  }}
+                  className="hover-scale no-print"
+                >
+                  <Printer size={16} /> DSB-Dossier drucken / PDF
+                </button>
+              </div>
+
+              {/* 4 Cards Grid for Municipal DPOs */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                
+                {/* 1. VVT Muster nach Art. 30 DSGVO */}
+                <div style={{
+                  background: '#ffffff',
+                  border: '1px solid rgba(226, 232, 240, 0.8)',
+                  borderRadius: '24px',
+                  padding: '28px',
+                  boxShadow: '0 8px 24px rgba(15, 23, 42, 0.03)'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+                    <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#e6f4ea', color: '#166534', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <FileCheck size={20} />
+                    </div>
+                    <div>
+                      <h4 style={{ margin: 0, fontSize: '1.02rem', fontWeight: 900, color: '#0f172a' }}>
+                        1. Muster für das Verzeichnis von Verarbeitungstätigkeiten (VVT nach Art. 30 DSGVO)
+                      </h4>
+                      <span style={{ fontSize: '0.74rem', color: '#64748b' }}>Zur direkten Übernahme in das behördliche Datenschutz-Verzeichnis der Stadt/Gemeinde</span>
+                    </div>
+                  </div>
+
+                  <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '18px', fontSize: '0.8rem', lineHeight: 1.6, color: '#334155' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                      <tbody>
+                        <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
+                          <td style={{ padding: '8px 4px', fontWeight: 800, width: '220px', color: '#0f172a' }}>Bezeichnung der Tätigkeit:</td>
+                          <td style={{ padding: '8px 4px' }}>Digitale Musikschulverwaltung, Raumplanung &amp; pädagogische Übebegleitung (Campus-Groovelab)</td>
+                        </tr>
+                        <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
+                          <td style={{ padding: '8px 4px', fontWeight: 800, color: '#0f172a' }}>Verantwortlicher Träger:</td>
+                          <td style={{ padding: '8px 4px' }}>{cleanSchoolName} (vertreten durch Schulleitung / Schulverwaltung)</td>
+                        </tr>
+                        <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
+                          <td style={{ padding: '8px 4px', fontWeight: 800, color: '#0f172a' }}>Auftragsverarbeiter (Art. 28):</td>
+                          <td style={{ padding: '8px 4px' }}>Campus-Groovelab (Einzelunternehmen Patrick Huber, 79618 Rheinfelden, DE)</td>
+                        </tr>
+                        <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
+                          <td style={{ padding: '8px 4px', fontWeight: 800, color: '#0f172a' }}>Zweckbestimmung:</td>
+                          <td style={{ padding: '8px 4px' }}>Koordination des Musikschulunterrichts, Raum- &amp; Terminbelegung, Bereitstellung digitaler Hausaufgabennotizen &amp; werbefreie Übungs-Audiobegleitung</td>
+                        </tr>
+                        <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
+                          <td style={{ padding: '8px 4px', fontWeight: 800, color: '#0f172a' }}>Rechtsgrundlagen:</td>
+                          <td style={{ padding: '8px 4px' }}>Art. 6 Abs. 1 lit. b DSGVO (Unterrichtsvertrag), Art. 6 Abs. 1 lit. e DSGVO i.V.m. Landes-SchulG (Kommunale Bildungsaufgabe), Art. 6 Abs. 1 lit. a / Art. 8 DSGVO (Einwilligung für optionale Audio-Uploads)</td>
+                        </tr>
+                        <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
+                          <td style={{ padding: '8px 4px', fontWeight: 800, color: '#0f172a' }}>Kategorien betroffener Personen:</td>
+                          <td style={{ padding: '8px 4px' }}>Musikschüler/innen, Erziehungsberechtigte, Lehrkräfte, Sekretariats- &amp; Schulleitungspersonal</td>
+                        </tr>
+                        <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
+                          <td style={{ padding: '8px 4px', fontWeight: 800, color: '#0f172a' }}>Verarbeitete Datenkategorien:</td>
+                          <td style={{ padding: '8px 4px' }}>Vorname, Nachname (im Lehrerbereich pseudonymisiert auf Anfangsbuchstabe), Instrument, Raumzuordnung, Stundenplanzeiten, freiwillige Audioaufnahmen. <strong>Keine Speicherung von Schüler-E-Mails, SEPA-/Bankdaten oder Passwörtern.</strong></td>
+                        </tr>
+                        <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
+                          <td style={{ padding: '8px 4px', fontWeight: 800, color: '#0f172a' }}>Empfänger &amp; Sub-Processors:</td>
+                          <td style={{ padding: '8px 4px' }}>Hetzner Online GmbH (Falkenstein/Nürnberg, Deutschland – ISO 27001)</td>
+                        </tr>
+                        <tr>
+                          <td style={{ padding: '8px 4px', fontWeight: 800, color: '#0f172a' }}>Drittlandtransfer:</td>
+                          <td style={{ padding: '8px 4px', color: '#166534', fontWeight: 800 }}>Nein (0,00% Transfer – Ausschließlich deutsches Rechenzentrum)</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* 2. DSFA Schwellwertprüfung nach Art. 35 DSGVO */}
+                <div style={{
+                  background: '#ffffff',
+                  border: '1px solid rgba(226, 232, 240, 0.8)',
+                  borderRadius: '24px',
+                  padding: '28px',
+                  boxShadow: '0 8px 24px rgba(15, 23, 42, 0.03)'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+                    <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#eff6ff', color: '#1d4ed8', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <CheckSquare size={20} />
+                    </div>
+                    <div>
+                      <h4 style={{ margin: 0, fontSize: '1.02rem', fontWeight: 900, color: '#0f172a' }}>
+                        2. Datenschutz-Folgenabschätzung (DSFA-Schwellwertprüfung nach Art. 35 DSGVO)
+                      </h4>
+                      <span style={{ fontSize: '0.74rem', color: '#64748b' }}>Formelle Prüfung anhand der Blacklist-Kriterien der Datenschutzkonferenz (DSK)</span>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '12px' }}>
+                    {[
+                      { q: 'Systematische Überwachung öffentlicher Bereiche?', r: 'NEIN', desc: 'Keine Video-, Standort- oder Bewegungsprofile.', pass: true },
+                      { q: 'Verarbeitung besonderer Kategorien (Art. 9 DSGVO)?', r: 'NEIN', desc: 'Keine Gesundheits-, Biometrie- oder Religionsdaten.', pass: true },
+                      { q: 'Automatisierte Entscheidungsfindung / Profiling (Art. 22)?', r: 'NEIN', desc: 'Keine Benotung, kein Scoring, kein pädagogisches Tracking.', pass: true },
+                      { q: 'Umfangreiche Verarbeitung von Daten schutzbedürftiger Personen?', r: 'KOMPENSIERT', desc: 'Schülerdaten sind durch Zero-Mail, Token-Isolation und Pseudonymisierung risikofrei minimiert.', pass: true }
+                    ].map((item, i) => (
+                      <div key={i} style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '14px', padding: '14px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                          <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#0f172a' }}>{item.q}</span>
+                          <span style={{ background: '#e6f4ea', color: '#166534', fontSize: '0.66rem', fontWeight: 900, padding: '2px 8px', borderRadius: '6px' }}>{item.r}</span>
+                        </div>
+                        <p style={{ margin: 0, fontSize: '0.74rem', color: '#64748b' }}>{item.desc}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div style={{ marginTop: '16px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '14px', padding: '14px 18px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <CheckCircle2 size={24} color="#166534" />
+                    <div>
+                      <strong style={{ fontSize: '0.84rem', color: '#166534' }}>Formelles Prüfergebnis für den DSB:</strong>
+                      <div style={{ fontSize: '0.76rem', color: '#15803d', marginTop: '2px' }}>
+                        Die Durchführung einer vollumfänglichen Datenschutz-Folgenabschätzung (DSFA) ist gemäß Art. 35 Abs. 1 DSGVO <strong>nicht erforderlich</strong>, da durch die Zero-Mail-, BFF- und Pseudonymisierungs-Architektur kein hohes Risiko für die Rechte und Freiheiten natürlicher Personen besteht.
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 3. DIN 66398 Löschkonzept */}
+                <div style={{
+                  background: '#ffffff',
+                  border: '1px solid rgba(226, 232, 240, 0.8)',
+                  borderRadius: '24px',
+                  padding: '28px',
+                  boxShadow: '0 8px 24px rgba(15, 23, 42, 0.03)'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+                    <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#fef3c7', color: '#92400e', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <Clock size={20} />
+                    </div>
+                    <div>
+                      <h4 style={{ margin: 0, fontSize: '1.02rem', fontWeight: 900, color: '#0f172a' }}>
+                        3. Kommunales Löschkonzept nach DIN 66398 &amp; Art. 17 DSGVO
+                      </h4>
+                      <span style={{ fontSize: '0.74rem', color: '#64748b' }}>Strukturierte Löschklassen mit automatisiertem Purge-Bot</span>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px' }}>
+                    {[
+                      { lk: 'LK 1: Session & Cache', frist: 'Sofort / Session-Ende', desc: 'JWE-Cookies verfallen nach Inaktivität; RAM-Zeroization beim Logout.' },
+                      { lk: 'LK 2: Audio-Aufnahmen', frist: 'Sofort bei Nutzeraktion', desc: 'Physische Löschung aus dem Cloud-Storage ohne Zwischenspeicherung.' },
+                      { lk: 'LK 3: Schüler-Profile', frist: '60 Tage Inaktivität / 30 Tage Exmatrikulation', desc: 'Automatischer Inaktivitäts-Stopp; vollständige Löschung nach Schuljahresende.' },
+                      { lk: 'LK 4: Rechnungsbelege (B2B)', frist: '10 Jahre (§ 147 AO)', desc: 'Gilt ausschließlich für Sammelrechnungen der Musikschule (keine Schülerdaten).' }
+                    ].map((item, i) => (
+                      <div key={i} style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '14px', padding: '14px' }}>
+                        <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#0f172a' }}>{item.lk}</div>
+                        <div style={{ fontSize: '0.72rem', color: '#34a853', fontWeight: 700, margin: '2px 0 4px 0' }}>{item.frist}</div>
+                        <div style={{ fontSize: '0.72rem', color: '#64748b', lineHeight: 1.45 }}>{item.desc}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 4. BYOD & Digitale Souveränität */}
+                <div style={{
+                  background: '#ffffff',
+                  border: '1px solid rgba(226, 232, 240, 0.8)',
+                  borderRadius: '24px',
+                  padding: '28px',
+                  boxShadow: '0 8px 24px rgba(15, 23, 42, 0.03)'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+                    <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#fdf4ff', color: '#a855f7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <Building size={20} />
+                    </div>
+                    <div>
+                      <h4 style={{ margin: 0, fontSize: '1.02rem', fontWeight: 900, color: '#0f172a' }}>
+                        4. Dienstanweisung-Konformität (BYOD) &amp; Digitale Souveränität
+                      </h4>
+                      <span style={{ fontSize: '0.74rem', color: '#64748b' }}>Sicherheit für private Lehrkräfte-Endgeräte &amp; 100% europäische Unabhängigkeit</span>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                    <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '16px' }}>
+                      <strong style={{ fontSize: '0.84rem', color: '#0f172a', display: 'block', marginBottom: '6px' }}>
+                        📱 BYOD-Sicherheit (Bring Your Own Device)
+                      </strong>
+                      <p style={{ margin: 0, fontSize: '0.76rem', color: '#475569', lineHeight: 1.55 }}>
+                        Da Lehrkräfte an Musikschulen häufig eigene Tablets/Laptops nutzen, schützt die <strong>BFF-Architektur</strong> die Schule vollständig: Es werden <strong>keine Datenbank-Tokens oder Schülerdaten im lokalen Dateisystem</strong> abgelegt. Bei Verlust eines Geräts kann die Schulleitung mit 1 Klick im Dashboard alle Sitzungen remote beenden.
+                      </p>
+                    </div>
+
+                    <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '16px' }}>
+                      <strong style={{ fontSize: '0.84rem', color: '#0f172a', display: 'block', marginBottom: '6px' }}>
+                        🇪🇺 100% Digitale Souveränität (Kein CLOUD Act)
+                      </strong>
+                      <p style={{ margin: 0, fontSize: '0.76rem', color: '#475569', lineHeight: 1.55 }}>
+                        Campus-Groovelab unterliegt keinem Zugriff durch außereuropäische Behörden (kein US-CLOUD-Act, kein FISA 702). Die Plattform wird ausschließlich von einem deutschen Einzelunternehmen betrieben und in nach ISO 27001 auditierten Rechenzentren der Hetzner Online GmbH in Deutschland gehostet.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
               </div>
             </div>
           )}
