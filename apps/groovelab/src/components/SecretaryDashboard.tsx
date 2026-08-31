@@ -28271,7 +28271,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '10px', fontSize: '0.7rem', lineHeight: '1.4' }}>
                                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
                                     <span style={{ color: '#34a853', fontWeight: 900, marginTop: '-1px' }}>✓</span>
-                                    <span><strong>ISO 27001 zertifiziert:</strong> Dedizierte Server in Frankfurt &amp; Falkenstein, kein US-Drittlandstransfer.</span>
+                                    <span><strong>ISO 27001 zertifiziert:</strong> Dedizierte Server in Falkenstein &amp; Nürnberg (Hetzner Deutschland), kein US-Drittlandstransfer.</span>
                                   </div>
                                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
                                     <span style={{ color: '#34a853', fontWeight: 900, marginTop: '-1px' }}>✓</span>

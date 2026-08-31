@@ -351,13 +351,9 @@ export const AVVModal: React.FC<AVVModalProps> = ({ isOpen, onClose, school, onA
               <span>Dienstleister &amp; Standort</span>
               <span>Leistungsumfang &amp; Zertifizierung</span>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #f1f5f9' }}>
-              <span><strong>Hetzner Online GmbH</strong> (Falkenstein/DE)</span>
-              <span>Cloud-Infrastruktur &amp; Web-Hosting (ISO 27001)</span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '6px' }}>
-              <span><strong>Supabase EU</strong> (Frankfurt am Main, Deutschland)</span>
-              <span>PostgreSQL-Datenbank &amp; RLS-Mandantentrennung (ISO 27001 / SOC 2)</span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0' }}>
+              <span><strong>Hetzner Online GmbH</strong> (Falkenstein/Vogtland, Deutschland)</span>
+              <span>Dedizierte Cloud-, Datenbank- &amp; Speicher-Infrastruktur (ISO 27001)</span>
             </div>
           </div>
 

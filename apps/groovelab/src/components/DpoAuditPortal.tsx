@@ -1201,17 +1201,17 @@ export function DpoAuditPortal({ onClose, schoolName = 'Stadtmusikschule', schoo
 
                 <div>
                   <h4 style={{ margin: '0 0 4px 0', fontSize: '0.9rem', fontWeight: 900, color: '#0f172a' }}>§ 2 Vertraulichkeit &amp; Serverstandort (Art. 28 Abs. 3 lit. b DSGVO)</h4>
-                  <p style={{ margin: 0 }}>Sämtliche personenbezogenen Daten werden zu 100% in ISO 27001-zertifizierten deutschen Rechenzentren der <strong>Hetzner Online GmbH (Falkenstein/DE) &amp; Supabase EU (Frankfurt/DE)</strong> verarbeitet. Ein Datentransfer in Drittstaaten außerhalb der EU/EWR findet nicht statt. Der Auftragnehmer gewährleistet, dass das zur Verarbeitung eingesetzte Personal zur Verschwiegenheit verpflichtet wurde.</p>
+                  <p style={{ margin: 0 }}>Sämtliche personenbezogenen Daten werden zu 100% in ISO 27001-zertifizierten deutschen Rechenzentren der <strong>Hetzner Online GmbH (Falkenstein/Vogtland &amp; Nürnberg, Deutschland)</strong> verarbeitet. Ein Datentransfer in Drittstaaten außerhalb der EU/EWR findet nicht statt. Der Auftragnehmer gewährleistet, dass das zur Verarbeitung eingesetzte Personal zur Verschwiegenheit verpflichtet wurde.</p>
                 </div>
 
                 <div>
                   <h4 style={{ margin: '0 0 4px 0', fontSize: '0.9rem', fontWeight: 900, color: '#0f172a' }}>§ 3 Technisch-Organisatorische Maßnahmen / TOMs (Art. 32 DSGVO)</h4>
-                  <p style={{ margin: 0 }}>Der Auftragnehmer garantiert die Einhaltung der TOMs nach Art. 32 DSGVO: TLS 1.3 HSTS &amp; AES-256 Verschlüsselung, clientseitige Datenminimierung (Pseudonymisierung von Vornamen, Filterung von Geburtsdaten), strikte Row-Level Security (RLS) Mandantentrennung sowie schreibgeschützte WORM Audit-Logs in deutscher Ortszeit (Europe/Berlin).</p>
+                  <p style={{ margin: 0 }}>Der Auftragnehmer garantiert die Einhaltung der TOMs nach Art. 32 DSGVO: TLS 1.3 HSTS &amp; JWE AES-256-GCM Verschlüsselung, clientseitige Datenminimierung (Pseudonymisierung von Vornamen, Filterung von Geburtsdaten), strikte Row-Level Security (RLS) Mandantentrennung sowie schreibgeschützte WORM Audit-Logs in deutscher Ortszeit (Europe/Berlin).</p>
                 </div>
 
                 <div>
                   <h4 style={{ margin: '0 0 4px 0', fontSize: '0.9rem', fontWeight: 900, color: '#0f172a' }}>§ 4 Unterauftragsverhältnisse (Art. 28 Abs. 2 &amp; Abs. 3 lit. d DSGVO)</h4>
-                  <p style={{ margin: 0 }}>Der Auftraggeber stimmt der Einbindung der Unterauftragsverarbeiter Hetzner Online GmbH (Hosting Infrastruktur DE) und Supabase EU (Datenbank &amp; Auth DE) zu. Der Auftragnehmer informiert den Auftraggeber vor jeder vorgesehenen Änderung bezüglich der Hinzuziehung anderer Unterauftragnehmer.</p>
+                  <p style={{ margin: 0 }}>Der Auftraggeber stimmt der Einbindung des Unterauftragsverarbeiters Hetzner Online GmbH (Dedizierte Server-, Datenbank- &amp; Cloud-Infrastruktur Deutschland) zu. Der Auftragnehmer informiert den Auftraggeber vor jeder vorgesehenen Änderung bezüglich der Hinzuziehung anderer Unterauftragnehmer.</p>
                 </div>
 
                 <div>

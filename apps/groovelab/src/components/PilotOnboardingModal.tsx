@@ -277,7 +277,7 @@ export const PilotOnboardingModal: React.FC<PilotOnboardingModalProps> = ({
 
                   <div>
                     <h4 style={{ margin: '0 0 4px 0', fontSize: '0.95rem', fontWeight: 800, color: '#0f172a' }}>§ 3 Hosting & Rechenzentren</h4>
-                    <p style={{ margin: 0 }}>Das Hosting erfolgt zu 100% in zertifizierten Rechenzentren in Deutschland (Hetzner Online GmbH, Standort Falkenstein/Vogtland sowie Supabase EU, Frankfurt am Main). Eine Übermittlung personenbezogener Daten in unsichere Drittstaaten ist ausgeschlossen.</p>
+                    <p style={{ margin: 0 }}>Das Hosting erfolgt zu 100% in zertifizierten Rechenzentren in Deutschland (Hetzner Online GmbH, Standort Falkenstein/Vogtland &amp; Nürnberg). Eine Übermittlung personenbezogener Daten in unsichere Drittstaaten ist ausgeschlossen.</p>
                   </div>
 
                   <div>
@@ -308,12 +308,12 @@ export const PilotOnboardingModal: React.FC<PilotOnboardingModalProps> = ({
 
                   <div>
                     <h4 style={{ margin: '0 0 4px 0', fontSize: '0.95rem', fontWeight: 800, color: '#0f172a' }}>§ 3 Technische & Organisatorische Maßnahmen (TOMs nach Art. 32 DSGVO)</h4>
-                    <p style={{ margin: 0 }}>Der Auftragsverarbeiter setzt folgende TOMs ein: Ende-zu-Ende TLS 1.3 Verschlüsselung im Transit, AES-256 Verschlüsselung auf Datenbank-Ebene, automatisierte Pseudonymisierung von Schülernamen im Unterrichtsbetrieb (`Max M.`), mandantenspezifische Row-Level Security (RLS) und tägliche verschlüsselte Backups.</p>
+                    <p style={{ margin: 0 }}>Der Auftragsverarbeiter setzt folgende TOMs ein: Ende-zu-Ende TLS 1.3 Verschlüsselung im Transit, JWE AES-256-GCM Verschlüsselung über Backend-for-Frontend (BFF), automatisierte Pseudonymisierung von Schülernamen im Unterrichtsbetrieb (`Max M.`), mandantenspezifische Row-Level Security (RLS) und stündliche verschlüsselte Backups.</p>
                   </div>
 
                   <div>
                     <h4 style={{ margin: '0 0 4px 0', fontSize: '0.95rem', fontWeight: 800, color: '#0f172a' }}>§ 4 Eingesetzte Unterauftragsverarbeiter</h4>
-                    <p style={{ margin: 0 }}>Als Unterauftragsverarbeiter sind genehmigt: 1. <strong>Hetzner Online GmbH</strong> (Industriestr. 25, 91710 Gunzenhausen – Server-Hosting in Falkenstein/Deutschland), 2. <strong>Supabase Inc. / AWS EU</strong> (Rechenzentrum Frankfurt am Main/Deutschland). Mit allen Unterauftragsverarbeitern bestehen wirksame Art. 28 DSGVO-Vereinbarungen.</p>
+                    <p style={{ margin: 0 }}>Als Unterauftragsverarbeiter ist genehmigt: <strong>Hetzner Online GmbH</strong> (Industriestr. 25, 91710 Gunzenhausen – Dediziertes Server-, Datenbank- &amp; Cloud-Hosting in Falkenstein/Vogtland &amp; Nürnberg, Deutschland – ISO 27001). Ein wirksamer Art. 28 DSGVO-Auftragsverarbeitungsvertrag besteht.</p>
                   </div>
 
                   <div>
