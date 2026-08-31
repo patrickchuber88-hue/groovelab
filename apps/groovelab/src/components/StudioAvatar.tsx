@@ -298,7 +298,6 @@ export const StudioAvatar = React.memo(({ src, style, className, user, userId, o
         onLoad={() => setIsLoaded(true)}
         loading="lazy"
         decoding="async"
-        crossOrigin="anonymous"
         style={{ 
           width: '100%', 
           height: '100%', 

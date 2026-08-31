@@ -49,6 +49,8 @@ scp supabase/migrations/297_tier1_enterprise_goldstandard_security.sql \
     supabase/migrations/321_safe_pgp_sym_decrypt_and_resilient_users_view.sql \
     supabase/migrations/322_enterprise_comprehensive_rls_suite.sql \
     supabase/migrations/323_enterprise_physical_secret_purge_and_zero_knowledge_auth.sql \
+    supabase/migrations/324_dev_bypass_prioritize_linus.sql \
+    supabase/migrations/325_fix_student_homework_and_progress_rls.sql \
     "$SERVER:$REMOTE_TEMP/"
 
 # 4. Führe Migrationen nacheinander in supabase-db aus
@@ -133,11 +135,17 @@ ssh "$SERVER" "docker exec -i supabase-db psql -U postgres postgres < $REMOTE_TE
 echo "⚡ Führe Migration 323 aus (Tier-1 Enterprise Physical Secret Purge & Zero-Knowledge IAM)..."
 ssh "$SERVER" "docker exec -i supabase-db psql -U postgres postgres < $REMOTE_TEMP/323_enterprise_physical_secret_purge_and_zero_knowledge_auth.sql"
 
+echo "⚡ Führe Migration 324 aus (Dev Bypass Prioritize Linus)..."
+ssh "$SERVER" "docker exec -i supabase-db psql -U postgres postgres < $REMOTE_TEMP/324_dev_bypass_prioritize_linus.sql" || true
+
+echo "⚡ Führe Migration 325 aus (Fix Student Homework, Progress & Lehrwerke RLS Permissions)..."
+ssh "$SERVER" "docker exec -i supabase-db psql -U postgres postgres < $REMOTE_TEMP/325_fix_student_homework_and_progress_rls.sql"
+
 echo "🧹 Bereinige temporäre Migrationsdateien..."
 ssh "$SERVER" "rm -rf $REMOTE_TEMP"
 
 echo ""
-echo "✅ Alle 27 Enterprise-Migrationen (297-323) erfolgreich und fehlerfrei auf dem Produktiv-Container angewendet!"
+echo "✅ Alle 29 Enterprise-Migrationen (297-325) erfolgreich und fehlerfrei auf dem Produktiv-Container angewendet!"
 ssh "$SERVER" "docker exec -t supabase-db psql -U postgres postgres -c \"NOTIFY pgrst, 'reload schema';\""
 
 # 6. Aufräumen
