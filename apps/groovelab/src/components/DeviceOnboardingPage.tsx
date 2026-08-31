@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { Smartphone, Monitor, Check, ArrowRight, Loader2, AlertTriangle, Share2, Tablet } from 'lucide-react';
 import { SmartAppInstallPrompt } from './ui/SmartAppInstallPrompt';
+import { CampusGroovelabBrand, CampusGroovelabText, CampusGroovelabLogo } from './CampusGroovelabBrand';
 
 interface DeviceOnboardingPageProps {
   token: string;
@@ -441,8 +442,8 @@ export const DeviceOnboardingPage: React.FC<DeviceOnboardingPageProps> = ({ toke
 
       {/* Header */}
       <div style={{ textAlign: 'center', marginTop: '16px', zIndex: 1 }}>
-        <h1 style={{ fontSize: '1.95rem', fontWeight: 800, letterSpacing: '-0.04em', marginBottom: '8px', color: '#ffffff' }}>
-          Campus-Groovelab Geräte-Onboarding
+        <h1 style={{ fontSize: '1.95rem', fontWeight: 800, letterSpacing: '-0.04em', marginBottom: '8px', color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+          <CampusGroovelabLogo size={30} fontSize="1.95rem" /> Geräte-Onboarding
         </h1>
         <p style={{ fontSize: '0.9rem', color: 'rgba(255, 255, 255, 0.55)', fontWeight: 500, letterSpacing: '-0.01em' }}>
           Richte dieses Gerät als Kiosk-Scanner ein
@@ -644,11 +645,11 @@ export const DeviceOnboardingPage: React.FC<DeviceOnboardingPageProps> = ({ toke
           {/* Text Content */}
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#ffffff', marginBottom: '1px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span>Campus-Groovelab</span>
+              <span><CampusGroovelabText campusColor="#ffffff" groovelabColor="#fde047" /></span>
               <span style={{ fontSize: '0.62rem', color: 'rgba(255,255,255,0.4)', fontWeight: 500 }}>JETZT</span>
             </div>
             <div style={{ fontSize: '0.72rem', color: 'rgba(255, 255, 255, 0.7)', lineHeight: 1.35, fontWeight: 500 }}>
-              Möchtest du die Campus-Groovelab App auf diesem Gerät installieren?
+              Möchtest du die <CampusGroovelabText campusColor="#ffffff" groovelabColor="#fde047" /> App auf diesem Gerät installieren?
             </div>
           </div>
           

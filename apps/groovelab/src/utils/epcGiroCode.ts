@@ -70,28 +70,40 @@ export function generateStudentGoBdCode(studentId: string, customDate?: Date): s
 }
 
 /**
- * Calculates dynamic remaining school year months and total fee (ending August 31st).
- * - Registration month is 100% free (0.00 € trial/introductory period).
- * - Paid period starts on the 1st of the next month and runs until August 31st.
+ * Calculates dynamic remaining school year months and total fee based on the school's configured school year.
+ * - Registration month is 100% free (0.00 € / CHF 0.00 trial/introductory period).
+ * - Paid period starts on the 1st of the next month and runs until the school's customized school year end.
  */
 export interface SchoolYearCalculation {
   freeMonthName: string;
+  freePeriodDescription: string;
   paidStartMonthName: string;
   paidStartYear: number;
   paidEndMonthName: string;
   paidEndYear: number;
   remainingPaidMonths: number;
-  monthlyRate: number; // 0.49 EUR or 0.80 CHF
+  monthlyRate: number; // 0.49 EUR or 1.00 CHF
   totalAmount: number; // e.g. 5.39 for 11 months, 4.90 for 10 months
   totalAmountStr: string; // "5,39" or "8.80"
-  periodDescription: string; // "01.10.2026 – 31.08.2027"
+  periodDescription: string; // e.g. "01.10.2026 – 31.08.2027" or "01.09.2026 – 31.07.2027"
+  isFirstYearDiscount: boolean;
   currency: 'EUR' | 'CHF';
 }
 
-export function calculateSchoolYearDirectBilling(nowDate?: Date, currency: 'EUR' | 'CHF' = 'EUR', customMonthlyRate?: number): SchoolYearCalculation {
+export function calculateSchoolYearDirectBilling(
+  nowDate?: Date,
+  currency: 'EUR' | 'CHF' = 'EUR',
+  customMonthlyRate?: number,
+  startMonthInput: number = 9,
+  startDayInput: number = 1
+): SchoolYearCalculation {
   const date = nowDate || new Date();
+  const currentDay = date.getDate();
   const currentMonth = date.getMonth() + 1; // 1 = Jan, 9 = Sept, 12 = Dec
   const currentYear = date.getFullYear();
+
+  const startMonth = Math.min(Math.max(Number(startMonthInput) || 9, 1), 12);
+  const startDay = Math.min(Math.max(Number(startDayInput) || 1, 1), 31);
 
   const monthNames = [
     'Januar', 'Februar', 'März', 'April', 'Mai', 'Juni',
@@ -100,35 +112,79 @@ export function calculateSchoolYearDirectBilling(nowDate?: Date, currency: 'EUR'
 
   const freeMonthName = monthNames[currentMonth - 1];
 
-  let nextMonth = currentMonth + 1;
-  let nextMonthYear = currentYear;
-  if (nextMonth > 12) {
-    nextMonth = 1;
-    nextMonthYear = currentYear + 1;
-  }
-  const paidStartMonthName = monthNames[nextMonth - 1];
+  // Calculate actual remaining days in the current calendar month
+  const lastDayOfCurrentMonth = new Date(currentYear, currentMonth, 0).getDate();
+  const daysRemainingInMonth = lastDayOfCurrentMonth - currentDay;
 
-  let endYear = currentYear;
-  if (currentMonth >= 9) {
-    endYear = currentYear + 1;
+  // If at least 14 days remain in the current month, the statutory 14-day right of withdrawal (§ 355 BGB)
+  // expires completely within the free trial month.
+  // If fewer than 14 days remain (e.g. registration on 28th October or 16th February), the statutory withdrawal
+  // period extends into the next month. In this case, the remaining days + entire next month are 100% free!
+  const hasFull14Days = daysRemainingInMonth >= 14;
+
+  let paidStartMonth: number;
+  let paidStartYear: number;
+  let freePeriodDescription: string;
+
+  if (hasFull14Days) {
+    paidStartMonth = currentMonth + 1;
+    paidStartYear = currentYear;
+    if (paidStartMonth > 12) {
+      paidStartMonth = 1;
+      paidStartYear = currentYear + 1;
+    }
+    freePeriodDescription = `Kostenfreier Schnuppermonat (${monthNames[currentMonth - 1]})`;
+  } else {
+    let nextMonth = currentMonth + 1;
+    let nextMonthYear = currentYear;
+    if (nextMonth > 12) {
+      nextMonth = 1;
+      nextMonthYear = currentYear + 1;
+    }
+    paidStartMonth = nextMonth + 1;
+    paidStartYear = nextMonthYear;
+    if (paidStartMonth > 12) {
+      paidStartMonth = 1;
+      paidStartYear = nextMonthYear + 1;
+    }
+    freePeriodDescription = `Kostenfreie Kennenlernphase (${monthNames[currentMonth - 1]} & ${monthNames[nextMonth - 1]})`;
   }
 
-  // Calculate remaining paid months until August 31st
-  let remainingPaidMonths = 0;
-  if (currentMonth >= 9) {
-    // Sept(9) -> Oct-Aug = (12 - 9) + 8 = 11 months
-    remainingPaidMonths = (12 - currentMonth) + 8;
-  } else if (currentMonth < 8) {
-    // Jan(1) -> Feb-Aug = 8 - 1 = 7 months
-    remainingPaidMonths = 8 - currentMonth;
-  } else if (currentMonth === 8) {
-    // August registration (ahead of new school year): 12 months for upcoming school year
-    remainingPaidMonths = 12;
-    endYear = currentYear + 1;
+  const paidStartMonthName = monthNames[paidStartMonth - 1];
+
+  // Next school year start date
+  let nextStartYear = currentYear;
+  let nextStartDate = new Date(nextStartYear, startMonth - 1, startDay);
+  if (nextStartDate.getTime() <= date.getTime()) {
+    nextStartYear = currentYear + 1;
+    nextStartDate = new Date(nextStartYear, startMonth - 1, startDay);
   }
 
+  // Current school year ends 1 day before the next school year start
+  const currentYearEndDate = new Date(nextStartDate.getTime() - 24 * 60 * 60 * 1000);
+  const endMonth = currentYearEndDate.getMonth() + 1;
+  const endDay = currentYearEndDate.getDate();
+  const endYear = currentYearEndDate.getFullYear();
+  const paidEndMonthName = monthNames[endMonth - 1];
+
+  // Calculate number of months between (paidStartMonth, paidStartYear) and (endMonth, endYear)
+  let remainingPaidMonths = (endYear - paidStartYear) * 12 + (endMonth - paidStartMonth) + 1;
+
+  let finalEndDay = endDay;
+  let finalEndMonth = endMonth;
+  let finalEndYear = endYear;
+  let finalEndMonthName = paidEndMonthName;
+
+  // If registration is in the final month of the current school year,
+  // the paid period starts with the new school year and runs for a full 12 months.
   if (remainingPaidMonths <= 0) {
     remainingPaidMonths = 12;
+    const followingStartDate = new Date(nextStartYear + 1, startMonth - 1, startDay);
+    const followingEndDate = new Date(followingStartDate.getTime() - 24 * 60 * 60 * 1000);
+    finalEndDay = followingEndDate.getDate();
+    finalEndMonth = followingEndDate.getMonth() + 1;
+    finalEndYear = followingEndDate.getFullYear();
+    finalEndMonthName = monthNames[finalEndMonth - 1];
   }
 
   const isChf = currency === 'CHF';
@@ -137,21 +193,24 @@ export function calculateSchoolYearDirectBilling(nowDate?: Date, currency: 'EUR'
   const totalAmount = Math.round(remainingPaidMonths * monthlyRate * 100) / 100;
   const totalAmountStr = isChf ? totalAmount.toFixed(2) : totalAmount.toFixed(2).replace('.', ',');
 
-  const startFormatted = `01.${String(nextMonth).padStart(2, '0')}.${nextMonthYear}`;
-  const endFormatted = `31.08.${endYear}`;
+  const startFormatted = `01.${String(paidStartMonth).padStart(2, '0')}.${paidStartYear}`;
+  const endFormatted = `${String(finalEndDay).padStart(2, '0')}.${String(finalEndMonth).padStart(2, '0')}.${finalEndYear}`;
   const periodDescription = `${startFormatted} – ${endFormatted}`;
+  const isFirstYearDiscount = remainingPaidMonths <= 11;
 
   return {
     freeMonthName,
+    freePeriodDescription,
     paidStartMonthName,
-    paidStartYear: nextMonthYear,
-    paidEndMonthName: 'August',
-    paidEndYear: endYear,
+    paidStartYear,
+    paidEndMonthName: finalEndMonthName,
+    paidEndYear: finalEndYear,
     remainingPaidMonths,
     monthlyRate,
     totalAmount,
     totalAmountStr,
     periodDescription,
+    isFirstYearDiscount,
     currency
   };
 }

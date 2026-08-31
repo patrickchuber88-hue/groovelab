@@ -150,7 +150,7 @@ export const generateConsentPDF = async (
   currentY += 8;
 
   const bulletPoints = [
-    { title: 'Namens-Anonymisierung: ', desc: 'Es werden keine vollständigen Namen erfasst. Profile werden ausschließlich im Format „Vorname + Initiale des Nachnamens“ (z. B. „Max M.“) geführt.' },
+    { title: 'Automatischer Sichtschutz (Privacy by Default): ', desc: 'In der App und im Unterricht wird der Nachname zum Schutz vor Schulterblicken stets automatisch auf die Initiale maskiert (z. B. „Max M.“). Die Musikschule verwaltet den Klarnamen sicher im internen Sekretariat.' },
     { title: 'Datensparsamkeit: ', desc: 'Wir erheben keinerlei E-Mail-Adressen von Kindern, Telefonnummern oder Bankdaten.' },
     { title: 'Zertifiziertes Hosting: ', desc: 'Der Serverbetrieb erfolgt in DSGVO-konformen deutschen Rechenzentren (Hetzner Online GmbH, Standort Falkenstein).' },
     { title: 'Audio-Aufnahmen: ', desc: 'Aufnahmen dienen rein pädagogischen Zwecken (Übe-Nachweis). Bei Löschung des Accounts oder Beitrags werden die Audio-Daten sofort physisch vom Cloud-Speicher gelöscht.' },

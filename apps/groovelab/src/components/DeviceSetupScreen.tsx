@@ -757,7 +757,7 @@ export function DeviceSetupScreen({
         }}>
           <strong style={{ fontSize: '0.82rem', display: 'block', marginBottom: '4px' }}>Rechtssicherer SaaS-Betrieb in ISO 27001-zertifizierten Rechenzentren</strong>
           <div style={{ marginTop: '4px' }}>
-            Um den gesetzlichen Anforderungen an Schulsoftware gerecht zu werden, müssen vor dem Eintragen von Schülernamen (nur Vorname + erster Buchstabe Nachname) die Einverständniserklärungen der Erziehungsberechtigten vorliegen. Nutze dafür unser vorbereitetes Infoblatt.
+            Um den gesetzlichen Anforderungen an Schulsoftware gerecht zu werden, müssen vor dem Eintragen von Schülernamen (im Unterrichtsbetrieb automatisch maskiert als Vorname + Initiale) die Einverständniserklärungen der Erziehungsberechtigten vorliegen. Nutze dafür unser vorbereitetes Infoblatt.
           </div>
         </div>
 

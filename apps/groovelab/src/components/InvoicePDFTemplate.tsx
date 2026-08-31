@@ -1,6 +1,7 @@
 import React from 'react';
 import QRCode from 'react-qr-code';
 import { useMasterPricing } from '../context/MasterPricingContext';
+import { CampusGroovelabBrand, CampusGroovelabText, CampusGroovelabLogo } from './CampusGroovelabBrand';
 
 interface InvoicePDFTemplateProps {
   invoice: {
@@ -205,8 +206,10 @@ export const InvoicePDFTemplate: React.FC<InvoicePDFTemplateProps> = ({
           {/* Invoice Meta */}
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: dynamicMargin }}>
             <div>
-              <h2 style={{ margin: 0, color: '#34a853', fontFamily: 'Urbanist', fontSize: '1.3rem', fontWeight: 900 }}>Campus-Groovelab</h2>
-              <span style={{ fontSize: '0.68rem', color: '#64748b', display: 'block' }}>Campus-Groovelab Billing System</span>
+              <h2 style={{ margin: 0, color: '#34a853', fontFamily: 'Urbanist', fontSize: '1.3rem', fontWeight: 900, display: 'flex', alignItems: 'center' }}>
+                <CampusGroovelabLogo size={22} fontSize="1.3rem" />
+              </h2>
+              <span style={{ fontSize: '0.68rem', color: '#64748b', display: 'block', marginTop: '2px' }}><CampusGroovelabText /> Billing System</span>
             </div>
             <div style={{ textAlign: 'right', fontSize: '0.78rem' }}>
               <strong style={{ display: 'block', fontSize: '0.92rem', color: invoice.status === 'Vorschau' ? '#d97706' : '#0f172a' }}>
@@ -228,7 +231,7 @@ export const InvoicePDFTemplate: React.FC<InvoicePDFTemplateProps> = ({
             </div>
             <div>
               <span style={{ color: '#64748b', textTransform: 'uppercase', fontSize: '0.62rem', fontWeight: 800, display: 'block', marginBottom: '6px' }}>Dienstleister</span>
-              <strong style={{ color: '#34a853', display: 'block', fontSize: '0.85rem' }}>Campus-Groovelab</strong>
+              <strong style={{ color: '#34a853', display: 'block', fontSize: '0.85rem' }}><CampusGroovelabText /></strong>
               <strong style={{ color: '#0f172a', display: 'block', fontWeight: 600 }}>{operator.company}</strong>
               <span>{operator.contact}</span><br />
               <span>{operator.street}</span><br />
@@ -274,7 +277,7 @@ export const InvoicePDFTemplate: React.FC<InvoicePDFTemplateProps> = ({
                   {/* Position 1: Software-Bereitstellung (Inklusive) */}
                   <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
                     <td style={{ padding: dynamicTdPadding }}>
-                      <strong style={{ display: 'block', color: '#0f172a' }}>Campus-Groovelab Software-Bereitstellung</strong>
+                      <strong style={{ display: 'block', color: '#0f172a' }}><CampusGroovelabText /> Software-Bereitstellung</strong>
                       <span style={{ fontSize: '0.68rem', color: '#34a853', fontWeight: 700 }}>{fmt(0)} (Inklusive)</span>
                     </td>
                     <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>

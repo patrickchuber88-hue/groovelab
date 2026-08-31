@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { LEGAL_MASTER_WORDING } from '../../constants/legalMasterWording';
 import { generateParentQuickstartPDF, generateTeacherQuickstartPDF, generateConsentPDF } from '../../utils/pdfGenerator';
+import { CampusGroovelabText } from '../CampusGroovelabBrand';
 
 export type HelpUserRole = 'admin' | 'secretary' | 'teacher' | 'student';
 export type HelpPlatform = 'campus' | 'groovelab' | 'admin' | 'admin_desk' | string;
@@ -1074,8 +1075,8 @@ export const HelpCenterModal: React.FC<HelpCenterModalProps> = ({
                     <span>{copiedText === activeGuide.id ? 'Inhalt kopiert!' : 'Leitfaden kopieren'}</span>
                   </button>
 
-                  <div style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 600 }}>
-                    Campus-Groovelab Master-Standard
+                  <div style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <CampusGroovelabText /> Master-Standard
                   </div>
                 </div>
               </div>
@@ -1258,8 +1259,8 @@ export const HelpCenterModal: React.FC<HelpCenterModalProps> = ({
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#22c55e' }} />
-            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569' }}>
-              Campus-Groovelab Support & Wissensdatenbank
+            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <CampusGroovelabText /> Support & Wissensdatenbank
             </span>
           </div>
 

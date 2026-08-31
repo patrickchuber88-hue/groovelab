@@ -23,6 +23,7 @@ import { UpdateAnnouncementHero } from './common/UpdateAnnouncementHero';
 import { usePremiumOnboardingTour, TourStep, TourStartButton } from './PremiumOnboardingTour';
 import { MobileBriefingCarousel } from './ui/MobileBriefingCarousel';
 import { cleanHomeworkNotesText, maskLastName, formatTeacherFullName } from '../utils/nameHelper';
+import { CampusGroovelabBrand, CampusGroovelabText, CampusGroovelabLogo } from './CampusGroovelabBrand';
 import { validateNewPin } from '../utils/pinValidation';
 import { CampusLevelSwitcher, CampusUiLevel } from './campus/CampusLevelSwitcher';
 import { CampusJuniorDashboard } from './campus/CampusJuniorDashboard';
@@ -25017,10 +25018,10 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                         {/* Kostenfreie Software & Bereitstellung */}
                         <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '18px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                           <span style={{ fontSize: '0.76rem', fontWeight: 850, color: '#0369a1', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                            ⚖️ Campus-Groovelab Bereitstellung
+                            ⚖️ <CampusGroovelabText campusColor="#0369a1" groovelabColor="#d97706" /> Bereitstellung
                           </span>
                           <p style={{ margin: 0, fontSize: '0.82rem', color: '#334155', lineHeight: 1.5, fontWeight: 550 }}>
-                            Die Campus-Groovelab Software ist ohne gesonderte Lizenzkaufgebühren im Bereitstellungspaket enthalten (Reine Cloud- &amp; Hosting-Infrastruktur).
+                            Die <CampusGroovelabText fontWeight={700} /> Software ist ohne gesonderte Lizenzkaufgebühren im Bereitstellungspaket enthalten (Reine Cloud- &amp; Hosting-Infrastruktur).
                           </p>
                         </div>
 
@@ -26238,8 +26239,8 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
               justifyContent: 'space-between',
               alignItems: 'center'
             }}>
-              <span style={{ color: 'white', fontWeight: 900, fontSize: '0.8rem', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
-                Campus-Groovelab Wrapped
+              <span style={{ color: 'white', fontWeight: 900, fontSize: '0.8rem', letterSpacing: '0.1em', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <CampusGroovelabText campusColor="#ffffff" groovelabColor="#fde047" /> Wrapped
               </span>
               <button 
                 onClick={() => setShowWrapped(false)}

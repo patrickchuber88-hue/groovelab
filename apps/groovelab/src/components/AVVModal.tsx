@@ -330,7 +330,7 @@ export const AVVModal: React.FC<AVVModalProps> = ({ isOpen, onClose, school, onA
             <strong>1. Kreis der betroffenen Personen:</strong> Schülerinnen und Schüler, Erziehungsberechtigte, Lehrkräfte sowie Verwaltungs- und Schulleitungspersonal des Auftraggebers.
           </p>
           <p style={{ margin: '0 0 12px 0' }}>
-            <strong>2. Kategorien personenbezogener Daten:</strong> Schulstammdaten, pseudonymisierte Benutzernamen (Vorname + 1. Buchstabe des Nachnamens), Rollen- und Berechtigungsstufen, Stundenplan-, Raum- und Terminbelegungsdaten sowie freiwillige Übungsaufnahmen. <em>Ausdrücklich ausgeschlossen: Es werden zu keinem Zeitpunkt Bank-, SEPA-, Kreditkartendaten oder E-Mail-Adressen von minderjährigen Schülern erfasst oder verarbeitet.</em>
+            <strong>2. Kategorien personenbezogener Daten:</strong> Schulstammdaten, Benutzernamen (Vorname, Nachname; im regulären Unterrichtsbetrieb standardmäßig pseudonymisiert/maskiert auf Vorname + 1. Buchstabe des Nachnamens), Rollen- und Berechtigungsstufen, Stundenplan-, Raum- und Terminbelegungsdaten sowie freiwillige Übungsaufnahmen. <em>Ausdrücklich ausgeschlossen: Es werden zu keinem Zeitpunkt Bank-, SEPA-, Kreditkartendaten oder E-Mail-Adressen von minderjährigen Schülern erfasst oder verarbeitet.</em>
           </p>
 
           <h4 style={{ fontSize: '0.88rem', fontWeight: 800, marginTop: '14px', color: '#0f172a' }}>

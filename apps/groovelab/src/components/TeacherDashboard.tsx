@@ -17,6 +17,7 @@ import { BriefingNotesCard } from './notes/BriefingNotesCard';
 import { BriefingToolboxCard } from './campus/BriefingToolboxCard';
 import { TagesplanQuickAudioModal } from './campus/TagesplanQuickAudioModal';
 import { GlobalNotesDrawer } from './notes/GlobalNotesDrawer';
+import { CampusGroovelabBrand, CampusGroovelabText, CampusGroovelabLogo } from './CampusGroovelabBrand';
 
 // Lazy load heavy auxiliary modals on demand for sub-second dashboard initial load & reduced memory footprint
 const MeisterwerkDocumentationModal = lazy(() => import('./MeisterwerkDocumentationModal').then(m => ({ default: m.MeisterwerkDocumentationModal })));
@@ -1302,7 +1303,10 @@ export function TeacherDashboard({
     if (initialTab) return initialTab;
     const valid = ['briefing', 'live', 'bands', 'students', 'proposals', 'settings', 'coaches', 'messages'];
     const saved = typeof window !== 'undefined' ? (sessionStorage.getItem('campus_teacher_active_tab') || localStorage.getItem('campus_teacher_active_tab')) : null;
-    if (saved && valid.includes(saved)) return saved as any;
+    if (saved && valid.includes(saved)) {
+      if (saved === 'live' && !hideHeader && activePlatform === 'campus') return 'briefing';
+      return saved as any;
+    }
     return hideHeader ? 'live' : 'briefing';
   });
 
@@ -14897,8 +14901,8 @@ useEffect(() => {
                   {/* Mobile Room Switcher Row */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', width: '100%' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <h2 style={{ fontSize: '1.5rem', fontWeight: 900, color: '#1e293b', letterSpacing: '-0.03em', margin: 0 }}>
-                        Campus-Groovelab
+                      <h2 style={{ fontSize: '1.5rem', fontWeight: 900, color: '#1e293b', letterSpacing: '-0.03em', margin: 0, display: 'flex', alignItems: 'center' }}>
+                        <CampusGroovelabLogo size={24} fontSize="1.5rem" />
                       </h2>
                       {setIsSidebarCollapsed && (
                         <button
@@ -14984,8 +14988,8 @@ useEffect(() => {
                       }}>
                         <Lock size={20} />
                       </div>
-                      <h4 style={{ fontSize: '18px', fontWeight: 900, color: '#1e293b', margin: '0 0 6px 0' }}>
-                        Campus-Groovelab Live
+                      <h4 style={{ fontSize: '18px', fontWeight: 900, color: '#1e293b', margin: '0 0 6px 0', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                        <CampusGroovelabLogo size={18} fontSize="18px" /> Live
                       </h4>
                       <p style={{ fontSize: '13px', color: '#64748b', margin: '0 0 16px 0', lineHeight: 1.4 }}>
                         Bitte checke vor Ort in der Musikschule ein, um deine iPad-Station zu aktivieren.

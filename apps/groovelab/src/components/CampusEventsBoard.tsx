@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import QRCode from 'react-qr-code';
 import { usePremiumOnboardingTour, TourStartButton } from './PremiumOnboardingTour';
+import { CampusGroovelabText } from './CampusGroovelabBrand';
 import { 
   Calendar, 
   Plus, 
@@ -6474,8 +6475,8 @@ export function CampusEventsBoard({
             ))}
           </div>
 
-          <div style={{ fontSize: '0.68rem', color: '#94a3b8', fontWeight: 600, marginTop: '4px' }}>
-            🚀 Campus-Groovelab Roadmap
+          <div style={{ fontSize: '0.68rem', color: '#94a3b8', fontWeight: 600, marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+            🚀 <CampusGroovelabText /> Roadmap
           </div>
         </div>
       </div>

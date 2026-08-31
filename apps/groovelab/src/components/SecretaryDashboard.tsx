@@ -23,6 +23,7 @@ import { AVVModal } from './AVVModal';
 import { StudentDetailModal } from './StudentDetailModal';
 import { TeacherDetailModal } from './TeacherDetailModal';
 import { CampusEventsBoard } from './CampusEventsBoard';
+import { CampusGroovelabBrand, CampusGroovelabText, CampusGroovelabLogo } from './CampusGroovelabBrand';
 import { CampusTeacherDashboard } from './CampusTeacherDashboard';
 import QRCode from 'react-qr-code';
 import { getInstrumentAvatarUrl } from './StudioAvatar';
@@ -40,6 +41,7 @@ import { GuidanceCenterModal } from './modals/GuidanceCenterModal';
 import { ParentInfoSheetModal } from './modals/ParentInfoSheetModal';
 import { generateTeacherQuickstartPDF, generateParentQuickstartPDF } from '../utils/pdfGenerator';
 import { getParentOnboardingUrl, isDevEnvironment } from '../utils/tenantUrlHelper';
+import { calculateSchoolYearDirectBilling } from '../utils/epcGiroCode';
 import { 
   fetchSchoolRoster, 
   getTeacherRoster, 
@@ -7160,29 +7162,22 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
 
   const getRemainingMonthsAndPrice = () => {
     const now = new Date();
-    const currentMonth = now.getMonth(); // 0 = Jan, 11 = Dec
-    const currentYear = now.getFullYear();
+    const startMonth = Number(schoolYearStartMonth || 9);
+    const startDay = Number(schoolYearStartDay || 1);
+    const isChf = masterPricing.currency === 'CHF';
+    const activeCurrency = isChf ? 'CHF' : 'EUR';
+    const rate = studentBillingOption === 'student_full' 
+      ? (effectiveSchoolRates.priceStudent || (isChf ? 1.00 : 0.49))
+      : (isChf ? 0.80 : 0.40);
     
-    let targetYear = currentYear;
-    if (currentMonth >= 8) { // Sept (8) or later
-      targetYear = currentYear + 1;
-    }
-    
-    const targetDate = new Date(targetYear, 8, 1); // Sept 1st of target year
-    
-    const yearDiff = targetDate.getFullYear() - now.getFullYear();
-    const monthDiff = targetDate.getMonth() - now.getMonth();
-    let monthsCount = yearDiff * 12 + monthDiff;
-    
-    if (monthsCount < 1) monthsCount = 1;
-    if (monthsCount > 12) monthsCount = 12;
-    
-    const pricePerMonth = studentBillingOption === 'student_full' 
-      ? (effectiveSchoolRates.priceStudent || 0.49)
-      : 0.40;
-    const totalPrice = parseFloat((monthsCount * pricePerMonth).toFixed(2));
-    
-    return { monthsCount, pricePerMonth, totalPrice };
+    const calc = calculateSchoolYearDirectBilling(now, activeCurrency, rate, startMonth, startDay);
+    return { 
+      monthsCount: calc.remainingPaidMonths, 
+      pricePerMonth: calc.monthlyRate, 
+      totalPrice: calc.totalAmount,
+      periodDescription: calc.periodDescription,
+      endMonthName: calc.paidEndMonthName
+    };
   };
 
   const fetchTrialLogs = async () => {
@@ -7218,17 +7213,19 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
   };
 
   const generateMailtoLink = (student: any) => {
-    const { monthsCount, pricePerMonth, totalPrice } = getRemainingMonthsAndPrice();
+    const { monthsCount, pricePerMonth, totalPrice, periodDescription } = getRemainingMonthsAndPrice();
     const employeeName = currentUserProfile ? `${currentUserProfile.first_name} ${currentUserProfile.last_name || ''}`.trim() : 'Ihre Musikschule';
-    const defaultTemplate = `Liebe Eltern,\n\nihr Kind {student_name} hat die Campus-App der Musikschule aktiviert und nutzt aktuell die 30-tägige kostenlose Probezeit.\n\nUm den Zugang dauerhaft freizuschalten, antworten Sie bitte einfach kurz auf diese E-Mail.\n\nDie Kosten belaufen sich für das restliche Schuljahr (bis zum 31. August) auf {months_count} Monate zu je {price_per_month} EUR, insgesamt also {total_price} EUR (ohne automatische Verlängerung).\n\nHerzliche Grüße\n{employee_name}\n{school_name}`;
+    const isChf = masterPricing.currency === 'CHF';
+    const defaultTemplate = `Liebe Eltern,\n\nihr Kind {student_name} hat die Campus-App der Musikschule aktiviert und nutzt aktuell die 30-tägige kostenlose Probezeit.\n\nUm den Zugang dauerhaft freizuschalten, antworten Sie bitte einfach kurz auf diese E-Mail.\n\nDie Kosten belaufen sich für das restliche Schuljahr auf {months_count} Monate zu je {price_per_month} ${isChf ? 'CHF' : 'EUR'}, insgesamt also {total_price} (Laufzeit: {period_description}, ohne automatische Verlängerung).\n\nHerzliche Grüße\n{employee_name}\n{school_name}`;
     
     let template = openingHours?.campus_settings?.mailto_template || defaultTemplate;
     
     const studentName = `${student.first_name || ''} ${student.last_name || ''}`.trim();
     template = template.replace(/{student_name}/g, studentName);
     template = template.replace(/{months_count}/g, monthsCount.toString());
-    template = template.replace(/{price_per_month}/g, pricePerMonth.toFixed(2).replace('.', ','));
-    template = template.replace(/{total_price}/g, totalPrice.toFixed(2) + ' €');
+    template = template.replace(/{price_per_month}/g, isChf ? pricePerMonth.toFixed(2) : pricePerMonth.toFixed(2).replace('.', ','));
+    template = template.replace(/{total_price}/g, isChf ? `CHF ${totalPrice.toFixed(2)}` : `${totalPrice.toFixed(2).replace('.', ',')} €`);
+    template = template.replace(/{period_description}/g, periodDescription || '');
     template = template.replace(/{employee_name}/g, employeeName);
     template = template.replace(/{school_name}/g, schoolName || 'Ihre Musikschule');
     
@@ -24882,7 +24879,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', width: '100%' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <h2 style={{ fontSize: '1.25rem', fontWeight: 900, color: '#eab308', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
-                          <Music size={20} style={{ color: '#eab308' }} /> Campus-Groovelab Board
+                          <CampusGroovelabLogo size={20} fontSize="1.25rem" /> Board
                         </h2>
                       </div>
                       {groovelabRooms.length > 1 && (
@@ -29050,7 +29047,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
 
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '0.78rem' }}>
                               <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
-                                <span>Campus-Groovelab Software-Bereitstellung:</span>
+                                <span><CampusGroovelabText /> Software-Bereitstellung:</span>
                                 <strong style={{ color: '#34a853' }}>0,00 € (Inklusive)</strong>
                               </div>
 
@@ -29590,7 +29587,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                         </div>
                                         
                                         {/* Apple-Style Segmented Battery Bar */}
-                                        <div style={{ width: '100%', height: '10px', background: '#f1f5f9', borderRadius: '9999px', overflow: 'hidden', display: 'flex', gap: '2px', padding: '2px' }}>
+                                        <div style={{ width: '100%', height: '10px', background: '#f1f5f9', borderRadius: '9999px', overflow: 'hidden', display: 'flex', padding: '2px' }}>
                                           <div style={{ width: (students.length > 0 ? Math.min(100, (activeStudentsCount_global / students.length) * 100) : 0) + '%', background: '#34a853', borderRadius: '9999px', transition: 'width 0.4s ease-out' }} />
                                         </div>
                                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: '#64748b', fontWeight: 500, marginTop: '6px' }}>
@@ -29609,9 +29606,22 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                         borderRadius: '16px',
                                         padding: '14px 16px'
                                       }}>
-                                        <Users size={18} style={{ color: '#ea4335', flexShrink: 0 }} />
-                                        <div style={{ fontSize: '0.75rem', color: '#475569', lineHeight: '1.4' }}>
-                                          <strong style={{ color: '#0f172a', fontWeight: 700 }}>Automatische Abrechnung:</strong> Neue Schüler werden einfach in der Schülerverwaltung angelegt. Sobald sie freigeschaltet werden, passt sich die Umlage automatisch an.
+                                        <div style={{
+                                          width: '32px',
+                                          height: '32px',
+                                          borderRadius: '10px',
+                                          background: '#f1f5f9',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center',
+                                          color: '#475569',
+                                          flexShrink: 0
+                                        }}>
+                                          <Users size={16} />
+                                        </div>
+                                        <div style={{ fontSize: '0.75rem', color: '#475569', lineHeight: 1.4 }}>
+                                          <span style={{ fontWeight: 700, color: '#0f172a' }}>Schüler hinzufügen &amp; aktivieren:</span>{' '}
+                                          Neue Schüler legst du einfach in der Schülerverwaltung an. Solange sie nicht aktiviert sind, fallen für sie keine Bereitstellungsgebühren an.
                                         </div>
                                       </div>
                                     </div>
@@ -29649,7 +29659,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
 
                                           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '0.78rem' }}>
                                             <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
-                                              <span>Campus-Groovelab Software-Bereitstellung:</span>
+                                              <span><CampusGroovelabText /> Software-Bereitstellung:</span>
                                               <strong style={{ color: '#34a853' }}>0,00 € (Inklusive)</strong>
                                             </div>
 
@@ -34279,7 +34289,7 @@ status: status,
                                         ? '- Die Nutzung der App erfolgt als transparenter Jahresbeitrag von 5,88 € für das gesamte Schuljahr (entspricht 0,49 € / Monat; Einmalzahlung, keine automatische Verlängerung).'
                                         : '- Die Musikschule bezuschusst das Profil; für Sie fällt ein reduzierter Jahresbeitrag von 4,80 € für das gesamte Schuljahr an (entspricht 0,40 € / Monat; Einmalzahlung, keine automatische Verlängerung).';
 
-                                    const text = `ELTERN-INFORMATION & EINWILLIGUNG ZUR NUTZUNG DER APP ${appName.toUpperCase()}\n\nSehr geehrte Eltern, liebe Erziehungsberechtigte,\n\nim Rahmen des ${subjectPhrase} nutzen wir ab sofort die webbasierte, datenschutzkonforme App „${appName}“ zur pädagogischen Begleitung und Gamification (XP-Punkte, Band-Matching, Song-Bibliotheken).\n\nDATENSCHUTZ UND SICHERHEIT STEHEN AN ERSTER STELLE:\n${costPhrase}\n- Es werden keinerlei sensible Vertragsdaten, Bankdaten oder E-Mail-Adressen von Kindern oder Eltern erfasst.\n- Zur Identifizierung wird lediglich ein Profil mit dem Vornamen sowie dem ersten Buchstaben des Nachnamens (z. B. „Jonas M.“) angelegt.\n- Das Hosting findet zu 100 % in zertifizierten deutschen Rechenzentren (Hetzner Online GmbH & Supabase EU) statt.\n- Audio-Aufnahmen dienen nur Übe-Protokollen und werden bei Löschung physisch vernichtet.\n\nMit der Nutzung der App willigen Sie ein, dass wir ein anonymisiertes Übe-Profil für Ihr Kind anlegen. Sie können die Löschung oder Sperrung des Profils jederzeit über uns verlangen.\n\nVielen Dank für Ihre Unterstützung!`;
+                                    const text = `ELTERN-INFORMATION & EINWILLIGUNG ZUR NUTZUNG DER APP ${appName.toUpperCase()}\n\nSehr geehrte Eltern, liebe Erziehungsberechtigte,\n\nim Rahmen des ${subjectPhrase} nutzen wir ab sofort die webbasierte, datenschutzkonforme App „${appName}“ zur pädagogischen Begleitung und Gamification (XP-Punkte, Band-Matching, Song-Bibliotheken).\n\nDATENSCHUTZ UND SICHERHEIT STEHEN AN ERSTER STELLE:\n${costPhrase}\n- Es werden keinerlei sensible Vertragsdaten, Bankdaten oder E-Mail-Adressen von Kindern oder Eltern erfasst.\n- Zur Identifizierung und zum Schutz vor Schulterblicken im Unterricht wird der Nachname auf allen Schüler- und Lehrer-Dashboards standardmäßig maskiert (z. B. „Jonas M.“).\n- Das Hosting findet zu 100 % in zertifizierten deutschen Rechenzentren (Hetzner Online GmbH & Supabase EU) statt.\n- Audio-Aufnahmen dienen nur Übe-Protokollen und werden bei Löschung physisch vernichtet.\n\nMit der Nutzung der App willigen Sie ein, dass wir ein geschütztes Übe-Profil für Ihr Kind anlegen. Sie können die Löschung oder Sperrung des Profils jederzeit über uns verlangen.\n\nVielen Dank für Ihre Unterstützung!`;
                                     const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
                                     const url = URL.createObjectURL(blob);
                                     const a = document.createElement('a');

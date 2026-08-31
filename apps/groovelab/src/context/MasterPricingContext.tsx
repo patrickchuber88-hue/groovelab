@@ -100,6 +100,18 @@ export const MasterPricingProvider: React.FC<{ children: React.ReactNode }> = ({
     if (typeof window !== 'undefined') {
       const stored = localStorage.getItem('groovelab_currency') as CurrencyCode;
       if (stored === 'CHF' || stored === 'EUR') return stored;
+
+      // Smart Zero-Click Geo & Locale Detection for Switzerland
+      try {
+        const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        if (timeZone && (timeZone === 'Europe/Zurich' || timeZone.includes('Zurich'))) {
+          return 'CHF';
+        }
+        const lang = (navigator.language || (navigator.languages && navigator.languages[0]) || '').toLowerCase();
+        if (lang.includes('-ch') || lang === 'de-ch' || lang === 'fr-ch' || lang === 'it-ch') {
+          return 'CHF';
+        }
+      } catch (e) {}
     }
     return 'EUR';
   });
@@ -133,26 +145,37 @@ export const MasterPricingProvider: React.FC<{ children: React.ReactNode }> = ({
         .eq('id', 1)
         .maybeSingle();
 
+      const activeRates = MASTER_CURRENCY_RATES[currency] || MASTER_CURRENCY_RATES.EUR;
+
       if (data) {
         const overrides = Array.isArray(data.special_offers)
           ? data.special_offers.find((o: any) => o?.id === '__cg_master_pricing_overrides__')
           : null;
 
-        const rawC = data.price_module_campus ?? overrides?.price_module_campus;
-        const rawG = data.price_module_groovelab ?? overrides?.price_module_groovelab;
-        const rawK = data.price_module_kombi ?? overrides?.price_module_kombi;
+        let c = activeRates.priceCampus;
+        let g = activeRates.priceGroovelab;
+        let k = activeRates.priceKombi;
+        let t = activeRates.priceTeacher;
+        let s = activeRates.priceStudent;
+        let ps = activeRates.pricePassiveStudent;
+        let sa = activeRates.priceStorageAddon;
 
-        let c = rawC !== null && rawC !== undefined ? Number(rawC) : 14.90;
-        let g = rawG !== null && rawG !== undefined ? Number(rawG) : 9.90;
-        let k = rawK !== null && rawK !== undefined ? Number(rawK) : 19.90;
+        if (currency === 'EUR') {
+          const rawC = data.price_module_campus ?? overrides?.price_module_campus;
+          const rawG = data.price_module_groovelab ?? overrides?.price_module_groovelab;
+          const rawK = data.price_module_kombi ?? overrides?.price_module_kombi;
+          if (rawC !== null && rawC !== undefined) c = Number(rawC);
+          if (rawG !== null && rawG !== undefined) g = Number(rawG);
+          if (rawK !== null && rawK !== undefined) k = Number(rawK);
+          if (Math.abs(c - 7.99) < 0.01 || Math.abs(c - 14.99) < 0.01) c = 14.90;
+          if (Math.abs(g - 4.99) < 0.01 || Math.abs(g - 9.99) < 0.01) g = 9.90;
+          if (Math.abs(k - 9.99) < 0.01 || Math.abs(k - 19.99) < 0.01) k = 19.90;
+          if (data.price_user_teacher !== null && data.price_user_teacher !== undefined) t = Number(data.price_user_teacher);
+          if (data.price_user_student !== null && data.price_user_student !== undefined) s = Number(data.price_user_student);
+          if (data.price_user_passive_student !== null && data.price_user_passive_student !== undefined) ps = Number(data.price_user_passive_student);
+          if (data.price_storage_addon !== null && data.price_storage_addon !== undefined) sa = Number(data.price_storage_addon);
+        }
 
-        if (Math.abs(c - 7.99) < 0.01 || Math.abs(c - 14.99) < 0.01) c = 14.90;
-        if (Math.abs(g - 4.99) < 0.01 || Math.abs(g - 9.99) < 0.01) g = 9.90;
-        if (Math.abs(k - 9.99) < 0.01 || Math.abs(k - 19.99) < 0.01) k = 19.90;
-        const t = (data.price_user_teacher !== null && data.price_user_teacher !== undefined) ? Number(data.price_user_teacher) : 0.49;
-        const s = (data.price_user_student !== null && data.price_user_student !== undefined) ? Number(data.price_user_student) : 0.49;
-        const ps = (data.price_user_passive_student !== null && data.price_user_passive_student !== undefined) ? Number(data.price_user_passive_student) : 0.09;
-        const sa = (data.price_storage_addon !== null && data.price_storage_addon !== undefined) ? Number(data.price_storage_addon) : 1.99;
         const freeMonths = (data.free_months_per_year !== null && data.free_months_per_year !== undefined) ? Number(data.free_months_per_year) : 0;
         const billingMonths = Math.max(1, 12 - freeMonths);
         const scope = (data.price_change_scope as 'new_only' | 'school_year_start' | 'immediate') || 'new_only';
@@ -263,7 +286,7 @@ export const MasterPricingProvider: React.FC<{ children: React.ReactNode }> = ({
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [currency]);
 
   return (
     <MasterPricingContext.Provider value={pricing}>

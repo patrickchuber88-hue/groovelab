@@ -13,6 +13,7 @@ import {
   FEEDBACK_STATUSES, PlatformFeedbackItem, computeSlaTarget,
   formatSlaCountdown
 } from '../../config/feedbackConfig';
+import { CampusGroovelabText } from '../CampusGroovelabBrand';
 
 const renderCategoryIcon = (iconName: string, size = 14, color = 'currentColor') => {
   switch (iconName) {
@@ -473,8 +474,8 @@ export const FeedbackHubModal: React.FC<FeedbackHubModalProps> = ({
               <h2 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em' }}>
                 Feedback & Ideenschmiede
               </h2>
-              <p style={{ margin: '2px 0 0', fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>
-                Campus-Groovelab wächst gemeinsam mit deinen Ideen
+              <p style={{ margin: '2px 0 0', fontSize: '0.8rem', color: '#64748b', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <CampusGroovelabText /> wächst gemeinsam mit deinen Ideen
               </p>
             </div>
           </div>

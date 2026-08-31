@@ -13,6 +13,7 @@ import { verifyTOTP } from '../utils/totp';
 import { registerClientSessionLease } from '../utils/sessionLeaseManager';
 import { setVaultItem } from '../utils/aesStorageVault';
 import { scrubSensitiveUrlParams } from '../utils/urlSecurityScrubber';
+import { CampusGroovelabBrand, CampusGroovelabText, CampusGroovelabLogo } from './CampusGroovelabBrand';
 
 
 
@@ -6100,7 +6101,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             </div>
             <div style={{ textAlign: 'left' }}>
               <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#0f172a', display: 'block' }}>Stundenplan einrichten</span>
-              <span style={{ fontSize: '0.68rem', color: '#64748b', display: 'block' }}>Campus-Groovelab</span>
+              <span style={{ fontSize: '0.68rem', display: 'block' }}><CampusGroovelabText fontSize="0.68rem" /></span>
             </div>
           </div>
           <span style={{ fontSize: '0.72rem', fontWeight: 850, background: '#f1f5f9', color: '#475569', padding: '5px 12px', borderRadius: '100px', fontFamily: 'Urbanist' }}>
@@ -6122,7 +6123,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           <form onSubmit={handleParentVerification} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
             <div style={{ textAlign: 'left' }}>
               <h3 style={{ margin: '0 0 6px 0', fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Outfit' }}>
-                Willkommen bei Campus-Groovelab!
+                Willkommen bei <CampusGroovelabText fontWeight={900} />!
               </h3>
               <p style={{ margin: 0, color: '#475569', fontSize: '0.82rem', lineHeight: '1.45' }}>
                 Lass uns zuerst die Daten deines Kindes verifizieren, damit wir die Wunschzeiten richtig zuordnen können. Bitte gib die Daten exakt so ein, wie sie auf der Anmeldung stehen.
@@ -7112,7 +7113,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                   sessionStorage.removeItem('groovelab_support_ghost');
                   sessionStorage.setItem('groovelab_active_workspace', 'teacher');
                   sessionStorage.setItem('groovelab_active_platform', 'campus');
-                  sessionStorage.setItem('campus_active_tab', 'live');
+                  sessionStorage.setItem('campus_active_tab', 'briefing');
                   sessionStorage.setItem('groovelab_user_id', targetUser.id);
                   sessionStorage.removeItem('groovelab_qr_token');
                   localStorage.removeItem('groovelab_last_qr_token');
@@ -7405,9 +7406,9 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               </div>
 
               <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '12px' }}>
-                <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 800, color: '#1e293b' }}>§ 9 VERTRAGSLAUFZEIT, PREISE, ZAHLUNGSBEDINGUNGEN & KÜNDIGUNG</h4>
-                <p style={{ margin: 0 }}><strong>1. Laufzeit gekoppelt an das Schuljahr:</strong> Das Vertragsverhältnis über die Server- & Servicebereitstellung ist fest an den Zyklus des Schuljahres (September bis August des Folgejahres) gebunden. Die Mindestlaufzeit beträgt ein volles Schuljahr (bzw. bei unterjährigem Einstieg die verbleibende Laufzeit bis zum nächsten 31. August).</p>
-                <p style={{ margin: '8px 0 0 0' }}><strong>2. Automatische Verlängerung:</strong> Der Vertrag verlängert sich automatisch um ein weiteres Schuljahr (12 Monate bis zum 31. August des Folgejahres), sofern er nicht mit einer Frist von 1 Monat zum Schuljahresende (d. h. spätestens bis zum 31. Juli) gekündigt wird.</p>
+                <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 800, color: '#1e293b' }}>§ 9 VERTRAGSLAUFZEIT, PREISE, ZAHLUNGSBEDINGUNGEN &amp; KÜNDIGUNG</h4>
+                <p style={{ margin: 0 }}><strong>1. Laufzeit gekoppelt an das Schuljahr:</strong> Das Vertragsverhältnis über die Server- &amp; Servicebereitstellung orientiert sich am Zyklus des jeweiligen Schuljahres (standardmäßig September bis August des Folgejahres bzw. das von der Musikschule konfigurierte Schuljahr). Die Mindestlaufzeit beträgt ein volles Schuljahr (bzw. bei unterjährigem Einstieg die verbleibende Laufzeit bis zum individuellen Schuljahresende).</p>
+                <p style={{ margin: '8px 0 0 0' }}><strong>2. Automatische Verlängerung:</strong> Der Vertrag verlängert sich automatisch um ein weiteres Schuljahr (12 Monate bis zum jeweiligen Schuljahresstichtag), sofern er nicht mit einer Frist von 1 Monat zum Schuljahresende gekündigt wird.</p>
                 <p style={{ margin: '8px 0 0 0' }}><strong>3. Preise & Kleinunternehmerregelung:</strong> Alle angegebenen Server- & Servicegebühren sind Endpreise. Da der Anbieter als Kleinunternehmer agiert, wird gemäß § 19 UStG keine Umsatzsteuer berechnet oder ausgewiesen.</p>
                 <p style={{ margin: '8px 0 0 0' }}><strong>4. Rechnungsstellung & Zahlungsfrist:</strong> Die Abrechnung der Server- & Servicegebühren erfolgt monatlich zum Monatsende. Rechnungen werden in elektronischer Form per E-Mail an die vom Kunden hinterlegte E-Mail-Adresse zugestellt. Der Rechnungsbetrag ist innerhalb von 14 Tagen nach Rechnungserhalt per manueller Banküberweisung auf das Geschäftskonto des Anbieters zu zahlen.</p>
                 <p style={{ margin: '8px 0 0 0' }}><strong>5. Außerordentliche Kündigung:</strong> Das Recht zur außerordentlichen Kündigung aus wichtigem Grund (§ 543 BGB) bleibt unberührt. Ein wichtiger Grund für den Anbieter liegt insbesondere vor, wenn der Kunde mit der Zahlung der Server- & Servicegebühren für zwei aufeinanderfolgende Monate in Verzug gerät.</p>

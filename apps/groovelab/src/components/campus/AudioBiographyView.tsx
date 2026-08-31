@@ -8,6 +8,7 @@ import {
   Folder, FolderOpen, BookOpen, Trophy, Maximize2, ArrowLeft, Printer, Home, Landmark, Crown
 } from 'lucide-react';
 import Confetti from 'react-confetti';
+import { CampusGroovelabText } from '../CampusGroovelabBrand';
 
 import { supabase } from '../../lib/supabase';
 import { 
@@ -6200,7 +6201,7 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
             </div>
             <div>
               <span style={{ color: colors.textSecondary, display: 'block', fontWeight: 700 }}>Plattform & Audio-Tresor:</span>
-              <strong style={{ color: colors.textPrimary }}>Campus-Groovelab</strong>
+              <strong style={{ color: colors.textPrimary }}><CampusGroovelabText /></strong>
             </div>
             <div>
               <span style={{ color: colors.textSecondary, display: 'block', fontWeight: 700 }}>Urheberschutz:</span>

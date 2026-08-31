@@ -9,6 +9,7 @@ import { isWebAuthnSupported, isMasterPasskeyRegistered, registerMasterPasskey, 
 import { createMasterSessionLease, logMasterAdminEvent } from '../utils/masterAuditLogger';
 import { verifyTOTP } from '../utils/totp';
 import { RegistrationAccessModal } from './RegistrationAccessModal';
+import { CampusGroovelabBrand, CampusGroovelabText, CampusGroovelabLogo } from './CampusGroovelabBrand';
 
 interface StartseiteProps {
   onLogin: () => void;
@@ -772,8 +773,7 @@ export const Startseite: React.FC<StartseiteProps> = ({
               cursor: 'default',
               userSelect: 'none'
             }}>
-            <Sparkles size={14} color="#10b981" />
-            Campus-Groovelab
+            <CampusGroovelabLogo size={15} fontSize="0.75rem" fontWeight={900} />
           </div>
           
           <h1 className="text-gradient" style={{

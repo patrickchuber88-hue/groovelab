@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { AlertTriangle, Trash2, X, ShieldAlert, Loader2 } from 'lucide-react';
+import { CampusGroovelabText } from './CampusGroovelabBrand';
 
 export interface StudentToDelete {
   id: string;
@@ -190,7 +191,7 @@ export const ConfirmDeleteStudentModal: React.FC<ConfirmDeleteStudentModalProps>
               }}>
                 <AlertTriangle size={20} color="#e11d48" style={{ flexShrink: 0, marginTop: '2px' }} />
                 <div style={{ fontSize: '0.875rem', color: '#9f1239', lineHeight: 1.5 }}>
-                  <strong>Achtung:</strong> Das Entfernen löscht den Schüler aus der Verwaltung von <strong>Campus-Groovelab</strong>. Alle Fortschritte, Song-Zuordnungen und Termine gehen unwiderruflich verloren.
+                  <strong>Achtung:</strong> Das Entfernen löscht den Schüler aus der Verwaltung von <strong><CampusGroovelabText campusColor="#166534" groovelabColor="#d97706" /></strong>. Alle Fortschritte, Song-Zuordnungen und Termine gehen unwiderruflich verloren.
                 </div>
               </div>
             </div>

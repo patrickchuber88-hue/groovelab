@@ -6,8 +6,10 @@ import {
 import { LegalTextModal } from './LegalTextModal';
 import { supabase } from '../lib/supabase';
 import { useMasterPricing } from '../context/MasterPricingContext';
+import { formatCurrency } from '../domain/pricingEngine';
 import { RegistrationAccessModal } from './RegistrationAccessModal';
 import { isRegistrationUnlocked } from '../utils/cryptoAuth';
+import { CampusGroovelabBrand, CampusGroovelabText, CampusGroovelabLogo } from './CampusGroovelabBrand';
 
 interface LandingPageProps {
   onLogin: () => void;
@@ -16,6 +18,9 @@ interface LandingPageProps {
 
 export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
   const masterPricing = useMasterPricing();
+  const isChf = masterPricing.currency === 'CHF';
+  const fmt = (amt: number) => isChf ? formatCurrency(amt, 'CHF') : formatCurrency(amt, 'EUR');
+
   const [activeTab, setActiveTab] = useState<number>(0);
   const [email, setEmail] = useState<string>('');
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
@@ -37,16 +42,16 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
   const [showFullTomCatalog, setShowFullTomCatalog] = useState<boolean>(false);
 
   const pricing = {
-    campus: masterPricing.priceCampus,
-    groovelab: masterPricing.priceGroovelab,
-    kombi: masterPricing.priceKombi,
-    teacher: masterPricing.priceTeacher,
-    student: masterPricing.priceStudent,
-    passiveStudent: masterPricing.pricePassiveStudent ?? 0.09,
-    storageAddon: masterPricing.priceStorageAddon ?? 2.99,
+    campus: isChf ? masterPricing.ratesCHF.priceCampus : masterPricing.priceCampus,
+    groovelab: isChf ? masterPricing.ratesCHF.priceGroovelab : masterPricing.priceGroovelab,
+    kombi: isChf ? masterPricing.ratesCHF.priceKombi : masterPricing.priceKombi,
+    teacher: isChf ? masterPricing.ratesCHF.priceTeacher : masterPricing.priceTeacher,
+    student: isChf ? masterPricing.ratesCHF.priceStudent : masterPricing.priceStudent,
+    passiveStudent: isChf ? masterPricing.ratesCHF.pricePassiveStudent : (masterPricing.pricePassiveStudent ?? 0.09),
+    storageAddon: isChf ? masterPricing.ratesCHF.priceStorageAddon : (masterPricing.priceStorageAddon ?? 1.99),
     freeMonthsPerYear: masterPricing.freeMonthsPerYear,
     billingMonthsPerYear: masterPricing.billingMonthsPerYear,
-    kombiSavings: masterPricing.kombiSavings,
+    kombiSavings: isChf ? masterPricing.ratesCHF.kombiSavings : masterPricing.kombiSavings,
     kombiSavingsPercent: masterPricing.kombiSavingsPercent
   };
 
@@ -109,9 +114,9 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
       ]
     },
     {
-      title: 'Termingekoppelte Shoutbox.',
+      title: 'Direktnachrichten & Termin-Shoutbox.',
       slogan: '100% DSGVO- & schulrechtskonform.',
-      description: 'Kein WhatsApp-Zwang, keine Preisgabe privater Handynummern. Direktnachrichten sind exklusiv an den Unterrichtstermin gekoppelt, transport- und serververschlüsselt (TLS 1.3 & AES-256) und frieren nach 48 Stunden automatisch ein. Schützt die Privatsphäre der Lehrer, wahrt den Kinderschutz und erfüllt die Dienstaufsichtspflicht der Musikschule.',
+      description: 'Kein WhatsApp-Zwang, keine Preisgabe privater Handynummern. Neben 1:1-Direktnachrichten zwischen Lehrkraft und Schüler sind terminbezogene Stunden-Nachrichten exklusiv an den jeweiligen Unterrichtstermin gekoppelt und frieren 48 Stunden nach der Stunde automatisch ein (Auto-Freeze). Schützt die Privatsphäre der Lehrkräfte, wahrt den Kinderschutz und erfüllt die Dienstaufsichtspflicht der Musikschule.',
       images: ['/screenshots/media__1782677535200.png']
     }
   ];
@@ -152,11 +157,11 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
         }}>
           {/* Logo */}
           <div 
-            onClick={() => scrollToSection('hero')} 
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
+            onClick={() => scrollToSection('hero')}
+            style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '8px', 
               cursor: 'pointer',
               fontWeight: 900,
               fontSize: '1.25rem',
@@ -164,8 +169,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
               color: '#000000'
             }}
           >
-            <Music size={24} style={{ color: '#232326' }} />
-            <span>Campus-Groovelab</span>
+            <CampusGroovelabLogo size={24} fontSize="1.25rem" />
           </div>
 
           {/* Desktop Navigation */}
@@ -359,7 +363,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                 e.currentTarget.style.transform = 'none';
               }}
             >
-              Kostenlos registrieren
+              Jetzt unverbindlich testen
             </button>
           </div>
 
@@ -447,7 +451,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                   cursor: 'pointer'
                 }}
               >
-                Kostenlos registrieren
+                Jetzt unverbindlich testen
               </button>
             </div>
           </div>
@@ -487,7 +491,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
           lineHeight: 1.6,
           marginBottom: '40px'
         }}>
-          Unser Fokus liegt nicht in der Verwaltung, sondern in der Umsetzung. Campus-Groovelab schließt als intelligenter Übebegleiter und smarter Organisator die Lücke zwischen Schülern, Lehrkräften und Verwaltung – für weniger Missverständnisse und mehr Freude am Musikmachen.
+          Unser Fokus liegt nicht in der Verwaltung, sondern in der Umsetzung. <CampusGroovelabText fontWeight={800} /> schließt als intelligenter Übebegleiter und smarter Organisator die Lücke zwischen Schülern, Lehrkräften und Verwaltung – für weniger Missverständnisse und mehr Freude am Musikmachen.
         </p>
 
         {/* Form and CTA */}
@@ -551,7 +555,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
               e.currentTarget.style.transform = 'none';
             }}
           >
-            Jetzt kostenlos starten
+            Jetzt unverbindlich testen
           </button>
         </form>
 
@@ -564,7 +568,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
           lineHeight: 1.4,
           maxWidth: '540px'
         }}>
-          Mit Klick auf „Jetzt kostenlos starten“ stimmen Sie den <a href="#" onClick={(e) => { e.preventDefault(); setActiveDocument('terms'); }} style={{ color: '#34a853', textDecoration: 'underline', fontWeight: 700 }}>Nutzungsbedingungen</a> zu und bestätigen, die <a href="#" onClick={(e) => { e.preventDefault(); setActiveDocument('privacy'); }} style={{ color: '#34a853', textDecoration: 'underline', fontWeight: 700 }}>Datenschutzerklärung</a> zur Kenntnis genommen zu haben.
+          Mit Klick auf „Jetzt unverbindlich testen“ stimmen Sie den <a href="#" onClick={(e) => { e.preventDefault(); setActiveDocument('terms'); }} style={{ color: '#34a853', textDecoration: 'underline', fontWeight: 700 }}>Nutzungsbedingungen</a> zu und bestätigen, die <a href="#" onClick={(e) => { e.preventDefault(); setActiveDocument('privacy'); }} style={{ color: '#34a853', textDecoration: 'underline', fontWeight: 700 }}>Datenschutzerklärung</a> zur Kenntnis genommen zu haben.
         </p>
 
         <p style={{
@@ -709,7 +713,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                   Direkte Entlastung &amp; Schnelle Prozesse
                 </h4>
                 <p style={{ fontSize: '14.5px', color: '#232326', lineHeight: 1.55, fontWeight: 550 }}>
-                  Weniger Kommunikation über drei Ecken (Schüler, Lehrer, Verwaltung) und ein reibungsloser Ablauf. Wir liefern ein blitzschnelles Krankheitsabwicklungssystem, unkompliziertes Onboarding beim Einrichten der Schule sowie eine effiziente Raumvergabe und Raumbuchung. So bleibt der Fokus auf dem Wesentlichen bei deutlich weniger aktivem Eingreifen durch die Verwaltung.
+                  Schluss mit zeitraubender Kommunikation über drei Ecken. <CampusGroovelabText fontWeight={700} /> bündelt Raumplanung, Krankheitsabwicklung und Schüler-Onboarding in einer zentralen Schaltzentrale. Die Verwaltung behält die volle Kontrolle, spart bis zu 80 % Routine-Aufwand und eliminiert mühsame Telefonketten.
                 </p>
               </div>
 
@@ -718,19 +722,19 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                 <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '12px', padding: 0, margin: 0 }}>
                   <li style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '14px', color: '#232326' }}>
                     <Check size={16} style={{ color: '#ea4335', marginTop: '2px', flexShrink: 0 }} />
-                    <span><strong>Schnelles Krankheits-System:</strong> Die meisten Nutzer direkt über die App erreichen und aufwendige Telefonketten minimieren.</span>
+                    <span><strong>1-Klick-Krankheitsabwicklung:</strong> Betroffene Schüler und Lehrkräfte sofort per Push erreichen – Telefonketten entfallen komplett.</span>
                   </li>
                   <li style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '14px', color: '#232326' }}>
                     <Check size={16} style={{ color: '#ea4335', marginTop: '2px', flexShrink: 0 }} />
-                    <span><strong>Raumvergabe &amp; Buchung:</strong> Schnelle Zuweisung von Räumen und Dienstaufgaben im System.</span>
+                    <span><strong>Intelligenter Raumplaner:</strong> Konfliktfreie Raumbelegung mit integriertem Genehmigungs-Workflow.</span>
                   </li>
                   <li style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '14px', color: '#232326' }}>
                     <Check size={16} style={{ color: '#ea4335', marginTop: '2px', flexShrink: 0 }} />
-                    <span><strong>Direkter Info-Fluss:</strong> Keine Umwege mehr bei der Kommunikation zwischen allen Beteiligten.</span>
+                    <span><strong>Zero-Mail &amp; DSGVO-Minimalismus:</strong> Keine Kinder-E-Mails oder Bankdaten – maximaler Haftungsschutz für die Schulleitung.</span>
                   </li>
                   <li style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '14px', color: '#232326' }}>
                     <Check size={16} style={{ color: '#ea4335', marginTop: '2px', flexShrink: 0 }} />
-                    <span><strong>Einfaches Onboarding:</strong> In wenigen Schritten eingerichtet und sofort startklar.</span>
+                    <span><strong>Blitz-Schul-Onboarding:</strong> Stammdaten-Import, QR-Aktivierung und sofortige Betriebsbereitschaft in wenigen Minuten.</span>
                   </li>
                 </ul>
               </div>
@@ -775,7 +779,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                   Einfache Organisation &amp; Dokumentation
                 </h4>
                 <p style={{ fontSize: '14.5px', color: '#232326', lineHeight: 1.55, fontWeight: 550 }}>
-                  Für Lehrer liefern wir eine effiziente Organisation und einfache Kommunikation mit den Schülern. Dokumentiere den Fortschritt spielend leicht im Alltag, melde dich im Krankheitsfall ohne Zusatzaufwand ab und erstelle den Stundenplan mit nur wenigen Klicks. Minimiert Missverständnisse und Ausfälle im Handumdrehen.
+                  Maximale pädagogische Freiheit bei minimalem Organisationsaufwand. Erstelle deinen Stundenplan per Drag &amp; Drop, halte Hausaufgaben und Audio-Aufnahmen direkt im Unterricht fest und schütze deinen Feierabend durch datenschutzkonforme Kommunikationskanäle.
                 </p>
               </div>
 
@@ -784,19 +788,19 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                 <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '12px', padding: 0, margin: 0 }}>
                   <li style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '14px', color: '#232326' }}>
                     <Check size={16} style={{ color: '#34a853', marginTop: '2px', flexShrink: 0 }} />
-                    <span><strong>Klick-Stundenplan:</strong> In wenigen Klicks erstellt mit schnellem Onboarding.</span>
+                    <span><strong>Intelligenter Stundenplan-Designer:</strong> Flexible Wochenplanung: Eigene Schüler sekundenschnell per Drag &amp; Drop oder per Auto-Zuteilung in freie Zeitslots einteilen.</span>
                   </li>
                   <li style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '14px', color: '#232326' }}>
                     <Check size={16} style={{ color: '#34a853', marginTop: '2px', flexShrink: 0 }} />
-                    <span><strong>iCal-Kalenderabo:</strong> Termine abonnieren und bei Verschiebungen direkt benachrichtigt werden.</span>
+                    <span><strong>1:1-Schülerchats &amp; Feierabendschutz:</strong> Direkte, DSGVO-konforme Kommunikation ohne WhatsApp oder private Handynummer – mit 48h-Auto-Freeze bei stundenbezogenen Nachrichten.</span>
                   </li>
                   <li style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '14px', color: '#232326' }}>
                     <Check size={16} style={{ color: '#34a853', marginTop: '2px', flexShrink: 0 }} />
-                    <span><strong>Einfache Dokumentation:</strong> Unterrichtsdetails festhalten, bevor sie im Alltag untergehen.</span>
+                    <span><strong>Digitales Hausaufgabenheft &amp; Meisterwerke:</strong> Hausaufgaben, pädagogische Notizen und Play-Along-Aufnahmen in unter 30 Sekunden direkt im Unterricht dokumentieren.</span>
                   </li>
                   <li style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '14px', color: '#232326' }}>
                     <Check size={16} style={{ color: '#34a853', marginTop: '2px', flexShrink: 0 }} />
-                    <span><strong>Schnelle Krankmeldung:</strong> Statusmeldung senden, ohne administrativen Zusatzaufwand.</span>
+                    <span><strong>Automatischer Handy-Kalendersync (iCal):</strong> Eigene Unterrichtsstunden, Ausfälle und Terminänderungen automatisch im Smartphone-Kalender (z. B. Apple Kalender, Google oder Outlook).</span>
                   </li>
                 </ul>
               </div>
@@ -841,7 +845,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                   Der perfekte Übebegleiter
                 </h4>
                 <p style={{ fontSize: '14.5px', color: '#232326', lineHeight: 1.55, fontWeight: 550 }}>
-                  Aus Sicht des Schülers der perfekte Übebegleiter: Wir liefern zeitgemäße Gamification, um das Üben als Gewohnheit statt als Pflicht zu etablieren. Wir liefern nicht einfach nur Noten, sondern die Gewohnheit, diese spielerisch zu meistern. Termine lassen sich bequem per iCal abonnieren, und schnelle Benachrichtigungen bei Verschiebungen verhindern Missverständnisse.
+                  Der moderne Begleiter für motivierte Schüler und entspannte Eltern. Spielerische Routinen, XP-Punkte und innovative Übe-Werkzeuge verwandeln das tägliche Üben von einer lästigen Pflicht in eine begeisternde Gewohnheit.
                 </p>
               </div>
 
@@ -850,19 +854,19 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                 <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '12px', padding: 0, margin: 0 }}>
                   <li style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '14px', color: '#232326' }}>
                     <Check size={16} style={{ color: '#34a853', marginTop: '2px', flexShrink: 0 }} />
-                    <span><strong>Gewohnheit statt Pflicht:</strong> Spielerische Routinen etablieren das Üben im Alltag.</span>
+                    <span><strong>Gamification &amp; Übe-Streaks:</strong> XP-Belohnungen, Abzeichen und Fortschritts-Tracker, die Kinder dauerhaft motivieren.</span>
                   </li>
                   <li style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '14px', color: '#232326' }}>
                     <Check size={16} style={{ color: '#34a853', marginTop: '2px', flexShrink: 0 }} />
-                    <span><strong>Moderne Gamification:</strong> Zeitgeistentsprechende Motivation, die Kinder begeistert.</span>
+                    <span><strong>Digitales Aufgabenheft &amp; Audio-Vault:</strong> Hausaufgaben, Lehrkraft-Notizen und Play-Along-Aufnahmen jederzeit griffbereit auf dem iPad/Smartphone.</span>
                   </li>
                   <li style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '14px', color: '#232326' }}>
                     <Check size={16} style={{ color: '#34a853', marginTop: '2px', flexShrink: 0 }} />
-                    <span><strong>Noten meistern:</strong> Wir vermitteln die Gewohnheit zum Meistern der Musiknoten.</span>
+                    <span><strong>Loopstation &amp; Übe-Timer:</strong> Interaktive Audio-Tools für kreatives, fokussiertes und selbstständiges Üben zu Hause.</span>
                   </li>
                   <li style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '14px', color: '#232326' }}>
                     <Check size={16} style={{ color: '#34a853', marginTop: '2px', flexShrink: 0 }} />
-                    <span><strong>iCal-Integration:</strong> Alle Unterrichtstermine abonnieren und immer auf dem Laufenden bleiben.</span>
+                    <span><strong>Volle Transparenz für Eltern:</strong> Keine verpassten Termine dank automatischem iCal-Sync und Push-Nachrichten bei Raum- oder Zeitänderungen.</span>
                   </li>
                 </ul>
               </div>
@@ -1372,22 +1376,95 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                 lineHeight: 1.6,
                 fontWeight: 550
               }}>
-                Keine Einrichtungsgebühr, keine Lizenzkaufgebühren und keine Knebelverträge. Verwaltungs- und Sekretariats-Nutzer sowie inaktive Schülerprofile sind dauerhaft kostenfrei inklusive. Sie zahlen ausschließlich die transparente Cloud- &amp; Hostingpauschale (ab {Math.min(pricing.campus, pricing.groovelab).toFixed(2).replace('.', ',')} € / Mo.) und aktive Profile bei tatsächlicher Nutzung.
+                Keine Einrichtungsgebühr, keine Lizenzkaufgebühren und keine Knebelverträge. Die Software-Bereitstellung sowie Verwaltungs- und Sekretariats-Nutzer sind dauerhaft inklusive ({isChf ? 'CHF 0.00' : '0,00 €'}). Du zahlst ausschließlich die transparente Server-Flatrate (ab {fmt(Math.min(pricing.campus, pricing.groovelab))} / Mo.), den minimalen Basisbeitrag ({fmt(pricing.passiveStudent)} / Mo. je Schüler-Datensatz) und aktive Modul-Nutzung bei tatsächlicher Aktivierung.
               </p>
+
+              {/* 🇨🇭 / 🇪🇺 Interactive Country & Currency Switcher (Tier-1 SaaS Enterprise Standard) */}
+              <div style={{ marginTop: '28px', display: 'flex', justifyContent: 'center' }}>
+                <div style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  background: '#f1f5f9',
+                  padding: '5px',
+                  borderRadius: '100px',
+                  border: '1.5px solid #e2e8f0',
+                  boxShadow: '0 2px 10px rgba(0,0,0,0.04)',
+                  gap: '4px'
+                }}>
+                  <button
+                    type="button"
+                    onClick={() => masterPricing.setCurrency('EUR')}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      padding: '8px 20px',
+                      borderRadius: '100px',
+                      border: 'none',
+                      background: !isChf ? '#ffffff' : 'transparent',
+                      color: !isChf ? '#0f172a' : '#64748b',
+                      fontWeight: !isChf ? 800 : 600,
+                      fontSize: '13.5px',
+                      cursor: 'pointer',
+                      boxShadow: !isChf ? '0 2px 8px rgba(0,0,0,0.08)' : 'none',
+                      transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
+                    }}
+                  >
+                    <span style={{ fontSize: '15px' }}>🇩🇪 🇦🇹</span>
+                    <span>Deutschland &amp; Österreich (€ EUR)</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => masterPricing.setCurrency('CHF')}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      padding: '8px 20px',
+                      borderRadius: '100px',
+                      border: 'none',
+                      background: isChf ? '#ffffff' : 'transparent',
+                      color: isChf ? '#0f172a' : '#64748b',
+                      fontWeight: isChf ? 800 : 600,
+                      fontSize: '13.5px',
+                      cursor: 'pointer',
+                      boxShadow: isChf ? '0 2px 8px rgba(0,0,0,0.08)' : 'none',
+                      transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
+                    }}
+                  >
+                    <span style={{ fontSize: '15px' }}>🇨🇭</span>
+                    <span>Schweiz (CHF)</span>
+                  </button>
+                </div>
+              </div>
             </div>
 
             {/* Grid for Hosting Modules & Bundles */}
             <div>
-              <h4 style={{
-                fontFamily: 'Urbanist, sans-serif',
-                fontSize: '22px',
-                fontWeight: 800,
-                color: '#0f172a',
-                marginBottom: '24px',
-                textAlign: 'left'
-              }}>
-                1. Dedicated Server-Hosting & Infrastruktur
-              </h4>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px', flexWrap: 'wrap', gap: '12px' }}>
+                <h4 style={{
+                  fontFamily: 'Urbanist, sans-serif',
+                  fontSize: '22px',
+                  fontWeight: 800,
+                  color: '#0f172a',
+                  margin: 0,
+                  textAlign: 'left'
+                }}>
+                  1. Dedicated Server-Hosting &amp; Infrastruktur
+                </h4>
+                <span style={{
+                  fontSize: '12.5px',
+                  color: '#64748b',
+                  fontWeight: 600,
+                  background: '#f8fafc',
+                  padding: '4px 12px',
+                  borderRadius: '20px',
+                  border: '1px solid #e2e8f0'
+                }}>
+                  {isChf ? '🇨🇭 Währung: Schweizer Franken (CHF)' : '🇪🇺 Währung: Euro (EUR)'}
+                </span>
+              </div>
               <div style={{
                 display: 'grid',
                 gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
@@ -1409,7 +1486,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                   <span style={{ fontWeight: 800, fontSize: '12px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Basis-Hosting</span>
                   <h5 style={{ margin: '4px 0 16px 0', fontSize: '20px', fontWeight: 800, color: '#0f172a' }}>Campus-Modul</h5>
                   <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginBottom: '20px' }}>
-                    <span style={{ fontSize: '36px', fontWeight: 900, color: '#0f172a' }}>{pricing.campus.toFixed(2).replace('.', ',')} €</span>
+                    <span style={{ fontSize: '36px', fontWeight: 900, color: '#0f172a' }}>{fmt(pricing.campus)}</span>
                     <span style={{ fontSize: '14px', color: '#64748b', fontWeight: 600 }}>/ Monat</span>
                   </div>
                   <p style={{ fontSize: '14px', color: '#475569', lineHeight: 1.5, margin: '0 0 24px 0', flexGrow: 1 }}>
@@ -1419,7 +1496,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                     <div style={{ display: 'flex', gap: '8px', alignItems: 'center', fontSize: '13px', color: '#334155' }}>
                       <Check size={16} style={{ color: '#34a853' }} /> <span>Meisterwerk-Protokoll &amp; Hausaufgabenheft</span>
                     </div>
-                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', fontSize: '13px', color: '#334155' }}>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', fontSize: '13px', color: '#34a853' }}>
                       <Check size={16} style={{ color: '#34a853' }} /> <span>Übe-Timer, Streaks &amp; Audio-Loopstation</span>
                     </div>
                     <div style={{ display: 'flex', gap: '8px', alignItems: 'center', fontSize: '13px', color: '#334155' }}>
@@ -1443,7 +1520,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                   <span style={{ fontWeight: 800, fontSize: '12px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Praxis-Plattform</span>
                   <h5 style={{ margin: '4px 0 16px 0', fontSize: '20px', fontWeight: 800, color: '#0f172a' }}>GrooveLab-Modul</h5>
                   <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginBottom: '20px' }}>
-                    <span style={{ fontSize: '36px', fontWeight: 900, color: '#0f172a' }}>{pricing.groovelab.toFixed(2).replace('.', ',')} €</span>
+                    <span style={{ fontSize: '36px', fontWeight: 900, color: '#0f172a' }}>{fmt(pricing.groovelab)}</span>
                     <span style={{ fontSize: '14px', color: '#64748b', fontWeight: 600 }}>/ Monat</span>
                   </div>
                   <p style={{ fontSize: '14px', color: '#475569', lineHeight: 1.5, margin: '0 0 24px 0', flexGrow: 1 }}>
@@ -1453,10 +1530,10 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                     <div style={{ display: 'flex', gap: '8px', alignItems: 'center', fontSize: '13px', color: '#334155' }}>
                       <Check size={16} style={{ color: '#34a853' }} /> <span>Bandgründung, Live Lab &amp; Repertoire</span>
                     </div>
-                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', fontSize: '13px', color: '#334155' }}>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', fontSize: '13px', color: '#34a853' }} >
                       <Check size={16} style={{ color: '#34a853' }} /> <span>Musiker- &amp; Band-Avatare + Skill-Radar</span>
                     </div>
-                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', fontSize: '13px', color: '#334155' }}>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', fontSize: '13px', color: '#34a853' }}>
                       <Check size={16} style={{ color: '#34a853' }} /> <span>Band-Chat, Songverwaltung &amp; Song-XP</span>
                     </div>
                   </div>
@@ -1493,7 +1570,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                   <span style={{ fontWeight: 800, fontSize: '12px', color: '#34a853', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Kombi-Vorteil</span>
                   <h5 style={{ margin: '4px 0 16px 0', fontSize: '20px', fontWeight: 900, color: '#0f172a' }}>Komplettpaket</h5>
                   <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginBottom: '20px' }}>
-                    <span style={{ fontSize: '36px', fontWeight: 900, color: '#34a853' }}>{pricing.kombi.toFixed(2).replace('.', ',')} €</span>
+                    <span style={{ fontSize: '36px', fontWeight: 900, color: '#34a853' }}>{fmt(pricing.kombi)}</span>
                     <span style={{ fontSize: '14px', color: '#64748b', fontWeight: 600 }}>/ Monat</span>
                   </div>
                   <p style={{ fontSize: '14px', color: '#475569', lineHeight: 1.5, margin: '0 0 24px 0', flexGrow: 1 }}>
@@ -1501,7 +1578,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                   </p>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', background: 'rgba(52, 168, 83, 0.05)', padding: '12px', borderRadius: '12px', marginBottom: '4px' }}>
                     <div style={{ display: 'flex', gap: '8px', alignItems: 'center', fontSize: '13px', color: '#34a853', fontWeight: 700 }}>
-                      <span>💡 Du sparst dauerhaft {(pricing.campus + pricing.groovelab - pricing.kombi).toFixed(2).replace('.', ',')} € / Monat!</span>
+                      <span>💡 Du sparst dauerhaft {fmt(pricing.kombiSavings)} / Monat gegenüber den Einzelmodulen!</span>
                     </div>
                   </div>
                 </div>
@@ -1531,6 +1608,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                   alignItems: 'center',
                   justifyContent: 'center',
                   fontWeight: 900,
+                  fontSize: '20px',
                   flexShrink: 0,
                   boxShadow: '0 2px 8px rgba(22, 165, 74, 0.3)'
                 }}>
@@ -1538,10 +1616,10 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                   <div style={{ fontSize: '16px', fontWeight: 900, color: '#14532d', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    Das Campus-Groovelab Preisversprechen: 100 % Bestandsschutz & Garantie
+                    Das Campus-Groovelab Preisversprechen: 100 % Bestandsschutz &amp; Garantie
                   </div>
                   <div style={{ fontSize: '13.5px', color: '#166534', lineHeight: 1.5, fontWeight: 500 }}>
-                    <strong>Sichern Sie sich den Tarif von heute – inklusive aller Innovationen von morgen!</strong> Der gebuchte Grundtarif Ihrer Musikschule (Server-Flatrate) sowie bestehende Lehrer- und Schüler-Profile sind dauerhaft vor Preiserhöhungen geschützt. Auch bei neuen KI-Funktionen, Raumplanern oder Modul-Updates steigt Ihr Sockelpreis um keinen Cent. Für neu angemeldete Schüler im neuen Schuljahr gilt transparent der jeweils aktuell gültige Schüler-Tarif.
+                    <strong>Sichere dir den Tarif von heute – inklusive aller Innovationen von morgen!</strong> Der gebuchte Grundtarif deiner Musikschule (Server-Flatrate) sowie bestehende Lehrkräfte- und Schüler-Profile sind dauerhaft vor Preiserhöhungen geschützt. Auch bei neuen KI-Funktionen, Raumplanern oder Modul-Updates steigt dein Sockelpreis um keinen Cent. Für neu angemeldete Schüler im neuen Schuljahr gilt transparent der jeweils aktuell gültige Schüler-Tarif.
                   </div>
                 </div>
               </div>
@@ -1563,21 +1641,28 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                   2. Nutzer-Bereitstellungen &amp; Profile
                 </h4>
                 <p style={{ fontSize: '14px', color: '#64748b', lineHeight: 1.5, marginBottom: '24px' }}>
-                  Um die anfallenden Cloud-Ressourcen fair und nutzungsbasiert zu skalieren, berechnen wir extrem geringe Gebühren pro aktivem Account.
+                  Um die anfallenden Cloud-Ressourcen fair und nutzungsbasiert zu skalieren, berechnen wir extrem geringe Bereitstellungsgebühren pro Account:
                 </p>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                   <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
-                    <div style={{ fontWeight: 800, fontSize: '15px', color: '#0f172a', marginBottom: '4px' }}>Lehrkräfte</div>
+                    <div style={{ fontWeight: 800, fontSize: '15px', color: '#0f172a', marginBottom: '4px' }}>Lehrkräfte &amp; Verwaltung</div>
                     <div style={{ fontSize: '13px', color: '#475569', lineHeight: 1.4 }}>
-                      <strong>{pricing.teacher.toFixed(2).replace('.', ',')} € / Monat</strong> je aktives Lehrer-Profil. Verwaltungs- und Sekretariats-Accounts (Rollen admin &amp; secretary) sind vollständig kostenfrei inklusive.
+                      <strong>{fmt(pricing.teacher)} / Monat</strong> je aktives Lehrer-Profil. Verwaltungs- und Sekretariats-Accounts (Rollen admin &amp; secretary) sind dauerhaft vollständig inklusive ({isChf ? 'CHF 0.00' : '0,00 €'}).
                     </div>
                   </div>
 
                   <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
-                    <div style={{ fontWeight: 800, fontSize: '15px', color: '#0f172a', marginBottom: '4px' }}>Schüler-Aktivierungen &amp; Deaktivierung</div>
+                    <div style={{ fontWeight: 800, fontSize: '15px', color: '#0f172a', marginBottom: '4px' }}>Basis-Bereitstellung (Schüler-Datensätze)</div>
                     <div style={{ fontSize: '13px', color: '#475569', lineHeight: 1.4 }}>
-                      <strong>{pricing.student.toFixed(2).replace('.', ',')} € / Monat</strong> je aktiver Schüler-Zugang. Bei Deaktivierung (monatlich) entfällt die Gebühr zum Monatsende. Bereits bezahlte Jahresbeiträge bleiben bis zum Schuljahresende aktiv und werden dann inaktiviert.
+                      <strong>{fmt(pricing.passiveStudent)} / Monat</strong> je Schüler-Profil. Beinhaltet das {isChf ? 'DSGVO- & nDSG-Datensatz-Hosting' : 'DSGVO-Datensatz-Hosting'}, QR-Landingpages, Stundenplan-, Termin- und Raumänderungs-Sync sowie das digitale Aufgabenheft.
+                    </div>
+                  </div>
+
+                  <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
+                    <div style={{ fontWeight: 800, fontSize: '15px', color: '#0f172a', marginBottom: '4px' }}>Interaktive Modul-Bereitstellung (Campus / GrooveLab)</div>
+                    <div style={{ fontSize: '13px', color: '#475569', lineHeight: 1.4 }}>
+                      <strong>{fmt(pricing.student)} / Monat</strong> je aktive Schüler-Nutzung bei bewusster Aktivierung. Bei der Eltern-Direktabrechnung kann diese Gebühr (wahlweise inkl. Basisbeitrag) komplett von den Eltern übernommen werden (Schule zahlt {isChf ? 'CHF 0.00' : '0,00 €'}).
                     </div>
                   </div>
                 </div>
@@ -1596,20 +1681,23 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                   <div style={{ background: 'rgba(52, 168, 83, 0.04)', padding: '16px', borderRadius: '16px', border: '1px solid rgba(52, 168, 83, 0.15)' }}>
                     <div style={{ fontWeight: 800, fontSize: '15px', color: '#34a853', marginBottom: '4px' }}>A: Eltern-Direktabrechnung (Zahlungsüberwachung)</div>
                     <div style={{ fontSize: '13px', color: '#2d4d38', lineHeight: 1.4, marginBottom: '8px' }}>
-                      Entlaste das Schulbudget auf <strong>0,00 € Schülergebühren</strong>. Die Eltern übernehmen den Kleinstbetrag direkt über die Plattform.
+                      Entlaste dein Schulbudget auf <strong>{isChf ? 'CHF 0.00' : '0,00 €'} Schülergebühren</strong> für das Campus-Modul. Die Eltern übernehmen den Kleinstbeitrag direkt über die Plattform als einmalige Jahreszahlung (zur Vermeidung von Bank- und Buchungsgebühren).
                     </div>
                     <div style={{ fontSize: '12px', color: '#475569', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      <span>• <strong>Vollständig:</strong> Eltern zahlen den Jahresbeitrag von {(pricing.student * 12).toFixed(2).replace('.', ',')} € (umgerechnet {pricing.student.toFixed(2).replace('.', ',')} €/Mo.). Schule zahlt 0,00 € Schülergebühr.</span>
-                      <span>• <strong>Teilweise:</strong> Eltern zahlen den Jahresbeitrag von {(Math.max(0, pricing.student - (pricing.passiveStudent ?? 0.09)) * 12).toFixed(2).replace('.', ',')} € (umgerechnet {Math.max(0, pricing.student - (pricing.passiveStudent ?? 0.09)).toFixed(2).replace('.', ',')} €/Mo.), Schule stützt mit {(pricing.passiveStudent ?? 0.09).toFixed(2).replace('.', ',')} €/Mo.</span>
+                      <span>• <strong>Vollständig:</strong> Eltern zahlen den Jahresbeitrag von {fmt(pricing.student * 12)} / Jahr (umgerechnet {fmt(pricing.student)}/Mo.). Die Schule zahlt {isChf ? 'CHF 0.00' : '0,00 €'} Schülergebühr.</span>
+                      <span>• <strong>Teilweise:</strong> Eltern zahlen den Jahresbeitrag von {fmt(Math.max(0, pricing.student - pricing.passiveStudent) * 12)} / Jahr (umgerechnet {fmt(Math.max(0, pricing.student - pricing.passiveStudent))}/Mo.), die Schule stützt die Basis-Bereitstellung mit {fmt(pricing.passiveStudent)}/Mo.</span>
+                      <span style={{ fontSize: '11px', color: '#64748b', fontStyle: 'italic', marginTop: '2px' }}>(Hinweis: GrooveLab-Bandaktivierungen werden für Schüler immer vollständig von der Musikschule als Sammelzahler getragen).</span>
                     </div>
 
                     {/* Solidaritätsversprechen Highlight Box */}
                     <div style={{ marginTop: '12px', background: '#ffffff', padding: '12px 14px', borderRadius: '12px', border: '1px solid #bbf7d0', boxShadow: '0 2px 8px rgba(52, 168, 83, 0.05)' }}>
                       <div style={{ fontSize: '13px', fontWeight: 800, color: '#15803d', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
-                        <span>💚 Das Solidaritätsversprechen deiner Musikschule: Das 20:1 Prinzip</span>
+                        <span>💚 Geschwister-Vorteil &amp; 20:1 Solidaritätsversprechen</span>
                       </div>
                       <div style={{ fontSize: '12px', color: '#334155', lineHeight: 1.45 }}>
-                        Kein Kind soll aus finanziellen Gründen vom Musiklernen ausgeschlossen werden. Bei der Eltern-Direktabrechnung schaltet das System für <strong>je 20 aktivierte Schüler-Profile automatisch 1 kostenfreie Freischaltung für Härtefälle &amp; Geschwisterkinder</strong> frei. Wer ein aktives Profil bezahlt, unterstützt so solidarisch benachteiligte Familien!
+                        Kein Kind soll aus finanziellen Gründen vom Musiklernen ausgeschlossen werden:
+                        <br />• <strong>Geschwister-Vorteil:</strong> Ab dem 3. Kind ist die Campus-Aktivierung für Eltern <strong>100 % KOSTENLOS ({isChf ? 'CHF 0.00' : '0,00 €'})</strong>!
+                        <br />• <strong>Solidaritäts-Prinzip:</strong> Für je 20 aktivierte Schüler-Profile schaltet das System automatisch 1 weitere kostenfreie Freischaltung für Härtefälle frei.
                       </div>
                     </div>
                   </div>
@@ -1620,9 +1708,9 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                       Die Musikschule zahlt gesammelt für alle Schüler. Hier profitierst du von exzellenten Skalierungsrabatten:
                     </div>
                     <div style={{ fontSize: '12px', color: '#475569', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      <span>• <strong>Monatliche Abrechnung:</strong> Abrechnung nach exakter Live-Schüleranzahl ({pricing.student.toFixed(2).replace('.', ',')} €/Schüler). Konten ohne Login für mehr als 2 Monate werden automatisch inaktiviert – Kosten fallen somit nur bei tatsächlicher Nutzung an.</span>
-                      <span>• <strong>Jahresbeitrag (10% Rabatt):</strong> Die Aktivierung eines Schülerprofils löst den Jahresbeitrag aus. Unterjährige Neuanmeldungen lassen sich jederzeit flexibel hinzufügen – der Beitrag wird dabei automatisiert auf die verbleibende Restlaufzeit berechnet.</span>
-                      <span>• <strong>Aktivierung aller Schüler zum Schuljahresstart (September) (20% Rabatt):</strong> Einmalige, gesammelte Aktivierung aller Schüler im September für das gesamte Schuljahr.</span>
+                      <span>• <strong>Monatliche Abrechnung:</strong> Abrechnung nach exakter Live-Schüleranzahl ({fmt(pricing.student)} / Modul-Aktivierung / Mo.). Automatischer Kosten-Stopp: Profile ohne Login für mehr als 2 Monate werden automatisch inaktiviert – Kosten fallen somit nur bei tatsächlicher Nutzung an.</span>
+                      <span>• <strong>Jahresbeitrag (10 % Rabatt):</strong> Die Aktivierung eines Schülerprofils löst den ermäßigten Jahresbeitrag aus. Unterjährige Neuanmeldungen lassen sich jederzeit flexibel hinzufügen – der Beitrag wird minutengenau auf die verbleibende Restlaufzeit berechnet.</span>
+                      <span>• <strong>Komplett-Aktivierung zum Schuljahresstart (September) (20 % Rabatt):</strong> Einmalige, gesammelte Aktivierung aller Schüler im September für das gesamte Schuljahr mit maximalem Rabattvorteil.</span>
                     </div>
                   </div>
                 </div>
@@ -1692,12 +1780,11 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
           gap: '24px'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 800, fontSize: '16px' }}>
-            <Music size={20} style={{ color: '#232326' }} />
-            <span>Campus-Groovelab</span>
+            <CampusGroovelabLogo size={20} fontSize="16px" />
           </div>
 
           <div style={{ fontSize: '14px', color: '#7d7d82' }}>
-            &copy; {new Date().getFullYear()} Campus-Groovelab. Alle Rechte vorbehalten.
+            &copy; {new Date().getFullYear()} <CampusGroovelabText fontWeight={700} />. Alle Rechte vorbehalten.
           </div>
 
           <div style={{
@@ -1763,7 +1850,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
             }}>
               <div>
                 <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#34a853', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  🛡️ Das Campus-Groovelab Sicherheitsversprechen
+                  🛡️ Das <CampusGroovelabText campusColor="#34a853" groovelabColor="#eab308" fontWeight={900} /> Sicherheitsversprechen
                 </h3>
                 <span style={{ fontSize: '0.72rem', color: '#34a853', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                   5-Säulen Vertrauens- & Freigabekonzept (Enterprise & Kommunal-Standard)
@@ -1805,7 +1892,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                   💡 Datensparsamkeit als aktive Härtung (Warum weniger Daten mehr Sicherheit bedeuten)
                 </span>
                 <p style={{ margin: 0, fontSize: '0.78rem', color: '#1e293b', lineHeight: 1.5, opacity: 0.9 }}>
-                  Da Campus-Groovelab als interaktives Lehr- und Organisations-Add-on agiert, verzichten wir bewusst auf die Erfassung vollständiger Stammdaten (keine Wohnadressen, E-Mail-Adressen von Kindern/Lehrern oder Bankverbindungen). Dieser extrem minimale Daten-Fußabdruck schützt Musikschulen wirksam vor Haftungsrisiken, beschleunigt die städtische Freigabe und garantiert: <strong>Daten, die gar nicht existieren, können niemals gestohlen werden.</strong>
+                  Da <CampusGroovelabText fontWeight={800} /> als fokussierte pädagogische Praxis-Plattform agiert, verzichten wir bewusst auf die Erfassung vollständiger Stammdaten (keine Wohnadressen, keine E-Mail-Adressen von Minderjährigen, keine Bankverbindungen). Dieser extrem minimale Daten-Fußabdruck schützt Musikschulen wirksam vor Haftungsrisiken, beschleunigt die behördliche Freigabe und garantiert: <strong>Daten, die gar nicht existieren, können niemals gestohlen werden.</strong>
                 </p>
               </div>
 
@@ -1818,7 +1905,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                     pillBg: '#e6f4ea',
                     pillColor: '#047857',
                     title: 'Absolute Datensparsamkeit für Minderjährige (Zero-Kid-PII)',
-                    desc: 'Keine E-Mail-Adressen von Schülern, keine Wohnadressen, keine Bankverbindungen. Speicherung von Geburtsdaten ist technisch ausgeschlossen: Bei der Ersterfassung filtert die Anwendung Geburtsmonat und -jahr noch lokal im Browser des Administrators unwiderruflich heraus. Lediglich die reine Tageszahl (1–31) wird als temporärer Einmal-Schlüssel für die Erstanmeldung übertragen und nach der Erstellung der eigenen Eltern-PIN ersetzt.'
+                    desc: 'Keine E-Mail-Adressen von Schülern, keine Wohnadressen, keine Bankverbindungen. Vollständige Geburtsdaten werden im System technisch ausgeschlossen. Die Erstanmeldung erfolgt über kryptografische Einmal-Aktivierungstoken (Zero-Knowledge), die nach der Ersteinrichtung sofort und unwiderruflich verfallen.'
                   },
                   {
                     icon: '📋',
@@ -1826,7 +1913,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                     pillBg: '#eff6ff',
                     pillColor: '#1d4ed8',
                     title: 'Kommunale Compliance & DSB-Blitz-Freigabe (Für städtische DSBs)',
-                    desc: 'Sofort digital unterzeichenbarer AVV nach Art. 28 DSGVO mit fertigem TOM-Katalog. Durch die strikte Datenminimierung ergibt die Schwellwertanalyse (Art. 35 DSGVO) ein minimales Risiko – eine zeitaufwendige DSFA ist im Regelfall nicht erforderlich. Inklusive transparenter Subunternehmer-Kette und automatisierter Löschkonzepte (Art. 17 DSGVO).'
+                    desc: 'Sofort digital unterzeichnungsfertiger AVV nach Art. 28 DSGVO mit fertigem 20-Punkte TOM-Katalog. Durch die strikte Datenminimierung ergibt die Schwellwertanalyse (Art. 35 DSGVO) ein minimales Risiko – eine zeitaufwendige DSFA ist im Regelfall nicht erforderlich. Inklusive transparenter Unterauftragsverarbeiter-Kette und automatisierter Löschkonzepte (Art. 17 DSGVO).'
                   },
                   {
                     icon: '🇩🇪',
@@ -1834,7 +1921,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                     pillBg: '#fef3c7',
                     pillColor: '#b45309',
                     title: '100% Server-Standort Deutschland & Zero US-Cloud-Act',
-                    desc: 'Infrastruktur und Datenbanken befinden sich zu 100% in deutschen Rechenzentren (Hetzner, ISO 27001 zertifiziert). Keinerlei US-Cloud-Subunternehmer (kein CLOUD Act Risiko, keine Privacy-Shield-Zitterpartie). Datenbankseitig erzwungene Mandantentrennung (Row-Level Security).'
+                    desc: 'Infrastruktur und Datenbanken befinden sich zu 100% in deutschen Rechenzentren (Hetzner, ISO 27001 zertifiziert). Keinerlei US-Cloud-Subunternehmer (kein CLOUD-Act-Risiko, keine Drittstaaten-Unsicherheit). Kernel-erzwungene Mandantentrennung (PostgreSQL FORCE RLS) und BFF Token-Isolation.'
                   },
                   {
                     icon: '⚖️',
@@ -1850,7 +1937,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                     pillBg: '#fff1f2',
                     pillColor: '#be123c',
                     title: 'Klassenzimmer-Sicherheit & Zero-Knowledge Biometrie',
-                    desc: 'DSGVO-konforme Nachnamensmaskierung (z. B. „Max M.“) als Privacy-Default schützt vor Mitlesen an Arbeitsplätzen. Automatisches Background-Blurring bei Tab-Wechsel. Biometrische Logins (FaceID/TouchID) und Kamera-Feeds (QR-Scan) verbleiben zu 100% lokal auf dem Schul-iPad/Endgerät.'
+                    desc: 'DSGVO-konforme Nachnamensmaskierung (z. B. „Max M.“) als Privacy-Default schützt vor Mitlesen im Unterricht. Zero-Trust Session-Leasing & 1-Click Remote-Logout für gemeinsam genutzte Schul-iPads. Biometrische Passkeys (FaceID/TouchID/FIDO2) und QR-Kamera-Feeds verbleiben zu 100% lokal auf dem Endgerät.'
                   }
                 ].map((saeule, idx) => (
                   <div key={idx} style={{

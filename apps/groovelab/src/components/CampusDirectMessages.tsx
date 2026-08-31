@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
+import { CampusGroovelabText } from './CampusGroovelabBrand';
 import { 
   Send, 
   Search, 
@@ -2547,8 +2548,8 @@ export function CampusDirectMessages({
                   <MessageSquare size={26} color="white" />
                 </div>
                 <div>
-                  <h3 style={{ fontSize: '1.2rem', fontWeight: 900, color: 'white', margin: 0 }}>
-                    Campus-Groovelab Nachrichten & Shoutbox ({assignedStudents.length})
+                  <h3 style={{ fontSize: '1.2rem', fontWeight: 900, color: 'white', margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <CampusGroovelabText campusColor="#ffffff" groovelabColor="#fde047" /> Nachrichten & Shoutbox ({assignedStudents.length})
                   </h3>
                   <p style={{ margin: '3px 0 0 0', fontSize: '0.78rem', color: 'rgba(255,255,255,0.9)', fontWeight: 600 }}>
                     100% DSGVO-konform • TLS 1.3 &amp; AES-256 verschlüsselte Direktnachrichten &amp; termingekoppelte Abstimmungen

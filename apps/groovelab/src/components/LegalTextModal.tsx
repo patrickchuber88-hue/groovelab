@@ -211,22 +211,24 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
           {activeTab === 'impressum' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
               <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#0f172a' }}>
-                Angaben gemäß § 5 DDG (Digitale-Dienste-Gesetz) & § 18 MStV
+                Angaben gemäß § 5 DDG (Digitale-Dienste-Gesetz) &amp; § 18 Abs. 2 MStV
               </h4>
 
               <div style={{ background: '#fafbfc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '18px' }}>
-                <strong style={{ color: '#0f172a' }}>Diensteanbieter & Betreiber der Plattform Campus-Groovelab:</strong><br />
+                <strong style={{ color: '#0f172a' }}>Diensteanbieter &amp; Betreiber der Plattform Campus-Groovelab:</strong><br />
                 Patrick Huber<br />
-                Karl-Fürstenberg Str. 59<br />
-                79618 Rheinfelden<br />
+                <span style={{ fontSize: '0.86rem', color: '#475569' }}>Softwareentwicklung &amp; Cloud-Dienstleistungen (Einzelunternehmen)</span><br />
+                Karl-Fürstenberg-Str. 59<br />
+                79618 Rheinfelden (Baden)<br />
                 Deutschland
               </div>
 
               <div>
-                <strong style={{ color: '#0f172a' }}>Kontakt &amp; Schnelle elektronische Kontaktaufnahme (§ 5 Abs. 1 Nr. 2 DDG):</strong><br />
-                E-Mail: <a href="mailto:kontakt@campus-groovelab.de" style={{ color: '#34a853', fontWeight: 700 }}>kontakt@campus-groovelab.de</a> / <a href="mailto:patrick.huber@musaek.de" style={{ color: '#34a853', fontWeight: 700 }}>patrick.huber@musaek.de</a><br />
-                <span style={{ fontSize: '0.80rem', color: '#475569', display: 'block', marginTop: '3px' }}>
-                  <strong>⚡ Elektronische Schnellkontakt-Garantie (BGH I ZR 238/14 / EuGH C-298/07):</strong> Anfragen über unsere E-Mail- &amp; Support-Kanäle werden an Werktagen (Mo–Fr 08:00–18:00 Uhr) garantiert <strong>innerhalb von maximal 60 Minuten</strong> beantwortet. Ein digitales Support- &amp; Feedback-System steht allen registrierten Nutzern und Schulen direkt im App-Dashboard zur Verfügung.
+                <strong style={{ color: '#0f172a' }}>Kontakt &amp; Schnelle elektronische Kontaktaufnahme (§ 5 Abs. 1 Nr. 2 DDG / Art. 3 UWG CH):</strong><br />
+                E-Mail: <a href="mailto:kontakt@campus-groovelab.de" style={{ color: '#34a853', fontWeight: 700 }}>kontakt@campus-groovelab.de</a><br />
+                Support &amp; Schulbetreuung: <a href="mailto:patrick.huber@musaek.de" style={{ color: '#34a853', fontWeight: 700 }}>patrick.huber@musaek.de</a><br />
+                <span style={{ fontSize: '0.80rem', color: '#475569', display: 'block', marginTop: '4px' }}>
+                  <strong>⚡ Elektronische Schnellkontakt-Garantie (BGH I ZR 238/14 / EuGH C-298/07):</strong> Anfragen über unsere E-Mail- &amp; Support-Kanäle werden an Werktagen (Mo–Fr 08:00–18:00 Uhr) garantiert <strong>innerhalb von maximal 60 Minuten</strong> beantwortet. Allen registrierten Musikschulen, Lehrkräften und Schülern steht zudem ein direktes In-App-Support- und Ticket-System im persönlichen Dashboard zur Verfügung.
                 </span>
                 <span style={{ fontSize: '0.80rem', color: '#475569', display: 'block', marginTop: '2px' }}>
                   Website: <a href="https://campus-groovelab.de" target="_blank" rel="noopener noreferrer" style={{ color: '#34a853', fontWeight: 700 }}>campus-groovelab.de</a>
@@ -234,19 +236,23 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
               </div>
 
               <div>
-                <strong style={{ color: '#0f172a' }}>Umsatzsteuer-Identifikation (§ 5 Abs. 1 Nr. 6 DDG / § 19 UStG):</strong><br />
-                Umsatzsteuerbefreit gemäß <strong>§ 19 UStG (Kleinunternehmerregelung)</strong>. Es wird keine Umsatzsteuer ausgewiesen.
+                <strong style={{ color: '#0f172a' }}>Umsatzsteuer &amp; Steuerliche Einstufung (§ 5 Abs. 1 Nr. 6 DDG):</strong><br />
+                Umsatzsteuerbefreit gemäß <strong>§ 19 UStG (Kleinunternehmerregelung)</strong>. Es wird keine Umsatzsteuer erhoben oder ausgewiesen.
               </div>
 
               <div>
-                <strong style={{ color: '#0f172a' }}>Verantwortlich für den Inhalt nach § 18 Abs. 2 MStV:</strong><br />
-                Patrick Huber, Karl-Fürstenberg Str. 59, 79618 Rheinfelden
+                <strong style={{ color: '#0f172a' }}>Verantwortlich für den redaktionellen Inhalt gemäß § 18 Abs. 2 MStV:</strong><br />
+                Patrick Huber, Karl-Fürstenberg-Str. 59, 79618 Rheinfelden (Baden)
               </div>
 
               <div>
-                <strong style={{ color: '#0f172a' }}>EU-Streitschlichtung & Verbraucherstreitbeilegung:</strong><br />
+                <strong style={{ color: '#0f172a' }}>EU-Streitschlichtung &amp; Verbraucherstreitbeilegung (§ 36 VSBG):</strong><br />
                 Die Europäische Kommission stellt eine Plattform zur Online-Streitbeilegung (OS) bereit: <a href="https://ec.europa.eu/consumers/odr/" target="_blank" rel="noopener noreferrer" style={{ color: '#2563eb', fontWeight: 700 }}>https://ec.europa.eu/consumers/odr/</a>.<br />
-                Wir sind nicht bereit oder verpflichtet, an Streitbeilegungsverfahren vor einer Verbraucherschlichtungsstelle teilzunehmen.
+                Unsere E-Mail-Adresse finden Sie oben im Impressum. Wir sind nicht bereit oder verpflichtet, an Streitbeilegungsverfahren vor einer Verbraucherschlichtungsstelle teilzunehmen.
+              </div>
+
+              <div style={{ fontSize: '0.82rem', color: '#64748b', lineHeight: 1.5, borderTop: '1px solid #e2e8f0', paddingTop: '12px' }}>
+                <strong>Haftung für Inhalte &amp; Links:</strong> Als Diensteanbieter sind wir gemäß § 7 Abs. 1 DDG für eigene Inhalte auf diesen Seiten nach den allgemeinen Gesetzen verantwortlich. Nach §§ 8 bis 10 DDG sind wir als Diensteanbieter jedoch nicht verpflichtet, übermittelte oder gespeicherte fremde Informationen zu überwachen. Verpflichtungen zur Entfernung oder Sperrung der Nutzung von Informationen nach den allgemeinen Gesetzen bleiben hiervon unberührt.
               </div>
             </div>
           )}
@@ -303,15 +309,17 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
                 Allgemeine Geschäftsbedingungen (AGB) – Campus-Groovelab
               </h4>
 
-              {/* ── TEIL A: B2B FÜR MUSIKSCHULEN ── */}
+              {/* ── TEIL A: B2B FÜR MUSIKSCHULEN & KOMMUNALE TRÄGER ── */}
               <div style={{ background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: '16px', padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 <span style={{ fontSize: '0.78rem', fontWeight: 900, color: '#0369a1', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  TEIL A: Bestimmungen für Musikschulen &amp; Bildungsträger (B2B / § 14 BGB)
+                  TEIL A: Bestimmungen für Musikschulen, Kommunale Träger &amp; Bildungsträger (B2B / Juristische Personen des öffentlichen &amp; privaten Rechts)
                 </span>
 
                 <div>
-                  <strong style={{ color: '#0f172a' }}>1. Vertragsgegenstand &amp; Rechtsnatur (SaaS-Mietvertrag)</strong><br />
-                  Diese Bestimmungen regeln die Bereitstellung der cloudbasierten Schulmanagement- und Übeplattform <strong>Campus-Groovelab</strong> durch den Betreiber Patrick Huber (Einzelunternehmer). Der Vertrag qualifiziert sich rechtlich als <strong>Software-as-a-Service (SaaS)-Mietvertrag gemäß § 535 ff. BGB</strong> über die Bereitstellung der Cloud-Infrastruktur, Datenbank-Hosting, Datensicherung und Wartung.
+                  <strong style={{ color: '#0f172a' }}>1. Vertragsgegenstand, Rechtsnatur &amp; Datenschutz (SaaS-Mietvertrag)</strong><br />
+                  (1) Diese Bestimmungen regeln die Bereitstellung der cloudbasierten Schulmanagement- und Übeplattform <strong>Campus-Groovelab</strong> durch den Betreiber Patrick Huber (Einzelunternehmer). Der Vertrag qualifiziert sich rechtlich als <strong>Software-as-a-Service (SaaS)-Mietvertrag gemäß § 535 ff. BGB</strong> über die Bereitstellung von Cloud-Infrastruktur, Datenbank-Hosting, Datensicherung und Systemwartung.<br />
+                  (2) Soweit im Rahmen der Bereitstellung personenbezogene Daten verarbeitet werden, gilt ergänzend die Vereinbarung zur Auftragsverarbeitung (AVV gemäß Art. 28 DSGVO bzw. Art. 9 nDSG) als integraler Vertragsbestandteil.<br />
+                  (3) Der Betreiber gewährleistet eine Verfügbarkeit der Cloud-Infrastruktur von 99,5 % im Jahresmittel (ausgenommen angekündigte Wartungsarbeiten außerhalb der Kernunterrichtszeiten).
                 </div>
 
                 <div>
@@ -329,18 +337,26 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
                 </div>
 
                 <div>
-                  <strong style={{ color: '#0f172a' }}>3. Urheberrecht &amp; Verbot geschützter Notenvervielfältigung (§ 60a UrhG, Art. 6 DSA)</strong><br />
-                  Die Musikschule und ihre Lehrkräfte verpflichten sich, keine urheberrechtlich geschützten Notensätze, Leadsheets oder Play-Along-Aufnahmen Dritter ohne Lizenz hochzuladen (§ 60a Abs. 3 Nr. 2 UrhG Notenvervielfältigungsverbot). Der Betreiber haftet als technischer Host-Provider nach Art. 6 DSA erst ab Kenntnis (Notice-and-Takedown).
+                  <strong style={{ color: '#0f172a' }}>3. Vertragslaufzeit, Unterjähriger Einstieg &amp; Kündigung der Schul-Infrastruktur</strong><br />
+                  (1) Der Vertragsbeginn und die Bereitstellung der Cloud-Infrastruktur können jederzeit zu jedem beliebigen Kalendertag des Jahres erfolgen. Die Vertragslaufzeit richtet sich nach dem von der jeweiligen Musikschule im System konfigurierten Schuljahreszeitraum (standardmäßig 01. September bis 31. August bzw. der landes- und schulartspezifische Stichtag). Bei unterjährigem Einstieg läuft die initiale Vertragslaufzeit ab dem Bereitstellungsdatum bis zum individuellen Ende des laufenden Schuljahres.<br />
+                  (2) Für die Folgezeit verlängert sich der Vertrag jeweils um ein weiteres volles Schuljahr (12 Monate bis zum jeweiligen Schuljahresstichtag), sofern er nicht mit einer Frist von einem (1) Monat zum Ende des Schuljahres in Textform (z. B. per E-Mail oder über das Dashboard) gekündigt wird.<br />
+                  (3) Bei unterjährigem Einstieg werden anfallende Bereitstellungs- und Infrastrukturpauschalen zeitanteilig (pro rata temporis) ab dem Monat der Freischaltung bis zum individuellen Schuljahresende berechnet.<br />
+                  (4) Neuanmeldungen, Modul-Aktivierungen sowie Abmeldungen einzelner Schüler- oder Lehrkräfte-Profile können während des laufenden Schuljahres jederzeit flexibel und tagesgenau im Administrations-Dashboard vorgenommen werden.
                 </div>
 
                 <div>
-                  <strong style={{ color: '#0f172a' }}>4. Raum-Engine &amp; Namensdarstellung</strong><br />
+                  <strong style={{ color: '#0f172a' }}>4. Urheberrecht &amp; Verbot geschützter Notenvervielfältigung (§ 60a UrhG, Art. 6 DSA)</strong><br />
+                  Die Musikschule und ihre Lehrkräfte verpflichten sich, keine urheberrechtlich geschützten Notensätze, Gesamtausgaben, Leadsheets oder Play-Along-Aufnahmen Dritter ohne Lizenz hochzuladen (§ 60a Abs. 3 Nr. 2 UrhG Notenvervielfältigungsverbot). Der Betreiber haftet als technischer Host-Provider nach Art. 6 DSA erst ab Kenntnis (Notice-and-Takedown).
+                </div>
+
+                <div>
+                  <strong style={{ color: '#0f172a' }}>5. Raum-Engine &amp; Namensdarstellung (Schutz von Minderjährigen)</strong><br />
                   Lehrkraft-Raumbuchungen werden im System initial im Status unbestätigt (<code style={{ background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px' }}>pending</code>) geführt und bedürfen der Freigabe durch das Sekretariat. Schülernamen werden auf Lehrer-Dashboards datenschutzkonform gekürzt (Vorname + Anfangsbuchstabe); Lehrkräfte werden zur eindeutigen Wiedererkennung mit vollständigem Namen geführt.
                 </div>
 
                 <div>
-                  <strong style={{ color: '#0f172a' }}>5. B2B-Gewährleistung &amp; Haftungsausschluss (§ 536a BGB)</strong><br />
-                  Gegenüber Unternehmern (§ 14 BGB) wird die verschuldensunabhängige Schadensersatzhaftung des Betreibers für anfängliche Mängel (§ 536a Abs. 1 Alt. 1 BGB) ausdrücklich ausgeschlossen. Bei einfacher Fahrlässigkeit haftet der Betreiber nur bei Verletzung wesentlicher Vertragspflichten (Kardinalpflichten) begrenzt auf den vertragstypisch vorhersehbaren Schaden.
+                  <strong style={{ color: '#0f172a' }}>6. B2B-Gewährleistung &amp; Haftungsbegrenzung (§ 536a BGB)</strong><br />
+                  Gegenüber Unternehmern und juristischen Personen des öffentlichen Rechts wird die verschuldensunabhängige Schadensersatzhaftung des Betreibers für anfängliche Mängel (§ 536a Abs. 1 Alt. 1 BGB) ausdrücklich ausgeschlossen. Bei einfacher Fahrlässigkeit haftet der Betreiber nur bei Verletzung wesentlicher Vertragspflichten (Kardinalpflichten) begrenzt auf den vertragstypisch vorhersehbaren Schaden.
                 </div>
               </div>
 
@@ -351,17 +367,17 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
                 </span>
 
                 <div>
-                  <strong style={{ color: '#0f172a' }}>6. Kostenfreier Schnuppermonat &amp; Schuljahres-Bereitstellung (Ausschließliche Jahresbeitragszahlung)</strong><br />
-                  Eltern, die das interaktive Campus-Modul für ihr Kind aktivieren, erhalten den laufenden Anmeldemonat zu 100% kostenfrei zum Kennenlernen. Für die verbleibenden Monate bis zum Schuljahresende (31. August) wird die Bereitstellung als einmaliger Jahresbeitrag (errechnet aus 0,49 € in DE/AT bzw. CHF 1.00 in CH pro bezahltem Monat) abgerechnet. Eine monatliche Einzelabrechnung ist ausgeschlossen.
+                  <strong style={{ color: '#0f172a' }}>7. Kostenfreier Schnuppermonat &amp; Schuljahres-Bereitstellung (Ausschließliche Jahresbeitragszahlung)</strong><br />
+                  Eltern, die das interaktive Campus-Modul für ihr Kind aktivieren, erhalten den laufenden Anmeldemonat zu 100 % kostenfrei zum Kennenlernen. Für die verbleibenden Monate bis zum individuellen Schuljahresende der Schule wird die Bereitstellung als einmaliger Jahresbeitrag (errechnet aus 0,49 € in DE/AT bzw. CHF 1.00 in CH pro bezahltem Monat) abgerechnet. Eine monatliche Einzelabrechnung ist zur Vermeidung unverhältnismäßiger Transaktionsgebühren ausgeschlossen.
                 </div>
 
                 <div>
-                  <strong style={{ color: '#0f172a' }}>7. Gesetzliche Verbraucherrechte &amp; Keine Abofalle</strong><br />
-                  Die gesetzlichen Mängelgewährleistungsrechte für Verbraucher bleiben uneingeschränkt bestehen. Es findet <strong>keine automatische Vertragsverlängerung</strong> über das Schuljahresende hinaus statt (Zero-Abofalle).
+                  <strong style={{ color: '#0f172a' }}>8. Gesetzliche Verbraucherrechte &amp; Keine automatische Verlängerung (Zero-Abofalle)</strong><br />
+                  Die gesetzlichen Mängelgewährleistungsrechte für Verbraucher bleiben uneingeschränkt bestehen. Es findet <strong>keine automatische Vertragsverlängerung</strong> über das Schuljahresende hinaus statt. Der Zugang endet automatisch zum konfigurierten Schuljahresende, sofern er nicht für das Folgeschuljahr aktiv bestätigt wird.
                 </div>
 
                 <div>
-                  <strong style={{ color: '#0f172a' }}>8. Elektronischer Kündigungsbutton &amp; Sofort-Widerruf (§ 312k BGB)</strong><br />
+                  <strong style={{ color: '#0f172a' }}>9. Elektronischer Kündigungsbutton &amp; Sofort-Widerruf (§ 312k BGB)</strong><br />
                   Während des kostenfreien Schnuppermonats können Eltern den Zugang mit 1 Klick im Elternbereich sofort und ohne Kosten widerrufen. Nach Durchführung der Kündigung wird unverzüglich eine elektronische Kündigungsbestätigung mit Datum und Zeitstempel bereitgestellt.
                 </div>
               </div>

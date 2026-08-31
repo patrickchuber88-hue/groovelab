@@ -53,14 +53,16 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
   const [showHardshipConfirm, setShowHardshipConfirm] = useState(false);
   const [agreeWithdrawalWaiver, setAgreeWithdrawalWaiver] = useState(true);
 
-  // Dynamic School Year Calculation (Registration month = free, remaining months until August 31st)
+  // Dynamic School Year Calculation (Registration month = free, remaining months until customized school year end)
   const isChf = schoolData?.currency === 'CHF' || 
     schoolData?.country === 'CH' || 
     schoolData?.country === 'Schweiz' || 
     String(schoolData?.country || '').toLowerCase().includes('schweiz') || 
     String(schoolData?.country || '').toLowerCase().includes('switzerland');
-  const activeCurrency = isChf ? 'CHF' : 'EUR';
-  const schoolYearCalc = calculateSchoolYearDirectBilling(undefined, activeCurrency);
+  const activeCurrency: 'EUR' | 'CHF' = isChf ? 'CHF' : 'EUR';
+  const schoolStartMonth = Number(schoolData?.school_year_start_month || 9);
+  const schoolStartDay = Number(schoolData?.school_year_start_day || 1);
+  const schoolYearCalc = calculateSchoolYearDirectBilling(undefined, activeCurrency, undefined, schoolStartMonth, schoolStartDay);
   const effectiveAnnualFee = annualFee !== 5.88 && annualFee !== 12.00 && annualFee !== 9.60 ? annualFee : schoolYearCalc.totalAmount;
   const totalAmountStr = schoolYearCalc.totalAmountStr;
   const monthlyRate = isChf ? 'CHF 1.00' : '0,49 €';
@@ -345,15 +347,20 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
               borderRadius: '100px',
               boxShadow: '0 2px 8px rgba(16, 185, 129, 0.3)'
             }}>
-              🎁 {schoolYearCalc.freeMonthName.toUpperCase()} KOSTENFREI ZUM SCHNUPPERN
+              🎁 {schoolYearCalc.freePeriodDescription.toUpperCase()}
             </div>
             <div style={{ marginTop: '4px' }}>
               <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>
                 Schuljahres-Bereitstellung ({periodDescription})
               </span>
-              <div style={{ fontSize: '0.92rem', fontWeight: 800, color: '#0f172a' }}>
-                Modul Campus ({remainingMonths} Monate bis Schuljahresende)
+              <div style={{ fontSize: '0.92rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span>Modul Campus ({remainingMonths} Monate bis Schuljahresende)</span>
               </div>
+              {schoolYearCalc.isFirstYearDiscount && (
+                <span style={{ fontSize: '0.68rem', color: '#059669', fontWeight: 800, display: 'inline-block', marginTop: '1px' }}>
+                  💚 Erstjahr-Vorteil: Nur {remainingMonths} statt 12 Monate berechnet ({freeMonthDisplay} Probezeit)!
+                </span>
+              )}
               <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '2px' }}>
                 Hausaufgabenheft, Übe-Timer, Loopstation &amp; Audio-Tresor
               </div>

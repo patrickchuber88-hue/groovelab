@@ -8,6 +8,7 @@ import { subscribeUserToPush } from './utils/webPush';
 import { StudioAvatar, getInstrumentAvatarUrl, getDefaultMusicianAvatarUrl, renderBandAvatar, resolveStudentInstrumentAsync, getEffectiveInstrument } from './components/StudioAvatar';
 import { reportClientError, initGlobalErrorListeners } from './lib/errorTelemetry';
 import { isDevEnvironment } from './utils/tenantUrlHelper';
+import { CampusGroovelabBrand, CampusGroovelabText, CampusGroovelabLogo } from './components/CampusGroovelabBrand';
 
 // Initialize global error interception
 initGlobalErrorListeners();
@@ -2670,7 +2671,8 @@ function App() {
   const [activeStudentTab, setActiveStudentTabRaw] = useState<string>(() => {
     const platform = (typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_active_platform') || localStorage.getItem('groovelab_active_platform')) : null) || 'campus';
     if (platform === 'campus') {
-      return (typeof window !== 'undefined' ? (sessionStorage.getItem('campus_active_tab') || localStorage.getItem('campus_active_tab')) : null) || 'briefing';
+      const tab = (typeof window !== 'undefined' ? (sessionStorage.getItem('campus_active_tab') || localStorage.getItem('campus_active_tab')) : null) || 'briefing';
+      return tab === 'live' ? 'briefing' : tab;
     }
     if (platform === 'ensembles') {
       return (typeof window !== 'undefined' ? (sessionStorage.getItem('ensembles_active_tab') || localStorage.getItem('ensembles_active_tab')) : null) || 'overview';
@@ -4065,13 +4067,13 @@ function App() {
 
           if (allowedPlatform === 'campus') {
             const storedTab = sessionStorage.getItem('campus_active_tab');
-            let defaultTab = storedTab ? storedTab : (isStudent ? 'briefing' : 'live');
+            let defaultTab = (storedTab && storedTab !== 'live') ? storedTab : 'briefing';
             
-            const isTeacherOrAdmin = userData.role?.toLowerCase() === 'teacher' || userData.role?.toLowerCase() === 'admin';
+            const isTeacherOrAdmin = userData.role?.toLowerCase() === 'teacher' || userData.role?.toLowerCase() === 'admin' || userData.role?.toLowerCase() === 'secretary';
             if (isTeacherOrAdmin) {
-              const studentTabs = ['briefing', 'practice_board', 'mediathek', 'practice', 'library', 'repertoire', 'matching'];
-              if (studentTabs.includes(defaultTab)) {
-                defaultTab = 'live';
+              const studentOnlyTabs = ['homework_book', 'practice_board', 'mediathek', 'practice', 'library', 'repertoire', 'matching', 'campus_cup', 'all_appointments', 'live'];
+              if (studentOnlyTabs.includes(defaultTab)) {
+                defaultTab = 'briefing';
               }
             }
             
@@ -4081,10 +4083,10 @@ function App() {
             const storedTab = sessionStorage.getItem('groovelab_active_tab');
             let defaultTab = storedTab ? storedTab : 'live';
             
-            const isTeacherOrAdmin = userData.role?.toLowerCase() === 'teacher' || userData.role?.toLowerCase() === 'admin';
+            const isTeacherOrAdmin = userData.role?.toLowerCase() === 'teacher' || userData.role?.toLowerCase() === 'admin' || userData.role?.toLowerCase() === 'secretary';
             if (isTeacherOrAdmin) {
-              const studentTabs = ['briefing', 'practice_board', 'mediathek', 'practice', 'library', 'repertoire', 'matching'];
-              if (studentTabs.includes(defaultTab)) {
+              const studentOnlyTabs = ['practice', 'library', 'repertoire', 'matching', 'homework_book', 'practice_board', 'mediathek', 'campus_cup', 'all_appointments'];
+              if (studentOnlyTabs.includes(defaultTab)) {
                 defaultTab = 'live';
               }
             }
@@ -6856,9 +6858,9 @@ function App() {
       setActivePlatform('campus');
       setActiveStudentTab('briefing');
     } else if (isCampusActive) {
-      // 1. Campus -> Briefing Board for students, Live Lab for teachers
+      // 1. Campus -> Briefing Board is ALWAYS the default start page upon login for all users (teachers, students, admins, secretaries)
       sessionStorage.setItem('groovelab_active_platform', 'campus');
-      const startCampusTab = (currentRole === 'teacher') ? 'live' : 'briefing';
+      const startCampusTab = 'briefing';
       sessionStorage.setItem('campus_active_tab', startCampusTab);
       sessionStorage.setItem('groovelab_active_tab', startCampusTab);
       setActivePlatform('campus');
@@ -6924,32 +6926,23 @@ function App() {
       if (selectedPlat === 'groovelab') {
         sessionStorage.setItem('groovelab_active_tab', 'live');
       } else {
-        sessionStorage.setItem('campus_active_tab', 'live');
-        sessionStorage.setItem('groovelab_active_tab', 'live');
+        sessionStorage.setItem('campus_active_tab', 'briefing');
+        sessionStorage.setItem('groovelab_active_tab', 'briefing');
       }
-    } else if (userToLogin?.role === 'secretary') {
+    } else if (userToLogin?.role === 'secretary' || userToLogin?.role === 'admin') {
       sessionStorage.setItem('groovelab_active_workspace', 'secretary');
       sessionStorage.setItem('groovelab_secretary_subtab', 'briefing');
       sessionStorage.setItem('campus_active_tab', 'briefing');
     } else {
-      sessionStorage.setItem('campus_active_tab', 'live');
-      if (userToLogin?.role === 'student') {
-        if (selectedPlat === 'groovelab') {
-          sessionStorage.setItem('groovelab_active_tab', 'live');
-        } else {
-          sessionStorage.setItem('groovelab_active_tab', 'briefing');
-          sessionStorage.setItem('campus_active_tab', 'briefing');
-        }
+      if (selectedPlat === 'campus') {
+        sessionStorage.setItem('campus_active_tab', 'briefing');
       } else {
         sessionStorage.setItem('groovelab_active_tab', 'live');
       }
     }
     
     const resolvedPlatform = selectedPlat;
-    const startTab = (resolvedPlatform === 'groovelab' && userToLogin?.role === 'student') ? 'live' :
-                      (userToLogin?.role === 'student') ? 'briefing' : 
-                      (userToLogin?.role === 'teacher') ? 'live' :
-                      (userToLogin?.role === 'secretary') ? 'briefing' : 'live';
+    const startTab = (resolvedPlatform === 'groovelab') ? 'live' : 'briefing';
     setActiveStudentTab(startTab);
 
     // Immediate Heartbeat on Login (non-blocking for instantaneous login transition!)
@@ -6976,9 +6969,7 @@ function App() {
       const storageKey = activePlatform === 'campus' ? 'campus_active_tab' : (activePlatform === 'ensembles' ? 'ensembles_active_tab' : 'groovelab_active_tab');
       const storedTab = (typeof window !== 'undefined' ? (sessionStorage.getItem(storageKey) || localStorage.getItem(storageKey)) : null);
       if (!storedTab) {
-        const startTab = user.role === 'student' 
-          ? (activePlatform === 'campus' ? 'briefing' : 'live') 
-          : (activePlatform === 'campus' ? 'briefing' : 'live');
+        const startTab = activePlatform === 'campus' ? 'briefing' : (activePlatform === 'ensembles' ? 'overview' : 'live');
         console.log('[Tab Sync] No tab stored in storage. Fallback to start tab:', startTab);
         setActiveStudentTab(startTab);
         if (typeof window !== 'undefined') {
@@ -6986,9 +6977,21 @@ function App() {
           localStorage.setItem(storageKey, startTab);
         }
       } else {
-        // Auto-correct if teacher/admin somehow has a student-only tab active
-        const isTeacherOrAdmin = user.role?.toLowerCase() === 'teacher' || user.role?.toLowerCase() === 'admin';
-        if (isTeacherOrAdmin && activePlatform !== 'campus') {
+        // Auto-correct if teacher/admin/staff on campus somehow has 'live' or invalid tab saved
+        const isTeacherOrAdmin = user.role?.toLowerCase() === 'teacher' || user.role?.toLowerCase() === 'admin' || user.role?.toLowerCase() === 'secretary';
+        if (isTeacherOrAdmin && activePlatform === 'campus') {
+          const validCampusTeacherTabs = ['briefing', 'schedule', 'events', 'messages', 'students', 'songs', 'rooms', 'stats', 'setup', 'profile', 'settings'];
+          if (!validCampusTeacherTabs.includes(activeStudentTab) || activeStudentTab === 'live') {
+            console.log('[Tab Sync] Auto-correcting invalid campus teacher tab to briefing:', activeStudentTab);
+            setActiveStudentTab('briefing');
+            if (typeof window !== 'undefined') {
+              sessionStorage.setItem('campus_active_tab', 'briefing');
+              localStorage.setItem('campus_active_tab', 'briefing');
+            }
+          }
+        }
+        // Auto-correct if teacher/admin on groovelab has student-only tab active
+        if (isTeacherOrAdmin && activePlatform === 'groovelab') {
           const studentTabs = ['practice', 'library', 'repertoire', 'matching'];
           if (studentTabs.includes(activeStudentTab)) {
             const fallbackTab = 'live';
@@ -7893,8 +7896,9 @@ function App() {
           sessionStorage.setItem('groovelab_active_platform', targetPlatform);
           localStorage.setItem('groovelab_active_platform', targetPlatform);
         }
+        const rawCampusTab = typeof window !== 'undefined' ? (sessionStorage.getItem('campus_active_tab') || localStorage.getItem('campus_active_tab')) : null;
         const startTab = targetPlatform === 'campus' 
-          ? (typeof window !== 'undefined' ? (sessionStorage.getItem('campus_active_tab') || localStorage.getItem('campus_active_tab')) : null) || 'briefing'
+          ? ((rawCampusTab && rawCampusTab !== 'live') ? rawCampusTab : 'briefing')
           : (typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_active_tab') || localStorage.getItem('groovelab_active_tab')) : null) || 'live';
         if (typeof window !== 'undefined') {
           sessionStorage.setItem(targetPlatform === 'campus' ? 'campus_active_tab' : 'groovelab_active_tab', startTab);
@@ -9606,9 +9610,8 @@ function App() {
                     sessionStorage.setItem('groovelab_active_workspace', 'teacher');
                   }
                   setActivePlatform('campus');
-                  const startTab = user?.role === 'teacher' 
-                    ? (sessionStorage.getItem('campus_active_tab') || 'briefing') 
-                    : (isStaff || user?.role === 'teacher' ? 'live' : 'briefing');
+                  const rawCampusTab = sessionStorage.getItem('campus_active_tab');
+                  const startTab = (rawCampusTab && rawCampusTab !== 'live') ? rawCampusTab : 'briefing';
                   setActiveStudentTab(startTab);
                   sessionStorage.setItem('campus_active_tab', startTab);
                 } else if (p === 'groovelab') {
@@ -9656,9 +9659,8 @@ function App() {
                     sessionStorage.setItem('groovelab_active_workspace', 'teacher');
                   }
                   setActivePlatform('campus');
-                  const startTab = user?.role === 'teacher' 
-                    ? (sessionStorage.getItem('campus_active_tab') || 'briefing') 
-                    : (isStaff ? 'live' : 'briefing');
+                  const rawCampusTab = sessionStorage.getItem('campus_active_tab');
+                  const startTab = (rawCampusTab && rawCampusTab !== 'live') ? rawCampusTab : 'briefing';
                   setActiveStudentTab(startTab);
                   sessionStorage.setItem('campus_active_tab', startTab);
                 }}
@@ -10993,7 +10995,7 @@ function App() {
                     <span style={{ opacity: 0.5 }}>•</span>
                     <span onClick={() => setShowImpressum(true)} style={{ cursor: 'pointer' }}>Impressum</span>
                   </div>
-                  <span style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 600 }}>Campus-Groovelab © {new Date().getFullYear()}</span>
+                  <span style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 600 }}><CampusGroovelabText fontSize="0.7rem" fontWeight={600} /> © {new Date().getFullYear()}</span>
                 </div>
               </div>
             ) : (
@@ -12312,7 +12314,7 @@ function App() {
                         <span style={{ opacity: 0.5 }}>•</span>
                         <span onClick={() => setShowImpressum(true)} style={{ cursor: 'pointer' }}>Impressum</span>
                       </div>
-                      <span style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 600 }}>Campus-Groovelab © {new Date().getFullYear()}</span>
+                      <span style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 600 }}><CampusGroovelabText fontSize="0.7rem" fontWeight={600} /> © {new Date().getFullYear()}</span>
                     </div>
                   </div>
                 </>
