@@ -43,7 +43,7 @@ export default defineConfig({
   build: {
     sourcemap: false, // Strict block on production source maps
     minify: 'esbuild',
-    chunkSizeWarningLimit: 1200,
+    chunkSizeWarningLimit: 800,
     rollupOptions: {
       output: {
         manualChunks: (id) => {
@@ -54,14 +54,22 @@ export default defineConfig({
             if (id.includes('lucide-react')) return 'vendor-lucide';
             if (id.includes('@supabase')) return 'vendor-supabase';
             if (id.includes('recharts') || id.includes('d3-') || id.includes('victory')) return 'vendor-charts';
-            if (id.includes('html2canvas') || id.includes('jspdf') || id.includes('purify') || id.includes('html-to-image')) return 'vendor-pdf';
+            if (id.includes('jspdf')) return 'vendor-jspdf';
+            if (id.includes('html2canvas') || id.includes('html-to-image')) return 'vendor-canvas';
+            if (id.includes('purify') || id.includes('dompurify')) return 'vendor-sanitizer';
             if (id.includes('jsqr') || id.includes('jsQR') || id.includes('qrcode') || id.includes('react-qr-scanner') || id.includes('react-qr-code')) return 'vendor-qr';
           }
           if (id.includes('ScheduleBoard') || id.includes('ScheduleCalendarView')) {
             return 'schedule-designer-suite';
           }
-          if (id.includes('MasterAdminDashboard') || id.includes('masterAdmin/') || id.includes('AdminDashboard') || id.includes('BillingDashboard')) {
-            return 'admin-master-suite';
+          if (id.includes('MasterAdminDashboard') || id.includes('masterAdmin/')) {
+            return 'master-admin-suite';
+          }
+          if (id.includes('BillingDashboard') || id.includes('SchoolDetailDrawer')) {
+            return 'billing-suite';
+          }
+          if (id.includes('AdminDashboard')) {
+            return 'admin-core-suite';
           }
           if (id.includes('SecretaryDashboard')) {
             return 'secretary-suite';
