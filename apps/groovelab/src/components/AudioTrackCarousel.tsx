@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { Play, Pause, ChevronLeft, ChevronRight, Trash2, Mic, Repeat, Timer, Scissors } from 'lucide-react';
 import { getBlob, storeBlob } from '../utils/blobStorage';
-import { AudioEditorModal } from './campus/AudioEditorModal';
+
+const AudioEditorModal = lazy(() => import('./campus/AudioEditorModal').then(m => ({ default: m.AudioEditorModal })));
 
 export interface AudioTrackItem {
   url: string;
@@ -633,19 +634,21 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
 
       {/* Audio Editor Modal */}
       {isEditorOpen && (
-        <AudioEditorModal
-          isOpen={isEditorOpen}
-          onClose={() => setIsEditorOpen(false)}
-          audioUrl={resolvedUrl}
-          initialLabel={label || `Aufnahme #${trackIndex + 1}`}
-          initialDuration={duration}
-          onSave={(res) => {
-            if (onSaveEdited) {
-              onSaveEdited(res);
-            }
-            setIsEditorOpen(false);
-          }}
-        />
+        <Suspense fallback={null}>
+          <AudioEditorModal
+            isOpen={isEditorOpen}
+            onClose={() => setIsEditorOpen(false)}
+            audioUrl={resolvedUrl}
+            initialLabel={label || `Aufnahme #${trackIndex + 1}`}
+            initialDuration={duration}
+            onSave={(res) => {
+              if (onSaveEdited) {
+                onSaveEdited(res);
+              }
+              setIsEditorOpen(false);
+            }}
+          />
+        </Suspense>
       )}
     </div>
   );
@@ -1218,16 +1221,18 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
 
       {/* Audio Editor Modal */}
       {isEditorOpen && (
-        <AudioEditorModal
-          isOpen={isEditorOpen}
-          onClose={() => setIsEditorOpen(false)}
-          audioUrl={resolvedUrl}
-          initialLabel={label || 'Aufnahme'}
-          initialDuration={duration}
-          onSave={(_res) => {
-            setIsEditorOpen(false);
-          }}
-        />
+        <Suspense fallback={null}>
+          <AudioEditorModal
+            isOpen={isEditorOpen}
+            onClose={() => setIsEditorOpen(false)}
+            audioUrl={resolvedUrl}
+            initialLabel={label || 'Aufnahme'}
+            initialDuration={duration}
+            onSave={(_res) => {
+              setIsEditorOpen(false);
+            }}
+          />
+        </Suspense>
       )}
     </div>
   );

@@ -62,11 +62,8 @@ export default defineConfig({
           if (id.includes('ScheduleBoard') || id.includes('ScheduleCalendarView')) {
             return 'schedule-designer-suite';
           }
-          if (id.includes('MasterAdminDashboard') || id.includes('masterAdmin/')) {
+          if (id.includes('MasterAdminDashboard') || id.includes('masterAdmin/') || id.includes('BillingDashboard') || id.includes('SchoolDetailDrawer')) {
             return 'master-admin-suite';
-          }
-          if (id.includes('BillingDashboard') || id.includes('SchoolDetailDrawer')) {
-            return 'billing-suite';
           }
           if (id.includes('AdminDashboard')) {
             return 'admin-core-suite';

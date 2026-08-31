@@ -13,7 +13,7 @@ import { processPureRawBlob, processStudioMastering, TARGET_PURE_RAW_LUFS, TARGE
 import { storeBlob, getBlob, deleteBlob } from '../utils/blobStorage';
 import { AudioTrackCarousel } from './AudioTrackCarousel';
 import { MeisterOhrSticker } from './MeisterOhrSticker';
-import { AudioEditorModal } from './campus/AudioEditorModal';
+const AudioEditorModal = React.lazy(() => import('./campus/AudioEditorModal').then(m => ({ default: m.AudioEditorModal })));
 import { synthesizeNeuralSpeech, playAudioBlob, stopNeuralSpeech, buildContinuousHomeworkNarrative, cleanTextForTts } from '../services/neuralTtsService';
 import { isDevEnvironment } from '../utils/tenantUrlHelper';
 import { generateStudentHomeworkPrintoutPDF } from '../utils/pdfGenerator';
@@ -21051,19 +21051,21 @@ const InlineAudioPlayer: React.FC<{
 
       {/* Studio Waveform & Pitch Editor Modal */}
       {isEditorOpen && (
-        <AudioEditorModal
-          isOpen={isEditorOpen}
-          onClose={() => setIsEditorOpen(false)}
-          audioUrl={resolvedUrl}
-          initialLabel={cleanTitle}
-          initialDuration={duration}
-          onSave={(res) => {
-            if (onSaveEdited) {
-              onSaveEdited(res);
-            }
-            setIsEditorOpen(false);
-          }}
-        />
+        <React.Suspense fallback={null}>
+          <AudioEditorModal
+            isOpen={isEditorOpen}
+            onClose={() => setIsEditorOpen(false)}
+            audioUrl={resolvedUrl}
+            initialLabel={cleanTitle}
+            initialDuration={duration}
+            onSave={(res) => {
+              if (onSaveEdited) {
+                onSaveEdited(res);
+              }
+              setIsEditorOpen(false);
+            }}
+          />
+        </React.Suspense>
       )}
     </div>
   );

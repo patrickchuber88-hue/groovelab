@@ -2151,23 +2151,96 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     try {
       const { data, error } = await supabase
         .from('campus_direct_messages')
-        .select('occurrence_id, recipient_id, is_read')
+        .select('occurrence_id, recipient_id, sender_id, is_read, content')
         .or(`sender_id.eq.${studentId},recipient_id.eq.${studentId}`);
       if (!error && data) {
-        const ids = Array.from(new Set(data.map((m: any) => m.occurrence_id).filter(Boolean)));
-        setOccurrencesWithMessages(ids);
-
+        const ids = new Set<string>();
         const unreadMap: Record<string, number> = {};
+
         data.forEach((m: any) => {
-          if (m.occurrence_id && m.recipient_id === studentId && !m.is_read) {
-            unreadMap[m.occurrence_id] = (unreadMap[m.occurrence_id] || 0) + 1;
+          const occId = m.occurrence_id ? String(m.occurrence_id) : '';
+          const text = String(m.content || '').trim();
+          if (occId) {
+            ids.add(occId);
+          }
+
+          let extDate: string | null = null;
+          if (occId) {
+            const matchVirtual = occId.match(/\d{4}-\d{2}-\d{2}/);
+            if (matchVirtual) extDate = matchVirtual[0];
+          }
+          if (!extDate && text) {
+            const matchIso = text.match(/\b(\d{4})-(\d{2})-(\d{2})\b/);
+            if (matchIso) {
+              extDate = `${matchIso[1]}-${matchIso[2]}-${matchIso[3]}`;
+            } else {
+              const matchFullYear = text.match(/(\d{1,2})\.(\d{1,2})\.(\d{2,4})/);
+              if (matchFullYear) {
+                const day = matchFullYear[1].padStart(2, '0');
+                const month = matchFullYear[2].padStart(2, '0');
+                let year = matchFullYear[3];
+                if (year.length === 2) year = `20${year}`;
+                extDate = `${year}-${month}-${day}`;
+              }
+            }
+          }
+
+          if (extDate) {
+            ids.add(extDate);
+            if (m.sender_id) ids.add(`${m.sender_id}_${extDate}`);
+            if (m.recipient_id) ids.add(`${m.recipient_id}_${extDate}`);
+            if (studentId) ids.add(`${studentId}_${extDate}`);
+          }
+
+          if (m.recipient_id === studentId && !m.is_read) {
+            if (occId) {
+              unreadMap[occId] = (unreadMap[occId] || 0) + 1;
+            }
+            if (extDate) {
+              unreadMap[extDate] = (unreadMap[extDate] || 0) + 1;
+              unreadMap[`${studentId}_${extDate}`] = (unreadMap[`${studentId}_${extDate}`] || 0) + 1;
+            }
           }
         });
+
+        setOccurrencesWithMessages(Array.from(ids));
         setOccurrencesWithUnreadCount(unreadMap);
       }
     } catch (err) {
       console.error('Error fetching occurrences with messages:', err);
     }
+  };
+
+  const checkOccurrenceHasMessages = (occ: any, dateStr?: string): boolean => {
+    if (!occ && !dateStr) return false;
+    const occId = typeof occ === 'string' ? occ : (occ?.id || occ?.occurrence_id || '');
+    if (occId && occurrencesWithMessages.includes(String(occId))) return true;
+
+    const dStr = dateStr || (typeof occ === 'object' ? occ?.date : undefined);
+    if (dStr) {
+      if (occurrencesWithMessages.includes(dStr)) return true;
+      if (studentId && occurrencesWithMessages.includes(`${studentId}_${dStr}`)) return true;
+      if (typeof occ === 'object' && occ) {
+        const sId = occ.schedule_id || occ.schedule?.id;
+        if (sId && occurrencesWithMessages.includes(`virtual-${sId}-${dStr}`)) return true;
+        const stId = occ.student_id || occ.student?.id;
+        if (stId && occurrencesWithMessages.includes(`${stId}_${dStr}`)) return true;
+      }
+    }
+    return false;
+  };
+
+  const getOccurrenceUnreadCount = (occ: any, dateStr?: string): number => {
+    if (!occ && !dateStr) return 0;
+    const occId = typeof occ === 'string' ? occ : (occ?.id || occ?.occurrence_id || '');
+    if (occId && occurrencesWithUnreadCount[String(occId)]) return occurrencesWithUnreadCount[String(occId)];
+
+    const dStr = dateStr || (typeof occ === 'object' ? occ?.date : undefined);
+    if (dStr) {
+      if (occurrencesWithUnreadCount[dStr]) return occurrencesWithUnreadCount[dStr];
+      if (studentId && occurrencesWithUnreadCount[`${studentId}_${dStr}`]) return occurrencesWithUnreadCount[`${studentId}_${dStr}`];
+    }
+    return 0;
   };
 
   const fetchBriefingOnly = async () => {
@@ -4759,7 +4832,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     try {
       const { data, error } = await supabase
         .from('fokus_logs')
-        .select('*')
+        .select('id, user_id, duration_seconds, duration_minutes, is_extra, flame_level, created_at')
         .eq('user_id', studentId)
         .order('created_at', { ascending: false });
 
@@ -5014,17 +5087,12 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       
       const seconds = log.duration_seconds || ((log.duration_minutes || 0) * 60);
       
-      // Pädagogische Regel: Fokus-Meisterschaft erfordert EINE Einheit am Stück (>= 180s)
       if (!log.is_extra) {
         if (seconds >= 180) {
           groups[dateStr].hasMasteredSession = true;
-          groups[dateStr].focusSeconds = 180;
-          groups[dateStr].extraSeconds += (seconds - 180);
-        } else {
-          groups[dateStr].focusSeconds += seconds;
         }
+        groups[dateStr].focusSeconds += seconds;
       } else {
-        // Freie Übezeit / Extrazeit
         groups[dateStr].extraSeconds += seconds;
       }
 
@@ -5038,6 +5106,16 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       if (totalSeconds > 0) {
         g.isPlaceholder = false;
       }
+      // 🎯 Deterministic Clamping: Maximum 180s (3 Min.) Focus per day; surplus is strictly Extra
+      if (totalSeconds >= 180 || g.hasMasteredSession) {
+        g.hasMasteredSession = true;
+        g.focusSeconds = 180;
+        g.extraSeconds = Math.max(0, totalSeconds - 180);
+      } else {
+        g.focusSeconds = totalSeconds;
+        g.extraSeconds = 0;
+      }
+
       if (g.hasMasteredSession) {
         if (!g.flameLevel || g.flameLevel === 'Keine Flamme') {
           g.flameLevel = getFlameLevelName(avatar?.streak_flame || 0);
@@ -8822,26 +8900,13 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                   const todayStr = toLocalYYYYMMDD(getSimulatedNow());
                   const todayLogs = (fokusLogs || []).filter(log => log.created_at && toLocalYYYYMMDD(new Date(log.created_at)) === todayStr);
                   
-                  // DB sums
-                  const dbFocusSecs = todayLogs.filter(l => !l.is_extra).reduce((sum, log) => sum + (log.duration_seconds || ((log.duration_minutes || 0) * 60)), 0);
-                  const dbExtraSecs = todayLogs.filter(l => l.is_extra).reduce((sum, log) => sum + (log.duration_seconds || ((log.duration_minutes || 0) * 60)), 0);
-                  
-                  // Live session sums
-                  let liveFocusSecs = 0;
-                  let liveExtraSecs = 0;
-                  if (sessionActive) {
-                    const targetSeconds = getTargetMinutes(avatar?.streak_flame || 0) * 60;
-                    if (secondsElapsed >= targetSeconds) {
-                      liveFocusSecs = targetSeconds;
-                      liveExtraSecs = secondsElapsed - targetSeconds;
-                    } else {
-                      liveFocusSecs = secondsElapsed;
-                    }
-                  }
-                  
-                  const totalFocusSecs = dbFocusSecs + liveFocusSecs;
-                  const totalExtraSecs = dbExtraSecs + liveExtraSecs;
-                  const totalDaySecs = totalFocusSecs + totalExtraSecs;
+                  const targetSecs = getTargetMinutes(avatar?.streak_flame || 0) * 60;
+                  const targetMins = getTargetMinutes(avatar?.streak_flame || 0);
+
+                  // 🎯 Single Source of Truth: Total DB Seconds recorded today
+                  const dbTotalSecs = todayLogs.reduce((sum, log) => sum + (log.duration_seconds || ((log.duration_minutes || 0) * 60)), 0);
+                  const liveSecs = sessionActive ? secondsElapsed : 0;
+                  const totalDaySecs = dbTotalSecs + liveSecs;
                   
                   if (totalDaySecs === 0) {
                     return `0 Min.`;
@@ -8849,27 +8914,34 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                   if (totalDaySecs > 0 && totalDaySecs < 60) {
                     return `${Math.round(totalDaySecs)} Sek.`;
                   }
-                  
+
+                  // 🎯 Strictly clamp Daily Focus Seconds to targetSecs (e.g. max 180s = 3 Min.)
+                  // Any surplus beyond the daily goal strictly flows into Extra / Freie Zeit!
+                  const totalFocusSecs = Math.min(totalDaySecs, targetSecs);
+                  const totalExtraSecs = Math.max(0, totalDaySecs - targetSecs);
+
                   const focusMin = Math.floor(totalFocusSecs / 60);
-                  
+                  const focusRemainderSec = Math.round(totalFocusSecs % 60);
+
                   if (totalExtraSecs > 0) {
-                    const extraFormatted = totalExtraSecs < 60 
-                      ? `${Math.round(totalExtraSecs)}s Extra` 
-                      : (totalExtraSecs % 60 === 0 
-                          ? `${Math.floor(totalExtraSecs / 60)}m Extra` 
-                          : `${Math.floor(totalExtraSecs / 60)}m ${Math.round(totalExtraSecs % 60)}s Extra`);
-                    
-                    if (totalFocusSecs > 0) {
-                      return (
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap' }}>
-                          <span>{focusMin} Min. Fokus</span>
-                          <span style={{ fontSize: '0.74rem', opacity: 0.95, fontWeight: 900, background: 'rgba(0, 0, 0, 0.08)', color: '#713f12', padding: '1px 6px', borderRadius: '6px' }}>
-                            + {extraFormatted}
-                          </span>
+                    const extraMin = Math.floor(totalExtraSecs / 60);
+                    const extraSec = Math.round(totalExtraSecs % 60);
+                    const extraFormatted = extraMin === 0 
+                      ? `${extraSec}s Extra` 
+                      : (extraSec === 0 ? `${extraMin}m Extra` : `${extraMin}m ${extraSec}s Extra`);
+
+                    return (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap' }}>
+                        <span>{focusMin} Min. Fokus</span>
+                        <span style={{ fontSize: '0.74rem', opacity: 0.95, fontWeight: 900, background: 'rgba(0, 0, 0, 0.08)', color: '#713f12', padding: '1px 6px', borderRadius: '6px' }}>
+                          + {extraFormatted}
                         </span>
-                      );
-                    }
-                    return extraFormatted;
+                      </span>
+                    );
+                  }
+
+                  if (focusRemainderSec > 0 && focusMin > 0) {
+                    return `${focusMin} Min. ${focusRemainderSec} Sek.`;
                   }
                   return `${focusMin} Min.`;
                 })()}</span>
@@ -9040,7 +9112,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                     </div>
                     <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#ffffff' }}>
                       {(() => {
-                        const logsMins = Math.round((fokusLogs || []).reduce((sum, log) => sum + (log.duration_seconds || ((log.duration_minutes || 0) * 60)), 0) / 60);
+                        const logsMins = Math.floor((fokusLogs || []).reduce((sum, log) => sum + (log.duration_seconds || ((log.duration_minutes || 0) * 60)), 0) / 60);
                         const effMins = Math.max(totalFocusMinutes || 0, logsMins);
                         if (effMins >= 1500) return 'Stufe 4: Übe-Großmeister';
                         if (effMins >= 500) return 'Stufe 3: Übe-Legende';
@@ -9054,7 +9126,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   {(() => {
-                    const logsMins = Math.round((fokusLogs || []).reduce((sum, log) => sum + (log.duration_seconds || ((log.duration_minutes || 0) * 60)), 0) / 60);
+                    const logsMins = Math.floor((fokusLogs || []).reduce((sum, log) => sum + (log.duration_seconds || ((log.duration_minutes || 0) * 60)), 0) / 60);
                     const effMins = Math.max(totalFocusMinutes || 0, logsMins);
                     let nextStickerName = 'Fleiß-Pionier';
                     let targetMin = 20;
@@ -9140,7 +9212,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                   zIndex: 0
                 }}>
                   {(() => {
-                    const logsMins = Math.round((fokusLogs || []).reduce((sum, log) => sum + (log.duration_seconds || ((log.duration_minutes || 0) * 60)), 0) / 60);
+                    const logsMins = Math.floor((fokusLogs || []).reduce((sum, log) => sum + (log.duration_seconds || ((log.duration_minutes || 0) * 60)), 0) / 60);
                     const effMins = Math.max(totalFocusMinutes || 0, logsMins);
                     return (
                       <div style={{
@@ -9154,7 +9226,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                 </div>
 
                 {(() => {
-                  const logsMins = Math.round((fokusLogs || []).reduce((sum, log) => sum + (log.duration_seconds || ((log.duration_minutes || 0) * 60)), 0) / 60);
+                  const logsMins = Math.floor((fokusLogs || []).reduce((sum, log) => sum + (log.duration_seconds || ((log.duration_minutes || 0) * 60)), 0) / 60);
                   const effMins = Math.max(totalFocusMinutes || 0, logsMins);
                   return [
                     { stage: 1, id: 'fleiss-pionier', title: 'Fleiß-Pionier', desc: '20 Min', icon: '🐝', done: (effMins >= 20), current: (effMins < 20) },
@@ -11573,8 +11645,10 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                 </div>
                                 <p style={{ margin: '2px 0 0 0', fontSize: '0.72rem', fontWeight: 700, color: '#15803d' }}>
                                   {(() => {
-                                    const focusSecs = todayGroup?.focusSeconds || (todayHasMastered ? 180 : 0);
-                                    const extraSecs = todayGroup?.extraSeconds || Math.max(0, todayTotalSecs - focusSecs);
+                                    const focusSecs = Math.min(180, todayGroup?.focusSeconds ?? (todayHasMastered ? 180 : 0));
+                                    const extraSecs = (todayGroup?.extraSeconds !== undefined)
+                                      ? todayGroup.extraSeconds
+                                      : Math.max(0, todayTotalSecs - focusSecs);
                                     const fMins = Math.floor(focusSecs / 60);
                                     if (extraSecs > 0) {
                                       const extraStr = extraSecs < 60 ? `${extraSecs} Sek.` : `${Math.floor(extraSecs / 60)} Min. ${extraSecs % 60 > 0 ? (extraSecs % 60) + ' Sek.' : ''}`.trim();
@@ -11587,7 +11661,10 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                             </div>
                             <span style={{ fontSize: '0.76rem', fontWeight: 900, color: '#166534', background: '#ffffff', border: '1px solid #bbf7d0', padding: '4px 10px', borderRadius: '12px', boxShadow: '0 2px 6px rgba(52, 168, 83, 0.1)' }}>
                               +{(() => {
-                                const extraSecs = todayGroup?.extraSeconds || Math.max(0, todayTotalSecs - 180);
+                                const focusSecs = Math.min(180, todayGroup?.focusSeconds ?? (todayHasMastered ? 180 : 0));
+                                const extraSecs = (todayGroup?.extraSeconds !== undefined)
+                                  ? todayGroup.extraSeconds
+                                  : Math.max(0, todayTotalSecs - focusSecs);
                                 const extraXp = Math.floor(extraSecs / 60);
                                 return 3 + extraXp;
                               })()} XP ⚡
@@ -13936,8 +14013,8 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                   const d = new Date(nextOcc.date);
                                   return `${d.toLocaleDateString('de-DE', {weekday: 'long', day: '2-digit', month: '2-digit'})} - ${nextOcc.start_time?.substring(0,5)} Uhr`;
                                 })() : 'Demnächst');
-                            const hasMessage = Boolean(finalOccurId && occurrencesWithMessages.includes(finalOccurId));
-                            const unreadMsgCount = finalOccurId ? (occurrencesWithUnreadCount[finalOccurId] || 0) : 0;
+                            const hasMessage = checkOccurrenceHasMessages(nextOcc || finalOccurId, targetDateStr);
+                            const unreadMsgCount = getOccurrenceUnreadCount(nextOcc || finalOccurId, targetDateStr);
                             const isCanceled = nextOcc?.status === 'canceled_by_student' || nextOcc?.status === 'cancelled' || nextOcc?.status === 'teacher_sick' || nextOcc?.status === 'canceled_by_teacher_sick';
 
                             return (
@@ -13961,7 +14038,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                   <span>{isCanceled ? `Abgesagt: ${lessonText}` : `Nächste Musikstunde: ${lessonText}`}</span>
                                 </div>
 
-                                {/* 2. Nachrichten Button */}
+                                {/* 2. Nachrichten / Shoutbox Button (1:1 synchron mit Termine-Board) */}
                                 {teacherId && (
                                   <button 
                                     type="button"
@@ -13980,37 +14057,37 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                       display: 'inline-flex', 
                                       alignItems: 'center', 
                                       gap: '8px', 
-                                      background: hasMessage ? 'linear-gradient(135deg, #ffffff 0%, #fefce8 100%)' : '#ffffff', 
-                                      color: hasMessage ? '#78350f' : '#475569', 
+                                      background: hasMessage ? '#fefce8' : '#ffffff', 
+                                      color: hasMessage ? '#ca8a04' : '#475569', 
                                       padding: '8px 16px', 
                                       minHeight: '38px',
                                       boxSizing: 'border-box',
                                       borderRadius: '14px', 
                                       fontSize: '0.80rem', 
                                       fontWeight: 900, 
-                                      border: hasMessage ? '2px solid #f59e0b' : '1px solid #cbd5e1', 
+                                      border: hasMessage ? '1px solid #fde047' : '1px solid #cbd5e1', 
                                       cursor: 'pointer',
-                                      boxShadow: hasMessage ? '0 4px 14px rgba(245, 158, 11, 0.22)' : '0 2px 6px rgba(0, 0, 0, 0.03)',
+                                      boxShadow: hasMessage ? '0 2px 8px rgba(202, 138, 4, 0.18)' : '0 2px 6px rgba(0, 0, 0, 0.03)',
                                       transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)'
                                     }}
                                     onMouseEnter={(e) => {
                                       e.currentTarget.style.transform = 'translateY(-1px)';
-                                      e.currentTarget.style.boxShadow = hasMessage ? '0 6px 18px rgba(245, 158, 11, 0.32)' : '0 4px 12px rgba(0, 0, 0, 0.08)';
+                                      e.currentTarget.style.background = hasMessage ? '#fef08a' : '#f8fafc';
+                                      e.currentTarget.style.boxShadow = hasMessage ? '0 4px 12px rgba(202, 138, 4, 0.25)' : '0 4px 12px rgba(0, 0, 0, 0.08)';
                                     }}
                                     onMouseLeave={(e) => {
                                       e.currentTarget.style.transform = 'none';
-                                      e.currentTarget.style.boxShadow = hasMessage ? '0 4px 14px rgba(245, 158, 11, 0.22)' : '0 2px 6px rgba(0, 0, 0, 0.03)';
+                                      e.currentTarget.style.background = hasMessage ? '#fefce8' : '#ffffff';
+                                      e.currentTarget.style.boxShadow = hasMessage ? '0 2px 8px rgba(202, 138, 4, 0.18)' : '0 2px 6px rgba(0, 0, 0, 0.03)';
                                     }}
-                                    onMouseDown={(e) => {
-                                      e.currentTarget.style.transform = 'translateY(1px)';
-                                    }}
-                                    onMouseUp={(e) => {
-                                      e.currentTarget.style.transform = 'translateY(-1px)';
-                                    }}
-                                    title="1:1 Nachrichten zum Unterrichtstermin"
+                                    title="1:1 Shoutbox zum Unterrichtstermin"
                                   >
-                                    <MessageSquare size={15} color={hasMessage ? '#d97706' : '#64748b'} fill={hasMessage ? 'rgba(245, 158, 11, 0.2)' : 'none'} />
-                                    <span>{unreadMsgCount > 0 ? (unreadMsgCount === 1 ? '1 neue Nachricht' : `${unreadMsgCount} neue Nachrichten`) : 'Nachrichten'}</span>
+                                    <MessageSquare 
+                                      size={15} 
+                                      color={hasMessage ? '#ca8a04' : '#64748b'} 
+                                      fill={hasMessage ? '#eab308' : 'none'} 
+                                    />
+                                    <span>{unreadMsgCount > 0 ? (unreadMsgCount === 1 ? '1 neue Nachricht' : `${unreadMsgCount} neue Nachrichten`) : (hasMessage ? 'Nachrichten vorhanden' : 'Nachrichten')}</span>
                                     {unreadMsgCount > 0 && (
                                       <span style={{
                                         background: '#f59e0b',
@@ -17604,8 +17681,8 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                               const d = new Date(nextOcc.date);
                               return `${d.toLocaleDateString('de-DE', {weekday: 'long', day: '2-digit', month: '2-digit'})} - ${nextOcc.start_time?.substring(0,5)} Uhr`;
                             })() : 'Demnächst');
-                        const hasMessage = Boolean(finalOccurId && occurrencesWithMessages.includes(finalOccurId));
-                        const unreadMsgCount = finalOccurId ? (occurrencesWithUnreadCount[finalOccurId] || 0) : 0;
+                        const hasMessage = checkOccurrenceHasMessages(nextOcc || finalOccurId, targetDateStr);
+                        const unreadMsgCount = getOccurrenceUnreadCount(nextOcc || finalOccurId, targetDateStr);
                         const isCanceled = nextOcc?.status === 'canceled_by_student' || nextOcc?.status === 'cancelled' || nextOcc?.status === 'teacher_sick' || nextOcc?.status === 'canceled_by_teacher_sick';
 
                         return (
@@ -17629,7 +17706,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                               <span>{isCanceled ? `Abgesagt: ${lessonText}` : `Nächste Session: ${lessonText}`}</span>
                             </div>
 
-                            {/* 2. Nachrichten Button */}
+                            {/* 2. Nachrichten / Shoutbox Button (1:1 synchron mit Termine-Board) */}
                             {teacherId && (
                               <button 
                                 type="button"
@@ -17648,37 +17725,37 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                   display: 'inline-flex', 
                                   alignItems: 'center', 
                                   gap: '8px', 
-                                  background: hasMessage ? 'linear-gradient(135deg, #ffffff 0%, #fefce8 100%)' : '#ffffff', 
-                                  color: hasMessage ? '#78350f' : '#475569', 
+                                  background: hasMessage ? '#fefce8' : '#ffffff', 
+                                  color: hasMessage ? '#ca8a04' : '#475569', 
                                   padding: '8px 16px', 
                                   minHeight: '38px',
                                   boxSizing: 'border-box',
                                   borderRadius: '14px', 
                                   fontSize: '0.80rem', 
                                   fontWeight: 900, 
-                                  border: hasMessage ? '2px solid #f59e0b' : '1px solid #cbd5e1', 
+                                  border: hasMessage ? '1px solid #fde047' : '1px solid #cbd5e1', 
                                   cursor: 'pointer',
-                                  boxShadow: hasMessage ? '0 4px 14px rgba(245, 158, 11, 0.22)' : '0 2px 6px rgba(0, 0, 0, 0.03)',
+                                  boxShadow: hasMessage ? '0 2px 8px rgba(202, 138, 4, 0.18)' : '0 2px 6px rgba(0, 0, 0, 0.03)',
                                   transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)'
                                 }}
                                 onMouseEnter={(e) => {
                                   e.currentTarget.style.transform = 'translateY(-1px)';
-                                  e.currentTarget.style.boxShadow = hasMessage ? '0 6px 18px rgba(245, 158, 11, 0.32)' : '0 4px 12px rgba(0, 0, 0, 0.08)';
+                                  e.currentTarget.style.background = hasMessage ? '#fef08a' : '#f8fafc';
+                                  e.currentTarget.style.boxShadow = hasMessage ? '0 4px 12px rgba(202, 138, 4, 0.25)' : '0 4px 12px rgba(0, 0, 0, 0.08)';
                                 }}
                                 onMouseLeave={(e) => {
                                   e.currentTarget.style.transform = 'none';
-                                  e.currentTarget.style.boxShadow = hasMessage ? '0 4px 14px rgba(245, 158, 11, 0.22)' : '0 2px 6px rgba(0, 0, 0, 0.03)';
+                                  e.currentTarget.style.background = hasMessage ? '#fefce8' : '#ffffff';
+                                  e.currentTarget.style.boxShadow = hasMessage ? '0 2px 8px rgba(202, 138, 4, 0.18)' : '0 2px 6px rgba(0, 0, 0, 0.03)';
                                 }}
-                                onMouseDown={(e) => {
-                                  e.currentTarget.style.transform = 'translateY(1px)';
-                                }}
-                                onMouseUp={(e) => {
-                                  e.currentTarget.style.transform = 'translateY(-1px)';
-                                }}
-                                title="1:1 Chat zum Unterrichtstermin"
+                                title="1:1 Shoutbox zum Unterrichtstermin"
                               >
-                                <MessageSquare size={15} color={hasMessage ? '#d97706' : '#64748b'} fill={hasMessage ? 'rgba(245, 158, 11, 0.2)' : 'none'} />
-                                <span>{unreadMsgCount > 0 ? (unreadMsgCount === 1 ? '1 neue Nachricht' : `${unreadMsgCount} neue Nachrichten`) : 'Nachrichten'}</span>
+                                <MessageSquare 
+                                  size={15} 
+                                  color={hasMessage ? '#ca8a04' : '#64748b'} 
+                                  fill={hasMessage ? '#eab308' : 'none'} 
+                                />
+                                <span>{unreadMsgCount > 0 ? (unreadMsgCount === 1 ? '1 neue Nachricht' : `${unreadMsgCount} neue Nachrichten`) : (hasMessage ? 'Nachrichten vorhanden' : 'Nachrichten')}</span>
                                 {unreadMsgCount > 0 && (
                                   <span style={{
                                     background: '#f59e0b',
@@ -18938,8 +19015,8 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                               const d = new Date(nextOcc.date);
                               return `${d.toLocaleDateString('de-DE', {weekday: 'long', day: '2-digit', month: '2-digit'})} - ${nextOcc.start_time?.substring(0,5)} Uhr`;
                             })() : 'Demnächst');
-                        const hasMessage = Boolean(finalOccurId && occurrencesWithMessages.includes(finalOccurId));
-                        const unreadMsgCount = finalOccurId ? (occurrencesWithUnreadCount[finalOccurId] || 0) : 0;
+                        const hasMessage = checkOccurrenceHasMessages(nextOcc || finalOccurId, targetDateStr);
+                        const unreadMsgCount = getOccurrenceUnreadCount(nextOcc || finalOccurId, targetDateStr);
                         const isCanceled = nextOcc?.status === 'canceled_by_student' || nextOcc?.status === 'cancelled' || nextOcc?.status === 'teacher_sick' || nextOcc?.status === 'canceled_by_teacher_sick';
 
                         return (
@@ -18963,7 +19040,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                               <span>{isCanceled ? `Abgesagt: ${lessonText}` : `Nächster Unterricht: ${lessonText}`}</span>
                             </div>
 
-                            {/* 2. Nachrichten Button */}
+                            {/* 2. Nachrichten / Shoutbox Button (1:1 synchron mit Termine-Board) */}
                             {teacherId && (
                               <button 
                                 type="button"
@@ -18982,37 +19059,37 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                   display: 'inline-flex', 
                                   alignItems: 'center', 
                                   gap: '8px', 
-                                  background: hasMessage ? 'linear-gradient(135deg, #ffffff 0%, #fefce8 100%)' : '#ffffff', 
-                                  color: hasMessage ? '#78350f' : '#475569', 
+                                  background: hasMessage ? '#fefce8' : '#ffffff', 
+                                  color: hasMessage ? '#ca8a04' : '#475569', 
                                   padding: '8px 16px', 
                                   minHeight: '38px',
                                   boxSizing: 'border-box',
                                   borderRadius: '14px', 
                                   fontSize: '0.80rem', 
                                   fontWeight: 900, 
-                                  border: hasMessage ? '2px solid #f59e0b' : '1px solid #cbd5e1', 
+                                  border: hasMessage ? '1px solid #fde047' : '1px solid #cbd5e1', 
                                   cursor: 'pointer',
-                                  boxShadow: hasMessage ? '0 4px 14px rgba(245, 158, 11, 0.22)' : '0 2px 6px rgba(0, 0, 0, 0.03)',
+                                  boxShadow: hasMessage ? '0 2px 8px rgba(202, 138, 4, 0.18)' : '0 2px 6px rgba(0, 0, 0, 0.03)',
                                   transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)'
                                 }}
                                 onMouseEnter={(e) => {
                                   e.currentTarget.style.transform = 'translateY(-1px)';
-                                  e.currentTarget.style.boxShadow = hasMessage ? '0 6px 18px rgba(245, 158, 11, 0.32)' : '0 4px 12px rgba(0, 0, 0, 0.08)';
+                                  e.currentTarget.style.background = hasMessage ? '#fef08a' : '#f8fafc';
+                                  e.currentTarget.style.boxShadow = hasMessage ? '0 4px 12px rgba(202, 138, 4, 0.25)' : '0 4px 12px rgba(0, 0, 0, 0.08)';
                                 }}
                                 onMouseLeave={(e) => {
                                   e.currentTarget.style.transform = 'none';
-                                  e.currentTarget.style.boxShadow = hasMessage ? '0 4px 14px rgba(245, 158, 11, 0.22)' : '0 2px 6px rgba(0, 0, 0, 0.03)';
+                                  e.currentTarget.style.background = hasMessage ? '#fefce8' : '#ffffff';
+                                  e.currentTarget.style.boxShadow = hasMessage ? '0 2px 8px rgba(202, 138, 4, 0.18)' : '0 2px 6px rgba(0, 0, 0, 0.03)';
                                 }}
-                                onMouseDown={(e) => {
-                                  e.currentTarget.style.transform = 'translateY(1px)';
-                                }}
-                                onMouseUp={(e) => {
-                                  e.currentTarget.style.transform = 'translateY(-1px)';
-                                }}
-                                title="1:1 Nachrichten zum Unterrichtstermin"
+                                title="1:1 Shoutbox zum Unterrichtstermin"
                               >
-                                <MessageSquare size={15} color={hasMessage ? '#d97706' : '#64748b'} fill={hasMessage ? 'rgba(245, 158, 11, 0.2)' : 'none'} />
-                                <span>{unreadMsgCount > 0 ? (unreadMsgCount === 1 ? '1 neue Nachricht' : `${unreadMsgCount} neue Nachrichten`) : 'Nachrichten'}</span>
+                                <MessageSquare 
+                                  size={15} 
+                                  color={hasMessage ? '#ca8a04' : '#64748b'} 
+                                  fill={hasMessage ? '#eab308' : 'none'} 
+                                />
+                                <span>{unreadMsgCount > 0 ? (unreadMsgCount === 1 ? '1 neue Nachricht' : `${unreadMsgCount} neue Nachrichten`) : (hasMessage ? 'Nachrichten vorhanden' : 'Nachrichten')}</span>
                                 {unreadMsgCount > 0 && (
                                   <span style={{
                                     background: '#f59e0b',
@@ -20052,8 +20129,8 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                     display: 'flex',
                                     alignItems: 'center',
                                     justifyContent: 'center',
-                                    background: occ.id && occurrencesWithMessages.includes(occ.id) ? '#fef3c7' : 'rgba(255, 255, 255, 0.2)',
-                                    color: occ.id && occurrencesWithMessages.includes(occ.id) ? '#d97706' : '#ffffff',
+                                    background: checkOccurrenceHasMessages(occ) ? '#fef3c7' : 'rgba(255, 255, 255, 0.2)',
+                                    color: checkOccurrenceHasMessages(occ) ? '#d97706' : '#ffffff',
                                     width: '32px',
                                     height: '32px',
                                     borderRadius: '50%',
@@ -20062,10 +20139,10 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                     transition: 'all 0.2s',
                                     flexShrink: 0
                                   }}
-                                  onMouseOver={e => { e.currentTarget.style.background = occ.id && occurrencesWithMessages.includes(occ.id) ? '#fde68a' : 'rgba(255, 255, 255, 0.3)'; }}
-                                  onMouseOut={e => { e.currentTarget.style.background = occ.id && occurrencesWithMessages.includes(occ.id) ? '#fef3c7' : 'rgba(255, 255, 255, 0.2)'; }}
+                                  onMouseOver={e => { e.currentTarget.style.background = checkOccurrenceHasMessages(occ) ? '#fde68a' : 'rgba(255, 255, 255, 0.3)'; }}
+                                  onMouseOut={e => { e.currentTarget.style.background = checkOccurrenceHasMessages(occ) ? '#fef3c7' : 'rgba(255, 255, 255, 0.2)'; }}
                                 >
-                                  <MessageSquare size={14} fill={occ.id && occurrencesWithMessages.includes(occ.id) ? 'currentColor' : 'none'} />
+                                  <MessageSquare size={14} fill={checkOccurrenceHasMessages(occ) ? 'currentColor' : 'none'} />
                                 </button>
                               </div>
                             </div>
@@ -20121,8 +20198,8 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                     display: 'flex',
                                     alignItems: 'center',
                                     justifyContent: 'center',
-                                    background: occ.id && occurrencesWithMessages.includes(occ.id) ? '#f59e0b' : 'rgba(120, 53, 15, 0.12)',
-                                    color: occ.id && occurrencesWithMessages.includes(occ.id) ? '#ffffff' : '#78350f',
+                                    background: checkOccurrenceHasMessages(occ) ? '#f59e0b' : 'rgba(120, 53, 15, 0.12)',
+                                    color: checkOccurrenceHasMessages(occ) ? '#ffffff' : '#78350f',
                                     width: '32px',
                                     height: '32px',
                                     borderRadius: '50%',
@@ -20131,10 +20208,10 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                     transition: 'all 0.2s',
                                     flexShrink: 0
                                   }}
-                                  onMouseOver={e => { e.currentTarget.style.background = occ.id && occurrencesWithMessages.includes(occ.id) ? '#d97706' : 'rgba(120, 53, 15, 0.22)'; }}
-                                  onMouseOut={e => { e.currentTarget.style.background = occ.id && occurrencesWithMessages.includes(occ.id) ? '#f59e0b' : 'rgba(120, 53, 15, 0.12)'; }}
+                                  onMouseOver={e => { e.currentTarget.style.background = checkOccurrenceHasMessages(occ) ? '#d97706' : 'rgba(120, 53, 15, 0.22)'; }}
+                                  onMouseOut={e => { e.currentTarget.style.background = checkOccurrenceHasMessages(occ) ? '#f59e0b' : 'rgba(120, 53, 15, 0.12)'; }}
                                 >
-                                  <MessageSquare size={14} fill={occ.id && occurrencesWithMessages.includes(occ.id) ? 'currentColor' : 'none'} />
+                                  <MessageSquare size={14} fill={checkOccurrenceHasMessages(occ) ? 'currentColor' : 'none'} />
                                 </button>
                               </div>
                             </div>
@@ -20173,8 +20250,8 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
-                                background: occ.id && occurrencesWithMessages.includes(occ.id) ? '#fef3c7' : '#f8fafc',
-                                color: occ.id && occurrencesWithMessages.includes(occ.id) ? '#d97706' : '#475569',
+                                background: checkOccurrenceHasMessages(occ) ? '#fef3c7' : '#f8fafc',
+                                color: checkOccurrenceHasMessages(occ) ? '#d97706' : '#475569',
                                 width: '32px',
                                 height: '32px',
                                 borderRadius: '50%',
@@ -20185,15 +20262,15 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                 flexShrink: 0
                               }}
                               onMouseOver={e => {
-                                e.currentTarget.style.background = occ.id && occurrencesWithMessages.includes(occ.id) ? '#fde68a' : '#f1f5f9';
-                                e.currentTarget.style.color = occ.id && occurrencesWithMessages.includes(occ.id) ? '#d97706' : '#1e293b';
+                                e.currentTarget.style.background = checkOccurrenceHasMessages(occ) ? '#fde68a' : '#f1f5f9';
+                                e.currentTarget.style.color = checkOccurrenceHasMessages(occ) ? '#d97706' : '#1e293b';
                               }}
                               onMouseOut={e => {
-                                e.currentTarget.style.background = occ.id && occurrencesWithMessages.includes(occ.id) ? '#fef3c7' : '#ffffff';
-                                e.currentTarget.style.color = occ.id && occurrencesWithMessages.includes(occ.id) ? '#d97706' : '#475569';
+                                e.currentTarget.style.background = checkOccurrenceHasMessages(occ) ? '#fef3c7' : '#ffffff';
+                                e.currentTarget.style.color = checkOccurrenceHasMessages(occ) ? '#d97706' : '#475569';
                               }}
                             >
-                              <MessageSquare size={14} fill={occ.id && occurrencesWithMessages.includes(occ.id) ? 'currentColor' : 'none'} />
+                              <MessageSquare size={14} fill={checkOccurrenceHasMessages(occ) ? 'currentColor' : 'none'} />
                             </button>
                           </div>
                         );

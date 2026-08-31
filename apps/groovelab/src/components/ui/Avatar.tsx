@@ -8,15 +8,17 @@ export interface AvatarProps {
   alt: string;
   size?: 'sm' | 'md' | 'lg';
   className?: string;
+  isHero?: boolean;
 }
 
-export const Avatar: React.FC<AvatarProps> = ({
+export const Avatar: React.FC<AvatarProps> = React.memo(({
   role,
   currentModule,
   src,
   alt,
   size = 'md',
   className = '',
+  isHero = false,
 }) => {
   const sizeClasses = {
     sm: 'w-8 h-8 text-xs',
@@ -24,9 +26,7 @@ export const Avatar: React.FC<AvatarProps> = ({
     lg: 'w-16 h-16 text-lg',
   };
 
-  // Rule: Admin & Secretary MUST use briefing board image /campus_login_hero.png
   const isVerwaltungUser = role === 'admin' || role === 'secretary';
-  // Rule: Musician avatars only allowed for teacher & student in groovelab module
   const allowMusicianAvatar = (role === 'teacher' || role === 'student') && currentModule === 'groovelab';
 
   let finalSrc = src;
@@ -37,14 +37,28 @@ export const Avatar: React.FC<AvatarProps> = ({
   }
 
   return (
-    <div className={`relative inline-block rounded-full overflow-hidden border border-gray-200 ${sizeClasses[size]} ${className}`}>
+    <div 
+      className={`relative inline-block rounded-full overflow-hidden border border-gray-200 ${sizeClasses[size]} ${className}`}
+      role="img"
+      aria-label={alt}
+    >
       {finalSrc ? (
-        <img src={finalSrc} alt={alt} className="w-full h-full object-cover" />
+        <img 
+          src={finalSrc} 
+          alt={alt} 
+          className="w-full h-full object-cover"
+          loading={isHero ? "eager" : "lazy"}
+          decoding={isHero ? "sync" : "async"}
+          {...(isHero ? { fetchPriority: 'high' } : {})}
+        />
       ) : (
-        <div className="w-full h-full bg-gray-300 flex items-center justify-center font-bold text-gray-700">
+        <div 
+          className="w-full h-full bg-gray-300 flex items-center justify-center font-bold text-gray-700"
+          aria-hidden="true"
+        >
           {alt.substring(0, 2).toUpperCase()}
         </div>
       )}
     </div>
   );
-};
+});

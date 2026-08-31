@@ -473,7 +473,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
       )}
 
       {/* Horizontal Scrollable Bottom Navigation Bar (All Menu Items in One Single Row) */}
-      <nav className="cg-mobile-bottom-nav">
+      <nav className="cg-mobile-bottom-nav" role="navigation" aria-label="Hauptnavigation Unten">
         {menuItems.map(item => {
           const TabIcon = item.icon;
           const isActive = activeTab === item.id || 

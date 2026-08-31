@@ -4225,6 +4225,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             <img 
               src="/campus_login_hero.png" 
               alt="Campus Chalk Illustration"
+              fetchPriority="high"
+              decoding="sync"
 
               style={{
                 width: '100%',

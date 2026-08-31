@@ -1,13 +1,15 @@
 import React from 'react';
+import { cn } from '../../utils/cn';
 
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: 'primary' | 'secondary' | 'danger' | 'ghost' | 'outline';
   moduleTheme?: 'admin' | 'campus' | 'groovelab';
   size?: 'sm' | 'md' | 'lg';
   isLoading?: boolean;
+  'aria-label'?: string;
 }
 
-export const Button: React.FC<ButtonProps> = ({
+export const Button: React.FC<ButtonProps> = React.memo(({
   children,
   variant = 'primary',
   moduleTheme,
@@ -15,6 +17,7 @@ export const Button: React.FC<ButtonProps> = ({
   isLoading = false,
   className = '',
   disabled,
+  'aria-label': ariaLabel,
   ...props
 }) => {
   const getThemeClass = (): string => {
@@ -40,11 +43,15 @@ export const Button: React.FC<ButtonProps> = ({
   return (
     <button
       disabled={disabled || isLoading}
-      className={`inline-flex items-center justify-center font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 ${sizeClasses[size]} ${getThemeClass()} ${className}`}
+      className={cn('inline-flex items-center justify-center font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50', sizeClasses[size], getThemeClass(), className)}
+      aria-label={ariaLabel || (typeof children === 'string' ? children : undefined)}
+      aria-busy={isLoading}
+      aria-disabled={disabled || isLoading}
+      role="button"
       {...props}
     >
-      {isLoading ? <span className="animate-spin mr-2">⏳</span> : null}
+      {isLoading ? <span className="animate-spin mr-2" aria-hidden="true">⏳</span> : null}
       {children}
     </button>
   );
-};
+});

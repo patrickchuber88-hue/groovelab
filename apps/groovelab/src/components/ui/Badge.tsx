@@ -7,7 +7,7 @@ export interface BadgeProps {
   className?: string;
 }
 
-export const Badge: React.FC<BadgeProps> = ({
+export const Badge: React.FC<BadgeProps> = React.memo(({
   children,
   variant = 'default',
   moduleTheme,
@@ -39,4 +39,4 @@ export const Badge: React.FC<BadgeProps> = ({
       {children}
     </span>
   );
-};
+});

@@ -91,7 +91,7 @@ export const MobileTopHeader: React.FC<MobileTopHeaderProps> = ({
   };
 
   return (
-    <header
+    <header role="banner" aria-label="Hauptnavigation Oben"
       className="cg-mobile-top-header"
       style={{
         position: 'sticky',

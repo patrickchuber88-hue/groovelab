@@ -12,6 +12,18 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 // Custom fetch wrapper to handle transient network errors and bypass CORS preflight issues
 const customFetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+  if (!init) init = {};
+  
+  // Only include credentials on same-origin requests (e.g. production BFF /api/db)
+  // to prevent browser CORS errors with Access-Control-Allow-Origin: * on localhost.
+  const isSameOrigin = typeof window !== 'undefined' && (
+    (typeof input === 'string' && (input.startsWith('/') || input.startsWith(window.location.origin))) ||
+    (input instanceof URL && input.origin === window.location.origin)
+  );
+  if (isSameOrigin) {
+    init.credentials = 'include';
+  }
+
   // Convert headers to a plain record object to avoid Headers class serialization issues in some browsers
   const rawHeaders: Record<string, string> = {};
   if (init?.headers) {
@@ -211,18 +223,22 @@ const customAuthLock = async (name: string, _acquireTimeout: number, fn: () => P
   return next;
 };
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  global: {
-    fetch: customFetch
-  },
-  auth: {
-    lock: customAuthLock,
-    storage: typeof window !== 'undefined' ? window.sessionStorage : undefined,
-    storageKey: 'groovelab-auth-token',
-    autoRefreshToken: true,
-    persistSession: true,
+export const supabase = createClient(
+  supabaseUrl, 
+  supabaseAnonKey, 
+  {
+    global: {
+      fetch: customFetch
+    },
+    auth: {
+      // 🔒 BANKING GOLDSTANDARD: 
+      // Der Browser weiß nichts mehr von JWTs. Das Token liegt unsichtbar als HttpOnly-Cookie im Hintergrund.
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+    }
   }
-});
+);
 
 /**
  * Helper to physically and fully delete all storage assets associated with users (e.g. custom avatars and homework audio files)
