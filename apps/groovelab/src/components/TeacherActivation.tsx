@@ -112,12 +112,19 @@ export function TeacherActivation({ onSuccess }: TeacherActivationProps) {
         .update({
           is_active: true,
           is_campus_active: true,
-          status: 'active',
-          master_admin_password: password // Store PIN/password securely in master_admin_password
+          status: 'active'
         })
         .eq('id', activatedTeacherId);
 
       if (updateError) throw updateError;
+
+      // Store PIN securely hashed in backend private_auth
+      if (password) {
+        await supabase.rpc('set_personal_pin', {
+          p_user_id: activatedTeacherId,
+          p_new_pin: password
+        });
+      }
 
       setStep('success');
     } catch (err: any) {

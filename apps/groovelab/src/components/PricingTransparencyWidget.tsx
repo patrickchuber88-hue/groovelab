@@ -121,7 +121,7 @@ export const PricingTransparencyWidget: React.FC<PricingTransparencyWidgetProps>
             {fmt(currentRates.priceStudent)} <span style={{ fontSize: '0.76rem', fontWeight: 600, color: '#64748b' }}>/ aktiv. Schüler / Mo.</span>
           </div>
           <div style={{ fontSize: '0.72rem', color: '#475569', lineHeight: 1.4 }}>
-            Nur tatsächlich eingeloggte Schüler werden berechnet. Auto-Passivierung nach 2 Monaten Inaktivität.
+            Nur tatsächlich eingeloggte Schüler werden berechnet. Automatische Deaktivierung bei Inaktivität (über 2 Monate).
           </div>
         </div>
       </div>

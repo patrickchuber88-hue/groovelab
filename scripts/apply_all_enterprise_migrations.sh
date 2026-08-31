@@ -47,6 +47,8 @@ scp supabase/migrations/297_tier1_enterprise_goldstandard_security.sql \
     supabase/migrations/319_fix_audit_log_hash_chain_columns.sql \
     supabase/migrations/320_tier1_goldstandard_optimizations.sql \
     supabase/migrations/321_safe_pgp_sym_decrypt_and_resilient_users_view.sql \
+    supabase/migrations/322_enterprise_comprehensive_rls_suite.sql \
+    supabase/migrations/323_enterprise_physical_secret_purge_and_zero_knowledge_auth.sql \
     "$SERVER:$REMOTE_TEMP/"
 
 # 4. Führe Migrationen nacheinander in supabase-db aus
@@ -125,15 +127,21 @@ ssh "$SERVER" "docker exec -i supabase-db psql -U postgres postgres < $REMOTE_TE
 echo "⚡ Führe Migration 321 aus (Safe PGP Decryption & Resilient Users View)..."
 ssh "$SERVER" "docker exec -i supabase-db psql -U postgres postgres < $REMOTE_TEMP/321_safe_pgp_sym_decrypt_and_resilient_users_view.sql"
 
+echo "⚡ Führe Migration 322 aus (Tier-1 Enterprise Comprehensive RLS Suite)..."
+ssh "$SERVER" "docker exec -i supabase-db psql -U postgres postgres < $REMOTE_TEMP/322_enterprise_comprehensive_rls_suite.sql"
+
+echo "⚡ Führe Migration 323 aus (Tier-1 Enterprise Physical Secret Purge & Zero-Knowledge IAM)..."
+ssh "$SERVER" "docker exec -i supabase-db psql -U postgres postgres < $REMOTE_TEMP/323_enterprise_physical_secret_purge_and_zero_knowledge_auth.sql"
+
 echo "🧹 Bereinige temporäre Migrationsdateien..."
 ssh "$SERVER" "rm -rf $REMOTE_TEMP"
 
 echo ""
-echo "✅ Alle 25 Enterprise-Migrationen erfolgreich und fehlerfrei auf dem Produktiv-Container angewendet!"
+echo "✅ Alle 27 Enterprise-Migrationen (297-323) erfolgreich und fehlerfrei auf dem Produktiv-Container angewendet!"
 ssh "$SERVER" "docker exec -t supabase-db psql -U postgres postgres -c \"NOTIFY pgrst, 'reload schema';\""
 
 # 6. Aufräumen
 ssh "$SERVER" "rm -rf $REMOTE_TEMP"
 
 echo ""
-echo "✅ Alle Enterprise Sicherheitsmigrationen (297-321) erfolgreich auf Live-Datenbank angewendet!"
+echo "✅ Alle Enterprise Sicherheitsmigrationen (297-323) erfolgreich auf Live-Datenbank angewendet!"

@@ -49,7 +49,7 @@ export const LEGAL_MASTER_WORDING = {
 
   // 3. Service- & Betreuungsgebühren
   fees: {
-    staffServiceFee: 'Service- & Administrationspauschale: 0,49 € / Mo. (DE/AT) bzw. CHF 0.80 / Mo. (CH) je aktive Lehrkraft (Verwaltung & Schulleitung 0,00 € / CHF 0.00 inklusive)',
+    staffServiceFee: 'Service- & Administrationspauschale: 0,49 € / Mo. (DE/AT) bzw. CHF 1.00 / Mo. (CH) je aktive Lehrkraft (Verwaltung & Schulleitung 0,00 € / CHF 0.00 inklusive)',
     studentBaseFee: 'Basis-Bereitstellung: 0,09 € / Mo. (DE/AT) bzw. CHF 0.20 / Mo. (CH) je Schüler (QR-Landingpage, Stundenplan & DSGVO/nDSG-Hosting)',
     studentCampusFee: 'Cloud- & Modul-Bereitstellung Campus: 0,49 € / Mo. (DE/AT) bzw. CHF 1.00 / Mo. (CH) je aktiver Schüler',
     studentGroovelabFee: 'Cloud- & Modul-Bereitstellung GrooveLab: 0,49 € / Mo. (DE/AT) bzw. CHF 1.00 / Mo. (CH) je aktiver Schüler (immer 100% von der Schule übernommen)',

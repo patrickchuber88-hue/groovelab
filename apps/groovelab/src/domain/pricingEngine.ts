@@ -32,7 +32,7 @@ export const MASTER_CURRENCY_RATES: Record<CurrencyCode, CurrencyPricingRates> =
     priceCampus: 19.90,
     priceGroovelab: 14.90,
     priceKombi: 29.90,
-    priceTeacher: 0.80,
+    priceTeacher: 1.00,
     priceStudent: 1.00,
     pricePassiveStudent: 0.20,
     priceStorageAddon: 2.90,

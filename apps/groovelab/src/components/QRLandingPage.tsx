@@ -1334,25 +1334,34 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         let hasCampusSub = false;
         let hasGroovelabSub = false;
         let isTrial = false;
+        let isBypassActive = false;
+
         if (userData.school_id) {
           const { data: schDetails } = await supabase
             .from('schools')
-            .select('name, has_campus_subscription, has_groovelab_subscription, is_trial, opening_hours, student_billing_option, contract_start_date, street, zip_code, city, logo_url, primary_color')
+            .select('name, has_campus_subscription, has_groovelab_subscription, is_trial, opening_hours, student_billing_option, contract_start_date, street, zip_code, city, logo_url, primary_color, subscription_bypass, status, is_billing_booked')
             .eq('id', userData.school_id)
             .single();
           if (schDetails) {
             schoolName = schDetails.name;
-            hasCampusSub = schDetails.has_campus_subscription ?? false;
-            hasGroovelabSub = schDetails.has_groovelab_subscription ?? false;
-            isTrial = schDetails.is_trial ?? false;
+            const isBypass = Boolean((schDetails as any).subscription_bypass);
+            const isUnbooked = (schDetails as any).is_billing_booked === false;
+            const isActiveStatus = (schDetails as any).status === 'active' || (schDetails as any).status === 'trial' || (schDetails as any).status === 'bypass';
+            
+            hasCampusSub = schDetails.has_campus_subscription ?? (isBypass || isUnbooked || isActiveStatus);
+            hasGroovelabSub = schDetails.has_groovelab_subscription ?? (isBypass || isUnbooked || isActiveStatus);
+            isTrial = Boolean(schDetails.is_trial) || isBypass || isUnbooked;
+            isBypassActive = isBypass || isUnbooked || isActiveStatus;
+            
             setSchoolData(schDetails);
             setSchoolFokusLevels(schDetails.opening_hours?.fokus_levels || null);
           }
         }
 
         const isStaff = userData.role === 'admin' || userData.role === 'teacher' || userData.role === 'secretary' || (Array.isArray(userData.roles) && (userData.roles.includes('admin') || userData.roles.includes('teacher') || userData.roles.includes('secretary')));
+        const isLocalDev = (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) || import.meta.env.DEV;
 
-        if (!hasCampusSub && !hasGroovelabSub && !isTrial && !isStaff) {
+        if (!hasCampusSub && !hasGroovelabSub && !isTrial && !isStaff && !isBypassActive && !isLocalDev) {
           setErrorMsg('Der Zugang für diese Musikschule ist aktuell nicht aktiv (Setup-Modus).');
           setPageState('error');
           return;

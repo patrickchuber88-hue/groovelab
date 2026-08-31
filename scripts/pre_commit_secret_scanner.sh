@@ -4,9 +4,10 @@
 # OWASP ASVS Level 3 Automated Secret & High-Entropy Token Linter
 # ==============================================================================
 
-set -e
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$REPO_ROOT"
 
-echo "🔍 Führe automatisierten Pre-Commit Secret-Scan durch..."
+echo "🔍 Führe automatisierten Pre-Commit Secret-Scan durch (Root: $REPO_ROOT)..."
 
 # List of files staged for commit, or all files in tracking if running standalone
 if [ "$1" == "--all" ]; then

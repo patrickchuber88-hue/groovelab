@@ -7799,8 +7799,10 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       effectiveAvatar.xp = metrics.totalXp;
       effectiveAvatar.streak_flame = metrics.streakFlame;
 
-      if (!avatarRecord && user.is_app_user) {
+      if (!avatarRecord && user.is_app_user && currentPlatform === 'groovelab') {
         setShowSelector(true);
+      } else {
+        setShowSelector(false);
       }
       setAvatar(effectiveAvatar);
 
@@ -8430,30 +8432,39 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     );
   }
 
-  // WENN IS_APP_USER = TRUE (Selector Screen if no avatar chosen yet)
-  if (showSelector) {
+  // WENN IS_APP_USER = TRUE (Selector Screen if no avatar chosen yet in GrooveLab)
+  if (showSelector && currentPlatform === 'groovelab') {
     return (
-      <div className="max-w-xl mx-auto bg-slate-900/40 border border-slate-800/80 backdrop-blur-xl rounded-3xl p-6 sm:p-8 shadow-2xl animate-fadeIn">
-        <div className="text-center mb-6">
-          <Sparkles className="h-8 w-8 text-indigo-500 mx-auto mb-2" />
-          <h3 className="text-2xl font-black text-white tracking-tight">Wähle deinen Helden!</h3>
-          <p className="text-sm text-slate-400 mt-1">Welche Musiker-Klasse passt zu dir? Du kannst sofort XP sammeln.</p>
+      <div style={{ maxWidth: '640px', margin: '40px auto', background: 'rgba(15, 23, 42, 0.85)', border: '1.5px solid rgba(51, 65, 85, 0.8)', backdropFilter: 'blur(20px)', borderRadius: '24px', padding: '32px', boxShadow: '0 20px 40px rgba(0, 0, 0, 0.5)', boxSizing: 'border-box' }}>
+        <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+          <Sparkles size={32} color="#eab308" style={{ margin: '0 auto 8px auto' }} />
+          <h3 style={{ fontSize: '1.5rem', fontWeight: 900, color: '#ffffff', letterSpacing: '-0.02em', margin: '0 0 4px 0' }}>Wähle deinen Helden!</h3>
+          <p style={{ fontSize: '0.85rem', color: '#94a3b8', margin: 0 }}>Welche Musiker-Klasse passt zu dir? Du kannst sofort XP sammeln.</p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px' }}>
           {HERO_CLASSES.map(hc => (
             <button
               key={hc.id}
               onClick={() => handleSelectHero(hc.id)}
               disabled={submittingSelection}
-              className="p-5 bg-slate-950/60 hover:bg-indigo-950/30 border border-slate-800 hover:border-indigo-500 rounded-2xl text-left transition-all duration-200 group cursor-pointer"
+              style={{
+                padding: '18px',
+                background: 'rgba(2, 6, 23, 0.8)',
+                border: '1.5px solid rgba(51, 65, 85, 0.8)',
+                borderRadius: '16px',
+                textAlign: 'left',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '14px'
+              }}
             >
-              <div className="flex items-center gap-3">
-                <span className="text-3xl bg-slate-900 p-2.5 rounded-xl group-hover:scale-110 transition-transform" style={{ filter: 'grayscale(100%)' }}>{hc.icon}</span>
-                <div>
-                  <span className="block font-extrabold text-white text-base group-hover:text-indigo-400 transition-all">{hc.name}</span>
-                  <span className="block text-xs text-slate-400 font-semibold mt-1 leading-relaxed">{hc.desc}</span>
-                </div>
+              <span style={{ fontSize: '1.8rem', background: '#0f172a', padding: '10px', borderRadius: '12px', filter: 'grayscale(100%)' }}>{hc.icon}</span>
+              <div>
+                <span style={{ display: 'block', fontWeight: 800, color: '#ffffff', fontSize: '0.95rem' }}>{hc.name}</span>
+                <span style={{ display: 'block', fontSize: '0.75rem', color: '#94a3b8', marginTop: '2px', lineHeight: 1.4 }}>{hc.desc}</span>
               </div>
             </button>
           ))}

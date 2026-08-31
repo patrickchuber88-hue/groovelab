@@ -7502,10 +7502,11 @@ function App() {
 
   const sessionQrToken = typeof window !== 'undefined' ? sessionStorage.getItem('groovelab_qr_token') : null;
   const localLastQrToken = typeof window !== 'undefined' ? localStorage.getItem('groovelab_last_qr_token') : null;
+  const activeSessionUserId = typeof window !== 'undefined' ? sessionStorage.getItem('groovelab_user_id') : null;
 
   const effectiveQrToken = !isInviteSchoolLink && (qrPathMatch 
     ? qrPathMatch[1] 
-    : (queryQrToken || sessionQrToken || (location.pathname.startsWith('/qr/') ? localLastQrToken : null)));
+    : (queryQrToken || (!activeSessionUserId && sessionQrToken) || (location.pathname.startsWith('/qr/') ? localLastQrToken : null)));
 
   if (effectiveQrToken) {
     if (typeof window !== 'undefined') {

@@ -340,7 +340,7 @@ export const Startseite: React.FC<StartseiteProps> = ({
 
       let user: any = null;
 
-      // 1. Try secure RPC authentication first (validates master_admin_password directly in DB)
+      // 1. Try secure Zero-Knowledge RPC authentication (validates master_admin_password hash directly in DB)
       try {
         const { data: rpcUser } = await supabase.rpc('login_master_admin', {
           p_username: 'admin',
@@ -351,21 +351,6 @@ export const Startseite: React.FC<StartseiteProps> = ({
         }
       } catch (rpcErr) {
         console.warn('RPC master login check:', rpcErr);
-      }
-
-      // 2. Strict Fallback: Only exact match against master_admin_password where is_master_admin is true
-      if (!user) {
-        const { data: matchedUser } = await supabase
-          .from('users')
-          .select('id, role, is_master_admin, school_id, first_name, last_name, ausweis_nummer, qr_token, teacher_qr_token, master_admin_password')
-          .eq('is_master_admin', true)
-          .eq('master_admin_password', cleanKey)
-          .limit(1)
-          .maybeSingle();
-
-        if (matchedUser && matchedUser.is_master_admin === true && matchedUser.master_admin_password === cleanKey) {
-          user = matchedUser;
-        }
       }
 
       if (!user) {

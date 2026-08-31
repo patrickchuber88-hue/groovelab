@@ -1,5 +1,5 @@
 -- ==============================================================================
--- Migration 316: Dev Bypass School Users Resolver (Localhost / Testing Only)
+-- Migration 324: Dev Bypass School Users Resolver (Prioritize Linus for Student)
 -- Scope: Returns safe user summaries (id, name, role) per school for Dev Bypass
 -- Standard: Zero-Trust & No PII/Secret exposure
 -- ==============================================================================

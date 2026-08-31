@@ -3761,16 +3761,61 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         const { data: res, error } = await supabase
           .rpc('get_dev_bypass_users_for_school', { p_school_id: targetSchoolId });
 
+        let resolvedStudent = res?.student || undefined;
+
+        // Ensure student bypass prioritizes Linus
+        if (!resolvedStudent || !resolvedStudent.name.toLowerCase().includes('linus')) {
+          try {
+            let { data: linusUsers } = await supabase
+              .from('users')
+              .select('id, role, school_id, first_name, last_name')
+              .eq('school_id', targetSchoolId)
+              .eq('role', 'student')
+              .ilike('first_name', '%linus%')
+              .limit(1);
+
+            if (!linusUsers || linusUsers.length === 0) {
+              const { data: globalLinus } = await supabase
+                .from('users')
+                .select('id, role, school_id, first_name, last_name')
+                .eq('role', 'student')
+                .ilike('first_name', '%linus%')
+                .limit(1);
+              if (globalLinus && globalLinus.length > 0) {
+                linusUsers = globalLinus;
+              }
+            }
+
+            if (linusUsers && linusUsers.length > 0) {
+              const l = linusUsers[0];
+              resolvedStudent = {
+                id: l.id,
+                name: `${l.first_name || ''} ${l.last_name || ''}`.trim(),
+                role: l.role,
+                school_id: l.school_id
+              };
+            }
+          } catch (eLinus) {
+            console.warn('[Bypass] Error prioritizing Linus user:', eLinus);
+          }
+        }
+
         if (res && !error) {
           setBypassUserCounts({
             hasAdmin: Boolean(res.admin?.id),
             hasTeacher: Boolean(res.teacher?.id),
-            hasStudent: Boolean(res.student?.id),
+            hasStudent: Boolean(resolvedStudent?.id || res.student?.id),
             adminUser: res.admin || undefined,
             teacherUser: res.teacher || undefined,
-            studentUser: res.student || undefined,
+            studentUser: resolvedStudent || res.student || undefined,
             schoolName: res.school_name || schoolData?.name || 'Musikschule'
           });
+        } else if (resolvedStudent) {
+          setBypassUserCounts(prev => ({
+            ...prev,
+            hasStudent: true,
+            studentUser: resolvedStudent
+          }));
         }
       } catch (e) {
         console.warn('[Bypass counts error]:', e);
@@ -6976,6 +7021,11 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 sessionStorage.setItem('groovelab_active_platform', 'campus');
                 sessionStorage.setItem('groovelab_user_id', targetId);
                 sessionStorage.removeItem('groovelab_qr_token');
+                localStorage.removeItem('groovelab_last_qr_token');
+                localStorage.removeItem('groovelab_qr_token');
+                if (typeof window !== 'undefined' && window.location.pathname.startsWith('/qr/')) {
+                  window.history.replaceState(null, '', '/');
+                }
                 onLogin(targetId, true);
               } catch (err: any) {
                 console.error('[Bypass] Error logging in as Master Admin:', err);
@@ -7017,6 +7067,11 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                   sessionStorage.setItem('campus_active_tab', 'briefing');
                   sessionStorage.setItem('groovelab_user_id', targetUser.id);
                   sessionStorage.removeItem('groovelab_qr_token');
+                  localStorage.removeItem('groovelab_last_qr_token');
+                  localStorage.removeItem('groovelab_qr_token');
+                  if (typeof window !== 'undefined' && window.location.pathname.startsWith('/qr/')) {
+                    window.history.replaceState(null, '', '/');
+                  }
                   onLogin(targetUser.id, true);
                 } catch (err: any) {
                   console.error('[Bypass] Error logging in as Verwaltung:', err);
@@ -7058,6 +7113,11 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                   sessionStorage.setItem('campus_active_tab', 'live');
                   sessionStorage.setItem('groovelab_user_id', targetUser.id);
                   sessionStorage.removeItem('groovelab_qr_token');
+                  localStorage.removeItem('groovelab_last_qr_token');
+                  localStorage.removeItem('groovelab_qr_token');
+                  if (typeof window !== 'undefined' && window.location.pathname.startsWith('/qr/')) {
+                    window.history.replaceState(null, '', '/');
+                  }
                   onLogin(targetUser.id, true);
                 } catch (err: any) {
                   console.error('[Bypass] Error logging in as Lehrer:', err);
@@ -7089,7 +7149,28 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               type="button"
               onClick={async () => {
                 try {
-                  const targetUser = bypassUserCounts.studentUser!;
+                  let targetUser = bypassUserCounts.studentUser!;
+                  if (!targetUser.name.toLowerCase().includes('linus')) {
+                    try {
+                      let { data: linusUsers } = await supabase
+                        .from('users')
+                        .select('id, role, school_id, first_name, last_name')
+                        .eq('role', 'student')
+                        .ilike('first_name', '%linus%')
+                        .limit(1);
+                      if (linusUsers && linusUsers.length > 0) {
+                        const l = linusUsers[0];
+                        targetUser = {
+                          id: l.id,
+                          name: `${l.first_name || ''} ${l.last_name || ''}`.trim(),
+                          role: l.role,
+                          school_id: l.school_id
+                        };
+                      }
+                    } catch (e) {
+                      // ignore
+                    }
+                  }
                   console.log('[Bypass] Logging in as Schüler:', targetUser.name);
                   sessionStorage.removeItem('groovelab_is_master_admin');
                   localStorage.removeItem('groovelab_is_master_admin');
@@ -7101,6 +7182,11 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                   sessionStorage.setItem('groovelab_location_mode', 'home');
                   sessionStorage.setItem('groovelab_user_id', targetUser.id);
                   sessionStorage.removeItem('groovelab_qr_token');
+                  localStorage.removeItem('groovelab_last_qr_token');
+                  localStorage.removeItem('groovelab_qr_token');
+                  if (typeof window !== 'undefined' && window.location.pathname.startsWith('/qr/')) {
+                    window.history.replaceState(null, '', '/');
+                  }
                   onLogin(targetUser.id, true);
                 } catch (err: any) {
                   console.error('[Bypass] Error logging in as Schüler:', err);
