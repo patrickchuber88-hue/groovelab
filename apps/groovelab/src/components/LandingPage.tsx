@@ -1087,7 +1087,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
               lineHeight: 1.6,
               marginBottom: '32px'
             }}>
-              Wir überlassen Datenschutz nicht dem Zufall. Weil Campus-Groovelab sich als Add-on versteht, speichern wir nur das absolute Minimum an Nutzerdaten – keine Bankverbindungen, keine Wohnadressen. Dieser minimale Daten-Fußabdruck ermöglicht uns innovative Interaktionsfeatures, die klassische, überladene Administrationssoftwares aus Datenschutzgründen gar nicht erst umsetzen dürfen.
+              Wir überlassen Datenschutz nicht dem Zufall. Weil Campus-Groovelab als fokussierte pädagogische Praxis-Plattform konzipiert ist, verarbeiten wir nur das absolute Minimum an Daten – keine Kinder-Mails, keine Bankverbindungen, keine Wohnadressen. Dieser minimale Daten-Fußabdruck ermöglicht uns innovative Interaktionsfeatures, die klassische, überladene Administrationssoftwares aus Datenschutzgründen gar nicht erst umsetzen dürfen.
             </p>
 
             <div style={{
@@ -1098,27 +1098,33 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
               marginBottom: '32px'
             }}>
               <div>
-                <h4 style={{ fontSize: '15px', fontWeight: 800, color: '#ffffff', marginBottom: '4px' }}>🛡️ Hermetische Datenisolation</h4>
+                <h4 style={{ fontSize: '15px', fontWeight: 800, color: '#ffffff', marginBottom: '4px' }}>🛡️ Hermetische Datenisolation (PostgreSQL RLS)</h4>
                 <p style={{ fontSize: '13.5px', color: '#a1a1aa', lineHeight: 1.5 }}>
-                  Schüler- und Lehrerdaten sind durch PostgreSQL Row-Level Security (RLS) im Datenbankkern isoliert. Abfragen werden direkt auf Datenbankebene validiert – Datenlecks durch Anwendungsfehler sind technisch ausgeschlossen.
+                  Schüler- und Lehrerdaten sind durch Row-Level Security direkt im Datenbankkern isoliert. Datenabfragen werden auf Kernel-Ebene validiert – Datenlecks durch Anwendungsfehler sind technisch ausgeschlossen.
                 </p>
               </div>
               <div>
-                <h4 style={{ fontSize: '15px', fontWeight: 800, color: '#ffffff', marginBottom: '4px' }}>🎫 Kryptografische QR-Logins</h4>
+                <h4 style={{ fontSize: '15px', fontWeight: 800, color: '#ffffff', marginBottom: '4px' }}>🎫 Zero-Mail &amp; Kryptografische Ausweise</h4>
                 <p style={{ fontSize: '13.5px', color: '#a1a1aa', lineHeight: 1.5 }}>
-                  Der Schülerausweis enthält keine Klartext-Personendaten. Der QR-Code codiert ein zufälliges kryptografisches Token (UUIDv4) – für Fremde absolut bedeutungslos (DSGVO-konforme Pseudonymisierung).
+                  Der Schülerausweis enthält keine Klartext-Personendaten. Der QR-Code codiert ein zufälliges kryptografisches Token (UUIDv4) – für Fremde absolut unlesbar (DSGVO-konforme Pseudonymisierung ohne Passwörter für Kinder).
                 </p>
               </div>
               <div>
-                <h4 style={{ fontSize: '15px', fontWeight: 800, color: '#ffffff', marginBottom: '4px' }}>🔐 1-Klick-Entwertung</h4>
+                <h4 style={{ fontSize: '15px', fontWeight: 800, color: '#ffffff', marginBottom: '4px' }}>🔐 1-Klick-Sperrung &amp; Session-Revocation</h4>
                 <p style={{ fontSize: '13.5px', color: '#a1a1aa', lineHeight: 1.5 }}>
-                  Geht ein Ausweis verloren, sperrst und regenerierst du das Token im Admin-Bereich mit nur einem Klick – ohne Passwörter oder Schülerprofile ändern zu müssen.
+                  Geht ein Ausweis verloren, sperrst und regenerierst du das Token im Admin-Bereich mit nur 1 Klick – ohne Passwörter oder Schülerprofile ändern zu müssen.
                 </p>
               </div>
               <div>
-                <h4 style={{ fontSize: '15px', fontWeight: 800, color: '#ffffff', marginBottom: '4px' }}>🔒 Modul-Kapselung vor Ort</h4>
+                <h4 style={{ fontSize: '15px', fontWeight: 800, color: '#ffffff', marginBottom: '4px' }}>🔒 Modul-Kapselung auf Schul-Geräten</h4>
                 <p style={{ fontSize: '13.5px', color: '#a1a1aa', lineHeight: 1.5 }}>
-                  Auf gemeinsam genutzten Schul-iPads sperrt die App den Campus-Bereich automatisch ab. Der Wechsel dorthin erfordert eine kurze QR-Scan-Bestätigung des Schülers.
+                  Auf gemeinsam genutzten Schul-iPads sperrt die App den Campus-Bereich automatisch ab. Der Wechsel dorthin erfordert eine kurze Bestätigung der Lehrkraft.
+                </p>
+              </div>
+              <div>
+                <h4 style={{ fontSize: '15px', fontWeight: 800, color: '#ffffff', marginBottom: '4px' }}>🗄️ Audio-Tresor &amp; Physische Sofort-Löschung</h4>
+                <p style={{ fontSize: '13.5px', color: '#a1a1aa', lineHeight: 1.5 }}>
+                  Schüler-Aufnahmen und Übetracks werden auf ISO 27001 zertifizierten deutschen Servern AES-256 verschlüsselt gespeichert. Bei Löschung greift die physische Sofort-Vernichtung (Recht auf Vergessenwerden nach Art. 17 DSGVO).
                 </p>
               </div>
             </div>
@@ -1140,7 +1146,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                 }}>
                   <ShieldCheck size={18} style={{ color: '#eab308' }} />
                 </div>
-                <span style={{ fontSize: '15px', fontWeight: 600 }}>100% DSGVO-konformes Hosting in Europa</span>
+                <span style={{ fontSize: '15px', fontWeight: 600 }}>100% deutsches Hosting in ISO 27001 Rechenzentren</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <div style={{
@@ -1154,7 +1160,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                 }}>
                   <ShieldCheck size={18} style={{ color: '#eab308' }} />
                 </div>
-                <span style={{ fontSize: '15px', fontWeight: 600 }}>Echtzeit-Datenisolation via Row-Level Security</span>
+                <span style={{ fontSize: '15px', fontWeight: 600 }}>Token-Isolation &amp; JWE-Verschlüsselung via BFF-Gateway</span>
               </div>
 
               <div 
@@ -1177,7 +1183,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                 }}
                 className="hover-scale"
               >
-                <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><ShieldCheck size={16} color="#ffffff" /> 18 von 18 Sicherheits-Stufen erfüllt</span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><ShieldCheck size={16} color="#ffffff" /> 20 von 20 Sicherheits-Stufen erfüllt</span>
                 <span style={{ 
                   background: '#34a853', 
                   color: 'white', 
