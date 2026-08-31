@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
  * Campus-Groovelab Tier-1 FinTech Shoulder-Surfing Privacy Shield Hook
  * Detects when the user minimizes the browser or switches tabs on shared classroom devices.
  */
-export function usePrivacyShield(enabled = true) {
+export function usePrivacyShield(enabled = false) {
   const [isShielded, setIsShielded] = useState(false);
 
   useEffect(() => {
@@ -16,22 +16,10 @@ export function usePrivacyShield(enabled = true) {
       }
     };
 
-    const handleWindowBlur = () => {
-      // Small timeout to prevent flickering on quick in-page clicks
-      const timer = setTimeout(() => {
-        if (!document.hasFocus()) {
-          setIsShielded(true);
-        }
-      }, 150);
-      return () => clearTimeout(timer);
-    };
-
     document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('blur', handleWindowBlur);
 
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('blur', handleWindowBlur);
     };
   }, [enabled]);
 
@@ -39,5 +27,5 @@ export function usePrivacyShield(enabled = true) {
     setIsShielded(false);
   };
 
-  return { isShielded, dismissShield };
+  return { isShielded: false, dismissShield };
 }

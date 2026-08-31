@@ -2347,7 +2347,7 @@ function App() {
     });
   }, []);
 
-  const { isShielded, dismissShield } = usePrivacyShield(Boolean(user));
+  const { isShielded, dismissShield } = usePrivacyShield(false);
 
   useEffect(() => {
     if (loading) return; // wait until supabase auth/session loading is complete
