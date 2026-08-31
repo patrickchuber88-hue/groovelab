@@ -367,7 +367,7 @@ export const AVVModal: React.FC<AVVModalProps> = ({ isOpen, onClose, school, onA
             <br />
             2. <strong>Proaktiver Silent Refresh &amp; Anti-CSRF Origin-Guard:</strong> Automatisierte Token-Rotation ohne Unterrichtsunterbrechung, striktes Fail-Closed Filtering mittels browser-nativem <code style={{ background: '#f1f5f9', padding: '1px 5px', borderRadius: '4px' }}>Sec-Fetch-Site</code> und Host-Header-Poisoning-Schutz.
             <br />
-            3. <strong>PostgreSQL FORCE Row-Level Security (RLS):</strong> Kernel-erzwungene Mandantentrennung auf allen 97 Datenbanktabellen mit transaktional isoliertem Mandantenkontext (<code style={{ background: '#f1f5f9', padding: '1px 5px', borderRadius: '4px' }}>is_local = true</code>) und automatisierter Vitest-Sicherheits-Gate-Testsuite.
+            3. <strong>PostgreSQL FORCE Row-Level Security (RLS):</strong> Kernel-erzwungene Mandantentrennung auf allen relationalen Datenbanktabellen mit transaktional isoliertem Mandantenkontext (<code style={{ background: '#f1f5f9', padding: '1px 5px', borderRadius: '4px' }}>is_local = true</code>) und automatisierter Vitest-Sicherheits-Gate-Testsuite.
             <br />
             4. <strong>Kryptografische Absicherung &amp; Passkeys:</strong> <strong>BSI- und OWASP-konformes PBKDF2 Zero-Knowledge Hashing (100.000 SHA-512 / SHA-256 Runden)</strong>, <strong>FIDO2 / WebAuthn Hardware-Passkeys mit Klon-Schutz</strong> und clientseitige <strong>AES-256-GCM Hardware-Vaults (Web Crypto API)</strong> für Offline-Caches.
             <br />

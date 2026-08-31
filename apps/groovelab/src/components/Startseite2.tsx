@@ -2215,42 +2215,44 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
                         sectionTitle: 'I. Art. 32 Abs. 1 lit. a DSGVO – Pseudonymisierung & Verschlüsselung',
                         sectionBadge: 'Kryptografie & Maskierung',
                         items: [
-                          { title: '1. Verschlüsselung in Transit & At-Rest', desc: 'TLS 1.3 Transport-Verschlüsselung mit HSTS. Datenbank- & Storage-Verschlüsselung im Ruhezustand nach AES-256.' },
-                          { title: '2. Strikte Datenminimierung (Privacy by Design)', desc: 'Es werden keine sensiblen Profildaten wie Schüler-E-Mails, Bank-/SEPA-Daten oder vollständige Geburtsdaten im System gespeichert. Daten werden bereits auf dem Endgerät minimiert.' },
-                          { title: '3. DSGVO-konforme Nachnamensmaskierung', desc: 'Standardmäßige Kürzung von Schülernamen auf „Max M.“ (Privacy by Default) gegen Schulterblick und unbefugtes Mitlesen im Unterricht.' },
-                          { title: '4. Zero-Knowledge Authentifizierung & PBKDF2 Hashing', desc: 'Authentifizierungs-Geheimnisse und PINs werden serverseitig mittels robustem PBKDF2/SHA-512 (100.000 Runden) mit dynamischem Salt irreversibel gehasht. Einmal-Aktivierungstoken verfallen nach der Erstanmeldung sofort und unwiderruflich.' },
-                          { title: '5. Lokale Zero-Cloud Biometrie- & Kameraverarbeitung', desc: 'Kamera-Feeds für QR-Logins und TouchID/FaceID-Passkeys verbleiben zu 100% lokal auf dem Endgerät des Nutzers.' }
+                          { title: '1. Verschlüsselung in Transit & At-Rest', desc: 'TLS 1.3 Transport-Verschlüsselung mit HSTS Preload. Datenbank- & Storage-Verschlüsselung im Ruhezustand nach AES-256.' },
+                          { title: '2. Backend-for-Frontend (BFF) Token-Isolation', desc: 'Alle Client-Anfragen laufen über ein geschütztes BFF-Gateway mit AES-256-GCM JWE-Cookies. Es befinden sich 0% Tokens im Browser-Speicher.' },
+                          { title: '3. Strikte Datenminimierung (Privacy by Design)', desc: 'Es werden keine sensiblen Profildaten wie Schüler-E-Mails, Bank-/SEPA-Daten oder Passwörter Minderjähriger im System verarbeitet.' },
+                          { title: '4. DSGVO-konforme Nachnamensmaskierung', desc: 'Standardmäßige Kürzung von Schülernamen auf „Max M.“ (Privacy by Default) gegen Schulterblick und unbefugtes Mitlesen im Unterricht.' },
+                          { title: '5. Zero-Knowledge Authentifizierung & PBKDF2', desc: 'Authentifizierungs-Geheimnisse und PINs werden serverseitig mittels PBKDF2/SHA-512 (100.000 Runden) gehasht. FIDO2 Passkeys mit Klon-Schutz.' }
                         ]
                       },
                       {
                         sectionTitle: 'II. Art. 32 Abs. 1 lit. b DSGVO – Vertraulichkeit & System-Integrität',
                         sectionBadge: 'Zugangskontrolle & Audit',
                         items: [
-                          { title: '6. Strikte Row-Level Security (RLS) & Physische Tabellentrennung', desc: 'Datenbankseitig erzwungene Mandantentrennung sowie physische Entkopplung von Vornamen, Nachnamen, Übe-Zeiten, Streaks und Kalenderdaten in getrennte Tabellen. Ein Kompromittieren einzelner Datenfelder gewährt keinerlei Zugriff auf zusammenhängende Profile.' },
-                          { title: '7. Brute-Force Lockout-Protection', desc: 'Automatische 15-minütige Sitzungssperre nach drei fehlerhaften PIN-Eingaben.' },
-                          { title: '8. Mikrofonschutz & Konfigurierbare Chat-Modi', desc: 'Sofortige Freigabe des Mikrofonzugriffs auf Betriebssystemebene beim Beenden von Modulen. Flexible Chat-Modi unterstützen wahlweise dauerhafte Schüler-Lehrer-Direktchats, Band- & lehrermoderierte Ensemble-Chats oder termingekoppelte Unterrichts-Chats mit 48h-Auto-Freeze nach Unterrichtsende.' },
-                          { title: '9. Zero-Trust Session-Leasing & Remote-Logout', desc: 'Sitzungen auf gemeinsam genutzten Schulgeräten können von der Schulleitung mit 1 Klick remote beendet werden; kein Verbleib von Zugangsdaten im Browser.' },
-                          { title: '10. Modul-Kapselung & Live-Lab 45m Session-Timeout', desc: 'Sichere Trennung zwischen Schul-Bandraum (GrooveLab) und Verwaltungs-App (Campus) auf gemeinsam genutzten iPads.' },
-                          { title: '11. Revisionssichere Append-Only WORM Audit-Logs', desc: 'Unmanipulierbare, schreibgeschützte Protokollierung aller administrativen Systemaktionen.' },
-                          { title: '12. Strikte Content Security Policy (CSP & XSS-Schutz)', desc: 'Web-Frontend lässt nur weiß gelistete Skripte zu und unterbindet XSS-Injections sowie unerlaubten Datenabfluss.' }
+                          { title: '6. Kernel-erzwungene PostgreSQL FORCE Row-Level Security (RLS)', desc: 'Datenbankseitig erzwungene Mandantentrennung auf allen relationalen Tabellen mit transaktional isoliertem Mandantenkontext (is_local = true).' },
+                          { title: '7. Anti-CSRF Origin Guard & SRI SHA-384', desc: 'Fail-Closed Sec-Fetch-Site Filtering, Host-Header-Schutz und kryptografische Subresource Integrity für alle Frontend-Dateien.' },
+                          { title: '8. Brute-Force & Credential-Stuffing Schutz', desc: 'Progressive Sitzungssperren und automatisiertes Throttling nach fehlerhaften Authentifizierungsversuchen.' },
+                          { title: '9. Hardware-Mikrofonschutz & Zero-Tracking', desc: 'Sofortige Freigabe des Mikrofonzugriffs auf Betriebssystemebene beim Beenden von Modulen (§ 201 StGB). 0% Fremd-Tracker, 100% lokale Schriften.' },
+                          { title: '10. Zero-Trust Session-Leasing & Remote-Logout', desc: 'Sitzungen auf gemeinsam genutzten Schulgeräten können von der Schulleitung mit 1 Klick remote beendet werden; kein Token-Verbleib im Browser.' }
                         ]
                       },
                       {
                         sectionTitle: 'III. Art. 32 Abs. 1 lit. c DSGVO – Verfügbarkeit & Belastbarkeit',
                         sectionBadge: 'Infrastruktur & Resilienz',
                         items: [
-                          { title: '13. Server-Standort 100% in Deutschland', desc: 'Betrieb in ISO 27001 zertifizierten deutschen Rechenzentren (Hetzner, Deutschland) – ohne US-Cloud-Subunternehmer (No CLOUD Act).' },
-                          { title: '14. Geografisch getrennte Zero-Knowledge-Backups', desc: 'Tägliche verschlüsselte Datenbank-Backups an einem zweiten, geografisch isolierten deutschen Rechenzentrums-Standort.' },
-                          { title: '15. Netzwerkeigenes Rate-Limiting & API-Throttling', desc: 'Automatisierte Bot-Angriffe, Credential-Stuffing und DoS-Versuche werden an den Außengrenzen vor der Datenbank abgefangen.' }
+                          { title: '11. Server-Standort 100% in Deutschland', desc: 'Betrieb in ISO 27001 zertifizierten deutschen Rechenzentren (Hetzner, Deutschland) – ohne US-Cloud-Subunternehmer (No CLOUD Act).' },
+                          { title: '12. Stündliche Zero-Knowledge-Backups', desc: 'Automatisierte, verschlüsselte Datenbank-Snapshots mit RTO < 15 Min und RPO < 1 Std. in geografisch getrennten deutschen Rechenzentren.' },
+                          { title: '13. Lokaler IndexedDB Audio-Tresor', desc: 'Pufferung von Übetracks im lokalen Tresor (groovelab_audio_vault) für 0ms Latenz und Offline-Playback in Proberäumen ohne Internet.' },
+                          { title: '14. Netzwerkeigenes Rate-Limiting & API-Throttling', desc: 'Automatisierte Bot-Angriffe, Credential-Stuffing und DoS-Versuche werden an den Außengrenzen vor der Datenbank abgefangen.' },
+                          { title: '15. High-Speed Asset Pre-Compression', desc: 'Vollständige Vorabkompression aller Assets in Brotli (q=11) und Gzip (lvl=9) für Sub-100ms Ladezeiten und minimale Serverlast.' }
                         ]
                       },
                       {
                         sectionTitle: 'IV. Art. 32 Abs. 1 lit. d DSGVO – Überprüfung & Evaluierung',
                         sectionBadge: 'Auditierung & Nachweis',
                         items: [
-                          { title: '16. Continuous Supply-Chain Security & CVE-Scans', desc: 'Automatische Überprüfung aller verwendeten Bibliotheken auf bekannte Schwachstellen vor jedem Produktions-Deployment.' },
-                          { title: '17. Periodische Penetrationstests & RFC 9116 security.txt', desc: 'Regelmäßige externe IT-Sicherheitsaudits und vertrauliche Meldeschnittstelle für Responsible Disclosure.' },
-                          { title: '18. Revisionssicheres DSGVO-Einwilligungsmanagement', desc: 'Zeitgestempelte, rechtssichere Protokollierung aller Eltern-Einwilligungen nach Art. 7 & Art. 8 DSGVO.' }
+                          { title: '16. Continuous Supply-Chain Security & CI/CD Gates', desc: 'Automatischer Pre-Commit Secret-Scanner, automatische Vitest-Mandantentrennungstests und CVE-Schwachstellen-Scans vor jedem Deployment.' },
+                          { title: '17. Revisionssicheres WORM Audit-Ledger', desc: 'Manipulationssichere SHA-256 Merkle-Chain zur unveränderbaren Protokollierung aller administrativen Aktionen und Belege (GoBD).' },
+                          { title: '18. DIN 66398 Löschkonzept & Storage-Janitor', desc: 'Automatischer Purge-Bot zur physischen Vernichtung gelöschter Audios und Inaktivitäts-Stopp nach 60 Tagen.' },
+                          { title: '19. Periodische Penetrationstests & RFC 9116 security.txt', desc: 'Regelmäßige externe IT-Sicherheitsaudits und vertrauliche Meldeschnittstelle für Responsible Disclosure.' },
+                          { title: '20. Revisionssicheres DSGVO-Einwilligungsmanagement', desc: 'Zeitgestempelte, rechtssichere Protokollierung aller Eltern-Einwilligungen nach Art. 7 & Art. 8 DSGVO.' }
                         ]
                       }
                     ].map((group, gIdx) => (
