@@ -28,7 +28,9 @@ import {
   ArrowLeftRight,
   RefreshCw,
   UserCheck,
-  Sparkles
+  Sparkles,
+  MessageSquare,
+  Lock
 } from 'lucide-react';
 import { useRealNamesVisibility, maskLastName, formatTeacherFullName, formatDisplaySubjectOrInstrument } from '../utils/nameHelper';
 import { MeisterwerkDocumentationModal, checkIsAudioTresorActive } from './MeisterwerkDocumentationModal';
@@ -7801,9 +7803,9 @@ return (
                       }}>
                         <div>
                           <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <span>💬</span>
+                            <MessageSquare size={18} color="#ffffff" />
                             <span>Termin-Shoutbox</span>
-                            {isFrozen && <span style={{ fontSize: '0.85rem' }}>🔒</span>}
+                            {isFrozen && <Lock size={14} color="#ffffff" />}
                           </h4>
                           <p style={{ margin: '3px 0 0 0', fontSize: '0.75rem', color: 'rgba(255, 255, 255, 0.9)', fontWeight: 600 }}>
                             Termingekoppelte Direktnachrichten mit {occ.student?.first_name || 'Schüler'}

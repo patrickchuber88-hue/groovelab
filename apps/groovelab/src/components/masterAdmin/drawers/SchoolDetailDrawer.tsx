@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { 
   X, Check, RefreshCw, Eye, HardDrive, Building, 
-  Sliders, ShieldCheck, Trash2, ArrowLeft, Disc3, Mic, Music, Sparkles, ShieldAlert, BookOpen
+  Sliders, ShieldCheck, Trash2, ArrowLeft, Disc3, Mic, Music, Sparkles, ShieldAlert, BookOpen, Clock
 } from 'lucide-react';
 import { DpoAuditPortal } from '../../DpoAuditPortal';
 import { supabase } from '../../../lib/supabase';
 import { StorageTier, DEFAULT_STORAGE_TIERS, getStorageTierByGb } from '../../../domain/pricingEngine';
+import { isSchoolTrialActive } from '../../../domain/schoolMetricsAggregator';
 
 interface SchoolDetailDrawerProps {
   school: any;
@@ -61,9 +62,11 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
   const [billingEmail, setBillingEmail] = useState(school?.billing_email || '');
   const [billingContact, setBillingContact] = useState(school?.billing_contact_person || '');
   const [status, setStatus] = useState(school?.status || 'active');
-  const [isTrial, setIsTrial] = useState<boolean>(school?.is_trial ?? false);
+  const [isTrial, setIsTrial] = useState<boolean>(() => isSchoolTrialActive(school));
   const [trialEndsAt, setTrialEndsAt] = useState<string>(
-    school?.trial_ends_at ? new Date(school.trial_ends_at).toISOString().split('T')[0] : ''
+    school?.trial_ends_at 
+      ? new Date(school.trial_ends_at).toISOString().split('T')[0] 
+      : (school?.created_at ? new Date(new Date(school.created_at).getTime() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] : '')
   );
   const [hasCampus, setHasCampus] = useState<boolean>(Boolean(school?.has_campus_subscription));
   const [hasGroovelab, setHasGroovelab] = useState<boolean>(Boolean(school?.has_groovelab_subscription));
@@ -71,8 +74,16 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
 
   // Audio-Tresor Storage State (Synchronized with Financial Control & SecretaryDashboard)
   const [extraStorageGb, setExtraStorageGb] = useState<number>(() => {
-    if (school?.storage_addon_gb !== undefined && school?.storage_addon_gb !== null) return Number(school.storage_addon_gb);
-    if (school?.extra_storage_gb !== undefined && school?.extra_storage_gb !== null) return Number(school.extra_storage_gb);
+    if (school?.storage_addon_gb !== undefined && school?.storage_addon_gb !== null && Number(school.storage_addon_gb) > 0) return Number(school.storage_addon_gb);
+    if (school?.extra_storage_gb !== undefined && school?.extra_storage_gb !== null && Number(school.extra_storage_gb) > 0) return Number(school.extra_storage_gb);
+    if (school?.extra_billing_option === 'option1') return 20;
+    try {
+      const overridesStr = localStorage.getItem('groovelab_school_overrides');
+      if (overridesStr) {
+        const overrides = JSON.parse(overridesStr);
+        if (overrides[school?.id]?.storage_addon_gb) return Number(overrides[school?.id]?.storage_addon_gb);
+      }
+    } catch (e) {}
     return 0;
   });
 
@@ -87,14 +98,22 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
       setBillingEmail(school.billing_email || '');
       setBillingContact(school.billing_contact_person || '');
       setStatus(school.status || 'active');
-      setIsTrial(school.is_trial ?? false);
-      setTrialEndsAt(school.trial_ends_at ? new Date(school.trial_ends_at).toISOString().split('T')[0] : '');
+      setIsTrial(isSchoolTrialActive(school));
+      setTrialEndsAt(school.trial_ends_at ? new Date(school.trial_ends_at).toISOString().split('T')[0] : (school.created_at ? new Date(new Date(school.created_at).getTime() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] : ''));
       setHasCampus(Boolean(school.has_campus_subscription));
       setHasGroovelab(Boolean(school.has_groovelab_subscription));
       setSubscriptionBypass(school.subscription_bypass ?? false);
       setExtraStorageGb(() => {
-        if (school.storage_addon_gb !== undefined && school.storage_addon_gb !== null) return Number(school.storage_addon_gb);
-        if (school.extra_storage_gb !== undefined && school.extra_storage_gb !== null) return Number(school.extra_storage_gb);
+        if (school.storage_addon_gb !== undefined && school.storage_addon_gb !== null && Number(school.storage_addon_gb) > 0) return Number(school.storage_addon_gb);
+        if (school.extra_storage_gb !== undefined && school.extra_storage_gb !== null && Number(school.extra_storage_gb) > 0) return Number(school.extra_storage_gb);
+        if (school.extra_billing_option === 'option1') return 20;
+        try {
+          const overridesStr = localStorage.getItem('groovelab_school_overrides');
+          if (overridesStr) {
+            const overrides = JSON.parse(overridesStr);
+            if (overrides[school?.id]?.storage_addon_gb) return Number(overrides[school?.id]?.storage_addon_gb);
+          }
+        } catch (e) {}
         return 0;
       });
     }
@@ -104,6 +123,7 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
     school?.status,
     school?.is_trial,
     school?.trial_ends_at,
+    school?.created_at,
     school?.has_campus_subscription,
     school?.has_groovelab_subscription,
     school?.subscription_bypass,
@@ -134,15 +154,29 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
 
   const baseStorageGb = 1.0;
   const totalStorageGb = baseStorageGb + extraStorageGb;
-  const storageUsedBytes = Number(school?.storage_used_bytes || 0);
+  let rawStorageUsed = Number(school?.storage_used_bytes || 0);
+  try {
+    const schId = String(school?.id || '');
+    const overrides = JSON.parse(localStorage.getItem('groovelab_school_overrides') || '{}');
+    if (overrides[schId]?.storage_used_bytes) {
+      rawStorageUsed = Math.max(rawStorageUsed, Number(overrides[schId].storage_used_bytes));
+    }
+    const directKey = localStorage.getItem(`groovelab_storage_used_bytes_${schId}`);
+    if (directKey) {
+      rawStorageUsed = Math.max(rawStorageUsed, Number(directKey));
+    }
+  } catch {}
+  const storageUsedBytes = rawStorageUsed;
   const usedStorageGb = storageUsedBytes / (1024 * 1024 * 1024);
   const usedStorageMb = storageUsedBytes / (1024 * 1024);
   const freeStorageGb = Math.max(0, totalStorageGb - usedStorageGb);
   const storagePercentage = Math.min(100, Math.round((usedStorageGb / totalStorageGb) * 100));
 
-  const formattedUsedStorage = (storageUsedBytes > 0 && usedStorageGb < 0.10)
-    ? `${usedStorageMb.toFixed(1).replace('.', ',')} MB`
-    : `${usedStorageGb.toFixed(2).replace('.', ',')} GB`;
+  const formattedUsedStorage = storageUsedBytes <= 0
+    ? '0,0 MB'
+    : usedStorageGb < 1.0
+      ? `${usedStorageMb.toFixed(1).replace('.', ',')} MB`
+      : `${usedStorageGb.toFixed(2).replace('.', ',')} GB`;
   const formattedStoragePct = storageUsedBytes > 0 && storagePercentage < 1 ? '< 1%' : `${storagePercentage}%`;
 
   const currentAddonPackage = STORAGE_PACKAGES.find((p: StorageTier) => p.gb === extraStorageGb) || {
@@ -324,8 +358,14 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
                   {isTrial ? 'Testphase' : status === 'active' ? '● Aktiv' : 'Pausiert'}
                 </span>
               </div>
-              <div style={{ fontSize: '0.72rem', color: '#64748b', fontFamily: 'monospace', marginTop: '1px' }}>
-                Mandanten-ID: {school.id}
+              <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '1px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                <span style={{ fontFamily: 'monospace' }}>Mandanten-ID: {school.id}</span>
+                {school.created_at && (
+                  <span style={{ color: '#334155', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                    <Clock size={11} color="#64748b" />
+                    Registriert: {new Date(school.created_at).toLocaleDateString('de-DE')} ({new Date(school.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Uhr UTC)
+                  </span>
+                )}
               </div>
             </div>
           </div>

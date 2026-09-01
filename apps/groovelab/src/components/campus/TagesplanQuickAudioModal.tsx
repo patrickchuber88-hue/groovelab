@@ -596,7 +596,9 @@ export const TagesplanQuickAudioModal: React.FC<TagesplanQuickAudioModalProps> =
       for (const clip of recordedClips) {
         const isoNow = new Date().toISOString();
         const fileName = `quick_hw_${student.id}_${clip.id}_${Date.now()}.webm`;
-        const filePath = `homework/${student.id}/${fileName}`;
+        const targetSchoolId = student?.school_id || (student as any)?.schoolId || teacher?.school_id || (window as any).__groovelab_school_id || localStorage.getItem('groovelab_school_id') || localStorage.getItem('campus_school_id');
+        const schoolPathPrefix = targetSchoolId ? `schools/${targetSchoolId}/` : '';
+        const filePath = `${schoolPathPrefix}recordings/${fileName}`;
 
         let finalUrl = clip.url || '';
 
@@ -609,6 +611,7 @@ export const TagesplanQuickAudioModal: React.FC<TagesplanQuickAudioModalProps> =
               durationSeconds: clip.durationSeconds,
               studentId: student.id,
               teacherId: teacher?.id,
+              schoolId: targetSchoolId,
               context: 'homework',
               title: clip.title,
               metadata: {
@@ -628,13 +631,31 @@ export const TagesplanQuickAudioModal: React.FC<TagesplanQuickAudioModalProps> =
         if (navigator.onLine && clip.blob) {
           try {
             const { error: upErr } = await supabase.storage
-              .from('recordings')
+              .from('campus-assets')
               .upload(filePath, clip.blob, { contentType: 'audio/webm', upsert: true });
             
             if (!upErr) {
-              const { data: urlData } = supabase.storage.from('recordings').getPublicUrl(filePath);
+              const { data: urlData } = supabase.storage.from('campus-assets').getPublicUrl(filePath);
               if (urlData?.publicUrl) {
                 finalUrl = urlData.publicUrl;
+              }
+
+              // Update school storage quota
+              if (targetSchoolId && clip.blob.size) {
+                try {
+                  const { data: schoolData } = await supabase
+                    .from('schools')
+                    .select('storage_used_bytes')
+                    .eq('id', targetSchoolId)
+                    .maybeSingle();
+                  if (schoolData) {
+                    const currentBytes = Number(schoolData.storage_used_bytes || 0);
+                    await supabase
+                      .from('schools')
+                      .update({ storage_used_bytes: currentBytes + clip.blob.size })
+                      .eq('id', targetSchoolId);
+                  }
+                } catch {}
               }
             }
           } catch (cloudErr) {

@@ -27557,8 +27557,9 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                 maxHeight: '400px'
               }} className="custom-scrollbar">
                 {isFrozen && (
-                  <div style={{ background: '#fef2f2', border: '1px solid #fee2f2', color: '#991b1b', padding: '8px 12px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'center', textAlign: 'center' }}>
-                    🔒 Shoutbox eingefroren (Schreibschutz nach 48h aktiv)
+                  <div style={{ background: '#fef2f2', border: '1px solid #fee2f2', color: '#991b1b', padding: '8px 12px', borderRadius: '100px', fontSize: '0.75rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'center', textAlign: 'center' }}>
+                    <Lock size={14} color="#991b1b" />
+                    <span>Shoutbox nach 48h eingefroren (Schreibschutz aktiv)</span>
                   </div>
                 )}
                 {chatMessages.length === 0 ? (

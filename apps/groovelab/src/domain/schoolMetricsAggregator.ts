@@ -231,7 +231,10 @@ export function aggregateSchoolMetrics(
     }
   });
 
-  const storageAddonGb = Number(school.storage_addon_gb || 0);
+  let storageAddonGb = Number(school.storage_addon_gb || school.extra_storage_gb || 0);
+  if (storageAddonGb === 0 && school.extra_billing_option === 'option1') {
+    storageAddonGb = 20;
+  }
   const storageAddonMonthlyFee = resolveStorageAddonFee(storageAddonGb, school.storage_addon_monthly_fee);
   const storageUsedBytes = Number(school.storage_used_bytes || 0);
 
@@ -255,6 +258,41 @@ export function aggregateSchoolMetrics(
     songsCount: (songs || []).filter(s => s.school_id === schId).length,
     bandsCount: (bands || []).filter(b => b.school_id === schId && b.name !== '__SYSTEM_ANNOUNCEMENTS__').length
   };
+}
+
+/**
+ * Evaluates whether a school is currently in an active trial period.
+ * Strict Tier-1 Time-Decay Evaluation:
+ * - If school is booked (is_billing_booked === true), trial is inactive.
+ * - If trial_ends_at is set, trial expires when Date.now() >= trial_ends_at.
+ * - If only created_at is available, trial expires 30 days after created_at.
+ * - If is_trial is false/null, trial is inactive.
+ */
+export function isSchoolTrialActive(school: any): boolean {
+  if (!school) return false;
+  if (school.subscription_bypass) return false;
+  if (school.is_billing_booked) return false;
+  
+  const isTrialFlag = Boolean(school.is_trial || school.status === 'trial');
+  if (!isTrialFlag) return false;
+
+  const now = Date.now();
+  if (school.trial_ends_at) {
+    const trialEnd = new Date(school.trial_ends_at).getTime();
+    if (!isNaN(trialEnd)) {
+      return trialEnd > now;
+    }
+  }
+
+  if (school.created_at) {
+    const createdTime = new Date(school.created_at).getTime();
+    if (!isNaN(createdTime)) {
+      const trialEnd = createdTime + (30 * 24 * 60 * 60 * 1000);
+      return trialEnd > now;
+    }
+  }
+
+  return isTrialFlag;
 }
 
 export interface CanonicalSchoolBillingSummary {
@@ -313,12 +351,13 @@ export function getSchoolCanonicalBilling(
   });
 
   const isBypass = Boolean(school.subscription_bypass);
+  const isTrial = isSchoolTrialActive(school);
   let status: 'trial' | 'active' | 'bypass' | 'suspended' = 'active';
   if (school.status === 'suspended' || school.is_paused) {
     status = 'suspended';
   } else if (isBypass) {
     status = 'bypass';
-  } else if (school.is_trial || school.status === 'trial') {
+  } else if (isTrial) {
     status = 'trial';
   }
 

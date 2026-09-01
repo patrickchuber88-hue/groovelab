@@ -3,6 +3,7 @@ import { Activity, RefreshCw, AlertTriangle, CheckCircle, Cpu, Users, Layers, Sh
 import { supabase } from '../../../lib/supabase';
 import { School, SchoolStat, PendingUser } from '../MasterAdminTypes';
 import { MasterPricingRates, isSchoolBypassActive } from '../../../domain/pricingEngine';
+import { isSchoolTrialActive } from '../../../domain/schoolMetricsAggregator';
 
 interface ExecutiveTabProps {
   schools: School[];
@@ -36,7 +37,7 @@ export const ExecutiveTab: React.FC<ExecutiveTabProps> = ({
   let payingSchoolsCount = 0;
   const committedBaseMrr = validSchools.reduce((acc, s) => {
     const isBypass = isSchoolBypassActive(s);
-    const isTrial = s.is_trial || s.status === 'trial';
+    const isTrial = isSchoolTrialActive(s);
     const isPaused = s.is_paused || s.status === 'suspended';
     if (isBypass || isTrial || isPaused) return acc;
 
@@ -60,7 +61,7 @@ export const ExecutiveTab: React.FC<ExecutiveTabProps> = ({
 
   const b2bSeatMrr = validSchools.reduce((acc, s) => {
     const isBypass = isSchoolBypassActive(s);
-    const isTrial = s.is_trial || s.status === 'trial';
+    const isTrial = isSchoolTrialActive(s);
     const isPaused = s.is_paused || s.status === 'suspended';
     if (isBypass || isTrial || isPaused) return acc;
 
@@ -92,7 +93,7 @@ export const ExecutiveTab: React.FC<ExecutiveTabProps> = ({
     const school = validSchools.find(s => s.id === u.school_id);
     if (!school) return acc;
     const isBypass = isSchoolBypassActive(school);
-    const isTrial = school.is_trial || school.status === 'trial';
+    const isTrial = isSchoolTrialActive(school);
     if (isBypass || isTrial) return acc;
 
     if ((u as any).student_billing_payment_method && (u as any).student_billing_cash_paid && !(u as any).exempt_from_direct_billing) {
@@ -109,12 +110,13 @@ export const ExecutiveTab: React.FC<ExecutiveTabProps> = ({
   let activeStorageAddonGb = 0;
   const storageAddonMrr = validSchools.reduce((acc, s: any) => {
     const isBypass = isSchoolBypassActive(s);
-    const isTrial = s.is_trial || s.status === 'trial';
+    const isTrial = isSchoolTrialActive(s);
     const isPaused = s.is_paused || s.status === 'suspended';
     if (isBypass || isTrial || isPaused) return acc;
 
-    const addonGb = Number(s.storage_addon_gb || 0);
-    const addonFee = Number(s.storage_addon_monthly_fee || (addonGb === 20 ? 5.49 : addonGb === 10 ? 2.99 : addonGb === 5 ? 1.49 : addonGb === 50 ? 9.99 : 0));
+    let addonGb = Number(s.storage_addon_gb || s.extra_storage_gb || 0);
+    if (addonGb === 0 && s.extra_billing_option === 'option1') addonGb = 20;
+    const addonFee = Number(s.storage_addon_monthly_fee || (addonGb === 25 ? 3.99 : addonGb === 20 ? 5.49 : addonGb === 10 ? 2.99 : addonGb === 5 ? 1.49 : addonGb === 50 ? 6.99 : addonGb === 100 ? 11.99 : addonGb === 250 ? 24.99 : 0));
 
     if (addonGb > 0 && (s.storage_addon_status === 'active' || !s.storage_addon_status || s.storage_addon_status === 'approved')) {
       activeStorageAddonCount++;

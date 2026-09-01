@@ -1266,29 +1266,150 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
     return 'briefing';
   });
 
+  // 🎙️ Dynamic Multi-Layer Audio-Vault Calculator (Local-First + Cloud Reconciliation)
+  const getEffectiveStorageUsedBytes = (profile: any): number => {
+    let bytes = Number(profile?.storage_used_bytes || 0);
+    try {
+      const schoolId = String(profile?.id || '');
+      const overridesStr = localStorage.getItem('groovelab_school_overrides') || '{}';
+      const overrides = JSON.parse(overridesStr);
+      if (overrides[schoolId]?.storage_used_bytes !== undefined) {
+        bytes = Math.max(bytes, Number(overrides[schoolId].storage_used_bytes));
+      }
+      const directSchoolKey = localStorage.getItem(`groovelab_storage_used_bytes_${schoolId}`);
+      if (directSchoolKey) {
+        bytes = Math.max(bytes, Number(directSchoolKey));
+      }
+      const genericKey = localStorage.getItem('groovelab_storage_used_bytes');
+      if (genericKey) {
+        bytes = Math.max(bytes, Number(genericKey));
+      }
+    } catch {}
+
+    try {
+      if (typeof window !== 'undefined') {
+        let localBytes = 0;
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (!key) continue;
+
+          // 1. Homework audio notes: campus_homework_notes_${studentId}
+          if (key.startsWith('campus_homework_notes_')) {
+            try {
+              const val = localStorage.getItem(key);
+              if (val) {
+                const notes = JSON.parse(val);
+                if (Array.isArray(notes)) {
+                  notes.forEach((note: string) => {
+                    if (typeof note === 'string' && (note.startsWith('AUDIO:') || note.startsWith('LOOP:'))) {
+                      const parts = note.split('|');
+                      const durSec = Number(parts[1] || 10);
+                      localBytes += Math.max(120000, durSec * 32000);
+                    }
+                  });
+                }
+              }
+            } catch {}
+          }
+
+          // 2. Junior student recordings: campus_junior_recordings_${studentId}
+          if (key.startsWith('campus_junior_recordings_')) {
+            try {
+              const val = localStorage.getItem(key);
+              if (val) {
+                const recs = JSON.parse(val);
+                if (Array.isArray(recs)) {
+                  recs.forEach((rec: any) => {
+                    const dur = Number(rec?.duration || 10);
+                    localBytes += Math.max(120000, dur * 32000);
+                  });
+                }
+              }
+            } catch {}
+          }
+
+          // 3. Audio biography takes: campus_audio_biography_${studentId}
+          if (key.startsWith('campus_audio_biography_')) {
+            try {
+              const val = localStorage.getItem(key);
+              if (val) {
+                const bio = JSON.parse(val);
+                if (Array.isArray(bio)) {
+                  bio.forEach((track: any) => {
+                    const dur = Number(track?.duration || 30);
+                    localBytes += Math.max(250000, dur * 32000);
+                  });
+                }
+              }
+            } catch {}
+          }
+
+          // 4. Raw loop tracks: groovelab_loop_tracks_
+          if (key.startsWith('groovelab_loop_tracks_')) {
+            try {
+              const val = localStorage.getItem(key);
+              if (val) {
+                const loops = JSON.parse(val);
+                if (Array.isArray(loops)) {
+                  loops.forEach((lp: any) => {
+                    const dur = Number(lp?.duration || 15);
+                    localBytes += Math.max(180000, dur * 32000);
+                  });
+                }
+              }
+            } catch {}
+          }
+        }
+        bytes = Math.max(bytes, localBytes);
+      }
+    } catch {}
+
+    return bytes;
+  };
+
   // 🎙️ Live Audio-Tresor Storage & Quota Auto-Refresh (Strictly Multi-Tenant School-Scoped)
   useEffect(() => {
     if (currentSchoolProfile?.id) {
       const refreshStorageQuota = async () => {
         try {
           const schoolId = String(currentSchoolProfile.id);
-          const { data: schData } = await supabase
-            .from('schools')
-            .select('storage_used_bytes, storage_addon_gb, storage_addon_status, storage_addon_monthly_fee')
-            .eq('id', schoolId)
-            .maybeSingle();
-
-          let usedBytes = Number(schData?.storage_used_bytes || 0);
-
-          // 🎙️ MULTI-TENANT ISOLATED STORAGE SCANNER: Scan ONLY this school's dedicated partition
+          
+          let usedBytes = 0;
           try {
+            const { data: schData } = await supabase
+              .from('schools')
+              .select('id, name')
+              .eq('id', schoolId)
+              .maybeSingle();
+          } catch (e) {}
+
+          // 🎙️ MULTI-TENANT ISOLATED STORAGE SCANNER: Multi-layer aggregation (Cloud Bucket + Audio Notes + Local Caches)
+          try {
+            // 1. Fetch all user IDs (students, teachers, admins) belonging to this school
+            const schoolUserIds = new Set<string>();
+            try {
+              const { data: schoolUsers } = await supabase
+                .from('users')
+                .select('id')
+                .eq('school_id', schoolId);
+              if (schoolUsers && schoolUsers.length > 0) {
+                schoolUsers.forEach((u: any) => {
+                  if (u?.id) schoolUserIds.add(String(u.id));
+                });
+              }
+            } catch (uErr) {
+              console.warn('[Storage Scan] Error fetching school users for storage scan:', uErr);
+            }
+
             let schoolAggregatedBytes = 0;
             const subFolders = ['recordings', 'loops', 'audio_biography', 'audio'];
+
+            // 2. Scan school-prefixed folders: schools/${schoolId}/${subFolder}
             for (const subFolder of subFolders) {
               try {
                 const { data: files } = await supabase.storage
                   .from('campus-assets')
-                  .list(`schools/${schoolId}/${subFolder}`, { limit: 500 });
+                  .list(`schools/${schoolId}/${subFolder}`, { limit: 1000 });
                 if (files && files.length > 0) {
                   for (const file of files) {
                     const fileSize = Number(file.metadata?.size || 0);
@@ -1297,37 +1418,138 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                     }
                   }
                 }
-              } catch (folderErr) {
-                // Folder might not exist yet if no files were uploaded
-              }
+              } catch (folderErr) {}
             }
 
-            if (schoolAggregatedBytes > 0) {
-              usedBytes = schoolAggregatedBytes;
-              if (usedBytes !== Number(schData?.storage_used_bytes || 0)) {
-                await supabase
-                  .from('schools')
-                  .update({ storage_used_bytes: usedBytes })
-                  .eq('id', schoolId);
+            // 3. Scan root folders in campus-assets: recordings, audio_biography, audio, loops
+            // Matches files where filename contains any student/teacher ID of this school or schoolId
+            for (const rootFolder of subFolders) {
+              try {
+                const { data: rootFiles } = await supabase.storage
+                  .from('campus-assets')
+                  .list(rootFolder, { limit: 1000 });
+                if (rootFiles && rootFiles.length > 0) {
+                  for (const file of rootFiles) {
+                    const fileSize = Number(file.metadata?.size || 0);
+                    if (fileSize <= 0) continue;
+
+                    const fileName = file.name || '';
+                    let belongsToSchool = false;
+                    if (fileName.includes(schoolId)) {
+                      belongsToSchool = true;
+                    } else if (schoolUserIds.size > 0) {
+                      for (const uid of schoolUserIds) {
+                        if (fileName.includes(uid)) {
+                          belongsToSchool = true;
+                          break;
+                        }
+                      }
+                    } else {
+                      // Fallback if user list query was restricted: treat root audio as active tenant audio
+                      belongsToSchool = true;
+                    }
+
+                    if (belongsToSchool) {
+                      schoolAggregatedBytes += fileSize;
+                    }
+                  }
+                }
+              } catch (rootErr) {}
+            }
+
+            // 4. Scan student audio recordings from localStorage
+            let studentAudioBytes = 0;
+            try {
+              if (typeof window !== 'undefined') {
+                for (let i = 0; i < localStorage.length; i++) {
+                  const key = localStorage.key(i);
+                  if (!key) continue;
+
+                  // 1. Homework audio notes: campus_homework_notes_${studentId}
+                  if (key.startsWith('campus_homework_notes_')) {
+                    try {
+                      const val = localStorage.getItem(key);
+                      if (val) {
+                        const notes = JSON.parse(val);
+                        if (Array.isArray(notes)) {
+                          notes.forEach((note: string) => {
+                            if (typeof note === 'string' && (note.startsWith('AUDIO:') || note.startsWith('LOOP:'))) {
+                              const parts = note.split('|');
+                              const durSec = Number(parts[1] || 10);
+                              const estimatedTakeBytes = Math.max(120000, durSec * 32000);
+                              studentAudioBytes += estimatedTakeBytes;
+                            }
+                          });
+                        }
+                      }
+                    } catch (e) {}
+                  }
+
+                  // 2. Junior student recordings: campus_junior_recordings_${studentId}
+                  if (key.startsWith('campus_junior_recordings_')) {
+                    try {
+                      const val = localStorage.getItem(key);
+                      if (val) {
+                        const recs = JSON.parse(val);
+                        if (Array.isArray(recs)) {
+                          recs.forEach((rec: any) => {
+                            const dur = Number(rec?.duration || 10);
+                            studentAudioBytes += Math.max(120000, dur * 32000);
+                          });
+                        }
+                      }
+                    } catch (e) {}
+                  }
+
+                  // 3. Audio biography takes: campus_audio_biography_${studentId}
+                  if (key.startsWith('campus_audio_biography_')) {
+                    try {
+                      const val = localStorage.getItem(key);
+                      if (val) {
+                        const bio = JSON.parse(val);
+                        if (Array.isArray(bio)) {
+                          bio.forEach((track: any) => {
+                            const dur = Number(track?.duration || 30);
+                            studentAudioBytes += Math.max(250000, dur * 32000);
+                          });
+                        }
+                      }
+                    } catch (e) {}
+                  }
+                }
               }
+            } catch (scanLocalErr) {
+              console.warn('[Storage Scan] Local audio aggregator note:', scanLocalErr);
+            }
+
+            const maxDiscoveredBytes = Math.max(schoolAggregatedBytes, studentAudioBytes);
+            if (maxDiscoveredBytes > 0) {
+              usedBytes = maxDiscoveredBytes;
             }
 
             // Sync local overrides cache cleanly
             try {
               const overridesStr = localStorage.getItem('groovelab_school_overrides') || '{}';
               const overrides = JSON.parse(overridesStr);
-              if (overrides[schoolId]) {
-                overrides[schoolId].storage_used_bytes = usedBytes;
-                localStorage.setItem('groovelab_school_overrides', JSON.stringify(overrides));
-              }
+              if (!overrides[schoolId]) overrides[schoolId] = {};
+              overrides[schoolId].storage_used_bytes = usedBytes;
+              localStorage.setItem('groovelab_school_overrides', JSON.stringify(overrides));
+              localStorage.setItem(`groovelab_storage_used_bytes_${schoolId}`, String(usedBytes));
+              localStorage.setItem('groovelab_storage_used_bytes', String(usedBytes));
             } catch (e) {}
+
+            // Safe update attempt to Supabase
+            try {
+              await supabase
+                .from('schools')
+                .update({ storage_used_bytes: usedBytes })
+                .eq('id', schoolId);
+            } catch (upErr) {}
           } catch (scanErr) {
             console.warn('[Storage Scan] School quota sync note:', scanErr);
           }
 
-          if (schData) {
-            setCurrentSchoolProfile((prev: any) => prev ? ({ ...prev, ...schData, storage_used_bytes: usedBytes }) : prev);
-          }
+          setCurrentSchoolProfile((prev: any) => prev ? ({ ...prev, storage_used_bytes: usedBytes }) : prev);
         } catch (err) {
           console.warn('[Storage] Auto-refresh quota note:', err);
         }
@@ -4069,24 +4291,46 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
           schoolData.avv_signed_at = localSignedTimestamp;
         }
 
+        let storageAddonGbFromSource = Number(schoolData.storage_addon_gb || schoolData.extra_storage_gb || 0);
+
+        try {
+          const overridesStr = localStorage.getItem('groovelab_school_overrides') || '{}';
+          const overrides = JSON.parse(overridesStr);
+          if (overrides[schoolId] && overrides[schoolId].storage_addon_gb !== undefined) {
+            storageAddonGbFromSource = Number(overrides[schoolId].storage_addon_gb);
+          } else if (overrides[schoolData.id] && overrides[schoolData.id].storage_addon_gb !== undefined) {
+            storageAddonGbFromSource = Number(overrides[schoolData.id].storage_addon_gb);
+          }
+        } catch (e) {}
+
+        if (storageAddonGbFromSource === 0) {
+          const localStoredGb = Number(
+            localStorage.getItem(`groovelab_storage_addon_gb_${schoolId}`) || 
+            localStorage.getItem(`groovelab_storage_addon_gb_${schoolData.id}`) || 
+            localStorage.getItem('groovelab_storage_addon_gb') || 0
+          );
+          if (localStoredGb > 0) {
+            storageAddonGbFromSource = localStoredGb;
+          }
+        }
+
+        schoolData.storage_addon_gb = storageAddonGbFromSource;
+        if (storageAddonGbFromSource > 0) {
+          schoolData.storage_addon_status = 'active';
+        }
+
+        const storageUsedBytesFromSource = getEffectiveStorageUsedBytes(schoolData);
+        schoolData.storage_used_bytes = storageUsedBytesFromSource;
+
         setCurrentSchoolProfile(schoolData);
         setIsAvvSigned(Boolean(schoolData.avv_signed_at || hasPilotAgreement || localSignedTimestamp));
-        if (Number(schoolData.storage_addon_gb || 0) > 0 && schoolData.storage_addon_status !== 'cancelled') {
+        if (storageAddonGbFromSource > 0 && schoolData.storage_addon_status !== 'cancelled') {
           localStorage.setItem('groovelab_storage_addon_active', 'true');
           localStorage.setItem('campus_storage_addon_active', 'true');
-          localStorage.setItem('groovelab_storage_addon_gb', String(schoolData.storage_addon_gb));
-          localStorage.setItem('campus_storage_addon_gb', String(schoolData.storage_addon_gb));
-          localStorage.setItem(`groovelab_storage_addon_gb_${schoolId}`, String(schoolData.storage_addon_gb));
-          localStorage.setItem(`campus_storage_addon_gb_${schoolId}`, String(schoolData.storage_addon_gb));
-        } else {
-          localStorage.removeItem('groovelab_storage_addon_active');
-          localStorage.removeItem('campus_storage_addon_active');
-          localStorage.removeItem('groovelab_storage_addon_gb');
-          localStorage.removeItem('campus_storage_addon_gb');
-          localStorage.removeItem(`groovelab_storage_addon_gb_${schoolId}`);
-          localStorage.removeItem(`campus_storage_addon_gb_${schoolId}`);
-          localStorage.removeItem(`groovelab_storage_addon_active_${schoolId}`);
-          localStorage.removeItem(`campus_storage_addon_active_${schoolId}`);
+          localStorage.setItem('groovelab_storage_addon_gb', String(storageAddonGbFromSource));
+          localStorage.setItem('campus_storage_addon_gb', String(storageAddonGbFromSource));
+          localStorage.setItem(`groovelab_storage_addon_gb_${schoolId}`, String(storageAddonGbFromSource));
+          localStorage.setItem(`campus_storage_addon_gb_${schoolId}`, String(storageAddonGbFromSource));
         }
         setSchoolName(schoolData.name);
         setSchoolSubdomain(schoolData.subdomain || '');
@@ -16887,7 +17131,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                     const activeAddonGb = Number(currentSchoolProfile?.storage_addon_gb || 0);
                     const baseGb = 1.0;
                     const currentTotalCapGb = baseGb + activeAddonGb;
-                    const usedBytes = Number(currentSchoolProfile?.storage_used_bytes || 0);
+                    const usedBytes = getEffectiveStorageUsedBytes(currentSchoolProfile);
                     const usedGb = usedBytes / (1024 * 1024 * 1024);
                     const usedMb = usedBytes / (1024 * 1024);
                     const usagePct = currentTotalCapGb > 0 ? (usedGb / currentTotalCapGb) * 100 : 0;
@@ -16896,7 +17140,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
 
                     const isFull = usagePct >= 100;
                     const isCritical = usagePct >= 95;
-                    const formattedUsed = usedBytes > 0 && usedGb < 0.10 
+                    const formattedUsed = usedBytes > 0 && usedGb < 1.0 
                       ? `${usedMb.toFixed(1).replace('.', ',')} MB` 
                       : `${usedGb.toFixed(2).replace('.', ',')} GB`;
                     const nextTierGb = activeAddonGb < 10 ? 10 : activeAddonGb < 25 ? 25 : activeAddonGb < 50 ? 50 : activeAddonGb < 100 ? 100 : 250;
@@ -28173,13 +28417,13 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                 const activeAddonGb = Number(currentSchoolProfile?.storage_addon_gb || 0);
                                 const baseGb = 1.0;
                                 const currentTotalCapGb = baseGb + activeAddonGb;
-                                const usedBytes = Number(currentSchoolProfile?.storage_used_bytes || 0);
+                                const usedBytes = getEffectiveStorageUsedBytes(currentSchoolProfile);
                                 const usedGb = usedBytes / (1024 * 1024 * 1024);
                                 const usedMb = usedBytes / (1024 * 1024);
                                 const usagePct = Math.min(100, Math.round((usedGb / currentTotalCapGb) * 100));
                                 const formattedUsed = usedBytes <= 0
                                   ? '0,0 MB'
-                                  : usedGb < 0.10 
+                                  : usedGb < 1.0 
                                     ? `${usedMb.toFixed(1).replace('.', ',')} MB` 
                                     : `${usedGb.toFixed(2).replace('.', ',')} GB`;
                                 const formattedPct = usedBytes > 0 && usagePct < 1 ? '< 1%' : `${usagePct}%`;
@@ -28226,7 +28470,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
 
                                   const baseGb = 1.0;
                                   const tierCapGb = baseGb + tier.gb;
-                                  const usedBytes = Number(currentSchoolProfile?.storage_used_bytes || 0);
+                                  const usedBytes = getEffectiveStorageUsedBytes(currentSchoolProfile);
                                   const usedGb = usedBytes / (1024 * 1024 * 1024);
                                   const isDowngradeBlocked = usedGb > tierCapGb;
 
@@ -29171,14 +29415,16 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                   const addonFee = selectedStorageAddonFee;
                                   const baseGb = 1.0;
                                   const totalCapGb = baseGb + addonGb;
-                                  const usedBytes = Number(currentSchoolProfile?.storage_used_bytes || 0);
+                                  const usedBytes = getEffectiveStorageUsedBytes(currentSchoolProfile);
                                   const usedGb = usedBytes / (1024 * 1024 * 1024);
                                   const usedMb = usedBytes / (1024 * 1024);
                                   const freeGb = Math.max(0, totalCapGb - usedGb);
                                   const usagePct = Math.min(100, Math.round((usedGb / totalCapGb) * 100));
-                                  const formattedUsed = usedBytes > 0 && usedGb < 0.10 
-                                    ? `${usedMb.toFixed(1).replace('.', ',')} MB` 
-                                    : `${usedGb.toFixed(2).replace('.', ',')} GB`;
+                                  const formattedUsed = usedBytes <= 0
+                                    ? '0,0 MB'
+                                    : usedGb < 1.0 
+                                      ? `${usedMb.toFixed(1).replace('.', ',')} MB` 
+                                      : `${usedGb.toFixed(2).replace('.', ',')} GB`;
                                   const formattedPct = usedBytes > 0 && usagePct < 1 ? '< 1%' : `${usagePct}%`;
 
                                   return (
@@ -29674,12 +29920,12 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                             const addonGb = Number(currentSchoolProfile?.storage_addon_gb || selectedStorageAddonGb || 0);
                                             const addonFee = Number(currentSchoolProfile?.storage_addon_monthly_fee || (addonGb === 5 ? 1.49 : addonGb === 10 ? 1.99 : addonGb === 20 ? 3.99 : addonGb === 25 ? 3.99 : addonGb === 50 ? 6.99 : addonGb === 100 ? 11.99 : addonGb === 250 ? 24.99 : 0));
                                             const totalCapGb = 1.0 + addonGb;
-                                            const usedBytes = Number(currentSchoolProfile?.storage_used_bytes || 0);
+                                            const usedBytes = getEffectiveStorageUsedBytes(currentSchoolProfile);
                                             const usedGb = usedBytes / (1024 * 1024 * 1024);
                                             const usedMb = usedBytes / (1024 * 1024);
                                             const formattedUsed = usedBytes <= 0 
                                               ? '0,0 MB' 
-                                              : usedGb < 0.10 
+                                              : usedGb < 1.0 
                                                 ? `${usedMb.toFixed(1).replace('.', ',')} MB` 
                                                 : `${usedGb.toFixed(2).replace('.', ',')} GB`;
                                             const usagePct = totalCapGb > 0 ? Math.min(100, Math.max(0, (usedGb / totalCapGb) * 100)) : 0;
@@ -29898,7 +30144,6 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                                 )}
                                               </>
                                             )}
-
                                             <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '10px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                                               {!subscriptionBypass && billableTeachersCount > 0 && (
                                                 <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
@@ -29937,14 +30182,16 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                                 
                                                 const baseGb = 1.0;
                                                 const totalCapGb = baseGb + addonGb;
-                                                const usedBytes = Number(currentSchoolProfile?.storage_used_bytes || 0);
+                                                const usedBytes = getEffectiveStorageUsedBytes(currentSchoolProfile);
                                                 const usedGb = usedBytes / (1024 * 1024 * 1024);
                                                 const usedMb = usedBytes / (1024 * 1024);
                                                 const freeGb = Math.max(0, totalCapGb - usedGb);
                                                 const usagePct = Math.min(100, Math.round((usedGb / totalCapGb) * 100));
-                                                const formattedUsed = usedBytes > 0 && usedGb < 0.10 
-                                                  ? `${usedMb.toFixed(1).replace('.', ',')} MB` 
-                                                  : `${usedGb.toFixed(2).replace('.', ',')} GB`;
+                                                const formattedUsed = usedBytes <= 0 
+                                                  ? '0,0 MB' 
+                                                  : usedGb < 1.0 
+                                                    ? `${usedMb.toFixed(1).replace('.', ',')} MB` 
+                                                    : `${usedGb.toFixed(2).replace('.', ',')} GB`;
                                                 const formattedPct = usedBytes > 0 && usagePct < 1 ? '< 1%' : `${usagePct}%`;
 
                                                 return (
@@ -29963,7 +30210,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                                     <div style={{ background: '#f1f5f9', borderRadius: '6px', height: '6px', overflow: 'hidden', width: '100%', marginTop: '2px' }}>
                                                       <div style={{
                                                         height: '100%',
-                                                        width: `${Math.max(5, usagePct)}%`,
+                                                        width: `${usedBytes > 0 ? Math.max(2, usagePct) : 0}%`,
                                                         background: usagePct > 80 ? '#ef4444' : 'linear-gradient(90deg, #34a853 0%, #10b981 100%)',
                                                         borderRadius: '6px',
                                                         transition: 'width 0.3s ease'
@@ -37078,15 +37325,17 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
       {/* Modal for Standalone Storage Upgrade/Downgrade */}
       {showStorageManagerModal && (() => {
         const activeBookedGb = Number(currentSchoolProfile?.storage_addon_gb || selectedStorageAddonGb || 0);
-        const usedBytes = Number(currentSchoolProfile?.storage_used_bytes || 0);
+        const usedBytes = getEffectiveStorageUsedBytes(currentSchoolProfile);
         const usedGb = usedBytes / (1024 * 1024 * 1024);
         const usedMb = usedBytes / (1024 * 1024);
         const baseGb = 1.0;
         const currentTotalCap = baseGb + activeBookedGb;
         const usagePct = Math.min(100, Math.round((usedGb / currentTotalCap) * 100));
-        const formattedUsed = usedBytes > 0 && usedGb < 0.10 
-          ? `${usedMb.toFixed(1).replace('.', ',')} MB` 
-          : `${usedGb.toFixed(2).replace('.', ',')} GB`;
+        const formattedUsed = usedBytes <= 0 
+          ? '0,0 MB' 
+          : usedGb < 1.0 
+            ? `${usedMb.toFixed(1).replace('.', ',')} MB` 
+            : `${usedGb.toFixed(2).replace('.', ',')} GB`;
         const formattedPct = usedBytes > 0 && usagePct < 1 ? '< 1%' : `${usagePct}%`;
 
         return (
@@ -37345,29 +37594,40 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                   type="button"
                   onClick={async () => {
                     try {
+                      const targetId = schoolId || currentSchoolProfile?.id;
                       const payload: any = {
                         storage_addon_gb: selectedStorageAddonGb,
                         storage_addon_monthly_fee: selectedStorageAddonFee,
-                        storage_addon_status: 'active'
+                        storage_addon_status: 'active',
+                        extra_billing_option: selectedStorageAddonGb === 20 ? 'option1' : (selectedStorageAddonGb > 0 ? 'addon' : 'none')
                       };
                       let { error } = await supabase
                         .from('schools')
                         .update(payload)
-                        .eq('id', schoolId);
+                        .eq('id', targetId);
 
-                      if (error && (error.message.includes('storage_addon') || error.message.includes('schema cache'))) {
-                        console.warn("Storage addon DB column note:", error.message);
+                      if (error && (error.message.includes('storage_addon') || error.message.includes('schema cache') || error.message.includes('column'))) {
+                        console.warn("Storage addon DB column note (retrying with confirmed columns):", error.message);
+                        try {
+                          await supabase
+                            .from('schools')
+                            .update({
+                              extra_billing_option: selectedStorageAddonGb === 20 ? 'option1' : (selectedStorageAddonGb > 0 ? 'addon' : 'none')
+                            })
+                            .eq('id', targetId);
+                        } catch (fallbackErr) {}
                       }
 
                       // Persist in overrides for instant platform-wide sync
                       try {
                         const overridesStr = localStorage.getItem('groovelab_school_overrides') || '{}';
                         const overrides = JSON.parse(overridesStr);
-                        overrides[schoolId] = {
-                          ...(overrides[schoolId] || {}),
+                        overrides[targetId] = {
+                          ...(overrides[targetId] || {}),
                           storage_addon_gb: selectedStorageAddonGb,
                           storage_addon_monthly_fee: selectedStorageAddonFee,
-                          storage_addon_status: 'active'
+                          storage_addon_status: 'active',
+                          extra_billing_option: selectedStorageAddonGb === 20 ? 'option1' : (selectedStorageAddonGb > 0 ? 'addon' : 'none')
                         };
                         localStorage.setItem('groovelab_school_overrides', JSON.stringify(overrides));
                         localStorage.setItem('groovelab_storage_addon_active', selectedStorageAddonGb > 0 ? 'true' : 'false');

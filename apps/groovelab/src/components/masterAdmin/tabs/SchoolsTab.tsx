@@ -10,6 +10,7 @@ import {
 import { supabase } from '../../../lib/supabase';
 import { calculateCampusGroovelabBilling } from '../../../domain/billingCalculator';
 import { isSchoolBypassActive } from '../../../domain/pricingEngine';
+import { isSchoolTrialActive } from '../../../domain/schoolMetricsAggregator';
 
 import type { School } from '../MasterAdminTypes';
 
@@ -23,6 +24,7 @@ interface SchoolsTabProps {
   onStartGhostMode: (school: School) => void;
   onDeleteSchool: (school: School) => void;
   onToggleSchoolStatus: (school: School, newStatus: string) => Promise<void>;
+  onTogglePauseSchool?: (school: School) => Promise<void>;
   onProvisionSchool: (data: any) => Promise<any>;
 }
 
@@ -36,6 +38,7 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
   onStartGhostMode,
   onDeleteSchool,
   onToggleSchoolStatus,
+  onTogglePauseSchool,
   onProvisionSchool
 }) => {
   // State for search and filters
@@ -73,8 +76,8 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
   }, [schools]);
 
   // Aggregate Metrics for Header Scorecards
-  const totalPayingSchools = sanitizedSchools.filter(s => s.status === 'active' && !s.is_trial && !isSchoolBypassActive(s) && !s.is_paused).length;
-  const totalTrialSchools = sanitizedSchools.filter(s => s.is_trial && s.is_approved !== false).length;
+  const totalPayingSchools = sanitizedSchools.filter(s => s.status === 'active' && !isSchoolTrialActive(s) && !isSchoolBypassActive(s) && !s.is_paused).length;
+  const totalTrialSchools = sanitizedSchools.filter(s => isSchoolTrialActive(s) && s.is_approved !== false).length;
   const totalBypassedSchools = sanitizedSchools.filter(s => isSchoolBypassActive(s)).length;
   const totalPendingSchools = sanitizedSchools.filter(s => s.is_approved === false || s.status === 'pending').length;
 
@@ -94,7 +97,7 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
     totalActiveStudentsCount += activeStudents;
     totalPassiveStudentsCount += passiveStudents;
 
-    if (!s.is_trial && !isSchoolBypassActive(s) && !s.is_paused && s.status === 'active') {
+    if (!isSchoolTrialActive(s) && !isSchoolBypassActive(s) && !s.is_paused && s.status === 'active') {
       const rates = masterPricing?.getSchoolRates ? masterPricing.getSchoolRates(s) : {
         priceCampus: s.custom_price_campus ?? masterPricing?.priceCampus ?? 14.90,
         priceGroovelab: s.custom_price_groovelab ?? masterPricing?.priceGroovelab ?? 9.90,
@@ -745,7 +748,7 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
 
                 const isPending = school.is_approved === false || school.status === 'pending';
                 const isPaused = school.is_paused || school.status === 'suspended';
-                const isTrial = school.is_trial && !isPending;
+                const isTrial = isSchoolTrialActive(school) && !isPending;
 
                 // MRR calculation
                 const rates = masterPricing?.getSchoolRates ? masterPricing.getSchoolRates(school) : {
@@ -757,8 +760,9 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
                   pricePassiveStudent: masterPricing?.pricePassiveStudent ?? 0.09
                 };
 
-                const storageAddonGbVal = Number(school.storage_addon_gb || 0);
-                const storageAddonFeeVal = Number(school.storage_addon_monthly_fee || (storageAddonGbVal === 20 ? 5.49 : storageAddonGbVal === 10 ? 2.99 : storageAddonGbVal === 5 ? 1.49 : storageAddonGbVal === 50 ? 9.99 : 0));
+                let storageAddonGbVal = Number(school.storage_addon_gb || (school as any).extra_storage_gb || 0);
+                if (storageAddonGbVal === 0 && (school as any).extra_billing_option === 'option1') storageAddonGbVal = 20;
+                const storageAddonFeeVal = Number(school.storage_addon_monthly_fee || (storageAddonGbVal === 25 ? 3.99 : storageAddonGbVal === 20 ? 5.49 : storageAddonGbVal === 10 ? 2.99 : storageAddonGbVal === 5 ? 1.49 : storageAddonGbVal === 50 ? 6.99 : storageAddonGbVal === 100 ? 11.99 : storageAddonGbVal === 250 ? 24.99 : 0));
 
                 const billingCalc = calculateCampusGroovelabBilling({
                   hasCampusModule: !!school.has_campus_subscription,
@@ -779,7 +783,7 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
                   }
                 });
 
-                const mrr = (school.is_trial || isSchoolBypassActive(school)) ? 0 : billingCalc.totalMonthlySchoolInvoice;
+                const mrr = (isTrial || isSchoolBypassActive(school) || isPaused) ? 0 : billingCalc.totalMonthlySchoolInvoice;
 
                 return (
                   <div

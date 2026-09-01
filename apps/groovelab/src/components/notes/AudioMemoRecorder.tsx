@@ -130,22 +130,42 @@ export const AudioMemoRecorder: React.FC<AudioMemoRecorderProps> = ({
     setErrorMsg(null);
 
     try {
+      const targetSchoolId = user?.school_id || (user as any)?.schoolId || (window as any).__groovelab_school_id || localStorage.getItem('groovelab_school_id') || localStorage.getItem('campus_school_id');
+      const schoolPathPrefix = targetSchoolId ? `schools/${targetSchoolId}/` : '';
       const fileName = `memo_${user?.id || 'guest'}_${Date.now()}.${audioBlob.type.includes('mp4') ? 'mp4' : 'webm'}`;
-      const filePath = `notes/${fileName}`;
+      const filePath = `${schoolPathPrefix}audio/${fileName}`;
 
       const { data, error } = await supabase.storage
-        .from('user-recordings')
+        .from('campus-assets')
         .upload(filePath, audioBlob, {
           contentType: audioBlob.type,
           upsert: true
         });
 
       let finalUrl = '';
-      if (!error && data?.path) {
+      if (!error) {
         const { data: publicUrlData } = supabase.storage
-          .from('user-recordings')
-          .getPublicUrl(data.path);
-        finalUrl = publicUrlData.publicUrl;
+          .from('campus-assets')
+          .getPublicUrl(filePath);
+        finalUrl = publicUrlData?.publicUrl || '';
+
+        // Update school storage quota
+        if (targetSchoolId && audioBlob.size) {
+          try {
+            const { data: schoolData } = await supabase
+              .from('schools')
+              .select('storage_used_bytes')
+              .eq('id', targetSchoolId)
+              .maybeSingle();
+            if (schoolData) {
+              const currentBytes = Number(schoolData.storage_used_bytes || 0);
+              await supabase
+                .from('schools')
+                .update({ storage_used_bytes: currentBytes + audioBlob.size })
+                .eq('id', targetSchoolId);
+            }
+          } catch {}
+        }
       } else {
         // Fallback local blob URL representation
         finalUrl = audioUrl || '';

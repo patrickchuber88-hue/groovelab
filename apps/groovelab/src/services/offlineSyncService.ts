@@ -145,7 +145,7 @@ export const flushOfflineAudioQueue = async (): Promise<{ success: number; faile
         let uploadSuccess = false;
         let publicUrl = '';
 
-        for (const bucket of ['recordings', 'student-recordings', 'audio']) {
+        for (const bucket of ['campus-assets', 'recordings', 'student-recordings', 'audio']) {
           try {
             const { error: uploadError } = await supabase.storage
               .from(bucket)
@@ -157,6 +157,25 @@ export const flushOfflineAudioQueue = async (): Promise<{ success: number; faile
               const { data: urlData } = supabase.storage.from(bucket).getPublicUrl(filePath);
               publicUrl = urlData?.publicUrl || '';
               uploadSuccess = true;
+
+              // Update school storage quota if schoolId is attached
+              const targetSchoolId = record.schoolId || (record.metadata as any)?.schoolId;
+              if (targetSchoolId && record.blob?.size) {
+                try {
+                  const { data: schoolData } = await supabase
+                    .from('schools')
+                    .select('storage_used_bytes')
+                    .eq('id', targetSchoolId)
+                    .maybeSingle();
+                  if (schoolData) {
+                    const currentBytes = Number(schoolData.storage_used_bytes || 0);
+                    await supabase
+                      .from('schools')
+                      .update({ storage_used_bytes: currentBytes + record.blob.size })
+                      .eq('id', targetSchoolId);
+                  }
+                } catch {}
+              }
               break;
             }
           } catch {
