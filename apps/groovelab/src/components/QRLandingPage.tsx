@@ -239,7 +239,16 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
     if (isAdminOrSecretary) {
       const finalAdminRole = hasAdminRole ? 'admin' : 'secretary';
       if (userData.role !== finalAdminRole) {
-        await supabase.from('users').update({ role: finalAdminRole }).eq('id', userData.id);
+        try {
+          const { error: roleErr } = await supabase.rpc('switch_user_active_role', {
+            p_target_role: finalAdminRole
+          });
+          if (roleErr) {
+            await supabase.from('users').update({ role: finalAdminRole }).eq('id', userData.id);
+          }
+        } catch (e) {
+          await supabase.from('users').update({ role: finalAdminRole }).eq('id', userData.id);
+        }
       }
       sessionStorage.setItem('groovelab_active_workspace', 'secretary');
     }
@@ -1291,15 +1300,35 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           return null;
         };
 
-        // Stage 1: Try combined OR query by authenticatable credentials ONLY
-        if (isUuid) {
-          userData = await executeUserQuery(fields => 
-            supabase.from('users').select(fields).or(`qr_token.eq.${token},teacher_qr_token.eq.${token}`)
-          );
-        } else {
-          userData = await executeUserQuery(fields => 
-            supabase.from('users').select(fields).or(`teacher_qr_token.eq.${token},ausweis_nummer.eq.${token},ausweis_nummer.eq.${upperToken}`)
-          );
+        // Stage 0: Tier-1 Server-Side Authentication RPC (OWASP ASVS Level 3)
+        try {
+          const { data: authResult, error: rpcErr } = await supabase.rpc('authenticate_by_credential', {
+            p_credential: token,
+            p_school_id: null
+          });
+
+          if (!rpcErr && authResult?.success && authResult?.user) {
+            userData = authResult.user;
+            if (authResult.lease_token) {
+              sessionStorage.setItem('gl_active_session_lease_id', authResult.lease_token);
+              localStorage.setItem('gl_active_session_lease_id', authResult.lease_token);
+            }
+          }
+        } catch (e) {
+          console.warn('[QRLanding] authenticate_by_credential exception:', e);
+        }
+
+        // Stage 1: Fallback combined OR query if RPC not present
+        if (!userData) {
+          if (isUuid) {
+            userData = await executeUserQuery(fields => 
+              supabase.from('users').select(fields).or(`qr_token.eq.${token},teacher_qr_token.eq.${token}`)
+            );
+          } else {
+            userData = await executeUserQuery(fields => 
+              supabase.from('users').select(fields).or(`teacher_qr_token.eq.${token},ausweis_nummer.eq.${token},ausweis_nummer.eq.${upperToken}`)
+            );
+          }
         }
 
         // Stage 3: Fallback direct query by teacher_qr_token

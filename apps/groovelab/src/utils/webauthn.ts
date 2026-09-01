@@ -39,6 +39,15 @@ function arrayBufferToBase64url(buffer: ArrayBuffer): string {
 }
 
 /**
+ * Safely extracts and normalizes the Relying Party ID (FQDN hostname without port or path).
+ */
+export const getSanitizedRpId = (): string => {
+  if (typeof window === 'undefined') return 'campus-groovelab.de';
+  const hostname = window.location.hostname;
+  return hostname || 'campus-groovelab.de';
+};
+
+/**
  * Registers a new credential (biometrics) for the user.
  * In a production app, the challenge, rp, and user information would be fetched from the backend first.
  */
@@ -56,7 +65,7 @@ export const registerBiometrics = async (
     challenge: base64urlToArrayBuffer(challengeFromServer),
     rp: {
       name: 'Campus-Groovelab',
-      id: window.location.hostname,
+      id: getSanitizedRpId(),
     },
     user: {
       id: base64urlToArrayBuffer(userId),
@@ -111,6 +120,7 @@ export const authenticateBiometrics = async (
 
   const publicKeyCredentialRequestOptions: PublicKeyCredentialRequestOptions = {
     challenge: base64urlToArrayBuffer(challengeFromServer),
+    rpId: getSanitizedRpId(),
     allowCredentials: allowedCredentialIds.map((id) => ({
       id: base64urlToArrayBuffer(id),
       type: 'public-key',

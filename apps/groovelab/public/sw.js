@@ -1,11 +1,33 @@
-const CACHE_NAME = 'groovelab-static-v170';
-const DYNAMIC_CACHE = 'groovelab-dynamic-v170';
+const CACHE_NAME = 'groovelab-static-v171';
+const DYNAMIC_CACHE = 'groovelab-dynamic-v171';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
   '/manifest.json',
   '/pwa-icon.png'
 ];
+
+// Security Hardening: Allowed origins for background sync & push notifications
+const ALLOWED_PUSH_HOSTS = [
+  'campus-groovelab.de',
+  'supabase.campus-groovelab.de',
+  'localhost',
+  '127.0.0.1',
+  '178.105.10.2'
+];
+
+function isValidPushHost(urlStr) {
+  if (!urlStr) return false;
+  try {
+    const parsed = new URL(urlStr, self.location.origin);
+    const host = parsed.hostname;
+    return ALLOWED_PUSH_HOSTS.some(function(allowed) {
+      return host === allowed || host.endsWith('.' + allowed);
+    });
+  } catch (e) {
+    return false;
+  }
+}
 
 self.addEventListener('install', function(event) {
   event.waitUntil(
@@ -47,6 +69,9 @@ self.addEventListener('push', function(event) {
   if (event.data) {
     try {
       const payload = event.data.json();
+      const targetUrl = payload.url || '/';
+      const safeUrl = isValidPushHost(targetUrl) ? targetUrl : '/';
+
       const options = {
         body: payload.body,
         icon: payload.icon || '/pwa-icon.png',
@@ -55,19 +80,19 @@ self.addEventListener('push', function(event) {
         tag: 'campus-notification',
         renotify: true,
         data: {
-          url: payload.url || '/',
+          url: safeUrl,
           notificationId: payload.notificationId || null,
-          supabaseUrl: payload.supabaseUrl || null,
+          supabaseUrl: (payload.supabaseUrl && isValidPushHost(payload.supabaseUrl)) ? payload.supabaseUrl : null,
           supabaseKey: payload.supabaseKey || null
         }
       };
       event.waitUntil(
-        self.registration.showNotification(payload.title || 'Campus', options)
+        self.registration.showNotification(payload.title || 'Campus-Groovelab', options)
       );
     } catch (e) {
       console.error('Error parsing push data:', e);
       event.waitUntil(
-        self.registration.showNotification('Campus', {
+        self.registration.showNotification('Campus-Groovelab', {
           body: event.data.text(),
           icon: '/pwa-icon.png',
           badge: '/pwa-icon.png',
@@ -91,14 +116,15 @@ self.addEventListener('notificationclick', function(event) {
   const notificationId = event.notification.data?.notificationId;
   const supabaseUrl = event.notification.data?.supabaseUrl;
   const supabaseKey = event.notification.data?.supabaseKey;
-  const url = event.notification.data?.url || '/';
+  const rawUrl = event.notification.data?.url || '/';
+  const url = isValidPushHost(rawUrl) ? rawUrl : '/';
 
   // 1. Immediately focus or open the window
   const navigationPromise = focusOrOpenWindow(url);
 
   // 2. Perform DB update in parallel without blocking client response
   let dbUpdatePromise = Promise.resolve();
-  if (notificationId && supabaseUrl && supabaseKey) {
+  if (notificationId && supabaseUrl && supabaseKey && isValidPushHost(supabaseUrl)) {
     dbUpdatePromise = fetch(`${supabaseUrl}/rest/v1/notifications?id=eq.${notificationId}`, {
       method: 'PATCH',
       headers: {
@@ -124,7 +150,8 @@ self.addEventListener('notificationclick', function(event) {
 });
 
 function focusOrOpenWindow(targetUrl) {
-  const absoluteUrl = new URL(targetUrl, self.location.origin).href;
+  const safeTarget = isValidPushHost(targetUrl) ? targetUrl : '/';
+  const absoluteUrl = new URL(safeTarget, self.location.origin).href;
 
   return clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(clientList) {
     // 1. If we find an active window, navigate and focus it

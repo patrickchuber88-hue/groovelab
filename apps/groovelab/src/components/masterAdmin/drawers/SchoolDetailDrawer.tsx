@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   X, Check, RefreshCw, Eye, HardDrive, Building, 
-  Sliders, ShieldCheck, Trash2, ArrowLeft, Disc3, Mic, Music, Sparkles, ShieldAlert, BookOpen, Clock
+  Sliders, ShieldCheck, Trash2, ArrowLeft, Disc3, Mic, Music, Sparkles, ShieldAlert, BookOpen, Clock, Volume2, Radio, Headphones
 } from 'lucide-react';
 import { DpoAuditPortal } from '../../DpoAuditPortal';
 import { supabase } from '../../../lib/supabase';
@@ -1027,84 +1027,138 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
                 </div>
 
                 {/* Apple-Style Stacked Segmented Bar */}
-                <div style={{ display: 'flex', height: '8px', borderRadius: '4px', overflow: 'hidden', gap: '2px', background: '#f1f5f9' }}>
-                  <div style={{ width: '48%', background: '#10b981', transition: 'width 0.3s ease' }} title="Audio-Biografie (48%)" />
-                  <div style={{ width: '32%', background: '#3b82f6', transition: 'width 0.3s ease' }} title="Loopstation (32%)" />
-                  <div style={{ width: '14%', background: '#f59e0b', transition: 'width 0.3s ease' }} title="Hausaufgaben (14%)" />
-                  <div style={{ width: '6%', background: '#8b5cf6', transition: 'width 0.3s ease' }} title="Meisterwerke (6%)" />
-                </div>
+                {storageUsedBytes <= 0 ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <div style={{ height: '8px', borderRadius: '4px', background: '#f1f5f9', width: '100%' }} />
+                    <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600, textAlign: 'center' }}>
+                      Noch keine Audioaufnahmen erstellt · 0,0 MB von {totalStorageGb} GB belegt (0%)
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', height: '8px', borderRadius: '4px', overflow: 'hidden', gap: '2px', background: '#f1f5f9' }}>
+                    <div style={{ width: '48%', background: '#10b981', transition: 'width 0.3s ease' }} title="Audio-Biografie (48%)" />
+                    <div style={{ width: '32%', background: '#3b82f6', transition: 'width 0.3s ease' }} title="Loopstation (32%)" />
+                    <div style={{ width: '14%', background: '#f59e0b', transition: 'width 0.3s ease' }} title="Hausaufgaben (14%)" />
+                    <div style={{ width: '6%', background: '#8b5cf6', transition: 'width 0.3s ease' }} title="Meisterwerke (6%)" />
+                  </div>
+                )}
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   {/* 1. Platz: Audio-Biografie & Schüler-Protokoll (48%) */}
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#10b981' }} />
-                      <BookOpen size={16} color="#059669" />
+                      <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: storageUsedBytes > 0 ? '#10b981' : '#cbd5e1' }} />
+                      <BookOpen size={16} color={storageUsedBytes > 0 ? '#059669' : '#64748b'} />
                       <div>
                         <div style={{ fontSize: '0.82rem', fontWeight: 750, color: '#1e293b' }}>Audio-Biografie &amp; Schüler-Protokoll</div>
                         <div style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 550 }}>Wöchentliches Unterrichts- &amp; Meilenstein-Archiv</div>
                       </div>
                     </div>
                     <span style={{ fontSize: '0.80rem', fontWeight: 850, color: '#0f172a' }}>
-                      {usedStorageGb < 1.0 
-                        ? `${(usedStorageGb * 1024 * 0.48).toFixed(1).replace('.', ',')} MB (48 %)` 
-                        : `${(usedStorageGb * 0.48).toFixed(2).replace('.', ',')} GB (48 %)`}
+                      {storageUsedBytes <= 0 
+                        ? '0,0 MB (0 %)'
+                        : usedStorageGb < 1.0 
+                          ? `${(usedStorageGb * 1024 * 0.48).toFixed(1).replace('.', ',')} MB (48 %)` 
+                          : `${(usedStorageGb * 0.48).toFixed(2).replace('.', ',')} GB (48 %)`}
                     </span>
                   </div>
 
                   {/* 2. Platz: Loopstation & Übe-Studio (32%) */}
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#3b82f6' }} />
-                      <Disc3 size={16} color="#2563eb" />
+                      <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: storageUsedBytes > 0 ? '#3b82f6' : '#cbd5e1' }} />
+                      <Disc3 size={16} color={storageUsedBytes > 0 ? '#2563eb' : '#64748b'} />
                       <div>
                         <div style={{ fontSize: '0.82rem', fontWeight: 750, color: '#1e293b' }}>Loopstation &amp; Übe-Studio Aufnahmen</div>
                         <div style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 550 }}>Mehrspurige Loops &amp; selbstständige Übe-Sessions</div>
                       </div>
                     </div>
                     <span style={{ fontSize: '0.80rem', fontWeight: 850, color: '#0f172a' }}>
-                      {usedStorageGb < 1.0 
-                        ? `${(usedStorageGb * 1024 * 0.32).toFixed(1).replace('.', ',')} MB (32 %)` 
-                        : `${(usedStorageGb * 0.32).toFixed(2).replace('.', ',')} GB (32 %)`}
+                      {storageUsedBytes <= 0 
+                        ? '0,0 MB (0 %)'
+                        : usedStorageGb < 1.0 
+                          ? `${(usedStorageGb * 1024 * 0.32).toFixed(1).replace('.', ',')} MB (32 %)` 
+                          : `${(usedStorageGb * 0.32).toFixed(2).replace('.', ',')} GB (32 %)`}
                     </span>
                   </div>
 
                   {/* 3. Platz: Hausaufgaben- & Unterrichtsaufnahmen (14%) */}
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#f59e0b' }} />
-                      <Mic size={16} color="#d97706" />
+                      <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: storageUsedBytes > 0 ? '#f59e0b' : '#cbd5e1' }} />
+                      <Mic size={16} color={storageUsedBytes > 0 ? '#d97706' : '#64748b'} />
                       <div>
                         <div style={{ fontSize: '0.82rem', fontWeight: 750, color: '#1e293b' }}>Hausaufgaben- &amp; Unterrichtsaufnahmen</div>
                         <div style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 550 }}>Sprachmemos der Lehrkräfte &amp; Übe-Vorgaben</div>
                       </div>
                     </div>
                     <span style={{ fontSize: '0.80rem', fontWeight: 850, color: '#0f172a' }}>
-                      {usedStorageGb < 1.0 
-                        ? `${(usedStorageGb * 1024 * 0.14).toFixed(1).replace('.', ',')} MB (14 %)` 
-                        : `${(usedStorageGb * 0.14).toFixed(2).replace('.', ',')} GB (14 %)`}
+                      {storageUsedBytes <= 0 
+                        ? '0,0 MB (0 %)'
+                        : usedStorageGb < 1.0 
+                          ? `${(usedStorageGb * 1024 * 0.14).toFixed(1).replace('.', ',')} MB (14 %)` 
+                          : `${(usedStorageGb * 0.14).toFixed(2).replace('.', ',')} GB (14 %)`}
                     </span>
                   </div>
 
                   {/* 4. Platz: Meisterwerk-Dokumentation (6%) */}
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#8b5cf6' }} />
-                      <Sparkles size={16} color="#7c3aed" />
+                      <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: storageUsedBytes > 0 ? '#8b5cf6' : '#cbd5e1' }} />
+                      <Sparkles size={16} color={storageUsedBytes > 0 ? '#7c3aed' : '#64748b'} />
                       <div>
                         <div style={{ fontSize: '0.82rem', fontWeight: 750, color: '#1e293b' }}>Meisterwerk-Dokumentation (Master-Audios)</div>
                         <div style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 550 }}>Kuratiertes Jahresvorspiel-Portfolio &amp; Master-Tracks</div>
                       </div>
                     </div>
                     <span style={{ fontSize: '0.80rem', fontWeight: 850, color: '#0f172a' }}>
-                      {usedStorageGb < 1.0 
-                        ? `${(usedStorageGb * 1024 * 0.06).toFixed(1).replace('.', ',')} MB (6 %)` 
-                        : `${(usedStorageGb * 0.06).toFixed(2).replace('.', ',')} GB (6 %)`}
+                      {storageUsedBytes <= 0 
+                        ? '0,0 MB (0 %)'
+                        : usedStorageGb < 1.0 
+                          ? `${(usedStorageGb * 1024 * 0.06).toFixed(1).replace('.', ',')} MB (6 %)` 
+                          : `${(usedStorageGb * 0.06).toFixed(2).replace('.', ',')} GB (6 %)`}
                     </span>
                   </div>
                 </div>
 
-                <div style={{ marginTop: '8px', padding: '12px 14px', borderRadius: '12px', background: '#ecfdf5', border: '1px solid #a7f3d0', fontSize: '0.74rem', color: '#065f46', lineHeight: '1.5' }}>
+                {/* Audio-Tresor Storage & Capacity Info Box */}
+                {(() => {
+                  const usedFormatted = usedStorageGb < 1.0 
+                    ? `${(usedStorageGb * 1024).toFixed(1).replace('.', ',')} MB` 
+                    : `${usedStorageGb.toFixed(2).replace('.', ',')} GB`;
+                  const approxRemainingHours = Math.max(1, Math.round((freeStorageGb * 1024 * 1024) / (500 * 60)));
+
+                  return (
+                    <div style={{
+                      marginTop: '4px',
+                      padding: '12px 14px',
+                      borderRadius: '12px',
+                      background: '#f8fafc',
+                      border: '1px solid #e2e8f0',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px',
+                      fontSize: '0.74rem',
+                      color: '#334155',
+                      lineHeight: '1.45'
+                    }}>
+                      <Volume2 size={16} color="#059669" style={{ flexShrink: 0 }} />
+                      <div>
+                        {storageUsedBytes <= 0 ? (
+                          <>
+                            <strong style={{ color: '#0f172a' }}>Audio-Tresor Status:</strong> Noch keine Audio-Aufnahmen archiviert · Volle <strong style={{ color: '#047857' }}>{totalStorageGb} GB Speicher</strong> bieten Puffer für über <strong style={{ color: '#047857' }}>{approxRemainingHours} Stunden</strong> Musikaufnahmen.
+                          </>
+                        ) : (
+                          <>
+                            <strong style={{ color: '#0f172a' }}>Audio-Tresor Status:</strong> <strong style={{ color: '#0f172a' }}>{usedFormatted}</strong> echte Audio-Aufnahmen archiviert · <strong style={{ color: '#047857' }}>{freeStorageGb.toFixed(2).replace('.', ',')} GB</strong> freier Speicher bieten Puffer für über <strong style={{ color: '#047857' }}>{approxRemainingHours} Stunden</strong> Musikaufnahmen.
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                <div style={{ marginTop: '4px', padding: '12px 14px', borderRadius: '12px', background: '#ecfdf5', border: '1px solid #a7f3d0', fontSize: '0.74rem', color: '#065f46', lineHeight: '1.5' }}>
                   <strong>DSGVO Art. 17 Physische Löschung:</strong> Alle gelöschten Audio-Einträge werden sofort physisch aus dem Hetzner-Tresor entfernt. Inaktive Demo-Files unterliegen einer 90-Tage-Retention.
                 </div>
               </div>

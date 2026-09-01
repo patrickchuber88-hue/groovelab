@@ -1813,10 +1813,16 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       if ((hasAdminRole || hasSecretaryRole) && user.role !== 'admin' && user.role !== 'secretary') {
         const newRole = hasAdminRole ? 'admin' : 'secretary';
         console.log(`[Role Auto-Switch] User has admin/secretary roles but active role is ${user.role}. Forcing auto-switch to ${newRole}`);
-        await supabase
-          .from('users')
-          .update({ role: newRole })
-          .eq('id', user.id);
+        try {
+          const { error: roleErr } = await supabase.rpc('switch_user_active_role', {
+            p_target_role: newRole
+          });
+          if (roleErr) {
+            await supabase.from('users').update({ role: newRole }).eq('id', user.id);
+          }
+        } catch (e) {
+          await supabase.from('users').update({ role: newRole }).eq('id', user.id);
+        }
         user.role = newRole;
       }
 
@@ -3134,44 +3140,61 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
     setLoading(true);
     setError(null);
     try {
-      console.log('[Login] Attempting manual PIN login...');
+      console.log('[Login] Attempting manual PIN login via server-side auth RPC...');
       const cleanPin = pin.trim();
 
-      sessionStorage.setItem('groovelab_qr_token', cleanPin);
+      let user: any = null;
+      let userErr: any = null;
 
-      let query = supabase
-        .from('users')
-        .select('*, schools(*)');
-      
-      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cleanPin);
-      const upperPin = cleanPin.toUpperCase();
+      // 1. Tier-1 Server-Side Authentication RPC
+      try {
+        const { data: authResult, error: rpcErr } = await supabase.rpc('authenticate_by_credential', {
+          p_credential: cleanPin,
+          p_school_id: schoolData?.id || null
+        });
 
-      if (isUuid) {
-        query = query.or(`qr_token.eq.${cleanPin},teacher_qr_token.eq.${cleanPin}`);
-      } else {
-        query = query.or(`teacher_qr_token.eq.${cleanPin},ausweis_nummer.eq.${cleanPin},ausweis_nummer.eq.${upperPin}`);
+        if (!rpcErr && authResult?.success && authResult?.user) {
+          user = authResult.user;
+          if (authResult.lease_token) {
+            sessionStorage.setItem('gl_active_session_lease_id', authResult.lease_token);
+            localStorage.setItem('gl_active_session_lease_id', authResult.lease_token);
+          }
+        } else if (authResult?.error) {
+          userErr = new Error(authResult.error);
+        } else if (rpcErr) {
+          userErr = rpcErr;
+        }
+      } catch (e: any) {
+        userErr = e;
       }
 
-      if (schoolData?.id) {
-        query = query.eq('school_id', schoolData.id);
-      }
-
-      let { data: user, error: userErr } = await query.maybeSingle();
-      sessionStorage.removeItem('groovelab_qr_token');
-
-      // Fallback for custom admin passwords/PINs stored in ausweis_nummer
-      if (!user) {
-        let fallbackQuery = supabase
+      // 2. Resilient fallback if RPC not yet deployed or transient connection issue
+      if (!user && (!userErr || String(userErr?.message || '').includes('function') || String(userErr?.message || '').includes('PGRST202'))) {
+        sessionStorage.setItem('groovelab_qr_token', cleanPin);
+        let query = supabase
           .from('users')
           .select('*, schools(*)');
         
-        if (schoolData?.id) {
-          fallbackQuery = fallbackQuery.eq('school_id', schoolData.id);
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cleanPin);
+        const upperPin = cleanPin.toUpperCase();
+
+        if (isUuid) {
+          query = query.or(`qr_token.eq.${cleanPin},teacher_qr_token.eq.${cleanPin}`);
+        } else {
+          query = query.or(`teacher_qr_token.eq.${cleanPin},ausweis_nummer.eq.${cleanPin},ausweis_nummer.eq.${upperPin}`);
         }
-        const { data: fallbackUser } = await fallbackQuery.eq('ausweis_nummer', cleanPin).maybeSingle();
+
+        if (schoolData?.id) {
+          query = query.eq('school_id', schoolData.id);
+        }
+
+        const { data: fallbackUser, error: fallbackErr } = await query.maybeSingle();
+        sessionStorage.removeItem('groovelab_qr_token');
         if (fallbackUser) {
           user = fallbackUser;
           userErr = null;
+        } else if (fallbackErr) {
+          userErr = fallbackErr;
         }
       }
 
@@ -3480,21 +3503,54 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
     try {
       console.log('[Login] Processing QR login token...');
 
-      // 1. User finden
-      sessionStorage.setItem('groovelab_qr_token', qrToken);
-      let query = supabase.from('users').select('*, schools(*)');
-      
-      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(qrToken);
-      const upperToken = qrToken.toUpperCase();
+      // 1. User finden via server-side Auth RPC
+      let user: any = null;
+      let userErr: any = null;
 
-      if (isUuid) {
-        query = query.or(`qr_token.eq.${qrToken},teacher_qr_token.eq.${qrToken}`);
-      } else {
-        query = query.or(`teacher_qr_token.eq.${qrToken},ausweis_nummer.eq.${qrToken},ausweis_nummer.eq.${upperToken}`);
+      try {
+        const { data: authResult, error: rpcErr } = await supabase.rpc('authenticate_by_credential', {
+          p_credential: qrToken,
+          p_school_id: schoolData?.id || null
+        });
+
+        if (!rpcErr && authResult?.success && authResult?.user) {
+          user = authResult.user;
+          if (authResult.lease_token) {
+            sessionStorage.setItem('gl_active_session_lease_id', authResult.lease_token);
+            localStorage.setItem('gl_active_session_lease_id', authResult.lease_token);
+          }
+        } else if (authResult?.error) {
+          userErr = new Error(authResult.error);
+        } else if (rpcErr) {
+          userErr = rpcErr;
+        }
+      } catch (e: any) {
+        userErr = e;
       }
-      
-      const { data: user, error: userErr } = await query.maybeSingle();
-      sessionStorage.removeItem('groovelab_qr_token');
+
+      // Fallback
+      if (!user) {
+        sessionStorage.setItem('groovelab_qr_token', qrToken);
+        let query = supabase.from('users').select('*, schools(*)');
+        
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(qrToken);
+        const upperToken = qrToken.toUpperCase();
+
+        if (isUuid) {
+          query = query.or(`qr_token.eq.${qrToken},teacher_qr_token.eq.${qrToken}`);
+        } else {
+          query = query.or(`teacher_qr_token.eq.${qrToken},ausweis_nummer.eq.${qrToken},ausweis_nummer.eq.${upperToken}`);
+        }
+        
+        const { data: fallbackUser, error: fallbackErr } = await query.maybeSingle();
+        sessionStorage.removeItem('groovelab_qr_token');
+        if (fallbackUser) {
+          user = fallbackUser;
+          userErr = null;
+        } else if (fallbackErr) {
+          userErr = fallbackErr;
+        }
+      }
 
       if (userErr || !user) throw new Error('Nutzer nicht gefunden.');
 

@@ -20,7 +20,21 @@ export const audioStorageCleanup = {
       }
 
       // 2. If stored in Supabase Storage, delete from the audio bucket
-      if (audioUrl.includes('supabase.co/storage/v1/object/public/')) {
+      if (audioUrl.includes('/storage/v1/object/public/')) {
+        const urlParts = audioUrl.split('/storage/v1/object/public/');
+        if (urlParts.length === 2) {
+          const pathSegments = urlParts[1].split('/');
+          const bucket = pathSegments[0];
+          const objectPath = pathSegments.slice(1).join('/');
+
+          if (bucket && objectPath) {
+            const { error } = await supabase.storage.from(bucket).remove([objectPath]);
+            if (error) {
+              console.warn('[AudioCleanup] Supabase Storage remove warning:', error.message);
+            }
+          }
+        }
+      } else if (audioUrl.includes('supabase.co/storage/v1/object/public/')) {
         const urlParts = audioUrl.split('/public/');
         if (urlParts.length === 2) {
           const pathSegments = urlParts[1].split('/');

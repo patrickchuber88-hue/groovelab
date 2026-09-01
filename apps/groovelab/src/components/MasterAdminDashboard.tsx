@@ -2626,9 +2626,27 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
         localStorage.setItem('campus_ghost_audit_trail', JSON.stringify([newLog, ...existingAudit].slice(0, 50)));
       } catch (e) {}
 
+      let ghostToken = '';
+      try {
+        const { data: ghostRpcData } = await supabase.rpc('activate_support_ghost_session', {
+          p_school_id: school.id,
+          p_target_user_id: targetUserId || null,
+          p_role: 'admin',
+          p_reason: 'Master Admin Diagnostics'
+        });
+        if (ghostRpcData?.ghost_lease_token) {
+          ghostToken = ghostRpcData.ghost_lease_token;
+          localStorage.setItem('gl_active_session_lease_id', ghostToken);
+          sessionStorage.setItem('gl_active_session_lease_id', ghostToken);
+        }
+      } catch (e) {
+        console.warn('[Ghost] activate_support_ghost_session exception:', e);
+      }
+
       const userParam = targetUserId ? `&ghost_user_id=${targetUserId}` : '';
+      const tokenParam = ghostToken ? `&ghost_lease_token=${ghostToken}` : '';
       localStorage.setItem('groovelab_ghost_auth_token', Date.now().toString());
-      const url = `${window.location.origin}/?school_id=${school.id}&support_ghost=true&role=admin${userParam}&ts=${Date.now()}`;
+      const url = `${window.location.origin}/?school_id=${school.id}&support_ghost=true&role=admin${userParam}${tokenParam}&ts=${Date.now()}`;
       window.open(url, '_blank');
       setSaveSuccessToast(`Ghost-Sitzung für „${school.name}“ im neuen Tab geöffnet (Kürzel: ⌥+Q).`);
       setTimeout(() => setSaveSuccessToast(null), 3000);

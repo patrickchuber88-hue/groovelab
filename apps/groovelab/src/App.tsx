@@ -2454,6 +2454,11 @@ function App() {
     const ghostRole = ghostUrlParams.get('role') || 
                       sessionStorage.getItem('groovelab_ghost_active_role') || 
                       'admin';
+    const ghostLeaseToken = ghostUrlParams.get('ghost_lease_token');
+    if (ghostLeaseToken) {
+      sessionStorage.setItem('gl_active_session_lease_id', ghostLeaseToken);
+      localStorage.setItem('gl_active_session_lease_id', ghostLeaseToken);
+    }
 
     const isMasterAuth = sessionStorage.getItem('groovelab_is_master_admin') === 'true' || 
                          localStorage.getItem('groovelab_is_master_admin') === 'true';
@@ -3452,28 +3457,46 @@ function App() {
       console.log(`[PublicPassView] Detected campus pass token in URL: ${urlCampusPassToken}`);
       const fetchPublicPass = async () => {
         try {
-          setLoadingPublicPass(true);
-          const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(urlCampusPassToken);
-          const upperToken = urlCampusPassToken.toUpperCase();
-          let passQuery = supabase
-            .from('users')
-            .select('id, first_name, last_name, role, email, instrument, qr_token, photo_url, school_id, ausweis_id, ausweis_nummer');
-          if (isUuid) {
-            passQuery = passQuery.or(`qr_token.eq.${urlCampusPassToken},teacher_qr_token.eq.${urlCampusPassToken}`);
-          } else {
-            passQuery = passQuery.or(`teacher_qr_token.eq.${urlCampusPassToken},ausweis_nummer.eq.${urlCampusPassToken},ausweis_nummer.eq.${upperToken}`);
+          // Stage 0: Tier-1 Server-Side Authentication RPC
+          let passData: any = null;
+          try {
+            const { data: authResult, error: rpcErr } = await supabase.rpc('authenticate_by_credential', {
+              p_credential: urlCampusPassToken,
+              p_school_id: null
+            });
+            if (!rpcErr && authResult?.success && authResult?.user) {
+              passData = authResult.user;
+              if (authResult.lease_token) {
+                sessionStorage.setItem('gl_active_session_lease_id', authResult.lease_token);
+                localStorage.setItem('gl_active_session_lease_id', authResult.lease_token);
+              }
+            }
+          } catch (e) {
+            console.warn('[PublicPassView] authenticate_by_credential fallback:', e);
           }
-          const { data, error } = await passQuery.maybeSingle();
-            
-          if (error) {
-            console.error('[PublicPassView] Supabase error fetching user for pass:', error);
-            return;
+
+          if (!passData) {
+            const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(urlCampusPassToken);
+            const upperToken = urlCampusPassToken.toUpperCase();
+            let passQuery = supabase
+              .from('users')
+              .select('id, first_name, last_name, role, email, instrument, qr_token, photo_url, school_id, ausweis_id, ausweis_nummer');
+            if (isUuid) {
+              passQuery = passQuery.or(`qr_token.eq.${urlCampusPassToken},teacher_qr_token.eq.${urlCampusPassToken}`);
+            } else {
+              passQuery = passQuery.or(`teacher_qr_token.eq.${urlCampusPassToken},ausweis_nummer.eq.${urlCampusPassToken},ausweis_nummer.eq.${upperToken}`);
+            }
+            const { data, error } = await passQuery.maybeSingle();
+            if (error) {
+              console.error('[PublicPassView] Supabase error fetching user for pass:', error);
+            }
+            if (data) passData = data;
           }
           
-          if (data) {
-            console.log('[PublicPassView] User pass loaded successfully:', data.first_name);
-            setPublicPassUser(data);
-            document.title = `Campus Pass | ${data.first_name} ${data.last_name}`;
+          if (passData) {
+            console.log('[PublicPassView] User pass loaded successfully:', passData.first_name);
+            setPublicPassUser(passData);
+            document.title = `Campus Pass | ${passData.first_name || ''} ${passData.last_name || ''}`.trim();
           }
         } catch (err) {
           console.error('[PublicPassView] Unexpected crash during fetch:', err);
@@ -6788,6 +6811,10 @@ function App() {
       setIsCampusUnlocked(false);
       sessionStorage.removeItem('groovelab_user_id');
       sessionStorage.removeItem('groovelab_location_mode');
+      sessionStorage.removeItem('gl_active_session_lease_id');
+      localStorage.removeItem('gl_active_session_lease_id');
+      sessionStorage.removeItem('gl_global_device_key');
+      localStorage.removeItem('gl_global_device_key');
       localStorage.removeItem('groovelab_user_id');
       localStorage.removeItem('groovelab_location_mode');
       localStorage.removeItem('groovelab_active_tab');
@@ -6814,7 +6841,6 @@ function App() {
       setSession(null);
       setIsCampusUnlocked(false);
       sessionStorage.removeItem('groovelab_user_id');
-      sessionStorage.removeItem('groovelab_user_id');
       sessionStorage.removeItem('groovelab_location_mode');
       sessionStorage.removeItem('groovelab_cached_user');
       sessionStorage.removeItem('groovelab_active_tab');
@@ -6822,6 +6848,10 @@ function App() {
       sessionStorage.removeItem('groovelab_active_platform');
       sessionStorage.removeItem('groovelab_active_workspace');
       sessionStorage.removeItem('groovelab_secretary_subtab');
+      sessionStorage.removeItem('gl_active_session_lease_id');
+      localStorage.removeItem('gl_active_session_lease_id');
+      sessionStorage.removeItem('gl_global_device_key');
+      localStorage.removeItem('gl_global_device_key');
 
       // If the device has a coupled station (not general uncoupled kiosk), do not pass kiosk_room_id
       // to avoid triggering auto-bootstrap on load which would overwrite the coupled station.
@@ -6856,6 +6886,10 @@ function App() {
     sessionStorage.removeItem('campus_active_tab');
     sessionStorage.removeItem('groovelab_active_workspace');
     sessionStorage.removeItem('groovelab_secretary_subtab');
+    sessionStorage.removeItem('gl_active_session_lease_id');
+    localStorage.removeItem('gl_active_session_lease_id');
+    sessionStorage.removeItem('gl_global_device_key');
+    localStorage.removeItem('gl_global_device_key');
 
     window.location.replace(getRedirectUrl());
   };
@@ -7950,12 +7984,17 @@ function App() {
       }
 
       // 2. Await database role update FIRST before triggering platform/tab refetches
-      const { error } = await supabase
-        .from('users')
-        .update({ role: newRole })
-        .eq('id', userId);
-      if (error) {
-        console.warn('Role update in Supabase notice:', error.message);
+      try {
+        const { error: rpcErr } = await supabase.rpc('switch_user_active_role', {
+          p_target_role: newRole
+        });
+        if (rpcErr) {
+          console.warn('[Role Switch] switch_user_active_role fallback notice:', rpcErr.message);
+          await supabase.from('users').update({ role: newRole }).eq('id', userId);
+        }
+      } catch (err: any) {
+        console.warn('[Role Switch] Error:', err);
+        await supabase.from('users').update({ role: newRole }).eq('id', userId);
       }
 
       // 3. Update active workspace and platform tabs
@@ -13787,7 +13826,7 @@ function App() {
                                 <a 
                                   href={song.media_link} 
                                   target="_blank" 
-                                  rel="noreferrer" 
+                                  rel="noopener noreferrer" 
                                   style={{ 
                                     color: '#2563eb', 
                                     fontSize: '0.75rem', 

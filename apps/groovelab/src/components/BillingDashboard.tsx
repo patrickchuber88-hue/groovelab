@@ -95,6 +95,8 @@ interface Invoice {
   storageAddonGb: number;
   storageUsedBytes: number;
   storageAddonMonthlyFee: number;
+  contractStartDate?: string | null;
+  createdAt?: string | null;
 }
 
 interface PlatformSummary {
@@ -328,12 +330,22 @@ Ihr Campus-Groovelab Abrechnungsteam`;
     fetchBillingData();
   };
 
-  const getSchoolInvoices = (schoolId: string, currentInvoiceAmount: number, schoolStatus?: string) => {
-    const storedDate = localStorage.getItem(`contractStartDate_${schoolId}`) || localStorage.getItem('contractStartDate');
-    const contractDateObj = storedDate ? new Date(storedDate) : new Date('2026-07-01T12:00:00Z');
+  const getSchoolInvoices = (
+    schoolId: string, 
+    currentInvoiceAmount: number, 
+    schoolStatus?: string,
+    contractStartDate?: string | null,
+    createdAt?: string | null
+  ) => {
+    let storedDate: string | null = null;
+    if (typeof window !== 'undefined') {
+      storedDate = localStorage.getItem(`contractStartDate_${schoolId}`);
+    }
+    const validDateStr = contractStartDate || createdAt || storedDate;
+    const contractDateObj = validDateStr ? new Date(validDateStr) : new Date();
     
-    const startYear = contractDateObj.getFullYear();
-    const startMonth = contractDateObj.getMonth() + 1;
+    const startYear = isNaN(contractDateObj.getFullYear()) ? new Date().getFullYear() : contractDateObj.getFullYear();
+    const startMonth = isNaN(contractDateObj.getMonth()) ? (new Date().getMonth() + 1) : (contractDateObj.getMonth() + 1);
 
     const systemDate = new Date();
     const currentYear = systemDate.getFullYear();
@@ -394,6 +406,9 @@ Ihr Campus-Groovelab Abrechnungsteam`;
   };
 
   useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('contractStartDate');
+    }
     fetchBillingData();
 
     const handleSchoolUpdate = () => {
@@ -484,7 +499,7 @@ Ihr Campus-Groovelab Abrechnungsteam`;
       invoices.forEach(inv => {
         if (inv.total <= 0 && inv.status !== 'active') return;
 
-        const schoolInvs = getSchoolInvoices(inv.schoolId, inv.total, inv.status);
+        const schoolInvs = getSchoolInvoices(inv.schoolId, inv.total, inv.status, inv.contractStartDate, inv.createdAt);
         const deMonthsMap: Record<string, number> = {
           'Januar': 1, 'Februar': 2, 'März': 3, 'April': 4,
           'Mai': 5, 'Juni': 6, 'Juli': 7, 'August': 8,
@@ -1056,7 +1071,9 @@ Campus-Groovelab Mahnwesen & Rechtsabteilung`;
           activeGroovelabCount: stats.groovelabStudents,
           storageAddonGb: stats.storageAddonGb,
           storageUsedBytes: stats.storageUsedBytes,
-          storageAddonMonthlyFee: stats.storageAddonMonthlyFee
+          storageAddonMonthlyFee: stats.storageAddonMonthlyFee,
+          contractStartDate: school.contract_start_date || null,
+          createdAt: school.created_at || null
         };
       });
 
@@ -1089,10 +1106,14 @@ Campus-Groovelab Mahnwesen & Rechtsabteilung`;
         }
 
         const schoolInvoicesFromDb = realInvoices.filter(i => i.school_id === inv.schoolId);
-        const storedDate = localStorage.getItem(`contractStartDate_${inv.schoolId}`) || localStorage.getItem('contractStartDate');
-        const contractDateObj = storedDate ? new Date(storedDate) : new Date('2026-07-01T12:00:00Z');
-        const startYear = contractDateObj.getFullYear();
-        const startMonth = contractDateObj.getMonth() + 1;
+        let storedDate: string | null = null;
+        if (typeof window !== 'undefined') {
+          storedDate = localStorage.getItem(`contractStartDate_${inv.schoolId}`);
+        }
+        const validDateStr = inv.contractStartDate || inv.createdAt || storedDate;
+        const contractDateObj = validDateStr ? new Date(validDateStr) : new Date();
+        const startYear = isNaN(contractDateObj.getFullYear()) ? new Date().getFullYear() : contractDateObj.getFullYear();
+        const startMonth = isNaN(contractDateObj.getMonth()) ? (new Date().getMonth() + 1) : (contractDateObj.getMonth() + 1);
         const systemDate = new Date();
         const currentYear = systemDate.getFullYear();
         const currentMonth = systemDate.getMonth() + 1;
@@ -2371,7 +2392,7 @@ Campus-Groovelab Mahnwesen & Rechtsabteilung`;
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '360px', overflowY: 'auto', paddingRight: '4px' }}>
                     {(() => {
-                      const generated = getSchoolInvoices(inv.schoolId, inv.total, inv.status);
+                      const generated = getSchoolInvoices(inv.schoolId, inv.total, inv.status, inv.contractStartDate, inv.createdAt);
                       const dbInvs = dbInvoices.filter(i => i.school_id === inv.schoolId);
                       const allCombined = [
                         ...dbInvs.map(i => ({
