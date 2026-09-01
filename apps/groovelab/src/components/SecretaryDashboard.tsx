@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, lazy, Suspense } from 'react';
 import { supabase, deleteUserStorageAssets } from '../lib/supabase';
 import { useRealNamesVisibility, maskLastName, sanitizeBirthDateToDayOnly, formatTeacherFullName } from '../utils/nameHelper';
 import { useMasterPricing } from '../context/MasterPricingContext';
@@ -15,36 +15,36 @@ import {
   Disc3, Menu
 } from 'lucide-react';
 import { isWebAuthnSupported, registerUserBiometrics, authenticateUserBiometrics, getStoredBiometricProfiles, removeBiometricProfile, BiometricVaultProfile } from '../utils/webauthn';
-import { TeacherDashboard } from './TeacherDashboard';
 import { usePremiumOnboardingTour, TourStartButton, TourStep } from './PremiumOnboardingTour';
-import { AdminDashboard } from './AdminDashboard';
-import { SecretaryDutiesView } from './secretary/SecretaryDutiesView';
-import { SecretaryCrisisView } from './secretary/SecretaryCrisisView';
-import { SecretaryEquipmentView } from './secretary/SecretaryEquipmentView';
-import { SecretaryAuditView } from './secretary/SecretaryAuditView';
-import { PilotOnboardingModal } from './PilotOnboardingModal';
-import { AVVModal } from './AVVModal';
-import { StudentDetailModal } from './StudentDetailModal';
-import { TeacherDetailModal } from './TeacherDetailModal';
-import { CampusEventsBoard } from './CampusEventsBoard';
 import { CampusGroovelabBrand, CampusGroovelabText, CampusGroovelabLogo } from './CampusGroovelabBrand';
-import { CampusTeacherDashboard } from './CampusTeacherDashboard';
 import QRCode from 'react-qr-code';
 import { getInstrumentAvatarUrl } from './StudioAvatar';
 import { QRCodeModal } from './QRCodeModal';
-import { InvoicePreviewModal } from './InvoicePreviewModal';
-import { DpoIdCardModal } from './DpoIdCardModal';
-import { DpoAuditPortal } from './DpoAuditPortal';
-import { FeedbackHubModal } from './feedback/FeedbackHubModal';
 import { UpdateAnnouncementHero } from './common/UpdateAnnouncementHero';
 import { ResponsiveContainer, PieChart as RechartsPieChart, Pie, Cell } from 'recharts';
-import { ConfirmDeleteStudentModal, StudentToDelete } from './ConfirmDeleteStudentModal';
+import { StudentToDelete } from './ConfirmDeleteStudentModal';
 import { deleteStudentFully } from '../utils/studentDeletionService';
-import { BulkImportModal } from './common/BulkImportModal';
-import { GuidanceCenterModal } from './modals/GuidanceCenterModal';
-import { ParentInfoSheetModal } from './modals/ParentInfoSheetModal';
-import { generateTeacherQuickstartPDF, generateParentQuickstartPDF } from '../utils/pdfGenerator';
 import { getParentOnboardingUrl, isDevEnvironment } from '../utils/tenantUrlHelper';
+
+// Lazy load heavy auxiliary modals and views on demand
+const SecretaryDutiesView = lazy(() => import('./secretary/SecretaryDutiesView').then(m => ({ default: m.SecretaryDutiesView })));
+const SecretaryCrisisView = lazy(() => import('./secretary/SecretaryCrisisView').then(m => ({ default: m.SecretaryCrisisView })));
+const SecretaryEquipmentView = lazy(() => import('./secretary/SecretaryEquipmentView').then(m => ({ default: m.SecretaryEquipmentView })));
+const SecretaryAuditView = lazy(() => import('./secretary/SecretaryAuditView').then(m => ({ default: m.SecretaryAuditView })));
+const AdminDashboard = lazy(() => import('./AdminDashboard').then(m => ({ default: m.AdminDashboard })));
+const CampusEventsBoard = lazy(() => import('./CampusEventsBoard').then(m => ({ default: m.CampusEventsBoard })));
+const PilotOnboardingModal = lazy(() => import('./PilotOnboardingModal').then(m => ({ default: m.PilotOnboardingModal })));
+const AVVModal = lazy(() => import('./AVVModal').then(m => ({ default: m.AVVModal })));
+const StudentDetailModal = lazy(() => import('./StudentDetailModal').then(m => ({ default: m.StudentDetailModal })));
+const TeacherDetailModal = lazy(() => import('./TeacherDetailModal').then(m => ({ default: m.TeacherDetailModal })));
+const InvoicePreviewModal = lazy(() => import('./InvoicePreviewModal').then(m => ({ default: m.InvoicePreviewModal })));
+const DpoIdCardModal = lazy(() => import('./DpoIdCardModal').then(m => ({ default: m.DpoIdCardModal })));
+const DpoAuditPortal = lazy(() => import('./DpoAuditPortal').then(m => ({ default: m.DpoAuditPortal })));
+const FeedbackHubModal = lazy(() => import('./feedback/FeedbackHubModal').then(m => ({ default: m.FeedbackHubModal })));
+const ConfirmDeleteStudentModal = lazy(() => import('./ConfirmDeleteStudentModal').then(m => ({ default: m.ConfirmDeleteStudentModal })));
+const BulkImportModal = lazy(() => import('./common/BulkImportModal').then(m => ({ default: m.BulkImportModal })));
+const GuidanceCenterModal = lazy(() => import('./modals/GuidanceCenterModal').then(m => ({ default: m.GuidanceCenterModal })));
+const ParentInfoSheetModal = lazy(() => import('./modals/ParentInfoSheetModal').then(m => ({ default: m.ParentInfoSheetModal })));
 import { calculateSchoolYearDirectBilling, calculateTransitionEffectiveDate } from '../utils/epcGiroCode';
 import { 
   fetchSchoolRoster, 
@@ -10030,79 +10030,81 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
     }, []);
 
     return (
-      <SecretaryDutiesView
-        duties={dutiesList}
-        dutiesLoading={dutiesLoading}
-        allUniqueTeachers={allUniqueTeachers}
-        editingDutyId={editingDutyId}
-        setEditingDutyId={setEditingDutyId}
-        newDutyTitle={newDutyTitle}
-        setNewDutyTitle={setNewDutyTitle}
-        newDutyDescription={newDutyDescription}
-        setNewDutyDescription={setNewDutyDescription}
-        newDutyType={newDutyType}
-        setNewDutyType={setNewDutyType}
-        newDutyPriority={newDutyPriority}
-        setNewDutyPriority={setNewDutyPriority}
-        newDutyTargetType={newDutyTargetType}
-        setNewDutyTargetType={setNewDutyTargetType}
-        newDutyTargetGroup={newDutyTargetGroup}
-        setNewDutyTargetGroup={setNewDutyTargetGroup}
-        newDutyTargetTeacherId={newDutyTargetTeacherId}
-        setNewDutyTargetTeacherId={setNewDutyTargetTeacherId}
-        newDutyDueDate={newDutyDueDate}
-        setNewDutyDueDate={setNewDutyDueDate}
-        newDutyRecurrence={newDutyRecurrence}
-        setNewDutyRecurrence={setNewDutyRecurrence}
-        newDutyAttachmentUrl={newDutyAttachmentUrl}
-        setNewDutyAttachmentUrl={setNewDutyAttachmentUrl}
-        newDutyQuestions={newDutyQuestions}
-        setNewDutyQuestions={setNewDutyQuestions}
-        uploadingDutyAttachment={isUploadingDutyAttachment}
-        handleUploadDutyAttachment={handleUploadDutyAttachment}
-        handleSaveDuty={handleCreateDuty}
-        handleDeleteDuty={handleDeleteDuty}
-        handleEditDuty={(duty) => {
-          setEditingDutyId(duty.id);
-          setNewDutyTitle(duty.title);
-          setNewDutyDescription(duty.description || '');
-          setNewDutyType(duty.questions ? 'questionnaire' : 'todo');
-          setNewDutyQuestions(duty.questions || []);
-          setNewDutyPriority(duty.priority || 'standard');
-          setNewDutyTargetType(duty.target_type || 'all');
-          setNewDutyTargetGroup(duty.target_group || 'guitar');
-          setNewDutyTargetTeacherId(duty.target_teacher_id || '');
-          setNewDutyDueDate(duty.due_date ? duty.due_date.split('T')[0] : '');
-          setNewDutyRecurrence((duty.recurrence as any) || 'none');
-          setNewDutyAttachmentUrl(duty.attachment_url || '');
-        }}
-        handleResetDutyForm={() => {
-          setEditingDutyId(null);
-          setNewDutyTitle('');
-          setNewDutyDescription('');
-          setNewDutyType('todo');
-          setNewDutyQuestions([]);
-          setNewDutyPriority('standard');
-          setNewDutyTargetType('all');
-          setNewDutyDueDate('');
-          setNewDutyRecurrence('none');
-          setNewDutyAttachmentUrl('');
-        }}
-        selectedDutyForStats={selectedDutyForStats}
-        setSelectedDutyForStats={setSelectedDutyForStats}
-        dutyResponses={dutyResponsesList}
-        fetchDutyStats={fetchDutyStats}
-        statsModalTab={statsModalTab}
-        setStatsModalTab={setStatsModalTab}
-        statsStatusFilter={statsStatusFilter}
-        setStatsStatusFilter={setStatsStatusFilter}
-        statsSearchQuery={statsSearchQuery}
-        setStatsSearchQuery={setStatsSearchQuery}
-        expandedResponseIds={expandedResponseIds}
-        setExpandedResponseIds={setExpandedResponseIds}
-        handleExportDutyPdf={() => window.print()}
-        handleExportDutyCsv={() => handleExportCSV(selectedDutyForStats)}
-      />
+      <Suspense fallback={<div style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>Lade Dienstgeschäfte...</div>}>
+        <SecretaryDutiesView
+          duties={dutiesList}
+          dutiesLoading={dutiesLoading}
+          allUniqueTeachers={allUniqueTeachers}
+          editingDutyId={editingDutyId}
+          setEditingDutyId={setEditingDutyId}
+          newDutyTitle={newDutyTitle}
+          setNewDutyTitle={setNewDutyTitle}
+          newDutyDescription={newDutyDescription}
+          setNewDutyDescription={setNewDutyDescription}
+          newDutyType={newDutyType}
+          setNewDutyType={setNewDutyType}
+          newDutyPriority={newDutyPriority}
+          setNewDutyPriority={setNewDutyPriority}
+          newDutyTargetType={newDutyTargetType}
+          setNewDutyTargetType={setNewDutyTargetType}
+          newDutyTargetGroup={newDutyTargetGroup}
+          setNewDutyTargetGroup={setNewDutyTargetGroup}
+          newDutyTargetTeacherId={newDutyTargetTeacherId}
+          setNewDutyTargetTeacherId={setNewDutyTargetTeacherId}
+          newDutyDueDate={newDutyDueDate}
+          setNewDutyDueDate={setNewDutyDueDate}
+          newDutyRecurrence={newDutyRecurrence}
+          setNewDutyRecurrence={setNewDutyRecurrence}
+          newDutyAttachmentUrl={newDutyAttachmentUrl}
+          setNewDutyAttachmentUrl={setNewDutyAttachmentUrl}
+          newDutyQuestions={newDutyQuestions}
+          setNewDutyQuestions={setNewDutyQuestions}
+          uploadingDutyAttachment={isUploadingDutyAttachment}
+          handleUploadDutyAttachment={handleUploadDutyAttachment}
+          handleSaveDuty={handleCreateDuty}
+          handleDeleteDuty={handleDeleteDuty}
+          handleEditDuty={(duty) => {
+            setEditingDutyId(duty.id);
+            setNewDutyTitle(duty.title);
+            setNewDutyDescription(duty.description || '');
+            setNewDutyType(duty.duty_type as any);
+            setNewDutyQuestions(duty.questions || []);
+            setNewDutyPriority((duty.priority as any) || 'standard');
+            setNewDutyTargetType(duty.target_type as any);
+            setNewDutyTargetGroup(duty.target_group || 'all');
+            setNewDutyTargetTeacherId(duty.target_teacher_id || '');
+            setNewDutyDueDate(duty.due_date ? duty.due_date.split('T')[0] : '');
+            setNewDutyRecurrence((duty.recurrence as any) || 'none');
+            setNewDutyAttachmentUrl(duty.attachment_url || '');
+          }}
+          handleResetDutyForm={() => {
+            setEditingDutyId(null);
+            setNewDutyTitle('');
+            setNewDutyDescription('');
+            setNewDutyType('todo');
+            setNewDutyQuestions([]);
+            setNewDutyPriority('standard');
+            setNewDutyTargetType('all');
+            setNewDutyDueDate('');
+            setNewDutyRecurrence('none');
+            setNewDutyAttachmentUrl('');
+          }}
+          selectedDutyForStats={selectedDutyForStats}
+          setSelectedDutyForStats={setSelectedDutyForStats}
+          dutyResponses={dutyResponsesList}
+          fetchDutyStats={fetchDutyStats}
+          statsModalTab={statsModalTab}
+          setStatsModalTab={setStatsModalTab}
+          statsStatusFilter={statsStatusFilter}
+          setStatsStatusFilter={setStatsStatusFilter}
+          statsSearchQuery={statsSearchQuery}
+          setStatsSearchQuery={setStatsSearchQuery}
+          expandedResponseIds={expandedResponseIds}
+          setExpandedResponseIds={setExpandedResponseIds}
+          handleExportDutyPdf={() => window.print()}
+          handleExportDutyCsv={() => handleExportCSV(selectedDutyForStats)}
+        />
+      </Suspense>
     );
   };
 
@@ -17334,21 +17336,23 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
 
         {/* TAB 1.1: SECRETARY - CRISIS */}
         {activeTab === 'secretary' && secretarySubTab === 'crisis' && (
-          <SecretaryCrisisView
-            crisisNotifications={crisisNotifications}
-            crisisTabMode={crisisTabMode}
-            setCrisisTabMode={setCrisisTabMode}
-            selectedCrisisTeacherId={selectedCrisisTeacherId}
-            setSelectedCrisisTeacherId={setSelectedCrisisTeacherId}
-            handleMarkAsNotified={handleMarkAsNotified}
-            handleArchiveCrisisTicket={handleArchiveCrisisTicket}
-            handleArchiveAllResolvedTickets={handleArchiveAllResolvedTickets}
-            handleEndSickOnBehalf={handleEndSickOnBehalf}
-            expandedLiveDayStr={expandedLiveDayStr}
-            setExpandedLiveDayStr={setExpandedLiveDayStr}
-            selectedArchiveLog={selectedArchiveLog}
-            setSelectedArchiveLog={setSelectedArchiveLog}
-          />
+          <Suspense fallback={<div style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>Lade Vertretungs- &amp; Krisenmanagement...</div>}>
+            <SecretaryCrisisView
+              crisisNotifications={crisisNotifications}
+              crisisTabMode={crisisTabMode}
+              setCrisisTabMode={setCrisisTabMode}
+              selectedCrisisTeacherId={selectedCrisisTeacherId}
+              setSelectedCrisisTeacherId={setSelectedCrisisTeacherId}
+              handleMarkAsNotified={handleMarkAsNotified}
+              handleArchiveCrisisTicket={handleArchiveCrisisTicket}
+              handleArchiveAllResolvedTickets={handleArchiveAllResolvedTickets}
+              handleEndSickOnBehalf={handleEndSickOnBehalf}
+              expandedLiveDayStr={expandedLiveDayStr}
+              setExpandedLiveDayStr={setExpandedLiveDayStr}
+              selectedArchiveLog={selectedArchiveLog}
+              setSelectedArchiveLog={setSelectedArchiveLog}
+            />
+          </Suspense>
         )}
 
         {/* TAB 1.5: SECRETARY - EMPLOYEES */}
@@ -19428,26 +19432,30 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
               {/* Subtab: Campus Räume */}
               {campusSubTab === 'rooms' && (
                 <div style={{ flex: 1, minWidth: 0, height: '85vh', overflowY: 'auto' }}>
-                  <AdminDashboard
-                    userId={userId || ''}
-                    onLogout={onLogout || (() => {})}
-                    forceTab="rooms"
-                    activePlatform="campus"
-                    hideHeader={true}
-                  />
+                  <Suspense fallback={<div style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>Lade Raumverwaltung...</div>}>
+                    <AdminDashboard
+                      userId={userId || ''}
+                      onLogout={onLogout || (() => {})}
+                      forceTab="rooms"
+                      activePlatform="campus"
+                      hideHeader={true}
+                    />
+                  </Suspense>
                 </div>
               )}
 
               {/* Subtab: Termine Board */}
               {campusSubTab === 'events' && (
                 <div style={{ flex: 1, minWidth: 0, width: '100%', boxSizing: 'border-box' }}>
-                  <CampusEventsBoard
-                    userId={userId || ''}
-                    role="secretary"
-                    schoolId={schoolId}
-                    supabase={supabase}
-                    brandColor="#34a853"
-                  />
+                  <Suspense fallback={<div style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>Lade Termine &amp; Kalender...</div>}>
+                    <CampusEventsBoard
+                      userId={userId || ''}
+                      role="secretary"
+                      schoolId={schoolId}
+                      supabase={supabase}
+                      brandColor="#34a853"
+                    />
+                  </Suspense>
                 </div>
               )}
 
@@ -30803,51 +30811,53 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
 
         {/* TAB 1.7.5: SECRETARY - EQUIPMENT */}
         {activeTab === 'secretary' && secretarySubTab === 'equipment' && (
-          <SecretaryEquipmentView
-            schoolId={schoolId}
-            schoolEquipment={schoolEquipment}
-            rooms={rooms}
-            selectedEquipmentRoomId={selectedEquipmentRoomId === 'All' ? null : selectedEquipmentRoomId}
-            setSelectedEquipmentRoomId={(id: string | null) => setSelectedEquipmentRoomId(id || 'All')}
-            equipmentFormName={equipmentFormName}
-            setEquipmentFormName={setEquipmentFormName}
-            equipmentFormQty={equipmentFormQty}
-            setEquipmentFormQty={setEquipmentFormQty}
-            equipmentSaving={equipmentSaving}
-            handleSaveEquipment={handleSaveEquipment}
-            equipmentSearchQuery={equipmentSearchQuery}
-            setEquipmentSearchQuery={setEquipmentSearchQuery}
-            equipmentSortFreeFirst={equipmentSortFreeFirst}
-            setEquipmentSortFreeFirst={setEquipmentSortFreeFirst}
-            dragOverRoomId={dragOverRoomId}
-            setDragOverRoomId={setDragOverRoomId}
-            handleDropInstrumentOnRoom={handleDropInstrumentOnRoom}
-            editingEquipmentGroup={editingEquipmentGroup}
-            setEditingEquipmentGroup={setEditingEquipmentGroup}
-            editGroupName={editGroupName}
-            setEditGroupName={setEditGroupName}
-            editGroupModel={editGroupModel}
-            setEditGroupModel={setEditGroupModel}
-            editGroupLink={editGroupLink}
-            setEditGroupLink={setEditGroupLink}
-            editGroupCoupled={editGroupCoupled}
-            setEditGroupCoupled={setEditGroupCoupled}
-            editGroupQty={editGroupQty}
-            setEditGroupQty={setEditGroupQty}
-            editGroupInstancesData={editGroupInstancesData}
-            setEditGroupInstancesData={setEditGroupInstancesData}
-            handleSaveGroupEdit={handleSaveEquipmentGroup}
-            handleDeleteEquipmentGroup={async () => {
-              if (!editingEquipmentGroup) return;
-              for (const inst of editingEquipmentGroup.instances) {
-                await handleDeleteEquipment(inst.id);
-              }
-              setEditingEquipmentGroup(null);
-            }}
-            equipmentNameInputRef={equipmentNameInputRef}
-            equipmentQtyInputRef={equipmentQtyInputRef}
-            parseRoomName={parseRoomName}
-          />
+          <Suspense fallback={<div style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>Lade Inventar &amp; Instrumente...</div>}>
+            <SecretaryEquipmentView
+              schoolId={schoolId}
+              schoolEquipment={schoolEquipment}
+              rooms={rooms}
+              selectedEquipmentRoomId={selectedEquipmentRoomId === 'All' ? null : selectedEquipmentRoomId}
+              setSelectedEquipmentRoomId={(id: string | null) => setSelectedEquipmentRoomId(id || 'All')}
+              equipmentFormName={equipmentFormName}
+              setEquipmentFormName={setEquipmentFormName}
+              equipmentFormQty={equipmentFormQty}
+              setEquipmentFormQty={setEquipmentFormQty}
+              equipmentSaving={equipmentSaving}
+              handleSaveEquipment={handleSaveEquipment}
+              equipmentSearchQuery={equipmentSearchQuery}
+              setEquipmentSearchQuery={setEquipmentSearchQuery}
+              equipmentSortFreeFirst={equipmentSortFreeFirst}
+              setEquipmentSortFreeFirst={setEquipmentSortFreeFirst}
+              dragOverRoomId={dragOverRoomId}
+              setDragOverRoomId={setDragOverRoomId}
+              handleDropInstrumentOnRoom={handleDropInstrumentOnRoom}
+              editingEquipmentGroup={editingEquipmentGroup}
+              setEditingEquipmentGroup={setEditingEquipmentGroup}
+              editGroupName={editGroupName}
+              setEditGroupName={setEditGroupName}
+              editGroupModel={editGroupModel}
+              setEditGroupModel={setEditGroupModel}
+              editGroupLink={editGroupLink}
+              setEditGroupLink={setEditGroupLink}
+              editGroupCoupled={editGroupCoupled}
+              setEditGroupCoupled={setEditGroupCoupled}
+              editGroupQty={editGroupQty}
+              setEditGroupQty={setEditGroupQty}
+              editGroupInstancesData={editGroupInstancesData}
+              setEditGroupInstancesData={setEditGroupInstancesData}
+              handleSaveGroupEdit={handleSaveEquipmentGroup}
+              handleDeleteEquipmentGroup={async () => {
+                if (!editingEquipmentGroup) return;
+                for (const inst of editingEquipmentGroup.instances) {
+                  await handleDeleteEquipment(inst.id);
+                }
+                setEditingEquipmentGroup(null);
+              }}
+              equipmentNameInputRef={equipmentNameInputRef}
+              equipmentQtyInputRef={equipmentQtyInputRef}
+              parseRoomName={parseRoomName}
+            />
+          </Suspense>
         )}
 
         {/* TAB 1.8: SECRETARY - SETUP */}
@@ -32508,67 +32518,75 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
         )}
         {activeTab === 'secretary' && secretarySubTab === 'duties' && renderDutiesBoard()}
         {activeTab === 'secretary' && secretarySubTab === 'audit' && (
-          <SecretaryAuditView
-            auditLogs={auditLogs}
-            auditLoading={auditLoading}
-            auditSearchQuery={auditSearchQuery}
-            setAuditSearchQuery={setAuditSearchQuery}
-            auditActionFilter={auditActionFilter}
-            setAuditActionFilter={setAuditActionFilter}
-            auditLimit={auditLimit}
-            setAuditLimit={setAuditLimit}
-            userMap={userMap}
-            exportAuditLogsToCsv={exportAuditLogsToCsv}
-            translateKey={translateKey}
-            translateValue={translateValue}
-          />
+          <Suspense fallback={<div style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>Lade Audit-Logbuch...</div>}>
+            <SecretaryAuditView
+              auditLogs={auditLogs}
+              auditLoading={auditLoading}
+              auditSearchQuery={auditSearchQuery}
+              setAuditSearchQuery={setAuditSearchQuery}
+              auditActionFilter={auditActionFilter}
+              setAuditActionFilter={setAuditActionFilter}
+              auditLimit={auditLimit}
+              setAuditLimit={setAuditLimit}
+              userMap={userMap}
+              exportAuditLogsToCsv={exportAuditLogsToCsv}
+              translateKey={translateKey}
+              translateValue={translateValue}
+            />
+          </Suspense>
         )}
 
       </div>
       {selectedStudentForDetail && (
-        <StudentDetailModal 
-          student={selectedStudentForDetail} 
-          onClose={() => {
-            setSelectedStudentForDetail(null);
-            fetchDashboardData();
-          }} 
-          callerDashboard="secretary"
-          activePlatform={activeTab}
-          onSwitchPlatform={(newPlatform) => {
-            setActiveTab(newPlatform);
-            if (newPlatform === 'campus') {
-              setCampusSubTab('briefing');
-            } else if (newPlatform === 'groovelab') {
-              setGroovelabSubTab('live');
-            }
-          }}
-        />
+        <Suspense fallback={null}>
+          <StudentDetailModal 
+            student={selectedStudentForDetail} 
+            onClose={() => {
+              setSelectedStudentForDetail(null);
+              fetchDashboardData();
+            }} 
+            callerDashboard="secretary"
+            activePlatform={activeTab}
+            onSwitchPlatform={(newPlatform) => {
+              setActiveTab(newPlatform);
+              if (newPlatform === 'campus') {
+                setCampusSubTab('briefing');
+              } else if (newPlatform === 'groovelab') {
+                setGroovelabSubTab('live');
+              }
+            }}
+          />
+        </Suspense>
       )}
-      <ConfirmDeleteStudentModal
-        isOpen={!!deleteStudentModalData}
-        student={deleteStudentModalData}
-        activePlatform={activeTab === 'campus' ? 'campus' : activeTab === 'groovelab' ? 'groovelab' : 'all'}
-        onClose={() => setDeleteStudentModalData(null)}
-        onConfirm={async (studentId) => {
-          const sName = deleteStudentModalData?.name;
-          const res = await deleteStudentFully(studentId, {
-            activePlatform: activeTab === 'campus' ? 'campus' : activeTab === 'groovelab' ? 'groovelab' : 'all',
-            isCampusActive: deleteStudentModalData?.isCampusActive,
-            isGroovelabActive: deleteStudentModalData?.isGroovelabActive,
-            studentName: sName
-          });
-          if (!res.success) {
-            throw new Error(res.error);
-          }
-          const fName = sName ? sName.trim().split(/\s+/)[0].toLowerCase() : '';
-          setStudents((prev: any[]) => prev.filter((s: any) => {
-            if (s.id === studentId) return false;
-            if (fName && s.first_name && s.first_name.toLowerCase().trim() === fName) return false;
-            return true;
-          }));
-          await fetchDashboardData();
-        }}
-      />
+      {deleteStudentModalData && (
+        <Suspense fallback={null}>
+          <ConfirmDeleteStudentModal
+            isOpen={!!deleteStudentModalData}
+            student={deleteStudentModalData}
+            activePlatform={activeTab === 'campus' ? 'campus' : activeTab === 'groovelab' ? 'groovelab' : 'all'}
+            onClose={() => setDeleteStudentModalData(null)}
+            onConfirm={async (studentId) => {
+              const sName = deleteStudentModalData?.name;
+              const res = await deleteStudentFully(studentId, {
+                activePlatform: activeTab === 'campus' ? 'campus' : activeTab === 'groovelab' ? 'groovelab' : 'all',
+                isCampusActive: deleteStudentModalData?.isCampusActive,
+                isGroovelabActive: deleteStudentModalData?.isGroovelabActive,
+                studentName: sName
+              });
+              if (!res.success) {
+                throw new Error(res.error);
+              }
+              const fName = sName ? sName.trim().split(/\s+/)[0].toLowerCase() : '';
+              setStudents((prev: any[]) => prev.filter((s: any) => {
+                if (s.id === studentId) return false;
+                if (fName && s.first_name && s.first_name.toLowerCase().trim() === fName) return false;
+                return true;
+              }));
+              await fetchDashboardData();
+            }}
+          />
+        </Suspense>
+      )}
       {showBulkDeleteModal && (
         <div style={{
           position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
@@ -32732,10 +32750,12 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
         </div>
       )}
       {selectedCoachProfile && (
-        <TeacherDetailModal
-          teacher={selectedCoachProfile}
-          onClose={() => setSelectedCoachProfile(null)}
-        />
+        <Suspense fallback={null}>
+          <TeacherDetailModal
+            teacher={selectedCoachProfile}
+            onClose={() => setSelectedCoachProfile(null)}
+          />
+        </Suspense>
       )}
       {manageTeacher && (() => {
         const isCampus = manageTeacher.isCampusActive || manageTeacher.is_campus_active;
@@ -33940,7 +33960,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
 
             doc.setFontSize(7.5);
             doc.setTextColor(148, 163, 184);
-            doc.text('Campus-Groovelab • Transparentes Cloud-Hosting statt teurer Software-Lizenzen. (0,00 € Lizenzgebühr).', 22, 266);
+            doc.text('Campus-Groovelab • Transparentes Cloud-Hosting statt teurer Software-Lizenzen (0,00 € Software-Bereitstellung).', 22, 266);
 
             doc.save(`Elternbrief_Campus_Direktabrechnung_${effectiveSchoolName.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`);
           } catch (e: any) {
@@ -34912,44 +34932,46 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
 
       {/* Modal for Invoice Preview / Print */}
       {selectedInvoice && (
-        <InvoicePreviewModal
-          invoice={{
-            id: selectedInvoice.id,
-            date: selectedInvoice.date,
-            dueDateStr: selectedInvoice.dueDateStr,
-            amount: selectedInvoice.type === 'AKT' ? selectedInvoice.amount : (selectedInvoice.isCurrentMonth ? currentTotalB2B_global : selectedInvoice.amount),
-            status: selectedInvoice.status,
-            type: selectedInvoice.type,
-            isCurrentMonth: selectedInvoice.isCurrentMonth,
-            hasCampus: hasCampusSub || campusActivatedThisMonth,
-            hasGroovelab: hasGroovelabSub || groovelabActivatedThisMonth,
-            totalTeachersCount: billableTeachersCount,
-            activeCampusCount: activeStudentsCount_global,
-            activeGroovelabCount: activeGroovelabStudentsCount_global,
-            passiveStudentsCount: passiveStudentsCount_global,
-            isSammelzahler: isSammelzahler,
-            activeStudentFee: (isSammelzahler ? activeStudentsCount_global * effectiveSchoolRates.priceStudent : 0) + (activeGroovelabStudentsCount_global * effectiveSchoolRates.priceStudent),
-            storageAddonGb: Number(currentSchoolProfile?.storage_addon_gb || selectedStorageAddonGb || 0),
-            storageAddonMonthlyFee: selectedStorageAddonFee || Number(currentSchoolProfile?.storage_addon_monthly_fee || 0),
-            activationsCount: selectedInvoice.activationsCount,
-            studentFee: selectedInvoice.studentFee,
-            restmonate: selectedInvoice.restmonate
-          }}
-          schoolName={schoolName}
-          schoolStreet={schoolStreet ? `${schoolStreet} ${schoolHouseNumber || ''}`.trim() : ''}
-          schoolZipCode={schoolZipCode}
-          schoolCity={schoolCity}
-          operatorCompany={operatorCompany}
-          operatorContact={operatorContact}
-          operatorStreet={operatorStreet}
-          operatorZip={operatorZip}
-          operatorCity={operatorCity}
-          operatorIban={operatorIban}
-          operatorBic={operatorBic}
-          billingPayer={billingPayer}
-          studentBillingOption={studentBillingOption}
-          onClose={() => setSelectedInvoice(null)}
-        />
+        <Suspense fallback={null}>
+          <InvoicePreviewModal
+            invoice={{
+              id: selectedInvoice.id,
+              date: selectedInvoice.date,
+              dueDateStr: selectedInvoice.dueDateStr,
+              amount: selectedInvoice.type === 'AKT' ? selectedInvoice.amount : (selectedInvoice.isCurrentMonth ? currentTotalB2B_global : selectedInvoice.amount),
+              status: selectedInvoice.status,
+              type: selectedInvoice.type,
+              isCurrentMonth: selectedInvoice.isCurrentMonth,
+              hasCampus: hasCampusSub || campusActivatedThisMonth,
+              hasGroovelab: hasGroovelabSub || groovelabActivatedThisMonth,
+              totalTeachersCount: billableTeachersCount,
+              activeCampusCount: activeStudentsCount_global,
+              activeGroovelabCount: activeGroovelabStudentsCount_global,
+              passiveStudentsCount: passiveStudentsCount_global,
+              isSammelzahler: isSammelzahler,
+              activeStudentFee: (isSammelzahler ? activeStudentsCount_global * effectiveSchoolRates.priceStudent : 0) + (activeGroovelabStudentsCount_global * effectiveSchoolRates.priceStudent),
+              storageAddonGb: Number(currentSchoolProfile?.storage_addon_gb || selectedStorageAddonGb || 0),
+              storageAddonMonthlyFee: selectedStorageAddonFee || Number(currentSchoolProfile?.storage_addon_monthly_fee || 0),
+              activationsCount: selectedInvoice.activationsCount,
+              studentFee: selectedInvoice.studentFee,
+              restmonate: selectedInvoice.restmonate
+            }}
+            schoolName={schoolName}
+            schoolStreet={schoolStreet ? `${schoolStreet} ${schoolHouseNumber || ''}`.trim() : ''}
+            schoolZipCode={schoolZipCode}
+            schoolCity={schoolCity}
+            operatorCompany={operatorCompany}
+            operatorContact={operatorContact}
+            operatorStreet={operatorStreet}
+            operatorZip={operatorZip}
+            operatorCity={operatorCity}
+            operatorIban={operatorIban}
+            operatorBic={operatorBic}
+            billingPayer={billingPayer}
+            studentBillingOption={studentBillingOption}
+            onClose={() => setSelectedInvoice(null)}
+          />
+        </Suspense>
       )}
 
       {/* Cancel Confirmation Modal */}
@@ -35416,38 +35438,42 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
         />
       )}
       {showPilotAgreementModalFromDashboard && userId && (
-        <PilotOnboardingModal
-          schoolId={schoolId}
-          userId={userId}
-          onComplete={() => {
-            setShowPilotAgreementModalFromDashboard(false);
-            fetchDashboardData();
-          }}
-          onShowPrivacy={() => setShowPrivacy(true)}
-          onShowAgb={() => setShowAgb(true)}
-        />
+        <Suspense fallback={null}>
+          <PilotOnboardingModal
+            schoolId={schoolId}
+            userId={userId}
+            onComplete={() => {
+              setShowPilotAgreementModalFromDashboard(false);
+              fetchDashboardData();
+            }}
+            onShowPrivacy={() => setShowPrivacy(true)}
+            onShowAgb={() => setShowAgb(true)}
+          />
+        </Suspense>
       )}
       {showAvvModal && (
-        <AVVModal
-          isOpen={showAvvModal}
-          onClose={() => setShowAvvModal(false)}
-          school={currentSchoolProfile || { id: schoolId, name: schoolName || 'Musikschule' }}
-          onAVVSigned={() => {
-            const nowIso = new Date().toISOString();
-            setIsAvvSigned(true);
-            if (schoolId) {
-              localStorage.setItem(`groovelab_avv_signed_${schoolId}`, nowIso);
-            }
-            if (currentSchoolProfile?.id) {
-              localStorage.setItem(`groovelab_avv_signed_${currentSchoolProfile.id}`, nowIso);
-            }
-            setCurrentSchoolProfile((prev: any) => ({
-              ...(prev || {}),
-              avv_signed_at: nowIso
-            }));
-            fetchDashboardData();
-          }}
-        />
+        <Suspense fallback={null}>
+          <AVVModal
+            isOpen={showAvvModal}
+            onClose={() => setShowAvvModal(false)}
+            school={currentSchoolProfile || { id: schoolId, name: schoolName || 'Musikschule' }}
+            onAVVSigned={() => {
+              const nowIso = new Date().toISOString();
+              setIsAvvSigned(true);
+              if (schoolId) {
+                localStorage.setItem(`groovelab_avv_signed_${schoolId}`, nowIso);
+              }
+              if (currentSchoolProfile?.id) {
+                localStorage.setItem(`groovelab_avv_signed_${currentSchoolProfile.id}`, nowIso);
+              }
+              setCurrentSchoolProfile((prev: any) => ({
+                ...(prev || {}),
+                avv_signed_at: nowIso
+              }));
+              fetchDashboardData();
+            }}
+          />
+        </Suspense>
       )}
 
       {/* ─── Unassigned-Warning Modal ─── */}
@@ -36219,12 +36245,16 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
       <TourComponent />
 
       {/* DPO ID Card Modal (Art. 38 DSGVO) */}
-      <DpoIdCardModal
-        isOpen={showDpoIdCardModal}
-        onClose={() => setShowDpoIdCardModal(false)}
-        schoolName={schoolName || 'Stadtmusikschule'}
-        schoolId={schoolId}
-      />
+      {showDpoIdCardModal && (
+        <Suspense fallback={null}>
+          <DpoIdCardModal
+            isOpen={showDpoIdCardModal}
+            onClose={() => setShowDpoIdCardModal(false)}
+            schoolName={schoolName || 'Stadtmusikschule'}
+            schoolId={schoolId}
+          />
+        </Suspense>
+      )}
 
       {/* DPO Audit Portal Modal */}
       {showDpoPortalModal && (
@@ -36238,61 +36268,79 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
           background: '#ffffff',
           overflowY: 'auto'
         }}>
-          <DpoAuditPortal
-            onClose={() => setShowDpoPortalModal(false)}
-            schoolName={schoolName || 'Stadtmusikschule'}
-          />
+          <Suspense fallback={null}>
+            <DpoAuditPortal
+              onClose={() => setShowDpoPortalModal(false)}
+              schoolName={schoolName || 'Stadtmusikschule'}
+            />
+          </Suspense>
         </div>
       )}
 
       {/* Smarter CSV/Excel Bulk-Import Modal */}
-      <BulkImportModal
-        isOpen={showBulkImportModal}
-        onClose={() => setShowBulkImportModal(false)}
-        schoolId={schoolId}
-        schoolName={schoolName || currentSchoolProfile?.name || 'Stadtmusikschule'}
-        teachers={allUniqueTeacherProfiles.map((t: any) => ({ id: t.id, name: t.name || `${t.firstName || ''} ${t.lastName || ''}`.trim() }))}
-        onImportComplete={() => {
-          fetchDashboardData();
-        }}
-      />
+      {showBulkImportModal && (
+        <Suspense fallback={null}>
+          <BulkImportModal
+            isOpen={showBulkImportModal}
+            onClose={() => setShowBulkImportModal(false)}
+            schoolId={schoolId}
+            schoolName={schoolName || currentSchoolProfile?.name || 'Stadtmusikschule'}
+            teachers={allUniqueTeacherProfiles.map((t: any) => ({ id: t.id, name: t.name || `${t.firstName || ''} ${t.lastName || ''}`.trim() }))}
+            onImportComplete={() => {
+              fetchDashboardData();
+            }}
+          />
+        </Suspense>
+      )}
 
       {/* Personalisierbares Eltern-Informationsblatt (PDF) Modal */}
-      <ParentInfoSheetModal
-        isOpen={showParentInfoSheetModal}
-        onClose={() => setShowParentInfoSheetModal(false)}
-        schoolData={{
-          name: schoolName || currentSchoolProfile?.name || 'Unsere Musikschule',
-          subdomain: currentSchoolProfile?.subdomain || '',
-          logo_url: currentSchoolProfile?.logo_url || '',
-          city: currentSchoolProfile?.city || '',
-          student_billing_option: currentSchoolProfile?.student_billing_option || 'school_all',
-          email: currentSchoolProfile?.email || ''
-        }}
-        activePlatformDefault={activeTab === 'campus' ? 'campus' : activeTab === 'groovelab' ? 'groovelab' : 'both'}
-      />
+      {showParentInfoSheetModal && (
+        <Suspense fallback={null}>
+          <ParentInfoSheetModal
+            isOpen={showParentInfoSheetModal}
+            onClose={() => setShowParentInfoSheetModal(false)}
+            schoolData={{
+              name: schoolName || currentSchoolProfile?.name || 'Unsere Musikschule',
+              subdomain: currentSchoolProfile?.subdomain || '',
+              logo_url: currentSchoolProfile?.logo_url || '',
+              city: currentSchoolProfile?.city || '',
+              student_billing_option: currentSchoolProfile?.student_billing_option || 'school_all',
+              email: currentSchoolProfile?.email || ''
+            }}
+            activePlatformDefault={activeTab === 'campus' ? 'campus' : activeTab === 'groovelab' ? 'groovelab' : 'both'}
+          />
+        </Suspense>
+      )}
 
       {/* Interaktives In-App Leitfaden & Eltern-Info Modal */}
-      <GuidanceCenterModal
-        isOpen={showGuidanceModal}
-        onClose={() => setShowGuidanceModal(false)}
-        schoolName={schoolName || currentSchoolProfile?.name || 'Stadtmusikschule'}
-        schoolSubdomain={currentSchoolProfile?.subdomain}
-        activePlatform={activePlatform as any}
-        initialTab={guidanceInitialTab}
-      />
+      {showGuidanceModal && (
+        <Suspense fallback={null}>
+          <GuidanceCenterModal
+            isOpen={showGuidanceModal}
+            onClose={() => setShowGuidanceModal(false)}
+            schoolName={schoolName || currentSchoolProfile?.name || 'Stadtmusikschule'}
+            schoolSubdomain={currentSchoolProfile?.subdomain}
+            activePlatform={activePlatform as any}
+            initialTab={guidanceInitialTab}
+          />
+        </Suspense>
+      )}
 
       {/* Platform-wide Feedback & Ideenschmiede Modal */}
-      <FeedbackHubModal
-        isOpen={isFeedbackModalOpen}
-        onClose={() => setIsFeedbackModalOpen(false)}
-        userRole="secretary"
-        userId={userId}
-        userName={schoolName ? `${schoolName} Verwaltung` : 'Verwaltung'}
-        schoolId={currentSchoolProfile?.id || schoolId}
-        schoolName={schoolName || currentSchoolProfile?.name}
-        activePlatform={activeTab === 'secretary' ? 'admin_desk' : activeTab}
-      />
+      {isFeedbackModalOpen && (
+        <Suspense fallback={null}>
+          <FeedbackHubModal
+            isOpen={isFeedbackModalOpen}
+            onClose={() => setIsFeedbackModalOpen(false)}
+            userRole="secretary"
+            userId={userId}
+            userName={schoolName ? `${schoolName} Verwaltung` : 'Verwaltung'}
+            schoolId={currentSchoolProfile?.id || schoolId}
+            schoolName={schoolName || currentSchoolProfile?.name}
+            activePlatform={activeTab === 'secretary' ? 'admin_desk' : activeTab}
+          />
+        </Suspense>
+      )}
     </div>
   </div>
 );

@@ -233,6 +233,35 @@ export const cleanNotesText = (text: string | null | undefined): string => {
     .trim();
 };
 
+/**
+ * Filters notes specifically for a student in a group or duo setting.
+ * - General notes (not starting with @) are shown to everyone.
+ * - Notes starting with @Name: (matching student's first name, case-insensitive) or @Alle: are shown to this student.
+ * - Notes starting with @OtherName: (where OtherName does not match) are filtered out for this student.
+ */
+export const filterNotesForStudent = (text: string | null | undefined, studentFirstName?: string): string => {
+  const cleaned = cleanNotesText(text);
+  if (!cleaned || !studentFirstName) return cleaned;
+  
+  const firstNameLower = studentFirstName.trim().toLowerCase();
+  
+  return cleaned
+    .split('\n')
+    .filter(line => {
+      const trimmed = line.trim();
+      if (!trimmed.startsWith('@')) return true; // General note
+      
+      const colonIdx = trimmed.indexOf(':');
+      if (colonIdx === -1) return true;
+      
+      const tagTarget = trimmed.substring(1, colonIdx).trim().toLowerCase();
+      if (tagTarget === 'alle' || tagTarget === 'all' || tagTarget === 'gruppe') return true;
+      
+      return tagTarget === firstNameLower;
+    })
+    .join('\n')
+    .trim();
+};
 
 export const checkIsAudioTresorActive = (studentObj?: any): boolean => {
   if (typeof window !== 'undefined') {

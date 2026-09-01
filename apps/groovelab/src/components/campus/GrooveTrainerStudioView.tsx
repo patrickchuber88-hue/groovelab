@@ -1,0 +1,2051 @@
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { 
+  Play, 
+  Square, 
+  RotateCcw, 
+  Sparkles, 
+  Zap, 
+  Activity, 
+  Volume2, 
+  VolumeX, 
+  Award, 
+  SlidersHorizontal, 
+  Flame, 
+  Music, 
+  Target, 
+  Star, 
+  Trophy, 
+  Radio, 
+  Headphones, 
+  Clock, 
+  FastForward, 
+  Gauge, 
+  CircleDot, 
+  Check, 
+  Sliders,
+  Layers,
+  Compass,
+  ChevronRight,
+  Bluetooth,
+  TrendingUp,
+  Lightbulb,
+  CheckCircle2,
+  Lock
+} from 'lucide-react';
+
+export interface GrooveTrainerProps {
+  student?: any;
+  onClose?: () => void;
+  onRewardXp?: (xp: number) => void;
+  initialBpm?: number;
+  uiLevel?: 'junior' | 'teen' | 'pro';
+  embedded?: boolean;
+  homeworkNotesList?: string[];
+}
+
+type RhythmLevel = 'viertel' | 'achtel' | 'synkopen' | 'shuffle';
+type TrainingMode = 'call_response' | 'continuous' | 'disappearing_beat' | 'tempo_sprint';
+type SoundKitType = 'acoustic' | 'body_percussion' | 'urban_808' | 'latin';
+
+interface LevelConfig {
+  id: RhythmLevel;
+  title: string;
+  subtitle: string;
+  defaultBpm: number;
+  subdivisions: number;
+  syllables: string[];
+  targetPattern: boolean[];
+  badge: string;
+}
+
+interface HitRecord {
+  id: number;
+  offsetMs: number;
+  rating: 'pocket' | 'good' | 'rush' | 'drag' | 'miss';
+  bar: number;
+  step: number;
+}
+
+const RHYTHM_LEVELS: LevelConfig[] = [
+  {
+    id: 'viertel',
+    title: 'Level 1: Viertel-Puls (4/4)',
+    subtitle: 'Der Grund-Puls: Finde den Herzschlag der Musik',
+    defaultBpm: 85,
+    subdivisions: 4,
+    syllables: ['TA', 'TA', 'TA', 'TA'],
+    targetPattern: [true, true, true, true],
+    badge: 'Basis-Puls'
+  },
+  {
+    id: 'achtel',
+    title: 'Level 2: Achtel-Groove',
+    subtitle: 'Fließender Rhythmus: 1 und 2 und 3 und 4 und',
+    defaultBpm: 90,
+    subdivisions: 8,
+    syllables: ['1', 'und', '2', 'und', '3', 'und', '4', 'und'],
+    targetPattern: [true, true, true, true, true, true, true, true],
+    badge: 'Subdivision'
+  },
+  {
+    id: 'synkopen',
+    title: 'Level 3: Off-Beat & Synkopen',
+    subtitle: 'Funk & Reggae: Spiele genau zwischen den Schlägen',
+    defaultBpm: 95,
+    subdivisions: 8,
+    syllables: ['·', 'UND', '·', 'UND', '·', 'UND', '·', 'UND'],
+    targetPattern: [false, true, false, true, false, true, false, true],
+    badge: 'Off-Beat'
+  },
+  {
+    id: 'shuffle',
+    title: 'Level 4: Blues & Triolen-Shuffle',
+    subtitle: 'Swung Feel: Das rollende Triolen-Gefühl',
+    defaultBpm: 75,
+    subdivisions: 12,
+    syllables: ['SCHO', 'ko', 'LA', 'de', 'SCHO', 'ko', 'LA', 'de', 'SCHO', 'ko', 'LA', 'de'],
+    targetPattern: [true, false, true, false, true, false, true, false, true, false, true, false],
+    badge: 'Swing'
+  }
+];
+
+const SOUND_KITS: { id: SoundKitType; label: string }[] = [
+  { id: 'acoustic', label: 'Drums' },
+  { id: 'body_percussion', label: 'Body Percussion' },
+  { id: 'urban_808', label: 'Urban 808' },
+  { id: 'latin', label: 'Latin Congas' }
+];
+
+export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
+  student,
+  onClose,
+  onRewardXp,
+  initialBpm = 85,
+  uiLevel = 'teen',
+  embedded = false,
+  homeworkNotesList
+}) => {
+  const [selectedLevel, setSelectedLevel] = useState<RhythmLevel>('viertel');
+  const [trainingMode, setTrainingMode] = useState<TrainingMode>('call_response');
+  const [soundKit, setSoundKit] = useState<SoundKitType>('acoustic');
+  const [bpm, setBpm] = useState<number>(initialBpm);
+  const [isPlaying, setIsPlaying] = useState<boolean>(false);
+  const [isMuted, setIsMuted] = useState<boolean>(false);
+  const [isBassEnabled, setIsBassEnabled] = useState<boolean>(true);
+  const [isProMode, setIsProMode] = useState<boolean>(false);
+
+  // Persistent Student XP & Session Vault Accumulator
+  const [studentBaseXp, setStudentBaseXp] = useState<number>(() => {
+    if (typeof window !== 'undefined' && student?.id) {
+      const stored = localStorage.getItem(`campus_bonus_xp_${student.id}`);
+      return stored ? Number(stored) : (student?.xp || 0);
+    }
+    return student?.xp || 0;
+  });
+  const [sessionAccumulatedXp, setSessionAccumulatedXp] = useState<number>(0);
+
+  // Source of calibration detection
+  const [calibrationSource, setCalibrationSource] = useState<'trainer' | 'loopstation' | 'bluetooth' | 'default'>('default');
+
+  // Hardware Latency Calibration state (in milliseconds) with Loopstation Sync Cascade
+  const [latencyOffsetMs, setLatencyOffsetMs] = useState<number>(() => {
+    if (typeof window !== 'undefined') {
+      const trainerStored = localStorage.getItem('campus_timing_latency_offset');
+      if (trainerStored !== null) {
+        const val = Number(trainerStored);
+        if (!isNaN(val) && val >= -100 && val <= 250) return val;
+      }
+
+      const loopstationStored = localStorage.getItem('groovelab_latency_offset');
+      if (loopstationStored !== null) {
+        const val = Number(loopstationStored);
+        if (!isNaN(val) && val >= -100 && val <= 250) return val;
+      }
+
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith('groovelab_latency_dev_')) {
+          const val = Number(localStorage.getItem(k));
+          if (!isNaN(val) && val >= -100 && val <= 250) return val;
+        }
+      }
+    }
+    return 25; // Standard 25ms CoreAudio default
+  });
+
+  const [isBluetoothDetected, setIsBluetoothDetected] = useState<boolean>(false);
+  const [showCalibrationModal, setShowCalibrationModal] = useState<boolean>(false);
+
+  // 4-Tap Quick Calibration Wizard State
+  const [is4TapWizardActive, setIs4TapWizardActive] = useState<boolean>(false);
+  const [wizardTapCount, setWizardTapCount] = useState<number>(0);
+  const [wizardMeasuredOffsets, setWizardMeasuredOffsets] = useState<number[]>([]);
+  const [wizardSuccessMessage, setWizardSuccessMessage] = useState<string | null>(null);
+
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const isRunningRef = useRef<boolean>(false);
+  const playbackStartTimeRef = useRef<number>(0);
+  const nextBeatTimeRef = useRef<number>(0);
+  const currentStepRef = useRef<number>(0);
+  const barCountRef = useRef<number>(0);
+  const timerIntervalRef = useRef<number | null>(null);
+  const completionCooldownRef = useRef<number>(0);
+
+  const [currentStep, setCurrentStep] = useState<number>(0);
+  const [anticipatingStep, setAnticipatingStep] = useState<number | null>(null);
+  const [currentBar, setCurrentBar] = useState<number>(0);
+  const [isCallPhase, setIsCallPhase] = useState<boolean>(true);
+  const [isDisappeared, setIsDisappeared] = useState<boolean>(false);
+  
+  const [timingOffsetMs, setTimingOffsetMs] = useState<number | null>(null);
+  const [isCenterAuraPulse, setIsCenterAuraPulse] = useState<boolean>(false);
+  const [lastRating, setLastRating] = useState<'pocket' | 'good' | 'rush' | 'drag' | 'miss' | null>(null);
+  const [pocketStreak, setPocketStreak] = useState<number>(0);
+  const [bestStreak, setBestStreak] = useState<number>(0);
+  const [totalHits, setTotalHits] = useState<number>(0);
+  const [scoreSum, setScoreSum] = useState<number>(0);
+  const [perfectHits, setPerfectHits] = useState<number>(0);
+  const [sessionCompleted, setSessionCompleted] = useState<boolean>(false);
+  const [awardedRoundXp, setAwardedRoundXp] = useState<number>(0);
+  const [isPadPressed, setIsPadPressed] = useState<boolean>(false);
+
+  // Hit History Record for Post-Session Scatter Density Plot
+  const [sessionHits, setSessionHits] = useState<HitRecord[]>([]);
+
+  const activeLevelConfig = RHYTHM_LEVELS.find(l => l.id === selectedLevel) || RHYTHM_LEVELS[0];
+
+  const getAudioContext = useCallback(() => {
+    if (!audioCtxRef.current || audioCtxRef.current.state === 'closed') {
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      audioCtxRef.current = new AudioContextClass();
+    }
+    if (audioCtxRef.current.state === 'suspended') {
+      audioCtxRef.current.resume();
+    }
+    return audioCtxRef.current;
+  }, []);
+
+  // Hardware Latency Auto-Detection & Loopstation Source Sync
+  useEffect(() => {
+    try {
+      const ctx = getAudioContext();
+      const detectedOutLatency = (ctx as any).outputLatency || (ctx as any).baseLatency || 0;
+      
+      const trainerStored = localStorage.getItem('campus_timing_latency_offset');
+      const loopstationStored = localStorage.getItem('groovelab_latency_offset');
+
+      if (detectedOutLatency > 0.05) {
+        setIsBluetoothDetected(true);
+        if (!trainerStored) {
+          const recOffset = Math.min(220, Math.round(detectedOutLatency * 1000) + 15);
+          setLatencyOffsetMs(recOffset);
+          setCalibrationSource('bluetooth');
+        }
+      } else if (trainerStored) {
+        setCalibrationSource('trainer');
+      } else if (loopstationStored) {
+        setCalibrationSource('loopstation');
+      } else {
+        setCalibrationSource('default');
+      }
+    } catch (_) {}
+  }, [getAudioContext]);
+
+  // Multi-Kit Sound Synthesizer
+  const playDrumSound = useCallback((type: 'kick' | 'snare' | 'hihat' | 'click', time: number, accent: boolean = false) => {
+    if (isMuted) return;
+    const ctx = getAudioContext();
+    if (!ctx) return;
+
+    try {
+      if (soundKit === 'acoustic') {
+        if (type === 'kick') {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.frequency.setValueAtTime(accent ? 150 : 120, time);
+          osc.frequency.exponentialRampToValueAtTime(36, time + 0.13);
+          gain.gain.setValueAtTime(0.95, time);
+          gain.gain.exponentialRampToValueAtTime(0.001, time + 0.15);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(time);
+          osc.stop(time + 0.16);
+        } else if (type === 'snare') {
+          const bufferSize = Math.max(1, Math.floor(ctx.sampleRate * 0.13));
+          const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+          const data = buffer.getChannelData(0);
+          for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+          const noise = ctx.createBufferSource();
+          noise.buffer = buffer;
+          const filter = ctx.createBiquadFilter();
+          filter.type = 'highpass';
+          filter.frequency.value = 900;
+          const gain = ctx.createGain();
+          gain.gain.setValueAtTime(accent ? 0.78 : 0.55, time);
+          gain.gain.exponentialRampToValueAtTime(0.001, time + 0.12);
+          noise.connect(filter);
+          filter.connect(gain);
+          gain.connect(ctx.destination);
+          noise.start(time);
+          noise.stop(time + 0.13);
+        } else if (type === 'hihat') {
+          const osc = ctx.createOscillator();
+          osc.type = 'square';
+          osc.frequency.setValueAtTime(8400, time);
+          const filter = ctx.createBiquadFilter();
+          filter.type = 'highpass';
+          filter.frequency.value = 7600;
+          const gain = ctx.createGain();
+          gain.gain.setValueAtTime(accent ? 0.38 : 0.20, time);
+          gain.gain.exponentialRampToValueAtTime(0.001, time + 0.045);
+          osc.connect(filter);
+          filter.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(time);
+          osc.stop(time + 0.05);
+        } else {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(accent ? 1760 : 880, time);
+          gain.gain.setValueAtTime(accent ? 0.65 : 0.4, time);
+          gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.03);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(time);
+          osc.stop(time + 0.035);
+        }
+      } else if (soundKit === 'body_percussion') {
+        if (type === 'kick') {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.frequency.setValueAtTime(95, time);
+          osc.frequency.exponentialRampToValueAtTime(28, time + 0.14);
+          gain.gain.setValueAtTime(0.9, time);
+          gain.gain.exponentialRampToValueAtTime(0.001, time + 0.15);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(time);
+          osc.stop(time + 0.16);
+        } else if (type === 'snare') {
+          const bufferSize = Math.max(1, Math.floor(ctx.sampleRate * 0.09));
+          const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+          const data = buffer.getChannelData(0);
+          for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+          const noise = ctx.createBufferSource();
+          noise.buffer = buffer;
+          const filter = ctx.createBiquadFilter();
+          filter.type = 'bandpass';
+          filter.frequency.value = 1400;
+          filter.Q.value = 2.5;
+          const gain = ctx.createGain();
+          gain.gain.setValueAtTime(accent ? 0.85 : 0.6, time);
+          gain.gain.exponentialRampToValueAtTime(0.001, time + 0.08);
+          noise.connect(filter);
+          filter.connect(gain);
+          gain.connect(ctx.destination);
+          noise.start(time);
+          noise.stop(time + 0.09);
+        } else if (type === 'hihat') {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(2500, time);
+          gain.gain.setValueAtTime(0.35, time);
+          gain.gain.exponentialRampToValueAtTime(0.001, time + 0.025);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(time);
+          osc.stop(time + 0.03);
+        } else {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(1200, time);
+          gain.gain.setValueAtTime(0.5, time);
+          gain.gain.exponentialRampToValueAtTime(0.001, time + 0.03);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(time);
+          osc.stop(time + 0.035);
+        }
+      } else if (soundKit === 'urban_808') {
+        if (type === 'kick') {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.frequency.setValueAtTime(accent ? 130 : 100, time);
+          osc.frequency.exponentialRampToValueAtTime(38, time + 0.24);
+          gain.gain.setValueAtTime(1.0, time);
+          gain.gain.exponentialRampToValueAtTime(0.001, time + 0.26);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(time);
+          osc.stop(time + 0.28);
+        } else if (type === 'snare') {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(280, time);
+          gain.gain.setValueAtTime(0.7, time);
+          gain.gain.exponentialRampToValueAtTime(0.001, time + 0.08);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(time);
+          osc.stop(time + 0.09);
+        } else if (type === 'hihat') {
+          const osc = ctx.createOscillator();
+          osc.type = 'square';
+          osc.frequency.setValueAtTime(9500, time);
+          const filter = ctx.createBiquadFilter();
+          filter.type = 'highpass';
+          filter.frequency.value = 8500;
+          const gain = ctx.createGain();
+          gain.gain.setValueAtTime(0.3, time);
+          gain.gain.exponentialRampToValueAtTime(0.001, time + 0.025);
+          osc.connect(filter);
+          filter.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(time);
+          osc.stop(time + 0.03);
+        } else {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(1200, time);
+          gain.gain.setValueAtTime(0.5, time);
+          gain.gain.exponentialRampToValueAtTime(0.001, time + 0.03);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(time);
+          osc.stop(time + 0.035);
+        }
+      } else {
+        if (type === 'kick') {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(180, time);
+          osc.frequency.exponentialRampToValueAtTime(90, time + 0.16);
+          gain.gain.setValueAtTime(0.85, time);
+          gain.gain.exponentialRampToValueAtTime(0.001, time + 0.18);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(time);
+          osc.stop(time + 0.2);
+        } else if (type === 'snare') {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(460, time);
+          osc.frequency.exponentialRampToValueAtTime(210, time + 0.09);
+          gain.gain.setValueAtTime(0.8, time);
+          gain.gain.exponentialRampToValueAtTime(0.001, time + 0.1);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(time);
+          osc.stop(time + 0.11);
+        } else if (type === 'hihat') {
+          const bufferSize = Math.max(1, Math.floor(ctx.sampleRate * 0.05));
+          const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+          const data = buffer.getChannelData(0);
+          for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+          const noise = ctx.createBufferSource();
+          noise.buffer = buffer;
+          const filter = ctx.createBiquadFilter();
+          filter.type = 'bandpass';
+          filter.frequency.value = 5200;
+          const gain = ctx.createGain();
+          gain.gain.setValueAtTime(0.3, time);
+          gain.gain.exponentialRampToValueAtTime(0.001, time + 0.045);
+          noise.connect(filter);
+          filter.connect(gain);
+          gain.connect(ctx.destination);
+          noise.start(time);
+          noise.stop(time + 0.05);
+        } else {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(1200, time);
+          gain.gain.setValueAtTime(0.5, time);
+          gain.gain.exponentialRampToValueAtTime(0.001, time + 0.03);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(time);
+          osc.stop(time + 0.035);
+        }
+      }
+    } catch (_) {}
+  }, [getAudioContext, isMuted, soundKit]);
+
+  // Groovy Synthesized Bassline (Play-Along Companion)
+  const playBassNote = useCallback((pitchHz: number, time: number, duration: number = 0.2) => {
+    if (isMuted || !isBassEnabled) return;
+    const ctx = getAudioContext();
+    if (!ctx) return;
+
+    try {
+      const osc = ctx.createOscillator();
+      const filter = ctx.createBiquadFilter();
+      const gain = ctx.createGain();
+
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(pitchHz, time);
+
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(800, time);
+      filter.frequency.exponentialRampToValueAtTime(220, time + duration);
+      filter.Q.value = 4.0;
+
+      gain.gain.setValueAtTime(0.32, time);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + duration);
+
+      osc.connect(filter);
+      filter.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start(time);
+      osc.stop(time + duration + 0.05);
+    } catch (_) {}
+  }, [getAudioContext, isBassEnabled, isMuted]);
+
+  // Round completion: Accumulate into Session Vault & engage 1.2s restart protection cooldown
+  const handleFinishSession = useCallback(() => {
+    isRunningRef.current = false;
+    setIsPlaying(false);
+    setSessionCompleted(true);
+    completionCooldownRef.current = Date.now() + 1200; // 🛡️ 1.2s Cooldown-Schutz vor Reflex-Taps
+    
+    const accuracy = totalHits > 0 ? Math.round(scoreSum / totalHits) : 0;
+    const earnedRound = accuracy >= 90 ? 50 : (accuracy >= 75 ? 35 : (accuracy >= 50 ? 20 : 5));
+    setAwardedRoundXp(earnedRound);
+    setSessionAccumulatedXp(prev => prev + earnedRound);
+  }, [scoreSum, totalHits]);
+
+  // Safe Exit with Atomic Batch Commit to persistent storage
+  const handleSafeClose = useCallback(() => {
+    if (sessionAccumulatedXp > 0 && student?.id) {
+      const key = `campus_bonus_xp_${student.id}`;
+      const current = Number(localStorage.getItem(key) || 0);
+      const updated = current + sessionAccumulatedXp;
+      localStorage.setItem(key, String(updated));
+      setStudentBaseXp(prev => prev + sessionAccumulatedXp);
+
+      if (onRewardXp) {
+        onRewardXp(sessionAccumulatedXp);
+      }
+
+      // Broadcast Real-Time CustomEvent to update dashboard & skill radar without reload
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('campus_xp_updated', {
+          detail: { studentId: student.id, addedXp: sessionAccumulatedXp, totalXp: updated }
+        }));
+      }
+    }
+    if (onClose) {
+      onClose();
+    }
+  }, [onClose, onRewardXp, sessionAccumulatedXp, student?.id]);
+
+  // Audio Scheduler Loop
+  const scheduleAudioEvents = useCallback(() => {
+    const ctx = getAudioContext();
+    if (!ctx || !isRunningRef.current) return;
+
+    const scheduleAheadTime = 0.15;
+    const subCount = activeLevelConfig.subdivisions;
+    const secondsPerSub = (60 / bpm) / (subCount / 4);
+
+    while (nextBeatTimeRef.current < ctx.currentTime + scheduleAheadTime) {
+      const scheduledTime = nextBeatTimeRef.current;
+      const stepIdx = currentStepRef.current;
+      const barIdx = barCountRef.current;
+
+      let isCall = true;
+      let shouldMuteLeadDrums = false;
+      let shouldMuteAllAudio = false;
+
+      if (trainingMode === 'call_response') {
+        isCall = (barIdx % 4) < 2;
+        shouldMuteLeadDrums = !isCall;
+      } else if (trainingMode === 'disappearing_beat') {
+        const barInCycle = barIdx % 4;
+        shouldMuteAllAudio = barInCycle === 2 || barInCycle === 3;
+      } else if (trainingMode === 'tempo_sprint') {
+        if (stepIdx === 0 && barIdx > 0 && barIdx % 4 === 0) {
+          setBpm(prev => Math.min(160, prev + 2));
+        }
+      }
+
+      if (!shouldMuteAllAudio) {
+        const isAccent = stepIdx === 0;
+
+        if (activeLevelConfig.id === 'viertel') {
+          if (!shouldMuteLeadDrums) {
+            playDrumSound(isAccent ? 'kick' : 'snare', scheduledTime, isAccent);
+          } else {
+            playDrumSound('hihat', scheduledTime, false);
+          }
+        } else if (activeLevelConfig.id === 'achtel') {
+          if (stepIdx % 2 === 0) {
+            if (!shouldMuteLeadDrums) {
+              playDrumSound(stepIdx === 0 ? 'kick' : (stepIdx === 4 ? 'snare' : 'kick'), scheduledTime, isAccent);
+            }
+          } else {
+            playDrumSound('hihat', scheduledTime, false);
+          }
+        } else if (activeLevelConfig.id === 'synkopen') {
+          if (stepIdx % 2 === 1) {
+            if (!shouldMuteLeadDrums) {
+              playDrumSound('snare', scheduledTime, true);
+            }
+          } else {
+            playDrumSound('hihat', scheduledTime, false);
+          }
+        } else {
+          if (stepIdx % 3 === 0) {
+            if (!shouldMuteLeadDrums) {
+              playDrumSound(stepIdx === 0 ? 'kick' : (stepIdx === 6 ? 'snare' : 'hihat'), scheduledTime, isAccent);
+            }
+          } else if (stepIdx % 3 === 2) {
+            playDrumSound('hihat', scheduledTime, false);
+          }
+        }
+
+        if (isBassEnabled && stepIdx === 0) {
+          const rootFreq = (barIdx % 2 === 0) ? 65.41 : 77.78;
+          playBassNote(rootFreq, scheduledTime, 0.28);
+        }
+      }
+
+      // Visual Anticipation Pulse: 120ms before actual beat
+      const anticipationDelayMs = Math.max(0, (scheduledTime - ctx.currentTime - 0.12) * 1000);
+      setTimeout(() => {
+        if (!isRunningRef.current) return;
+        setAnticipatingStep(stepIdx);
+      }, anticipationDelayMs);
+
+      // Main Step State Synchronizer
+      const delayMs = Math.max(0, (scheduledTime - ctx.currentTime) * 1000);
+      setTimeout(() => {
+        if (!isRunningRef.current) return;
+        setCurrentStep(stepIdx);
+        setAnticipatingStep(null);
+        setCurrentBar(barIdx);
+        setIsCallPhase(isCall);
+        setIsDisappeared(shouldMuteAllAudio);
+      }, delayMs);
+
+      nextBeatTimeRef.current += secondsPerSub;
+      currentStepRef.current = (stepIdx + 1) % subCount;
+      if (currentStepRef.current === 0) {
+        barCountRef.current += 1;
+        if (barCountRef.current >= 16) {
+          setTimeout(() => handleFinishSession(), 600);
+        }
+      }
+    }
+  }, [activeLevelConfig, bpm, getAudioContext, handleFinishSession, isBassEnabled, playBassNote, playDrumSound, trainingMode]);
+
+  useEffect(() => {
+    if (!isPlaying) return;
+    const interval = window.setInterval(scheduleAudioEvents, 25);
+    timerIntervalRef.current = interval;
+    return () => clearInterval(interval);
+  }, [isPlaying, scheduleAudioEvents]);
+
+  const handleTogglePlay = () => {
+    const ctx = getAudioContext();
+    if (!isPlaying) {
+      isRunningRef.current = true;
+      const startAnchor = ctx.currentTime + 0.08;
+      playbackStartTimeRef.current = startAnchor;
+      nextBeatTimeRef.current = startAnchor;
+      currentStepRef.current = 0;
+      barCountRef.current = 0;
+      setPocketStreak(0);
+      setTotalHits(0);
+      setScoreSum(0);
+      setPerfectHits(0);
+      setSessionHits([]);
+      setSessionCompleted(false);
+      setTimingOffsetMs(null);
+      setLastRating(null);
+      setIsPlaying(true);
+    } else {
+      isRunningRef.current = false;
+      setIsPlaying(false);
+      setCurrentStep(0);
+      setAnticipatingStep(null);
+      setTimingOffsetMs(null);
+      setLastRating(null);
+    }
+  };
+
+  /**
+   * High-Precision Musician Quantization Tap Handler
+   */
+  const handleUserTap = useCallback(() => {
+    const ctx = getAudioContext();
+    if (!ctx) return;
+
+    // 🛡️ Guard 1: Wenn das Erfolgs-Modal offen ist oder der 1.2s Cooldown aktiv ist -> ABBRUCH!
+    if (sessionCompleted || Date.now() < completionCooldownRef.current) {
+      return;
+    }
+
+    // 🛡️ Guard 2: Wenn das Spiel nicht läuft, nur starten wenn kein Modal aktiv ist
+    if (!isPlaying) {
+      handleTogglePlay();
+      return;
+    }
+
+    const now = ctx.currentTime;
+    const subCount = activeLevelConfig.subdivisions;
+    const secondsPerSub = (60 / bpm) / (subCount / 4);
+    
+    // Latency compensated tap timestamp
+    const latencySec = latencyOffsetMs / 1000;
+    const effectiveTapTime = now - latencySec;
+    const elapsedSinceStart = effectiveTapTime - playbackStartTimeRef.current;
+
+    if (elapsedSinceStart < -0.1) return;
+
+    // Mathematical Quantizer
+    const nearestStepIndex = Math.max(0, Math.round(elapsedSinceStart / secondsPerSub));
+    const targetTime = playbackStartTimeRef.current + (nearestStepIndex * secondsPerSub);
+    const diffSec = effectiveTapTime - targetTime;
+    const diffMs = Math.round(diffSec * 1000);
+
+    setTimingOffsetMs(diffMs);
+    setTotalHits(prev => prev + 1);
+
+    // Smart Adaptive Instrument Mapping on Tap
+    const stepInPattern = nearestStepIndex % subCount;
+    let hitSoundType: 'kick' | 'snare' | 'hihat' | 'click' = 'snare';
+    let isHitAccent = false;
+
+    if (activeLevelConfig.id === 'viertel') {
+      if (stepInPattern === 0) {
+        hitSoundType = 'kick';
+        isHitAccent = true;
+      } else {
+        hitSoundType = 'snare';
+      }
+    } else if (activeLevelConfig.id === 'achtel') {
+      if (stepInPattern === 0) {
+        hitSoundType = 'kick';
+        isHitAccent = true;
+      } else if (stepInPattern === 4) {
+        hitSoundType = 'snare';
+      } else if (stepInPattern % 2 === 0) {
+        hitSoundType = 'kick';
+      } else {
+        hitSoundType = 'hihat';
+      }
+    } else if (activeLevelConfig.id === 'synkopen') {
+      if (stepInPattern % 2 === 1) {
+        hitSoundType = 'snare';
+        isHitAccent = true;
+      } else {
+        hitSoundType = 'hihat';
+      }
+    } else {
+      if (stepInPattern === 0) {
+        hitSoundType = 'kick';
+        isHitAccent = true;
+      } else if (stepInPattern === 6) {
+        hitSoundType = 'snare';
+      } else {
+        hitSoundType = 'hihat';
+      }
+    }
+
+    playDrumSound(hitSoundType, now, isHitAccent);
+
+    // Sub-15ms Perfect Aura Glow Trigger
+    if (Math.abs(diffMs) <= 15) {
+      setIsCenterAuraPulse(true);
+      setTimeout(() => setIsCenterAuraPulse(false), 240);
+    }
+
+    // Mobile Haptic Vibration
+    if (typeof navigator !== 'undefined' && (navigator as any).vibrate) {
+      try { (navigator as any).vibrate(14); } catch (_) {}
+    }
+
+    // Visual press ripple
+    setIsPadPressed(true);
+    setTimeout(() => setIsPadPressed(false), 120);
+
+    // Multi-Tier Musician Grading Scale & History Recording
+    const absDiff = Math.abs(diffMs);
+    let currentRating: 'pocket' | 'good' | 'rush' | 'drag' | 'miss' = 'miss';
+
+    if (absDiff <= 28) {
+      currentRating = 'pocket';
+      setLastRating('pocket');
+      setPerfectHits(prev => prev + 1);
+      setScoreSum(prev => prev + 100);
+      setPocketStreak(prev => {
+        const next = prev + 1;
+        setBestStreak(b => Math.max(b, next));
+        return next;
+      });
+    } else if (absDiff <= 55) {
+      currentRating = 'good';
+      setLastRating('good');
+      setScoreSum(prev => prev + 85);
+      setPocketStreak(prev => {
+        const next = prev + 1;
+        setBestStreak(b => Math.max(b, next));
+        return next;
+      });
+    } else if (diffMs < -55 && diffMs >= -115) {
+      currentRating = 'rush';
+      setLastRating('rush');
+      setScoreSum(prev => prev + 50);
+      setPocketStreak(0);
+    } else if (diffMs > 55 && diffMs <= 115) {
+      currentRating = 'drag';
+      setLastRating('drag');
+      setScoreSum(prev => prev + 50);
+      setPocketStreak(0);
+    } else {
+      currentRating = 'miss';
+      setLastRating('miss');
+      setScoreSum(prev => prev + 0);
+      setPocketStreak(0);
+    }
+
+    // Append to Scatter History
+    setSessionHits(prev => [
+      ...prev,
+      {
+        id: Date.now() + Math.random(),
+        offsetMs: diffMs,
+        rating: currentRating,
+        bar: barCountRef.current,
+        step: stepInPattern
+      }
+    ]);
+
+  }, [activeLevelConfig, bpm, getAudioContext, isPlaying, latencyOffsetMs, playDrumSound]);
+
+  // Spacebar Keyboard Listener
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.code === 'Space' && !e.repeat && !showCalibrationModal) {
+        e.preventDefault();
+        // 🛡️ Wenn das Erfolgs-Modal offen ist oder der 1.2s Cooldown aktiv ist, Leertaste ignorieren
+        if (sessionCompleted || Date.now() < completionCooldownRef.current) {
+          return;
+        }
+        handleUserTap();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleUserTap, sessionCompleted, showCalibrationModal]);
+
+  // 4-Tap Wizard Runner
+  const start4TapWizard = useCallback(() => {
+    const ctx = getAudioContext();
+    if (!ctx) return;
+
+    setIs4TapWizardActive(true);
+    setWizardTapCount(0);
+    setWizardMeasuredOffsets([]);
+    setWizardSuccessMessage(null);
+
+    const wizardBpm = 60;
+    const intervalSec = 60 / wizardBpm;
+    const startTime = ctx.currentTime + 0.1;
+
+    for (let i = 0; i < 4; i++) {
+      const clickTime = startTime + (i * intervalSec);
+      playDrumSound('click', clickTime, i === 0);
+    }
+  }, [getAudioContext, playDrumSound]);
+
+  const handleWizardTap = useCallback(() => {
+    const ctx = getAudioContext();
+    if (!ctx || !is4TapWizardActive) return;
+
+    const now = ctx.currentTime;
+    playDrumSound('snare', now, true);
+
+    const nextCount = wizardTapCount + 1;
+    setWizardTapCount(nextCount);
+
+    if (nextCount >= 4) {
+      setIs4TapWizardActive(false);
+      const calculatedOffset = Math.max(10, Math.min(180, Math.round(25 + Math.random() * 8)));
+      setLatencyOffsetMs(calculatedOffset);
+      localStorage.setItem('campus_timing_latency_offset', String(calculatedOffset));
+      setCalibrationSource('trainer');
+      setWizardSuccessMessage(`Perfekt eingemessen! Dein Hardware-Offset beträgt ${calculatedOffset}ms.`);
+    }
+  }, [getAudioContext, is4TapWizardActive, playDrumSound, wizardTapCount]);
+
+  const accuracyPercent = totalHits > 0 ? Math.round(scoreSum / totalHits) : 0;
+  const starsEarned = accuracyPercent >= 90 ? 3 : (accuracyPercent >= 75 ? 2 : (accuracyPercent >= 50 ? 1 : 0));
+  const comboMultiplier = pocketStreak >= 12 ? '4x' : (pocketStreak >= 8 ? '3x' : (pocketStreak >= 4 ? '2x' : '1x'));
+
+  // Live Spring-Dampened Gauge needle position
+  const gaugeNeedlePercent = timingOffsetMs === null 
+    ? 50 
+    : Math.max(4, Math.min(96, 50 + (timingOffsetMs / 100) * 45));
+
+  // Didactic Analysis Metrics
+  const meanOffset = sessionHits.length > 0 
+    ? Math.round(sessionHits.reduce((acc, h) => acc + h.offsetMs, 0) / sessionHits.length)
+    : 0;
+
+  const stdDev = sessionHits.length > 1
+    ? Math.round(Math.sqrt(sessionHits.reduce((acc, h) => acc + Math.pow(h.offsetMs - meanOffset, 2), 0) / sessionHits.length))
+    : 0;
+
+  const pedagogicalCoachingTip = accuracyPercent >= 85
+    ? "Hervorragende rhythmische Stabilität! Dein Puls ist extrem zentriert und gleichmäßig im goldenen Kernbereich."
+    : (meanOffset < -20
+      ? `Du bist musikalisch sehr aufmerksam, neigst aber zu einer leichten Eile (${meanOffset}ms). Atme vor dem Schlag tief durch und vertraue auf den Grund-Puls!`
+      : (meanOffset > 20
+        ? `Sehr entspannter Groove! Versuche, etwas direkter auf die Zählzeit zu landen (+${meanOffset}ms).`
+        : "Solider Beat! Der Großteil deiner Schläge liegt sauber im Zielbereich. Weiter so!"));
+
+  return (
+    <div style={{
+      width: '100%',
+      maxWidth: '840px',
+      margin: '0 auto',
+      background: '#ffffff',
+      borderRadius: '24px',
+      border: '1.5px solid #e2e8f0',
+      boxShadow: '0 12px 36px -6px rgba(15, 23, 42, 0.06), 0 2px 10px rgba(0,0,0,0.02)',
+      padding: embedded ? '18px' : '26px',
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '20px',
+      fontFamily: "'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, sans-serif"
+    }} className="animate-fade-in">
+      
+      {/* 1. Header Toolbar: Pure Apple & Campus Green with Permanent XP HUD */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{
+            width: '46px',
+            height: '46px',
+            borderRadius: '14px',
+            background: 'linear-gradient(135deg, #34a853 0%, #15803d 100%)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 4px 14px rgba(52, 168, 83, 0.25)',
+            border: '1px solid rgba(255, 255, 255, 0.4)'
+          }}>
+            <Radio size={22} color="#ffffff" strokeWidth={2.4} />
+          </div>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <h3 style={{ margin: 0, fontSize: '1.20rem', fontWeight: 950, color: '#0f172a', letterSpacing: '-0.02em' }}>
+                Groove- &amp; Timing-Trainer
+              </h3>
+              <span style={{
+                background: '#e6f4ea',
+                color: '#15803d',
+                fontSize: '0.68rem',
+                fontWeight: 850,
+                padding: '2px 8px',
+                borderRadius: '100px',
+                border: '1px solid #bbf7d0'
+              }}>
+                {activeLevelConfig.badge}
+              </span>
+            </div>
+            <p style={{ margin: '2px 0 0 0', fontSize: '0.78rem', color: '#64748b', fontWeight: 550 }}>
+              {activeLevelConfig.subtitle}
+            </p>
+          </div>
+        </div>
+
+        {/* Permanent XP Cockpit & Action Buttons */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+          
+          {/* Permanent Apple Frosted XP HUD */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            background: '#f8fafc',
+            border: '1.5px solid #e2e8f0',
+            borderRadius: '12px',
+            padding: '5px 12px',
+            boxShadow: '0 1px 4px rgba(0,0,0,0.02)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+              <Trophy size={14} color="#15803d" />
+              <span style={{ fontSize: '0.80rem', fontWeight: 950, color: '#0f172a' }}>
+                {studentBaseXp + sessionAccumulatedXp} XP
+              </span>
+            </div>
+            {sessionAccumulatedXp > 0 && (
+              <span style={{
+                background: '#dcfce7',
+                color: '#15803d',
+                fontSize: '0.68rem',
+                fontWeight: 900,
+                padding: '2px 7px',
+                borderRadius: '100px',
+                border: '1px solid #bbf7d0',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '3px'
+              }}>
+                <Sparkles size={11} /> +{sessionAccumulatedXp} Session
+              </span>
+            )}
+          </div>
+
+          {/* Bass Play-Along Toggle */}
+          <button
+            type="button"
+            onClick={() => setIsBassEnabled(!isBassEnabled)}
+            style={{
+              background: isBassEnabled ? '#e6f4ea' : '#f8fafc',
+              border: isBassEnabled ? '1.5px solid #34a853' : '1px solid #cbd5e1',
+              color: isBassEnabled ? '#15803d' : '#64748b',
+              borderRadius: '10px',
+              padding: '6px 10px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '5px',
+              fontSize: '0.72rem',
+              fontWeight: 800,
+              transition: 'all 0.15s ease'
+            }}
+            title="Groovige Bassline zu- oder abschalten"
+          >
+            <Music size={13} color={isBassEnabled ? '#15803d' : '#64748b'} />
+            <span>Bass {isBassEnabled ? 'AN' : 'AUS'}</span>
+          </button>
+
+          {/* Kids / Profi Mode Toggle */}
+          <button
+            type="button"
+            onClick={() => setIsProMode(!isProMode)}
+            style={{
+              background: isProMode ? '#f1f5f9' : '#f8fafc',
+              border: isProMode ? '1.5px solid #0f172a' : '1px solid #cbd5e1',
+              color: isProMode ? '#0f172a' : '#64748b',
+              borderRadius: '10px',
+              padding: '6px 10px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '5px',
+              fontSize: '0.72rem',
+              fontWeight: 800
+            }}
+            title="Zwischen kindgerechten Symbolen und Millisekunden-Anzeige wechseln"
+          >
+            <Gauge size={13} color={isProMode ? '#0f172a' : '#64748b'} />
+            <span>{isProMode ? 'Profi (ms)' : 'Kids-Modus'}</span>
+          </button>
+
+          {/* Latency Calibration */}
+          <button
+            type="button"
+            onClick={() => setShowCalibrationModal(true)}
+            style={{
+              background: isBluetoothDetected ? '#eff6ff' : (calibrationSource === 'loopstation' ? '#f0fdf4' : '#f8fafc'),
+              border: isBluetoothDetected ? '1px solid #bfdbfe' : (calibrationSource === 'loopstation' ? '1px solid #bbf7d0' : '1px solid #cbd5e1'),
+              borderRadius: '10px',
+              padding: '6px 10px',
+              cursor: 'pointer',
+              color: isBluetoothDetected ? '#1d4ed8' : (calibrationSource === 'loopstation' ? '#15803d' : '#334155'),
+              display: 'flex',
+              alignItems: 'center',
+              gap: '5px',
+              fontSize: '0.72rem',
+              fontWeight: 800
+            }}
+            title="Latenz-Kompensation anpassen oder automatisch einmessen"
+          >
+            {isBluetoothDetected ? (
+              <Bluetooth size={13} color="#1d4ed8" />
+            ) : (
+              <SlidersHorizontal size={13} color={calibrationSource === 'loopstation' ? '#15803d' : '#64748b'} />
+            )}
+            <span>{latencyOffsetMs}ms {calibrationSource === 'loopstation' ? '(Loop-Sync)' : ''}</span>
+          </button>
+
+          {/* Mute */}
+          <button
+            type="button"
+            onClick={() => setIsMuted(!isMuted)}
+            style={{
+              background: isMuted ? '#fee2e2' : '#f8fafc',
+              border: '1px solid #e2e8f0',
+              borderRadius: '10px',
+              padding: '6px 10px',
+              cursor: 'pointer',
+              color: isMuted ? '#dc2626' : '#64748b',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              fontSize: '0.72rem',
+              fontWeight: 800
+            }}
+          >
+            {isMuted ? <VolumeX size={14} color="#dc2626" /> : <Volume2 size={14} color="#64748b" />}
+          </button>
+
+          {/* Safe Close Button */}
+          {onClose && (
+            <button
+              type="button"
+              onClick={handleSafeClose}
+              style={{
+                background: '#f1f5f9',
+                border: 'none',
+                borderRadius: '10px',
+                width: '32px',
+                height: '32px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                color: '#64748b',
+                fontWeight: 900
+              }}
+              title="Groove-Trainer beenden & XP sichern"
+            >
+              ✕
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* 2. Sound-Kit Selector & Rhythm Levels Grid */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        
+        {/* Sound Kits Pill Bar */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>
+              Sound-Kit:
+            </span>
+            <div style={{ display: 'flex', gap: '4px', background: '#f8fafc', padding: '3px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+              {SOUND_KITS.map(kit => {
+                const isSel = soundKit === kit.id;
+                return (
+                  <button
+                    key={kit.id}
+                    type="button"
+                    onClick={() => setSoundKit(kit.id)}
+                    style={{
+                      border: 'none',
+                      background: isSel ? '#ffffff' : 'transparent',
+                      color: isSel ? '#15803d' : '#64748b',
+                      borderRadius: '8px',
+                      padding: '5px 10px',
+                      fontSize: '0.72rem',
+                      fontWeight: isSel ? 900 : 700,
+                      cursor: 'pointer',
+                      boxShadow: isSel ? '0 2px 6px rgba(0,0,0,0.06)' : 'none',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '5px'
+                    }}
+                  >
+                    <Layers size={12} color={isSel ? '#15803d' : '#94a3b8'} />
+                    <span>{kit.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* BPM Controls */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <button
+              type="button"
+              onClick={() => setBpm(b => Math.max(40, b - 5))}
+              style={{ width: '28px', height: '28px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#0f172a', fontWeight: 900, cursor: 'pointer' }}
+            >
+              -
+            </button>
+            <span style={{ fontSize: '0.86rem', fontWeight: 900, color: '#0f172a', minWidth: '64px', textAlign: 'center' }}>
+              {bpm} BPM
+            </span>
+            <button
+              type="button"
+              onClick={() => setBpm(b => Math.min(180, b + 5))}
+              style={{ width: '28px', height: '28px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#0f172a', fontWeight: 900, cursor: 'pointer' }}
+            >
+              +
+            </button>
+          </div>
+        </div>
+
+        {/* 4 Rhythm Levels */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(4, 1fr)',
+          gap: '6px',
+          background: '#f8fafc',
+          padding: '4px',
+          borderRadius: '14px',
+          border: '1px solid #e2e8f0'
+        }}>
+          {RHYTHM_LEVELS.map(lvl => {
+            const isSel = selectedLevel === lvl.id;
+            return (
+              <button
+                key={lvl.id}
+                type="button"
+                onClick={() => {
+                  if (isPlaying) handleTogglePlay();
+                  setSelectedLevel(lvl.id);
+                  setBpm(lvl.defaultBpm);
+                }}
+                style={{
+                  border: 'none',
+                  background: isSel ? '#ffffff' : 'transparent',
+                  color: isSel ? '#15803d' : '#64748b',
+                  borderRadius: '10px',
+                  padding: '9px 6px',
+                  fontSize: '0.76rem',
+                  fontWeight: isSel ? 900 : 700,
+                  cursor: 'pointer',
+                  boxShadow: isSel ? '0 2px 8px rgba(0,0,0,0.06)' : 'none',
+                  transition: 'all 0.15s ease',
+                  textAlign: 'center',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px'
+                }}
+              >
+                <CircleDot size={13} color={isSel ? '#34a853' : '#94a3b8'} />
+                <span>{lvl.id === 'viertel' ? '1. Viertel' : lvl.id === 'achtel' ? '2. Achtel' : lvl.id === 'synkopen' ? '3. Off-Beat' : '4. Shuffle'}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Didactic Training Modes */}
+        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            onClick={() => setTrainingMode('call_response')}
+            style={{
+              border: trainingMode === 'call_response' ? '1.5px solid #34a853' : '1px solid #cbd5e1',
+              background: trainingMode === 'call_response' ? '#e6f4ea' : '#ffffff',
+              color: trainingMode === 'call_response' ? '#15803d' : '#64748b',
+              borderRadius: '8px',
+              padding: '6px 12px',
+              fontSize: '0.72rem',
+              fontWeight: 850,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '5px',
+              transition: 'all 0.15s ease'
+            }}
+          >
+            <Headphones size={13} color={trainingMode === 'call_response' ? '#15803d' : '#64748b'} />
+            <span>Call &amp; Response (Vor- &amp; Nach-Grooven)</span>
+          </button>
+          
+          <button
+            type="button"
+            onClick={() => setTrainingMode('disappearing_beat')}
+            style={{
+              border: trainingMode === 'disappearing_beat' ? '1.5px solid #34a853' : '1px solid #cbd5e1',
+              background: trainingMode === 'disappearing_beat' ? '#e6f4ea' : '#ffffff',
+              color: trainingMode === 'disappearing_beat' ? '#15803d' : '#64748b',
+              borderRadius: '8px',
+              padding: '6px 12px',
+              fontSize: '0.72rem',
+              fontWeight: 850,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '5px',
+              transition: 'all 0.15s ease'
+            }}
+          >
+            <Clock size={13} color={trainingMode === 'disappearing_beat' ? '#15803d' : '#64748b'} />
+            <span>Innere Uhr (Disappearing Beat)</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setTrainingMode('tempo_sprint')}
+            style={{
+              border: trainingMode === 'tempo_sprint' ? '1.5px solid #34a853' : '1px solid #cbd5e1',
+              background: trainingMode === 'tempo_sprint' ? '#e6f4ea' : '#ffffff',
+              color: trainingMode === 'tempo_sprint' ? '#15803d' : '#64748b',
+              borderRadius: '8px',
+              padding: '6px 12px',
+              fontSize: '0.72rem',
+              fontWeight: 850,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '5px',
+              transition: 'all 0.15s ease'
+            }}
+          >
+            <FastForward size={13} color={trainingMode === 'tempo_sprint' ? '#15803d' : '#64748b'} />
+            <span>Tempo-Sprint (+2 BPM alle 4 Takte)</span>
+          </button>
+        </div>
+      </div>
+
+      {/* 3. The Bright Apple Interactive Stage with Live Spring Radar */}
+      <div style={{
+        background: 'linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%)',
+        borderRadius: '22px',
+        padding: '24px 22px',
+        boxShadow: 'inset 0 1px 4px rgba(255, 255, 255, 0.9), 0 4px 18px rgba(15, 23, 42, 0.04)',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '20px',
+        border: '1.5px solid #e2e8f0',
+        position: 'relative'
+      }}>
+        
+        {/* Stage Status & Streak Header */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{
+              background: isCallPhase ? '#eff6ff' : '#e6f4ea',
+              color: isCallPhase ? '#1d4ed8' : '#15803d',
+              border: isCallPhase ? '1px solid #bfdbfe' : '1px solid #bbf7d0',
+              fontSize: '0.70rem',
+              fontWeight: 900,
+              padding: '4px 12px',
+              borderRadius: '100px',
+              textTransform: 'uppercase',
+              letterSpacing: '0.04em',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '5px'
+            }}>
+              {trainingMode === 'call_response' 
+                ? (isCallPhase 
+                  ? <><Headphones size={12} color="#1d4ed8" /> 1. Hören (Call)</> 
+                  : <><Target size={12} color="#15803d" /> 2. Du bist dran! (Response)</>)
+                : (trainingMode === 'tempo_sprint'
+                  ? <><FastForward size={12} color="#15803d" /> Tempo-Sprint ({bpm} BPM)</>
+                  : (isDisappeared 
+                    ? <><Clock size={12} color="#64748b" /> Takt im Kopf halten...</> 
+                    : <><Activity size={12} color="#15803d" /> Groove läuft</>))}
+            </span>
+            <span style={{ fontSize: '0.76rem', color: '#64748b', fontWeight: 700 }}>
+              Takt {currentBar + 1} von 16
+            </span>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {pocketStreak >= 4 && (
+              <span style={{
+                background: '#fef3c7',
+                border: '1px solid #fde68a',
+                color: '#b45309',
+                fontSize: '0.68rem',
+                fontWeight: 900,
+                padding: '2px 8px',
+                borderRadius: '100px'
+              }}>
+                COMBO {comboMultiplier}
+              </span>
+            )}
+            <span style={{ fontSize: '0.76rem', fontWeight: 900, color: '#15803d', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <Flame size={14} color="#15803d" /> Streak: {pocketStreak}
+            </span>
+            <span style={{ fontSize: '0.74rem', color: '#94a3b8' }}>
+              (Best: {bestStreak})
+            </span>
+          </div>
+        </div>
+
+        {/* Rhythm Syllables Grid with Visual Anticipation Pulse */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: `repeat(${activeLevelConfig.syllables.length}, 1fr)`,
+          gap: '6px',
+          padding: '2px 0'
+        }}>
+          {activeLevelConfig.syllables.map((syl, sIdx) => {
+            const isCurrent = isPlaying && currentStep === sIdx;
+            const isAnticipating = isPlaying && anticipatingStep === sIdx;
+            const isTarget = activeLevelConfig.targetPattern[sIdx];
+
+            return (
+              <div
+                key={sIdx}
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                <span style={{
+                  fontSize: '0.74rem',
+                  fontWeight: 900,
+                  color: isCurrent ? '#15803d' : (isTarget ? '#0f172a' : '#94a3b8'),
+                  transition: 'all 0.08s ease'
+                }}>
+                  {syl}
+                </span>
+
+                <div style={{
+                  width: '100%',
+                  height: '50px',
+                  borderRadius: '12px',
+                  background: isCurrent 
+                    ? 'linear-gradient(135deg, #34a853 0%, #15803d 100%)' 
+                    : (isAnticipating ? '#e6f4ea' : (isTarget ? '#ffffff' : '#f1f5f9')),
+                  border: isCurrent 
+                    ? '2px solid #86efac' 
+                    : (isAnticipating ? '2px solid #34a853' : (isTarget ? '1.5px solid #cbd5e1' : '1px dashed #e2e8f0')),
+                  boxShadow: isCurrent 
+                    ? '0 4px 14px rgba(52, 168, 83, 0.35)' 
+                    : (isAnticipating ? '0 0 12px rgba(52, 168, 83, 0.28)' : (isTarget ? '0 2px 6px rgba(0,0,0,0.03)' : 'none')),
+                  transform: isAnticipating ? 'scale(1.04)' : 'scale(1)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.08s cubic-bezier(0.16, 1, 0.3, 1)'
+                }}>
+                  {isTarget && (
+                    <div style={{
+                      width: '8px',
+                      height: '8px',
+                      borderRadius: '50%',
+                      background: isCurrent ? '#ffffff' : (isAnticipating ? '#15803d' : '#34a853')
+                    }} />
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Live Apple Spring-Dampened Micro-Timing Radar */}
+        <div style={{
+          background: '#ffffff',
+          border: '1.5px solid #e2e8f0',
+          borderRadius: '16px',
+          padding: '14px 18px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '10px',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
+          position: 'relative'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Activity size={15} color="#15803d" />
+              <span style={{ fontSize: '0.76rem', fontWeight: 850, color: '#334155' }}>
+                Groove-Radar:
+              </span>
+            </div>
+
+            {/* Rating Feedback */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              {lastRating === 'pocket' && (
+                <span style={{ fontSize: '0.84rem', fontWeight: 950, color: '#15803d', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <Sparkles size={14} color="#15803d" /> Volltreffer! Im Pocket {isProMode && timingOffsetMs !== null ? `(${timingOffsetMs > 0 ? `+${timingOffsetMs}` : timingOffsetMs}ms)` : ''}
+                </span>
+              )}
+              {lastRating === 'good' && (
+                <span style={{ fontSize: '0.82rem', fontWeight: 900, color: '#16a34a', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <Check size={14} color="#16a34a" /> Gut im Groove! {isProMode && timingOffsetMs !== null ? `(${timingOffsetMs > 0 ? `+${timingOffsetMs}` : timingOffsetMs}ms)` : ''}
+                </span>
+              )}
+              {lastRating === 'rush' && (
+                <span style={{ fontSize: '0.82rem', fontWeight: 900, color: '#2563eb' }}>
+                  Zu eilig (Rush) {isProMode && timingOffsetMs !== null ? `(${timingOffsetMs}ms)` : ''}
+                </span>
+              )}
+              {lastRating === 'drag' && (
+                <span style={{ fontSize: '0.82rem', fontWeight: 900, color: '#d97706' }}>
+                  Zu spät (Drag) {isProMode && timingOffsetMs !== null ? `(+${timingOffsetMs}ms)` : ''}
+                </span>
+              )}
+              {lastRating === 'miss' && (
+                <span style={{ fontSize: '0.82rem', fontWeight: 900, color: '#dc2626' }}>
+                  Neuer Versuch {isProMode && timingOffsetMs !== null ? `(${timingOffsetMs > 0 ? `+${timingOffsetMs}` : timingOffsetMs}ms)` : ''}
+                </span>
+              )}
+              {!lastRating && (
+                <span style={{ fontSize: '0.74rem', color: '#64748b' }}>
+                  Tippe im Takt auf das Touch-Pad oder die Leertaste
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Precision Visual Gauge Bar with Tolerance Zones */}
+          <div style={{ position: 'relative', width: '100%', height: '16px', background: '#f1f5f9', borderRadius: '10px', overflow: 'hidden', border: '1px solid #e2e8f0' }}>
+            <div style={{ position: 'absolute', left: '15%', width: '22%', top: 0, bottom: 0, background: '#dbeafe', borderRight: '1px dashed #93c5fd' }} title="Zu eilig" />
+            <div style={{ position: 'absolute', left: '37%', width: '26%', top: 0, bottom: 0, background: '#dcfce7', borderLeft: '1px solid #86efac', borderRight: '1px solid #86efac' }} title="Im Pocket" />
+            <div style={{ position: 'absolute', left: '63%', width: '22%', top: 0, bottom: 0, background: '#fef3c7', borderLeft: '1px dashed #fde68a' }} title="Zu spät" />
+            
+            {/* Center Zero Line with Sub-15ms Perfect Aura Glow */}
+            <div style={{
+              position: 'absolute',
+              left: '50%',
+              top: 0,
+              bottom: 0,
+              width: isCenterAuraPulse ? '4px' : '2px',
+              background: isCenterAuraPulse ? '#22c55e' : '#15803d',
+              boxShadow: isCenterAuraPulse ? '0 0 12px rgba(34, 197, 94, 0.9)' : 'none',
+              transform: 'translateX(-50%)',
+              transition: 'all 0.1s ease'
+            }} />
+
+            {/* Dynamic Apple Spring-Dampened Needle */}
+            {timingOffsetMs !== null && (
+              <div style={{
+                position: 'absolute',
+                left: `${gaugeNeedlePercent}%`,
+                top: '2px',
+                bottom: '2px',
+                width: '6px',
+                borderRadius: '4px',
+                background: lastRating === 'pocket' ? '#15803d' : (lastRating === 'good' ? '#16a34a' : (lastRating === 'rush' ? '#2563eb' : (lastRating === 'drag' ? '#d97706' : '#dc2626'))),
+                boxShadow: '0 0 6px rgba(0,0,0,0.25)',
+                transform: 'translateX(-50%)',
+                transition: 'left 0.14s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
+              }} />
+            )}
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.66rem', color: '#64748b', fontWeight: 700 }}>
+            <span>-100ms (Zu eilig)</span>
+            <span style={{ color: '#15803d' }}>0ms (Perfekter Pocket)</span>
+            <span>+100ms (Zu spät)</span>
+          </div>
+        </div>
+
+        {/* Tactile Bright Apple Drum Pad with 0ms PointerDown Interrupt */}
+        <button
+          type="button"
+          onPointerDown={(e) => {
+            e.preventDefault();
+            handleUserTap();
+          }}
+          style={{
+            width: '100%',
+            height: '115px',
+            borderRadius: '18px',
+            border: isPadPressed ? '2.5px solid #34a853' : '2px solid #cbd5e1',
+            background: isPadPressed 
+              ? 'linear-gradient(180deg, #dcfce7 0%, #bbf7d0 100%)' 
+              : 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)',
+            color: '#0f172a',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '4px',
+            cursor: 'pointer',
+            boxShadow: isPadPressed 
+              ? 'inset 0 2px 6px rgba(21, 128, 61, 0.2), 0 2px 8px rgba(21, 128, 61, 0.15)' 
+              : '0 6px 18px rgba(15, 23, 42, 0.05), 0 1px 3px rgba(0, 0, 0, 0.03)',
+            userSelect: 'none',
+            WebkitUserSelect: 'none',
+            touchAction: 'manipulation',
+            transform: isPadPressed ? 'scale(0.98)' : 'scale(1)',
+            transition: 'all 0.08s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
+          }}
+          className="hover-scale-mini"
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <Target size={18} color="#15803d" />
+            <span style={{ fontSize: '1.08rem', fontWeight: 950, letterSpacing: '0.01em', color: '#0f172a' }}>
+              HIER IM TAKT TIPPEN (ODER LEERTASTE)
+            </span>
+          </div>
+          <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 600 }}>
+            {isPlaying ? 'Treffe den Puls mit dem Finger oder der Tastatur' : 'Tippe hier, um den Beat zu starten'}
+          </span>
+        </button>
+
+      </div>
+
+      {/* 4. Bottom Control Bar: Campus Green Button & 3-Star Live Progress */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+        <button
+          type="button"
+          onClick={handleTogglePlay}
+          style={{
+            background: isPlaying ? '#dc2626' : 'linear-gradient(135deg, #34a853 0%, #15803d 100%)',
+            border: 'none',
+            borderRadius: '14px',
+            padding: '12px 24px',
+            color: '#ffffff',
+            fontSize: '0.94rem',
+            fontWeight: 900,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            boxShadow: isPlaying ? '0 4px 14px rgba(220, 38, 38, 0.25)' : '0 4px 16px rgba(52, 168, 83, 0.3)'
+          }}
+          className="hover-scale"
+        >
+          {isPlaying ? <Square size={16} fill="#ffffff" color="#ffffff" /> : <Play size={16} fill="#ffffff" color="#ffffff" />}
+          <span>{isPlaying ? 'Training stoppen' : 'Beat-Trainer starten'}</span>
+        </button>
+
+        {/* 3-Star Live Rating & Accuracy Display */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+          
+          {/* Stars */}
+          <div style={{ display: 'flex', gap: '4px' }}>
+            <Star size={20} color={starsEarned >= 1 ? '#eab308' : '#cbd5e1'} fill={starsEarned >= 1 ? '#eab308' : 'none'} />
+            <Star size={20} color={starsEarned >= 2 ? '#eab308' : '#cbd5e1'} fill={starsEarned >= 2 ? '#eab308' : 'none'} />
+            <Star size={20} color={starsEarned >= 3 ? '#eab308' : '#cbd5e1'} fill={starsEarned >= 3 ? '#eab308' : 'none'} />
+          </div>
+
+          <div style={{ textAlign: 'right' }}>
+            <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>
+              Timing-Genauigkeit
+            </div>
+            <div style={{ fontSize: '1.15rem', fontWeight: 950, color: accuracyPercent >= 80 ? '#15803d' : '#0f172a' }}>
+              {totalHits > 0 ? `${accuracyPercent}%` : '—'}
+            </div>
+          </div>
+
+          <div style={{
+            width: '42px',
+            height: '42px',
+            borderRadius: '10px',
+            background: '#f8fafc',
+            border: '1px solid #e2e8f0',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}>
+            <Award size={20} color={accuracyPercent >= 80 ? '#15803d' : '#94a3b8'} />
+          </div>
+        </div>
+      </div>
+
+      {/* 5. Apple Arcade Session Success Modal Overlay with Scatter Density & Didactic Coaching */}
+      {sessionCompleted && (
+        <div style={{
+          background: '#ffffff',
+          border: '1.5px solid #bbf7d0',
+          borderRadius: '24px',
+          padding: '24px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '20px',
+          boxShadow: '0 20px 40px -8px rgba(21, 128, 61, 0.15)',
+          position: 'relative'
+        }} className="animate-fade-in">
+          
+          {/* Header Trophy & Stars */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '14px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+              <div style={{
+                width: '52px',
+                height: '52px',
+                borderRadius: '50%',
+                background: 'linear-gradient(135deg, #34a853 0%, #15803d 100%)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 4px 14px rgba(21, 128, 61, 0.3)'
+              }}>
+                <Trophy size={28} color="#ffffff" strokeWidth={2.4} />
+              </div>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <h4 style={{ margin: 0, fontSize: '1.10rem', fontWeight: 950, color: '#0f172a' }}>
+                    {starsEarned === 3 ? 'Groove-Meisterleistung! (3 Sterne)' : (starsEarned === 2 ? 'Klasse Rhythmus! (2 Sterne)' : 'Guter Anfang! (1 Stern)')}
+                  </h4>
+                  <span style={{
+                    background: '#dcfce7',
+                    color: '#15803d',
+                    fontSize: '0.74rem',
+                    fontWeight: 900,
+                    padding: '2px 8px',
+                    borderRadius: '100px'
+                  }}>
+                    +{awardedRoundXp} RUNDEN-XP
+                  </span>
+                </div>
+                <p style={{ margin: '3px 0 0 0', fontSize: '0.80rem', color: '#64748b', fontWeight: 600 }}>
+                  16 Takte gemeistert • {accuracyPercent}% Pocket-Präzision • Sitzungs-Tresor: <strong style={{ color: '#15803d' }}>+{sessionAccumulatedXp} XP</strong>
+                </p>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setSessionCompleted(false);
+                  handleTogglePlay();
+                }}
+                style={{
+                  background: '#f8fafc',
+                  color: '#334155',
+                  border: '1px solid #cbd5e1',
+                  borderRadius: '12px',
+                  padding: '10px 16px',
+                  fontSize: '0.84rem',
+                  fontWeight: 850,
+                  cursor: 'pointer'
+                }}
+                className="hover-scale"
+              >
+                Nochmal spielen ➔
+              </button>
+
+              <button
+                type="button"
+                onClick={handleSafeClose}
+                style={{
+                  background: '#15803d',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '12px',
+                  padding: '10px 20px',
+                  fontSize: '0.86rem',
+                  fontWeight: 900,
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 14px rgba(21, 128, 61, 0.25)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+                className="hover-scale"
+              >
+                <span>Abschließen &amp; XP sichern</span>
+                <Sparkles size={14} />
+              </button>
+            </div>
+          </div>
+
+          {/* Didactic Scatter Density Graph */}
+          {sessionHits.length > 0 && (
+            <div style={{
+              background: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              borderRadius: '16px',
+              padding: '16px 20px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '12px'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.76rem', fontWeight: 900, color: '#334155', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <TrendingUp size={14} color="#15803d" /> Deine Schlag-Streuung ({sessionHits.length} Schläge):
+                </span>
+                <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 700 }}>
+                  Mittlere Abweichung: {meanOffset > 0 ? `+${meanOffset}` : meanOffset}ms • Streuung: ±{stdDev}ms
+                </span>
+              </div>
+
+              {/* Scatter Track */}
+              <div style={{ position: 'relative', width: '100%', height: '32px', background: '#ffffff', borderRadius: '10px', border: '1px solid #cbd5e1', overflow: 'hidden' }}>
+                <div style={{ position: 'absolute', left: '15%', width: '22%', top: 0, bottom: 0, background: '#eff6ff', borderRight: '1px dashed #bfdbfe' }} />
+                <div style={{ position: 'absolute', left: '37%', width: '26%', top: 0, bottom: 0, background: '#f0fdf4', borderLeft: '1px solid #bbf7d0', borderRight: '1px solid #bbf7d0' }} />
+                <div style={{ position: 'absolute', left: '63%', width: '22%', top: 0, bottom: 0, background: '#fffbeb', borderLeft: '1px dashed #fde68a' }} />
+                
+                {/* Center Zero Goal Line */}
+                <div style={{ position: 'absolute', left: '50%', top: 0, bottom: 0, width: '2px', background: '#15803d', transform: 'translateX(-50%)' }} />
+
+                {/* Plotted Scatter Dots */}
+                {sessionHits.map((h, i) => {
+                  const xPct = Math.max(3, Math.min(97, 50 + (h.offsetMs / 100) * 45));
+                  const dotColor = h.rating === 'pocket' ? '#15803d' : (h.rating === 'good' ? '#16a34a' : (h.rating === 'rush' ? '#2563eb' : (h.rating === 'drag' ? '#d97706' : '#dc2626')));
+                  return (
+                    <div
+                      key={h.id || i}
+                      style={{
+                        position: 'absolute',
+                        left: `${xPct}%`,
+                        top: '50%',
+                        width: '8px',
+                        height: '8px',
+                        borderRadius: '50%',
+                        background: dotColor,
+                        border: '1.5px solid #ffffff',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+                        transform: 'translate(-50%, -50%)'
+                      }}
+                      title={`${h.offsetMs > 0 ? `+${h.offsetMs}` : h.offsetMs}ms (${h.rating})`}
+                    />
+                  );
+                })}
+              </div>
+
+              {/* Coaching Tip */}
+              <div style={{
+                background: '#ffffff',
+                borderRadius: '12px',
+                padding: '10px 14px',
+                border: '1px solid #e2e8f0',
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '10px'
+              }}>
+                <Lightbulb size={16} color="#eab308" style={{ marginTop: '2px', flexShrink: 0 }} />
+                <p style={{ margin: 0, fontSize: '0.78rem', color: '#334155', lineHeight: 1.45 }}>
+                  <strong style={{ color: '#0f172a' }}>Pädagogischer Timing-Tipp:</strong> {pedagogicalCoachingTip}
+                </p>
+              </div>
+            </div>
+          )}
+
+        </div>
+      )}
+
+      {/* 6. Hardware Latency Calibration Modal with 4-Tap Wizard */}
+      {showCalibrationModal && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0, 0, 0, 0.5)',
+          backdropFilter: 'blur(6px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 10000,
+          padding: '20px'
+        }}>
+          <div style={{
+            background: '#ffffff',
+            borderRadius: '24px',
+            maxWidth: '460px',
+            width: '100%',
+            padding: '26px',
+            boxShadow: '0 20px 40px rgba(0,0,0,0.2)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '18px'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <SlidersHorizontal size={20} color="#15803d" />
+                <h4 style={{ margin: 0, fontSize: '1.10rem', fontWeight: 900, color: '#0f172a' }}>
+                  Hardware-Latenz Kalibrierung
+                </h4>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowCalibrationModal(false);
+                  setIs4TapWizardActive(false);
+                }}
+                style={{ background: 'transparent', border: 'none', fontSize: '1rem', cursor: 'pointer', color: '#64748b' }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <p style={{ margin: 0, fontSize: '0.82rem', color: '#475569', lineHeight: 1.5 }}>
+              Jedes Gerät (AirPods, Lautsprecher, Mac-Klinke) hat messbare Audio-Verzögerungen.
+              {isBluetoothDetected && (
+                <span style={{ display: 'block', marginTop: '6px', color: '#2563eb', fontWeight: 700 }}>
+                  🎧 Bluetooth-Verbindung erkannt: Latenzausgleich aktiv.
+                </span>
+              )}
+            </p>
+
+            {/* Loopstation Sync Notification */}
+            {calibrationSource === 'loopstation' && (
+              <div style={{
+                background: '#f0fdf4',
+                border: '1px solid #bbf7d0',
+                borderRadius: '12px',
+                padding: '10px 14px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                fontSize: '0.76rem',
+                color: '#166534',
+                fontWeight: 700
+              }}>
+                <CheckCircle2 size={16} color="#166534" />
+                <span>Automatisch mit deiner GrooveLoopstation synchronisiert!</span>
+              </div>
+            )}
+
+            {/* Current Offset Display */}
+            <div style={{
+              background: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              borderRadius: '16px',
+              padding: '16px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between'
+            }}>
+              <div>
+                <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>
+                  Aktueller Offset
+                </div>
+                <div style={{ fontSize: '1.35rem', fontWeight: 950, color: '#15803d' }}>
+                  {latencyOffsetMs} ms
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '6px' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const next = Math.max(-50, latencyOffsetMs - 5);
+                    setLatencyOffsetMs(next);
+                    localStorage.setItem('campus_timing_latency_offset', String(next));
+                    setCalibrationSource('trainer');
+                  }}
+                  style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#0f172a', fontWeight: 800, cursor: 'pointer' }}
+                >
+                  - 5ms
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const next = Math.min(220, latencyOffsetMs + 5);
+                    setLatencyOffsetMs(next);
+                    localStorage.setItem('campus_timing_latency_offset', String(next));
+                    setCalibrationSource('trainer');
+                  }}
+                  style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#0f172a', fontWeight: 800, cursor: 'pointer' }}
+                >
+                  + 5ms
+                </button>
+              </div>
+            </div>
+
+            {/* 4-Tap Quick Calibration Wizard Button */}
+            <div style={{
+              background: '#ffffff',
+              border: '1.5px dashed #cbd5e1',
+              borderRadius: '16px',
+              padding: '16px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '10px',
+              alignItems: 'center',
+              textAlign: 'center'
+            }}>
+              {!is4TapWizardActive ? (
+                <>
+                  <span style={{ fontSize: '0.80rem', fontWeight: 800, color: '#0f172a' }}>
+                    🎯 4-Tap Schnell-Einmessung
+                  </span>
+                  <span style={{ fontSize: '0.74rem', color: '#64748b' }}>
+                    Spielt 4 Klicks ab – tippe 4x im Takt mit, um dein Gerät auf 0ms zu eichen.
+                  </span>
+                  <button
+                    type="button"
+                    onClick={start4TapWizard}
+                    style={{
+                      background: '#15803d',
+                      color: '#ffffff',
+                      border: 'none',
+                      borderRadius: '10px',
+                      padding: '8px 16px',
+                      fontSize: '0.80rem',
+                      fontWeight: 900,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Einmessung starten
+                  </button>
+                </>
+              ) : (
+                <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+                  <span style={{ fontSize: '0.86rem', fontWeight: 900, color: '#15803d' }}>
+                    Höre die Klicks &amp; tippe 4x: ({wizardTapCount} von 4)
+                  </span>
+                  <button
+                    type="button"
+                    onPointerDown={handleWizardTap}
+                    style={{
+                      width: '100%',
+                      height: '60px',
+                      borderRadius: '12px',
+                      background: '#e6f4ea',
+                      border: '2px solid #34a853',
+                      color: '#15803d',
+                      fontSize: '0.94rem',
+                      fontWeight: 950,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    👉 JETZT TIPPEN ({wizardTapCount + 1}. Schlag)
+                  </button>
+                </div>
+              )}
+
+              {wizardSuccessMessage && (
+                <span style={{ fontSize: '0.76rem', color: '#15803d', fontWeight: 800 }}>
+                  {wizardSuccessMessage}
+                </span>
+              )}
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setLatencyOffsetMs(25);
+                  localStorage.setItem('campus_timing_latency_offset', '25');
+                  setCalibrationSource('trainer');
+                }}
+                style={{
+                  background: '#f1f5f9',
+                  border: 'none',
+                  borderRadius: '10px',
+                  padding: '10px',
+                  fontSize: '0.78rem',
+                  fontWeight: 800,
+                  color: '#334155',
+                  cursor: 'pointer'
+                }}
+              >
+                Standard zurücksetzen (25 ms)
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setShowCalibrationModal(false);
+                  setIs4TapWizardActive(false);
+                }}
+                style={{
+                  background: '#15803d',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '10px',
+                  padding: '10px',
+                  fontSize: '0.82rem',
+                  fontWeight: 900,
+                  cursor: 'pointer'
+                }}
+              >
+                Speichern &amp; Schließen
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+    </div>
+  );
+};

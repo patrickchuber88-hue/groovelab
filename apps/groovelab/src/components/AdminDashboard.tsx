@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase, deleteUserStorageAssets } from '../lib/supabase';
 import { Music, Calendar, AlertCircle, Library, Shield, ShieldCheck, LogOut, Users, User, Monitor, QrCode, Plus, Pencil, Trash2, Box, BarChart as LucideBarChart, Clock, Star, PieChart as LucidePieChart, TrendingUp, Tablet, ExternalLink, Settings, Search, Bell, MapPin, X, Printer, Award, Download, Mic, Check, CheckCircle2, ChevronLeft, ChevronRight, ChevronDown, GripVertical, BookOpen, Maximize2, ArrowLeft, GraduationCap, Lock, Activity, Zap, RefreshCw, Sliders, VolumeX, Copy, Eye, EyeOff, School, Lightbulb, Disc, XCircle, Volume2, FileText, DoorClosed, Hourglass } from 'lucide-react';
@@ -9,22 +9,26 @@ import {
   Radar, RadarChart, PolarGrid, PolarAngleAxis
 } from 'recharts';
 import { renderInstrumentIcon } from '../utils/instruments';
-import { StudentDetailModal } from './StudentDetailModal';
-import { ScheduleBoard } from './ScheduleBoard';
-import { StudentScheduleSlotsModal } from './StudentScheduleSlotsModal';
-import { MeisterwerkDocumentationModal, checkIsAudioTresorActive } from './MeisterwerkDocumentationModal';
-import { CampusEventsBoard } from './CampusEventsBoard';
+import { checkIsAudioTresorActive } from '../domain/stickersAndTresor';
 import { CampusSetupScreen } from './CampusSetupScreen';
 import { StudioAvatar } from './StudioAvatar';
 import { IDBadgeCard, inlineAllImagesInElement } from './IDBadgeCard';
 import { useRealNamesVisibility, maskLastName, formatTeacherFullName } from '../utils/nameHelper';
-import { ConfirmDeleteStudentModal, StudentToDelete } from './ConfirmDeleteStudentModal';
+import { StudentToDelete } from './ConfirmDeleteStudentModal';
 import { deleteStudentFully } from '../utils/studentDeletionService';
-import { AVVModal } from './AVVModal';
-import { FeedbackHubModal } from './feedback/FeedbackHubModal';
-import { HelpCenterModal } from './help/HelpCenterModal';
-import { ParentInfoSheetModal } from './modals/ParentInfoSheetModal';
 import { revokeStudentToken } from '../utils/tokenSigner';
+
+// Lazy load heavy sub-suites & modals on demand
+const StudentDetailModal = lazy(() => import('./StudentDetailModal').then(m => ({ default: m.StudentDetailModal })));
+const ScheduleBoard = lazy(() => import('./ScheduleBoard').then(m => ({ default: m.ScheduleBoard })));
+const StudentScheduleSlotsModal = lazy(() => import('./StudentScheduleSlotsModal').then(m => ({ default: m.StudentScheduleSlotsModal })));
+const MeisterwerkDocumentationModal = lazy(() => import('./MeisterwerkDocumentationModal').then(m => ({ default: m.MeisterwerkDocumentationModal })));
+const CampusEventsBoard = lazy(() => import('./CampusEventsBoard').then(m => ({ default: m.CampusEventsBoard })));
+const ConfirmDeleteStudentModal = lazy(() => import('./ConfirmDeleteStudentModal').then(m => ({ default: m.ConfirmDeleteStudentModal })));
+const AVVModal = lazy(() => import('./AVVModal').then(m => ({ default: m.AVVModal })));
+const FeedbackHubModal = lazy(() => import('./feedback/FeedbackHubModal').then(m => ({ default: m.FeedbackHubModal })));
+const HelpCenterModal = lazy(() => import('./help/HelpCenterModal').then(m => ({ default: m.HelpCenterModal })));
+const ParentInfoSheetModal = lazy(() => import('./modals/ParentInfoSheetModal').then(m => ({ default: m.ParentInfoSheetModal })));
 import { 
   fetchSchoolRoster, 
   getTeacherRoster, 
@@ -2439,40 +2443,46 @@ export function AdminDashboard({
         }
 
         if (studentsData) {
-          // --- AUTO-CLEANUP DELETED/ARCHIVED STUDENTS ---
+          // --- AUTO-CLEANUP DELETED/ARCHIVED STUDENTS (NON-BLOCKING BACKGROUND DISPATCH) ---
           const expiredStudents = studentsData.filter((s: any) => s.contract_ends_at && new Date(s.contract_ends_at).getTime() < Date.now());
           const expiredIds = expiredStudents.map((s: any) => s.id);
-          
-          let activeStudentsForState = studentsData;
+          const toDelete = expiredStudents.filter((s: any) => s.delete_after_contract === true).map((s: any) => s.id);
+          const activeStudentsForState = toDelete.length > 0
+            ? studentsData.filter((s: any) => !toDelete.includes(s.id))
+            : studentsData;
 
-          if (expiredIds.length > 0) {
-            // Remove all expired users from bands to free the spot
-            await supabase.from('band_members').delete().in('user_id', expiredIds);
-            
-            // Hard delete users who requested deletion
-            const toDelete = expiredStudents.filter((s: any) => s.delete_after_contract === true).map((s: any) => s.id);
-            if (toDelete.length > 0) {
-              await deleteUserStorageAssets(toDelete);
-              await supabase.from('bands').update({ coach_id: null }).in('coach_id', toDelete);
-              await supabase.from('user_song_skills').delete().in('user_id', toDelete);
-              await supabase.from('user_song_skills').update({ verified_by_id: null }).in('verified_by_id', toDelete);
-              await supabase.from('sessions').delete().in('user_id', toDelete);
-              await supabase.from('band_songs').update({ suggested_by: null }).in('suggested_by', toDelete);
-              await supabase.from('lab_planning').delete().in('user_id', toDelete);
-              await supabase.from('band_shoutbox').delete().in('user_id', toDelete);
-              await supabase.from('band_song_slots').delete().in('user_id', toDelete);
-              await supabase.from('help_requests').delete().in('user_id', toDelete);
-              await supabase.from('avatars').delete().in('user_id', toDelete);
-              await supabase.from('users').delete().in('id', toDelete);
-              
-              activeStudentsForState = studentsData.filter((s: any) => !toDelete.includes(s.id));
-            }
-          }
-
+          // Immediately render student list without stalling on DB mutations
           setStudents(prev => {
             if (prev && JSON.stringify(prev) === JSON.stringify(activeStudentsForState)) return prev;
             return activeStudentsForState;
           });
+
+          // Perform cleanup in parallel background worker to keep UI 100% smooth
+          if (expiredIds.length > 0) {
+            setTimeout(async () => {
+              try {
+                await supabase.from('band_members').delete().in('user_id', expiredIds);
+                if (toDelete.length > 0) {
+                  await deleteUserStorageAssets(toDelete);
+                  await Promise.allSettled([
+                    supabase.from('bands').update({ coach_id: null }).in('coach_id', toDelete),
+                    supabase.from('user_song_skills').delete().in('user_id', toDelete),
+                    supabase.from('user_song_skills').update({ verified_by_id: null }).in('verified_by_id', toDelete),
+                    supabase.from('sessions').delete().in('user_id', toDelete),
+                    supabase.from('band_songs').update({ suggested_by: null }).in('suggested_by', toDelete),
+                    supabase.from('lab_planning').delete().in('user_id', toDelete),
+                    supabase.from('band_shoutbox').delete().in('user_id', toDelete),
+                    supabase.from('band_song_slots').delete().in('user_id', toDelete),
+                    supabase.from('help_requests').delete().in('user_id', toDelete),
+                    supabase.from('avatars').delete().in('user_id', toDelete),
+                    supabase.from('users').delete().in('id', toDelete)
+                  ]);
+                }
+              } catch (cleanErr) {
+                console.warn('[AdminDashboard] Background student cleanup caught error:', cleanErr);
+              }
+            }, 0);
+          }
           const studentIds = activeStudentsForState.map((s: any) => s.id);
           
           // Fetch active sessions for school's students
@@ -14818,17 +14828,19 @@ export function AdminDashboard({
     if (!selectedStudent) return null;
 
     return (
-      <StudentDetailModal 
-        student={selectedStudent} 
-        onClose={() => setSelectedStudent(null)} 
-        callerDashboard="teacher"
-        onOpenBandProfile={(band) => {
-          setEditingBand(band);
-          setSelectedStudent(null);
-        }}
-        activePlatform={activePlatform === "campus" ? "campus" : "groovelab"}
-        onSwitchPlatform={onSwitchPlatform}
-      />
+      <Suspense fallback={null}>
+        <StudentDetailModal 
+          student={selectedStudent} 
+          onClose={() => setSelectedStudent(null)} 
+          callerDashboard="teacher"
+          onOpenBandProfile={(band) => {
+            setEditingBand(band);
+            setSelectedStudent(null);
+          }}
+          activePlatform={activePlatform === "campus" ? "campus" : "groovelab"}
+          onSwitchPlatform={onSwitchPlatform}
+        />
+      </Suspense>
     );
   };
 
@@ -15891,15 +15903,21 @@ export function AdminDashboard({
       )}
 
       {activeTab === 'schedule' ? (
-        admin && <ScheduleBoard schoolId={admin.school_id} userId={userId} />
+        admin && (
+          <Suspense fallback={<div style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>Lade Stundenplan...</div>}>
+            <ScheduleBoard schoolId={admin.school_id} userId={userId} />
+          </Suspense>
+        )
       ) : activeTab === 'events' ? (
-        <CampusEventsBoard 
-          userId={userId}
-          role={admin?.role || 'teacher'}
-          schoolId={admin?.school_id || ''}
-          supabase={supabase}
-          brandColor={brandColor}
-        />
+        <Suspense fallback={<div style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>Lade Termine &amp; Kalender...</div>}>
+          <CampusEventsBoard 
+            userId={userId}
+            role={admin?.role || 'teacher'}
+            schoolId={admin?.school_id || ''}
+            supabase={supabase}
+            brandColor={brandColor}
+          />
+        </Suspense>
       ) : activeTab === 'bands' ? (
         renderBandsTab()
       ) : activeTab === 'students' ? (
@@ -15923,97 +15941,113 @@ export function AdminDashboard({
       )}
 
       {renderStudentDetailModal()}
-      <ConfirmDeleteStudentModal
-        isOpen={!!deleteStudentModalData}
-        student={deleteStudentModalData}
-        activePlatform={activePlatform === 'campus' ? 'campus' : activePlatform === 'groovelab' ? 'groovelab' : 'all'}
-        onClose={() => setDeleteStudentModalData(null)}
-        onConfirm={async (studentId) => {
-          const res = await deleteStudentFully(studentId, {
-            activePlatform: activePlatform === 'campus' ? 'campus' : activePlatform === 'groovelab' ? 'groovelab' : 'all',
-            isCampusActive: deleteStudentModalData?.isCampusActive,
-            isGroovelabActive: deleteStudentModalData?.isGroovelabActive
-          });
-          if (!res.success) {
-            throw new Error(res.error);
-          }
-          setStudents(prev => prev.filter(s => s.id !== studentId));
-        }}
-      />
+      {deleteStudentModalData && (
+        <Suspense fallback={null}>
+          <ConfirmDeleteStudentModal
+            isOpen={!!deleteStudentModalData}
+            student={deleteStudentModalData}
+            activePlatform={activePlatform === 'campus' ? 'campus' : activePlatform === 'groovelab' ? 'groovelab' : 'all'}
+            onClose={() => setDeleteStudentModalData(null)}
+            onConfirm={async (studentId) => {
+              const res = await deleteStudentFully(studentId, {
+                activePlatform: activePlatform === 'campus' ? 'campus' : activePlatform === 'groovelab' ? 'groovelab' : 'all',
+                isCampusActive: deleteStudentModalData?.isCampusActive,
+                isGroovelabActive: deleteStudentModalData?.isGroovelabActive
+              });
+              if (!res.success) {
+                throw new Error(res.error);
+              }
+              setStudents(prev => prev.filter(s => s.id !== studentId));
+            }}
+          />
+        </Suspense>
+      )}
       
       {/* Personalisierbares Eltern-Informationsblatt (PDF) Modal */}
-      <ParentInfoSheetModal
-        isOpen={showParentInfoSheetModal}
-        onClose={() => setShowParentInfoSheetModal(false)}
-        schoolData={{
-          name: schoolObj?.name || (admin?.schools ? (Array.isArray(admin.schools) ? admin.schools[0]?.name : admin.schools?.name) : '') || 'Unsere Musikschule',
-          subdomain: schoolObj?.subdomain || '',
-          logo_url: schoolObj?.logo_url || '',
-          city: schoolObj?.city || '',
-          student_billing_option: schoolObj?.student_billing_option || 'school_all',
-          email: schoolObj?.email || admin?.email || ''
-        }}
-        activePlatformDefault={activePlatform === 'campus' ? 'campus' : activePlatform === 'groovelab' ? 'groovelab' : 'both'}
-      />
+      {showParentInfoSheetModal && (
+        <Suspense fallback={null}>
+          <ParentInfoSheetModal
+            isOpen={showParentInfoSheetModal}
+            onClose={() => setShowParentInfoSheetModal(false)}
+            schoolData={{
+              name: schoolObj?.name || (admin?.schools ? (Array.isArray(admin.schools) ? admin.schools[0]?.name : admin.schools?.name) : '') || 'Unsere Musikschule',
+              subdomain: schoolObj?.subdomain || '',
+              logo_url: schoolObj?.logo_url || '',
+              city: schoolObj?.city || '',
+              student_billing_option: schoolObj?.student_billing_option || 'school_all',
+              email: schoolObj?.email || admin?.email || ''
+            }}
+            activePlatformDefault={activePlatform === 'campus' ? 'campus' : activePlatform === 'groovelab' ? 'groovelab' : 'both'}
+          />
+        </Suspense>
+      )}
 
       {renderQRModal()}
       {selectedTimetableStudent && (
-        <StudentScheduleSlotsModal
-          student={selectedTimetableStudent}
-          onClose={() => setSelectedTimetableStudent(null)}
-          onPreferencesSaved={() => {
-            if (admin?.school_id) {
-              supabase
-                .from('student_schedule_preferences')
-                .select('student_id, preference_type, day_of_week, start_time')
-                .then(({ data }) => {
-                  if (data) {
-                    const map: Record<string, any[]> = {};
-                    data.forEach((p: any) => {
-                      if (!map[p.student_id]) map[p.student_id] = [];
-                      map[p.student_id].push(p);
-                    });
-                    setAllSchedulePreferences(map);
-                  }
-                });
-            }
-            fetchData(true);
-          }}
-          activePlatform={activePlatform}
-          teacherId={admin?.id}
-          onOpenScheduleBoard={() => setActiveTab('schedule')}
-        />
+        <Suspense fallback={null}>
+          <StudentScheduleSlotsModal
+            student={selectedTimetableStudent}
+            onClose={() => setSelectedTimetableStudent(null)}
+            onPreferencesSaved={() => {
+              if (admin?.school_id) {
+                supabase
+                  .from('student_schedule_preferences')
+                  .select('student_id, preference_type, day_of_week, start_time')
+                  .then(({ data }) => {
+                    if (data) {
+                      const map: Record<string, any[]> = {};
+                      data.forEach((p: any) => {
+                        if (!map[p.student_id]) map[p.student_id] = [];
+                        map[p.student_id].push(p);
+                      });
+                      setAllSchedulePreferences(map);
+                    }
+                  });
+              }
+              fetchData(true);
+            }}
+            activePlatform={activePlatform}
+            teacherId={admin?.id}
+            onOpenScheduleBoard={() => setActiveTab('schedule')}
+          />
+        </Suspense>
       )}
       {renderRoomLayoutModal()}
       {renderBatchiPadModal()}
       {renderLogoutDialog()}
 
-      <AVVModal
-        isOpen={showAVVModal}
-        onClose={() => setShowAVVModal(false)}
-        school={schoolObj || (admin?.schools ? (Array.isArray(admin.schools) ? admin.schools[0] : admin.schools) : null) || { id: admin?.school_id, name: admin?.first_name ? `${admin.first_name}'s Schule` : 'Musikschule' }}
-        onAVVSigned={() => {
-          const nowIso = new Date().toISOString();
-          if (admin) {
-            setAdmin((prev: any) => {
-              if (!prev) return prev;
-              const currentSchools = prev.schools;
-              let updatedSchools;
-              if (Array.isArray(currentSchools)) {
-                updatedSchools = currentSchools.map((s: any) => ({ ...s, avv_signed_at: nowIso }));
-              } else if (currentSchools && typeof currentSchools === 'object') {
-                updatedSchools = { ...currentSchools, avv_signed_at: nowIso };
-              } else {
-                updatedSchools = { id: prev.school_id, avv_signed_at: nowIso };
+      {showAVVModal && (
+        <Suspense fallback={null}>
+          <AVVModal
+            isOpen={showAVVModal}
+            onClose={() => setShowAVVModal(false)}
+            school={schoolObj || (admin?.schools ? (Array.isArray(admin.schools) ? admin.schools[0] : admin.schools) : null) || { id: admin?.school_id, name: admin?.first_name ? `${admin.first_name}'s Schule` : 'Musikschule' }}
+            onAVVSigned={() => {
+              const nowIso = new Date().toISOString();
+              if (admin) {
+                setAdmin((prev: any) => {
+                  if (!prev) return prev;
+                  const currentSchools = prev.schools;
+                  let updatedSchools;
+                  if (Array.isArray(currentSchools)) {
+                    updatedSchools = currentSchools.map((s: any) => ({ ...s, avv_signed_at: nowIso }));
+                  } else if (currentSchools && typeof currentSchools === 'object') {
+                    updatedSchools = { ...currentSchools, avv_signed_at: nowIso };
+                  } else {
+                    updatedSchools = { id: prev.school_id, avv_signed_at: nowIso };
+                  }
+                  return {
+                    ...prev,
+                    schools: updatedSchools
+                  };
+                });
               }
-              return {
-                ...prev,
-                schools: updatedSchools
-              };
-            });
-          }
-        }}
-      />
+              setShowAVVModal(false);
+              fetchData(true);
+            }}
+          />
+        </Suspense>
+      )}
 
       {/* Notebook Lehrwerk Detail Modal (Bypassed - edit mode triggered inline on click) */}
       {false && selectedLehrwerkForDetail && (() => {
@@ -18703,47 +18737,51 @@ export function AdminDashboard({
       )}
 
       {showTageskompassModal && selectedStudentForTageskompass && (
-        <MeisterwerkDocumentationModal
-          student={{
-            id: selectedStudentForTageskompass.id,
-            first_name: selectedStudentForTageskompass.first_name,
-            last_name: selectedStudentForTageskompass.last_name,
-            photo_url: selectedStudentForTageskompass.photo_url || '/avatar_ghost.jpg',
-            is_campus_active: selectedStudentForTageskompass.is_campus_active,
-            school_id: selectedStudentForTageskompass.school_id || admin?.school_id
-          }}
-          onClose={() => {
-            setShowTageskompassModal(false);
-            setSelectedStudentForTageskompass(null);
-            setInitialLehrwerkIdForTageskompass(null);
-          }}
-          teacherId={userId}
-          initialLehrwerkId={initialLehrwerkIdForTageskompass || undefined}
-          hasTresorStorage={checkIsAudioTresorActive(selectedStudentForTageskompass) || checkIsAudioTresorActive(admin)}
-          onProfileClick={(student) => {
-            setShowTageskompassModal(false);
-            setSelectedStudentForTageskompass(null);
-            setInitialLehrwerkIdForTageskompass(null);
-            setSelectedStudent(student);
-          }}
-        />
+        <Suspense fallback={null}>
+          <MeisterwerkDocumentationModal
+            student={{
+              id: selectedStudentForTageskompass.id,
+              first_name: selectedStudentForTageskompass.first_name,
+              last_name: selectedStudentForTageskompass.last_name,
+              photo_url: selectedStudentForTageskompass.photo_url || '/avatar_ghost.jpg',
+              is_campus_active: selectedStudentForTageskompass.is_campus_active,
+              school_id: selectedStudentForTageskompass.school_id || admin?.school_id
+            }}
+            onClose={() => {
+              setShowTageskompassModal(false);
+              setSelectedStudentForTageskompass(null);
+              setInitialLehrwerkIdForTageskompass(null);
+            }}
+            teacherId={userId}
+            initialLehrwerkId={initialLehrwerkIdForTageskompass || undefined}
+            hasTresorStorage={checkIsAudioTresorActive(selectedStudentForTageskompass) || checkIsAudioTresorActive(admin)}
+            onProfileClick={(student) => {
+              setShowTageskompassModal(false);
+              setSelectedStudentForTageskompass(null);
+              setInitialLehrwerkIdForTageskompass(null);
+              setSelectedStudent(student);
+            }}
+          />
+        </Suspense>
       )}
 
       {showTeacherToolsModal && (
-        <MeisterwerkDocumentationModal
-          student={{
-            id: 'teacher-self',
-            first_name: admin?.first_name || 'Lehrer',
-            last_name: admin?.last_name || '',
-            photo_url: admin?.photo_url || '/campus_login_hero.png',
-            is_campus_active: true,
-            school_id: admin?.school_id
-          }}
-          onClose={() => setShowTeacherToolsModal(false)}
-          teacherId={userId}
-          isTeacherTools={true}
-          hasTresorStorage={checkIsAudioTresorActive(admin)}
-        />
+        <Suspense fallback={null}>
+          <MeisterwerkDocumentationModal
+            student={{
+              id: 'teacher-self',
+              first_name: admin?.first_name || 'Lehrer',
+              last_name: admin?.last_name || '',
+              photo_url: admin?.photo_url || '/campus_login_hero.png',
+              is_campus_active: true,
+              school_id: admin?.school_id
+            }}
+            onClose={() => setShowTeacherToolsModal(false)}
+            teacherId={userId}
+            isTeacherTools={true}
+            hasTresorStorage={checkIsAudioTresorActive(admin)}
+          />
+        </Suspense>
       )}
 
       {previewingTextbaustein && (
@@ -20783,29 +20821,37 @@ function DeviceSetupScreen({
       )}
 
       {/* Feedback & Ideenschmiede Modal */}
-      <FeedbackHubModal
-        isOpen={isFeedbackModalOpen}
-        onClose={() => setIsFeedbackModalOpen(false)}
-        userRole="admin"
-        userId={admin?.id || admin?.userId || 'admin'}
-        userName="Administrator"
-        schoolId={effectiveSchool?.id || school?.id}
-        schoolName={effectiveSchool?.name}
-        activePlatform={activePlatform as any}
-      />
+      {isFeedbackModalOpen && (
+        <Suspense fallback={null}>
+          <FeedbackHubModal
+            isOpen={isFeedbackModalOpen}
+            onClose={() => setIsFeedbackModalOpen(false)}
+            userRole="admin"
+            userId={admin?.id || admin?.userId || 'admin'}
+            userName="Administrator"
+            schoolId={effectiveSchool?.id || school?.id}
+            schoolName={effectiveSchool?.name}
+            activePlatform={activePlatform as any}
+          />
+        </Suspense>
+      )}
 
       {/* Leitfäden & Akademie Modal */}
-      <HelpCenterModal
-        isOpen={isHelpCenterOpen}
-        onClose={() => setIsHelpCenterOpen(false)}
-        userRole="admin"
-        activePlatform={activePlatform as any}
-        schoolName={effectiveSchool?.name || school?.name}
-        onOpenFeedbackHub={() => {
-          setIsHelpCenterOpen(false);
-          setIsFeedbackModalOpen(true);
-        }}
-      />
+      {isHelpCenterOpen && (
+        <Suspense fallback={null}>
+          <HelpCenterModal
+            isOpen={isHelpCenterOpen}
+            onClose={() => setIsHelpCenterOpen(false)}
+            userRole="admin"
+            activePlatform={activePlatform as any}
+            schoolName={effectiveSchool?.name || school?.name}
+            onOpenFeedbackHub={() => {
+              setIsHelpCenterOpen(false);
+              setIsFeedbackModalOpen(true);
+            }}
+          />
+        </Suspense>
+      )}
     </div>
   );
 }

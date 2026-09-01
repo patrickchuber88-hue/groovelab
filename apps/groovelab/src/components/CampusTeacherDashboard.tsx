@@ -34,7 +34,9 @@ import {
   Printer,
   Mic,
   KeyRound,
-  Timer
+  Timer,
+  Music,
+  Sparkles
 } from 'lucide-react';
 import { useRealNamesVisibility, maskLastName, formatTeacherFullName } from '../utils/nameHelper';
 import { FeedbackHubModal } from './feedback/FeedbackHubModal';
@@ -601,6 +603,7 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
     const { data: allOccurs } = await supabase
       .from('schedule_occurrences')
       .select('*, student:users!schedule_occurrences_student_id_fkey(*), teacher:users!schedule_occurrences_teacher_id_fkey(*), schedules!schedule_occurrences_schedule_id_fkey(*)')
+      .eq('school_id', schoolId)
       .gte('date', startDateStr).lte('date', endDateStr);
 
     const staticBookings = mappedAllSchedData;
@@ -2449,8 +2452,9 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
                   )}
                 </div>
                 {cascadeLink && (
-                  <p className="text-[10px] font-mono text-emerald-400 break-all select-all p-2 bg-slate-950 rounded-lg border border-slate-800">
-                    {cascadeLink}
+                  <p className="text-[10px] font-mono text-emerald-400 break-all select-all p-2 bg-slate-950 rounded-lg border border-slate-800 flex items-center justify-between">
+                    <span>{cascadeLink.replace(/token=[^&]+/, 'token=••••••••••••')}</span>
+                    <span className="text-[9px] text-slate-500 ml-2">(Kopieren per Button)</span>
                   </p>
                 )}
               </div>
@@ -3453,7 +3457,7 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
                       }}
                       className="p-2.5 rounded-xl border border-slate-800 bg-slate-950/40 hover:bg-slate-850/20 text-left text-xs font-semibold text-slate-300 hover:text-white transition duration-150 flex items-center gap-2"
                     >
-                      <span className="text-sm">⏱️</span>
+                      <Timer size={16} className="text-emerald-400" />
                       <div className="flex flex-col">
                         <span className="font-bold">Tempo halten</span>
                         <span className="text-[9px] text-slate-500 font-medium">Metronom BPM</span>
@@ -3469,7 +3473,7 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
                       }}
                       className="p-2.5 rounded-xl border border-slate-800 bg-slate-950/40 hover:bg-slate-850/20 text-left text-xs font-semibold text-slate-300 hover:text-white transition duration-150 flex items-center gap-2"
                     >
-                      <span className="text-sm">✨</span>
+                      <Sparkles size={16} className="text-emerald-400" />
                       <div className="flex flex-col">
                         <span className="font-bold">Sauber spielen</span>
                         <span className="text-[9px] text-slate-500 font-medium">Klarer Klang</span>
@@ -3485,7 +3489,7 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
                       }}
                       className="p-2.5 rounded-xl border border-slate-800 bg-slate-950/40 hover:bg-slate-850/20 text-left text-xs font-semibold text-slate-300 hover:text-white transition duration-150 flex items-center gap-2"
                     >
-                      <span className="text-sm">🥁</span>
+                      <Music size={16} className="text-emerald-400" />
                       <div className="flex flex-col">
                         <span className="font-bold">Rhythmus-Metronom</span>
                         <span className="text-[9px] text-slate-500 font-medium">Timing & Takt</span>
@@ -3501,7 +3505,7 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
                       }}
                       className="p-2.5 rounded-xl border border-slate-800 bg-slate-950/40 hover:bg-slate-850/20 text-left text-xs font-semibold text-slate-300 hover:text-white transition duration-150 flex items-center gap-2"
                     >
-                      <span className="text-sm">🖖</span>
+                      <Check size={16} className="text-emerald-400" />
                       <div className="flex flex-col">
                         <span className="font-bold">Fingersatz üben</span>
                         <span className="text-[9px] text-slate-500 font-medium">Fingersatz einhalten</span>
@@ -3512,14 +3516,14 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
 
                 {/* 1-Klick-Feedback Schnelltasten */}
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider">🚀 1-Klick-Feedback (Schnelltasten):</label>
+                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider">1-Klick-Feedback (Schnelltasten):</label>
                   <div className="flex flex-wrap gap-1.5 pb-1">
                     {[
-                      { label: '🥁 Rhythmus sitzt', text: 'Der Rhythmus war heute super stabil und präzise!' },
-                      { label: '🎵 Melodie gelernt', text: 'Melodie komplett auswendig gelernt, tolle Arbeit!' },
-                      { label: '⚡ Konzentration top', text: 'Heute extrem konzentriert gearbeitet und super Fortschritte gemacht.' },
-                      { label: '🌟 Hausaufgabe perfekt', text: 'Hausaufgabe fehlerfrei vorbereitet, weiter so!' },
-                      { label: '🖐️ Handhaltung', text: 'Achte bei den nächsten Malen noch mehr auf eine entspannte Handhaltung.' }
+                      { label: 'Rhythmus sitzt', text: 'Der Rhythmus war heute super stabil und präzise!' },
+                      { label: 'Melodie gelernt', text: 'Melodie komplett auswendig gelernt, tolle Arbeit!' },
+                      { label: 'Konzentration top', text: 'Heute extrem konzentriert gearbeitet und super Fortschritte gemacht.' },
+                      { label: 'Hausaufgabe perfekt', text: 'Hausaufgabe fehlerfrei vorbereitet, weiter so!' },
+                      { label: 'Handhaltung', text: 'Achte bei den nächsten Malen noch mehr auf eine entspannte Handhaltung.' }
                     ].map((tag, idx) => (
                        <button
                          key={idx}

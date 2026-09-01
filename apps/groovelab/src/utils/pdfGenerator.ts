@@ -1625,6 +1625,159 @@ export const generateGdprDataReportPDF = async (data: GdprReportData) => {
   doc.save(`Campus_Groovelab_DSGVO_Bericht_${cleanName}_${dateFileStr}.pdf`);
 };
 
+export interface GdprDeletionCertificateData {
+  studentName: string;
+  studentFullName?: string;
+  schoolName: string;
+  certificateId?: string;
+  purgedAudioFilesCount?: number;
+  freedStorageBytes?: number;
+  deletedAt?: string;
+}
+
+export const generateGdprDeletionCertificatePDF = async (data: GdprDeletionCertificateData) => {
+  const { default: jsPDF } = await import('jspdf');
+  const doc = new jsPDF();
+
+  const now = new Date();
+  const dateStr = now.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  const timeStr = now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+  const certId = data.certificateId || `CG-PURGE-${Math.random().toString(16).substring(2, 8).toUpperCase()}-${now.getFullYear().toString().slice(-2)}${(now.getMonth() + 1).toString().padStart(2, '0')}`;
+
+  const displayNameForTitle = data.studentFullName || data.studentName;
+  doc.setProperties({
+    title: `DSGVO_Art17_Loeschungszertifikat_${displayNameForTitle.replace(/\s+/g, '_')}`,
+    subject: 'DSGVO Art. 17 Offizielles Löschungs- und Austrittszertifikat',
+    author: 'Campus-Groovelab Plattform',
+    creator: 'Campus-Groovelab Compliance Engine'
+  });
+
+  const primaryRed = [234, 67, 53];      // Admin Red #ea4335
+  const slateDark = [15, 23, 42];        // Slate 900
+  const slateBody = [51, 65, 85];        // Slate 700
+  const slateMuted = [100, 116, 139];    // Slate 500
+  const cardBg = [248, 250, 252];        // Slate 50
+  const cardBorder = [226, 232, 240];    // Slate 200
+
+  // 1. Accent Top Bar
+  doc.setFillColor(primaryRed[0], primaryRed[1], primaryRed[2]);
+  doc.rect(0, 0, 210, 6, 'F');
+
+  // 2. Header
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(15);
+  doc.setTextColor(slateDark[0], slateDark[1], slateDark[2]);
+  doc.text('CAMPUS-GROOVELAB', 20, 20);
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(11.5);
+  doc.setTextColor(primaryRed[0], primaryRed[1], primaryRed[2]);
+  doc.text('Offizielles DSGVO-Löschungs- & Austrittszertifikat', 20, 27);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.setTextColor(slateMuted[0], slateMuted[1], slateMuted[2]);
+  doc.text(`Zertifikats-Aktenzeichen: ${certId} • Bestätigung nach Art. 17 DSGVO`, 20, 33);
+
+  let y = 42;
+
+  // Block 1: Bestätigung der Datenlöschung
+  doc.setFillColor(cardBg[0], cardBg[1], cardBg[2]);
+  doc.setDrawColor(cardBorder[0], cardBorder[1], cardBorder[2]);
+  doc.roundedRect(20, y, 170, 52, 3, 3, 'FD');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9.5);
+  doc.setTextColor(slateDark[0], slateDark[1], slateDark[2]);
+  doc.text('1. BESTÄTIGUNG DER RECHTSKONFORMEN DATENLÖSCHUNG', 25, y + 8);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.setTextColor(slateBody[0], slateBody[1], slateBody[2]);
+
+  doc.text(`Betroffener Schüler:`, 25, y + 17);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(slateDark[0], slateDark[1], slateDark[2]);
+  doc.text(displayNameForTitle, 80, y + 17);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(slateBody[0], slateBody[1], slateBody[2]);
+  doc.text(`Zugehörige Musikschule:`, 25, y + 24);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(slateDark[0], slateDark[1], slateDark[2]);
+  doc.text(data.schoolName, 80, y + 24);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(slateBody[0], slateBody[1], slateBody[2]);
+  doc.text(`Löschungszeitpunkt:`, 25, y + 31);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(slateDark[0], slateDark[1], slateDark[2]);
+  doc.text(`${dateStr}, ${timeStr} Uhr`, 80, y + 31);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(slateBody[0], slateBody[1], slateBody[2]);
+  doc.text(`Gelöschte persönliche Audiospuren:`, 25, y + 38);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(primaryRed[0], primaryRed[1], primaryRed[2]);
+  doc.text(`${data.purgedAudioFilesCount ?? 0} Dateien (${((data.freedStorageBytes ?? 0) / (1024 * 1024)).toFixed(2)} MB freigegeben)`, 80, y + 38);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(slateBody[0], slateBody[1], slateBody[2]);
+  doc.text(`Status des Benutzerprofils:`, 25, y + 45);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(primaryRed[0], primaryRed[1], primaryRed[2]);
+  doc.text(`Dauerhaft deaktiviert & Zugänge gesperrt`, 80, y + 45);
+
+  y += 58;
+
+  // Block 2: Revisionssichere Pflichtangaben (GoBD / Steuerrecht)
+  doc.setFillColor(cardBg[0], cardBg[1], cardBg[2]);
+  doc.setDrawColor(cardBorder[0], cardBorder[1], cardBorder[2]);
+  doc.roundedRect(20, y, 170, 48, 3, 3, 'FD');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9.5);
+  doc.setTextColor(slateDark[0], slateDark[1], slateDark[2]);
+  doc.text('2. GESETZLICHE AUFBEWAHRUNGSPFLICHTEN (§ 147 AO / GoBD)', 25, y + 8);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7.8);
+  doc.setTextColor(slateBody[0], slateBody[1], slateBody[2]);
+
+  const gobdInfo = 'Gemäß § 147 der Abgabenordnung (AO) und den Grundsätzen zur ordnungsmäßigen Führung und Aufbewahrung von Büchern (GoBD) müssen buchhalterische Transaktionsbelege, erstellte Rechnungsdokumente und Buchungsnachweise für eine gesetzliche Dauer von 10 Jahren revisionssicher und unveränderbar archiviert werden. Nach Ablauf dieser gesetzlichen Frist erfolgt die vollautomatische Endlöschung.';
+  doc.text(doc.splitTextToSize(gobdInfo, 160), 25, y + 17);
+
+  y += 54;
+
+  // Block 3: Revisionssicheres Siegel
+  doc.setFillColor(240, 253, 244);
+  doc.setDrawColor(187, 247, 208);
+  doc.roundedRect(20, y, 170, 32, 3, 3, 'FD');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9);
+  doc.setTextColor(21, 128, 61);
+  doc.text('REVISIONSSICHERE DSGVO-KONFORMITÄT & ZERTIFIZIERUNG', 25, y + 8);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7.5);
+  doc.setTextColor(30, 41, 59);
+  const sealText = `Hiermit wird zertifiziert, dass alle personenbezogenen Daten sowie persönlichen Audio-Dateien des Schülers auf Veranlassung der Musikschule physisch und unwiderruflich gelöscht wurden. Die Plattform Campus-Groovelab garantiert die Einhaltung aller Vorgaben nach Art. 17 Abs. 1 DSGVO.`;
+  doc.text(doc.splitTextToSize(sealText, 158), 25, y + 15);
+
+  // Footer
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7.5);
+  doc.setTextColor(slateMuted[0], slateMuted[1], slateMuted[2]);
+  doc.text('Campus-Groovelab • DSGVO-konforme Bildungsplattform • www.campus-groovelab.de', 20, 285);
+  doc.text('Dokument-ID: ' + certId, 140, 285);
+
+  // Save PDF
+  const safeClean = (data.studentName || 'Schueler').replace(/[^a-zA-Z0-9]/g, '_');
+  const dateFile = now.toISOString().split('T')[0];
+  doc.save(`Campus_Groovelab_DSGVO_Loeschungszertifikat_${safeClean}_${dateFile}.pdf`);
+};
+
 export interface InvoicePDFParams {
   invoiceId: string;
   invoiceDate: string;

@@ -112,6 +112,18 @@
 
 ## Future Plans & Notes (Zukünftige Vorhaben)
 - **Profilauswahl-Sicherheit im Campus-Modul**: Der Familien-Schnellwechsel (Schnellwahl lokaler Profile ohne PIN-Abfrage) ist für Familien mit mehreren Kindern im Campus-Modul gewollt. Im GrooveLab-Modul wird dies nicht benötigt. Bei zukünftigen Modifikationen des Campus-Moduls soll dieses Prinzip dort verankert und gepflegt werden.
+- **Peer-to-Peer Termintausch-Börse (Mastermind-Roadmap)**: Für eine spätere Ausbaustufe ist die automatisierte Peer-to-Peer Termintausch-Börse für Eltern/Schüler vorgesehen. Die Umsetzung folgt strikt den 6 Axiomen:
+  1. *Lehrer- und Fach-Invarianz*: Tausch ausschließlich innerhalb desselben Lehrers und Fachs.
+  2. *Dauer-Isomorphie*: 30 Min. tauscht nur mit 30 Min.; 45 Min. nur mit 45 Min.
+  3. *Double-Opt-In der Eltern*: Tauschanfrage wird erst nach ausdrücklicher Bestätigung durch Elternteil B verbindlich.
+  4. *1-Tap Lehrer-Veto / Auto-Approval*: Lehrkraft erhält Benachrichtigungskarte mit Veto-Option.
+  5. *Atomarer Datenbank-Swap*: Transaktionale Vertauschung der `schedule_occurrences` in Supabase ohne Raum- oder Zeit-Kollisionen.
+  6. *Echtzeit-Synchronisation*: Lautlose Aktualisierung für Lehrkraft, Schüler-Dashboards und Sekretariats-Logbuch.
+- **Duo- und Gruppenunterricht (@Schüler-Annotation)**: Schnellauswahl-Buttons (`@Schüler`) im Hausaufgabenheft/Meisterwerk-Protokoll, um innerhalb eines gemeinsamen Gruppenstücks individuelle Bemerkungen gezielt im Heft des jeweiligen Schülers hervorzuheben und bei Mitschülern auszublenden.
+- **Schnupperstunden-Portal & Lead-Pipeline (Roadmap)**: Öffentliches Self-Service Schnupperstunden-Buchungsportal für die Musikschul-Website mit automatischer Pausen-Slot-Erkennung der Dozenten und 1-Klick-Wandlung in einen Festvertragsentwurf nach erfolgreicher Probestunde.
+- **Herrenberg-Audit & Deputats-Ampel (Roadmap)**: Rechtssichere Dokumentation tatsächlich gehaltener Unterrichte für Honorarkräfte (BSG-Urteil B 12 R 3/20 R) und Soll/Ist-Deputatsabgleich für Festangestellte inkl. monatlichem digitalem Signaturlauf am Monatsletzten.
+- **Konzert- & Stage-Manager Suite / Band-Finder (Roadmap)**: Automatisierter Programmheft- und Ablauf-Generator für Schulkonzerte (inkl. Umbau-Pausen, Bühnen-Patchplänen und druckbaren DIN A4/A5 Flyern) sowie intelligenter Band-Matching-Algorithmus basierend auf den Skill-Radar-Levels der Schüler.
+- **Instrumenten-Pflege & Ergonomie-Suite (Roadmap)**: Intelligenter Nutzungsdauer-Zähler (nach tatsächlichen Übestunden statt Kalendertagen), instrumentenspezifische Pflege-Karten (Saiten, Reeds, Kolophonium, Felle), Ergonomie-Haltungscheck vor der Session, digitaler Eltern-Einkaufszettel und digitaler Lehrer-„Instrumenten-TÜV“-Stempel.
 
 ## PWA & Deployment Rules
 - **PWA Auto-Update Mechanism**: Ensure the automatic Service Worker update checker (`reg.update()`) remains active in `App.tsx` and checks every 5 minutes.

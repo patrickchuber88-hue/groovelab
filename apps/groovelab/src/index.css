@@ -2496,9 +2496,35 @@ input[type="range"]::-moz-range-thumb {
 }
 
 /* Tier-1 SaaS 10k Scale Virtual Rendering (DOM Optimization) */
-.virtual-render-item {
+.virtual-render-item, .virtual-row, .content-auto {
   content-visibility: auto;
-  contain-intrinsic-size: 0 52px;
+  contain-intrinsic-size: 0 64px;
+}
+
+.virtual-card-lg {
+  content-visibility: auto;
+  contain-intrinsic-size: 0 160px;
+}
+
+/* GPU Accelerated Layer Promotion */
+.gpu-layer {
+  transform: translateZ(0);
+  will-change: transform;
+  backface-visibility: hidden;
+}
+
+/* Instant-Scroll Performance with Over-scroll containment */
+.smooth-scroll-perf {
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+}
+
+/* Fast-Tap Zero-Delay Optimization */
+.fast-tap {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
 }
 
 

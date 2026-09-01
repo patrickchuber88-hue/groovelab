@@ -5,20 +5,22 @@ import Confetti from 'react-confetti';
 import { supabase } from '../lib/supabase';
 // @ts-ignore
 import * as lamejs from '@breezystack/lamejs';
-import { GrooveLoopstation } from './groovelab/GrooveLoopstation';
 import { GroovePracticeCompanion } from './groovelab/GroovePracticeCompanion';
-import { CampusTuner } from './campus/CampusTuner';
-import { AudioBiographyView, CustomPlaylist, CustomPlaylistTrack } from './campus/AudioBiographyView';
+import { GrooveTrainerStudioView } from './campus/GrooveTrainerStudioView';
+import type { CustomPlaylist, CustomPlaylistTrack } from './campus/AudioBiographyView';
 import { processPureRawBlob, processStudioMastering, TARGET_PURE_RAW_LUFS, TARGET_STUDIO_LUFS, TARGET_PEAK_DBTP } from '../utils/audioMasteringEngine';
 import { storeBlob, getBlob, deleteBlob } from '../utils/blobStorage';
 import { AudioTrackCarousel } from './AudioTrackCarousel';
 import { MeisterOhrSticker } from './MeisterOhrSticker';
 const AudioEditorModal = React.lazy(() => import('./campus/AudioEditorModal').then(m => ({ default: m.AudioEditorModal })));
+const GrooveLoopstation = React.lazy(() => import('./groovelab/GrooveLoopstation').then(m => ({ default: m.GrooveLoopstation })));
+const CampusTuner = React.lazy(() => import('./campus/CampusTuner').then(m => ({ default: m.CampusTuner })));
+const AudioBiographyView = React.lazy(() => import('./campus/AudioBiographyView').then(m => ({ default: m.AudioBiographyView })));
+const MeisterwerkCertificateModal = React.lazy(() => import('./ui/MeisterwerkCertificateModal').then(m => ({ default: m.MeisterwerkCertificateModal })));
 import { synthesizeNeuralSpeech, playAudioBlob, stopNeuralSpeech, buildContinuousHomeworkNarrative, cleanTextForTts } from '../services/neuralTtsService';
 import { isDevEnvironment } from '../utils/tenantUrlHelper';
 import { generateStudentHomeworkPrintoutPDF } from '../utils/pdfGenerator';
 import { formatTeacherFullName, capitalizeFirstLetter, formatSongTitleCase, copyTextToClipboard } from '../utils/nameHelper';
-import { MeisterwerkCertificateModal } from './ui/MeisterwerkCertificateModal';
 import { AudioWaveformVisualizer } from './ui/AudioWaveformVisualizer';
 
 
@@ -37,6 +39,7 @@ import {
   getUnifiedStickerStatus, 
   getUnifiedStickersMap, 
   cleanNotesText, 
+  filterNotesForStudent,
   isInternalMetadataNote,
   checkIsAudioTresorActive,
   type StickerUnlockContext,
@@ -48,6 +51,7 @@ export {
   getUnifiedStickerStatus, 
   getUnifiedStickersMap, 
   cleanNotesText, 
+  filterNotesForStudent,
   isInternalMetadataNote,
   checkIsAudioTresorActive 
 };
@@ -1309,7 +1313,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
   const [stickerCategoryFilter, setStickerCategoryFilter] = useState<'all' | 'ueben' | 'xp' | 'streaks' | 'songs' | 'spezial'>('all');
   const [isXpLegendOpen, setIsXpLegendOpen] = useState<boolean>(false);
-  const [activeViewMode, setActiveViewMode] = useState<'document' | 'recordings' | 'loopstation' | 'practice' | 'tuner'>(initialViewMode || (isTeacherTools ? 'loopstation' : 'document'));
+  const [activeViewMode, setActiveViewMode] = useState<'document' | 'recordings' | 'loopstation' | 'practice' | 'tuner' | 'groovetrainer'>(initialViewMode || (isTeacherTools ? 'loopstation' : 'document'));
 
   // Speech Recognition & Audio play-along state
   const [isListening, setIsListening] = useState(false);
@@ -8175,6 +8179,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
               { value: 'practice', label: 'Übe-Begleiter' },
               { value: 'recordings', label: 'Audio-Aufnahmen' },
               { value: 'tuner', label: 'Stimmgerät (Tuner)' },
+              { value: 'groovetrainer', label: 'Groove-Trainer' },
               { value: 'radar', label: 'Skill-Radar' },
               { value: 'history', label: 'Archiv & Historie' }
             ];
@@ -8378,24 +8383,48 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             }}>
               {renderSkillRadarTabContent()}
             </div>
+          ) : activeViewMode === 'groovetrainer' ? (
+            <div style={{
+              width: '100%',
+              boxSizing: 'border-box',
+              padding: isMobileOrSim ? '16px 16px calc(280px + env(safe-area-inset-bottom, 40px)) 16px' : '20px 24px 80px 24px'
+            }}>
+              <GrooveTrainerStudioView
+                student={student}
+                onClose={() => {
+                  setActiveViewMode('document');
+                  setHubTab('modules');
+                }}
+                uiLevel={uiLevel}
+                onRewardXp={(xp) => {
+                  if (student?.id) {
+                    const key = `campus_bonus_xp_${student.id}`;
+                    const current = Number(localStorage.getItem(key) || 0);
+                    localStorage.setItem(key, String(current + xp));
+                  }
+                }}
+              />
+            </div>
           ) : activeViewMode === 'loopstation' ? (
             <div style={{
               width: '100%',
               boxSizing: 'border-box',
               padding: isMobileOrSim ? '16px 16px calc(280px + env(safe-area-inset-bottom, 40px)) 16px' : '20px 24px 80px 24px'
             }}>
-              <GrooveLoopstation
-                student={student}
-                homeworkNotesList={homeworkNotesList}
-                setHomeworkNotesList={setHomeworkNotesList}
-                syncHomeworkNotes={syncHomeworkNotes}
-                fetchProgress={fetchProgress}
-                notifyHomeworkChange={notifyHomeworkChange}
-                readOnly={readOnly}
-                setActiveViewMode={setActiveViewMode}
-                useNotebookLayout={useNotebookLayout}
-                hasTresorStorage={hasTresorStorage}
-              />
+              <React.Suspense fallback={<div style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>Lade Loopstation...</div>}>
+                <GrooveLoopstation
+                  student={student}
+                  homeworkNotesList={homeworkNotesList}
+                  setHomeworkNotesList={setHomeworkNotesList}
+                  syncHomeworkNotes={syncHomeworkNotes}
+                  fetchProgress={fetchProgress}
+                  notifyHomeworkChange={notifyHomeworkChange}
+                  readOnly={readOnly}
+                  setActiveViewMode={setActiveViewMode}
+                  useNotebookLayout={useNotebookLayout}
+                  hasTresorStorage={hasTresorStorage}
+                />
+              </React.Suspense>
             </div>
           ) : activeViewMode === 'practice' ? (
             <div style={{
@@ -8435,9 +8464,11 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
               boxSizing: 'border-box',
               padding: isMobileOrSim ? '16px 16px calc(280px + env(safe-area-inset-bottom, 40px)) 16px' : '28px 24px 80px 24px'
             }}>
-              <CampusTuner
-                uiLevel={uiLevel}
-              />
+              <React.Suspense fallback={<div style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>Lade Stimmgerät...</div>}>
+                <CampusTuner
+                  uiLevel={uiLevel}
+                />
+              </React.Suspense>
             </div>
           ) : activeViewMode === 'recordings' ? (
             <div style={{
@@ -12782,7 +12813,54 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                               </div>
                             </div>
 
-                            {/* 6. Skill-Radar (Nur Teen & Pro) */}
+                            {/* 6. Groove-Trainer (Für alle Altersstufen!) */}
+                            <div
+                              onClick={() => {
+                                setActiveModalTab('document');
+                                setActiveViewMode('groovetrainer' as any);
+                                setActiveSubView('hub');
+                              }}
+                              style={{
+                                background: '#ffffff',
+                                border: '1.5px solid #e2e8f0',
+                                borderRadius: '16px',
+                                padding: '14px 8px 12px 8px',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                textAlign: 'center',
+                                cursor: 'pointer',
+                                boxShadow: '0 2px 8px -2px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02)',
+                                transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
+                              }}
+                              className="hover-scale"
+                            >
+                              <div style={{
+                                width: '62px',
+                                height: '62px',
+                                borderRadius: '14px',
+                                background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
+                                boxShadow: '0 6px 14px -2px rgba(249, 115, 22, 0.40)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                position: 'relative',
+                                overflow: 'hidden',
+                                border: '1px solid rgba(255, 255, 255, 0.3)'
+                              }}>
+                                <Radio size={30} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />
+                              </div>
+                              <div style={{ marginTop: '8px', padding: '0 2px' }}>
+                                <div style={{ fontSize: '0.86rem', fontWeight: 850, color: '#0f172a', letterSpacing: '-0.02em', lineHeight: '1.2' }}>
+                                  Groove-Trainer
+                                </div>
+                                <div style={{ fontSize: '0.70rem', fontWeight: 600, color: '#64748b', marginTop: '2px', lineHeight: '1.3' }}>
+                                  Rhythmus &amp; Timing
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* 7. Skill-Radar (Nur Teen & Pro) */}
                             {uiLevel !== 'junior' && (
                               <div
                                 onClick={() => {
@@ -12829,7 +12907,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                               </div>
                             )}
 
-                            {/* 7. Archiv (Nur Pro) */}
+                            {/* 8. Archiv (Nur Pro - Letztes Modul) */}
                             {uiLevel === 'pro' && (
                               <div
                                 onClick={() => {
@@ -17168,6 +17246,53 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                             {/* ========================================================================= */}
                             {/* ZONE 2: INTEGRATED STUDIO WORKBENCH (Apple Fluid Canvas)                 */}
                             {/* ========================================================================= */}
+                            {readOnly && (
+                              <div style={{
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '8px',
+                                paddingTop: '12px',
+                                borderTop: '1px solid #f1f5f9'
+                              }}>
+                                <div style={{
+                                  background: '#fffbeb',
+                                  border: '1.5px solid #fef3c7',
+                                  borderRadius: '14px',
+                                  padding: '12px 14px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'space-between',
+                                  gap: '12px',
+                                  boxShadow: '0 2px 8px rgba(245, 158, 11, 0.05)'
+                                }}>
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0, flex: 1 }}>
+                                    <span style={{ fontSize: '0.78rem', fontWeight: 850, color: '#92400e', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                      ❓ Frage für deine nächste Unterrichtsstunde:
+                                    </span>
+                                    <span style={{ fontSize: '0.70rem', color: '#b45309', fontWeight: 550 }}>
+                                      Hakt ein Griff oder Takt? Sprich deine Frage kurz ein – deine Lehrkraft sieht sie direkt in der nächsten Stunde!
+                                    </span>
+                                  </div>
+                                  <SpeechDictationButton
+                                    onTranscript={(text) => {
+                                      const qText = `❓ Frage für den Unterricht: ${text}`;
+                                      const current = latestGeneralHomeworkNotesRef.current || generalHomeworkNotes || '';
+                                      const next = current.trim() ? `${current.trim()}\n${qText}` : qText;
+                                      latestGeneralHomeworkNotesRef.current = next;
+                                      setGeneralHomeworkNotes(next);
+                                      const specialNotes = (homeworkNotesList || []).filter(n => typeof n === 'string' && isInternalMetadataNote(n));
+                                      const noteLines = next.split('\n').map(s => s.trim()).filter(s => s.length > 0 && !isInternalMetadataNote(s));
+                                      const combined = [...specialNotes, ...noteLines];
+                                      setHomeworkNotesList(combined);
+                                      try { localStorage.setItem(`campus_homework_notes_${student.id}`, JSON.stringify(combined)); } catch {}
+                                      triggerDebouncedAutoSave(350);
+                                    }}
+                                    title="Frage per Spracheingabe einsprechen"
+                                  />
+                                </div>
+                              </div>
+                            )}
+
                             {!readOnly && (
                               <div style={{
                                 display: 'flex',
@@ -17446,7 +17571,91 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
                                         {/* Single Dynamic Textarea (Auto-Expanding with Content & Precision Cursor Tracking) */}
                                         {activeNoteTarget === 'student' ? (
-                                          <textarea
+                                          <>
+                                            {!readOnly && viewingWeekOffset === 0 && (
+                                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px', flexWrap: 'wrap' }}>
+                                                <span style={{ fontSize: '0.70rem', fontWeight: 800, color: '#64748b' }}>Schnell-Zuweisung:</span>
+                                                {student?.first_name && (
+                                                  <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                      const tagToInsert = `@${student.first_name}: `;
+                                                      const currentText = generalHomeworkNotes || '';
+                                                      const cursor = studentNotesSelectionRef.current?.start ?? currentText.length;
+                                                      const nextText = currentText.slice(0, cursor) + (currentText.length > 0 && !currentText.endsWith('\n') ? '\n' : '') + tagToInsert + currentText.slice(cursor);
+                                                      latestGeneralHomeworkNotesRef.current = nextText;
+                                                      setGeneralHomeworkNotes(nextText);
+                                                      const noteLines = nextText.split('\n').map(s => s.trim()).filter(s => s.length > 0 && !isInternalMetadataNote(s));
+                                                      setHomeworkNotesList(noteLines);
+                                                      try { localStorage.setItem(`campus_homework_notes_${student.id}`, JSON.stringify(noteLines)); } catch {}
+                                                      triggerDebouncedAutoSave(350);
+                                                      setTimeout(() => {
+                                                        if (studentNotesTextareaRef.current) {
+                                                          studentNotesTextareaRef.current.focus();
+                                                          const pos = cursor + tagToInsert.length + 1;
+                                                          studentNotesTextareaRef.current.setSelectionRange(pos, pos);
+                                                        }
+                                                      }, 20);
+                                                    }}
+                                                    style={{
+                                                      background: '#e6f4ea',
+                                                      border: '1px solid rgba(52, 168, 83, 0.3)',
+                                                      borderRadius: '6px',
+                                                      padding: '2px 8px',
+                                                      fontSize: '0.70rem',
+                                                      fontWeight: 800,
+                                                      color: '#15803d',
+                                                      cursor: 'pointer',
+                                                      display: 'inline-flex',
+                                                      alignItems: 'center',
+                                                      gap: '4px',
+                                                      transition: 'all 0.15s'
+                                                    }}
+                                                  >
+                                                    + @{student.first_name}
+                                                  </button>
+                                                )}
+                                                <button
+                                                  type="button"
+                                                  onClick={() => {
+                                                    const tagToInsert = '@Alle: ';
+                                                    const currentText = generalHomeworkNotes || '';
+                                                    const cursor = studentNotesSelectionRef.current?.start ?? currentText.length;
+                                                    const nextText = currentText.slice(0, cursor) + (currentText.length > 0 && !currentText.endsWith('\n') ? '\n' : '') + tagToInsert + currentText.slice(cursor);
+                                                    latestGeneralHomeworkNotesRef.current = nextText;
+                                                    setGeneralHomeworkNotes(nextText);
+                                                    const noteLines = nextText.split('\n').map(s => s.trim()).filter(s => s.length > 0 && !isInternalMetadataNote(s));
+                                                    setHomeworkNotesList(noteLines);
+                                                    try { localStorage.setItem(`campus_homework_notes_${student.id}`, JSON.stringify(noteLines)); } catch {}
+                                                    triggerDebouncedAutoSave(350);
+                                                    setTimeout(() => {
+                                                      if (studentNotesTextareaRef.current) {
+                                                        studentNotesTextareaRef.current.focus();
+                                                        const pos = cursor + tagToInsert.length + 1;
+                                                        studentNotesTextareaRef.current.setSelectionRange(pos, pos);
+                                                      }
+                                                    }, 20);
+                                                  }}
+                                                  style={{
+                                                    background: '#f1f5f9',
+                                                    border: '1px solid #cbd5e1',
+                                                    borderRadius: '6px',
+                                                    padding: '2px 8px',
+                                                    fontSize: '0.70rem',
+                                                    fontWeight: 800,
+                                                    color: '#475569',
+                                                    cursor: 'pointer',
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    gap: '4px',
+                                                    transition: 'all 0.15s'
+                                                  }}
+                                                >
+                                                  + @Alle
+                                                </button>
+                                              </div>
+                                            )}
+                                            <textarea
                                             ref={studentNotesTextareaRef}
                                             placeholder={viewingWeekOffset === 0
                                               ? "Trage hier zusätzliche Bemerkungen zur Hausaufgabe ein..."
@@ -17538,6 +17747,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                               display: 'block'
                                             }}
                                           />
+                                        </>
                                         ) : (
                                           <textarea
                                             ref={teacherNotesTextareaRef}
@@ -18972,19 +19182,21 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         </div>
       ) : activeModalTab === 'audiobiography' ? (
         /* AUDIO-BIOGRAFIE VIEW (AKUSTISCHES STAMMBAUCH & MEILENSTEINE) */
-        <AudioBiographyView
-          student={{
-            ...student,
-            school_id: student?.school_id || (student as any)?.schoolId || studentSchoolId || localStorage.getItem('campus_school_id') || localStorage.getItem('groovelab_school_id') || localStorage.getItem('school_id'),
-            school_name: schoolName || (student as any)?.school_name,
-            schools: (student as any)?.schools || (window as any).__groovelab_active_school
-          }}
-          teacherId={teacherId}
-          isTeacher={isTeacherTools}
-          onBackToHub={() => { setActiveModalTab('document'); setActiveSubView('hub'); }}
-          isMobileOrSim={isMobileOrSim}
-          studentUiLevel={uiLevel}
-        />
+        <React.Suspense fallback={<div style={{ padding: '60px', textAlign: 'center', color: '#64748b' }}>Lade Audio-Biografie...</div>}>
+          <AudioBiographyView
+            student={{
+              ...student,
+              school_id: student?.school_id || (student as any)?.schoolId || studentSchoolId || localStorage.getItem('campus_school_id') || localStorage.getItem('groovelab_school_id') || localStorage.getItem('school_id'),
+              school_name: schoolName || (student as any)?.school_name,
+              schools: (student as any)?.schools || (window as any).__groovelab_active_school
+            }}
+            teacherId={teacherId}
+            isTeacher={isTeacherTools}
+            onBackToHub={() => { setActiveModalTab('document'); setActiveSubView('hub'); }}
+            isMobileOrSim={isMobileOrSim}
+            studentUiLevel={uiLevel}
+          />
+        </React.Suspense>
       ) : (
         /* COLUMN 4: 🏆 MEISTERWERKE & LOGBUCH (Full Width in Swiss Modernist Style) */
         <div style={{
@@ -20161,16 +20373,18 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           </div>
           {skillRadarDrawer}
           {certModalSong && (
-            <MeisterwerkCertificateModal
-              studentName={certModalSong.studentName}
-              songTitle={certModalSong.songTitle}
-              instrument={certModalSong.instrument}
-              schoolName={certModalSong.schoolName}
-              teacherName={certModalSong.teacherName}
-              masteredDate={certModalSong.masteredDate}
-              certificateId={certModalSong.certificateId}
-              onClose={() => setCertModalSong(null)}
-            />
+            <React.Suspense fallback={null}>
+              <MeisterwerkCertificateModal
+                studentName={certModalSong.studentName}
+                songTitle={certModalSong.songTitle}
+                instrument={certModalSong.instrument}
+                schoolName={certModalSong.schoolName}
+                teacherName={certModalSong.teacherName}
+                masteredDate={certModalSong.masteredDate}
+                certificateId={certModalSong.certificateId}
+                onClose={() => setCertModalSong(null)}
+              />
+            </React.Suspense>
           )}
         </>
       );
@@ -20208,16 +20422,18 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         )}
         {skillRadarDrawer}
         {certModalSong && (
-          <MeisterwerkCertificateModal
-            studentName={certModalSong.studentName}
-            songTitle={certModalSong.songTitle}
-            instrument={certModalSong.instrument}
-            schoolName={certModalSong.schoolName}
-            teacherName={certModalSong.teacherName}
-            masteredDate={certModalSong.masteredDate}
-            certificateId={certModalSong.certificateId}
-            onClose={() => setCertModalSong(null)}
-          />
+          <React.Suspense fallback={null}>
+            <MeisterwerkCertificateModal
+              studentName={certModalSong.studentName}
+              songTitle={certModalSong.songTitle}
+              instrument={certModalSong.instrument}
+              schoolName={certModalSong.schoolName}
+              teacherName={certModalSong.teacherName}
+              masteredDate={certModalSong.masteredDate}
+              certificateId={certModalSong.certificateId}
+              onClose={() => setCertModalSong(null)}
+            />
+          </React.Suspense>
         )}
       </>
     );

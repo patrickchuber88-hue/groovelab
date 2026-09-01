@@ -165,7 +165,7 @@ export const ReconciliationTab: React.FC<ReconciliationTabProps> = ({
       showToast(`Schüler "${getAnonymizedName(user)}" als Härtefall befreit & freigeschaltet.`);
       onRefresh();
     } catch (err: any) {
-      alert('Fehler bei Härtefall-Befreiung: ' + err.message);
+      showToast('Fehler bei Härtefall-Befreiung: ' + err.message);
     }
   };
 

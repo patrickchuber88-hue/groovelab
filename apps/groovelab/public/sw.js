@@ -1,10 +1,18 @@
-const CACHE_NAME = 'groovelab-static-v171';
-const DYNAMIC_CACHE = 'groovelab-dynamic-v171';
+const CACHE_NAME = 'groovelab-static-v172';
+const DYNAMIC_CACHE = 'groovelab-dynamic-v172';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
   '/manifest.json',
-  '/pwa-icon.png'
+  '/pwa-icon.png',
+  '/campus_login_hero.png',
+  '/avatars/gitarre_avatar_new.png',
+  '/avatars/drums_avatar.png',
+  '/avatars/piano_avatar.png',
+  '/avatars/gesang_avatar.png',
+  '/avatars/sax_avatar.png',
+  '/avatars/bass_avatar.png',
+  '/avatars/geige_avatar.png'
 ];
 
 // Security Hardening: Allowed origins for background sync & push notifications

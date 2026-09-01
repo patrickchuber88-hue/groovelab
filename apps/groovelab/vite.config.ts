@@ -57,7 +57,11 @@ export default defineConfig({
             if (id.includes('jspdf')) return 'vendor-jspdf';
             if (id.includes('html2canvas') || id.includes('html-to-image')) return 'vendor-canvas';
             if (id.includes('purify') || id.includes('dompurify')) return 'vendor-sanitizer';
+            if (id.includes('confetti') || id.includes('canvas-confetti')) return 'vendor-confetti';
             if (id.includes('jsqr') || id.includes('jsQR') || id.includes('qrcode') || id.includes('react-qr-scanner') || id.includes('react-qr-code')) return 'vendor-qr';
+          }
+          if (id.includes('CampusEventsBoard')) {
+            return 'campus-events-suite';
           }
           if (id.includes('ScheduleBoard') || id.includes('ScheduleCalendarView')) {
             return 'schedule-designer-suite';

@@ -318,7 +318,16 @@ export const TagesplanQuickAudioModal: React.FC<TagesplanQuickAudioModalProps> =
   };
 
   useEffect(() => {
-    return () => stopHardware();
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        stopHardware();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      stopHardware();
+    };
   }, []);
 
   if (!isOpen || !student) return null;

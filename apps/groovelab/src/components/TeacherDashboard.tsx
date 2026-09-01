@@ -3,23 +3,24 @@ import { MUSIC_QUOTES, getQuotesForAudience, getDailyQuote } from '@groovelab/sh
 import { usePremiumOnboardingTour, TourStartButton, TourStep } from './PremiumOnboardingTour';
 import { supabase, deleteUserStorageAssets } from '../lib/supabase';
 import { Monitor, Music, Award, Box, Plus, AlertCircle, AlertTriangle, User, Users, Star, TrendingUp, Shield, Zap, Play, Info, CheckCircle, Check, Search, Trash2, Bell, X, Clock, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, LayoutDashboard, LogOut, Flame, GraduationCap, UserPlus, Edit3, Calendar, Activity, CheckSquare, Mail, Copy, Sparkles, BookOpen, MessageSquare, Lock, Palmtree, Heart, Settings, Key, Sun, ThumbsUp, Building2, Hourglass, Eye, EyeOff, ShieldCheck, CheckCheck, CalendarX, Send, Lightbulb, Download, Sliders, Mic, Disc, Radio, Timer, ArrowRight, Headphones, FileText } from 'lucide-react';
-import { TeacherDetailModal } from './TeacherDetailModal';
-import { StudentDetailModal } from './StudentDetailModal';
 import { checkIsAudioTresorActive } from '../domain/stickersAndTresor';
 import { UpdateAnnouncementHero } from './common/UpdateAnnouncementHero';
 import { renderInstrumentIcon } from '../utils/instruments';
 import { getDistanceFromLatLonInM } from '../utils/geo';
 import { useRealNamesVisibility, maskLastName, formatSingleStudentAnonymized, formatGroupStudentsAnonymized, getGroupTypeLabel, sanitizeBirthDateToDayOnly, formatTeacherFullName } from '../utils/nameHelper';
-import { ConfirmDeleteStudentModal, StudentToDelete } from './ConfirmDeleteStudentModal';
+import { StudentToDelete } from './ConfirmDeleteStudentModal';
 import { deleteStudentFully } from '../utils/studentDeletionService';
 import { MobileBriefingCarousel } from './ui/MobileBriefingCarousel';
 import { BriefingNotesCard } from './notes/BriefingNotesCard';
 import { BriefingToolboxCard } from './campus/BriefingToolboxCard';
-import { TagesplanQuickAudioModal } from './campus/TagesplanQuickAudioModal';
 import { GlobalNotesDrawer } from './notes/GlobalNotesDrawer';
 import { CampusGroovelabBrand, CampusGroovelabText, CampusGroovelabLogo } from './CampusGroovelabBrand';
 
 // Lazy load heavy auxiliary modals on demand for sub-second dashboard initial load & reduced memory footprint
+const TeacherDetailModal = lazy(() => import('./TeacherDetailModal').then(m => ({ default: m.TeacherDetailModal })));
+const StudentDetailModal = lazy(() => import('./StudentDetailModal').then(m => ({ default: m.StudentDetailModal })));
+const ConfirmDeleteStudentModal = lazy(() => import('./ConfirmDeleteStudentModal').then(m => ({ default: m.ConfirmDeleteStudentModal })));
+const TagesplanQuickAudioModal = lazy(() => import('./campus/TagesplanQuickAudioModal').then(m => ({ default: m.TagesplanQuickAudioModal })));
 const MeisterwerkDocumentationModal = lazy(() => import('./MeisterwerkDocumentationModal').then(m => ({ default: m.MeisterwerkDocumentationModal })));
 const LiveStageToolboxModal = lazy(() => import('./LiveStageToolboxModal').then(m => ({ default: m.LiveStageToolboxModal })));
 const FeedbackHubModal = lazy(() => import('./feedback/FeedbackHubModal').then(m => ({ default: m.FeedbackHubModal })));
@@ -3602,7 +3603,7 @@ export function TeacherDashboard({
       window.removeEventListener('refresh-bookings', loadMyBookings);
       window.removeEventListener('groovelab_schedule_changed', loadMyBookings);
     };
-  }, [userId, ticker]);
+  }, [userId]);
 
   const handleBookingClick = (b: any) => {
     if (b.date) {
@@ -5084,7 +5085,7 @@ export function TeacherDashboard({
       if (watchdogTimer) clearTimeout(watchdogTimer);
       window.removeEventListener('storage', handleSimStorage);
     };
-  }, [userId, ticker, briefingRefreshTicker]);
+  }, [userId, briefingRefreshTicker]);
 
   const unreadHelpCount = Math.max(0, helpRequests.length - lastSeenCounts.help);
   const unreadRehearsalCount = Math.max(0, rehearsalSuggestions.length - lastSeenCounts.rehearsal);
@@ -5192,30 +5193,52 @@ export function TeacherDashboard({
       }, 500);
     };
 
+    const sId = teacher?.school_id;
+
     const channelSessions = supabase
       .channel(`realtime_teacher_sessions_${userId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'sessions' }, () => {
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'sessions',
+        ...(sId ? { filter: `school_id=eq.${sId}` } : {})
+      }, () => {
         debouncedFetchData();
       })
       .subscribe();
 
     const channelHelp = supabase
       .channel(`realtime_teacher_help_${userId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'help_requests' }, () => {
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'help_requests',
+        ...(sId ? { filter: `school_id=eq.${sId}` } : {})
+      }, () => {
         debouncedFetchData();
       })
       .subscribe();
 
     const channelSkills = supabase
       .channel(`realtime_teacher_skills_${userId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'user_song_skills' }, () => {
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'user_song_skills',
+        ...(sId ? { filter: `school_id=eq.${sId}` } : {})
+      }, () => {
         debouncedFetchData();
       })
       .subscribe();
 
     const channelBands = supabase
       .channel(`realtime_teacher_bands_${userId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'bands' }, () => {
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'bands',
+        ...(sId ? { filter: `school_id=eq.${sId}` } : {})
+      }, () => {
         debouncedFetchData();
       })
       .subscribe();
@@ -8784,6 +8807,14 @@ useEffect(() => {
                     const isRescheduledAway = activeSlots.every((s: any) => s.status === 'rescheduled_away');
                     const isFinished = currentTimeStr >= slotEnd && !isCanceled && !isRescheduledAway;
                     const isCurrentSlot = currentTimeStr >= slotStart && currentTimeStr < slotEnd;
+                    const minutesToSlotEnd = (() => {
+                      const [ch, cm] = currentTimeStr.split(':').map(Number);
+                      const [eh, em] = slotEnd.split(':').map(Number);
+                      const currentTotal = ch * 60 + cm;
+                      const endTotal = eh * 60 + em;
+                      return endTotal - currentTotal;
+                    })();
+                    const isWrapUp = isCurrentSlot && !isFinished && !isBreak && !isCanceled && !isRescheduledAway && minutesToSlotEnd <= 3 && minutesToSlotEnd > 0;
                     const isRescheduledPending = activeSlots.some((s: any) => 
                        s.status === 'rescheduled_pending' || 
                        s.status === 'pending_reschedule' || 
@@ -8871,16 +8902,16 @@ useEffect(() => {
                         }} />
                       );
                     } else if (isCurrentSlot && !isFinished) {
-                      slotBg = '#e6f4ea';
-                      slotBorder = '1.5px solid #e6f4ea';
-                      slotBorderLeft = '5px solid #34a853';
+                      slotBg = isWrapUp ? '#fefce8' : '#e6f4ea';
+                      slotBorder = isWrapUp ? '1.5px solid #fef08a' : '1.5px solid #e6f4ea';
+                      slotBorderLeft = isWrapUp ? '5px solid #eab308' : '5px solid #34a853';
                       titleColor = '#0f172a';
                       dotComponent = (
                         <div style={{
                           width: '20px',
                           height: '20px',
                           borderRadius: '50%',
-                          border: '3px solid #34a853',
+                          border: `3px solid ${isWrapUp ? '#eab308' : '#34a853'}`,
                           background: '#ffffff',
                           display: 'flex',
                           alignItems: 'center',
@@ -8892,7 +8923,7 @@ useEffect(() => {
                             width: '8px',
                             height: '8px',
                             borderRadius: '50%',
-                            background: '#34a853'
+                            background: isWrapUp ? '#eab308' : '#34a853'
                           }} />
                         </div>
                       );
@@ -9011,13 +9042,13 @@ useEffect(() => {
                              justifyContent: 'space-between',
                              gap: isMobileDevice ? '4px' : '12px',
                              padding: isMobileDevice ? '10px 12px' : '8px 14px',
-                             background: isCurrentSlot ? '#e6f4ea' : slotBg,
+                             background: isCurrentSlot ? (isWrapUp ? '#fefce8' : '#e6f4ea') : slotBg,
                              borderRadius: '12px',
                              border: slotBorder,
                              borderLeft: slotBorderLeft,
                              cursor: ((slot.student || slot.isGroup) && !isCanceled && !isRescheduledAway) ? 'pointer' : 'default',
                              transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
-                             boxShadow: isCurrentSlot ? '0 8px 24px rgba(52, 168, 83, 0.12), 0 2px 6px rgba(52, 168, 83, 0.06)' : ((idx === prepIndex) ? (isRescheduledPending ? '0 6px 18px rgba(234, 179, 8, 0.08)' : '0 6px 18px rgba(59, 130, 246, 0.06)') : '0 4px 10px rgba(0, 0, 0, 0.02), 0 1px 3px rgba(0, 0, 0, 0.02)'),
+                             boxShadow: isCurrentSlot ? (isWrapUp ? '0 8px 24px rgba(234, 179, 8, 0.16), 0 2px 6px rgba(234, 179, 8, 0.08)' : '0 8px 24px rgba(52, 168, 83, 0.12), 0 2px 6px rgba(52, 168, 83, 0.06)') : ((idx === prepIndex) ? (isRescheduledPending ? '0 6px 18px rgba(234, 179, 8, 0.08)' : '0 6px 18px rgba(59, 130, 246, 0.06)') : '0 4px 10px rgba(0, 0, 0, 0.02), 0 1px 3px rgba(0, 0, 0, 0.02)'),
                              minWidth: 0,
                              boxSizing: 'border-box',
                              overflow: 'hidden',
@@ -9073,6 +9104,26 @@ useEffect(() => {
                                          )}
                                          {slot.timeSlot} Uhr
                                        </div>
+
+                                       {isWrapUp && (
+                                        <span style={{
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          gap: '4px',
+                                          background: '#fef08a',
+                                          border: '1px solid #fde047',
+                                          borderRadius: '6px',
+                                          padding: '2px 8px',
+                                          fontWeight: 800,
+                                          fontSize: '0.68rem',
+                                          color: '#854d0e',
+                                          flexShrink: 0,
+                                          boxShadow: '0 1px 3px rgba(234, 179, 8, 0.15)'
+                                        }}>
+                                          <Clock size={10} color="#854d0e" />
+                                          Wrap-Up ({minutesToSlotEnd} Min.)
+                                        </span>
+                                      )}
                                        <div style={{ width: '1.5px', height: '14px', background: '#e2e8f0', flexShrink: 0 }} />
                                      </>
                                    )}
@@ -10719,59 +10770,69 @@ useEffect(() => {
           />
         </Suspense>
       )}
-      {selectedCoachProfile && <TeacherDetailModal teacher={selectedCoachProfile} onClose={() => setSelectedCoachProfile(null)} />}
-      {selectedStudentProfile && (
-        <StudentDetailModal 
-          student={selectedStudentProfile} 
-          onClose={() => setSelectedStudentProfile(null)} 
-          callerDashboard="teacher"
-          activePlatform={activePlatform === 'campus' ? 'campus' : 'groovelab'}
-          onOpenBandProfile={(band) => {
-            setEditingBand(band);
-            setSelectedStudentProfile(null);
-          }}
-          onOpenTageskompass={(std) => {
-            setDocStudent({
-              ...std,
-              id: std.id,
-              first_name: std.first_name,
-              last_name: std.last_name,
-              photo_url: std.photo_url || '/avatar_ghost.jpg',
-              is_campus_active: std.is_campus_active,
-              school_id: std.school_id || teacher?.school_id,
-              schoolId: std.school_id || teacher?.school_id,
-              schools: std.schools || (teacher as any)?.schools,
-              school_name: std.schools?.name || std.school_name
-            });
-            setSelectedStudentProfile(null);
-          }}
-        />
+      {selectedCoachProfile && (
+        <Suspense fallback={null}>
+          <TeacherDetailModal teacher={selectedCoachProfile} onClose={() => setSelectedCoachProfile(null)} />
+        </Suspense>
       )}
-      <ConfirmDeleteStudentModal
-        isOpen={!!deleteStudentModalData}
-        student={deleteStudentModalData}
-        activePlatform={activePlatform === 'campus' ? 'campus' : activePlatform === 'groovelab' ? 'groovelab' : 'all'}
-        onClose={() => setDeleteStudentModalData(null)}
-        onConfirm={async (studentId) => {
-          const sName = deleteStudentModalData?.name;
-          const res = await deleteStudentFully(studentId, {
-            activePlatform: activePlatform === 'campus' ? 'campus' : activePlatform === 'groovelab' ? 'groovelab' : 'all',
-            isCampusActive: deleteStudentModalData?.isCampusActive,
-            isGroovelabActive: deleteStudentModalData?.isGroovelabActive,
-            studentName: sName
-          });
-          if (!res.success) {
-            throw new Error(res.error);
-          }
-          const fName = sName ? sName.trim().split(/\s+/)[0].toLowerCase() : '';
-          setAllStudents(prev => prev.filter(s => {
-            if (s.id === studentId) return false;
-            if (fName && s.first_name && s.first_name.toLowerCase().trim() === fName) return false;
-            return true;
-          }));
-          await fetchData();
-        }}
-      />
+      {selectedStudentProfile && (
+        <Suspense fallback={null}>
+          <StudentDetailModal 
+            student={selectedStudentProfile} 
+            onClose={() => setSelectedStudentProfile(null)} 
+            callerDashboard="teacher"
+            activePlatform={activePlatform === 'campus' ? 'campus' : 'groovelab'}
+            onOpenBandProfile={(band) => {
+              setEditingBand(band);
+              setSelectedStudentProfile(null);
+            }}
+            onOpenTageskompass={(std) => {
+              setDocStudent({
+                ...std,
+                id: std.id,
+                first_name: std.first_name,
+                last_name: std.last_name,
+                photo_url: std.photo_url || '/avatar_ghost.jpg',
+                is_campus_active: std.is_campus_active,
+                school_id: std.school_id || teacher?.school_id,
+                schoolId: std.school_id || teacher?.school_id,
+                schools: std.schools || (teacher as any)?.schools,
+                school_name: std.schools?.name || std.school_name
+              });
+              setSelectedStudentProfile(null);
+            }}
+          />
+        </Suspense>
+      )}
+      {deleteStudentModalData && (
+        <Suspense fallback={null}>
+          <ConfirmDeleteStudentModal
+            isOpen={!!deleteStudentModalData}
+            student={deleteStudentModalData}
+            activePlatform={activePlatform === 'campus' ? 'campus' : activePlatform === 'groovelab' ? 'groovelab' : 'all'}
+            onClose={() => setDeleteStudentModalData(null)}
+            onConfirm={async (studentId) => {
+              const sName = deleteStudentModalData?.name;
+              const res = await deleteStudentFully(studentId, {
+                activePlatform: activePlatform === 'campus' ? 'campus' : activePlatform === 'groovelab' ? 'groovelab' : 'all',
+                isCampusActive: deleteStudentModalData?.isCampusActive,
+                isGroovelabActive: deleteStudentModalData?.isGroovelabActive,
+                studentName: sName
+              });
+              if (!res.success) {
+                throw new Error(res.error);
+              }
+              const fName = sName ? sName.trim().split(/\s+/)[0].toLowerCase() : '';
+              setAllStudents(prev => prev.filter(s => {
+                if (s.id === studentId) return false;
+                if (fName && s.first_name && s.first_name.toLowerCase().trim() === fName) return false;
+                return true;
+              }));
+              await fetchData();
+            }}
+          />
+        </Suspense>
+      )}
        {docStudent && (
         <Suspense fallback={null}>
           <MeisterwerkDocumentationModal 
@@ -10796,17 +10857,19 @@ useEffect(() => {
 
       {/* 1-Click Audio-Hausaufgabe Modal */}
       {quickAudioStudent && (
-        <TagesplanQuickAudioModal
-          isOpen={Boolean(quickAudioStudent)}
-          student={quickAudioStudent}
-          teacher={teacher}
-          dateStr={getSimulatedNow().toISOString()}
-          hasTresorStorage={Number(schoolData?.storage_addon_gb || 0) > 0 || checkIsAudioTresorActive(quickAudioStudent) || checkIsAudioTresorActive(teacher)}
-          onClose={() => setQuickAudioStudent(null)}
-          onSaved={() => {
-            setToastMessage(`✓ Hausaufgabe für ${quickAudioStudent.first_name || quickAudioStudent.name} erfolgreich aktualisiert!`);
-          }}
-        />
+        <Suspense fallback={null}>
+          <TagesplanQuickAudioModal
+            isOpen={Boolean(quickAudioStudent)}
+            student={quickAudioStudent}
+            teacher={teacher}
+            dateStr={getSimulatedNow().toISOString()}
+            hasTresorStorage={Number(schoolData?.storage_addon_gb || 0) > 0 || checkIsAudioTresorActive(quickAudioStudent) || checkIsAudioTresorActive(teacher)}
+            onClose={() => setQuickAudioStudent(null)}
+            onSaved={() => {
+              setToastMessage(`✓ Hausaufgabe für ${quickAudioStudent.first_name || quickAudioStudent.name} erfolgreich aktualisiert!`);
+            }}
+          />
+        </Suspense>
       )}
 
       {/* Spotlight Command Palette (⌘K) */}
@@ -12396,6 +12459,14 @@ useEffect(() => {
                             const isRescheduledAway = activeSlots.every((s: any) => s.status === 'rescheduled_away');
                             const isFinished = currentTimeStr >= slotEnd && !isCanceled && !isRescheduledAway;
                             const isCurrentSlot = currentTimeStr >= slotStart && currentTimeStr < slotEnd;
+                            const minutesToSlotEnd = (() => {
+                              const [ch, cm] = currentTimeStr.split(':').map(Number);
+                              const [eh, em] = slotEnd.split(':').map(Number);
+                              const currentTotal = ch * 60 + cm;
+                              const endTotal = eh * 60 + em;
+                              return endTotal - currentTotal;
+                            })();
+                            const isWrapUp = isCurrentSlot && !isFinished && !isBreak && !isCanceled && !isRescheduledAway && minutesToSlotEnd <= 3 && minutesToSlotEnd > 0;
                             const isRescheduledPending = activeSlots.some((s: any) => 
                                s.status === 'rescheduled_pending' || 
                                s.status === 'pending_reschedule' || 
@@ -12483,16 +12554,16 @@ useEffect(() => {
                                 }} />
                               );
                             } else if (isCurrentSlot && !isFinished) {
-                              slotBg = '#e6f4ea';
-                              slotBorder = '1.5px solid #e6f4ea';
-                              slotBorderLeft = '5px solid #34a853';
+                              slotBg = isWrapUp ? '#fefce8' : '#e6f4ea';
+                              slotBorder = isWrapUp ? '1.5px solid #fef08a' : '1.5px solid #e6f4ea';
+                              slotBorderLeft = isWrapUp ? '5px solid #eab308' : '5px solid #34a853';
                               titleColor = '#0f172a';
                               dotComponent = (
                                 <div style={{
                                   width: '20px',
                                   height: '20px',
                                   borderRadius: '50%',
-                                  border: '3px solid #34a853',
+                                  border: `3px solid ${isWrapUp ? '#eab308' : '#34a853'}`,
                                   background: '#ffffff',
                                   display: 'flex',
                                   alignItems: 'center',
@@ -12504,7 +12575,7 @@ useEffect(() => {
                                     width: '8px',
                                     height: '8px',
                                     borderRadius: '50%',
-                                    background: '#34a853'
+                                    background: isWrapUp ? '#eab308' : '#34a853'
                                   }} />
                                 </div>
                               );
@@ -12622,13 +12693,13 @@ useEffect(() => {
                                      alignItems: 'center',
                                      gap: '12px',
                                      padding: '8px 14px',
-                                     background: isCurrentSlot ? '#e6f4ea' : slotBg,
+                                     background: isCurrentSlot ? (isWrapUp ? '#fefce8' : '#e6f4ea') : slotBg,
                                      borderRadius: '12px',
                                      border: slotBorder,
                                      borderLeft: slotBorderLeft,
                                      cursor: ((slot.student || slot.isGroup) && !isCanceled && !isRescheduledAway) ? 'pointer' : 'default',
                                      transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
-                                     boxShadow: isCurrentSlot ? '0 8px 24px rgba(52, 168, 83, 0.12), 0 2px 6px rgba(52, 168, 83, 0.06)' : ((idx === prepIndex) ? (isRescheduledPending ? '0 6px 18px rgba(234, 179, 8, 0.08)' : '0 6px 18px rgba(59, 130, 246, 0.06)') : '0 4px 10px rgba(0, 0, 0, 0.02), 0 1px 3px rgba(0, 0, 0, 0.02)'),
+                                     boxShadow: isCurrentSlot ? (isWrapUp ? '0 8px 24px rgba(234, 179, 8, 0.16), 0 2px 6px rgba(234, 179, 8, 0.08)' : '0 8px 24px rgba(52, 168, 83, 0.12), 0 2px 6px rgba(52, 168, 83, 0.06)') : ((idx === prepIndex) ? (isRescheduledPending ? '0 6px 18px rgba(234, 179, 8, 0.08)' : '0 6px 18px rgba(59, 130, 246, 0.06)') : '0 4px 10px rgba(0, 0, 0, 0.02), 0 1px 3px rgba(0, 0, 0, 0.02)'),
                                      minWidth: 0,
                                      opacity: ((!slot.student && !slot.isGroup) || isCanceled) ? 0.75 : 1
                                    }}
@@ -15055,7 +15126,7 @@ useEffect(() => {
                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
                             {coaches.filter(Boolean).map((c, idx) => {
                               const isSelf = userId && c.id === userId;
-                              const coachName = c.users ? `${c.users.first_name} ${maskLastName(c.users.last_name, showRealNames)}` : 'Coach';
+                              const coachName = c.users ? formatTeacherFullName(c.users) : 'Coach';
                               return (
                                 <div
                                   key={c.id || idx}
@@ -19028,17 +19099,6 @@ useEffect(() => {
                     style={{ padding: '12px 16px', borderRadius: '12px', border: '1.5px solid #e2e8f0', outline: 'none', fontSize: '0.9rem' }}
                   />
                 </div>
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>E-Mail (optional)</label>
-                <input 
-                  type="email"
-                  value={newStudent.email} 
-                  onChange={e => setNewStudent({...newStudent, email: e.target.value})} 
-                  placeholder="schueler@example.com"
-                  style={{ padding: '12px 16px', borderRadius: '12px', border: '1.5px solid #e2e8f0', outline: 'none', fontSize: '0.9rem' }}
-                />
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>

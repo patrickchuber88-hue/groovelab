@@ -1509,8 +1509,8 @@ const DashboardLoader = () => (
 
 async function safeSupabaseQuery<T>(
   queryFn: () => Promise<{ data: T | null; error: any }>,
-  retries = 3,
-  delay = 500
+  retries = 2,
+  delay = 200
 ): Promise<{ data: T | null; error: any }> {
   let attempt = 0;
   while (attempt < retries) {
@@ -1531,7 +1531,7 @@ async function safeSupabaseQuery<T>(
     attempt++;
     console.warn(`[SupabaseRetry] Query failed, retrying attempt ${attempt}/${retries} in ${delay}ms...`);
     await new Promise(resolve => setTimeout(resolve, delay));
-    delay *= 2;
+    delay *= 1.5;
   }
   return { data: null, error: new Error('All query attempts failed.') };
 }
@@ -3789,18 +3789,19 @@ function App() {
       if (typeof (window as any).stopAllCameras === 'function') {
         (window as any).stopAllCameras();
       }
-      // Safety timeout: if fetchDashboardData hangs (e.g. frozen auth lock),
-      // force-clear the loading spinner after 10 seconds.
+      // Safety timeout: if fetchDashboardData hangs, force-clear the loading spinner after 3.5s
       const safetyTimer = setTimeout(() => {
         setLoading(prev => {
           if (prev) {
-            console.warn('[Dashboard] Safety timeout: loading was stuck for 10s. Force-clearing.');
+            console.warn('[Dashboard] Safety timeout: loading was stuck for 3.5s. Force-clearing.');
             return false;
           }
           return prev;
         });
-      }, 10000);
-      fetchDashboardData(loggedInUserId, true).finally(() => clearTimeout(safetyTimer));
+      }, 3500);
+      
+      const needsInitialLoading = !user;
+      fetchDashboardData(loggedInUserId, needsInitialLoading).finally(() => clearTimeout(safetyTimer));
     }
   }, [loggedInUserId]);
 
@@ -3888,7 +3889,7 @@ function App() {
 
   const fetchDashboardData = async (userId: string, isInitial: boolean = false) => {
     try {
-      if (isInitial) setLoading(true);
+      if (isInitial && !user) setLoading(true);
       console.log(`[Dashboard] Fetching data for user: ${userId}`);
       
       // Stage 1 light: Fetch user record and current session in parallel with automatic retries
@@ -4021,7 +4022,7 @@ function App() {
         // We only trigger diagnostic exit hatch if this is an actual DB fetch error and we have NO offline cache
         if (userRes?.error && isInitial) {
            if (typeof window !== 'undefined') {
-              (window as any).fetchDashboardDataError = userRes.error;
+              (window as any).fetchDashboardDataError = userRes.error?.message || String(userRes.error);
               (window as any).fetchDashboardDataStack = new Error().stack;
            }
         }
@@ -7895,7 +7896,7 @@ function App() {
             padding: '12px',
             borderRadius: '8px'
           }}>
-            <strong>Fehlerdetails:</strong> {debugError}
+            <strong>Fehlerdetails:</strong> {typeof debugError === 'object' ? (debugError?.message || JSON.stringify(debugError)) : String(debugError)}
             {debugStack && (
               <pre style={{ 
                 marginTop: '10px', 

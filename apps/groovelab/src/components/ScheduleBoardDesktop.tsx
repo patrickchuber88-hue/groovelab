@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { usePremiumOnboardingTour, TourStartButton, TourStep } from './PremiumOnboardingTour';
-import { supabase, deleteUserStorageAssets } from '../lib/supabase';
+import { supabase, deleteUserStorageAssets, queryCache } from '../lib/supabase';
 import { 
   Calendar, 
   Plus, 
@@ -1055,41 +1055,81 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
         }
       }
 
-      // Fetch all rooms
-      const { data: rData } = await supabase
-        .from('rooms')
-        .select('id, name')
-        .eq('school_id', schoolId)
-        .order('name');
-      const loadedRooms = rData || [];
-      setRooms(loadedRooms);
+      // 2. High-Performance Enterprise Single-Flight Batch Query (Consolidated 6 serial waterfalls into 1 parallel Promise.all)
+      const [
+        loadedRooms,
+        { data: schedData },
+        { data: occData },
+        { data: groupData },
+        { data: teacherProfile },
+        { data: teacherProfileRaw },
+        allStudentsDb,
+        allSchoolStudentUsers,
+        pendingData
+      ] = await Promise.all([
+        // Rooms (Cached with SWR 60s)
+        queryCache.fetch(`rooms_${schoolId}`, async () => {
+          const { data } = await supabase.from('rooms').select('id, name').eq('school_id', schoolId).order('name');
+          return data || [];
+        }, { ttlMs: 60_000, staleWhileRevalidate: true }),
+
+        // Teacher Schedules
+        supabase.from('schedules').select('*, student:users!schedules_student_id_fkey(*)').eq('school_id', schoolId).eq('teacher_id', selectedTeacherId),
+
+        // Teacher Occurrences
+        supabase.from('schedule_occurrences').select('student_id').eq('teacher_id', selectedTeacherId),
+
+        // Teacher Bands with members in single-hop join
+        supabase.from('bands').select('id, coach_id, band_members(user_id)').eq('coach_id', selectedTeacherId),
+
+        // Teacher Profile
+        supabase.from('users').select('*').eq('id', selectedTeacherId).maybeSingle(),
+
+        // Teacher Profile Raw
+        supabase.from('users_raw').select('*').eq('id', selectedTeacherId).maybeSingle(),
+
+        // School Students Catalog (Cached with SWR 60s)
+        queryCache.fetch(`students_table_${schoolId}`, async () => {
+          const { data } = await supabase.from('students').select('*').eq('school_id', schoolId);
+          return data || [];
+        }, { ttlMs: 60_000, staleWhileRevalidate: true }),
+
+        // School Student Users (Cached with SWR 60s)
+        queryCache.fetch(`student_users_${schoolId}`, async () => {
+          const { data } = await supabase.from('users').select('id, first_name, last_name, instrument, lesson_duration, sibling_group_id, group_id, is_campus_active, is_groovelab_active, is_active, teacher_id').eq('school_id', schoolId).eq('role', 'student');
+          return data || [];
+        }, { ttlMs: 60_000, staleWhileRevalidate: true }),
+
+        // School Pending Students (Cached with SWR 60s)
+        queryCache.fetch(`pending_students_${schoolId}`, async () => {
+          const { data } = await supabase.from('pending_students_decrypted').select('id, first_name, last_name, instrument, lesson_duration, sibling_group_id, group_id, teacher_id').eq('school_id', schoolId);
+          return data || [];
+        }, { ttlMs: 60_000, staleWhileRevalidate: true })
+      ]);
+
+      setRooms(loadedRooms || []);
       const activePlatformVal = localStorage.getItem('groovelab_active_platform') || 'groovelab';
       const defaultRoomObj = activePlatformVal === 'groovelab'
         ? (loadedRooms.find((r: any) => r.name.toLowerCase().includes('groovelab')) || loadedRooms[0])
         : (loadedRooms.find((r: any) => !r.name.toLowerCase().includes('groovelab')) || loadedRooms[0]);
       const defaultRoomId = defaultRoomObj ? defaultRoomObj.id : '';
 
-      if (loadedRooms.length > 0) {
+      if (loadedRooms && loadedRooms.length > 0) {
         setNewBoardRoom(defaultRoomId);
       }
-      
-      // 2. Fetch assigned student IDs across schedules, occurrences, bands, and teacher profile for selected teacher
-      const [{ data: schedData }, { data: occData }, { data: groupData }, { data: teacherProfile }, { data: teacherProfileRaw }] = await Promise.all([
-        supabase.from('schedules').select('*, student:users!schedules_student_id_fkey(*)').eq('school_id', schoolId).eq('teacher_id', selectedTeacherId),
-        supabase.from('schedule_occurrences').select('student_id').eq('teacher_id', selectedTeacherId),
-        supabase.from('bands').select('id').eq('coach_id', selectedTeacherId),
-        supabase.from('users').select('*').eq('id', selectedTeacherId).maybeSingle(),
-        supabase.from('users_raw').select('*').eq('id', selectedTeacherId).maybeSingle()
-      ]);
 
       const schedStudentIds = (schedData || []).map(s => s.student_id).filter(Boolean);
       const occStudentIds = (occData || []).map(s => s.student_id).filter(Boolean);
 
       let groupStudentIds: string[] = [];
       if (groupData && groupData.length > 0) {
-        const groupIds = groupData.map(g => g.id);
-        const { data: gsData } = await supabase.from('band_members').select('user_id').in('band_id', groupIds);
-        groupStudentIds = (gsData || []).map(gs => gs.user_id).filter(Boolean);
+        groupData.forEach(g => {
+          if (Array.isArray(g.band_members)) {
+            g.band_members.forEach((bm: any) => {
+              if (bm?.user_id) groupStudentIds.push(bm.user_id);
+            });
+          }
+        });
       }
 
       const rawPlannedEarly = teacherProfileRaw?.planned_boards || (teacherProfileRaw as any)?.campus_räume || (teacherProfileRaw as any)?.groovelab_räume || teacherProfile?.planned_boards || (teacherProfile as any)?.campus_räume || (teacherProfile as any)?.groovelab_räume;
@@ -1101,32 +1141,14 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
 
       const teacherAssignedStudentIds = new Set([...schedStudentIds, ...occStudentIds, ...groupStudentIds]);
 
-      // 2. Fetch student records from students table for this school
-      const { data: allStudentsDb } = await supabase
-        .from('students')
-        .select('*')
-        .eq('school_id', schoolId);
-
       const statusMap: Record<string, string> = {};
       const stDbStudentIds = new Set<string>();
-      allStudentsDb?.forEach(st => {
+      allStudentsDb?.forEach((st: any) => {
         if (st.id) stDbStudentIds.add(st.id);
         if ((st as any).user_id) stDbStudentIds.add((st as any).user_id);
         if ((st as any).student_id) stDbStudentIds.add((st as any).student_id);
         statusMap[st.id] = st.status;
       });
-
-      const { data: allSchoolStudentUsers } = await supabase
-        .from('users')
-        .select('id, first_name, last_name, instrument, lesson_duration, sibling_group_id, group_id, is_campus_active, is_groovelab_active, is_active, teacher_id')
-        .eq('school_id', schoolId)
-        .eq('role', 'student');
-
-      // Fetch pending students from pending_students_decrypted view
-      const { data: pendingData } = await supabase
-        .from('pending_students_decrypted')
-        .select('id, first_name, last_name, instrument, lesson_duration, sibling_group_id, group_id, teacher_id')
-        .eq('school_id', schoolId);
 
       const studentMap = new Map<string, Student>();
       const userToStudentIdMap = new Map<string, string>();

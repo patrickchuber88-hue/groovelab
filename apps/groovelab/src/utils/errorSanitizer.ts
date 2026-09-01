@@ -21,6 +21,8 @@ export function sanitizeErrorMessage(message: string): string {
 
 export function initGlobalErrorSanitizer(): void {
   if (typeof window === 'undefined') return;
+  if ((window as any).__errorSanitizerInitialized) return;
+  (window as any).__errorSanitizerInitialized = true;
 
   const originalConsoleError = console.error;
   console.error = (...args: any[]) => {
