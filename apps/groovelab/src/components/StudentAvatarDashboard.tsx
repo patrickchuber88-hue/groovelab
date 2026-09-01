@@ -5845,10 +5845,27 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
   };
 
   const fetchStudentProgress = async (silent = false) => {
-    if (!silent) {
+    const targetId = studentId || studentUser?.id;
+    if (!targetId) return;
+
+    // ⚡ 0. Optimistic Instant Cache Loading (0ms)
+    try {
+      const cached = sessionStorage.getItem(`groovelab_mediathek_cache_${targetId}`);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed.lehrwerke && Array.isArray(parsed.lehrwerke)) setLehrwerke(parsed.lehrwerke);
+        if (parsed.songs && Array.isArray(parsed.songs)) setSongs(parsed.songs);
+        if (parsed.activeSongSkills && Array.isArray(parsed.activeSongSkills)) setActiveSongSkills(parsed.activeSongSkills);
+        if (parsed.progressItems && Array.isArray(parsed.progressItems)) setProgressItems(parsed.progressItems);
+      }
+    } catch (e) {
+      // ignore
+    }
+
+    if (!silent && !sessionStorage.getItem(`groovelab_mediathek_cache_${targetId}`)) {
       setProgressLoading(true);
     }
-    let success = false;
+
     try {
       const stored = localStorage.getItem('student_lehrwerke_progress');
       if (stored) {
@@ -5858,104 +5875,91 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       console.error(e);
     }
 
-    try {
-      let schoolId = studentUser?.school_id;
-      if (!schoolId) {
-        const { data: u } = await supabase.from('users').select('school_id').eq('id', studentId).single();
-        schoolId = u?.school_id;
-      }
-      let query = supabase.from('lehrwerke').select('*');
-      if (schoolId) {
-        query = query.eq('school_id', schoolId);
-      }
-      const { data: lehrwerkeData } = await query.order('title');
-      if (lehrwerkeData) {
-        setLehrwerke(lehrwerkeData.map((item: any) => ({
-          ...item,
-          totalPages: item.total_pages || 50
-        })));
-      }
-    } catch (err) {
-      console.error('Error fetching lehrwerke:', err);
-    }
+    const schoolId = studentUser?.school_id || (studentUser as any)?.schools?.id;
 
+    // ⚡ 1. Ultra-Fast Parallel SWR Supabase Queries
     try {
-      let schoolId = studentUser?.school_id;
-      if (!schoolId) {
-        const { data: u } = await supabase.from('users').select('school_id').eq('id', studentId).single();
-        schoolId = u?.school_id;
-      }
-      let query = supabase.from('songs').select('*');
-      if (schoolId) {
-        query = query.eq('school_id', schoolId);
-      }
-      const { data: songsData } = await query.order('title');
-      if (songsData) {
-        setSongs(songsData);
-      }
-    } catch (err) {
-      console.error('Error fetching songs:', err);
-    }
+      const lehrwerkePromise = schoolId 
+        ? supabase.from('lehrwerke').select('*').eq('school_id', schoolId).order('title')
+        : supabase.from('lehrwerke').select('*').order('title');
 
-    try {
-      const { data: skillsData } = await supabase
+      const songsPromise = schoolId
+        ? supabase.from('songs').select('*').eq('school_id', schoolId).order('title')
+        : supabase.from('songs').select('*').order('title');
+
+      const skillsPromise = supabase
         .from('user_song_skills')
         .select('*, songs(*)')
-        .eq('user_id', studentId);
-      if (skillsData) {
-        const filteredSkills = skillsData.filter((skill: any) => {
+        .eq('user_id', targetId);
+
+      const matrixPromise = supabase
+        .from('progress_matrix')
+        .select('*')
+        .eq('student_id', targetId)
+        .order('updated_at', { ascending: false });
+
+      const [lehrwerkeRes, songsRes, skillsRes, matrixRes] = await Promise.allSettled([
+        lehrwerkePromise,
+        songsPromise,
+        skillsPromise,
+        matrixPromise
+      ]);
+
+      let loadedLehrwerke: any[] = [];
+      let loadedSongs: any[] = [];
+      let loadedSkills: any[] = [];
+      let loadedProgress: any[] = [];
+
+      if (lehrwerkeRes.status === 'fulfilled' && (lehrwerkeRes.value as any)?.data) {
+        loadedLehrwerke = ((lehrwerkeRes.value as any).data || []).map((item: any) => ({
+          ...item,
+          totalPages: item.total_pages || 50
+        }));
+        setLehrwerke(loadedLehrwerke);
+      }
+
+      if (songsRes.status === 'fulfilled' && (songsRes.value as any)?.data) {
+        loadedSongs = (songsRes.value as any).data || [];
+        setSongs(loadedSongs);
+      }
+
+      if (skillsRes.status === 'fulfilled' && (skillsRes.value as any)?.data) {
+        loadedSkills = ((skillsRes.value as any).data || []).filter((skill: any) => {
           if (!skill.songs) return false;
           return skill.songs.is_campus_active === true;
         });
-        setActiveSongSkills(filteredSkills);
+        setActiveSongSkills(loadedSkills);
       }
-    } catch (err) {
-      console.error('Error fetching user_song_skills:', err);
-    }
 
-    try {
-      // Try to call backend API
-      const resp = await fetch(`/api/student/get-progress?studentId=${studentId}`, {
-        headers: {
-          'Authorization': `Bearer ${sessionStorage.getItem('sb-access-token') || ''}`
-        }
-      });
-      if (resp.ok && resp.headers.get('content-type')?.includes('application/json')) {
-        const data = await resp.json();
-        setProgressItems(data.progress || []);
-        success = true;
-      }
-    } catch (err) {
-      console.warn('API fetch failed, falling back to direct Supabase query:', err);
-    }
-
-    if (!success) {
-      try {
-        // Direct Supabase query fallback
-        const premium = true;
-
-        const { data: matrixItems } = await supabase
-          .from('progress_matrix')
-          .select('*')
-          .eq('student_id', studentId)
-          .order('updated_at', { ascending: false });
-
-        // Apply asymmetric logic locally as fallback and deduplicate by topic_name
+      if (matrixRes.status === 'fulfilled' && (matrixRes.value as any)?.data) {
         const uniqueItemsMap = new Map<string, any>();
-        (matrixItems || []).forEach((item: any) => {
+        ((matrixRes.value as any).data || []).forEach((item: any) => {
           const name = (item.topic_name || '').trim().toLowerCase();
           if (name && !uniqueItemsMap.has(name)) {
             uniqueItemsMap.set(name, item);
           }
         });
-        const sanitized = Array.from(uniqueItemsMap.values());
-
-        setProgressItems(sanitized);
-      } catch (err) {
-        console.error('Error fetching progress matrix via fallback:', err);
+        loadedProgress = Array.from(uniqueItemsMap.values());
+        setProgressItems(loadedProgress);
       }
+
+      // Save cache snapshot for 0ms SWR instant boot
+      try {
+        sessionStorage.setItem(`groovelab_mediathek_cache_${targetId}`, JSON.stringify({
+          lehrwerke: loadedLehrwerke,
+          songs: loadedSongs,
+          activeSongSkills: loadedSkills,
+          progressItems: loadedProgress,
+          timestamp: Date.now()
+        }));
+      } catch (e) {
+        // ignore quota
+      }
+    } catch (err) {
+      console.error('Error fetching student progress in parallel:', err);
+    } finally {
+      setProgressLoading(false);
     }
-    setProgressLoading(false);
   };
 
 
@@ -12525,9 +12529,23 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
 
       <div id="tour-student-songs" style={{ display: activeTab === 'songs' ? 'flex' : 'none', flexDirection: 'column', gap: '20px' }}>
         {activeTab === 'songs' && (
-          progressLoading ? (
-            <div style={{ padding: '40px', textAlign: 'center', color: '#64748b', fontWeight: 600 }}>
-              Songs & Material werden geladen...
+          (progressLoading && assignedCampusSongs.length === 0 && lehrwerke.length === 0) ? (
+            <div style={{
+              padding: '60px 20px',
+              textAlign: 'center',
+              background: 'linear-gradient(135deg, #ffffff 0%, #f0fdf4 100%)',
+              borderRadius: '24px',
+              border: '1.5px solid #86efac',
+              boxShadow: '0 8px 30px rgba(34, 197, 94, 0.08)',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '12px'
+            }}>
+              <div className="animate-spin" style={{ width: '32px', height: '32px', border: '3px solid #bbf7d0', borderTopColor: '#16a34a', borderRadius: '50%' }} />
+              <div style={{ color: '#166534', fontWeight: 900, fontSize: '1.05rem' }}>Mediathek wird geladen…</div>
+              <div style={{ color: '#64748b', fontSize: '0.82rem', fontWeight: 600 }}>Deine Songs und Unterrichtsmaterialien werden synchronisiert</div>
             </div>
           ) : (
             <div style={{
@@ -12598,21 +12616,21 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                         type="button"
                         onClick={() => setJuniorMediathekFilter('all')}
                         style={{
-                          height: '36px',
-                          padding: '0 16px',
+                          height: '38px',
+                          padding: '0 18px',
                           borderRadius: '100px',
-                          border: juniorMediathekFilter === 'all' ? `1.5px solid ${brandColor}` : '1px solid #e2e8f0',
-                          background: juniorMediathekFilter === 'all' ? `${brandColor}15` : '#ffffff',
-                          color: juniorMediathekFilter === 'all' ? brandColor : '#64748b',
+                          border: juniorMediathekFilter === 'all' ? '1.5px solid #86efac' : '1px solid #e2e8f0',
+                          background: juniorMediathekFilter === 'all' ? '#dcfce7' : '#ffffff',
+                          color: juniorMediathekFilter === 'all' ? '#15803d' : '#64748b',
                           fontWeight: 850,
-                          fontSize: '0.8rem',
+                          fontSize: '0.82rem',
                           cursor: 'pointer',
                           display: 'flex',
                           alignItems: 'center',
                           gap: '6px',
                           whiteSpace: 'nowrap',
                           transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
-                          boxShadow: juniorMediathekFilter === 'all' ? `0 2px 8px ${brandColor}20` : 'none'
+                          boxShadow: juniorMediathekFilter === 'all' ? '0 4px 12px rgba(34, 197, 94, 0.18)' : '0 1px 3px rgba(0,0,0,0.02)'
                         }}
                       >
                         <span>Alles ({activeAssignedSongs.length + assignedLehrwerke.length})</span>
@@ -12622,21 +12640,21 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                         type="button"
                         onClick={() => setJuniorMediathekFilter('songs')}
                         style={{
-                          height: '36px',
-                          padding: '0 16px',
+                          height: '38px',
+                          padding: '0 18px',
                           borderRadius: '100px',
-                          border: juniorMediathekFilter === 'songs' ? `1.5px solid ${brandColor}` : '1px solid #e2e8f0',
-                          background: juniorMediathekFilter === 'songs' ? `${brandColor}15` : '#ffffff',
-                          color: juniorMediathekFilter === 'songs' ? brandColor : '#64748b',
+                          border: juniorMediathekFilter === 'songs' ? '1.5px solid #86efac' : '1px solid #e2e8f0',
+                          background: juniorMediathekFilter === 'songs' ? '#dcfce7' : '#ffffff',
+                          color: juniorMediathekFilter === 'songs' ? '#15803d' : '#64748b',
                           fontWeight: 850,
-                          fontSize: '0.8rem',
+                          fontSize: '0.82rem',
                           cursor: 'pointer',
                           display: 'flex',
                           alignItems: 'center',
                           gap: '6px',
                           whiteSpace: 'nowrap',
                           transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
-                          boxShadow: juniorMediathekFilter === 'songs' ? `0 2px 8px ${brandColor}20` : 'none'
+                          boxShadow: juniorMediathekFilter === 'songs' ? '0 4px 12px rgba(34, 197, 94, 0.18)' : '0 1px 3px rgba(0,0,0,0.02)'
                         }}
                       >
                         <Music size={14} />
@@ -12647,21 +12665,21 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                         type="button"
                         onClick={() => setJuniorMediathekFilter('lehrwerke')}
                         style={{
-                          height: '36px',
-                          padding: '0 16px',
+                          height: '38px',
+                          padding: '0 18px',
                           borderRadius: '100px',
-                          border: juniorMediathekFilter === 'lehrwerke' ? `1.5px solid ${brandColor}` : '1px solid #e2e8f0',
-                          background: juniorMediathekFilter === 'lehrwerke' ? `${brandColor}15` : '#ffffff',
-                          color: juniorMediathekFilter === 'lehrwerke' ? brandColor : '#64748b',
+                          border: juniorMediathekFilter === 'lehrwerke' ? '1.5px solid #86efac' : '1px solid #e2e8f0',
+                          background: juniorMediathekFilter === 'lehrwerke' ? '#dcfce7' : '#ffffff',
+                          color: juniorMediathekFilter === 'lehrwerke' ? '#15803d' : '#64748b',
                           fontWeight: 850,
-                          fontSize: '0.8rem',
+                          fontSize: '0.82rem',
                           cursor: 'pointer',
                           display: 'flex',
                           alignItems: 'center',
                           gap: '6px',
                           whiteSpace: 'nowrap',
                           transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
-                          boxShadow: juniorMediathekFilter === 'lehrwerke' ? `0 2px 8px ${brandColor}20` : 'none'
+                          boxShadow: juniorMediathekFilter === 'lehrwerke' ? '0 4px 12px rgba(34, 197, 94, 0.18)' : '0 1px 3px rgba(0,0,0,0.02)'
                         }}
                       >
                         <Library size={14} />
@@ -12673,19 +12691,21 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                           type="button"
                           onClick={() => setJuniorMediathekFilter('homework')}
                           style={{
-                            height: '36px',
-                            padding: '0 16px',
+                            height: '38px',
+                            padding: '0 18px',
                             borderRadius: '100px',
                             border: juniorMediathekFilter === 'homework' ? '1.5px solid #0284c7' : '1px solid #e2e8f0',
                             background: juniorMediathekFilter === 'homework' ? '#e0f2fe' : '#ffffff',
+                            color: juniorMediathekFilter === 'homework' ? '#0284c7' : '#64748b',
                             fontWeight: 850,
-                            fontSize: '0.8rem',
+                            fontSize: '0.82rem',
                             cursor: 'pointer',
                             display: 'flex',
                             alignItems: 'center',
                             gap: '6px',
                             whiteSpace: 'nowrap',
-                            transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
+                            transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                            boxShadow: juniorMediathekFilter === 'homework' ? '0 4px 12px rgba(2, 132, 199, 0.18)' : '0 1px 3px rgba(0,0,0,0.02)'
                           }}
                         >
                           <Star size={14} color="#0284c7" />
@@ -12705,16 +12725,16 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                     onChange={e => setSongSearch(e.target.value)}
                     style={{ 
                       width: '100%', 
-                      padding: '11px 14px 11px 44px', 
-                      borderRadius: '14px', 
+                      padding: '12px 16px 12px 46px', 
+                      borderRadius: '16px', 
                       border: '1px solid #e2e8f0', 
                       background: '#f8fafc', 
-                      fontWeight: 600, 
-                      fontSize: '0.88rem', 
+                      fontWeight: 650, 
+                      fontSize: '0.90rem', 
                       outline: 'none', 
                       transition: 'all 0.2s', 
                       boxSizing: 'border-box',
-                      boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.01)'
+                      boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.02)'
                     }}
                   />
                 </div>
@@ -12752,34 +12772,35 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                   return (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', width: '100%' }}>
                       
-                      {/* Apple-Music Hero Spotlight: "Deine heutige Mission" */}
+                      {/* Apple HIG Luminous Hero Spotlight: "Deine heutige Mission" */}
                       {activeMissionSong && (
                         <div 
                           onClick={() => setSelectedSongForDetail(activeMissionSong)}
                           style={{
-                            background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
-                            borderRadius: '22px',
-                            padding: '20px',
-                            color: '#ffffff',
+                            background: 'linear-gradient(135deg, #ffffff 0%, #f0fdf4 50%, #dcfce7 100%)',
+                            borderRadius: '24px',
+                            padding: '22px 24px',
+                            color: '#0f172a',
                             position: 'relative',
                             overflow: 'hidden',
-                            boxShadow: '0 8px 24px -4px rgba(15, 23, 42, 0.18)',
+                            boxShadow: '0 12px 32px -4px rgba(34, 197, 94, 0.12), 0 4px 16px -2px rgba(0, 0, 0, 0.03)',
                             display: 'flex',
                             flexDirection: 'column',
-                            gap: '14px',
+                            gap: '16px',
                             cursor: 'pointer',
-                            border: '1px solid rgba(255, 255, 255, 0.08)'
+                            border: '1.5px solid #86efac',
+                            transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
                           }}
                           className="hover-scale-subtle"
                         >
-                          {/* Ambient glow accent */}
+                          {/* Ambient soft glow accent */}
                           <div style={{
                             position: 'absolute',
-                            top: '-30px',
-                            right: '-30px',
-                            width: '160px',
-                            height: '160px',
-                            background: 'radial-gradient(circle, rgba(34, 197, 94, 0.3) 0%, transparent 70%)',
+                            top: '-40px',
+                            right: '-40px',
+                            width: '200px',
+                            height: '200px',
+                            background: 'radial-gradient(circle, rgba(34, 197, 94, 0.18) 0%, transparent 70%)',
                             pointerEvents: 'none'
                           }} />
 
@@ -12789,30 +12810,31 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                               display: 'inline-flex',
                               alignItems: 'center',
                               gap: '6px',
-                              background: 'rgba(34, 197, 94, 0.2)',
-                              color: '#4ade80',
-                              border: '1px solid rgba(34, 197, 94, 0.35)',
-                              padding: '3px 10px',
+                              background: '#dcfce7',
+                              color: '#15803d',
+                              border: '1px solid #86efac',
+                              padding: '4px 12px',
                               borderRadius: '100px',
-                              fontSize: '0.70rem',
+                              fontSize: '0.72rem',
                               fontWeight: 850,
                               letterSpacing: '0.03em',
-                              textTransform: 'uppercase'
+                              textTransform: 'uppercase',
+                              boxShadow: '0 2px 6px rgba(34, 197, 94, 0.1)'
                             }}>
-                              <Star size={11} fill="#4ade80" />
+                              <Sparkles size={12} color="#15803d" />
                               <span>Deine heutige Mission</span>
                             </div>
-                            <span style={{ fontSize: '0.70rem', color: '#94a3b8', fontWeight: 700 }}>Tippe für Details</span>
+                            <span style={{ fontSize: '0.74rem', color: '#16a34a', fontWeight: 750 }}>Tippe für Details →</span>
                           </div>
 
                           {/* Hero Main Content */}
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', zIndex: 2 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '18px', zIndex: 2 }}>
                             {renderSongVinylCover(getSongColor(activeMissionSong.title || ''), 'md')}
                             <div style={{ flex: 1, minWidth: 0 }}>
-                              <h3 style={{ margin: '0 0 3px 0', fontSize: '1.30rem', fontWeight: 900, color: '#ffffff', letterSpacing: '-0.02em', lineHeight: 1.2 }}>
+                              <h3 style={{ margin: '0 0 4px 0', fontSize: '1.35rem', fontWeight: 950, color: '#0f172a', letterSpacing: '-0.02em', lineHeight: 1.2 }}>
                                 {activeMissionSong.title}
                               </h3>
-                              <p style={{ margin: 0, fontSize: '0.84rem', color: '#cbd5e1', fontWeight: 650 }}>
+                              <p style={{ margin: 0, fontSize: '0.88rem', color: '#15803d', fontWeight: 750 }}>
                                 von {activeMissionSong.artist}
                               </p>
                             </div>
@@ -12831,20 +12853,21 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                               background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
                               color: '#ffffff',
                               border: 'none',
-                              padding: '10px 16px',
-                              borderRadius: '12px',
-                              fontWeight: 850,
-                              fontSize: '0.85rem',
+                              padding: '12px 18px',
+                              borderRadius: '14px',
+                              fontWeight: 900,
+                              fontSize: '0.88rem',
                               cursor: 'pointer',
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
                               gap: '8px',
-                              boxShadow: '0 4px 12px rgba(34, 197, 94, 0.3)',
-                              transition: 'all 0.2s ease'
+                              boxShadow: '0 8px 20px -2px rgba(34, 197, 94, 0.35)',
+                              transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
                             }}
+                            className="hover-scale"
                           >
-                            <Play size={14} fill="white" color="white" />
+                            <Play size={15} fill="white" color="white" />
                             <span>Jetzt üben (Timer starten)</span>
                           </button>
                         </div>
@@ -12909,16 +12932,16 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                     onClick={() => setSelectedSongForDetail(song)}
                                     className="hover-scale-subtle"
                                     style={{ 
-                                      padding: '12px 16px', 
+                                      padding: '14px 18px', 
                                       display: 'flex', 
-                                      gap: '12px',
+                                      gap: '14px',
                                       alignItems: 'center', 
                                       background: '#ffffff', 
-                                      borderRadius: '16px', 
-                                      border: '1px solid #f1f5f9', 
-                                      boxShadow: '0 2px 8px -2px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02)', 
-                                      transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
-                                      minHeight: '80px',
+                                      borderRadius: '20px', 
+                                      border: '1px solid #e2e8f0', 
+                                      boxShadow: '0 4px 16px -2px rgba(0, 0, 0, 0.03), 0 1px 2px rgba(0, 0, 0, 0.02)', 
+                                      transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+                                      minHeight: '84px',
                                       boxSizing: 'border-box',
                                       cursor: 'pointer'
                                     }}
@@ -12928,8 +12951,8 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
 
                                     {/* Title and Artist */}
                                     <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                                      <div style={{ fontWeight: 850, color: '#0f172a', fontSize: '0.98rem', letterSpacing: '-0.01em', lineHeight: '1.25', wordBreak: 'break-word' }}>{song.title}</div>
-                                      <div style={{ fontSize: '0.78rem', fontWeight: 600, color: '#64748b', lineHeight: '1.2', wordBreak: 'break-word' }}>von {song.artist}</div>
+                                      <div style={{ fontWeight: 850, color: '#0f172a', fontSize: '1.0rem', letterSpacing: '-0.01em', lineHeight: '1.25', wordBreak: 'break-word' }}>{song.title}</div>
+                                      <div style={{ fontSize: '0.80rem', fontWeight: 600, color: '#64748b', lineHeight: '1.2', wordBreak: 'break-word' }}>von {song.artist}</div>
                                     </div>
 
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
@@ -12969,14 +12992,15 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                         <span style={{
                                           background: statusBg,
                                           color: statusColor,
-                                          padding: '3px 8px',
-                                          borderRadius: '6px',
-                                          fontSize: '0.68rem',
+                                          padding: '4px 10px',
+                                          borderRadius: '8px',
+                                          fontSize: '0.70rem',
                                           fontWeight: 850,
                                           textTransform: 'uppercase',
                                           whiteSpace: 'nowrap',
                                           alignSelf: 'center',
-                                          flexShrink: 0
+                                          flexShrink: 0,
+                                          border: statusColor === '#0284c7' ? '1px solid #bae6fd' : '1px solid rgba(0,0,0,0.05)'
                                         }}>
                                           {statusText}
                                         </span>
@@ -13027,43 +13051,43 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                     onClick={() => setSelectedLehrwerkForDetail(item)}
                                     className="hover-scale-subtle" 
                                     style={{ 
-                                      padding: '12px 16px', 
+                                      padding: '14px 18px', 
                                       background: '#ffffff', 
                                       display: 'flex', 
-                                      gap: '12px', 
+                                      gap: '14px', 
                                       alignItems: 'center', 
-                                      borderRadius: '16px', 
-                                      border: '1px solid #f1f5f9', 
-                                      boxShadow: '0 2px 8px -2px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02)',
+                                      borderRadius: '20px', 
+                                      border: '1px solid #e2e8f0', 
+                                      boxShadow: '0 4px 16px -2px rgba(0, 0, 0, 0.03), 0 1px 2px rgba(0, 0, 0, 0.02)',
                                       position: 'relative',
-                                      transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
-                                      minHeight: '80px',
+                                      transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+                                      minHeight: '84px',
                                       boxSizing: 'border-box',
                                       cursor: 'pointer'
                                     }}
                                   >
                                     <div style={{ 
-                                      width: '40px', 
-                                      height: '52px', 
+                                      width: '42px', 
+                                      height: '54px', 
                                       background: `linear-gradient(135deg, ${gradient.from}, ${gradient.to})`, 
-                                      borderRadius: '7px', 
+                                      borderRadius: '8px', 
                                       display: 'flex', 
                                       alignItems: 'center', 
                                       justifyContent: 'center', 
                                       color: gradient.text, 
-                                      boxShadow: '0 2px 6px rgba(0,0,0,0.06)',
+                                      boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
                                       flexShrink: 0
                                     }}>
-                                      <BookOpen size={17} color={gradient.text} />
+                                      <BookOpen size={18} color={gradient.text} />
                                     </div>
                                     <div style={{ flex: 1, minWidth: 0 }}>
-                                      <h4 style={{ margin: '0 0 2px 0', fontSize: '0.92rem', fontWeight: 850, color: '#1e293b', lineHeight: '1.25', wordBreak: 'break-word' }}>{item.title}</h4>
-                                      {item.author && <p style={{ margin: '0 0 2px 0', fontSize: '0.76rem', color: '#64748b', fontWeight: 600, lineHeight: '1.2', wordBreak: 'break-word' }}>von {item.author}</p>}
-                                      <p style={{ margin: 0, fontSize: '0.70rem', color: '#94a3b8', fontWeight: 700 }}>📖 {item.totalPages || 50} Seiten</p>
+                                      <h4 style={{ margin: '0 0 2px 0', fontSize: '0.96rem', fontWeight: 850, color: '#1e293b', lineHeight: '1.25', wordBreak: 'break-word' }}>{item.title}</h4>
+                                      {item.author && <p style={{ margin: '0 0 2px 0', fontSize: '0.78rem', color: '#64748b', fontWeight: 600, lineHeight: '1.2', wordBreak: 'break-word' }}>von {item.author}</p>}
+                                      <p style={{ margin: 0, fontSize: '0.72rem', color: '#94a3b8', fontWeight: 700 }}>📖 {item.totalPages || 50} Seiten</p>
                                       
                                       {masteredCount > 0 && (
                                         <div style={{ marginTop: '6px' }}>
-                                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.62rem', color: '#64748b', fontWeight: 700, marginBottom: '3px' }}>
+                                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.64rem', color: '#64748b', fontWeight: 700, marginBottom: '3px' }}>
                                             <span>{masteredCount} / {item.totalPages} Seiten</span>
                                             <span>{Math.round(pct * 100)}%</span>
                                           </div>
@@ -13087,23 +13111,23 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
 
               {/* RIGHT COLUMN: MEINE ERFOLGE WIDGET */}
               <div style={{
-                background: '#ffffff',
-                border: '1px solid #f1f5f9',
-                borderRadius: '20px',
-                padding: '20px',
-                boxShadow: '0 4px 16px -2px rgba(15, 23, 42, 0.04)',
+                background: 'linear-gradient(180deg, #ffffff 0%, #fbfdfc 100%)',
+                border: '1px solid #e2e8f0',
+                borderRadius: '24px',
+                padding: '22px',
+                boxShadow: '0 8px 24px -4px rgba(15, 23, 42, 0.04)',
                 display: 'flex',
                 flexDirection: 'column',
-                gap: '16px'
+                gap: '18px'
               }}>
                 <div>
-                  <h4 style={{ fontSize: '1.02rem', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px', margin: 0, fontWeight: 850 }}>
-                    <div style={{ background: '#fef3c7', padding: '5px', borderRadius: '8px', display: 'flex', alignItems: 'center' }}>
-                      <Trophy size={15} color="#d97706" fill="#d97706" />
+                  <h4 style={{ fontSize: '1.05rem', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px', margin: 0, fontWeight: 900 }}>
+                    <div style={{ background: '#fef3c7', padding: '6px', borderRadius: '10px', display: 'flex', alignItems: 'center', border: '1px solid #fde68a' }}>
+                      <Trophy size={16} color="#d97706" fill="#d97706" />
                     </div>
                     <span>Meine Erfolge</span>
                   </h4>
-                  <p style={{ color: '#64748b', fontSize: '0.72rem', margin: '3px 0 0 0', fontWeight: 600 }}>
+                  <p style={{ color: '#64748b', fontSize: '0.74rem', margin: '4px 0 0 0', fontWeight: 600 }}>
                     Deine gesammelten Meilensteine
                   </p>
                 </div>
