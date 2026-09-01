@@ -1465,6 +1465,18 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         throw new Error('Ungültige Master-Admin Anmeldedaten.');
       }
 
+      if (user.error) {
+        throw new Error(user.error);
+      }
+
+      if (user.requires_2fa || (user.is_2fa_enabled && !user.id)) {
+        setAdminPendingUser(user);
+        setAdminAuthStep(2);
+        setError(null);
+        setAdminLoginLoading(false);
+        return;
+      }
+
       if (user.is_2fa_enabled && user.two_factor_secret) {
         setAdminPendingUser(user);
         setAdminAuthStep(2);
@@ -1491,11 +1503,29 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
     setAdminLoginLoading(true);
     setError(null);
     try {
-      const isValid = await verifyTOTP(cleanCode, adminPendingUser.two_factor_secret);
-      if (!isValid) {
-        throw new Error('Ungültiger 2FA-Code. Bitte aktuellen Code aus der Authenticator-App eingeben.');
+      // 1. Primary: Server-Side Zero-Secret 2FA Verification
+      const { data: verifiedUser, error: verifyErr } = await supabase
+        .rpc('login_master_admin', {
+          p_username: adminUsernameInput.trim(),
+          p_password: adminPasswordInput.trim(),
+          p_totp_code: cleanCode
+        });
+
+      if (!verifyErr && verifiedUser && verifiedUser.id && !verifiedUser.error) {
+        await completeAdminLogin(verifiedUser);
+        return;
       }
-      await completeAdminLogin(adminPendingUser);
+
+      // 2. Client-side fallback if legacy secret was present in pending user
+      if (adminPendingUser.two_factor_secret) {
+        const isValid = await verifyTOTP(cleanCode, adminPendingUser.two_factor_secret);
+        if (isValid) {
+          await completeAdminLogin(adminPendingUser);
+          return;
+        }
+      }
+
+      throw new Error(verifiedUser?.error || 'Ungültiger 2FA-Code. Bitte aktuellen Code aus der Authenticator-App eingeben.');
     } catch (err: any) {
       setError(err.message || '2FA-Verifikation fehlgeschlagen.');
       setAdminLoginLoading(false);

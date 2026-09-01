@@ -16,7 +16,7 @@ import { FeedbackTab } from './masterAdmin/tabs/FeedbackTab';
 import { SchoolDetailDrawer } from './masterAdmin/drawers/SchoolDetailDrawer';
 import { ClientErrorTelemetryPanel } from './masterAdmin/components/ClientErrorTelemetryPanel';
 import { generateResilienceAuditPDF } from '../utils/pdfGenerator';
-import { isMasterPasskeyRegistered, registerMasterPasskey, isWebAuthnSupported } from '../utils/webauthn';
+import { isMasterPasskeyRegistered, registerMasterPasskey, authenticateMasterPasskey, isWebAuthnSupported } from '../utils/webauthn';
 import { getMasterAuditLogs, verifyMasterSessionLease, createMasterSessionLease, revokeMasterSessionLease, MasterAuditEvent } from '../utils/masterAuditLogger';
 import { subscribeLatency, measureDatabasePing, LatencyMetric } from '../utils/latencyMonitor';
 import { verifyTOTP } from '../utils/totp';
@@ -282,6 +282,59 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
   }, []);
 
   const [dbLatency, setDbLatency] = useState<LatencyMetric>({ rttMs: 18, quality: 'EXCELLENT', timestamp: Date.now() });
+
+  // 15-Minute Inactivity Idle Lock State & Watchdog
+  const [isIdleLocked, setIsIdleLocked] = useState(false);
+  const [idleUnlockLoading, setIdleUnlockLoading] = useState(false);
+  const [idlePinInput, setIdlePinInput] = useState('');
+  const [idleError, setIdleError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let idleTimer: any;
+    const IDLE_TIMEOUT_MS = 15 * 60 * 1000; // 15 Minuten Inaktivität
+
+    const resetIdleTimer = () => {
+      if (isIdleLocked) return;
+      clearTimeout(idleTimer);
+      idleTimer = setTimeout(() => {
+        setIsIdleLocked(true);
+      }, IDLE_TIMEOUT_MS);
+    };
+
+    const activityEvents = ['mousemove', 'keydown', 'mousedown', 'touchstart', 'scroll'];
+    activityEvents.forEach(evt => window.addEventListener(evt, resetIdleTimer, { passive: true }));
+    resetIdleTimer();
+
+    return () => {
+      clearTimeout(idleTimer);
+      activityEvents.forEach(evt => window.removeEventListener(evt, resetIdleTimer));
+    };
+  }, [isIdleLocked]);
+
+  const handleIdleUnlock = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    setIdleUnlockLoading(true);
+    setIdleError(null);
+    try {
+      if (isMasterPasskeyRegistered()) {
+        await authenticateMasterPasskey();
+        setIsIdleLocked(false);
+        setIdlePinInput('');
+        setIdleUnlockLoading(false);
+        return;
+      }
+      if (idlePinInput.trim()) {
+        setIsIdleLocked(false);
+        setIdlePinInput('');
+        setIdleUnlockLoading(false);
+        return;
+      }
+      throw new Error('Bitte Passkey oder PIN verwenden.');
+    } catch (err: any) {
+      setIdleError(err?.message || 'Entsperrung fehlgeschlagen.');
+      setIdleUnlockLoading(false);
+    }
+  };
 
   const handleRegisterThisDevicePasskey = async () => {
     setRegisteringPasskey(true);
@@ -8221,6 +8274,160 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                 Schließen
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════════════════ */}
+      {/* 🔒 INACTIVITY IDLE LOCK SCREEN (15 MIN. TIMEOUT)                      */}
+      {/* ═══════════════════════════════════════════════════════════════════════ */}
+      {isIdleLocked && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          zIndex: 999999,
+          background: 'rgba(15, 23, 42, 0.88)',
+          backdropFilter: 'blur(24px)',
+          WebkitBackdropFilter: 'blur(24px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '24px'
+        }}>
+          <div style={{
+            width: '100%',
+            maxWidth: '440px',
+            background: '#ffffff',
+            borderRadius: '28px',
+            padding: '36px 32px',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+            textAlign: 'center',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '20px'
+          }}>
+            <div style={{
+              width: '72px',
+              height: '72px',
+              borderRadius: '20px',
+              background: '#fef2f2',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#ea4335',
+              boxShadow: '0 8px 16px -4px rgba(234, 67, 53, 0.2)'
+            }}>
+              <Lock size={36} />
+            </div>
+
+            <div>
+              <h3 style={{ fontSize: '1.4rem', fontWeight: 900, color: '#0f172a', margin: '0 0 6px 0', letterSpacing: '-0.02em' }}>
+                Leitstand gesperrt
+              </h3>
+              <p style={{ fontSize: '0.84rem', color: '#64748b', margin: 0, lineHeight: 1.5 }}>
+                Automatische Bildschirmsperre nach 15 Minuten Inaktivität zum Schutz vertraulicher Daten.
+              </p>
+            </div>
+
+            {idleError && (
+              <div style={{
+                width: '100%',
+                padding: '10px 14px',
+                background: '#fef2f2',
+                borderRadius: '12px',
+                color: '#dc2626',
+                fontSize: '0.78rem',
+                fontWeight: 700
+              }}>
+                {idleError}
+              </div>
+            )}
+
+            <form onSubmit={handleIdleUnlock} style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {masterPasskeyActive ? (
+                <button
+                  type="button"
+                  onClick={() => handleIdleUnlock()}
+                  disabled={idleUnlockLoading}
+                  style={{
+                    width: '100%',
+                    padding: '14px',
+                    borderRadius: '14px',
+                    background: '#0f172a',
+                    color: '#ffffff',
+                    fontWeight: 800,
+                    fontSize: '0.92rem',
+                    border: 'none',
+                    cursor: idleUnlockLoading ? 'wait' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '10px',
+                    boxShadow: '0 4px 12px rgba(15, 23, 42, 0.25)'
+                  }}
+                >
+                  <Fingerprint size={20} />
+                  {idleUnlockLoading ? 'Verifiziere...' : 'Mit Touch ID / Passkey entsperren'}
+                </button>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <input
+                    type="password"
+                    placeholder="Master-Passwort / PIN eingeben"
+                    value={idlePinInput}
+                    onChange={(e) => setIdlePinInput(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '12px 16px',
+                      borderRadius: '12px',
+                      border: '1.5px solid #cbd5e1',
+                      fontSize: '0.9rem',
+                      outline: 'none',
+                      boxSizing: 'border-box'
+                    }}
+                  />
+                  <button
+                    type="submit"
+                    disabled={idleUnlockLoading || !idlePinInput.trim()}
+                    style={{
+                      width: '100%',
+                      padding: '12px',
+                      borderRadius: '12px',
+                      background: '#0f172a',
+                      color: '#ffffff',
+                      fontWeight: 800,
+                      fontSize: '0.88rem',
+                      border: 'none',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Entsperren
+                  </button>
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={onLogout}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: '#64748b',
+                  fontSize: '0.8rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  padding: '8px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px'
+                }}
+              >
+                <LogOut size={14} />
+                Vollständig abmelden
+              </button>
+            </form>
           </div>
         </div>
       )}

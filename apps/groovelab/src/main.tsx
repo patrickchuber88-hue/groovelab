@@ -3,7 +3,11 @@ import ReactDOM from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import App from './App'
 import { MasterPricingProvider } from './context/MasterPricingContext'
+import { initGlobalErrorSanitizer } from './utils/errorSanitizer'
 import './index.css'
+
+// Initialize Zero-PII Error & Crash Telemetry Sanitizer (ASVS Level 3)
+initGlobalErrorSanitizer();
 
 // Anti-Clickjacking & Frame-Busting Guard (ASVS Level 3)
 if (typeof window !== 'undefined' && window.top !== window.self) {

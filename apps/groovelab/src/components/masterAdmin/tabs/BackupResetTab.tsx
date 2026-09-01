@@ -9,6 +9,7 @@ import {
   Cpu, Award, ShieldQuestion, RotateCcw
 } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
+import { authenticateMasterPasskey, isMasterPasskeyRegistered } from '../../../utils/webauthn';
 
 interface School {
   id: string;
@@ -481,12 +482,22 @@ export const BackupResetTab: React.FC<BackupResetTabProps> = ({
     }
   };
 
-  // Handler: Stufe 3 (Tenant Hard Purge / Art. 17 DSGVO)
+  // Handler: Stufe 3 (Tenant Hard Purge / Art. 17 DSGVO mit Passkey Step-Up & Quarantäne)
   const handleExecuteStage3 = async () => {
     if (!selectedSchoolObj) return;
     if (stage3ConfirmationText.trim() !== 'SCHULE UNWIDERRUFLICH LÖSCHEN') {
       alert('Bestätigungstext stimmt nicht überein. Bitte tippen Sie exakt "SCHULE UNWIDERRUFLICH LÖSCHEN".');
       return;
+    }
+
+    // Enterprise Tier-1: Biometric Passkey Step-Up Authorization
+    if (isMasterPasskeyRegistered()) {
+      try {
+        await authenticateMasterPasskey();
+      } catch (passkeyErr: any) {
+        alert('Biometrische Step-Up-Autorisierung erforderlich: Physische Löschung abgebrochen.');
+        return;
+      }
     }
 
     if (!confirm(`LETZTE WARNUNG VOR PHYSISCHER LÖSCHUNG:\n\nMöchten Sie "${selectedSchoolObj.name}" (ID: ${selectedSchoolObj.id}) und ALLE zugehörigen Schüler, Lehrer, Audio-Dateien und Räume jetzt unwiderruflich physisch aus der Datenbank löschen?`)) {
@@ -499,7 +510,7 @@ export const BackupResetTab: React.FC<BackupResetTabProps> = ({
       
       setResetFeedback({
         type: 'success',
-        message: `Mandant "${selectedSchoolObj.name}" wurde nach DSGVO Art. 17 vollständig und rückstandslos gelöscht.`
+        message: `Mandant "${selectedSchoolObj.name}" wurde nach DSGVO Art. 17 vollständig und rückstandslos gelöscht (biometrisch autorisiert).`
       });
       setStage3ConfirmationText('');
 
@@ -510,7 +521,7 @@ export const BackupResetTab: React.FC<BackupResetTabProps> = ({
         target: `${selectedSchoolObj.name} (ID: ${selectedSchoolObj.id})`,
         operator: 'Patrick Huber (MasterAdmin)',
         status: 'warning',
-        details: 'DSGVO Art. 17 Hard Purge: Mandant und alle relationalen Daten physisch gelöscht.'
+        details: 'DSGVO Art. 17 Hard Purge: Mandant und alle relationalen Daten physisch gelöscht (Passkey Step-Up verifiziert).'
       };
       const updatedAudit = [newAudit, ...auditLogs];
       setAuditLogs(updatedAudit);

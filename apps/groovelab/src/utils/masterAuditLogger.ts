@@ -4,6 +4,7 @@
  */
 
 import { registerClientSessionLease } from './sessionLeaseManager';
+import { supabase } from '../lib/supabase';
 
 export interface MasterSessionLease {
   userId: string;
@@ -194,6 +195,21 @@ export async function logMasterAdminEvent(event: Omit<MasterAuditEvent, 'id' | '
     // Retain the last 150 critical events in circular buffer
     const trimmedLogs = existingLogs.slice(0, 150);
     localStorage.setItem(MASTER_AUDIT_LOG_KEY, JSON.stringify(trimmedLogs));
+
+    // Replicate to immutable PostgreSQL WORM table master_audit_trail asynchronously
+    Promise.resolve(
+      supabase
+        .from('master_audit_trail')
+        .insert({
+          user_id: entry.userId,
+          action: entry.action,
+          auth_method: entry.authMethod || null,
+          status: entry.status,
+          details: entry.details || null,
+          user_agent: entry.userAgent,
+          origin: entry.origin
+        })
+    ).catch(() => {});
 
     console.info(`[Master Audit] ${entry.timestamp} | ${entry.action} | ${entry.status} | User: ${entry.userId}`);
   } catch (err) {
