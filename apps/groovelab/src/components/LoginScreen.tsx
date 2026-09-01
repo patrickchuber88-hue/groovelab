@@ -3741,89 +3741,148 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
     const loadSchoolUsers = async () => {
       try {
-        // Resolve target school ID with fallbacks
-        let targetSchoolId = schoolData?.id || 
-                             scopedFamilyProfiles[0]?.school_id || 
-                             savedFamilyProfiles[0]?.school_id || 
-                             localStorage.getItem('groovelab_school_id');
-
-        if (!targetSchoolId) {
-          const { data: defaultSchools } = await supabase
-            .from('schools')
-            .select('id, name')
-            .limit(1);
-          if (defaultSchools && defaultSchools.length > 0) {
-            targetSchoolId = defaultSchools[0].id;
-          }
-        }
+        // Resolve target school ID with strict scoping
+        const targetSchoolId = schoolData?.id || 
+                             (typeof window !== 'undefined' ? (localStorage.getItem('groovelab_last_school_id') || localStorage.getItem('groovelab_school_id')) : null);
 
         if (!targetSchoolId) return;
 
-        const { data: res, error } = await supabase
-          .rpc('get_dev_bypass_users_for_school', { p_school_id: targetSchoolId });
+        // 1. Fetch current school name
+        let resolvedSchoolName = schoolData?.name;
+        if (!resolvedSchoolName) {
+          const { data: sData } = await supabase
+            .from('schools')
+            .select('name')
+            .eq('id', targetSchoolId)
+            .maybeSingle();
+          if (sData?.name) resolvedSchoolName = sData.name;
+        }
 
-        let resolvedStudent = res?.student || undefined;
+        // 2. Fetch Admin / Secretary User strictly for this school (checking role, roles array, and is_master_admin)
+        let adminUser: { id: string; name: string; role: string; school_id: string } | undefined = undefined;
+        const { data: adminData } = await supabase
+          .from('users')
+          .select('id, role, roles, is_master_admin, school_id, first_name, last_name')
+          .eq('school_id', targetSchoolId)
+          .or('role.eq.admin,role.eq.secretary,roles.cs.{"admin"},roles.cs.{"secretary"},is_master_admin.eq.true')
+          .order('role', { ascending: true })
+          .limit(1);
 
-        // Ensure student bypass prioritizes Linus
-        if (!resolvedStudent || !resolvedStudent.name.toLowerCase().includes('linus')) {
-          try {
-            let { data: linusUsers } = await supabase
-              .from('users')
-              .select('id, role, school_id, first_name, last_name')
-              .eq('school_id', targetSchoolId)
-              .eq('role', 'student')
-              .ilike('first_name', '%linus%')
-              .limit(1);
+        if (adminData && adminData.length > 0) {
+          const a = adminData[0];
+          const hasAdminRole = a.role === 'admin' || (Array.isArray(a.roles) && a.roles.includes('admin')) || a.is_master_admin;
+          adminUser = {
+            id: a.id,
+            name: `${a.first_name || ''} ${a.last_name || ''}`.trim() || (hasAdminRole ? 'Schulleiter' : 'Verwaltung'),
+            role: hasAdminRole ? 'admin' : 'secretary',
+            school_id: a.school_id
+          };
+        } else {
+          // Explicit Schulleiter identity strictly for this school
+          adminUser = {
+            id: `admin-${targetSchoolId}`,
+            name: 'Schulleiter',
+            role: 'admin',
+            school_id: targetSchoolId
+          };
+        }
 
-            if (!linusUsers || linusUsers.length === 0) {
-              const { data: globalLinus } = await supabase
-                .from('users')
-                .select('id, role, school_id, first_name, last_name')
-                .eq('role', 'student')
-                .ilike('first_name', '%linus%')
-                .limit(1);
-              if (globalLinus && globalLinus.length > 0) {
-                linusUsers = globalLinus;
-              }
-            }
+        // 3. Fetch Teacher User strictly for this school (prioritizing dedicated teachers like Mateo B.)
+        let teacherUser: { id: string; name: string; role: string; school_id: string } | undefined = undefined;
+        const { data: teacherData } = await supabase
+          .from('users')
+          .select('id, role, roles, school_id, first_name, last_name')
+          .eq('school_id', targetSchoolId)
+          .eq('role', 'teacher')
+          .neq('id', adminUser?.id || '')
+          .order('first_name', { ascending: true })
+          .limit(1);
 
-            if (linusUsers && linusUsers.length > 0) {
-              const l = linusUsers[0];
-              resolvedStudent = {
-                id: l.id,
-                name: `${l.first_name || ''} ${l.last_name || ''}`.trim(),
-                role: l.role,
-                school_id: l.school_id
-              };
-            }
-          } catch (eLinus) {
-            console.warn('[Bypass] Error prioritizing Linus user:', eLinus);
+        if (teacherData && teacherData.length > 0) {
+          const t = teacherData[0];
+          teacherUser = {
+            id: t.id,
+            name: `${t.first_name || ''} ${t.last_name || ''}`.trim() || 'Lehrkraft',
+            role: t.role,
+            school_id: t.school_id
+          };
+        } else {
+          const { data: anyTeacher } = await supabase
+            .from('users')
+            .select('id, role, school_id, first_name, last_name')
+            .eq('school_id', targetSchoolId)
+            .eq('role', 'teacher')
+            .limit(1);
+          if (anyTeacher && anyTeacher.length > 0) {
+            const t = anyTeacher[0];
+            teacherUser = {
+              id: t.id,
+              name: `${t.first_name || ''} ${t.last_name || ''}`.trim() || 'Lehrkraft',
+              role: t.role,
+              school_id: t.school_id
+            };
           }
         }
 
-        if (res && !error) {
-          setBypassUserCounts({
-            hasAdmin: Boolean(res.admin?.id),
-            hasTeacher: Boolean(res.teacher?.id),
-            hasStudent: Boolean(resolvedStudent?.id || res.student?.id),
-            adminUser: res.admin || undefined,
-            teacherUser: res.teacher || undefined,
-            studentUser: resolvedStudent || res.student || undefined,
-            schoolName: res.school_name || schoolData?.name || 'Musikschule'
-          });
-        } else if (resolvedStudent) {
-          setBypassUserCounts(prev => ({
-            ...prev,
-            hasStudent: true,
-            studentUser: resolvedStudent
-          }));
+        // 4. Fetch Student User strictly for this school (prioritizing Linus if present in THIS school)
+        let studentUser: { id: string; name: string; role: string; school_id: string } | undefined = undefined;
+        const { data: linusData } = await supabase
+          .from('users')
+          .select('id, role, school_id, first_name, last_name')
+          .eq('school_id', targetSchoolId)
+          .eq('role', 'student')
+          .ilike('first_name', '%linus%')
+          .limit(1);
+
+        if (linusData && linusData.length > 0) {
+          const s = linusData[0];
+          studentUser = {
+            id: s.id,
+            name: `${s.first_name || ''} ${s.last_name || ''}`.trim() || 'Schüler',
+            role: s.role,
+            school_id: s.school_id
+          };
+        } else {
+          const { data: anyStudentData } = await supabase
+            .from('users')
+            .select('id, role, school_id, first_name, last_name')
+            .eq('school_id', targetSchoolId)
+            .eq('role', 'student')
+            .limit(1);
+
+          if (anyStudentData && anyStudentData.length > 0) {
+            const s = anyStudentData[0];
+            studentUser = {
+              id: s.id,
+              name: `${s.first_name || ''} ${s.last_name || ''}`.trim() || 'Schüler',
+              role: s.role,
+              school_id: s.school_id
+            };
+          } else {
+            studentUser = {
+              id: `student-${targetSchoolId}`,
+              name: 'Schüler',
+              role: 'student',
+              school_id: targetSchoolId
+            };
+          }
         }
+
+        setBypassUserCounts({
+          hasAdmin: Boolean(adminUser),
+          hasTeacher: Boolean(teacherUser),
+          hasStudent: Boolean(studentUser),
+          adminUser,
+          teacherUser,
+          studentUser,
+          schoolName: resolvedSchoolName || 'Musikschule'
+        });
       } catch (e) {
         console.warn('[Bypass counts error]:', e);
       }
     };
     loadSchoolUsers();
-  }, [schoolData?.id, scopedFamilyProfiles, isLocalhost]);
+  }, [schoolData?.id, schoolData?.name, isLocalhost]);
 
   // Intercept and render coach self-onboarding if invite parameters are in URL
   if (inviteSchoolId) {
@@ -7096,7 +7155,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 gap: '8px'
               }}
             >
-              🏛️ BYPASS: VERWALTUNG ({bypassUserCounts.adminUser.name} • {bypassUserCounts.schoolName})
+              🏛️ BYPASS: {bypassUserCounts.adminUser.role === 'secretary' ? 'VERWALTUNG' : 'SCHULLEITUNG'} ({bypassUserCounts.adminUser.name} • {bypassUserCounts.schoolName})
             </button>
           )}
 
@@ -7152,28 +7211,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               type="button"
               onClick={async () => {
                 try {
-                  let targetUser = bypassUserCounts.studentUser!;
-                  if (!targetUser.name.toLowerCase().includes('linus')) {
-                    try {
-                      let { data: linusUsers } = await supabase
-                        .from('users')
-                        .select('id, role, school_id, first_name, last_name')
-                        .eq('role', 'student')
-                        .ilike('first_name', '%linus%')
-                        .limit(1);
-                      if (linusUsers && linusUsers.length > 0) {
-                        const l = linusUsers[0];
-                        targetUser = {
-                          id: l.id,
-                          name: `${l.first_name || ''} ${l.last_name || ''}`.trim(),
-                          role: l.role,
-                          school_id: l.school_id
-                        };
-                      }
-                    } catch (e) {
-                      // ignore
-                    }
-                  }
+                  const targetUser = bypassUserCounts.studentUser!;
                   console.log('[Bypass] Logging in as Schüler:', targetUser.name);
                   sessionStorage.removeItem('groovelab_is_master_admin');
                   localStorage.removeItem('groovelab_is_master_admin');

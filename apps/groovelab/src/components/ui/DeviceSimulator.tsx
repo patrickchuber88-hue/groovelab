@@ -149,67 +149,14 @@ export const DeviceSimulator: React.FC<DeviceSimulatorProps> = ({ children }) =>
     setTouchPos(null);
   };
 
+  // Inactive mode: render children transparently with no floating button (Shift+D toggles it)
+  if (!isActive) {
+    return <>{children}</>;
+  }
+
   return (
     <div style={{ minHeight: '100vh', width: '100%', position: 'relative' }}>
-      {/* Floating Toggle Button (Visible strictly in development environment) */}
-      <div
-        style={{
-          position: 'fixed',
-          bottom: '20px',
-          right: '20px',
-          zIndex: 999999,
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px'
-        }}
-      >
-        <button
-          onClick={() => setIsActive(prev => !prev)}
-          style={{
-            background: isActive
-              ? 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)'
-              : 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
-            color: '#ffffff',
-            border: '1px solid rgba(255, 255, 255, 0.2)',
-            borderRadius: '100px',
-            padding: '10px 18px',
-            fontWeight: 800,
-            fontSize: '0.82rem',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            boxShadow: '0 8px 24px rgba(0, 0, 0, 0.25)',
-            cursor: 'pointer',
-            backdropFilter: 'blur(12px)',
-            transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
-          }}
-        >
-          <Sliders size={16} />
-          <span>{isActive ? 'Simulator Aktiv' : 'Dev Simulator'}</span>
-          <span
-            style={{
-              background: 'rgba(255, 255, 255, 0.2)',
-              borderRadius: '6px',
-              padding: '2px 6px',
-              fontSize: '0.68rem',
-              fontWeight: 700,
-              fontFamily: 'monospace'
-            }}
-          >
-            Shift+D
-          </span>
-        </button>
-      </div>
-
-      {/* Main App Content Container */}
-      {!isActive ? (
-        // Standard View without Simulator
-        <div style={{ width: '100%', minHeight: '100vh' }}>
-          {children}
-        </div>
-      ) : (
-        /* Simulated Device Viewport Canvas */
-        <div
+      {/* Simulated Device Viewport Canvas (Toggled exclusively via Shift+D) */}        <div
           style={{
             height: isDesktop ? 'auto' : '100vh',
             maxHeight: isDesktop ? 'none' : '100vh',
@@ -473,7 +420,6 @@ export const DeviceSimulator: React.FC<DeviceSimulatorProps> = ({ children }) =>
             </div>
           )}
         </div>
-      )}
     </div>
   );
 };

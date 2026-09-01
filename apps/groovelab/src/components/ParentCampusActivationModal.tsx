@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import QRCode from 'react-qr-code';
 import { 
-  X, Check, Copy, Download, ShieldCheck, QrCode, Building2, 
+  Users, X, Check, Copy, Download, ShieldCheck, QrCode, Building2, 
   HelpCircle, ArrowRight, Sparkles, HeartHandshake, CheckCircle2 
 } from 'lucide-react';
 import { 
@@ -51,7 +51,28 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submittedSuccess, setSubmittedSuccess] = useState(false);
   const [showHardshipConfirm, setShowHardshipConfirm] = useState(false);
+  interface LinkedSibling {
+    name: string;
+    id?: string;
+    isCampusActive: boolean;
+  }
+
   const [agreeWithdrawalWaiver, setAgreeWithdrawalWaiver] = useState(true);
+  const [linkedSiblings, setLinkedSiblings] = useState<LinkedSibling[]>(() => {
+    if (typeof window === 'undefined') return [];
+    try {
+      const stored = localStorage.getItem(`campus_family_siblings_${student.school_id || 'school'}`);
+      if (!stored) return [];
+      const parsed = JSON.parse(stored);
+      return parsed.map((item: any) => typeof item === 'string' ? { name: item, isCampusActive: true } : item);
+    } catch (e) { return []; }
+  });
+  const [showAddSiblingInput, setShowAddSiblingInput] = useState<boolean>(false);
+  const [siblingNameOrPin, setSiblingNameOrPin] = useState<string>('');
+  const [siblingLookupLoading, setSiblingLookupLoading] = useState<boolean>(false);
+
+  const activePaidSiblingsCount = linkedSiblings.filter(s => s.isCampusActive).length;
+  const isThirdOrMoreChild = activePaidSiblingsCount >= 2;
 
   // Dynamic School Year Calculation (Registration month = free, remaining months until customized school year end)
   const isChf = schoolData?.currency === 'CHF' || 
@@ -94,15 +115,18 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
     setTimeout(() => setCopiedField(null), 2500);
   };
 
-  // Mark as transfer initiated
+  // Mark as transfer initiated and activate student profile
   const handleConfirmTransferInitiated = async () => {
     try {
       setIsSubmitting(true);
+      const isFamilyBonus = linkedSiblings.length >= 2;
       const { error } = await supabase
         .from('students')
         .update({
-          student_billing_payment_method: 'bank_transfer',
-          payment_status: 'pending',
+          student_billing_payment_method: isFamilyBonus ? 'family_bonus' : 'bank_transfer',
+          payment_status: 'paid',
+          is_campus_active: true,
+          exempt_from_direct_billing: isFamilyBonus ? true : false,
           updated_at: new Date().toISOString()
         })
         .eq('id', student.id);
@@ -113,16 +137,25 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
           .from('users')
           .update({
             student_billing_payment_method: 'bank_transfer',
+            payment_status: 'paid',
+            is_campus_active: true,
             updated_at: new Date().toISOString()
           })
           .eq('id', student.id);
       }
 
+      try {
+        if (typeof window !== 'undefined') {
+          localStorage.setItem(`campus_paid_${student.id}`, 'true');
+          localStorage.setItem(`campus_active_${student.id}`, 'true');
+        }
+      } catch (e) {}
+
       setSubmittedSuccess(true);
       if (onPaymentSubmitted) onPaymentSubmitted();
       setTimeout(() => {
         onClose();
-      }, 2500);
+      }, 2000);
     } catch (err) {
       console.warn('Payment update notice error:', err);
       setSubmittedSuccess(true);
@@ -366,11 +399,13 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
               </div>
             </div>
             <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: '1.35rem', fontWeight: 900, color: '#059669', letterSpacing: '-0.03em' }}>
-                {freeMonthDisplay} <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#64748b' }}>({schoolYearCalc.freeMonthName})</span>
+              <div style={{ fontSize: '1.35rem', fontWeight: 900, color: isThirdOrMoreChild ? '#ca8a04' : '#059669', letterSpacing: '-0.03em' }}>
+                {isThirdOrMoreChild ? (isChf ? 'CHF 0.00' : '0,00 €') : freeMonthDisplay} <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#64748b' }}>({isThirdOrMoreChild ? 'Familien-Bonus' : schoolYearCalc.freeMonthName})</span>
               </div>
-              <span style={{ fontSize: '0.70rem', color: '#64748b', fontWeight: 600, display: 'block' }}>
-                ab 01.{schoolYearCalc.paidStartMonthName.slice(0,3)}: {isChf ? `CHF ${totalAmountStr}` : `${totalAmountStr} €`} ({remainingMonths} × {monthlyRate})
+              <span style={{ fontSize: '0.70rem', color: isThirdOrMoreChild ? '#ca8a04' : '#64748b', fontWeight: 700, display: 'block' }}>
+                {isThirdOrMoreChild 
+                  ? '🎉 Als 3. Kind dauerhaft 100% kostenlos!' 
+                  : `ab 01.${schoolYearCalc.paidStartMonthName.slice(0,3)}: ${isChf ? `CHF ${totalAmountStr}` : `${totalAmountStr} €`} (${remainingMonths} × ${monthlyRate})`}
               </span>
               <span style={{ fontSize: '0.64rem', color: '#94a3b8', fontWeight: 600, display: 'block', marginTop: '1px' }}>
                 {taxDisclaimer}
@@ -378,7 +413,188 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
             </div>
           </div>
 
-          {/* EPC-QR GiroCode Stage */}
+          {/* 👨‍👩‍👧 Family Hub / Geschwister-Verknüpfung (Paid-First Architecture) */}
+          <div style={{
+            background: isThirdOrMoreChild ? '#fefce8' : '#f8fafc',
+            border: `1.5px solid ${isThirdOrMoreChild ? '#facc15' : '#e2e8f0'}`,
+            borderRadius: '16px',
+            padding: '14px 16px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '10px'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Users size={16} color={isThirdOrMoreChild ? '#ca8a04' : '#64748b'} />
+                <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#0f172a' }}>
+                  Familien-Vorteil &amp; Geschwisterrabatt
+                </span>
+              </div>
+              <span style={{ fontSize: '0.68rem', fontWeight: 800, background: isThirdOrMoreChild ? '#fef08a' : '#e2e8f0', color: isThirdOrMoreChild ? '#854d0e' : '#475569', padding: '2px 8px', borderRadius: '6px' }}>
+                {activePaidSiblingsCount} von 2 aktiven Geschwistern
+              </span>
+            </div>
+
+            <p style={{ margin: 0, fontSize: '0.74rem', color: '#475569', lineHeight: 1.4 }}>
+              Haben Sie mehrere Kinder an der Musikschule? <strong>Sobald 2 Geschwisterkinder ein aktives Campus-Modul besitzen, ist der Zugang ab dem 3. Kind dauerhaft 100% KOSTENLOS (0,00 €)!</strong>
+            </p>
+
+            {/* Linked Siblings Chips */}
+            {linkedSiblings.length > 0 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                {linkedSiblings.map((sib, idx) => (
+                  <span key={idx} style={{ 
+                    background: sib.isCampusActive ? '#ecfdf5' : '#ffffff', 
+                    border: `1px solid ${sib.isCampusActive ? '#a7f3d0' : '#cbd5e1'}`, 
+                    padding: '3px 8px', 
+                    borderRadius: '6px', 
+                    fontSize: '0.72rem', 
+                    fontWeight: 700, 
+                    color: sib.isCampusActive ? '#065f46' : '#64748b', 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '4px' 
+                  }}>
+                    <span>{idx + 1}. Kind: {sib.name} {sib.isCampusActive ? '(✓ Aktiv)' : '(⏳ Inaktiv)'}</span>
+                  </span>
+                ))}
+                <span style={{ 
+                  background: isThirdOrMoreChild ? '#dcfce7' : '#f1f5f9', 
+                  border: `1px solid ${isThirdOrMoreChild ? '#86efac' : '#cbd5e1'}`, 
+                  padding: '3px 8px', 
+                  borderRadius: '6px', 
+                  fontSize: '0.72rem', 
+                  fontWeight: 800, 
+                  color: isThirdOrMoreChild ? '#166534' : '#475569' 
+                }}>
+                  {linkedSiblings.length + 1}. Kind: {student.first_name || 'Aktuelles Kind'} {isThirdOrMoreChild ? '(🎉 100% Gratis)' : `(${monthlyRate}/Mo.)`}
+                </span>
+              </div>
+            )}
+
+            {/* Status Feedback */}
+            {isThirdOrMoreChild ? (
+              <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#15803d', background: '#dcfce7', padding: '6px 10px', borderRadius: '8px' }}>
+                🎉 Glückwunsch! Als 3. aktives Kind ist der Campus-Zugang für {student.first_name || 'dieses Kind'} für das gesamte Schuljahr 100% KOSTENLOS (0,00 €)!
+              </div>
+            ) : activePaidSiblingsCount === 1 ? (
+              <div style={{ fontSize: '0.70rem', color: '#b45309', background: '#fef3c7', padding: '6px 10px', borderRadius: '8px', fontWeight: 600 }}>
+                💡 Noch 1 aktives Geschwisterkind nötig, um ab dem 3. Kind dauerhaft kostenlos zu üben.
+              </div>
+            ) : null}
+
+            {/* Add Sibling Trigger / Input */}
+            {!showAddSiblingInput ? (
+              <button
+                type="button"
+                onClick={() => setShowAddSiblingInput(true)}
+                style={{
+                  background: '#ffffff',
+                  border: '1px dashed #94a3b8',
+                  borderRadius: '8px',
+                  padding: '6px 10px',
+                  fontSize: '0.72rem',
+                  fontWeight: 700,
+                  color: '#0f172a',
+                  cursor: 'pointer',
+                  alignSelf: 'flex-start',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px'
+                }}
+              >
+                <span>+ Geschwisterkind hinzufügen &amp; prüfen</span>
+              </button>
+            ) : (
+              <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                <input
+                  type="text"
+                  placeholder="Vorname oder PIN des Geschwisterkindes"
+                  value={siblingNameOrPin}
+                  onChange={(e) => setSiblingNameOrPin(e.target.value)}
+                  style={{
+                    flex: 1,
+                    padding: '6px 10px',
+                    borderRadius: '8px',
+                    border: '1px solid #cbd5e1',
+                    fontSize: '0.76rem',
+                    outline: 'none'
+                  }}
+                />
+                <button
+                  type="button"
+                  disabled={siblingLookupLoading}
+                  onClick={async () => {
+                    const inputVal = siblingNameOrPin.trim();
+                    if (!inputVal) return;
+                    setSiblingLookupLoading(true);
+                    
+                    let isAct = true;
+                    let resolvedName = inputVal;
+                    let resolvedId = '';
+
+                    try {
+                      const { data } = await supabase
+                        .from('users_raw')
+                        .select('id, first_name, last_name, is_campus_active, payment_status, student_billing_payment_method')
+                        .eq('school_id', student.school_id)
+                        .or(`id.eq.${inputVal},first_name.ilike.${inputVal},kiosk_pin.eq.${inputVal}`)
+                        .limit(1);
+
+                      if (data && data.length > 0) {
+                        const found = data[0];
+                        resolvedName = found.first_name || inputVal;
+                        resolvedId = found.id;
+                        isAct = Boolean(found.is_campus_active || found.payment_status === 'paid' || found.student_billing_payment_method === 'bank_transfer' || found.student_billing_payment_method === 'family_bonus');
+                      } else {
+                        const localPaid = localStorage.getItem(`campus_paid_${inputVal}`) === 'true' || localStorage.getItem(`campus_active_${inputVal}`) === 'true';
+                        isAct = localPaid;
+                      }
+                    } catch (e) {
+                      console.warn('Sibling lookup error:', e);
+                    } finally {
+                      setSiblingLookupLoading(false);
+                    }
+
+                    const newSibling: LinkedSibling = {
+                      name: resolvedName,
+                      id: resolvedId || undefined,
+                      isCampusActive: isAct
+                    };
+
+                    const nextSiblings = [...linkedSiblings.filter(s => s.name.toLowerCase() !== resolvedName.toLowerCase()), newSibling];
+                    setLinkedSiblings(nextSiblings);
+                    try {
+                      localStorage.setItem(`campus_family_siblings_${student.school_id || 'school'}`, JSON.stringify(nextSiblings));
+                    } catch (e) {}
+                    setSiblingNameOrPin('');
+                    setShowAddSiblingInput(false);
+                  }}
+                  style={{
+                    background: '#0f172a',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '8px',
+                    padding: '6px 12px',
+                    fontSize: '0.74rem',
+                    fontWeight: 800,
+                    cursor: siblingLookupLoading ? 'wait' : 'pointer'
+                  }}
+                >
+                  {siblingLookupLoading ? 'Prüfe...' : 'Hinzufügen'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowAddSiblingInput(false)}
+                  style={{ background: 'transparent', border: 'none', color: '#64748b', fontSize: '0.72rem', cursor: 'pointer' }}
+                >
+                  Abbrechen
+                </button>
+              </div>
+            )}
+          </div>
+
+                    {/* EPC-QR GiroCode Stage */}
           <div style={{
             background: '#ffffff',
             border: '1.5px solid #e2e8f0',
@@ -578,7 +794,7 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
               onMouseOver={(e) => { if (!submittedSuccess && agreeWithdrawalWaiver) e.currentTarget.style.transform = 'translateY(-1px)'; }}
               onMouseOut={(e) => { e.currentTarget.style.transform = 'translateY(0)'; }}
             >
-              {isSubmitting ? 'Wird freigeschaltet...' : submittedSuccess ? '✓ Überweisung gemeldet' : `${schoolYearCalc.freeMonthName} gratis testen & zahlungspflichtig bestellen ➔`}
+              {isSubmitting ? 'Wird freigeschaltet...' : submittedSuccess ? '✓ Überweisung gemeldet' : `${isThirdOrMoreChild ? '🎁 Kostenlosen 3. Kind Zugang jetzt freischalten ➔' : `${schoolYearCalc.freeMonthName} gratis testen & zahlungspflichtig bestellen ➔`}`}
             </button>
 
             {/* 2-Column secondary tools */}

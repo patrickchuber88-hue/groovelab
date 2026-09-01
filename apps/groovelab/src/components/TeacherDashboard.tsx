@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback, useRef, lazy, Suspens
 import { MUSIC_QUOTES, getQuotesForAudience, getDailyQuote } from '@groovelab/shared';
 import { usePremiumOnboardingTour, TourStartButton, TourStep } from './PremiumOnboardingTour';
 import { supabase, deleteUserStorageAssets } from '../lib/supabase';
-import { Monitor, Music, Award, Box, Plus, AlertCircle, AlertTriangle, User, Users, Star, TrendingUp, Shield, Zap, Play, Info, CheckCircle, Check, Search, Trash2, Bell, X, Clock, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, LayoutDashboard, LogOut, Flame, GraduationCap, UserPlus, Edit3, Calendar, Activity, CheckSquare, Mail, Copy, Sparkles, BookOpen, MessageSquare, Lock, Palmtree, Heart, Settings, Key, Sun, ThumbsUp, Building2, Hourglass, Eye, EyeOff, ShieldCheck, CheckCheck, CalendarX, Send, Lightbulb, Download, Sliders, Mic, Disc, Radio, Timer, ArrowRight } from 'lucide-react';
+import { Monitor, Music, Award, Box, Plus, AlertCircle, AlertTriangle, User, Users, Star, TrendingUp, Shield, Zap, Play, Info, CheckCircle, Check, Search, Trash2, Bell, X, Clock, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, LayoutDashboard, LogOut, Flame, GraduationCap, UserPlus, Edit3, Calendar, Activity, CheckSquare, Mail, Copy, Sparkles, BookOpen, MessageSquare, Lock, Palmtree, Heart, Settings, Key, Sun, ThumbsUp, Building2, Hourglass, Eye, EyeOff, ShieldCheck, CheckCheck, CalendarX, Send, Lightbulb, Download, Sliders, Mic, Disc, Radio, Timer, ArrowRight, Headphones, FileText } from 'lucide-react';
 import { TeacherDetailModal } from './TeacherDetailModal';
 import { StudentDetailModal } from './StudentDetailModal';
 import { checkIsAudioTresorActive } from '../domain/stickersAndTresor';
@@ -17745,8 +17745,17 @@ useEffect(() => {
                             <AvatarImage src={student.photo_url} user={student} activePlatform={activePlatform} />
                           </div>
                           <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontWeight: 900, fontSize: '1rem', color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                              {student.first_name} {maskLastName(student.last_name, showRealNames)}
+                            <div style={{ fontWeight: 900, fontSize: '1rem', color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <span>{student.first_name} {maskLastName(student.last_name, showRealNames)}</span>
+                              {isStudentActive ? (
+                                <span title="Interaktives Campus-Studio aktiv (Übe-Timer, Loopstation & Aufnahmen)" style={{ display: 'inline-flex', alignItems: 'center' }}>
+                                  <Headphones size={13} style={{ color: '#16a34a', flexShrink: 0 }} />
+                                </span>
+                              ) : (
+                                <span title="Basis-Modus aktiv (Digitales Hausaufgabenheft & Notizen)" style={{ display: 'inline-flex', alignItems: 'center' }}>
+                                  <FileText size={13} style={{ color: '#94a3b8', flexShrink: 0 }} />
+                                </span>
+                              )}
                             </div>
                             <div style={{ marginTop: '2px' }}>
                               {isStudentActive ? (

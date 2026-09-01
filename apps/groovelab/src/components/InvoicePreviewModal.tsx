@@ -620,14 +620,14 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                       {/* Position 1: Student Activations */}
                       <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
                         <td style={{ padding: '8px 0' }}>
-                          <strong style={{ display: 'block', color: '#0f172a' }}>Cloud- &amp; Modul-Bereitstellung: Modul Campus (Sammelabrechnung)</strong>
+                          <strong style={{ display: 'block', color: '#0f172a' }}>Cloud- &amp; Modul-Bereitstellung: Campus</strong>
                           <span style={{ fontSize: '0.68rem', color: isFree ? '#ea4335' : '#64748b', fontWeight: isFree ? 700 : 500 }}>
                             {studentBillingOption === 'option2' 
-                              ? `Monatliche Cloud-Bereitstellung für Schüler-Profile (Umlagesatz = ${masterPricing.priceStudent.toFixed(2).replace('.', ',')} € / Mo.). Keine gesonderten Lizenzkaufgebühren.`
-                              : `Jahrespauschale für die Cloud-Bereitstellung aktiver Schüler-Profile (Umlagesatz = ${((invoice.studentFee || 4.80) / (invoice.restmonate || 12)).toFixed(2).replace('.', ',')} € / Mo. für ${invoice.restmonate || 12} Restmonate). Keine gesonderten Lizenzkaufgebühren.`
+                              ? `Monatliche Cloud-Bereitstellung für Schüler-Profile (${(invoice.studentFee || masterPricing.priceStudent || 0.49).toFixed(2).replace('.', ',')} € / Mo. je Schüler). Keine gesonderten Lizenzkaufgebühren.`
+                              : studentBillingOption === 'option3_3'
+                                ? `Einmalige Komplett-Jahrespauschale für alle Schüler-Profile zum Schuljahresstart (inkl. 20% Rabatt). Keine gesonderten Lizenzkaufgebühren.`
+                                : `Jahrespauschale für die Cloud-Bereitstellung aktiver Schüler-Profile (inkl. 10% Rabatt für ${invoice.restmonate || 12} Restmonate). Keine gesonderten Lizenzkaufgebühren.`
                             }
-                            {studentBillingOption === 'option3_2' && <strong style={{ color: '#34a853', marginLeft: '6px' }}>(inkl. 10% Rabatt für Jahrespauschale)</strong>}
-                            {studentBillingOption === 'option3_3' && <strong style={{ color: '#34a853', marginLeft: '6px' }}>(inkl. 20% Rabatt für Komplett-Jahrespauschale)</strong>}
                             {isFree && <strong style={{ color: '#ea4335', marginLeft: '6px' }}>{freeLabel}</strong>}
                           </span>
                         </td>
@@ -635,7 +635,7 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                           {invoice.activationsCount || 0} Schüler
                         </td>
                         <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>
-                          {isFree ? '0,00 €' : `${(invoice.studentFee || 4.80).toFixed(2).replace('.', ',')} €`}
+                          {isFree ? '0,00 €' : `${(invoice.studentFee || 0.49).toFixed(2).replace('.', ',')} €`}
                         </td>
                         <td style={{ padding: '8px 0', textAlign: 'right', fontWeight: 600 }}>
                           {isFree ? '0,00 €' : `${invoice.amount.toFixed(2).replace('.', ',')} €`}
@@ -662,7 +662,7 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                 )}
                 {isAkt && (
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.74rem', color: '#64748b', marginBottom: '4px' }}>
-                    <span>{billingPayer === 'student' ? '• Durchlaufender Posten (Umlage an Schüler):' : '• Direktabrechnung Schüler-Bereitstellung (Träger):'}</span>
+                    <span>{billingPayer === 'student' ? '• Durchlaufender Posten (Umlage an Schüler):' : '• Sammelabrechnung Schüler-Bereitstellung (Träger):'}</span>
                     <span style={{ fontWeight: 650, color: billingPayer === 'student' ? '#34a853' : '#ea580c', whiteSpace: 'nowrap' }}>
                       {studentShareTotal.toFixed(2).replace('.', ',')} €
                     </span>

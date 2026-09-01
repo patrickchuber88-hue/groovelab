@@ -387,28 +387,79 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
           {activeTab === 'cancellation' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
               <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#0f172a' }}>
-                Widerrufsbelehrung & Muster-Widerrufsformular (für Verbraucher/Eltern nach § 312g BGB)
+                Widerrufsbelehrung &amp; Muster-Widerrufsformular
               </h4>
+              <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '-12px' }}>
+                (Gültig für Verbraucher/Eltern bei Schüler-Direktabrechnung gemäß § 312g BGB i. V. m. Art. 246a EGBGB)
+              </div>
 
+              {/* 1. Widerrufsbelehrung */}
               <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '16px', padding: '18px' }}>
-                <strong style={{ color: '#1e40af' }}>Widerrufsrecht für Verbraucher:</strong><br />
-                Sie haben das Recht, binnen vierzehn Tagen ohne Angabe von Gründen diesen Vertrag zu widerrufen. Die Widerrufsfrist beträgt vierzehn Tage ab dem Tag des Vertragsabschlusses.
+                <strong style={{ color: '#1e40af', fontSize: '0.92rem' }}>1. Widerrufsrecht für Verbraucher</strong><br />
+                <p style={{ margin: '8px 0 0 0', fontSize: '0.84rem', lineHeight: 1.6, color: '#1e3a8a' }}>
+                  Sie haben das Recht, binnen vierzehn Tagen ohne Angabe von Gründen diesen Vertrag zu widerrufen. Die Widerrufsfrist beträgt vierzehn Tage ab dem Tag des Vertragsabschlusses (Aktivierung des Profils).
+                </p>
               </div>
 
               <div>
                 <strong style={{ color: '#0f172a' }}>Ausübung des Widerrufs:</strong><br />
-                Um Ihr Widerrufsrecht auszuüben, müssen Sie uns (Patrick Huber, Karl-Fürstenberg Str. 59, 79618 Rheinfelden, E-Mail: <a href="mailto:kontakt@campus-groovelab.de" style={{ color: '#2563eb', fontWeight: 700 }}>kontakt@campus-groovelab.de</a> / <a href="mailto:patrick.huber@musaek.de" style={{ color: '#2563eb', fontWeight: 700 }}>patrick.huber@musaek.de</a>) mittels einer eindeutigen Erklärung (z. B. ein mit der Post versandter Brief oder E-Mail) über Ihren Entschluss, diesen Vertrag zu widerrufen, informieren.
+                <p style={{ margin: '6px 0 0 0', fontSize: '0.82rem', lineHeight: 1.5, color: '#334155' }}>
+                  Um Ihr Widerrufsrecht auszuüben, müssen Sie uns:
+                </p>
+                <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '12px 16px', margin: '8px 0', fontSize: '0.82rem', lineHeight: 1.5, color: '#0f172a' }}>
+                  <strong>Patrick Huber – Softwareentwicklung &amp; Cloud-Dienstleistungen</strong><br />
+                  Karl-Fürstenberg Str. 59, 79618 Rheinfelden, Deutschland<br />
+                  E-Mail: <a href="mailto:kontakt@campus-groovelab.de" style={{ color: '#2563eb', fontWeight: 700 }}>kontakt@campus-groovelab.de</a> / <a href="mailto:patrick.huber@musaek.de" style={{ color: '#2563eb', fontWeight: 700 }}>patrick.huber@musaek.de</a>
+                </div>
+                <p style={{ margin: '6px 0 0 0', fontSize: '0.82rem', lineHeight: 1.5, color: '#334155' }}>
+                  mittels einer eindeutigen Erklärung (z. B. ein mit der Post versandter Brief, E-Mail oder über die elektronische Widerrufsfunktion im Eltern-Portal) über Ihren Entschluss, diesen Vertrag zu widerrufen, informieren. Sie können dafür das untenstehende Muster-Widerrufsformular verwenden, das jedoch nicht vorgeschrieben ist.
+                </p>
               </div>
 
               <div>
-                <strong style={{ color: '#0f172a' }}>Muster-Widerrufsformular:</strong><br />
-                <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '14px', borderRadius: '12px', fontFamily: 'monospace', fontSize: '0.78rem', marginTop: '6px' }}>
-                  An: Patrick Huber, Karl-Fürstenberg Str. 59, 79618 Rheinfelden, E-Mail: kontakt@campus-groovelab.de / patrick.huber@musaek.de<br /><br />
-                  Hiermit widerrufe(n) ich/wir (*) den von mir/uns (*) abgeschlossenen Vertrag über die Bereitstellung des Zugangs Campus-Groovelab.<br />
-                  - Bestellt am (*)/erhalten am (*)<br />
-                  - Name des/der Verbraucher(s)<br />
-                  - Anschrift des/der Verbraucher(s)<br />
-                  - Datum & Unterschrift (nur bei Mitteilung auf Papier)
+                <strong style={{ color: '#0f172a' }}>Fristwahrung:</strong><br />
+                <p style={{ margin: '6px 0 0 0', fontSize: '0.82rem', lineHeight: 1.5, color: '#334155' }}>
+                  Zur Wahrung der Widerrufsfrist reicht es aus, dass Sie die Mitteilung über die Ausübung des Widerrufsrechts vor Ablauf der Widerrufsfrist absenden.
+                </p>
+              </div>
+
+              {/* 2. Folgen des Widerrufs */}
+              <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '16px', padding: '18px' }}>
+                <strong style={{ color: '#166534', fontSize: '0.92rem' }}>2. Folgen des Widerrufs</strong><br />
+                <p style={{ margin: '8px 0 0 0', fontSize: '0.82rem', lineHeight: 1.6, color: '#14532d' }}>
+                  Wenn Sie diesen Vertrag widerrufen, haben wir Ihnen alle Zahlungen, die wir von Ihnen erhalten haben, unverzüglich und spätestens binnen vierzehn Tagen ab dem Tag zurückzuzahlen, an dem die Mitteilung über Ihren Widerruf dieses Vertrags bei uns eingegangen ist. Für diese Rückzahlung verwenden wir dasselbe Zahlungsmittel, das Sie bei der ursprünglichen Transaktion eingesetzt haben, es sei denn, mit Ihnen wurde ausdrücklich etwas anderes vereinbart; in keinem Fall werden Ihnen wegen dieser Rückzahlung Entgelte berechnet.
+                </p>
+                <div style={{ marginTop: '10px', fontSize: '0.80rem', lineHeight: 1.5, color: '#166534', borderTop: '1px solid #86efac', paddingTop: '10px' }}>
+                  <strong>Kostenfreier Probemonat &amp; Wertersatz-Ausschluss:</strong><br />
+                  Da die Bereitstellung im ersten Monat bzw. der Kennenlernphase vollständig kostenfrei erfolgt, schulden Sie im Falle eines Widerrufs während der Probezeit keinerlei Wertersatz oder Nutzungsentschädigung. Mit Wirksamwerden des Widerrufs erlischt die digitale Zugangsberechtigung zum Campus-Modul.
+                </div>
+              </div>
+
+              {/* 3. Schweiz-Hinweis */}
+              <div style={{ fontSize: '0.80rem', color: '#64748b', lineHeight: 1.5 }}>
+                <strong style={{ color: '#0f172a' }}>3. Besondere Hinweise für Nutzer in der Schweiz:</strong><br />
+                Für Nutzer mit Wohnsitz in der Schweiz gewährt der Betreiber diese 14-tägige Widerrufsfrist auf freiwilliger vertraglicher Basis im gleichen Umfang.
+              </div>
+
+              {/* 4. Muster-Widerrufsformular */}
+              <div>
+                <strong style={{ color: '#0f172a' }}>4. Muster-Widerrufsformular:</strong><br />
+                <div style={{ fontSize: '0.78rem', color: '#64748b', margin: '4px 0 8px 0' }}>
+                  (Wenn Sie den Vertrag widerrufen wollen, dann füllen Sie bitte dieses Formular aus und senden Sie es zurück.)
+                </div>
+                <div style={{ background: '#f8fafc', border: '1px solid #cbd5e1', padding: '16px', borderRadius: '12px', fontFamily: 'monospace', fontSize: '0.76rem', lineHeight: 1.7, color: '#1e293b' }}>
+                  An:<br />
+                  Patrick Huber – Softwareentwicklung &amp; Cloud-Dienstleistungen<br />
+                  Karl-Fürstenberg Str. 59, 79618 Rheinfelden, Deutschland<br />
+                  E-Mail: kontakt@campus-groovelab.de / patrick.huber@musaek.de<br /><br />
+                  Hiermit widerrufe(n) ich/wir (*) den von mir/uns (*) abgeschlossenen Vertrag über die Bereitstellung des Zugangs Campus-Groovelab (Modul Campus).<br /><br />
+                  - Bestellt am (*) / freigeschaltet am (*): _______________________________<br />
+                  - Name des/der Verbraucher(s): _________________________________________<br />
+                  - Name des Schülers / Kindes: _________________________________________<br />
+                  - Anschrift des/der Verbraucher(s): ______________________________________<br />
+                  - Datum: ________________________<br />
+                  - Unterschrift des/der Verbraucher(s) (nur bei Mitteilung auf Papier): ______________________<br /><br />
+                  (*) Unzutreffendes streichen.
                 </div>
               </div>
             </div>

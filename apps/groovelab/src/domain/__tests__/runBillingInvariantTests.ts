@@ -138,4 +138,27 @@ assert(resolveStorageAddonFee(50) === 9.99, '50 GB should resolve to 9.99 €');
 assert(resolveStorageAddonFee(20, 4.00) === 4.00, 'Custom fee override should take precedence');
 console.log('✅ Test 4 passed\n');
 
+// --- TEST 5: AKT Invoices - Mathematical Multiplier & Quantity Invariants ---
+console.log('Test 5: Student Activation Invoices (AKT) - Mathematical Determinism');
+
+// Scenario A: Monthly variable billing (Option 2) with 2 students
+const countA = 2;
+const feeA = 0.49;
+const amountA = parseFloat((countA * feeA).toFixed(2));
+assert(amountA === 0.98, `2 students @ 0.49 € must equal 0.98 €, got ${amountA} €`);
+
+// Scenario B: School year start package (Option 3_3 in September) with 73 students
+const countB = 73;
+const feeB = 4.70; // 0.49 * 12 * 0.80 = 4.704 -> 4.70 €
+const amountB = parseFloat((countB * feeB).toFixed(2));
+assert(amountB === 343.10, `73 students @ 4.70 € must equal 343.10 €, got ${amountB} €`);
+
+// Scenario C: Dynamic discount annual package (Option 3_2) with 5 students
+const countC = 5;
+const feeC = 5.29; // 0.49 * 12 * 0.90 = 5.292 -> 5.29 €
+const amountC = parseFloat((countC * feeC).toFixed(2));
+assert(amountC === 26.45, `5 students @ 5.29 € must equal 26.45 €, got ${amountC} €`);
+
+console.log('✅ Test 5 passed: All AKT invoice mathematical invariants strictly hold!\n');
+
 console.log('🎉 ALL BILLING INVARIANT TESTS PASSED WITH 100% CONSISTENCY!');

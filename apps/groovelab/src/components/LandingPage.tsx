@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Music, Calendar, ShieldCheck, Users, 
-  Layers, ChevronDown, Check, ArrowRight, X, Menu, BookOpen, Sparkles
+  Layers, ChevronDown, Check, CheckCircle2, ArrowRight, X, Menu, BookOpen, Sparkles
 } from 'lucide-react';
 import { LegalTextModal } from './LegalTextModal';
 import { supabase } from '../lib/supabase';
@@ -485,13 +485,14 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
         </h1>
         
         <p style={{
-          fontSize: 'clamp(1rem, 2vw, 1.25rem)',
-          color: '#232326',
-          maxWidth: '750px',
+          fontSize: 'clamp(1rem, 2vw, 1.22rem)',
+          color: '#334155',
+          maxWidth: '780px',
           lineHeight: 1.6,
-          marginBottom: '40px'
+          marginBottom: '36px',
+          fontWeight: 500
         }}>
-          Unser Fokus liegt nicht in der Verwaltung, sondern in der Umsetzung. <CampusGroovelabText fontWeight={800} /> schließt als intelligenter Übebegleiter und smarter Organisator die Lücke zwischen Schülern, Lehrkräften und Verwaltung – für weniger Missverständnisse und mehr Freude am Musikmachen.
+          Die Plattform für das, was wirklich zählt: Musik. <CampusGroovelabText fontWeight={800} /> ist der smarte Praxis-Begleiter für deinen gesamten Musikschulalltag: Intelligente Raum- &amp; Stundenplanung, digitales Aufgabenheft und motivierender Übebegleiter in einem – für reibungslose Abläufe im Team und messbar mehr Freude am Musikmachen.
         </p>
 
         {/* Form and CTA */}
@@ -506,7 +507,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
         }}>
           <input 
             type="email" 
-            placeholder="Deine E-Mail-Adresse"
+            placeholder="Dienstliche E-Mail-Adresse eingeben..."
             aria-label="Deine E-Mail-Adresse"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
@@ -539,15 +540,18 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
               color: '#ffffff',
               border: 'none',
               borderRadius: '100px',
-              fontWeight: 600,
+              fontWeight: 700,
               fontSize: '16px',
               padding: '16px 32px',
               cursor: 'pointer',
               boxShadow: '0 4px 14px rgba(52, 168, 83, 0.2)',
-              transition: 'all 0.2s'
+              transition: 'all 0.2s',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
             }}
             onMouseOver={(e) => {
-              e.currentTarget.style.backgroundColor = '#34a853';
+              e.currentTarget.style.backgroundColor = '#2e944b';
               e.currentTarget.style.transform = 'translateY(-1px)';
             }}
             onMouseOut={(e) => {
@@ -555,15 +559,15 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
               e.currentTarget.style.transform = 'none';
             }}
           >
-            Jetzt unverbindlich testen
+            Jetzt unverbindlich testen <ArrowRight size={18} />
           </button>
         </form>
 
         <p style={{
-          fontSize: '11px',
+          fontSize: '11.5px',
           color: '#64748b',
           marginTop: '-4px',
-          marginBottom: '20px',
+          marginBottom: '22px',
           textAlign: 'center',
           lineHeight: 1.4,
           maxWidth: '540px'
@@ -571,14 +575,28 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
           Mit Klick auf „Jetzt unverbindlich testen“ stimmen Sie den <a href="#" onClick={(e) => { e.preventDefault(); setActiveDocument('terms'); }} style={{ color: '#34a853', textDecoration: 'underline', fontWeight: 700 }}>Nutzungsbedingungen</a> zu und bestätigen, die <a href="#" onClick={(e) => { e.preventDefault(); setActiveDocument('privacy'); }} style={{ color: '#34a853', textDecoration: 'underline', fontWeight: 700 }}>Datenschutzerklärung</a> zur Kenntnis genommen zu haben.
         </p>
 
-        <p style={{
-          fontSize: '13px',
-          color: '#7d7d82',
-          marginBottom: '64px',
-          marginTop: '0px'
+        {/* 3 Tier-1 Enterprise Trust Chips */}
+        <div style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          justifyContent: 'center',
+          alignItems: 'center',
+          gap: '16px',
+          marginBottom: '56px'
         }}>
-          Transparente Cloud-Flatrates. Keine Einrichtungsgebühr, keine Kreditkarte erforderlich.
-        </p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: '#475569', fontWeight: 600 }}>
+            <CheckCircle2 size={15} color="#34a853" />
+            <span>30 Tage unverbindliche Testphase</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: '#475569', fontWeight: 600 }}>
+            <CheckCircle2 size={15} color="#34a853" />
+            <span>Keine Kreditkarte &amp; keine Einrichtungsgebühr</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: '#475569', fontWeight: 600 }}>
+            <ShieldCheck size={15} color="#34a853" />
+            <span>100 % DSGVO- &amp; nDSG-Server</span>
+          </div>
+        </div>
 
         {/* Visual: Browser Mockup of Schedule Board */}
         <div style={{
@@ -1729,9 +1747,6 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
               gap: '16px',
               textAlign: 'center'
             }}>
-              <div style={{ fontSize: '13px', fontWeight: 800, color: '#b45309' }}>
-                💡 Großschulen &amp; Vereine: Unsere Server-Flatrates und fairen Rabatt-Staffeln skalieren vollautomatisch mit der Größe deiner Musikschule – 100% transparent ohne Verhandlungsaufwand.
-              </div>
               <button 
                 onClick={() => triggerProtectedRegistration()}
                 style={{

@@ -119,7 +119,7 @@ if (typeof navigator !== 'undefined' && navigator.mediaDevices && navigator.medi
 let _lastReplaceStateTime = 0;
 let _replaceStateCount = 0;
 
-export const safeReplaceState = (data: any, unused: string, url?: string | URL | null) => {
+const safeReplaceState = (data: any, unused: string, url?: string | URL | null) => {
   if (typeof window === 'undefined' || !window.history) return;
   try {
     const now = Date.now();
@@ -403,6 +403,18 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode, fallbac
 
   render() {
     if (this.state.hasError) {
+      const errorMessage = String(this.state.error?.message || this.state.error || "");
+      const isChunkError = 
+        errorMessage.includes("Importing a module script failed") ||
+        errorMessage.includes("Failed to fetch dynamically imported module") ||
+        errorMessage.includes("chunk") ||
+        errorMessage.includes("loading-error") ||
+        errorMessage.includes("dynamically imported");
+
+      if (isChunkError) {
+        return <DashboardLoader />;
+      }
+
       return this.props.fallback || (
         <div className="glass-panel animation-slide-up" style={{ 
           padding: '60px 40px', 
@@ -2004,6 +2016,42 @@ function App() {
     }
     return null;
   });
+
+  const [showDateSimulation, setShowDateSimulation] = useState<boolean>(() => {
+    if (typeof window === 'undefined' || !isDevEnvironment()) return false;
+    return localStorage.getItem('groovelab_dev_date_sim_visible') === 'true';
+  });
+
+  useEffect(() => {
+    if (!isDevEnvironment()) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.shiftKey && (e.key === 'T' || e.key === 't')) {
+        const tag = (e.target as HTMLElement)?.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement)?.isContentEditable) return;
+        e.preventDefault();
+        setShowDateSimulation(prev => {
+          const next = !prev;
+          try { localStorage.setItem('groovelab_dev_date_sim_visible', String(next)); } catch {}
+          window.dispatchEvent(new CustomEvent('groovelab_date_sim_toggle', { detail: next }));
+          return next;
+        });
+      }
+    };
+    const handleToggleSync = (e: any) => {
+      if (typeof e?.detail === 'boolean') {
+        setShowDateSimulation(e.detail);
+      } else {
+        const saved = localStorage.getItem('groovelab_dev_date_sim_visible') === 'true';
+        setShowDateSimulation(saved);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('groovelab_date_sim_toggle', handleToggleSync);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('groovelab_date_sim_toggle', handleToggleSync);
+    };
+  }, []);
 
   const [campusStudentUiLevel, setCampusStudentUiLevel] = useState<CampusUiLevel>(() => {
     if (typeof window === 'undefined') return 'junior';
@@ -3837,6 +3885,23 @@ function App() {
       let usedOfflineCache = false;
 
       // --- OFFLINE & PERSISTENT CACHE FALLBACK LOGIC ---
+      if (!userData && userId?.startsWith('admin-')) {
+        const sId = userId.replace('admin-', '');
+        const { data: sData } = await supabase.rpc('get_public_school_theme', { p_subdomain: sId });
+        userData = {
+          id: userId,
+          first_name: 'Schulleitung',
+          last_name: sData?.name || 'Verwaltung',
+          role: 'admin',
+          roles: ['admin'],
+          school_id: sId,
+          is_campus_active: true,
+          is_groovelab_active: true,
+          photo_url: '/campus_login_hero.png',
+          schools: sData || { id: sId, name: sData?.name || 'Musikschule' }
+        };
+      }
+
       if (!userData) {
         console.warn('[Dashboard] Attempting to load user from local cache...');
         const cachedUserStr = sessionStorage.getItem('groovelab_cached_user');
@@ -3948,29 +4013,43 @@ function App() {
       
       if (isAdminOrSecUser && schoolId) {
         try {
-          // 1. Check if school already accepted terms during signup / self-onboarding (avv_signed_at)
-          const { data: schoolRecord } = await supabase
-            .from('schools')
-            .select('avv_signed_at, status')
-            .eq('id', schoolId)
-            .maybeSingle();
+          const localSignedTimestamp = typeof window !== 'undefined'
+            ? (localStorage.getItem(`groovelab_avv_signed_${schoolId}`) || localStorage.getItem('groovelab_avv_signed_all') || localStorage.getItem('campus_avv_signed'))
+            : null;
 
-          if (schoolRecord?.avv_signed_at) {
+          if (localSignedTimestamp) {
             setShowPilotAgreementModal(false);
           } else {
-            const { data: agreementData, error: agreementError } = await supabase
-              .from('pilot_agreements')
-              .select('id')
-              .eq('school_id', schoolId)
+            // 1. Check if school already accepted terms during signup / self-onboarding (avv_signed_at)
+            const { data: schoolRecord } = await supabase
+              .from('schools')
+              .select('avv_signed_at, status')
+              .eq('id', schoolId)
               .maybeSingle();
 
-            if (agreementError) {
-              console.error('[Dashboard] Error querying pilot agreements:', agreementError);
-            } else if (!agreementData) {
-              console.log('[Dashboard] No pilot agreement found for school. Displaying onboarding modal.');
-              setShowPilotAgreementModal(true);
-            } else {
+            if (schoolRecord?.avv_signed_at) {
+              if (typeof window !== 'undefined') {
+                localStorage.setItem(`groovelab_avv_signed_${schoolId}`, schoolRecord.avv_signed_at);
+              }
               setShowPilotAgreementModal(false);
+            } else {
+              const { data: agreementData, error: agreementError } = await supabase
+                .from('pilot_agreements')
+                .select('id')
+                .eq('school_id', schoolId)
+                .maybeSingle();
+
+              if (agreementError) {
+                console.error('[Dashboard] Error querying pilot agreements:', agreementError);
+              } else if (!agreementData) {
+                console.log('[Dashboard] No pilot agreement found for school. Displaying onboarding modal.');
+                setShowPilotAgreementModal(true);
+              } else {
+                if (typeof window !== 'undefined') {
+                  localStorage.setItem(`groovelab_avv_signed_${schoolId}`, new Date().toISOString());
+                }
+                setShowPilotAgreementModal(false);
+              }
             }
           }
         } catch (err) {
@@ -7657,6 +7736,9 @@ function App() {
       const isParentOnboarding = urlParams.has('invite_school_id') || 
                                  urlParams.get('onboarding') === 'parent' || 
                                  urlParams.get('platform') === 'groovelab' ||
+                                 urlParams.has('school_id') ||
+                                 urlParams.has('school') ||
+                                 urlParams.has('subdomain') ||
                                  hasSubdomain || 
                                  isKioskMode;
       if (isParentOnboarding) {
@@ -7941,10 +8023,10 @@ function App() {
         )}
         <Suspense fallback={<DashboardLoader />}>
           <SecretaryDashboard 
-            schoolId={user.school_id} 
-            userId={user.id} 
-            userRole={user.role}
-            userRoles={user.roles}
+            schoolId={user?.school_id || (Array.isArray(user?.schools) ? user.schools[0]?.id : user?.schools?.id) || ''} 
+            userId={user?.id || ''} 
+            userRole={user?.role || 'secretary'}
+            userRoles={user?.roles || []}
             onLogout={handleLogout} 
             onRoleSwitched={handleSwitchActiveRole}
             activePlatform={activePlatform}
@@ -10294,8 +10376,8 @@ function App() {
                   />
                 </div>
               )}
-              {/* Datum Simulation Control (Dev Mode Only) */}
-              {isDevEnvironment() && (
+              {/* Datum Simulation Control (Dev Mode Only - Toggled via Shift+T) */}
+              {isDevEnvironment() && showDateSimulation && (
                 <div style={{
                   display: 'flex',
                   alignItems: 'center',

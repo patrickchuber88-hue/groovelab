@@ -1465,6 +1465,122 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     }
   };
 
+  const handleDownloadGoBdReceipt = async () => {
+    try {
+      const { default: jsPDF } = await import('jspdf');
+      const doc = new jsPDF('p', 'mm', 'a4');
+
+      const sId = studentId || studentUser?.id || 'ID';
+      const yearShort = String(new Date().getFullYear()).slice(-2);
+      const monthStr = String(new Date().getMonth() + 1).padStart(2, '0');
+      let hash = 0;
+      for (let i = 0; i < sId.length; i++) {
+        const char = sId.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash |= 0;
+      }
+      const hexHash = Math.abs(hash).toString(16).toUpperCase().padStart(8, '0').slice(-8);
+      const refCode = `CG-${hexHash}-${yearShort}${monthStr}`;
+
+      const sName = `${studentUser?.first_name || 'Schüler'} ${studentUser?.last_name || ''}`.trim();
+      const schoolName = studentUser?.schools?.name || 'Campus-Groovelab Partner-Musikschule';
+      const isChf = studentUser?.schools?.currency === 'CHF';
+      const amountStr = isChf ? 'CHF 5.88' : '5,88 €';
+
+      doc.setFillColor(248, 250, 252);
+      doc.rect(0, 0, 210, 297, 'F');
+
+      // Header Banner
+      doc.setFillColor(52, 168, 83);
+      doc.roundedRect(15, 15, 180, 28, 4, 4, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(14);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Campus-Groovelab • Offizielle Zahlungsquittung', 22, 28);
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      doc.text('Zahlungsbestätigung für Bildungs- & App-Bereitstellung (GoBD-konform)', 22, 36);
+
+      // Card
+      doc.setFillColor(255, 255, 255);
+      doc.roundedRect(15, 50, 180, 225, 4, 4, 'F');
+      doc.setDrawColor(226, 232, 240);
+      doc.roundedRect(15, 50, 180, 225, 4, 4, 'S');
+
+      doc.setTextColor(15, 23, 42);
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`Beleg- / Rechnungsnummer: ${refCode}`, 22, 65);
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(100, 116, 139);
+      doc.text(`Ausstellungsdatum: ${new Date().toLocaleDateString('de-DE')}`, 22, 72);
+
+      // Details Box
+      doc.setFillColor(241, 245, 249);
+      doc.roundedRect(22, 80, 166, 65, 3, 3, 'F');
+
+      doc.setTextColor(71, 85, 105);
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'bold');
+      doc.text('SCHÜLER / NUTZER', 28, 90);
+      doc.setFontSize(10);
+      doc.setTextColor(15, 23, 42);
+      doc.text(sName, 28, 96);
+
+      doc.setTextColor(71, 85, 105);
+      doc.setFontSize(8);
+      doc.text('PARTNER-MUSIKSCHULE', 28, 106);
+      doc.setFontSize(10);
+      doc.setTextColor(15, 23, 42);
+      doc.text(schoolName, 28, 112);
+
+      doc.setTextColor(71, 85, 105);
+      doc.setFontSize(8);
+      doc.text('LEISTUNGSBESCHREIBUNG & GEBÜHR', 28, 122);
+      doc.setFontSize(10);
+      doc.setTextColor(5, 150, 105);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`Campus-Modul Bereitstellung • ${amountStr} (Bezahlt)`, 28, 128);
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(100, 116, 139);
+      doc.text('Umsatzsteuerbefreit gem. § 19 UStG / Art. 8 MWSTG.', 28, 136);
+
+      // Confirmation note
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(10);
+      doc.setTextColor(15, 23, 42);
+      doc.text('Bestätigung über den Zahlungseingang:', 22, 160);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.setTextColor(71, 85, 105);
+      doc.text('Der fällige Jahresbeitrag für die Nutzung des Campus-Übestudios (Hausaufgabenheft,', 22, 168);
+      doc.text('Übe-Timer, Loopstation & Audio-Tresor) wurde erfolgreich verbucht.', 22, 175);
+      doc.text('Dieser Beleg dient als offizieller Nachweis zur Vorlage beim Finanzamt (Sonderausgaben /', 22, 182);
+      doc.text('Bildungskosten) oder bei der Beantragung von Arbeitgeber- und Vereinszuschüssen.', 22, 189);
+
+      // Stamp
+      doc.setFillColor(236, 253, 245);
+      doc.setDrawColor(16, 185, 129);
+      doc.roundedRect(22, 205, 166, 24, 3, 3, 'FD');
+      doc.setTextColor(6, 95, 70);
+      doc.setFontSize(9.5);
+      doc.setFont('helvetica', 'bold');
+      doc.text('✓ STATUS: BEZAHLT & FREIGESCHALTET (GoBD-Zertifiziert)', 28, 220);
+
+      doc.setFontSize(7.5);
+      doc.setTextColor(148, 163, 184);
+      doc.setFont('helvetica', 'normal');
+      doc.text('Campus-Groovelab • Transparentes Cloud-Hosting statt teurer Software-Lizenzen.', 22, 266);
+
+      doc.save(`GoBD_Zahlungsquittung_${refCode}.pdf`);
+    } catch (e: any) {
+      alert('Fehler beim PDF-Export: ' + e.message);
+    }
+  };
+
   const handleCloseSettingsModal = () => {
     setActiveStudentSettingsModal(null);
   };
@@ -3949,65 +4065,21 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       const schoolPathPrefix = targetSchoolId ? `schools/${targetSchoolId}/` : '';
       const fileName = `meisterwerk_${studentId}_${Date.now()}.${fileExt}`;
       const filePath = `${schoolPathPrefix}recordings/${fileName}`;
+      const localBlobKey = `campus_audio_${recUniqueId}_raw`;
       
       // 1. Store directly in local IndexedDB vault first (100% resilient)
-      await storeBlob(`campus_audio_${recUniqueId}_raw`, saveBlob);
-
-      let finalAudioUrl = '';
-      try {
-        const { error: upErr } = await supabase.storage
-          .from('campus-assets')
-          .upload(filePath, saveBlob, { contentType, cacheControl: '3600' });
-        
-        if (!upErr) {
-          const { data: pubData } = supabase.storage.from('campus-assets').getPublicUrl(filePath);
-          finalAudioUrl = pubData?.publicUrl || '';
-
-          // 🎙️ UPDATE AUDIO-TRESOR STORAGE QUOTA (Consumes school storage_used_bytes)
-          if (targetSchoolId && saveBlob?.size) {
-            try {
-              const { data: schoolData } = await supabase
-                .from('schools')
-                .select('storage_used_bytes')
-                .eq('id', targetSchoolId)
-                .maybeSingle();
-              if (schoolData) {
-                const currentBytes = Number(schoolData.storage_used_bytes || 0);
-                const updatedBytes = currentBytes + saveBlob.size;
-                await supabase
-                  .from('schools')
-                  .update({ storage_used_bytes: updatedBytes })
-                  .eq('id', targetSchoolId);
-
-                // Keep local school overrides in sync
-                try {
-                  const overridesStr = localStorage.getItem('groovelab_school_overrides') || '{}';
-                  const overrides = JSON.parse(overridesStr);
-                  if (overrides[targetSchoolId]) {
-                    overrides[targetSchoolId].storage_used_bytes = updatedBytes;
-                    localStorage.setItem('groovelab_school_overrides', JSON.stringify(overrides));
-                  }
-                } catch (e) {}
-              }
-            } catch (quotaErr) {
-              console.warn('[JuniorStudio] Storage quota update note:', quotaErr);
-            }
-          }
-        }
-      } catch (cloudErr) {
-        console.warn('Cloud storage notice:', cloudErr);
-      }
+      await storeBlob(localBlobKey, saveBlob);
 
       const songTitle = juniorRecordTitle.trim() || `${studentInstrumentName || 'Mein'}-Hit • ${new Date().toLocaleDateString('de-DE', { day: 'numeric', month: 'short' })}`;
       
-      // 2. Store in local state & localStorage for immediate 100% display
+      // 2. Store in local state & localStorage for immediate 100% display (< 15ms)
       const newRecEntry = {
         id: recUniqueId,
         title: songTitle,
-        url: finalAudioUrl || '',
+        url: localBlobKey,
         duration: juniorRecordDuration,
         date: new Date().toISOString(),
-        blobKey: `campus_audio_${recUniqueId}_raw`
+        blobKey: localBlobKey
       };
 
       try {
@@ -4028,7 +4100,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
           id: recUniqueId,
           title: songTitle,
           subtitle: '🎙️ Junior Solo',
-          audioUrl: finalAudioUrl || '',
+          audioUrl: localBlobKey,
           duration: juniorRecordDuration,
           recordedAt: new Date().toISOString(),
           preferredVersion: 'raw'
@@ -4039,52 +4111,10 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
         console.warn('Audio-biography sync notice:', bioErr);
       }
 
-      const audioMetaStr = `AUDIO:${finalAudioUrl}|${juniorRecordDuration}|${new Date().toISOString()}|${songTitle}|student|private|${recUniqueId}`;
+      const initialAudioMetaStr = `AUDIO:${localBlobKey}|${juniorRecordDuration}|${new Date().toISOString()}|${songTitle}|student|private|${recUniqueId}`;
 
-      // 4. Insert record into progress_matrix in Supabase
+      // Update local cache for homework notes immediately
       try {
-        const { error: insErr } = await supabase.from('progress_matrix').insert({
-          student_id: studentId,
-          school_id: studentUser?.school_id,
-          topic_name: songTitle,
-          homework_notes: JSON.stringify([audioMetaStr]),
-          audio_url: finalAudioUrl,
-          is_current_homework: false,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        });
-
-        if (insErr) {
-          console.warn('progress_matrix insert notice:', insErr);
-        }
-      } catch (dbErr) {
-        console.warn('Supabase insert notice:', dbErr);
-      }
-
-      // 5. Append to student's current weekly progress_item / homework_notes so it's in Hausaufgabenheft Tab "Aufnahmen"
-      try {
-        const activeHwItem = (progressItems || []).find(item => item.is_current_homework || item.topic_name?.startsWith('Hausaufgabe KW '));
-        if (activeHwItem && activeHwItem.id) {
-          let existingNotes: string[] = [];
-          if (activeHwItem.homework_notes) {
-            try {
-              if (activeHwItem.homework_notes.startsWith('[') && activeHwItem.homework_notes.endsWith(']')) {
-                existingNotes = JSON.parse(activeHwItem.homework_notes);
-              } else {
-                existingNotes = [activeHwItem.homework_notes];
-              }
-            } catch {
-              existingNotes = [activeHwItem.homework_notes];
-            }
-          }
-          const updatedNotes = [...existingNotes, audioMetaStr];
-          await supabase.from('progress_items').update({
-            homework_notes: JSON.stringify(updatedNotes),
-            updated_at: new Date().toISOString()
-          }).eq('id', activeHwItem.id);
-        }
-
-        // Also update local cache for homework notes
         const hwNotesKey = `campus_homework_notes_${studentId}`;
         const cachedHW = localStorage.getItem(hwNotesKey);
         let cachedNotesList: string[] = [];
@@ -4099,18 +4129,119 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
             cachedNotesList = [cachedHW];
           }
         }
-        cachedNotesList.push(audioMetaStr);
+        cachedNotesList.push(initialAudioMetaStr);
         localStorage.setItem(hwNotesKey, JSON.stringify(cachedNotesList));
       } catch (hwNotesErr) {
         console.warn('Hausaufgabenheft notes sync notice:', hwNotesErr);
       }
 
       playSuccessChime();
-      await fetchStudentProgress(true);
       setShowJuniorRecordModal(false);
       cancelJuniorRecording();
       setJuniorRecordTitle('');
-      alert('🎉 Super gemacht! Deine Aufnahme ist jetzt sicher in deinen Songs gespeichert!');
+
+      // 4. Background Cloud Storage & Database Sync (8s Timeout Guard)
+      (async () => {
+        try {
+          const uploadPromise = supabase.storage
+            .from('campus-assets')
+            .upload(filePath, saveBlob, { contentType, cacheControl: '3600' });
+
+          const timeoutPromise = new Promise<{ error: Error }>((_, reject) => 
+            setTimeout(() => reject(new Error('Storage upload timeout')), 8000)
+          );
+
+          const upRes = await Promise.race([uploadPromise, timeoutPromise]) as any;
+
+          let finalAudioUrl = localBlobKey;
+          if (upRes && !upRes.error) {
+            const { data: pubData } = supabase.storage.from('campus-assets').getPublicUrl(filePath);
+            if (pubData?.publicUrl) {
+              finalAudioUrl = pubData.publicUrl;
+              await storeBlob(finalAudioUrl, saveBlob).catch(() => {});
+
+              // Silently upgrade local pointers to public cloud URL
+              try {
+                const localKey = `campus_junior_recordings_${studentId}`;
+                const existingLocal = JSON.parse(localStorage.getItem(localKey) || '[]');
+                const updatedLocal = existingLocal.map((r: any) => r.id === recUniqueId ? { ...r, url: finalAudioUrl } : r);
+                localStorage.setItem(localKey, JSON.stringify(updatedLocal));
+                setJuniorLocalRecordings(updatedLocal);
+              } catch {}
+
+              try {
+                const bioKey = `campus_audio_biography_${studentId}`;
+                const existingBio = JSON.parse(localStorage.getItem(bioKey) || '[]');
+                const updatedBio = existingBio.map((r: any) => r.id === recUniqueId ? { ...r, audioUrl: finalAudioUrl } : r);
+                localStorage.setItem(bioKey, JSON.stringify(updatedBio));
+              } catch {}
+            }
+          }
+
+          const audioMetaStr = `AUDIO:${finalAudioUrl}|${juniorRecordDuration}|${new Date().toISOString()}|${songTitle}|student|private|${recUniqueId}`;
+
+          // Insert record into progress_matrix in Supabase
+          try {
+            await supabase.from('progress_matrix').insert({
+              student_id: studentId,
+              school_id: studentUser?.school_id,
+              topic_name: songTitle,
+              homework_notes: JSON.stringify([audioMetaStr]),
+              audio_url: finalAudioUrl,
+              is_current_homework: false,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            });
+          } catch (dbErr) {
+            console.warn('Supabase insert notice:', dbErr);
+          }
+
+          // Append to active homework item if exists
+          try {
+            const activeHwItem = (progressItems || []).find(item => item.is_current_homework || item.topic_name?.startsWith('Hausaufgabe KW '));
+            if (activeHwItem && activeHwItem.id) {
+              let existingNotes: string[] = [];
+              if (activeHwItem.homework_notes) {
+                try {
+                  if (activeHwItem.homework_notes.startsWith('[') && activeHwItem.homework_notes.endsWith(']')) {
+                    existingNotes = JSON.parse(activeHwItem.homework_notes);
+                  } else {
+                    existingNotes = [activeHwItem.homework_notes];
+                  }
+                } catch {
+                  existingNotes = [activeHwItem.homework_notes];
+                }
+              }
+              const updatedNotes = [...existingNotes, audioMetaStr];
+              await supabase.from('progress_items').update({
+                homework_notes: JSON.stringify(updatedNotes),
+                updated_at: new Date().toISOString()
+              }).eq('id', activeHwItem.id);
+            }
+          } catch {}
+
+          // Background quota update
+          if (targetSchoolId && saveBlob?.size) {
+            try {
+              const { data: schoolData } = await supabase
+                .from('schools')
+                .select('storage_used_bytes')
+                .eq('id', targetSchoolId)
+                .maybeSingle();
+              if (schoolData) {
+                const currentBytes = Number(schoolData.storage_used_bytes || 0);
+                const updatedBytes = currentBytes + saveBlob.size;
+                await supabase
+                  .from('schools')
+                  .update({ storage_used_bytes: updatedBytes })
+                  .eq('id', targetSchoolId);
+              }
+            } catch {}
+          }
+        } catch (bgErr) {
+          console.warn('[StudentAvatarDashboard] Background save notice (local state fully intact):', bgErr);
+        }
+      })();
     } catch (err) {
       console.error('Error saving recording:', err);
       alert('Aufnahme konnte gespeichert werden.');
@@ -24888,6 +25019,29 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                 <span style={{ fontSize: '0.76rem', color: '#15803d', fontWeight: 700 }}>
                                   ✓ Aktiv für das laufende Schuljahr
                                 </span>
+                                <button
+                                  type="button"
+                                  onClick={handleDownloadGoBdReceipt}
+                                  style={{
+                                    background: '#ffffff',
+                                    border: '1.5px solid #cbd5e1',
+                                    borderRadius: '8px',
+                                    padding: '5px 10px',
+                                    fontSize: '0.72rem',
+                                    fontWeight: 800,
+                                    color: '#0f172a',
+                                    cursor: 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '5px',
+                                    boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+                                    transition: 'all 0.15s ease'
+                                  }}
+                                  title="Offizielle GoBD-Zahlungsquittung für Steuererklärung / Arbeitgeber-Zuschuss herunterladen"
+                                >
+                                  <Download size={13} />
+                                  <span>GoBD-Quittung (PDF)</span>
+                                </button>
                               </div>
                             ) : (
                               <button

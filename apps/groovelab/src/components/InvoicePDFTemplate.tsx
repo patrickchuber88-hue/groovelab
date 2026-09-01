@@ -451,18 +451,20 @@ export const InvoicePDFTemplate: React.FC<InvoicePDFTemplateProps> = ({
                   {/* Position 1: Student Activations */}
                   <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
                     <td style={{ padding: dynamicTdPadding }}>
-                      <strong style={{ display: 'block', color: '#0f172a' }}>Cloud- &amp; Modul-Bereitstellung: Modul Campus (Sammelabrechnung)</strong>
+                      <strong style={{ display: 'block', color: '#0f172a' }}>Cloud- &amp; Modul-Bereitstellung: Campus</strong>
                       <span style={{ fontSize: '0.68rem', color: '#64748b' }}>
-                        Jahrespauschale für die Cloud-Bereitstellung aktiver Schüler-Profile (Umlagesatz = {fmt(isChf ? 0.80 : 0.40)} / Mo. für {invoice.restmonate || 12} Restmonate). Keine gesonderten Lizenzkaufgebühren.
-                        {school.studentBillingOption === 'option3_2' && <strong style={{ color: '#34a853', marginLeft: '6px' }}>(inkl. 10% Rabatt für Jahrespauschale)</strong>}
-                        {school.studentBillingOption === 'option3_3' && <strong style={{ color: '#34a853', marginLeft: '6px' }}>(inkl. 20% Rabatt für Komplett-Jahrespauschale)</strong>}
+                        {school.studentBillingOption === 'option2'
+                          ? `Monatliche Cloud-Bereitstellung für Schüler-Profile (${fmt(invoice.studentFee || (isChf ? 1.00 : 0.49))} / Mo. je Schüler). Keine gesonderten Lizenzkaufgebühren.`
+                          : school.studentBillingOption === 'option3_3'
+                            ? 'Einmalige Komplett-Jahrespauschale für alle Schüler-Profile zum Schuljahresstart (inkl. 20% Rabatt). Keine gesonderten Lizenzkaufgebühren.'
+                            : `Jahrespauschale für die Cloud-Bereitstellung aktiver Schüler-Profile (inkl. 10% Rabatt für ${invoice.restmonate || 12} Restmonate). Keine gesonderten Lizenzkaufgebühren.`}
                       </span>
                     </td>
                     <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
                       {invoice.activationsCount || 0} Schüler
                     </td>
                     <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
-                      {fmt(invoice.studentFee || (isChf ? 9.60 : 4.80))}
+                      {fmt(invoice.studentFee || (isChf ? 1.00 : 0.49))}
                     </td>
                     <td style={{ padding: dynamicTdPadding, textAlign: 'right', fontWeight: 600 }}>
                       {fmt(invoice.amount)}
@@ -497,7 +499,7 @@ export const InvoicePDFTemplate: React.FC<InvoicePDFTemplateProps> = ({
                 )}
                 {isAkt && (
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.74rem', color: '#64748b', marginBottom: '4px' }}>
-                    <span>{school.billingPayer === 'student' ? '• Durchlaufender Posten (Umlage an Schüler):' : '• Direktabrechnung Schüler-Bereitstellung (Träger):'}</span>
+                    <span>{school.billingPayer === 'student' ? '• Durchlaufender Posten (Umlage an Schüler):' : '• Sammelabrechnung Schüler-Bereitstellung (Träger):'}</span>
                     <span style={{ fontWeight: 650, color: school.billingPayer === 'student' ? '#34a853' : '#ea580c', whiteSpace: 'nowrap' }}>{fmt(studentShareTotal)}</span>
                   </div>
                 )}

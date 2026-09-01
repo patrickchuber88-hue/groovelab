@@ -20,6 +20,7 @@ export interface BillingCalculationInput {
   passiveStudentCount?: number;
   billingDiscountType?: 'monthly' | 'annual_10' | 'schoolyear_start_20';
   exemptStudentCount?: number; // Hardship / Sibling exempt students
+  parentPaidStudentCount?: number; // Students whose parents already paid direct annual fee (Double-Billing Guard)
   directBillingMode?: 'none' | 'full' | 'partial';
   studentProfiles?: Array<{
     custom_student_price?: number | null;
@@ -119,7 +120,8 @@ export function calculateCampusGroovelabBilling(input: BillingCalculationInput):
     }, 0);
     campusStudentActivationFeeTotal = Number(campusStudentActivationFeeTotal.toFixed(2));
   } else {
-    const billableCampusCount = Math.max(0, effectiveCampusCount - exemptStudentCount);
+    const parentPaidCount = directBillingMode === 'none' ? Math.max(0, input.parentPaidStudentCount ?? 0) : 0;
+    const billableCampusCount = Math.max(0, effectiveCampusCount - exemptStudentCount - parentPaidCount);
     campusStudentActivationFeeTotal = Number((billableCampusCount * effectiveStudentRate).toFixed(2));
   }
 

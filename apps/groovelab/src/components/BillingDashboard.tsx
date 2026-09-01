@@ -458,7 +458,8 @@ Ihr Campus-Groovelab Abrechnungsteam`;
     }
   };
 
-  const getSchoolNumericId = (id: string): number => {
+  const getSchoolNumericId = (id?: string | null): number => {
+    if (!id || typeof id !== 'string') return 1;
     if (id === '74713df2-6176-4a41-a8cd-9fbebe34e9b8') return 1;
     let hash = 0;
     for (let i = 0; i < id.length; i++) {

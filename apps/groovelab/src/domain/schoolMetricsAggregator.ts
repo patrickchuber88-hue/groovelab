@@ -125,6 +125,7 @@ export interface AggregatedSchoolStats {
   groovelabStudents: number;
   passiveStudents: number;
   exemptActiveStudents: number;
+  parentPaidStudents?: number;
   totalTeachers: number;
   activeTeachers: number;
   totalEmployees: number;
@@ -200,6 +201,7 @@ export function aggregateSchoolMetrics(
   const activeStudents = Math.max(campusStudents, groovelabStudents);
   const passiveStudents = Math.max(0, totalStudents - activeStudents);
   const exemptActiveStudents = cleanStudentsList.filter(s => s.is_campus_active && s.exempt_from_direct_billing).length;
+  const parentPaidStudents = cleanStudentsList.filter(s => s.is_campus_active && (s.student_billing_payment_method === 'bank_transfer' || s.student_billing_payment_method === 'debit' || s.payment_status === 'paid')).length;
 
   // Employees & Teachers
   let totalEmployees = 0;
@@ -241,6 +243,7 @@ export function aggregateSchoolMetrics(
     groovelabStudents,
     passiveStudents,
     exemptActiveStudents,
+    parentPaidStudents,
     totalTeachers: billableTeacherCount,
     activeTeachers: billableTeacherCount,
     totalEmployees,
@@ -293,6 +296,7 @@ export function getSchoolCanonicalBilling(
     storageAddonMonthlyFee: stats.storageAddonMonthlyFee,
     billingDiscountType: (school.billing_discount_type as any) || 'monthly',
     exemptStudentCount: stats.exemptActiveStudents,
+    parentPaidStudentCount: stats.parentPaidStudents,
     directBillingMode: isFullDirect ? 'full' : (isPartial ? 'partial' : 'none'),
     rates: {
       priceCampus: effectiveRates.priceCampus,

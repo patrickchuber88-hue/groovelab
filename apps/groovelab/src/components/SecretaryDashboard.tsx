@@ -1182,7 +1182,8 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
     steps: tourSteps,
     platformTheme: 'admin'
   });
-  const getSchoolNumericId = (id: string): number => {
+  const getSchoolNumericId = (id?: string | null): number => {
+    if (!id || typeof id !== 'string') return 1;
     if (id === '74713df2-6176-4a41-a8cd-9fbebe34e9b8') return 1;
     let hash = 0;
     for (let i = 0; i < id.length; i++) {
@@ -1309,16 +1310,6 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                   .update({ storage_used_bytes: usedBytes })
                   .eq('id', schoolId);
               }
-            } else {
-              // If school has 0 files in its partition, verify if DB had contaminated legacy global bytes
-              if (usedBytes > 0) {
-                // School has 0 actual uploaded files in its tenant partition -> reset to 0
-                usedBytes = 0;
-                await supabase
-                  .from('schools')
-                  .update({ storage_used_bytes: 0 })
-                  .eq('id', schoolId);
-              }
             }
 
             // Sync local overrides cache cleanly
@@ -1349,7 +1340,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
   const [auditSearchQuery, setAuditSearchQuery] = useState<string>('');
   const [auditActionFilter, setAuditActionFilter] = useState<string>('All');
   const [campusSubTab, setCampusSubTab] = useState<'briefing' | 'subjects' | 'onboarding' | 'students' | 'cooperations' | 'events' | 'schedules' | 'status' | 'rooms'>(() => {
-    const saved = localStorage.getItem('groovelab_campus_subtab');
+    const saved = typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_campus_subtab') || localStorage.getItem('groovelab_campus_subtab')) : null;
     const valid = ['briefing', 'subjects', 'onboarding', 'students', 'cooperations', 'events', 'schedules', 'status', 'rooms'];
     if (saved && valid.includes(saved)) return saved as any;
     return 'briefing';
@@ -1752,10 +1743,12 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
 
   useEffect(() => {
     sessionStorage.setItem('groovelab_secretary_subtab', secretarySubTab);
+    localStorage.setItem('groovelab_secretary_subtab', secretarySubTab);
   }, [secretarySubTab]);
 
   useEffect(() => {
     sessionStorage.setItem('groovelab_campus_subtab', campusSubTab);
+    localStorage.setItem('groovelab_campus_subtab', campusSubTab);
   }, [campusSubTab]);
 
   useEffect(() => {
@@ -2215,9 +2208,19 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
   const [customActivationBillingZip, setCustomActivationBillingZip] = useState<string>('');
   const [customActivationBillingCity, setCustomActivationBillingCity] = useState<string>('');
   const [customActivationBillingEmail, setCustomActivationBillingEmail] = useState<string>('');
-  const [selectedStorageAddonGb, setSelectedStorageAddonGb] = useState<number>(0);
-  const [selectedStorageAddonFee, setSelectedStorageAddonFee] = useState<number>(0);
+  const [selectedStorageAddonGb, setSelectedStorageAddonGb] = useState<number>(() => {
+    if (typeof window === 'undefined') return 0;
+    return Number(localStorage.getItem(`groovelab_storage_addon_gb_${schoolId}`) || localStorage.getItem('groovelab_storage_addon_gb') || 0);
+  });
+  const [selectedStorageAddonFee, setSelectedStorageAddonFee] = useState<number>(() => {
+    if (typeof window === 'undefined') return 0;
+    const gb = Number(localStorage.getItem(`groovelab_storage_addon_gb_${schoolId}`) || localStorage.getItem('groovelab_storage_addon_gb') || 0);
+    return gb === 5 ? 1.49 : gb === 10 ? 1.99 : gb === 20 ? 3.99 : gb === 25 ? 3.99 : gb === 50 ? 6.99 : gb === 100 ? 11.99 : gb === 250 ? 24.99 : 0;
+  });
   const [showStorageManagerModal, setShowStorageManagerModal] = useState<boolean>(false);
+  const [showSwitchBillingModelModal, setShowSwitchBillingModelModal] = useState<boolean>(false);
+  const [selectedSwitchTargetPayer, setSelectedSwitchTargetPayer] = useState<'school' | 'student'>('student');
+  const [isSwitchingPayer, setIsSwitchingPayer] = useState<boolean>(false);
   const [showStorageTerminationModal, setShowStorageTerminationModal] = useState<boolean>(false);
   const [storageTerminationDays, setStorageTerminationDays] = useState<number>(30);
   const [agreedToSepa, setAgreedToSepa] = useState<boolean>(false);
@@ -2255,6 +2258,42 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
   const [isCancelled, setIsCancelled] = useState<boolean>(() => {
     return typeof window !== 'undefined' && localStorage.getItem(`isCancelled_${schoolId}`) === 'true';
   });
+
+  const [showDateSimulation, setShowDateSimulation] = useState<boolean>(() => {
+    if (typeof window === 'undefined' || !isDevEnvironment()) return false;
+    return localStorage.getItem('groovelab_dev_date_sim_visible') === 'true';
+  });
+
+  useEffect(() => {
+    if (!isDevEnvironment()) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.shiftKey && (e.key === 'T' || e.key === 't')) {
+        const tag = (e.target as HTMLElement)?.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement)?.isContentEditable) return;
+        e.preventDefault();
+        setShowDateSimulation(prev => {
+          const next = !prev;
+          try { localStorage.setItem('groovelab_dev_date_sim_visible', String(next)); } catch {}
+          window.dispatchEvent(new CustomEvent('groovelab_date_sim_toggle', { detail: next }));
+          return next;
+        });
+      }
+    };
+    const handleToggleSync = (e: any) => {
+      if (typeof e?.detail === 'boolean') {
+        setShowDateSimulation(e.detail);
+      } else {
+        const saved = localStorage.getItem('groovelab_dev_date_sim_visible') === 'true';
+        setShowDateSimulation(saved);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('groovelab_date_sim_toggle', handleToggleSync);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('groovelab_date_sim_toggle', handleToggleSync);
+    };
+  }, []);
   const [showCancelModal, setShowCancelModal] = useState<boolean>(false);
   const [selectedModalOption, setSelectedModalOption] = useState<string>('option1');
   const [isPaused, setIsPaused] = useState<boolean>(false);
@@ -7118,9 +7157,9 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
             instrument: finalInstrument || 'Nicht festgelegt',
             avatar_url: defaultAvatarUrl,
             is_active: true,
-            is_campus_active: true,
+            is_campus_active: !(billingPayer === 'student' || studentBillingOption === 'student_full' || studentBillingOption === 'student_partial' || studentBillingOption === 'option1'),
             is_groovelab_active: false,
-            status: 'active',
+            status: (billingPayer === 'student' || studentBillingOption === 'student_full' || studentBillingOption === 'student_partial' || studentBillingOption === 'option1') ? 'passive' : 'active',
             ausweis_nummer: pin,
             qr_token: qrToken,
             lesson_duration: bulkImportDuration || 30
@@ -11889,7 +11928,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
 
                       {/* Integrated Module Chips (Campus & GrooveLab) */}
                       <div style={{ flex: '1.6', display: 'flex', gap: '6px', minWidth: 0, flexShrink: 0 }}>
-                        {/* Campus Chip */}
+                        {/* Campus Chip with Legal Governance (§ 312j BGB) */}
                         <button
                           type="button"
                           onClick={async () => {
@@ -11899,35 +11938,49 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                               return;
                             }
                             const sName = `${student.first_name || ''} ${student.last_name || ''}`.trim() || 'diesem Schüler';
-                            const actionWord = student.is_campus_active ? 'deaktivieren' : 'aktivieren';
+                            const isDirectBilling = billingPayer === 'student' || studentBillingOption === 'student_full' || studentBillingOption === 'student_partial' || studentBillingOption === 'option1';
                             
                             let markAsHardship = false;
-                            const isActivating = !student.is_campus_active;
+                            let markAsCashPaid = false;
+                            let nextActive = !student.is_campus_active;
 
-                            if (isActivating) {
-                              const hasFreeHardshipSlot = hardshipEarnedSlots > hardshipUsedSlots;
-                              if (hasFreeHardshipSlot && !student.exempt_from_direct_billing) {
-                                const wantsHardship = window.confirm(
-                                  `🎁 Freier Härtefall-Slot verfügbar (${hardshipUsedSlots} von ${hardshipEarnedSlots} belegt)!\n\nMöchtest du ${sName} als beitragsfreien Härtefall freistellen (0,00 € statt 0,49 € / Mo.)?`
+                            if (isDirectBilling) {
+                              if (!student.is_campus_active) {
+                                // Direct Billing Governance: Secretariat cannot force B2C contract on parents.
+                                // It can grant Hardship Exemption (school pays) or book Cash/Office payment.
+                                const choice = window.confirm(
+                                  `🔒 Rechtssichere Eltern-Direktabrechnung (§ 312j BGB)\n\nFür ${sName} zahlen regulär die Eltern direkt per GiroCode / Überweisung im Schüler-Login (5,88 € / Jahr).\n\nMöchtest du diesen Schüler als beitragsfreien HÄRTEFALL freistellen (Kosten werden von der Musikschule getragen)?\n\n[OK] = Als Härtefall freistellen\n[Abbrechen] = Keine Änderung (Eltern aktivieren selbst)`
                                 );
-                                if (wantsHardship) {
+                                if (choice) {
                                   markAsHardship = true;
+                                  nextActive = true;
+                                } else {
+                                  return;
                                 }
                               } else {
-                                if (!window.confirm(`Campus-Modul für ${sName} ${actionWord}?`)) return;
+                                if (student.exempt_from_direct_billing) {
+                                  if (!window.confirm(`Härtefall-Freistellung für ${sName} aufheben? (Schüler wechselt zurück in den regulären Eltern-Zahlungsstatus)`)) return;
+                                  nextActive = false;
+                                } else if (student.student_billing_cash_paid) {
+                                  if (!window.confirm(`Barzahlung für ${sName} stornieren und Campus deaktivieren?`)) return;
+                                  nextActive = false;
+                                } else {
+                                  if (!window.confirm(`Campus-Zugang für ${sName} pausieren / deaktivieren?`)) return;
+                                  nextActive = false;
+                                }
                               }
                             } else {
+                              // Sammelzahler: School pays, Secretariat has full toggle authority
+                              const actionWord = student.is_campus_active ? 'deaktivieren' : 'aktivieren';
                               if (!window.confirm(`Campus-Modul für ${sName} ${actionWord}?`)) return;
                             }
 
                             try {
-                              const newVal = !student.is_campus_active;
-                              const userUpdates: any = { is_campus_active: newVal };
-                              if (newVal && markAsHardship) {
-                                userUpdates.exempt_from_direct_billing = true;
-                              } else if (!newVal) {
-                                userUpdates.exempt_from_direct_billing = false;
-                              }
+                              const userUpdates: any = { 
+                                is_campus_active: nextActive,
+                                exempt_from_direct_billing: markAsHardship ? true : (nextActive ? Boolean(student.exempt_from_direct_billing) : false),
+                                payment_status: nextActive ? (markAsHardship ? 'hardship' : (isDirectBilling ? 'paid' : 'active')) : 'passive'
+                              };
 
                               const { data: existingUser } = await supabase.from('users_raw').select('id').eq('id', student.id).maybeSingle();
                               if (!existingUser) {
@@ -11940,10 +11993,11 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                   instrument: student.instrument || 'Musiker',
                                   teacher_id: student.teacher_id || null,
                                   lesson_duration: student.lesson_duration || 30,
-                                  is_campus_active: newVal,
+                                  is_campus_active: nextActive,
                                   is_groovelab_active: !!student.is_groovelab_active,
                                   is_active: false,
-                                  exempt_from_direct_billing: !!userUpdates.exempt_from_direct_billing
+                                  exempt_from_direct_billing: !!userUpdates.exempt_from_direct_billing,
+                                  payment_status: userUpdates.payment_status
                                 });
                               } else {
                                 await supabase.from('users_raw').update(userUpdates).eq('id', student.id);
@@ -11985,11 +12039,13 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                           title={
                             student.is_campus_active 
                               ? (student.exempt_from_direct_billing 
-                                  ? "Campus aktiv (Härtefall - 100% beitragsfrei: 0,00 €/Mo.)" 
+                                  ? "Campus aktiv (Härtefall - von Musikschule übernommen: 0,49 €/Mo.)" 
                                   : (student.isPendingOnboarding 
                                       ? "Campus gebucht (Einladung offen - PIN noch nicht eingelöst)" 
-                                      : "Campus aktiv (Reguläre Abrechnung: 0,49 €/Mo.)")) 
-                              : "Campus nicht gebucht (Klick zum Aktivieren)"
+                                      : "Campus aktiv (Direktabrechnung Eltern / Sammelzahlung)")) 
+                              : (billingPayer === 'student' 
+                                  ? "Basis-Zugang (Passiv 0,09 €) • Klick für Härtefall-Freistellung oder Barzahlung" 
+                                  : "Campus nicht gebucht (Klick zum Aktivieren)")
                           }
                         >
                           <span>
@@ -16236,8 +16292,8 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
               <RefreshCw size={16} />
             </button>
 
-            {/* Datum Simulation Control (Dev Mode Only) */}
-            {isDevEnvironment() && (
+            {/* Datum Simulation Control (Dev Mode Only - Toggled via Shift+T) */}
+            {isDevEnvironment() && showDateSimulation && (
               <div style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -28121,9 +28177,11 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                 const usedGb = usedBytes / (1024 * 1024 * 1024);
                                 const usedMb = usedBytes / (1024 * 1024);
                                 const usagePct = Math.min(100, Math.round((usedGb / currentTotalCapGb) * 100));
-                                const formattedUsed = usedBytes > 0 && usedGb < 0.10 
-                                  ? `${usedMb.toFixed(1).replace('.', ',')} MB` 
-                                  : `${usedGb.toFixed(2).replace('.', ',')} GB`;
+                                const formattedUsed = usedBytes <= 0
+                                  ? '0,0 MB'
+                                  : usedGb < 0.10 
+                                    ? `${usedMb.toFixed(1).replace('.', ',')} MB` 
+                                    : `${usedGb.toFixed(2).replace('.', ',')} GB`;
                                 const formattedPct = usedBytes > 0 && usagePct < 1 ? '< 1%' : `${usagePct}%`;
 
                                 return (
@@ -28904,6 +28962,14 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                         const simulated = typeof window !== 'undefined' ? localStorage.getItem(`simulatedContractStartDate_${schoolId}`) : null;
                                         const todayStr = simulated || new Date().toISOString().split('T')[0];
 
+                                        const activeSchoolAddonGb = Number(currentSchoolProfile?.storage_addon_gb || 0);
+                                        const effectiveAddonGb = selectedStorageAddonGb > 0 
+                                          ? selectedStorageAddonGb 
+                                          : (activeSchoolAddonGb > 0 ? activeSchoolAddonGb : 0);
+                                        const effectiveAddonFee = selectedStorageAddonFee > 0
+                                          ? selectedStorageAddonFee
+                                          : (Number(currentSchoolProfile?.storage_addon_monthly_fee || 0) || (effectiveAddonGb === 25 ? 3.99 : effectiveAddonGb === 10 ? 1.99 : effectiveAddonGb === 50 ? 6.99 : effectiveAddonGb === 100 ? 11.99 : effectiveAddonGb === 250 ? 24.99 : 0));
+
                                         let bookingDone = false;
                                         try {
                                           const { data: rpcData, error: rpcErr } = await supabase.rpc('confirm_school_subscription', {
@@ -28912,8 +28978,8 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                             p_has_groovelab: hasGroovelabSub,
                                             p_student_billing_option: studentBillingOption,
                                             p_contract_start_date: todayStr,
-                                            p_storage_addon_gb: selectedStorageAddonGb || 0,
-                                            p_storage_addon_monthly_fee: selectedStorageAddonFee || 0
+                                            p_storage_addon_gb: effectiveAddonGb,
+                                            p_storage_addon_monthly_fee: effectiveAddonFee
                                           });
                                           if (!rpcErr && rpcData?.success) {
                                             bookingDone = true;
@@ -28931,9 +28997,9 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                           is_trial: false,
                                           status: 'active'
                                         };
-                                        if (selectedStorageAddonGb > 0) {
-                                          updatePayload.storage_addon_gb = selectedStorageAddonGb;
-                                          updatePayload.storage_addon_monthly_fee = selectedStorageAddonFee;
+                                        if (effectiveAddonGb > 0) {
+                                          updatePayload.storage_addon_gb = effectiveAddonGb;
+                                          updatePayload.storage_addon_monthly_fee = effectiveAddonFee;
                                           updatePayload.storage_addon_status = 'active';
                                         } else {
                                           updatePayload.storage_addon_gb = 0;
@@ -29476,16 +29542,46 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                         {/* Row 2: Billing Payer, Student Fee, and Audio-Tresor Storage (3 Columns) */}
                                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', marginBottom: '14px' }}>
                                           {/* Who pays */}
-                                          <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '14px 16px', borderRadius: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                            <div style={{ width: '10px', height: '10px', minWidth: '10px', borderRadius: '50%', background: '#7e22ce', boxShadow: '0 0 0 3px rgba(126, 34, 206, 0.15)' }} />
-                                            <div>
-                                              <div style={{ fontSize: '0.84rem', fontWeight: 700, color: '#0f172a' }}>
-                                                {billingPayer === 'school' ? 'Zahlung: Musikschule' : 'Zahlung: Eltern'}
-                                              </div>
-                                              <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 500 }}>
-                                                {billingPayer === 'school' ? 'Sammelabrechnung Träger' : 'Direktabrechnung'}
+                                          <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '14px 16px', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                              <div style={{ width: '10px', height: '10px', minWidth: '10px', borderRadius: '50%', background: billingPayer === 'school' ? '#7e22ce' : '#0284c7', boxShadow: `0 0 0 3px ${billingPayer === 'school' ? 'rgba(126, 34, 206, 0.15)' : 'rgba(2, 132, 199, 0.15)'}` }} />
+                                              <div>
+                                                <div style={{ fontSize: '0.84rem', fontWeight: 700, color: '#0f172a' }}>
+                                                  {billingPayer === 'school' ? 'Zahlung: Musikschule' : 'Zahlung: Eltern'}
+                                                </div>
+                                                <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 500 }}>
+                                                  {billingPayer === 'school' ? 'Sammelabrechnung Träger' : 'Direktabrechnung (Jahresbeitrag)'}
+                                                </div>
                                               </div>
                                             </div>
+                                            <button
+                                              type="button"
+                                              onClick={() => {
+                                                setSelectedSwitchTargetPayer(billingPayer === 'school' ? 'student' : 'school');
+                                                setShowSwitchBillingModelModal(true);
+                                              }}
+                                              style={{
+                                                background: '#ffffff',
+                                                border: '1.5px solid #cbd5e1',
+                                                borderRadius: '8px',
+                                                padding: '4px 9px',
+                                                fontSize: '0.68rem',
+                                                fontWeight: 700,
+                                                color: '#0f172a',
+                                                cursor: 'pointer',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '4px',
+                                                whiteSpace: 'nowrap',
+                                                boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                                                transition: 'all 0.15s ease'
+                                              }}
+                                              onMouseOver={(e) => { e.currentTarget.style.borderColor = '#0f172a'; }}
+                                              onMouseOut={(e) => { e.currentTarget.style.borderColor = '#cbd5e1'; }}
+                                            >
+                                              <RefreshCw size={11} />
+                                              <span>Anpassen &gt;</span>
+                                            </button>
                                           </div>
 
                                           {/* Student cost */}
@@ -29509,9 +29605,11 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                             const usedBytes = Number(currentSchoolProfile?.storage_used_bytes || 0);
                                             const usedGb = usedBytes / (1024 * 1024 * 1024);
                                             const usedMb = usedBytes / (1024 * 1024);
-                                            const formattedUsed = usedBytes > 0 && usedGb < 0.10 
-                                              ? `${usedMb.toFixed(1).replace('.', ',')} MB` 
-                                              : `${usedGb.toFixed(2).replace('.', ',')} GB`;
+                                            const formattedUsed = usedBytes <= 0 
+                                              ? '0,0 MB' 
+                                              : usedGb < 0.10 
+                                                ? `${usedMb.toFixed(1).replace('.', ',')} MB` 
+                                                : `${usedGb.toFixed(2).replace('.', ',')} GB`;
                                             const usagePct = totalCapGb > 0 ? Math.min(100, Math.max(0, (usedGb / totalCapGb) * 100)) : 0;
                                             const isWarning = usagePct >= 80;
                                             const isCritical = usagePct >= 95;
@@ -30152,71 +30250,78 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                   const monthsMapLocal: Record<number, number> = {
                                     9: 12, 10: 11, 11: 10, 12: 9, 1: 8, 2: 7, 3: 6, 4: 5, 5: 4, 6: 3, 7: 2, 8: 1
                                   };
-                                  const restmonate = monthsMapLocal[m] !== undefined ? monthsMapLocal[m] : 12;
-                                  // Dynamic student fee depending on billing options (monthly vs annual packages)
-                                  let studentFee = effectiveSchoolRates.priceStudent;
-                                  if (studentBillingOption === 'option2') {
-                                    studentFee = 0.40;
-                                  } else if (studentBillingOption === 'option3_2') {
-                                    studentFee = getDynamicAnnualPrice(contractStartDate, 10);
-                                  } else if (studentBillingOption === 'option3_3') {
-                                    studentFee = getDynamicAnnualPrice(contractStartDate, 20);
-                                  }
-                                  const aktAmount = studentBillingOption === 'option3_3'
-                                    ? students.length * studentFee
-                                    : monthActivationsCount * studentFee;
+                                   const restmonate = monthsMapLocal[m] !== undefined ? monthsMapLocal[m] : 12;
+                                   // Dynamic student fee depending on billing options (monthly vs annual packages)
+                                   let studentFee = effectiveSchoolRates.priceStudent || 0.49;
+                                   let effectiveActivationsCount = monthActivationsCount;
 
-                                  // 1. Infrastruktur-Rechnung (INF)
-                                  invoicesData.push({
-                                    id: `INF-${schoolNumericId}-${yearShort}${monthStr}-01`,
-                                    type: 'INF',
-                                    year: String(y),
-                                    monthName: monthName,
-                                    date: invoiceDateStr,
-                                    dueDateStr: dueDateStr,
-                                    isCurrentMonth: isCurrent,
-                                    b2b: infAmount,
-                                    amount: infAmount,
-                                    schoolStudentCost: 0,
-                                    schoolStudentLevy: 0,
-                                    schoolExtraCost: 0,
-                                    extraLevyMonthly: 0,
-                                    extraEinmalzahlung: 0,
-                                    b2c: 0,
-                                    einmalzahlung: 0,
-                                    status: status,
-                                    paid: paid,
-                                    creationTime: creationTime
-                                  });
+                                   if (studentBillingOption === 'option2') {
+                                     studentFee = effectiveSchoolRates.priceStudent || 0.49;
+                                     effectiveActivationsCount = monthActivationsCount;
+                                   } else if (studentBillingOption === 'option3_2') {
+                                     studentFee = getDynamicAnnualPrice(contractStartDate, 10);
+                                     effectiveActivationsCount = monthActivationsCount;
+                                   } else if (studentBillingOption === 'option3_3') {
+                                     studentFee = getDynamicAnnualPrice(contractStartDate, 20);
+                                     if (m === 9) {
+                                       effectiveActivationsCount = students.length;
+                                     } else {
+                                       effectiveActivationsCount = monthActivationsCount;
+                                     }
+                                   }
+                                   const aktAmount = parseFloat((effectiveActivationsCount * studentFee).toFixed(2));
 
-                                  // 2. Sammelrechnung Schüleraktivierungen (AKT) - Only shown if school is the payer
-                                  if (aktAmount > 0 && billingPayer === 'school') {
-                                    invoicesData.push({
-                                      id: `AKT-${schoolNumericId}-${yearShort}${monthStr}-01`,
-                                      type: 'AKT',
-                                      year: String(y),
-                                      monthName: monthName,
-                                      date: invoiceDateStr,
-                                      dueDateStr: dueDateStr,
-                                      isCurrentMonth: isCurrent,
-                                      b2b: 0,
-                                      amount: aktAmount,
-                                      schoolStudentCost: 0,
-                                      schoolStudentLevy: studentBillingOption === 'option2' ? aktAmount : 0,
-                                      schoolExtraCost: 0,
-                                      extraLevyMonthly: 0,
-                                      extraEinmalzahlung: 0,
-                                      b2c: aktAmount,
-                                      einmalzahlung: studentBillingOption === 'option1' ? aktAmount : 0,
-status: status,
-                                      paid: paid,
-                                      creationTime: creationTime,
-                                      activationsCount: monthActivationsCount,
-                                      restmonate: restmonate,
-                                      studentFee: studentFee,
-                                      activatedStudentsList: monthActivations
-                                    });
-                                  }
+                                   // 1. Infrastruktur-Rechnung (INF)
+                                   invoicesData.push({
+                                     id: `INF-${schoolNumericId}-${yearShort}${monthStr}-01`,
+                                     type: 'INF',
+                                     year: String(y),
+                                     monthName: monthName,
+                                     date: invoiceDateStr,
+                                     dueDateStr: dueDateStr,
+                                     isCurrentMonth: isCurrent,
+                                     b2b: infAmount,
+                                     amount: infAmount,
+                                     schoolStudentCost: 0,
+                                     schoolStudentLevy: 0,
+                                     schoolExtraCost: 0,
+                                     extraLevyMonthly: 0,
+                                     extraEinmalzahlung: 0,
+                                     b2c: 0,
+                                     einmalzahlung: 0,
+                                     status: status,
+                                     paid: paid,
+                                     creationTime: creationTime
+                                   });
+
+                                   // 2. Sammelrechnung Schüleraktivierungen (AKT) - Only shown if school is the payer
+                                   if (aktAmount > 0 && billingPayer === 'school') {
+                                     invoicesData.push({
+                                       id: `AKT-${schoolNumericId}-${yearShort}${monthStr}-01`,
+                                       type: 'AKT',
+                                       year: String(y),
+                                       monthName: monthName,
+                                       date: invoiceDateStr,
+                                       dueDateStr: dueDateStr,
+                                       isCurrentMonth: isCurrent,
+                                       b2b: 0,
+                                       amount: aktAmount,
+                                       schoolStudentCost: 0,
+                                       schoolStudentLevy: studentBillingOption === 'option2' ? aktAmount : 0,
+                                       schoolExtraCost: 0,
+                                       extraLevyMonthly: 0,
+                                       extraEinmalzahlung: 0,
+                                       b2c: aktAmount,
+                                       einmalzahlung: studentBillingOption === 'option1' ? aktAmount : 0,
+                                       status: status,
+                                       paid: paid,
+                                       creationTime: creationTime,
+                                       activationsCount: effectiveActivationsCount,
+                                       restmonate: restmonate,
+                                       studentFee: studentFee,
+                                       activatedStudentsList: monthActivations
+                                     });
+                                   }
 
                                   // Increment month
                                   m++;
@@ -36350,6 +36455,441 @@ status: status,
         </div>
       )}
 
+            {/* 🌟 Apple Tier-1 Enterprise Modal: Switch Billing Model (Sammelzahler vs. Eltern-Direktabrechnung) */}
+      {showSwitchBillingModelModal && (() => {
+        const activeCampusCount = (students || []).filter((s: any) => s.isCampusActive || s.is_campus_active).length;
+        const currentMonthlyFeeForStudents = billingPayer === 'school' ? activeCampusCount * 0.49 : 0;
+        const targetMonthlyFeeForStudents = selectedSwitchTargetPayer === 'student' ? activeCampusCount * 0.09 : activeCampusCount * 0.49;
+        const monthlySavings = Math.max(0, currentMonthlyFeeForStudents - targetMonthlyFeeForStudents);
+        const yearlySavings = monthlySavings * 12;
+
+        const effectiveSchoolName = schoolName || currentSchoolProfile?.name || 'Musikschule';
+
+        const isChf = currentSchoolProfile?.currency === 'CHF';
+        const activeCurrency = isChf ? 'CHF' : 'EUR';
+        const studentRate = isChf ? 1.00 : 0.49;
+        const schoolStartMonth = Number(currentSchoolProfile?.school_year_start_month || 9);
+        const schoolStartDay = Number(currentSchoolProfile?.school_year_start_day || 1);
+        const schoolYearCalc = calculateSchoolYearDirectBilling(new Date(), activeCurrency, studentRate, schoolStartMonth, schoolStartDay);
+
+        const handleDownloadParentLetterPdf = async () => {
+          try {
+            const { default: jsPDF } = await import('jspdf');
+            const doc = new jsPDF('p', 'mm', 'a4');
+
+            doc.setFillColor(248, 250, 252);
+            doc.rect(0, 0, 210, 297, 'F');
+
+            doc.setFillColor(52, 168, 83);
+            doc.roundedRect(15, 15, 180, 28, 4, 4, 'F');
+            doc.setTextColor(255, 255, 255);
+            doc.setFontSize(14);
+            doc.setFont('helvetica', 'bold');
+            doc.text('Campus-Groovelab • Elterninformation', 22, 28);
+            doc.setFontSize(9);
+            doc.setFont('helvetica', 'normal');
+            doc.text(`Information zur Freischaltung des Campus-Moduls • ${effectiveSchoolName}`, 22, 36);
+
+            doc.setFillColor(255, 255, 255);
+            doc.roundedRect(15, 50, 180, 225, 4, 4, 'F');
+            doc.setDrawColor(226, 232, 240);
+            doc.roundedRect(15, 50, 180, 225, 4, 4, 'S');
+
+            doc.setTextColor(15, 23, 42);
+            doc.setFontSize(13);
+            doc.setFont('helvetica', 'bold');
+            doc.text('Liebe Eltern, liebe Schülerinnen und Schüler,', 22, 65);
+
+            doc.setFontSize(9.2);
+            doc.setFont('helvetica', 'normal');
+            doc.setTextColor(51, 65, 85);
+            
+            const currencySymbol = isChf ? 'CHF' : '€';
+            const lines = [
+              'unsere Musikschule nutzt die innovative Plattform Campus-Groovelab für den digitalen Unterricht,',
+              'das interaktive Hausaufgabenheft, Übe-Timer, Loopstation und Unterrichtsaufnahmen.',
+              '',
+              'Zur Deckung der individuellen Bereitstellungskosten stellen wir für das laufende Schuljahr auf',
+              'das Modell der fairen Eltern-Direktabrechnung mit dynamischer Restzeitberechnung um.',
+              '',
+              'Die wichtigsten Eckdaten für Sie im Überblick:',
+              `• Einmaliger Restschuljahres-Beitrag: nur ${schoolYearCalc.totalAmountStr} ${currencySymbol} (für ${schoolYearCalc.remainingPaidMonths} Restmonate à ${studentRate.toFixed(2).replace('.', ',')} ${currencySymbol} bis Schuljahresende).`,
+              `• 30 Tage Kulanzfrist: Der Probemonat (${schoolYearCalc.freeMonthName}) ist gratis • Ihr Kind kann 30 Tage voll üben.`,
+              '• Dynamische Restzeit: Sie zahlen immer nur die verbleibenden Monate bis zum Schuljahresende (kein Volljahr-Zwang).',
+              '• Kein Abo & keine Verlängerung: Einmalige Schuljahresgebühr • endet automatisch zum Schuljahresende.',
+              '• GrooveLab-Vorteil: Band-Rooms, Repertoire & Songs bleiben für Ihr Kind 100% kostenfrei (Schule übernimmt).',
+              '• 100% Datenschutz: Keine Speicherung von Bankdaten Minderjähriger (DSGVO/COPPA-konform).',
+              '',
+              'So schalten Sie den Zugang für Ihr Kind frei:',
+              '1. Öffnen Sie die Campus-Groovelab App auf dem Smartphone oder Tablet Ihres Kindes.',
+              '2. Klicken Sie im oberen Bereich auf „Jahresbeitrag für Eltern freischalten“.',
+              '3. Scannen Sie den vorausgefüllten EPC-GiroCode mit Ihrer Banking-App (z. B. Sparkasse, VR, ING, N26, PostFinance).',
+              '4. Nach der Überweisung ist der Zugang dauerhaft für das gesamte Schuljahr freigeschaltet.',
+              '',
+              'Härtefall-Regelung & Geschwisterrabatt:',
+              'Familien mit mehreren Kindern oder in besonderen Lebenslagen können sich vertrauensvoll an unser',
+              'Schulsekretariat wenden – die Musikschule kann das Profil unbürokratisch freistellen.',
+              '',
+              'Herzliche Grüße,',
+              `${effectiveSchoolName} • Schulleitung & Lehrkräfte-Team`
+            ];
+
+            let y = 76;
+            lines.forEach(line => {
+              if (line.startsWith('•') || line.startsWith('1.') || line.startsWith('2.') || line.startsWith('3.') || line.startsWith('4.')) {
+                doc.setFont('helvetica', 'bold');
+                doc.text(line, 22, y);
+                doc.setFont('helvetica', 'normal');
+              } else if (line.startsWith('Die wichtigsten') || line.startsWith('So schalten') || line.startsWith('Härtefall-')) {
+                doc.setFont('helvetica', 'bold');
+                doc.setTextColor(15, 23, 42);
+                doc.text(line, 22, y);
+                doc.setFont('helvetica', 'normal');
+                doc.setTextColor(51, 65, 85);
+              } else {
+                doc.text(line, 22, y);
+              }
+              y += 5.8;
+            });
+
+            doc.setFontSize(7.5);
+            doc.setTextColor(148, 163, 184);
+            doc.text('Campus-Groovelab • Transparentes Cloud-Hosting statt teurer Software-Lizenzen. (0,00 € Lizenzgebühr).', 22, 266);
+
+            doc.save(`Elternbrief_Campus_Direktabrechnung_${effectiveSchoolName.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`);
+          } catch (e: any) {
+            alert('Fehler beim PDF-Export: ' + e.message);
+          }
+        };
+
+        const handleConfirmSwitchBillingModel = async () => {
+          try {
+            setIsSwitchingPayer(true);
+            const targetPayer = selectedSwitchTargetPayer;
+            const targetOption = targetPayer === 'student' ? 'student_full' : 'option2';
+            
+            const updates: any = {
+              billing_payer: targetPayer,
+              student_billing_option: targetOption,
+              updated_at: new Date().toISOString()
+            };
+
+            const { error } = await supabase
+              .from('schools')
+              .update(updates)
+              .eq('id', schoolId);
+
+            if (error) throw error;
+
+            // Instant 0-Day Full Coverage: If switching to Sammelzahler, immediately activate all passive students
+            if (targetPayer === 'school') {
+              const passiveIds = (students || []).filter((s: any) => !s.is_campus_active).map((s: any) => s.id);
+              if (passiveIds.length > 0) {
+                try {
+                  await supabase
+                    .from('users_raw')
+                    .update({ is_campus_active: true, status: 'active', payment_status: 'active', updated_at: new Date().toISOString() })
+                    .in('id', passiveIds);
+                  await supabase
+                    .from('users')
+                    .update({ is_campus_active: true, status: 'active', payment_status: 'active', updated_at: new Date().toISOString() })
+                    .in('id', passiveIds);
+                } catch (e) {
+                  console.warn('Instant student activation notice:', e);
+                }
+              }
+            }
+
+            try {
+              const overridesStr = localStorage.getItem('groovelab_school_overrides') || localStorage.getItem('campus_school_overrides');
+              const overrides = overridesStr ? JSON.parse(overridesStr) : {};
+              overrides[schoolId] = {
+                ...(overrides[schoolId] || {}),
+                billing_payer: targetPayer,
+                student_billing_option: targetOption
+              };
+              localStorage.setItem('groovelab_school_overrides', JSON.stringify(overrides));
+              localStorage.setItem('campus_school_overrides', JSON.stringify(overrides));
+            } catch (e) {}
+
+            setBillingPayer(targetPayer);
+            setStudentBillingOption(targetOption);
+            setShowSwitchBillingModelModal(false);
+            await fetchDashboardData();
+            alert(targetPayer === 'student' 
+              ? 'Erfolgreich umgestellt! Deine Musikschule ist ab sofort auf Eltern-Direktabrechnung umgeschaltet. Alle aktiven Schüler behalten 30 Tage Übergangsfrist.' 
+              : 'Erfolgreich umgestellt! Deine Musikschule übernimmt ab sofort alle Schülerkosten als Sammelzahler (0 Tage Frist • sofortige Vollfreischaltung aller Schüler).');
+          } catch (err: any) {
+            alert('Fehler beim Modellwechsel: ' + err.message);
+          } finally {
+            setIsSwitchingPayer(false);
+          }
+        };
+
+        return (
+          <div
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: 'rgba(15, 23, 42, 0.65)',
+              backdropFilter: 'blur(10px)',
+              WebkitBackdropFilter: 'blur(10px)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 99999,
+              padding: '20px'
+            }}
+            onClick={() => setShowSwitchBillingModelModal(false)}
+          >
+            <div
+              style={{
+                background: '#ffffff',
+                borderRadius: '24px',
+                width: '100%',
+                maxWidth: '680px',
+                padding: '28px 32px',
+                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+                border: '1px solid rgba(255, 255, 255, 0.8)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '20px',
+                maxHeight: '92vh',
+                overflowY: 'auto'
+              }}
+              onClick={e => e.stopPropagation()}
+            >
+              {/* Modal Header */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div>
+                  <span style={{ fontSize: '0.68rem', background: '#e0e7ff', color: '#4338ca', padding: '3px 10px', borderRadius: '999px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    Enterprise Abrechnungs-Modell
+                  </span>
+                  <h3 style={{ margin: '8px 0 2px 0', fontSize: '1.35rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em' }}>
+                    Abrechnungsmodell für Schüler-Aktivierungen anpassen
+                  </h3>
+                  <p style={{ margin: 0, fontSize: '0.82rem', color: '#64748b', lineHeight: 1.4 }}>
+                    Wechsle jederzeit flexibel zwischen Sammelabrechnung über die Musikschule und Eltern-Direktabrechnung mit 30 Tagen Kulanzfrist.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowSwitchBillingModelModal(false)}
+                  style={{ background: '#f1f5f9', border: 'none', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#64748b' }}
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* 2-Option Cards Selector */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                {/* Option 1: Eltern-Direktabrechnung */}
+                <div
+                  onClick={() => setSelectedSwitchTargetPayer('student')}
+                  style={{
+                    border: '2px solid',
+                    borderColor: selectedSwitchTargetPayer === 'student' ? '#0284c7' : '#e2e8f0',
+                    background: selectedSwitchTargetPayer === 'student' ? '#f0f9ff' : '#ffffff',
+                    borderRadius: '18px',
+                    padding: '18px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    gap: '12px',
+                    transition: 'all 0.15s ease',
+                    boxShadow: selectedSwitchTargetPayer === 'student' ? '0 8px 20px rgba(2, 132, 199, 0.12)' : 'none'
+                  }}
+                >
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                      <span style={{ fontSize: '0.68rem', fontWeight: 800, background: '#dcfce7', color: '#166534', padding: '2px 8px', borderRadius: '6px' }}>
+                        🌟 Empfohlen
+                      </span>
+                      <div style={{ width: '18px', height: '18px', borderRadius: '50%', border: '2px solid', borderColor: selectedSwitchTargetPayer === 'student' ? '#0284c7' : '#cbd5e1', background: selectedSwitchTargetPayer === 'student' ? '#0284c7' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ffffff', fontSize: '0.65rem' }}>
+                        {selectedSwitchTargetPayer === 'student' && '✓'}
+                      </div>
+                    </div>
+                    <div style={{ fontSize: '0.94rem', fontWeight: 800, color: '#0f172a' }}>
+                      Eltern-Direktabrechnung
+                    </div>
+                    <div style={{ fontSize: '0.74rem', color: '#0284c7', fontWeight: 700, margin: '2px 0 6px 0' }}>
+                      5,88 € / Jahr (0,49 € / Mo.) direkt durch Eltern
+                    </div>
+                    <ul style={{ margin: 0, paddingLeft: '16px', fontSize: '0.72rem', color: '#475569', lineHeight: 1.5 }}>
+                      <li>Schule zahlt ab sofort nur <strong>0,09 € Basisgebühr / Mo.</strong></li>
+                      <li>Mit jeder Eltern-Aktivierung sinkt der Beitrag auf <strong>0,00 €</strong></li>
+                      <li>30 Tage Übergangsphase: Voller Schüler-Zugang bleibt aktiv</li>
+                    </ul>
+                  </div>
+                </div>
+
+                {/* Option 2: Sammelzahler */}
+                <div
+                  onClick={() => setSelectedSwitchTargetPayer('school')}
+                  style={{
+                    border: '2px solid',
+                    borderColor: selectedSwitchTargetPayer === 'school' ? '#7e22ce' : '#e2e8f0',
+                    background: selectedSwitchTargetPayer === 'school' ? '#faf5ff' : '#ffffff',
+                    borderRadius: '18px',
+                    padding: '18px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    gap: '12px',
+                    transition: 'all 0.15s ease',
+                    boxShadow: selectedSwitchTargetPayer === 'school' ? '0 8px 20px rgba(126, 34, 206, 0.12)' : 'none'
+                  }}
+                >
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                      <span style={{ fontSize: '0.68rem', fontWeight: 800, background: '#f3e8ff', color: '#6b21a8', padding: '2px 8px', borderRadius: '6px' }}>
+                        🏫 Sammelzahler
+                      </span>
+                      <div style={{ width: '18px', height: '18px', borderRadius: '50%', border: '2px solid', borderColor: selectedSwitchTargetPayer === 'school' ? '#7e22ce' : '#cbd5e1', background: selectedSwitchTargetPayer === 'school' ? '#7e22ce' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ffffff', fontSize: '0.65rem' }}>
+                        {selectedSwitchTargetPayer === 'school' && '✓'}
+                      </div>
+                    </div>
+                    <div style={{ fontSize: '0.94rem', fontWeight: 800, color: '#0f172a' }}>
+                      Musikschule übernimmt
+                    </div>
+                    <div style={{ fontSize: '0.74rem', color: '#7e22ce', fontWeight: 700, margin: '2px 0 6px 0' }}>
+                      0,49 € / Schüler / Mo. auf Sammelrechnung
+                    </div>
+                    <ul style={{ margin: 0, paddingLeft: '16px', fontSize: '0.72rem', color: '#475569', lineHeight: 1.5 }}>
+                      <li>100% kostenlos für alle Eltern</li>
+                      <li>Schule trägt alle Aktivierungen</li>
+                      <li>Keine Direktüberweisung nötig</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
+              {/* Live Savings Calculator Banner */}
+              {selectedSwitchTargetPayer === 'student' && billingPayer === 'school' && (
+                <div style={{
+                  background: 'linear-gradient(135deg, #ecfdf5 0%, #dcfce7 100%)',
+                  border: '1.5px solid #86efac',
+                  borderRadius: '16px',
+                  padding: '16px 20px',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
+                }}>
+                  <div>
+                    <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#047857', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                      💰 Deine sofortige Kostenersparnis
+                    </span>
+                    <div style={{ fontSize: '0.86rem', color: '#14532d', fontWeight: 700, marginTop: '2px' }}>
+                      {activeCampusCount} aktive Schüler: Nur noch {(activeCampusCount * 0.09).toFixed(2).replace('.', ',')} € / Mo. Datensatzgebühr statt {(activeCampusCount * 0.49).toFixed(2).replace('.', ',')} €
+                    </div>
+                    <div style={{ fontSize: '0.74rem', color: '#15803d', marginTop: '2px' }}>
+                      Bei Elternzahlung sinken die Schulkosten für diese Schüler vollständig auf 0,00 €.
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: '1.3rem', fontWeight: 900, color: '#047857' }}>
+                      -{monthlySavings.toFixed(2).replace('.', ',')} € / Mo.
+                    </div>
+                    <span style={{ fontSize: '0.7rem', color: '#15803d', fontWeight: 700 }}>
+                      (-{yearlySavings.toFixed(2).replace('.', ',')} € / Jahr)
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* 30-Day Grace Period Guarantee Badge */}
+              <div style={{
+                background: '#f8fafc',
+                border: '1px solid #e2e8f0',
+                borderRadius: '14px',
+                padding: '12px 16px',
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '10px',
+                fontSize: '0.76rem',
+                color: '#334155',
+                lineHeight: 1.4
+              }}>
+                <ShieldCheck size={18} color="#10b981" style={{ flexShrink: 0, marginTop: '1px' }} />
+                <span>
+                  <strong>30 Tage Kulanzfrist-Garantie:</strong> Kein Unterrichtsausfall! Alle aktiven Schüler behalten bei der Umstellung 30 Tage lang uneingeschränkten Zugriff auf Übe-Timer, Hausaufgabenheft und Audio-Studio, während Eltern den Beitrag bequem per Banking-App freischalten.
+                </span>
+              </div>
+
+              {/* Action Buttons & Parent Letter Download */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '4px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '10px' }}>
+                  {/* Confirm CTA */}
+                  <button
+                    type="button"
+                    disabled={isSwitchingPayer || selectedSwitchTargetPayer === billingPayer}
+                    onClick={handleConfirmSwitchBillingModel}
+                    style={{
+                      background: selectedSwitchTargetPayer === billingPayer 
+                        ? '#94a3b8' 
+                        : (selectedSwitchTargetPayer === 'student' ? 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)' : 'linear-gradient(135deg, #7e22ce 0%, #6b21a8 100%)'),
+                      color: '#ffffff',
+                      border: 'none',
+                      borderRadius: '14px',
+                      padding: '13px 18px',
+                      fontSize: '0.88rem',
+                      fontWeight: 800,
+                      cursor: (isSwitchingPayer || selectedSwitchTargetPayer === billingPayer) ? 'default' : 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px',
+                      boxShadow: selectedSwitchTargetPayer !== billingPayer ? '0 6px 18px rgba(2, 132, 199, 0.3)' : 'none',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    {isSwitchingPayer ? 'Wird umgestellt...' : selectedSwitchTargetPayer === billingPayer ? 'Modell ist bereits aktiv' : `Wechsel zu ${selectedSwitchTargetPayer === 'student' ? 'Direktabrechnung' : 'Sammelzahler'} bestätigen ➔`}
+                  </button>
+
+                  {/* Sample Parent Letter */}
+                  <button
+                    type="button"
+                    onClick={handleDownloadParentLetterPdf}
+                    style={{
+                      background: '#ffffff',
+                      border: '1.5px solid #cbd5e1',
+                      borderRadius: '14px',
+                      padding: '13px 14px',
+                      fontSize: '0.78rem',
+                      fontWeight: 800,
+                      color: '#0f172a',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px',
+                      transition: 'all 0.15s ease'
+                    }}
+                    onMouseOver={(e) => { e.currentTarget.style.borderColor = '#0f172a'; }}
+                    onMouseOut={(e) => { e.currentTarget.style.borderColor = '#cbd5e1'; }}
+                  >
+                    <Download size={15} />
+                    <span>Muster-Elternbrief (PDF)</span>
+                  </button>
+                </div>
+
+                <div style={{ textAlign: 'center' }}>
+                  <span style={{ fontSize: '0.68rem', color: '#94a3b8' }}>
+                    Campus-Groovelab • Flexible SaaS-Vertragsanpassung ohne Kündigungsfristen oder Einrichtungsgebühren.
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+
       {/* Modal for Standalone Storage Upgrade/Downgrade */}
       {showStorageManagerModal && (() => {
         const activeBookedGb = Number(currentSchoolProfile?.storage_addon_gb || selectedStorageAddonGb || 0);
@@ -36913,7 +37453,7 @@ status: status,
             id: selectedInvoice.id,
             date: selectedInvoice.date,
             dueDateStr: selectedInvoice.dueDateStr,
-            amount: selectedInvoice.isCurrentMonth ? currentTotalB2B_global : selectedInvoice.amount,
+            amount: selectedInvoice.type === 'AKT' ? selectedInvoice.amount : (selectedInvoice.isCurrentMonth ? currentTotalB2B_global : selectedInvoice.amount),
             status: selectedInvoice.status,
             type: selectedInvoice.type,
             isCurrentMonth: selectedInvoice.isCurrentMonth,

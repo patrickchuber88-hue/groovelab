@@ -128,11 +128,11 @@ const customFetch = async (input: RequestInfo | URL, init?: RequestInit): Promis
     let timeoutId: any = null;
     try {
       let fetchInit = newInit;
-      // Wrap request with a fast failover timeout (4.5s for normal queries, 30s for large audio/asset uploads)
+      // Wrap request with a resilient failover timeout (12s for normal queries, 45s for large audio/asset uploads)
       if (!newInit.signal && typeof AbortController !== 'undefined') {
         const inputUrlStr = typeof input === 'string' ? input : (input instanceof URL ? input.href : '');
         const isStorageUpload = inputUrlStr.includes('/storage/v1/object/');
-        const queryTimeout = isStorageUpload ? 30000 : 4500;
+        const queryTimeout = isStorageUpload ? 45000 : 12000;
         const controller = new AbortController();
         timeoutId = setTimeout(() => controller.abort(), queryTimeout);
         fetchInit = { ...newInit, signal: controller.signal };
@@ -148,8 +148,8 @@ const customFetch = async (input: RequestInfo | URL, init?: RequestInit): Promis
             const clone = response.clone();
             const text = await clone.text();
             if (text.includes('schema cache') || text.includes('PGRST002') || text.includes('503') || text.includes('502')) {
-              console.warn(`[Supabase Fetch] PostgREST schema cache reload (HTTP ${response.status}). Retrying attempt ${attempt + 1} in ${attempt * 250}ms...`);
-              await new Promise(r => setTimeout(r, attempt * 250));
+              console.warn(`[Supabase Fetch] PostgREST schema cache reload (HTTP ${response.status}). Retrying attempt ${attempt + 1} in ${attempt * 400}ms...`);
+              await new Promise(r => setTimeout(r, attempt * 400));
               continue;
             }
           } catch (e) {}
@@ -176,8 +176,8 @@ const customFetch = async (input: RequestInfo | URL, init?: RequestInit): Promis
         (typeof navigator !== 'undefined' && !navigator.onLine);
         
       if (isNetworkError && attempt < maxAttempts) {
-        const delay = 150 * attempt; // Fast incremental retry (150ms, 300ms)
-        console.warn(`[Supabase Fetch] Attempt ${attempt} failed with "${errMsg}". Retrying in ${delay}ms...`);
+        const delay = Math.min(1200, 200 * Math.pow(2, attempt - 1) + Math.random() * 80);
+        console.warn(`[Supabase Fetch] Attempt ${attempt} failed with "${errMsg}". Retrying in ${Math.round(delay)}ms...`);
         await new Promise(resolve => setTimeout(resolve, delay));
         continue;
       }
@@ -194,6 +194,36 @@ const customFetch = async (input: RequestInfo | URL, init?: RequestInit): Promis
   }
   throw lastError;
 };
+
+// ─── Automated Health & Presence Auto-Recovery Monitor ─────────────────────
+if (typeof window !== 'undefined') {
+  const triggerHealthRecovery = async () => {
+    try {
+      if (dbCircuitBreaker.getState() !== 'CLOSED') {
+        const res = await fetch(`${supabaseUrl}/rest/v1/`, {
+          method: 'HEAD',
+          headers: { apikey: supabaseAnonKey }
+        });
+        if (res.ok || res.status === 401 || res.status === 200) {
+          dbCircuitBreaker.recordSuccess();
+          console.info('[Supabase Heartbeat] Connection probe successful. Circuit Breaker reset to CLOSED.');
+        }
+      }
+      if (supabase && (supabase as any).realtime && typeof (supabase as any).realtime.connect === 'function') {
+        (supabase as any).realtime.connect();
+      }
+    } catch (e) {
+      // Passive probe failed, will auto-retry on next interaction
+    }
+  };
+
+  window.addEventListener('online', triggerHealthRecovery);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      triggerHealthRecovery();
+    }
+  });
+}
 
 // ─── Custom in-memory auth lock ─────────────────────────────────────────────
 // Replaces navigator.locks to avoid "lock was stolen by another request" errors

@@ -589,14 +589,10 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       if (cached && cached.startsWith('[') && cached.endsWith(']')) {
         const parsed = JSON.parse(cached);
         return parsed.filter((n: string) => 
-          typeof n === 'string' && 
-          !n.startsWith('AUDIO:') && 
-          !n.startsWith('STICKER:') && 
-          !n.startsWith('FEEDBACK:') && 
-          !n.startsWith('STUDENT_NOTE_')
+          typeof n === 'string' && !isInternalMetadataNote(n)
         ).join('\n\n') || '';
       }
-      return cached || '';
+      return !isInternalMetadataNote(cached) ? (cached || '') : '';
     } catch {
       return '';
     }
@@ -1719,26 +1715,102 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     return [narrative];
   };
 
-  const generateSmartAudioTitle = (isTeacher: boolean, customLabel?: string): string => {
-    if (customLabel && customLabel.trim()) return customLabel.trim();
+  const generateSmartAudioTitle = (isTeacher: boolean, customLabel?: string, overrideSongId?: string): string => {
+    const trimmedCustom = (customLabel || "").trim();
+    if (trimmedCustom && trimmedCustom !== 'Meisterwerk-Aufnahme') {
+      return trimmedCustom;
+    }
 
     const now = getSimulatedNow();
     const weekdayShort = now.toLocaleDateString("de-DE", { weekday: "short" });
     const dateShort = now.toLocaleDateString("de-DE", { day: "2-digit", month: "short" });
     const timeShort = now.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
+    const weekStr = getISOWeek(now);
+    const weekNum = weekStr.split("-W")[1] || "";
 
-    // 1. Check if active piece / topic name exists
-    const activePiece = (topicName || "").trim();
-    if (activePiece && !activePiece.toLowerCase().startsWith("hausaufgabe") && !activePiece.toLowerCase().startsWith("allgemein")) {
-      return `${activePiece} • ${weekdayShort}, ${timeShort}`;
-    }
+    // 1. Check if an active song or topic exists
+    const activeSong = (activeSongSkills || []).find(s => (overrideSongId && s.id === overrideSongId) || (selectedActiveSongId && s.id === selectedActiveSongId));
+    const songTitle = activeSong?.songs?.title || activeSong?.title || activeSong?.song_title;
+    const cleanTopic = (topicName || "").trim();
+    const meaningfulTopic = cleanTopic && !cleanTopic.toLowerCase().startsWith("hausaufgabe") && !cleanTopic.toLowerCase().startsWith("allgemein") && cleanTopic !== 'Meisterwerk-Aufnahme' ? cleanTopic : null;
+    const targetSubject = songTitle || meaningfulTopic;
 
-    // 2. Role-based smart naming
+    const instrumentName = studentInstrument || (student as any)?.instrument || (student as any)?.instrument_name || '';
+
     if (isTeacher) {
-      return `Unterrichts-Audio • ${weekdayShort}, ${dateShort}`;
+      // 👨‍🏫 LEHRKRAFT (Vom Unterricht / Feedback & Play-Along):
+      if (targetSubject) {
+        return `${targetSubject} • Unterricht (${weekdayShort}, ${dateShort} • ${timeShort})`;
+      }
+      return `Unterrichts-Audio • ${weekdayShort}, ${dateShort} (KW ${weekNum} • ${timeShort})`;
     } else {
-      return `Übe-Take • ${weekdayShort}, ${dateShort} (${timeShort})`;
+      // 🎓 SCHÜLER (Übe-Studio & Eigene Aufnahmen):
+      if (targetSubject) {
+        return `${targetSubject} • Übe-Take (${weekdayShort}, ${dateShort} • ${timeShort})`;
+      }
+      if (instrumentName) {
+        return `${instrumentName}-Übung • ${weekdayShort}, ${dateShort} (${timeShort})`;
+      }
+      return `Übe-Take • ${weekdayShort}, ${dateShort} (KW ${weekNum} • ${timeShort})`;
     }
+  };
+
+  const matchesAudioSearch = (aud: any, searchQuery: string): boolean => {
+    if (!searchQuery || !searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase().trim();
+    
+    // 1. Match in direct text label / title / notes
+    const label = (aud.label || aud.title || "").toLowerCase();
+    if (label.includes(q)) return true;
+
+    // 2. Resolve date keywords
+    const d = aud.date ? new Date(aud.date) : null;
+    if (d && !isNaN(d.getTime())) {
+      const weekdayFull = d.toLocaleDateString("de-DE", { weekday: "long" }).toLowerCase();
+      const weekdayShort = d.toLocaleDateString("de-DE", { weekday: "short" }).toLowerCase();
+      const monthFull = d.toLocaleDateString("de-DE", { month: "long" }).toLowerCase();
+      const monthShort = d.toLocaleDateString("de-DE", { month: "short" }).toLowerCase();
+      const dayNum = String(d.getDate());
+      const monthNum = String(d.getMonth() + 1).padStart(2, "0");
+      const yearNum = String(d.getFullYear());
+      const timeStr = d.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
+      const weekStr = getISOWeek(d);
+      const weekNum = weekStr.split("-W")[1] || "";
+
+      const datePatterns = [
+        weekdayFull,
+        weekdayShort.replace('.', ''),
+        monthFull,
+        monthShort.replace('.', ''),
+        `${dayNum}.${monthNum}`,
+        `${dayNum}. ${monthShort}`,
+        `${dayNum}. ${monthFull}`,
+        `kw ${weekNum}`,
+        `kw${weekNum}`,
+        `woche ${weekNum}`,
+        yearNum,
+        timeStr
+      ];
+
+      if (datePatterns.some(pat => pat.includes(q) || q.includes(pat))) {
+        return true;
+      }
+    }
+
+    // 3. Match role / visibility / category keywords
+    const visibility = (aud.visibility || "").toLowerCase();
+    const source = (aud.source || "").toLowerCase();
+    if (q.includes("lehrer") || q.includes("lehrkraft") || q.includes("unterricht")) {
+      if (source.includes("teacher") || visibility.includes("teacher") || label.includes("unterricht")) return true;
+    }
+    if (q.includes("schüler") || q.includes("übung") || q.includes("take") || q.includes("privat")) {
+      if (source.includes("junior") || visibility.includes("private") || label.includes("übe")) return true;
+    }
+    if (q.includes("favorit") || q.includes("stern") || q.includes("gemerkt")) {
+      if (favoriteAudioUrls.includes(aud.url)) return true;
+    }
+
+    return false;
   };
 
   // ⏱️ Recording Metronome / Click State
@@ -2020,14 +2092,14 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   const startRecordingAudio = async (overrideSongId?: string | React.MouseEvent, overrideLabel?: string, isMasterworkSong = false) => {
     const rawSongId = typeof overrideSongId === 'string' ? overrideSongId : null;
     const targetSongId = rawSongId || selectedActiveSongId;
-    const targetLabel = (typeof overrideLabel === 'string' ? overrideLabel : null) || audioLabel || topicName || 'Meisterwerk-Aufnahme';
+    const targetLabel = (typeof overrideLabel === 'string' ? overrideLabel : null) || audioLabel || '';
     const isMasterwork = isMasterworkSong || Boolean(rawSongId);
     recordingTargetRef.current = { songId: targetSongId || undefined, label: targetLabel, isMasterwork };
     if (targetSongId) {
       setSelectedActiveSongId(targetSongId);
       setActiveRecordingSongId(targetSongId);
     }
-    if (targetLabel) {
+    if (targetLabel && targetLabel !== 'Meisterwerk-Aufnahme') {
       setAudioLabel(targetLabel);
     }
 
@@ -2166,237 +2238,228 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
         setAudioBlob(blob);
         setAudioUrl(url);
-        
-        setIsUploadingAudio(true);
 
-        const saveAudioMetadata = async (audioUrlString: string) => {
+        const recDuration = durationInSeconds || Math.round(audioDuration) || 1;
+        const targetInfo = recordingTargetRef.current;
+        const isMasterwork = targetInfo.isMasterwork || Boolean(targetInfo.songId);
+        const currentSongId = targetInfo.songId || selectedActiveSongId;
+        const currentAudioLabel = targetInfo.label || audioLabel || '';
+        const normKey = currentAudioLabel.toLowerCase().trim();
+        const isTeacherActor = !readOnly;
+        const isStudentSession = !isTeacherActor;
+        const smartTitle = generateSmartAudioTitle(isTeacherActor, currentAudioLabel, currentSongId);
+
+        const fileExt = hasTresorStorage ? 'wav' : (blob.type.includes('wav') ? 'wav' : blob.type.includes('webm') ? 'webm' : blob.type.includes('ogg') ? 'ogg' : 'mp3');
+        const contentType = hasTresorStorage ? 'audio/wav' : (blob.type || 'audio/webm');
+        const timeStamp = Date.now();
+        const uniqueRecId = `rec-${student.id}-${timeStamp}`;
+        const localBlobKey = `campus_blob_${student.id}_${timeStamp}.${fileExt}`;
+
+        // ⚡ 1. OPTIMISTIC INSTANT PERSISTENCE (< 15ms)
+        // Store binary into local IndexedDB immediately
+        await storeBlob(localBlobKey, blob).catch(() => {});
+
+        if (isMasterwork) {
+          // 🏆 EXCLUSIVELY ATTACHED TO THE 100% MEISTERWERK SONG
+          if (currentSongId) {
+            localStorage.setItem(`campus_mastered_audio_${student.id}_${currentSongId}`, localBlobKey);
+          }
+          if (normKey) {
+            localStorage.setItem(`campus_mastered_audio_${student.id}_${normKey}`, localBlobKey);
+          }
+
+          // Clean up any test recordings from junior recordings
+          const juniorKey = `campus_junior_recordings_${student.id}`;
           try {
-            const isTeacherActor = !readOnly;
-            const isStudentSession = !isTeacherActor;
-            
-            if (blob) {
-              await storeBlob(audioUrlString, blob).catch(() => {});
-            }
-
-            const targetInfo = recordingTargetRef.current;
-            const isMasterwork = targetInfo.isMasterwork || Boolean(targetInfo.songId);
-            const currentSongId = targetInfo.songId || selectedActiveSongId;
-            const currentAudioLabel = targetInfo.label || audioLabel || topicName || 'Meisterwerk-Aufnahme';
-            const normKey = currentAudioLabel.toLowerCase().trim();
-
-            if (isMasterwork) {
-              // 🏆 EXCLUSIVELY ATTACHED TO THE 100% MEISTERWERK SONG
-              // DO NOT SAVE TO JUNIOR RECORDINGS OR HOMEWORK NOTES!
-              if (currentSongId) {
-                localStorage.setItem(`campus_mastered_audio_${student.id}_${currentSongId}`, audioUrlString);
-              }
-              if (normKey) {
-                localStorage.setItem(`campus_mastered_audio_${student.id}_${normKey}`, audioUrlString);
-              }
-
-              // Clean up any test recordings from junior recordings
-              const juniorKey = `campus_junior_recordings_${student.id}`;
-              try {
-                const stored = localStorage.getItem(juniorKey);
-                if (stored) {
-                  const parsed = JSON.parse(stored);
-                  if (Array.isArray(parsed)) {
-                    const cleaned = parsed.filter(r => {
-                      const rText = `${r.title || ''} ${r.label || ''}`.toLowerCase();
-                      return !rText.includes(normKey) && !rText.includes('over each other');
-                    });
-                    localStorage.setItem(juniorKey, JSON.stringify(cleaned));
-                    setLocalJuniorRecordingsTrigger(prev => prev + 1);
-                  }
-                }
-              } catch {}
-
-              // Clean up any test notes from homeworkNotesList
-              setHomeworkNotesList(prev => {
-                const ex = prev || [];
-                const cleanedList = ex.filter(n => {
-                  if (typeof n === 'string' && n.startsWith('AUDIO:')) {
-                    const nLower = n.toLowerCase();
-                    return !nLower.includes(normKey) && !nLower.includes('over each other');
-                  }
-                  return true;
+            const stored = localStorage.getItem(juniorKey);
+            if (stored) {
+              const parsed = JSON.parse(stored);
+              if (Array.isArray(parsed)) {
+                const cleaned = parsed.filter(r => {
+                  const rText = `${r.title || ''} ${r.label || ''}`.toLowerCase();
+                  return !rText.includes(normKey) && !rText.includes('over each other');
                 });
-                if (cleanedList.length !== ex.length) {
-                  syncHomeworkNotes(cleanedList).catch(() => {});
-                }
-                return cleanedList;
-              });
-
-              // 🎵 Update React State for activeSongSkills and progressItems ONLY
-              setActiveSongSkills(prev => (prev || []).map(s => {
-                const sTitle = (s.songs?.title || s.title || s.song_title || '').toLowerCase().trim();
-                if ((currentSongId && s.id === currentSongId) || (sTitle && (normKey.includes(sTitle) || sTitle.includes(normKey)))) {
-                  return { ...s, recording_url: audioUrlString, audio_url: audioUrlString };
-                }
-                return s;
-              }));
-
-              setProgressItems(prev => (prev || []).map(p => {
-                const pTitle = ((p as any).topic_name || (p as any).title || '').toLowerCase().trim();
-                if ((currentSongId && p.id === currentSongId) || (pTitle && (normKey.includes(pTitle) || pTitle.includes(normKey)))) {
-                  return {
-                    ...p,
-                    recording_url: audioUrlString
-                  };
-                }
-                return p;
-              }));
-
-              // ☁️ Async Supabase Database Persist for the song ONLY
-              if (currentSongId) {
-                supabase.from('user_song_skills').update({ recording_url: audioUrlString }).eq('id', currentSongId).then(() => {});
-                supabase.from('progress_matrix').update({ recording_url: audioUrlString }).eq('id', currentSongId).then(() => {});
+                localStorage.setItem(juniorKey, JSON.stringify(cleaned));
+                setLocalJuniorRecordingsTrigger(prev => prev + 1);
               }
-
-              setAudioLabel('');
-              return;
             }
+          } catch {}
 
-            // --- Regular non-Meisterwerk homework notes & junior recordings ---
-            const recDuration = durationInSeconds || Math.round(audioDuration) || 1;
-            const smartTitle = generateSmartAudioTitle(isTeacherActor, currentAudioLabel);
+          // Clean up any test notes from homeworkNotesList
+          setHomeworkNotesList(prev => {
+            const ex = prev || [];
+            const cleanedList = ex.filter(n => {
+              if (typeof n === 'string' && n.startsWith('AUDIO:')) {
+                const nLower = n.toLowerCase();
+                return !nLower.includes(normKey) && !nLower.includes('over each other');
+              }
+              return true;
+            });
+            if (cleanedList.length !== ex.length) {
+              syncHomeworkNotes(cleanedList).catch(() => {});
+            }
+            return cleanedList;
+          });
 
-            if (isStudentSession) {
-              // 🎓 Student practice recording
-              const juniorKey = `campus_junior_recordings_${student.id}`;
-              let existing: any[] = [];
-              try {
-                const stored = localStorage.getItem(juniorKey);
-                if (stored) {
-                  const parsed = JSON.parse(stored);
-                  if (Array.isArray(parsed)) existing = parsed;
-                }
-              } catch {}
+          // 🎵 Update React State for activeSongSkills and progressItems ONLY
+          setActiveSongSkills(prev => (prev || []).map(s => {
+            const sTitle = (s.songs?.title || s.title || s.song_title || '').toLowerCase().trim();
+            if ((currentSongId && s.id === currentSongId) || (sTitle && (normKey.includes(sTitle) || sTitle.includes(normKey)))) {
+              return { ...s, recording_url: localBlobKey, audio_url: localBlobKey };
+            }
+            return s;
+          }));
 
-              const newRec = {
-                id: `rec-${Date.now()}`,
-                url: audioUrlString,
-                duration: recDuration,
-                date: new Date().toISOString(),
-                title: smartTitle,
-                label: currentAudioLabel,
-                visibility: isTeacherActor ? 'shared_with_teacher' : 'private'
+          setProgressItems(prev => (prev || []).map(p => {
+            const pTitle = ((p as any).topic_name || (p as any).title || '').toLowerCase().trim();
+            if ((currentSongId && p.id === currentSongId) || (pTitle && (normKey.includes(pTitle) || pTitle.includes(normKey)))) {
+              return {
+                ...p,
+                recording_url: localBlobKey
               };
-
-              const updated = [newRec, ...existing];
-              localStorage.setItem(juniorKey, JSON.stringify(updated));
-              setLocalJuniorRecordingsTrigger(prev => prev + 1);
-            } else {
-              // 👨‍🏫 Teacher homework voice note
-              const creatorRole = 'teacher';
-              const initialVisibility = 'shared_with_teacher';
-              const audioMetaStr = `AUDIO:${audioUrlString}|${recDuration}|${new Date().toISOString()}|${smartTitle}|${creatorRole}|${initialVisibility}`;
-              
-              setHomeworkNotesList(prev => {
-                const ex = prev || [];
-                const updatedList = [...ex.filter(n => n !== audioMetaStr), audioMetaStr];
-                syncHomeworkNotes(updatedList).catch(err => console.warn('[saveAudioMetadata] sync note:', err));
-                return updatedList;
-              });
             }
+            return p;
+          }));
 
-            notifyHomeworkChange();
-            setAudioLabel('');
-          } catch (saveErr) {
-            console.warn("Failed to save audio metadata (fallback handled):", saveErr);
+          if (currentSongId) {
+            supabase.from('user_song_skills').update({ recording_url: localBlobKey }).eq('id', currentSongId).then(() => {});
+            supabase.from('progress_matrix').update({ recording_url: localBlobKey }).eq('id', currentSongId).then(() => {});
           }
-        };
-
-        try {
-          const fileExt = hasTresorStorage ? 'wav' : (blob.type.includes('wav') ? 'wav' : blob.type.includes('webm') ? 'webm' : blob.type.includes('ogg') ? 'ogg' : 'mp3');
-          const contentType = hasTresorStorage ? 'audio/wav' : (blob.type || 'audio/webm');
-          
-          let targetSchoolId = student?.school_id || (student as any)?.schoolId || localStorage.getItem('groovelab_school_id') || localStorage.getItem('campus_school_id');
-          if (!targetSchoolId && student?.id) {
-            try {
-              const { data: stRec } = await supabase
-                .from('students')
-                .select('school_id')
-                .eq('id', student.id)
-                .maybeSingle();
-              if (stRec?.school_id) targetSchoolId = stRec.school_id;
-            } catch (stErr) {
-              console.warn('[Meisterwerk] School lookup note:', stErr);
-            }
-          }
-
-          const schoolPathPrefix = targetSchoolId ? `schools/${targetSchoolId}/` : '';
-          const fileName = `${student.id}_feedback_${Date.now()}.${fileExt}`;
-          const filePath = `${schoolPathPrefix}recordings/${fileName}`;
-          
-          let uploadedUrl = url;
+        } else if (isStudentSession) {
+          // 🎓 Student practice recording - INSTANT UPDATE IN LOCAL STORAGE & UI
+          const juniorKey = `campus_junior_recordings_${student.id}`;
+          let existing: any[] = [];
           try {
-            const { error: uploadErr } = await supabase.storage
+            const stored = localStorage.getItem(juniorKey);
+            if (stored) {
+              const parsed = JSON.parse(stored);
+              if (Array.isArray(parsed)) existing = parsed;
+            }
+          } catch {}
+
+          const newRec = {
+            id: uniqueRecId,
+            url: localBlobKey,
+            duration: recDuration,
+            date: new Date().toISOString(),
+            title: smartTitle,
+            label: currentAudioLabel,
+            visibility: 'private'
+          };
+
+          const updated = [newRec, ...existing];
+          localStorage.setItem(juniorKey, JSON.stringify(updated));
+          setLocalJuniorRecordingsTrigger(prev => prev + 1);
+        } else {
+          // 👨‍🏫 Teacher homework voice note - INSTANT UPDATE
+          const creatorRole = 'teacher';
+          const initialVisibility = 'shared_with_teacher';
+          const audioMetaStr = `AUDIO:${localBlobKey}|${recDuration}|${new Date().toISOString()}|${smartTitle}|${creatorRole}|${initialVisibility}`;
+          
+          setHomeworkNotesList(prev => {
+            const ex = prev || [];
+            const updatedList = [...ex.filter(n => n !== audioMetaStr), audioMetaStr];
+            syncHomeworkNotes(updatedList).catch(err => console.warn('[saveAudioMetadata] sync note:', err));
+            return updatedList;
+          });
+        }
+
+        notifyHomeworkChange();
+        setAudioLabel('');
+        setIsUploadingAudio(false); // ⚡ SPINNER VANISHES INSTANTLY! ZERO PERCEIVED DELAY!
+
+        // ☁️ 2. RESILIENT ASYNC BACKGROUND CLOUD SYNC (Non-blocking with 8s Timeout Guard)
+        (async () => {
+          try {
+            let targetSchoolId = student?.school_id || (student as any)?.schoolId || localStorage.getItem('groovelab_school_id') || localStorage.getItem('campus_school_id');
+            const schoolPathPrefix = targetSchoolId ? `schools/${targetSchoolId}/` : '';
+            const fileName = `${student.id}_feedback_${timeStamp}.${fileExt}`;
+            const filePath = `${schoolPathPrefix}recordings/${fileName}`;
+
+            // 8s Timeout Guard so hanging network never leaks resources
+            const uploadPromise = supabase.storage
               .from('campus-assets')
               .upload(filePath, blob, { 
                 contentType,
                 cacheControl: 'private, max-age=3600' 
               });
-              
-            if (!uploadErr) {
+
+            const timeoutPromise = new Promise<{ error: Error }>((_, reject) => 
+              setTimeout(() => reject(new Error('Storage upload timeout')), 8000)
+            );
+
+            const uploadRes = await Promise.race([uploadPromise, timeoutPromise]) as any;
+
+            if (uploadRes && !uploadRes.error) {
               const { data: publicUrlData } = supabase.storage
                 .from('campus-assets')
                 .getPublicUrl(filePath);
-              if (publicUrlData?.publicUrl) {
-                uploadedUrl = publicUrlData.publicUrl;
-              }
-            } else {
-              console.warn('[Meisterwerk] Supabase storage upload notice, storing locally in IndexedDB:', uploadErr);
-              const localKey = `campus_blob_${fileName}`;
-              await storeBlob(localKey, blob);
-              uploadedUrl = localKey;
-            }
-          } catch (storageErr) {
-            console.warn('[Meisterwerk] Storage notice, using local key:', storageErr);
-            const localKey = `campus_blob_${fileName}`;
-            await storeBlob(localKey, blob);
-            uploadedUrl = localKey;
-          }
-            
-          await saveAudioMetadata(uploadedUrl);
+              
+              const cloudUrl = publicUrlData?.publicUrl;
+              if (cloudUrl) {
+                // Also cache under cloudUrl in IndexedDB for seamless offline/online playback
+                await storeBlob(cloudUrl, blob).catch(() => {});
 
-          // 🎙️ UPDATE AUDIO-TRESOR STORAGE QUOTA (Consumes school storage_used_bytes)
-          if (targetSchoolId && blob?.size) {
-            try {
-              const { data: schoolData } = await supabase
-                .from('schools')
-                .select('storage_used_bytes')
-                .eq('id', targetSchoolId)
-                .maybeSingle();
-              if (schoolData) {
-                const currentBytes = Number(schoolData.storage_used_bytes || 0);
-                const updatedBytes = currentBytes + blob.size;
-                await supabase
-                  .from('schools')
-                  .update({ storage_used_bytes: updatedBytes })
-                  .eq('id', targetSchoolId);
-
-                // Keep local school overrides in sync
-                try {
-                  const overridesStr = localStorage.getItem('groovelab_school_overrides') || '{}';
-                  const overrides = JSON.parse(overridesStr);
-                  if (overrides[targetSchoolId]) {
-                    overrides[targetSchoolId].storage_used_bytes = updatedBytes;
-                    localStorage.setItem('groovelab_school_overrides', JSON.stringify(overrides));
+                // Silently upgrade local pointers to public cloud URL
+                if (isMasterwork) {
+                  if (currentSongId) localStorage.setItem(`campus_mastered_audio_${student.id}_${currentSongId}`, cloudUrl);
+                  if (normKey) localStorage.setItem(`campus_mastered_audio_${student.id}_${normKey}`, cloudUrl);
+                  if (currentSongId) {
+                    supabase.from('user_song_skills').update({ recording_url: cloudUrl }).eq('id', currentSongId).then(() => {});
+                    supabase.from('progress_matrix').update({ recording_url: cloudUrl }).eq('id', currentSongId).then(() => {});
                   }
-                } catch (e) {}
+                } else if (isStudentSession) {
+                  const juniorKey = `campus_junior_recordings_${student.id}`;
+                  try {
+                    const stored = localStorage.getItem(juniorKey);
+                    if (stored) {
+                      const parsed = JSON.parse(stored);
+                      if (Array.isArray(parsed)) {
+                        const upgraded = parsed.map((r: any) => r.id === uniqueRecId || r.url === localBlobKey ? { ...r, url: cloudUrl } : r);
+                        localStorage.setItem(juniorKey, JSON.stringify(upgraded));
+                        setLocalJuniorRecordingsTrigger(prev => prev + 1);
+                      }
+                    }
+                  } catch {}
+                } else {
+                  // Teacher note upgrade
+                  setHomeworkNotesList(prev => {
+                    const ex = prev || [];
+                    const upgradedList = ex.map((n: string) => {
+                      if (typeof n === 'string' && n.includes(localBlobKey)) {
+                        return n.replace(localBlobKey, cloudUrl);
+                      }
+                      return n;
+                    });
+                    syncHomeworkNotes(upgradedList).catch(() => {});
+                    return upgradedList;
+                  });
+                }
               }
-            } catch (quotaErr) {
-              console.warn('[Meisterwerk] Storage quota update note:', quotaErr);
             }
+
+            // Optional: Background quota tracking without blocking UI
+            if (targetSchoolId && blob?.size) {
+              try {
+                const { data: schoolData } = await supabase
+                  .from('schools')
+                  .select('storage_used_bytes')
+                  .eq('id', targetSchoolId)
+                  .maybeSingle();
+                if (schoolData) {
+                  const currentBytes = Number(schoolData.storage_used_bytes || 0);
+                  const updatedBytes = currentBytes + blob.size;
+                  await supabase
+                    .from('schools')
+                    .update({ storage_used_bytes: updatedBytes })
+                    .eq('id', targetSchoolId);
+                }
+              } catch {}
+            }
+          } catch (bgSyncErr) {
+            console.warn('[Meisterwerk] Background cloud sync note (local playback fully intact):', bgSyncErr);
           }
-        } catch (err: any) {
-          console.warn("Storage upload note, saving locally:", err);
-          const localFallbackUrl = url || URL.createObjectURL(blob);
-          await saveAudioMetadata(localFallbackUrl);
-        } finally {
-          setIsUploadingAudio(false);
-        }
+        })();
       };
 
       setAudioDuration(0);
@@ -3153,11 +3216,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
       // Filter text notes for the textarea
       loadedHomeworkNotes = loadedHomeworkNotesList.filter((n: string) => 
-        typeof n === 'string' && 
-        !n.startsWith('AUDIO:') && 
-        !n.startsWith('STICKER:') && 
-        !n.startsWith('FEEDBACK:') && 
-        !n.startsWith('STUDENT_NOTE_')
+        typeof n === 'string' && !isInternalMetadataNote(n)
       ).join('\n\n');
 
       if (!loadedTeacherNotes) {
@@ -4249,8 +4308,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     setGeneralHomeworkNotes(nextText);
     setHomeworkNotes(nextText);
 
-    const specialNotes = (homeworkNotesList || []).filter(n => typeof n === 'string' && (n.startsWith('AUDIO:') || n.startsWith('STICKER:') || n.startsWith('FEEDBACK:') || n.startsWith('STUDENT_NOTE_')));
-    const combined = [...specialNotes, ...updatedLines];
+    const specialNotes = (homeworkNotesList || []).filter(n => typeof n === 'string' && isInternalMetadataNote(n));
+    const cleanUpdatedLines = updatedLines.filter(s => s.length > 0 && !isInternalMetadataNote(s));
+    const combined = [...specialNotes, ...cleanUpdatedLines];
     setHomeworkNotesList(combined);
 
     try {
@@ -4293,8 +4353,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     setGeneralHomeworkNotes(nextText);
     studentNotesSelectionRef.current = { start: nextText.length, end: nextText.length };
 
-    const specialNotes = (homeworkNotesList || []).filter(n => typeof n === 'string' && (n.startsWith('AUDIO:') || n.startsWith('STICKER:') || n.startsWith('FEEDBACK:') || n.startsWith('STUDENT_NOTE_')));
-    const noteLines = nextText.split('\n').map(s => s.trim()).filter(Boolean);
+    const specialNotes = (homeworkNotesList || []).filter(n => typeof n === 'string' && isInternalMetadataNote(n));
+    const noteLines = nextText.split('\n').map(s => s.trim()).filter(s => s.length > 0 && !isInternalMetadataNote(s));
     const combined = [...specialNotes, ...noteLines];
     setHomeworkNotesList(combined);
 
@@ -4340,8 +4400,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     setGeneralHomeworkNotes(nextText);
     studentNotesSelectionRef.current = { start: nextText.length, end: nextText.length };
 
-    const specialNotes = (homeworkNotesList || []).filter(n => typeof n === 'string' && (n.startsWith('AUDIO:') || n.startsWith('STICKER:') || n.startsWith('FEEDBACK:') || n.startsWith('STUDENT_NOTE_')));
-    const noteLines = nextText.split('\n').map(s => s.trim()).filter(Boolean);
+    const specialNotes = (homeworkNotesList || []).filter(n => typeof n === 'string' && isInternalMetadataNote(n));
+    const noteLines = nextText.split('\n').map(s => s.trim()).filter(s => s.length > 0 && !isInternalMetadataNote(s));
     const combined = [...specialNotes, ...noteLines];
     setHomeworkNotesList(combined);
 
@@ -4402,8 +4462,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     setGeneralHomeworkNotes(nextText);
     studentNotesSelectionRef.current = { start: newCursorPos, end: newCursorPos };
 
-    const specialNotes = (homeworkNotesList || []).filter(n => typeof n === 'string' && (n.startsWith('AUDIO:') || n.startsWith('STICKER:') || n.startsWith('FEEDBACK:') || n.startsWith('STUDENT_NOTE_')));
-    const noteLines = nextText.split('\n').map(s => s.trim()).filter(Boolean);
+    const specialNotes = (homeworkNotesList || []).filter(n => typeof n === 'string' && isInternalMetadataNote(n));
+    const noteLines = nextText.split('\n').map(s => s.trim()).filter(s => s.length > 0 && !isInternalMetadataNote(s));
     const combined = [...specialNotes, ...noteLines];
     setHomeworkNotesList(combined);
 
@@ -7085,22 +7145,24 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
                 let rawImpulseLines: string[] = [];
                 if (currentItem?.teacher_notes) {
-                  const cleaned = String(currentItem.teacher_notes).replace(/\["STICKER:[^\]]+"\]/g, '').replace(/STICKER:[^|]+\|[^|]+\|[^|]+/g, '').replace(/AUDIO:[^\s]+/g, '').trim();
-                  if (cleaned) rawImpulseLines = cleaned.split('\n').map(s => s.trim()).filter(Boolean);
+                  const cleaned = cleanNotesText(currentItem.teacher_notes);
+                  if (cleaned) rawImpulseLines = cleaned.split('\n').map(s => s.trim()).filter(s => s.length > 0 && !isInternalMetadataNote(s));
                 }
                 if (rawImpulseLines.length === 0 && currentItem?.homework_notes) {
                   try {
-                    const parsed = JSON.parse(currentItem.homework_notes);
+                    const parsed = typeof currentItem.homework_notes === 'string'
+                      ? JSON.parse(currentItem.homework_notes)
+                      : currentItem.homework_notes;
                     if (Array.isArray(parsed)) {
-                      rawImpulseLines = parsed.filter((n: string) => typeof n === 'string' && !n.startsWith('STICKER:') && !n.startsWith('AUDIO:') && !n.startsWith('FEEDBACK:')).map(s => s.trim()).filter(Boolean);
+                      rawImpulseLines = parsed.filter((n: string) => typeof n === 'string' && !isInternalMetadataNote(n)).map(s => s.trim()).filter(Boolean);
                     }
                   } catch (e) {
-                    const cleaned = String(currentItem.homework_notes).replace(/\["STICKER:[^\]]+"\]/g, '').replace(/STICKER:[^|]+\|[^|]+\|[^|]+/g, '').replace(/AUDIO:[^\s]+/g, '').trim();
-                    if (cleaned) rawImpulseLines = cleaned.split('\n').map(s => s.trim()).filter(Boolean);
+                    const cleaned = cleanNotesText(currentItem.homework_notes);
+                    if (cleaned) rawImpulseLines = cleaned.split('\n').map(s => s.trim()).filter(s => s.length > 0 && !isInternalMetadataNote(s));
                   }
                 }
                 if (rawImpulseLines.length === 0 && generalHomeworkNotes) {
-                  rawImpulseLines = String(generalHomeworkNotes).split('\n').map(s => s.trim()).filter(Boolean);
+                  rawImpulseLines = String(generalHomeworkNotes).split('\n').map(s => s.trim()).filter(s => s.length > 0 && !isInternalMetadataNote(s));
                 }
 
                 return (
@@ -8861,10 +8923,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
                   // Filter by Search Query if active
                   const isSearching = recordingSearchQuery.trim() !== "";
-                  const searchResults = isSearching ? teacherAudios.filter(aud => {
-                    const q = recordingSearchQuery.toLowerCase().trim();
-                    return (aud.label || "").toLowerCase().includes(q) || (aud.date || "").toLowerCase().includes(q);
-                  }) : [];
+                  const searchResults = isSearching ? teacherAudios.filter(aud => matchesAudioSearch(aud, recordingSearchQuery)) : [];
 
                   // Current Week Audios
                   const currentWeekAudios = teacherAudios.filter(aud => {
@@ -9840,10 +9899,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
                   // Filter by Search Query if active
                   const isSearching = recordingSearchQuery.trim() !== "";
-                  const searchResults = isSearching ? studentAudios.filter(aud => {
-                    const q = recordingSearchQuery.toLowerCase().trim();
-                    return (aud.label || "").toLowerCase().includes(q) || (aud.date || "").toLowerCase().includes(q);
-                  }) : [];
+                  const searchResults = isSearching ? studentAudios.filter(aud => matchesAudioSearch(aud, recordingSearchQuery)) : [];
 
                   // Current Week Audios
                   const currentWeekAudios = studentAudios.filter(aud => {
@@ -13946,53 +14002,103 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           </div>{/* close inner scrollable div */}
 
           {/* Meisterwerke, Sticker-Album & Audio-Biografie Buttons - pinned at bottom (Trophy Dock) */}
-                <div style={{ padding: '8px 16px 14px 16px', display: 'flex', gap: '8px', borderTop: '1px solid #f1f5f9', background: '#ffffff' }}>
+                <div style={{
+                  padding: isMobileOrSim ? '6px 10px calc(8px + env(safe-area-inset-bottom, 0px)) 10px' : '8px 16px 14px 16px',
+                  display: 'flex',
+                  gap: isMobileOrSim ? '6px' : '8px',
+                  borderTop: '1px solid #f1f5f9',
+                  background: '#ffffff',
+                  boxSizing: 'border-box',
+                  width: '100%'
+                }}>
                   <button
                     type="button"
                     onClick={() => setActiveModalTab('logbook')}
                     style={{
-                      flex: 1, padding: '10px 6px', borderRadius: '12px', border: 'none',
-                      background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', color: 'white', fontWeight: 800, fontSize: '0.76rem', cursor: 'pointer',
+                      flex: 1,
+                      minWidth: 0,
+                      padding: isMobileOrSim ? '8px 4px' : '10px 6px',
+                      borderRadius: '12px',
+                      border: 'none',
+                      background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+                      color: 'white',
+                      fontWeight: 800,
+                      fontSize: isMobileOrSim ? '0.72rem' : '0.76rem',
+                      cursor: 'pointer',
                       boxShadow: '0 3px 8px rgba(99, 102, 241, 0.25)',
                       transition: 'all 0.15s ease',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px'
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: isMobileOrSim ? '4px' : '5px'
                     }}
                     className="hover-scale"
+                    title={isMobileOrSim ? 'Deine Meisterwerke' : undefined}
                   >
-                    <Award size={14} />
-                    <span style={{ whiteSpace: 'nowrap' }}>Deine Meisterwerke</span>
+                    <Award size={isMobileOrSim ? 13 : 14} />
+                    <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {isMobileOrSim ? 'Meisterwerke' : 'Deine Meisterwerke'}
+                    </span>
                   </button>
                   <button
                     type="button"
                     onClick={() => { setActiveModalTab('stickeralbum'); setActiveSubView('hub'); }}
                     style={{
-                      flex: 1, padding: '10px 6px', borderRadius: '12px', border: 'none',
-                      background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', color: 'white', fontWeight: 800, fontSize: '0.76rem', cursor: 'pointer',
+                      flex: 1,
+                      minWidth: 0,
+                      padding: isMobileOrSim ? '8px 4px' : '10px 6px',
+                      borderRadius: '12px',
+                      border: 'none',
+                      background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                      color: 'white',
+                      fontWeight: 800,
+                      fontSize: isMobileOrSim ? '0.72rem' : '0.76rem',
+                      cursor: 'pointer',
                       boxShadow: '0 3px 8px rgba(217, 119, 6, 0.25)',
                       transition: 'all 0.15s ease',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px'
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: isMobileOrSim ? '4px' : '5px'
                     }}
                     className="hover-scale"
+                    title={isMobileOrSim ? (uiLevel === 'junior' ? 'Sticker-Album' : uiLevel === 'teen' ? 'Badges & Trophäen' : 'Meilensteine') : undefined}
                   >
-                    <Star size={14} fill="#fff" />
-                    <span style={{ whiteSpace: 'nowrap' }}>
-                      {uiLevel === 'junior' ? 'Sticker-Album' : uiLevel === 'teen' ? 'Badges & Trophäen' : 'Meilensteine'}
+                    <Star size={isMobileOrSim ? 13 : 14} fill="#fff" />
+                    <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {isMobileOrSim 
+                        ? (uiLevel === 'junior' ? 'Sticker' : uiLevel === 'teen' ? 'Trophäen' : 'Meilensteine')
+                        : (uiLevel === 'junior' ? 'Sticker-Album' : uiLevel === 'teen' ? 'Badges & Trophäen' : 'Meilensteine')}
                     </span>
                   </button>
                   <button
                     type="button"
                     onClick={() => { setActiveModalTab('audiobiography'); setActiveSubView('hub'); }}
                     style={{
-                      flex: 1, padding: '10px 6px', borderRadius: '12px', border: 'none',
-                      background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)', color: 'white', fontWeight: 800, fontSize: '0.76rem', cursor: 'pointer',
+                      flex: 1,
+                      minWidth: 0,
+                      padding: isMobileOrSim ? '8px 4px' : '10px 6px',
+                      borderRadius: '12px',
+                      border: 'none',
+                      background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)',
+                      color: 'white',
+                      fontWeight: 800,
+                      fontSize: isMobileOrSim ? '0.72rem' : '0.76rem',
+                      cursor: 'pointer',
                       boxShadow: '0 3px 8px rgba(16, 185, 129, 0.25)',
                       transition: 'all 0.15s ease',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px'
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: isMobileOrSim ? '4px' : '5px'
                     }}
                     className="hover-scale"
+                    title={isMobileOrSim ? 'Audio-Biografie (Tresor)' : undefined}
                   >
-                    <Disc size={14} />
-                    <span style={{ whiteSpace: 'nowrap' }}>Audio-Biografie</span>
+                    <Disc size={isMobileOrSim ? 13 : 14} />
+                    <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {isMobileOrSim ? 'Biografie' : 'Audio-Biografie'}
+                    </span>
                   </button>
                 </div>
               </>
@@ -17165,8 +17271,6 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                     </div>
                                   )}
                                 </div>
-
-                                {/* SECTION 2: Unified Notes Area with Segmented Switcher */}
                                   {(() => {
                                     const toolboxViewingWeekIso = (() => {
                                       if (viewingWeekOffset === 0) return getISOWeek();
@@ -17193,14 +17297,14 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                           : histWeekItem.homework_notes;
                                         if (Array.isArray(parsed)) {
                                           return parsed
-                                            .filter((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('FEEDBACK:') && !n.startsWith('STUDENT_NOTE_'))
+                                            .filter((n: string) => typeof n === 'string' && !isInternalMetadataNote(n))
                                             .join('\n')
                                             .trim();
                                         } else if (typeof parsed === 'string') {
-                                          return parsed.split('\n').filter((s: string) => !s.startsWith('AUDIO:') && !s.startsWith('STICKER:') && !s.startsWith('FEEDBACK:')).join('\n').trim();
+                                          return parsed.split('\n').filter((s: string) => !isInternalMetadataNote(s)).join('\n').trim();
                                         }
                                       } catch (e) {
-                                        return String(histWeekItem.homework_notes).replace(/\["STICKER:[^\]]+"\]/g, '').replace(/STICKER:[^|]+\|[^|]+\|[^|]+/g, '').replace(/AUDIO:[^\s]+/g, '').trim();
+                                        return cleanNotesText(histWeekItem.homework_notes);
                                       }
                                       return '';
                                     };
@@ -17389,8 +17493,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                               if (viewingWeekOffset === 0) {
                                                 latestGeneralHomeworkNotesRef.current = val;
                                                 setGeneralHomeworkNotes(val);
-                                                const specialNotes = (homeworkNotesList || []).filter(n => typeof n === 'string' && (n.startsWith('AUDIO:') || n.startsWith('STICKER:') || n.startsWith('FEEDBACK:') || n.startsWith('STUDENT_NOTE_')));
-                                                const noteLines = val.split('\n').map(s => s.trim()).filter(Boolean);
+                                                const specialNotes = (homeworkNotesList || []).filter(n => typeof n === 'string' && isInternalMetadataNote(n));
+                                                const noteLines = val.split('\n').map(s => s.trim()).filter(s => s.length > 0 && !isInternalMetadataNote(s));
                                                 const combined = [...specialNotes, ...noteLines];
                                                 setHomeworkNotesList(combined);
                                                 try { localStorage.setItem(`campus_homework_notes_${student.id}`, JSON.stringify(combined)); } catch {}
