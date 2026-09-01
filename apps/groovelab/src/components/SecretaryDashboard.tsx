@@ -41,7 +41,7 @@ import { GuidanceCenterModal } from './modals/GuidanceCenterModal';
 import { ParentInfoSheetModal } from './modals/ParentInfoSheetModal';
 import { generateTeacherQuickstartPDF, generateParentQuickstartPDF } from '../utils/pdfGenerator';
 import { getParentOnboardingUrl, isDevEnvironment } from '../utils/tenantUrlHelper';
-import { calculateSchoolYearDirectBilling } from '../utils/epcGiroCode';
+import { calculateSchoolYearDirectBilling, calculateTransitionEffectiveDate } from '../utils/epcGiroCode';
 import { 
   fetchSchoolRoster, 
   getTeacherRoster, 
@@ -29540,64 +29540,136 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                         </div>
 
                                         {/* Row 2: Billing Payer, Student Fee, and Audio-Tresor Storage (3 Columns) */}
-                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', marginBottom: '14px' }}>
-                                          {/* Who pays */}
-                                          <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '14px 16px', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                              <div style={{ width: '10px', height: '10px', minWidth: '10px', borderRadius: '50%', background: billingPayer === 'school' ? '#7e22ce' : '#0284c7', boxShadow: `0 0 0 3px ${billingPayer === 'school' ? 'rgba(126, 34, 206, 0.15)' : 'rgba(2, 132, 199, 0.15)'}` }} />
-                                              <div>
-                                                <div style={{ fontSize: '0.84rem', fontWeight: 700, color: '#0f172a' }}>
-                                                  {billingPayer === 'school' ? 'Zahlung: Musikschule' : 'Zahlung: Eltern'}
-                                                </div>
-                                                <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 500 }}>
-                                                  {billingPayer === 'school' ? 'Sammelabrechnung Träger' : 'Direktabrechnung (Jahresbeitrag)'}
-                                                </div>
+                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px', marginBottom: '14px' }}>
+                                          {/* Card 1: Who pays */}
+                                          <div style={{
+                                            background: '#ffffff',
+                                            border: '1.5px solid #e2e8f0',
+                                            padding: '16px',
+                                            borderRadius: '18px',
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            justifyContent: 'space-between',
+                                            minHeight: '142px',
+                                            boxShadow: '0 2px 10px rgba(0, 0, 0, 0.03)',
+                                            boxSizing: 'border-box'
+                                          }}>
+                                            <div>
+                                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                                                <div style={{
+                                                  width: '8px',
+                                                  height: '8px',
+                                                  minWidth: '8px',
+                                                  borderRadius: '50%',
+                                                  background: billingPayer === 'school' ? '#7e22ce' : '#0284c7',
+                                                  boxShadow: `0 0 0 3px ${billingPayer === 'school' ? 'rgba(126, 34, 206, 0.18)' : 'rgba(2, 132, 199, 0.18)'}`
+                                                }} />
+                                                <span style={{ fontSize: '0.66rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                                                  Zahlungsmodell
+                                                </span>
+                                              </div>
+                                              <div style={{ fontSize: '0.94rem', fontWeight: 800, color: '#0f172a', letterSpacing: '-0.01em', marginBottom: '3px' }}>
+                                                {billingPayer === 'school' ? 'Zahlung: Musikschule' : 'Zahlung: Eltern'}
+                                              </div>
+                                              <div style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 500 }}>
+                                                {billingPayer === 'school' ? 'Sammelabrechnung Träger (0,49 € / Mo.)' : 'Direktabrechnung (Jahresbeitrag)'}
                                               </div>
                                             </div>
+
                                             <button
                                               type="button"
                                               onClick={() => {
-                                                setSelectedSwitchTargetPayer(billingPayer === 'school' ? 'student' : 'school');
+                                                setSelectedSwitchTargetPayer(billingPayer);
                                                 setShowSwitchBillingModelModal(true);
                                               }}
                                               style={{
-                                                background: '#ffffff',
-                                                border: '1.5px solid #cbd5e1',
-                                                borderRadius: '8px',
-                                                padding: '4px 9px',
-                                                fontSize: '0.68rem',
-                                                fontWeight: 700,
-                                                color: '#0f172a',
+                                                width: '100%',
+                                                marginTop: '12px',
+                                                background: billingPayer === 'school' ? '#0f172a' : '#0284c7',
+                                                color: '#ffffff',
+                                                border: 'none',
+                                                borderRadius: '11px',
+                                                padding: '9px 14px',
+                                                fontSize: '0.75rem',
+                                                fontWeight: 800,
                                                 cursor: 'pointer',
                                                 display: 'flex',
                                                 alignItems: 'center',
-                                                gap: '4px',
-                                                whiteSpace: 'nowrap',
-                                                boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                                                justifyContent: 'center',
+                                                gap: '6px',
+                                                boxShadow: '0 2px 6px rgba(15, 23, 42, 0.1)',
                                                 transition: 'all 0.15s ease'
                                               }}
-                                              onMouseOver={(e) => { e.currentTarget.style.borderColor = '#0f172a'; }}
-                                              onMouseOut={(e) => { e.currentTarget.style.borderColor = '#cbd5e1'; }}
+                                              onMouseOver={(e) => {
+                                                e.currentTarget.style.transform = 'translateY(-1px)';
+                                                e.currentTarget.style.boxShadow = '0 4px 12px rgba(15, 23, 42, 0.18)';
+                                              }}
+                                              onMouseOut={(e) => {
+                                                e.currentTarget.style.transform = 'none';
+                                                e.currentTarget.style.boxShadow = '0 2px 6px rgba(15, 23, 42, 0.1)';
+                                              }}
                                             >
-                                              <RefreshCw size={11} />
-                                              <span>Anpassen &gt;</span>
+                                              <RefreshCw size={12} />
+                                              <span>Tarif &amp; Zahler anpassen</span>
                                             </button>
                                           </div>
 
-                                          {/* Student cost */}
-                                          <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '14px 16px', borderRadius: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                            <div style={{ width: '10px', height: '10px', minWidth: '10px', borderRadius: '50%', background: billingPayer === 'school' ? '#34a853' : '#0284c7', boxShadow: `0 0 0 3px ${billingPayer === 'school' ? 'rgba(52, 168, 83, 0.15)' : 'rgba(2, 132, 199, 0.15)'}` }} />
+                                          {/* Card 2: Student cost */}
+                                          <div style={{
+                                            background: '#ffffff',
+                                            border: '1.5px solid #e2e8f0',
+                                            padding: '16px',
+                                            borderRadius: '18px',
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            justifyContent: 'space-between',
+                                            minHeight: '142px',
+                                            boxShadow: '0 2px 10px rgba(0, 0, 0, 0.03)',
+                                            boxSizing: 'border-box'
+                                          }}>
                                             <div>
-                                              <div style={{ fontSize: '0.84rem', fontWeight: 700, color: '#0f172a' }}>
+                                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                                                <div style={{
+                                                  width: '8px',
+                                                  height: '8px',
+                                                  minWidth: '8px',
+                                                  borderRadius: '50%',
+                                                  background: billingPayer === 'school' ? '#16a34a' : '#0284c7',
+                                                  boxShadow: `0 0 0 3px ${billingPayer === 'school' ? 'rgba(22, 163, 74, 0.18)' : 'rgba(2, 132, 199, 0.18)'}`
+                                                }} />
+                                                <span style={{ fontSize: '0.66rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                                                  Kosten pro Schüler
+                                                </span>
+                                              </div>
+                                              <div style={{ fontSize: '0.94rem', fontWeight: 800, color: '#0f172a', letterSpacing: '-0.01em', marginBottom: '3px' }}>
                                                 Beitrag für Schüler
                                               </div>
-                                              <div style={{ fontSize: '0.72rem', color: billingPayer === 'school' ? '#15803d' : '#0369a1', fontWeight: 600 }}>
-                                                {billingPayer === 'school' ? '0,00 € (100% Kostenfrei)' : 'Direktbeitrag der Eltern'}
+                                              <div style={{ fontSize: '0.74rem', color: billingPayer === 'school' ? '#15803d' : '#0369a1', fontWeight: 600 }}>
+                                                {billingPayer === 'school' ? '0,00 € (100% Kostenfrei für Eltern)' : 'Einmaliger Direktbeitrag der Eltern'}
                                               </div>
+                                            </div>
+
+                                            <div style={{
+                                              width: '100%',
+                                              marginTop: '12px',
+                                              background: billingPayer === 'school' ? '#f0fdf4' : '#f0f9ff',
+                                              border: `1px solid ${billingPayer === 'school' ? '#bbf7d0' : '#bae6fd'}`,
+                                              borderRadius: '11px',
+                                              padding: '9px 12px',
+                                              fontSize: '0.72rem',
+                                              fontWeight: 700,
+                                              color: billingPayer === 'school' ? '#15803d' : '#0284c7',
+                                              display: 'flex',
+                                              alignItems: 'center',
+                                              justifyContent: 'center',
+                                              gap: '6px',
+                                              boxSizing: 'border-box'
+                                            }}>
+                                              <span>{billingPayer === 'school' ? '✓ Träger übernimmt 100%' : '✓ Dynamischer Jahresrestbeitrag'}</span>
                                             </div>
                                           </div>
 
-                                          {/* Audio-Tresor Cloud-Speicher Card */}
+                                          {/* Card 3: Audio-Tresor Cloud-Speicher Card */}
                                           {(() => {
                                             const addonGb = Number(currentSchoolProfile?.storage_addon_gb || selectedStorageAddonGb || 0);
                                             const addonFee = Number(currentSchoolProfile?.storage_addon_monthly_fee || (addonGb === 5 ? 1.49 : addonGb === 10 ? 1.99 : addonGb === 20 ? 3.99 : addonGb === 25 ? 3.99 : addonGb === 50 ? 6.99 : addonGb === 100 ? 11.99 : addonGb === 250 ? 24.99 : 0));
@@ -29615,53 +29687,91 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                             const isCritical = usagePct >= 95;
 
                                             return (
-                                              <div style={{ background: '#f8fafc', border: `1px solid ${isCritical ? '#fca5a5' : isWarning ? '#fde68a' : '#e2e8f0'}`, padding: '14px 16px', borderRadius: '16px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '8px' }}>
-                                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                    <div style={{ width: '10px', height: '10px', minWidth: '10px', borderRadius: '50%', background: isCritical ? '#dc2626' : isWarning ? '#f59e0b' : '#10b981', boxShadow: `0 0 0 3px ${isCritical ? 'rgba(220, 38, 38, 0.15)' : isWarning ? 'rgba(245, 158, 11, 0.15)' : 'rgba(16, 185, 129, 0.15)'}` }} />
-                                                    <div style={{ fontSize: '0.84rem', fontWeight: 700, color: '#0f172a' }}>Audio-Tresor Speicher</div>
+                                              <div style={{
+                                                background: '#ffffff',
+                                                border: `1.5px solid ${isCritical ? '#fca5a5' : isWarning ? '#fde68a' : '#e2e8f0'}`,
+                                                padding: '16px',
+                                                borderRadius: '18px',
+                                                display: 'flex',
+                                                flexDirection: 'column',
+                                                justifyContent: 'space-between',
+                                                minHeight: '142px',
+                                                boxShadow: '0 2px 10px rgba(0, 0, 0, 0.03)',
+                                                boxSizing: 'border-box'
+                                              }}>
+                                                <div>
+                                                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                      <div style={{
+                                                        width: '8px',
+                                                        height: '8px',
+                                                        minWidth: '8px',
+                                                        borderRadius: '50%',
+                                                        background: isCritical ? '#dc2626' : isWarning ? '#f59e0b' : '#10b981',
+                                                        boxShadow: `0 0 0 3px ${isCritical ? 'rgba(220, 38, 38, 0.18)' : isWarning ? 'rgba(245, 158, 11, 0.18)' : 'rgba(16, 185, 129, 0.18)'}`
+                                                      }} />
+                                                      <span style={{ fontSize: '0.66rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                                                        Audio-Tresor Speicher
+                                                      </span>
+                                                    </div>
+                                                    <span style={{ fontSize: '0.66rem', background: isCritical ? '#fee2e2' : isWarning ? '#fef3c7' : addonGb > 0 ? '#dcfce7' : '#f1f5f9', color: isCritical ? '#991b1b' : isWarning ? '#92400e' : addonGb > 0 ? '#166534' : '#475569', padding: '1px 7px', borderRadius: '6px', fontWeight: 700 }}>
+                                                      {isCritical ? '🚨 95% Belegt' : isWarning ? '⚠️ 80% Belegt' : addonGb > 0 ? `+${addonGb} GB` : '1 GB Basis'}
+                                                    </span>
                                                   </div>
-                                                  <span style={{ fontSize: '0.68rem', background: isCritical ? '#fee2e2' : isWarning ? '#fef3c7' : addonGb > 0 ? '#dcfce7' : '#f1f5f9', color: isCritical ? '#991b1b' : isWarning ? '#92400e' : addonGb > 0 ? '#166534' : '#475569', padding: '1px 6px', borderRadius: '6px', fontWeight: 700 }}>
-                                                    {isCritical ? '🚨 95% Belegt' : isWarning ? '⚠️ 80% Belegt' : addonGb > 0 ? `+${addonGb} GB` : '1 GB Basis'}
-                                                  </span>
-                                                </div>
-                                                {/* Live Quota Bar */}
-                                                <div style={{ width: '100%', height: '5px', background: '#e2e8f0', borderRadius: '100px', overflow: 'hidden', margin: '2px 0' }}>
-                                                  <div style={{
-                                                    width: `${usedBytes > 0 ? Math.max(3, usagePct) : 0}%`,
-                                                    height: '100%',
-                                                    background: isCritical ? '#dc2626' : isWarning ? '#f59e0b' : 'linear-gradient(90deg, #10b981 0%, #059669 100%)',
-                                                    borderRadius: '100px',
-                                                    transition: 'width 0.3s ease'
-                                                  }} />
-                                                </div>
-                                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '2px' }}>
-                                                  <div style={{ fontSize: '0.72rem', color: isCritical ? '#dc2626' : isWarning ? '#b45309' : '#64748b', fontWeight: 600 }}>
-                                                    {formattedUsed} von {totalCapGb} GB ({usagePct.toFixed(0)}%) {addonGb > 0 ? `• ${addonFee.toFixed(2).replace('.', ',')} € / Mo.` : '• Inklusive'}
+
+                                                  <div style={{ fontSize: '0.94rem', fontWeight: 800, color: '#0f172a', letterSpacing: '-0.01em', marginBottom: '3px' }}>
+                                                    {formattedUsed} von {totalCapGb} GB <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 500 }}>({usagePct.toFixed(0)}%)</span>
                                                   </div>
-                                                  <button
-                                                    type="button"
-                                                    onClick={() => setShowStorageManagerModal(true)}
-                                                    style={{
-                                                      background: '#ffffff',
-                                                      border: '1.5px solid #cbd5e1',
-                                                      borderRadius: '8px',
-                                                      padding: '3px 8px',
-                                                      fontSize: '0.68rem',
-                                                      fontWeight: 700,
-                                                      color: '#0f172a',
-                                                      cursor: 'pointer',
-                                                      display: 'flex',
-                                                      alignItems: 'center',
-                                                      gap: '2px',
-                                                      boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
-                                                      transition: 'all 0.15s ease'
-                                                    }}
-                                                  >
-                                                    <span>Anpassen</span>
-                                                    <ChevronRight size={11} color="#64748b" />
-                                                  </button>
+
+                                                  {/* Live Quota Bar */}
+                                                  <div style={{ width: '100%', height: '5px', background: '#f1f5f9', borderRadius: '100px', overflow: 'hidden', margin: '6px 0 2px 0' }}>
+                                                    <div style={{
+                                                      width: `${usedBytes > 0 ? Math.max(3, usagePct) : 0}%`,
+                                                      height: '100%',
+                                                      background: isCritical ? '#dc2626' : isWarning ? '#f59e0b' : 'linear-gradient(90deg, #10b981 0%, #059669 100%)',
+                                                      borderRadius: '100px',
+                                                      transition: 'width 0.3s ease'
+                                                    }} />
+                                                  </div>
                                                 </div>
+
+                                                <button
+                                                  type="button"
+                                                  onClick={() => setShowStorageManagerModal(true)}
+                                                  style={{
+                                                    width: '100%',
+                                                    marginTop: '12px',
+                                                    background: '#f8fafc',
+                                                    border: '1.5px solid #e2e8f0',
+                                                    borderRadius: '11px',
+                                                    padding: '8px 12px',
+                                                    fontSize: '0.74rem',
+                                                    fontWeight: 700,
+                                                    color: '#0f172a',
+                                                    cursor: 'pointer',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    gap: '6px',
+                                                    boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
+                                                    transition: 'all 0.15s ease'
+                                                  }}
+                                                  onMouseOver={(e) => {
+                                                    e.currentTarget.style.background = '#ffffff';
+                                                    e.currentTarget.style.borderColor = '#cbd5e1';
+                                                    e.currentTarget.style.transform = 'translateY(-1px)';
+                                                    e.currentTarget.style.boxShadow = '0 4px 10px rgba(0,0,0,0.06)';
+                                                  }}
+                                                  onMouseOut={(e) => {
+                                                    e.currentTarget.style.background = '#f8fafc';
+                                                    e.currentTarget.style.borderColor = '#e2e8f0';
+                                                    e.currentTarget.style.transform = 'none';
+                                                    e.currentTarget.style.boxShadow = '0 1px 2px rgba(0,0,0,0.03)';
+                                                  }}
+                                                >
+                                                  <span>Speicher &amp; Tresor anpassen</span>
+                                                  <ChevronRight size={12} color="#64748b" />
+                                                </button>
                                               </div>
                                             );
                                           })()}
@@ -36458,8 +36568,8 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
             {/* 🌟 Apple Tier-1 Enterprise Modal: Switch Billing Model (Sammelzahler vs. Eltern-Direktabrechnung) */}
       {showSwitchBillingModelModal && (() => {
         const activeCampusCount = (students || []).filter((s: any) => s.isCampusActive || s.is_campus_active).length;
-        const currentMonthlyFeeForStudents = billingPayer === 'school' ? activeCampusCount * 0.49 : 0;
-        const targetMonthlyFeeForStudents = selectedSwitchTargetPayer === 'student' ? activeCampusCount * 0.09 : activeCampusCount * 0.49;
+        const currentMonthlyFeeForStudents = billingPayer === 'school' ? activeCampusCount * (currentSchoolProfile?.currency === 'CHF' ? 1.00 : 0.49) : 0;
+        const targetMonthlyFeeForStudents = selectedSwitchTargetPayer === 'student' ? 0 : activeCampusCount * (currentSchoolProfile?.currency === 'CHF' ? 1.00 : 0.49);
         const monthlySavings = Math.max(0, currentMonthlyFeeForStudents - targetMonthlyFeeForStudents);
         const yearlySavings = monthlySavings * 12;
 
@@ -36467,10 +36577,20 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
 
         const isChf = currentSchoolProfile?.currency === 'CHF';
         const activeCurrency = isChf ? 'CHF' : 'EUR';
+        const currencySymbol = isChf ? 'CHF' : '€';
         const studentRate = isChf ? 1.00 : 0.49;
         const schoolStartMonth = Number(currentSchoolProfile?.school_year_start_month || 9);
         const schoolStartDay = Number(currentSchoolProfile?.school_year_start_day || 1);
-        const schoolYearCalc = calculateSchoolYearDirectBilling(new Date(), activeCurrency, studentRate, schoolStartMonth, schoolStartDay);
+
+        const transitionInfo = calculateTransitionEffectiveDate(new Date());
+        const schoolYearCalc = calculateSchoolYearDirectBilling(
+          new Date(),
+          activeCurrency,
+          studentRate,
+          schoolStartMonth,
+          schoolStartDay,
+          transitionInfo.effectiveDateIso
+        );
 
         const handleDownloadParentLetterPdf = async () => {
           try {
@@ -36513,9 +36633,9 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
               'das Modell der fairen Eltern-Direktabrechnung mit dynamischer Restzeitberechnung um.',
               '',
               'Die wichtigsten Eckdaten für Sie im Überblick:',
-              `• Einmaliger Restschuljahres-Beitrag: nur ${schoolYearCalc.totalAmountStr} ${currencySymbol} (für ${schoolYearCalc.remainingPaidMonths} Restmonate à ${studentRate.toFixed(2).replace('.', ',')} ${currencySymbol} bis Schuljahresende).`,
-              `• 30 Tage Kulanzfrist: Der Probemonat (${schoolYearCalc.freeMonthName}) ist gratis • Ihr Kind kann 30 Tage voll üben.`,
-              '• Dynamische Restzeit: Sie zahlen immer nur die verbleibenden Monate bis zum Schuljahresende (kein Volljahr-Zwang).',
+              `• Voll finanzierte Übergangsphase: Der laufende Monat (${transitionInfo.currentMonthName}) und der Folgemonat (${transitionInfo.bufferMonthName}) werden zu 100% von der Musikschule übernommen. Ihr Kind übt unterbrechungsfrei weiter!`,
+              `• Bezahlter Zeitraum ab ${transitionInfo.effectiveDateFormatted}: Einmaliger Restschuljahres-Beitrag von nur ${schoolYearCalc.totalAmountStr} ${currencySymbol} (für ${schoolYearCalc.remainingPaidMonths} verbleibende Restmonate bis zum Schuljahresende am 31. August).`,
+              '• Dynamische Restzeit: Sie zahlen immer nur die tatsächlich verbleibenden Monate bis zum Schuljahresende (kein 12-Monats-Zwang).',
               '• Kein Abo & keine Verlängerung: Einmalige Schuljahresgebühr • endet automatisch zum Schuljahresende.',
               '• GrooveLab-Vorteil: Band-Rooms, Repertoire & Songs bleiben für Ihr Kind 100% kostenfrei (Schule übernimmt).',
               '• 100% Datenschutz: Keine Speicherung von Bankdaten Minderjähriger (DSGVO/COPPA-konform).',
@@ -36571,6 +36691,8 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
             const updates: any = {
               billing_payer: targetPayer,
               student_billing_option: targetOption,
+              direct_billing_effective_date: targetPayer === 'student' ? transitionInfo.effectiveDateIso : null,
+              direct_billing_switched_at: new Date().toISOString(),
               updated_at: new Date().toISOString()
             };
 
@@ -36606,7 +36728,8 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
               overrides[schoolId] = {
                 ...(overrides[schoolId] || {}),
                 billing_payer: targetPayer,
-                student_billing_option: targetOption
+                student_billing_option: targetOption,
+                direct_billing_effective_date: updates.direct_billing_effective_date
               };
               localStorage.setItem('groovelab_school_overrides', JSON.stringify(overrides));
               localStorage.setItem('campus_school_overrides', JSON.stringify(overrides));
@@ -36617,7 +36740,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
             setShowSwitchBillingModelModal(false);
             await fetchDashboardData();
             alert(targetPayer === 'student' 
-              ? 'Erfolgreich umgestellt! Deine Musikschule ist ab sofort auf Eltern-Direktabrechnung umgeschaltet. Alle aktiven Schüler behalten 30 Tage Übergangsfrist.' 
+              ? `Erfolgreich umgestellt! Deine Musikschule finanziert den ${transitionInfo.currentMonthName} und den ${transitionInfo.bufferMonthName} als Puffer-Übergangsmonat (0,49 € / Schüler). Ab dem ${transitionInfo.effectiveDateFormatted} greift die Eltern-Direktabrechnung mit nur ${schoolYearCalc.totalAmountStr} € Restschuljahresbeitrag pro Schüler.`
               : 'Erfolgreich umgestellt! Deine Musikschule übernimmt ab sofort alle Schülerkosten als Sammelzahler (0 Tage Frist • sofortige Vollfreischaltung aller Schüler).');
           } catch (err: any) {
             alert('Fehler beim Modellwechsel: ' + err.message);
@@ -36672,7 +36795,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                     Abrechnungsmodell für Schüler-Aktivierungen anpassen
                   </h3>
                   <p style={{ margin: 0, fontSize: '0.82rem', color: '#64748b', lineHeight: 1.4 }}>
-                    Wechsle jederzeit flexibel zwischen Sammelabrechnung über die Musikschule und Eltern-Direktabrechnung mit 30 Tagen Kulanzfrist.
+                    Wechsle flexibel zwischen Musikschul-Sammelabrechnung und Eltern-Direktabrechnung mit voll finanzierter 2-Monats-Übergangsphase für unterbrechungsfreien Unterricht.
                   </p>
                 </div>
                 <button
@@ -36706,10 +36829,17 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                 >
                   <div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                      <span style={{ fontSize: '0.68rem', fontWeight: 800, background: '#dcfce7', color: '#166534', padding: '2px 8px', borderRadius: '6px' }}>
-                        🌟 Empfohlen
-                      </span>
-                      <div style={{ width: '18px', height: '18px', borderRadius: '50%', border: '2px solid', borderColor: selectedSwitchTargetPayer === 'student' ? '#0284c7' : '#cbd5e1', background: selectedSwitchTargetPayer === 'student' ? '#0284c7' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ffffff', fontSize: '0.65rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ fontSize: '0.68rem', fontWeight: 800, background: '#dcfce7', color: '#166534', padding: '2px 8px', borderRadius: '6px' }}>
+                          🌟 Empfohlen
+                        </span>
+                        {billingPayer === 'student' && (
+                          <span style={{ fontSize: '0.68rem', fontWeight: 800, background: '#e0f2fe', color: '#0369a1', padding: '2px 8px', borderRadius: '6px' }}>
+                            ● Aktuell aktiv
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ width: '20px', height: '20px', borderRadius: '50%', border: '2px solid', borderColor: selectedSwitchTargetPayer === 'student' ? '#0284c7' : '#cbd5e1', background: selectedSwitchTargetPayer === 'student' ? '#0284c7' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ffffff', fontSize: '0.72rem', fontWeight: 800 }}>
                         {selectedSwitchTargetPayer === 'student' && '✓'}
                       </div>
                     </div>
@@ -36717,12 +36847,12 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                       Eltern-Direktabrechnung
                     </div>
                     <div style={{ fontSize: '0.74rem', color: '#0284c7', fontWeight: 700, margin: '2px 0 6px 0' }}>
-                      5,88 € / Jahr (0,49 € / Mo.) direkt durch Eltern
+                      {schoolYearCalc.totalAmountStr} {currencySymbol} Restschuljahres-Beitrag ({studentRate.toFixed(2).replace('.', ',')} {currencySymbol} / Mo.)
                     </div>
                     <ul style={{ margin: 0, paddingLeft: '16px', fontSize: '0.72rem', color: '#475569', lineHeight: 1.5 }}>
-                      <li>Schule zahlt ab sofort nur <strong>0,09 € Basisgebühr / Mo.</strong></li>
-                      <li>Mit jeder Eltern-Aktivierung sinkt der Beitrag auf <strong>0,00 €</strong></li>
-                      <li>30 Tage Übergangsphase: Voller Schüler-Zugang bleibt aktiv</li>
+                      <li>Ab <strong>{transitionInfo.effectiveDateFormatted}</strong>: Schulkosten sinken auf <strong>0,00 € pro aktiven Schüler</strong></li>
+                      <li>Puffer-Garantie: Musikschule finanziert <strong>{transitionInfo.currentMonthName} &amp; {transitionInfo.bufferMonthName}</strong> vollständig</li>
+                      <li>Kein Abo &amp; keine Verlängerung: Einmalbeitrag bis 31. August</li>
                     </ul>
                   </div>
                 </div>
@@ -36747,10 +36877,17 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                 >
                   <div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                      <span style={{ fontSize: '0.68rem', fontWeight: 800, background: '#f3e8ff', color: '#6b21a8', padding: '2px 8px', borderRadius: '6px' }}>
-                        🏫 Sammelzahler
-                      </span>
-                      <div style={{ width: '18px', height: '18px', borderRadius: '50%', border: '2px solid', borderColor: selectedSwitchTargetPayer === 'school' ? '#7e22ce' : '#cbd5e1', background: selectedSwitchTargetPayer === 'school' ? '#7e22ce' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ffffff', fontSize: '0.65rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ fontSize: '0.68rem', fontWeight: 800, background: '#f3e8ff', color: '#6b21a8', padding: '2px 8px', borderRadius: '6px' }}>
+                          🏫 Sammelzahler
+                        </span>
+                        {billingPayer === 'school' && (
+                          <span style={{ fontSize: '0.68rem', fontWeight: 800, background: '#e0f2fe', color: '#0369a1', padding: '2px 8px', borderRadius: '6px' }}>
+                            ● Aktuell aktiv
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ width: '20px', height: '20px', borderRadius: '50%', border: '2px solid', borderColor: selectedSwitchTargetPayer === 'school' ? '#7e22ce' : '#cbd5e1', background: selectedSwitchTargetPayer === 'school' ? '#7e22ce' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ffffff', fontSize: '0.72rem', fontWeight: 800 }}>
                         {selectedSwitchTargetPayer === 'school' && '✓'}
                       </div>
                     </div>
@@ -36758,18 +36895,39 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                       Musikschule übernimmt
                     </div>
                     <div style={{ fontSize: '0.74rem', color: '#7e22ce', fontWeight: 700, margin: '2px 0 6px 0' }}>
-                      0,49 € / Schüler / Mo. auf Sammelrechnung
+                      {studentRate.toFixed(2).replace('.', ',')} {currencySymbol} / Schüler / Mo. auf Sammelrechnung
                     </div>
                     <ul style={{ margin: 0, paddingLeft: '16px', fontSize: '0.72rem', color: '#475569', lineHeight: 1.5 }}>
-                      <li>100% kostenlos für alle Eltern</li>
-                      <li>Schule trägt alle Aktivierungen</li>
-                      <li>Keine Direktüberweisung nötig</li>
+                      <li>100% kostenlos für alle Eltern &amp; Schüler</li>
+                      <li>Schule trägt alle Modul-Aktivierungen</li>
+                      <li>Keine Einzelüberweisung der Eltern nötig</li>
                     </ul>
                   </div>
                 </div>
               </div>
 
-              {/* Live Savings Calculator Banner */}
+              {/* Notice when current tariff is already selected */}
+              {selectedSwitchTargetPayer === billingPayer && (
+                <div style={{
+                  background: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '14px',
+                  padding: '12px 16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px',
+                  fontSize: '0.78rem',
+                  color: '#475569',
+                  lineHeight: 1.45
+                }}>
+                  <span style={{ fontSize: '1rem' }}>ℹ️</span>
+                  <span>
+                    <strong>{billingPayer === 'school' ? 'Musikschule übernimmt (Sammelzahler)' : 'Eltern-Direktabrechnung'}</strong> ist derzeit aktiv. Klicke auf die andere Option, um das Abrechnungsmodell umzustellen.
+                  </span>
+                </div>
+              )}
+
+              {/* Live Savings Calculator Banner (when switching from school to student) */}
               {selectedSwitchTargetPayer === 'student' && billingPayer === 'school' && (
                 <div style={{
                   background: 'linear-gradient(135deg, #ecfdf5 0%, #dcfce7 100%)',
@@ -36782,48 +36940,71 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                 }}>
                   <div>
                     <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#047857', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                      💰 Deine sofortige Kostenersparnis
+                      💰 Deine monatliche Kostenersparnis ab {transitionInfo.effectiveDateFormatted}
                     </span>
                     <div style={{ fontSize: '0.86rem', color: '#14532d', fontWeight: 700, marginTop: '2px' }}>
-                      {activeCampusCount} aktive Schüler: Nur noch {(activeCampusCount * 0.09).toFixed(2).replace('.', ',')} € / Mo. Datensatzgebühr statt {(activeCampusCount * 0.49).toFixed(2).replace('.', ',')} €
+                      {activeCampusCount} aktive Schüler: 0,00 € Schulkosten ab Stichtag statt {(activeCampusCount * studentRate).toFixed(2).replace('.', ',')} {currencySymbol} / Mo.
                     </div>
                     <div style={{ fontSize: '0.74rem', color: '#15803d', marginTop: '2px' }}>
-                      Bei Elternzahlung sinken die Schulkosten für diese Schüler vollständig auf 0,00 €.
+                      Eltern übernehmen die Bereitstellung direkt • Musikschule spart 100% der Schüler-Aktivierungsgebühr.
                     </div>
                   </div>
                   <div style={{ textAlign: 'right' }}>
                     <div style={{ fontSize: '1.3rem', fontWeight: 900, color: '#047857' }}>
-                      -{monthlySavings.toFixed(2).replace('.', ',')} € / Mo.
+                      -{monthlySavings.toFixed(2).replace('.', ',')} {currencySymbol} / Mo.
                     </div>
                     <span style={{ fontSize: '0.7rem', color: '#15803d', fontWeight: 700 }}>
-                      (-{yearlySavings.toFixed(2).replace('.', ',')} € / Jahr)
+                      (-{yearlySavings.toFixed(2).replace('.', ',')} {currencySymbol} / Jahr)
                     </span>
                   </div>
                 </div>
               )}
 
-              {/* 30-Day Grace Period Guarantee Badge */}
-              <div style={{
-                background: '#f8fafc',
-                border: '1px solid #e2e8f0',
-                borderRadius: '14px',
-                padding: '12px 16px',
-                display: 'flex',
-                alignItems: 'flex-start',
-                gap: '10px',
-                fontSize: '0.76rem',
-                color: '#334155',
-                lineHeight: 1.4
-              }}>
-                <ShieldCheck size={18} color="#10b981" style={{ flexShrink: 0, marginTop: '1px' }} />
-                <span>
-                  <strong>30 Tage Kulanzfrist-Garantie:</strong> Kein Unterrichtsausfall! Alle aktiven Schüler behalten bei der Umstellung 30 Tage lang uneingeschränkten Zugriff auf Übe-Timer, Hausaufgabenheft und Audio-Studio, während Eltern den Beitrag bequem per Banking-App freischalten.
-                </span>
-              </div>
+              {/* 2-Month Buffer Period Guarantee Badge (when switching from school to student) */}
+              {selectedSwitchTargetPayer === 'student' && billingPayer === 'school' && (
+                <div style={{
+                  background: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '14px',
+                  padding: '12px 16px',
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: '10px',
+                  fontSize: '0.76rem',
+                  color: '#334155',
+                  lineHeight: 1.4
+                }}>
+                  <ShieldCheck size={18} color="#10b981" style={{ flexShrink: 0, marginTop: '1px' }} />
+                  <span>
+                    <strong>2-Monats-Puffer-Garantie:</strong> Kein Unterrichtsausfall! Deine Musikschule finanziert den laufenden Monat ({transitionInfo.currentMonthName}) sowie den gesamten Folgemonat ({transitionInfo.bufferMonthName}) als Übergangsphase zu 100%. Ab dem {transitionInfo.effectiveDateFormatted} greift die faire Eltern-Direktabrechnung mit nur {schoolYearCalc.totalAmountStr} {currencySymbol} Restschuljahresbeitrag.
+                  </span>
+                </div>
+              )}
+
+              {/* Notice when switching from student to school */}
+              {selectedSwitchTargetPayer === 'school' && billingPayer === 'student' && (
+                <div style={{
+                  background: 'linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%)',
+                  border: '1.5px solid #d8b4fe',
+                  borderRadius: '16px',
+                  padding: '16px 20px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  fontSize: '0.82rem',
+                  color: '#581c87',
+                  lineHeight: 1.4
+                }}>
+                  <Sparkles size={20} color="#7e22ce" style={{ flexShrink: 0 }} />
+                  <span>
+                    <strong>Sofortige Vollfreischaltung aller Schüler:</strong> Deine Musikschule übernimmt ab sofort alle Schülerkosten auf die monatliche Schulsammelrechnung ({studentRate.toFixed(2).replace('.', ',')} {currencySymbol} / Schüler / Mo.). Alle Schülerprofile werden sofort und ohne Wartezeit voll aktiviert.
+                  </span>
+                </div>
+              )}
 
               {/* Action Buttons & Parent Letter Download */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '4px' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '10px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: selectedSwitchTargetPayer === 'student' ? '1.2fr 1fr' : '1fr', gap: '10px' }}>
                   {/* Confirm CTA */}
                   <button
                     type="button"
@@ -36831,9 +37012,9 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                     onClick={handleConfirmSwitchBillingModel}
                     style={{
                       background: selectedSwitchTargetPayer === billingPayer 
-                        ? '#94a3b8' 
+                        ? '#e2e8f0' 
                         : (selectedSwitchTargetPayer === 'student' ? 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)' : 'linear-gradient(135deg, #7e22ce 0%, #6b21a8 100%)'),
-                      color: '#ffffff',
+                      color: selectedSwitchTargetPayer === billingPayer ? '#94a3b8' : '#ffffff',
                       border: 'none',
                       borderRadius: '14px',
                       padding: '13px 18px',
@@ -36848,7 +37029,11 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                       transition: 'all 0.15s ease'
                     }}
                   >
-                    {isSwitchingPayer ? 'Wird umgestellt...' : selectedSwitchTargetPayer === billingPayer ? 'Modell ist bereits aktiv' : `Wechsel zu ${selectedSwitchTargetPayer === 'student' ? 'Direktabrechnung' : 'Sammelzahler'} bestätigen ➔`}
+                    {isSwitchingPayer 
+                      ? 'Wird umgestellt...' 
+                      : selectedSwitchTargetPayer === billingPayer 
+                        ? '✓ Aktuelles Modell ist bereits aktiv' 
+                        : `Wechsel zu ${selectedSwitchTargetPayer === 'student' ? 'Eltern-Direktabrechnung' : 'Musikschul-Sammelabrechnung'} bestätigen ➔`}
                   </button>
 
                   {/* Sample Parent Letter */}

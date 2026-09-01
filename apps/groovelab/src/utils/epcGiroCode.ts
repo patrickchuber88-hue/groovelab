@@ -90,12 +90,64 @@ export interface SchoolYearCalculation {
   currency: 'EUR' | 'CHF';
 }
 
+export function calculateTransitionEffectiveDate(nowDate?: Date): {
+  effectiveDate: Date;
+  effectiveDateIso: string;
+  effectiveDateFormatted: string;
+  currentMonthName: string;
+  bufferMonthName: string;
+  paidStartMonthName: string;
+} {
+  const date = nowDate || new Date();
+  const currentMonth = date.getMonth() + 1; // 1-12
+  const currentYear = date.getFullYear();
+
+  const monthNames = [
+    'Januar', 'Februar', 'März', 'April', 'Mai', 'Juni',
+    'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'
+  ];
+
+  const currentMonthName = monthNames[currentMonth - 1];
+
+  // Buffer month is currentMonth + 1 (e.g. April if March)
+  let bufferMonth = currentMonth + 1;
+  let bufferYear = currentYear;
+  if (bufferMonth > 12) {
+    bufferMonth = 1;
+    bufferYear = currentYear + 1;
+  }
+  const bufferMonthName = monthNames[bufferMonth - 1];
+
+  // Direct billing starts on 1st of month + 2 (e.g. May if March)
+  let startMonth = bufferMonth + 1;
+  let startYear = bufferYear;
+  if (startMonth > 12) {
+    startMonth = 1;
+    startYear = bufferYear + 1;
+  }
+  const paidStartMonthName = monthNames[startMonth - 1];
+
+  const effectiveDate = new Date(startYear, startMonth - 1, 1, 0, 0, 0, 0);
+  const effectiveDateIso = `${startYear}-${String(startMonth).padStart(2, '0')}-01`;
+  const effectiveDateFormatted = `01.${String(startMonth).padStart(2, '0')}.${startYear}`;
+
+  return {
+    effectiveDate,
+    effectiveDateIso,
+    effectiveDateFormatted,
+    currentMonthName,
+    bufferMonthName,
+    paidStartMonthName
+  };
+}
+
 export function calculateSchoolYearDirectBilling(
   nowDate?: Date,
   currency: 'EUR' | 'CHF' = 'EUR',
   customMonthlyRate?: number,
   startMonthInput: number = 9,
-  startDayInput: number = 1
+  startDayInput: number = 1,
+  transitionEffectiveDate?: Date | string | null
 ): SchoolYearCalculation {
   const date = nowDate || new Date();
   const currentDay = date.getDate();
@@ -112,42 +164,49 @@ export function calculateSchoolYearDirectBilling(
 
   const freeMonthName = monthNames[currentMonth - 1];
 
-  // Calculate actual remaining days in the current calendar month
-  const lastDayOfCurrentMonth = new Date(currentYear, currentMonth, 0).getDate();
-  const daysRemainingInMonth = lastDayOfCurrentMonth - currentDay;
-
-  // If at least 14 days remain in the current month, the statutory 14-day right of withdrawal (§ 355 BGB)
-  // expires completely within the free trial month.
-  // If fewer than 14 days remain (e.g. registration on 28th October or 16th February), the statutory withdrawal
-  // period extends into the next month. In this case, the remaining days + entire next month are 100% free!
-  const hasFull14Days = daysRemainingInMonth >= 14;
-
   let paidStartMonth: number;
   let paidStartYear: number;
   let freePeriodDescription: string;
 
-  if (hasFull14Days) {
-    paidStartMonth = currentMonth + 1;
-    paidStartYear = currentYear;
-    if (paidStartMonth > 12) {
-      paidStartMonth = 1;
-      paidStartYear = currentYear + 1;
-    }
-    freePeriodDescription = `Kostenfreier Schnuppermonat (${monthNames[currentMonth - 1]})`;
+  if (transitionEffectiveDate) {
+    const tDate = typeof transitionEffectiveDate === 'string' ? new Date(transitionEffectiveDate) : transitionEffectiveDate;
+    paidStartMonth = tDate.getMonth() + 1;
+    paidStartYear = tDate.getFullYear();
+    const prevMonthIdx = paidStartMonth === 1 ? 11 : paidStartMonth - 2;
+    const prevMonthName = monthNames[prevMonthIdx];
+    freePeriodDescription = `Übergangsphase finanziert durch die Musikschule (bis Ende ${prevMonthName})`;
   } else {
-    let nextMonth = currentMonth + 1;
-    let nextMonthYear = currentYear;
-    if (nextMonth > 12) {
-      nextMonth = 1;
-      nextMonthYear = currentYear + 1;
+    // Calculate actual remaining days in the current calendar month
+    const lastDayOfCurrentMonth = new Date(currentYear, currentMonth, 0).getDate();
+    const daysRemainingInMonth = lastDayOfCurrentMonth - currentDay;
+
+    // If at least 14 days remain in the current month, statutory 14-day withdrawal (§ 355 BGB)
+    // expires inside the free trial month. If < 14 days, buffer extends into next month.
+    const hasFull14Days = daysRemainingInMonth >= 14;
+
+    if (hasFull14Days) {
+      paidStartMonth = currentMonth + 1;
+      paidStartYear = currentYear;
+      if (paidStartMonth > 12) {
+        paidStartMonth = 1;
+        paidStartYear = currentYear + 1;
+      }
+      freePeriodDescription = `Kostenfreier Schnuppermonat (${monthNames[currentMonth - 1]})`;
+    } else {
+      let nextMonth = currentMonth + 1;
+      let nextMonthYear = currentYear;
+      if (nextMonth > 12) {
+        nextMonth = 1;
+        nextMonthYear = currentYear + 1;
+      }
+      paidStartMonth = nextMonth + 1;
+      paidStartYear = nextMonthYear;
+      if (paidStartMonth > 12) {
+        paidStartMonth = 1;
+        paidStartYear = nextMonthYear + 1;
+      }
+      freePeriodDescription = `Kostenfreie Kennenlernphase (${monthNames[currentMonth - 1]} & ${monthNames[nextMonth - 1]})`;
     }
-    paidStartMonth = nextMonth + 1;
-    paidStartYear = nextMonthYear;
-    if (paidStartMonth > 12) {
-      paidStartMonth = 1;
-      paidStartYear = nextMonthYear + 1;
-    }
-    freePeriodDescription = `Kostenfreie Kennenlernphase (${monthNames[currentMonth - 1]} & ${monthNames[nextMonth - 1]})`;
   }
 
   const paidStartMonthName = monthNames[paidStartMonth - 1];

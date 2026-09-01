@@ -281,8 +281,12 @@ export function getSchoolCanonicalBilling(
   const hasCampus = Boolean(school.has_campus_subscription);
   const hasGroovelab = Boolean(school.has_groovelab_subscription);
 
+  const now = new Date();
+  const directEffectiveDateStr = school.direct_billing_effective_date;
+  const isPendingTransition = Boolean(directEffectiveDateStr && new Date(directEffectiveDateStr).getTime() > now.getTime());
+
   const isPartial = school.student_billing_option === 'student_partial';
-  const isFullDirect = school.student_billing_option === 'student_full';
+  const isFullDirect = school.student_billing_option === 'student_full' && !isPendingTransition;
   const passiveStudentsCount = isPartial ? stats.totalStudents : (isFullDirect ? 0 : stats.passiveStudents);
 
   const billingResult = calculateCampusGroovelabBilling({

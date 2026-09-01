@@ -83,7 +83,14 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
   const activeCurrency: 'EUR' | 'CHF' = isChf ? 'CHF' : 'EUR';
   const schoolStartMonth = Number(schoolData?.school_year_start_month || 9);
   const schoolStartDay = Number(schoolData?.school_year_start_day || 1);
-  const schoolYearCalc = calculateSchoolYearDirectBilling(undefined, activeCurrency, undefined, schoolStartMonth, schoolStartDay);
+  const schoolYearCalc = calculateSchoolYearDirectBilling(
+    undefined, 
+    activeCurrency, 
+    undefined, 
+    schoolStartMonth, 
+    schoolStartDay, 
+    schoolData?.direct_billing_effective_date
+  );
   const effectiveAnnualFee = annualFee !== 5.88 && annualFee !== 12.00 && annualFee !== 9.60 ? annualFee : schoolYearCalc.totalAmount;
   const totalAmountStr = schoolYearCalc.totalAmountStr;
   const monthlyRate = isChf ? 'CHF 1.00' : '0,49 €';
