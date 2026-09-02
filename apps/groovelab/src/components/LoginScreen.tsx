@@ -9,7 +9,6 @@ import { LegalTextModal } from './LegalTextModal';
 import { DpoAuditPortal } from './DpoAuditPortal';
 import { validateNewPin } from '../utils/pinValidation';
 import { createMasterSessionLease } from '../utils/masterAuditLogger';
-import { verifyTOTP } from '../utils/totp';
 import { registerClientSessionLease } from '../utils/sessionLeaseManager';
 import { setVaultItem } from '../utils/aesStorageVault';
 import { scrubSensitiveUrlParams } from '../utils/urlSecurityScrubber';
@@ -1469,15 +1468,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         throw new Error(user.error);
       }
 
-      if (user.requires_2fa || (user.is_2fa_enabled && !user.id)) {
-        setAdminPendingUser(user);
-        setAdminAuthStep(2);
-        setError(null);
-        setAdminLoginLoading(false);
-        return;
-      }
-
-      if (user.is_2fa_enabled && user.two_factor_secret) {
+      if (user.requires_2fa || user.is_2fa_enabled) {
         setAdminPendingUser(user);
         setAdminAuthStep(2);
         setError(null);
@@ -1503,7 +1494,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
     setAdminLoginLoading(true);
     setError(null);
     try {
-      // 1. Primary: Server-Side Zero-Secret 2FA Verification
+      // 1. Authoritative: Server-Side Zero-Secret 2FA Verification (Fail-Closed)
       const { data: verifiedUser, error: verifyErr } = await supabase
         .rpc('login_master_admin', {
           p_username: adminUsernameInput.trim(),
@@ -1516,16 +1507,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         return;
       }
 
-      // 2. Client-side fallback if legacy secret was present in pending user
-      if (adminPendingUser.two_factor_secret) {
-        const isValid = await verifyTOTP(cleanCode, adminPendingUser.two_factor_secret);
-        if (isValid) {
-          await completeAdminLogin(adminPendingUser);
-          return;
-        }
-      }
-
-      throw new Error(verifiedUser?.error || 'Ungültiger 2FA-Code. Bitte aktuellen Code aus der Authenticator-App eingeben.');
+      throw new Error(verifiedUser?.error || verifyErr?.message || 'Ungültiger 2FA-Code. Bitte aktuellen Code aus der Authenticator-App eingeben.');
     } catch (err: any) {
       setError(err.message || '2FA-Verifikation fehlgeschlagen.');
       setAdminLoginLoading(false);
@@ -1848,12 +1830,13 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             p_target_role: newRole
           });
           if (roleErr) {
-            await supabase.from('users').update({ role: newRole }).eq('id', user.id);
+            console.error('[Role Auto-Switch] switch_user_active_role error:', roleErr.message);
+          } else {
+            user.role = newRole;
           }
-        } catch (e) {
-          await supabase.from('users').update({ role: newRole }).eq('id', user.id);
+        } catch (e: any) {
+          console.error('[Role Auto-Switch] RPC error:', e);
         }
-        user.role = newRole;
       }
 
       let finalStationId = null;
@@ -2864,7 +2847,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         
         // Update first sibling group id if it was null
         if (!userRow?.sibling_group_id) {
-          await supabase.from('users_raw').update({ sibling_group_id: siblingGroupId }).eq('id', parentChildren[0].id);
+          await supabase.from('users').update({ sibling_group_id: siblingGroupId }).eq('id', parentChildren[0].id);
         }
       }
 
@@ -2883,7 +2866,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           const finalBirthDate = hasCampus ? (child.birth_date || null) : null;
 
           const { data: newStud, error: insertError } = await supabase
-            .from('users_raw')
+            .from('users')
             .insert({
               school_id: schoolId,
               role: 'student',
@@ -3005,27 +2988,35 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
     setBiometricsStatus('registering');
     setBiometricsErrorMessage('');
     try {
-      // Mock random challenge from server
-      const mockChallenge = btoa(crypto.randomUUID());
+      // 1. Fetch authoritative cryptographic challenge from server
+      const { data: chalData, error: chalErr } = await supabase.rpc('generate_webauthn_challenge', {
+        p_user_id: verifiedStudentDetails.id,
+        p_type: 'register'
+      });
+
+      if (chalErr || !chalData?.challenge) {
+        throw new Error('Sicherheits-Challenge konnte nicht vom Server bezogen werden.');
+      }
+
       const email = `${verifiedStudentDetails.first_name.toLowerCase()}.${verifiedStudentDetails.last_name.toLowerCase()}@campus-groovelab.local`;
       const result = await registerBiometrics(
         email,
         verifiedStudentDetails.id,
-        mockChallenge
+        chalData.challenge
       );
       
-      // Store in Supabase
-      if (verifiedStudentDetails?.id) {
-        sessionStorage.setItem('groovelab_user_id', verifiedStudentDetails.id);
-      }
-      const { error } = await supabase.from('user_credentials').insert({
-        user_id: verifiedStudentDetails.id,
-        credential_id: result.id,
-        public_key: JSON.stringify(result.response),
-        device_name: 'WebAuthn Device'
+      // 2. Store & bind credential via server-side RPC (validates challenge & sets session)
+      const { data: regResult, error: regErr } = await supabase.rpc('register_webauthn_credential', {
+        p_user_id: verifiedStudentDetails.id,
+        p_credential_id: result.id,
+        p_public_key: JSON.stringify(result.response),
+        p_device_name: 'Passkey Device',
+        p_challenge: chalData.challenge
       });
 
-      if (error) throw error;
+      if (regErr || !regResult?.success) {
+        throw new Error(regErr?.message || regResult?.error || 'Registrierung des Passkeys fehlgeschlagen.');
+      }
 
       // Save to local Biometric Device Vault for instant Quick-Login persistence
       saveBiometricProfile({
@@ -3063,13 +3054,21 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         return;
       }
 
-      // 1. Generate challenge
-      const mockChallenge = btoa(crypto.randomUUID());
+      // 1. Request cryptographic challenge from server
+      const { data: chalData, error: chalErr } = await supabase.rpc('generate_webauthn_challenge', {
+        p_user_id: null,
+        p_type: 'auth'
+      });
+
+      if (chalErr || !chalData?.challenge) {
+        throw new Error('Sicherheits-Challenge konnte nicht vom Server bezogen werden.');
+      }
+
       const challengeBuffer = new Uint8Array(
-        atob(mockChallenge).split("").map((c) => c.charCodeAt(0))
+        chalData.challenge.match(/.{1,2}/g)?.map((byte: string) => parseInt(byte, 16)) || []
       ).buffer;
 
-      // 2. Fetch the resident credential
+      // 2. Fetch the resident credential assertion
       const assertion = (await navigator.credentials.get({
         publicKey: {
           challenge: challengeBuffer,
@@ -3084,31 +3083,28 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
       const credentialId = assertion.id;
 
-      // 3. Find the credential row in DB using secure RPC
-      const { data: matchedUserId, error: credErr } = await supabase
-        .rpc('get_user_id_by_credential', { input_credential_id: credentialId });
+      // 3. Authenticate credential and receive verified lease & sanitized profile via server RPC
+      const { data: authResult, error: authErr } = await supabase.rpc('authenticate_webauthn_credential', {
+        p_credential_id: credentialId,
+        p_challenge: chalData.challenge,
+        p_school_id: schoolData?.id || null
+      });
 
-      if (credErr || !matchedUserId) {
-        throw new Error("Dieses Gerät ist nicht für ein Benutzerkonto registriert.");
+      if (authErr || !authResult?.success || !authResult?.user) {
+        throw new Error(authResult?.error || authErr?.message || "Dieses Passkey-Gerät ist keinem Benutzerkonto zugeordnet.");
       }
 
-      // 4. Fetch the user details
-      const { data: user, error: userErr } = await supabase
-        .from('users')
-        .select('*, schools(*)')
-        .eq('id', matchedUserId)
-        .single();
-
-      if (userErr || !user) {
-        throw new Error("Benutzerkonto konnte nicht geladen werden.");
+      if (authResult.lease_token) {
+        sessionStorage.setItem('gl_active_session_lease_id', authResult.lease_token);
+        localStorage.setItem('gl_active_session_lease_id', authResult.lease_token);
       }
 
-      // 5. Finalize login
-      await finalizeLogin(user, loginStationId, false);
+      // 4. Finalize login with verified server profile
+      await finalizeLogin(authResult.user, loginStationId, false);
 
     } catch (err: any) {
       console.error('Biometrics login failed:', err);
-      alert(err.message || 'Anmeldung per Fingerabdruck fehlgeschlagen.');
+      alert(err.message || 'Anmeldung per Fingerabdruck/FaceID fehlgeschlagen.');
       setLoading(false);
     }
   };
@@ -3176,7 +3172,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       let user: any = null;
       let userErr: any = null;
 
-      // 1. Tier-1 Server-Side Authentication RPC
+      // 1. Tier-1 Server-Side Authentication RPC (Fail-Closed)
       try {
         const { data: authResult, error: rpcErr } = await supabase.rpc('authenticate_by_credential', {
           p_credential: cleanPin,
@@ -3196,36 +3192,6 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         }
       } catch (e: any) {
         userErr = e;
-      }
-
-      // 2. Resilient fallback if RPC not yet deployed or transient connection issue
-      if (!user && (!userErr || String(userErr?.message || '').includes('function') || String(userErr?.message || '').includes('PGRST202'))) {
-        sessionStorage.setItem('groovelab_qr_token', cleanPin);
-        let query = supabase
-          .from('users')
-          .select('*, schools(*)');
-        
-        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cleanPin);
-        const upperPin = cleanPin.toUpperCase();
-
-        if (isUuid) {
-          query = query.or(`qr_token.eq.${cleanPin},teacher_qr_token.eq.${cleanPin}`);
-        } else {
-          query = query.or(`teacher_qr_token.eq.${cleanPin},ausweis_nummer.eq.${cleanPin},ausweis_nummer.eq.${upperPin}`);
-        }
-
-        if (schoolData?.id) {
-          query = query.eq('school_id', schoolData.id);
-        }
-
-        const { data: fallbackUser, error: fallbackErr } = await query.maybeSingle();
-        sessionStorage.removeItem('groovelab_qr_token');
-        if (fallbackUser) {
-          user = fallbackUser;
-          userErr = null;
-        } else if (fallbackErr) {
-          userErr = fallbackErr;
-        }
       }
 
       if (userErr || !user) {
@@ -3533,7 +3499,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
     try {
       console.log('[Login] Processing QR login token...');
 
-      // 1. User finden via server-side Auth RPC
+      // 1. User finden via server-side Auth RPC (Fail-Closed)
       let user: any = null;
       let userErr: any = null;
 
@@ -3556,30 +3522,6 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         }
       } catch (e: any) {
         userErr = e;
-      }
-
-      // Fallback
-      if (!user) {
-        sessionStorage.setItem('groovelab_qr_token', qrToken);
-        let query = supabase.from('users').select('*, schools(*)');
-        
-        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(qrToken);
-        const upperToken = qrToken.toUpperCase();
-
-        if (isUuid) {
-          query = query.or(`qr_token.eq.${qrToken},teacher_qr_token.eq.${qrToken}`);
-        } else {
-          query = query.or(`teacher_qr_token.eq.${qrToken},ausweis_nummer.eq.${qrToken},ausweis_nummer.eq.${upperToken}`);
-        }
-        
-        const { data: fallbackUser, error: fallbackErr } = await query.maybeSingle();
-        sessionStorage.removeItem('groovelab_qr_token');
-        if (fallbackUser) {
-          user = fallbackUser;
-          userErr = null;
-        } else if (fallbackErr) {
-          userErr = fallbackErr;
-        }
       }
 
       if (userErr || !user) throw new Error('Nutzer nicht gefunden.');
@@ -8748,70 +8690,26 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
                 setLoading(true);
                 try {
-                  const authQrToken = pinSetupUser?.qr_token || pinSetupUser?.ausweis_nummer || pinSetupUser?.id;
+                  const authQrToken = pinSetupUser.qr_token || pinSetupUser.teacher_qr_token || pinSetupUser.ausweis_nummer || pinSetupUser.id || '';
                   if (authQrToken) {
                     sessionStorage.setItem('groovelab_qr_token', authQrToken);
                   }
-                  try {
-                    await supabase.from('students').update({
-                      personal_pin: pinSetupInput,
-                      parent_pin: pinSetupInput,
-                      onboarding_pin: pinSetupInput,
-                      is_pin_activated: true
-                    }).eq('id', pinSetupUser.id);
+                  const { data: rpcRes, error: rpcErr } = await supabase.rpc('set_initial_student_pin', {
+                    p_student_id: pinSetupUser.id,
+                    p_qr_token: authQrToken,
+                    p_pin: pinSetupInput
+                  });
 
-                    await supabase.from('pending_students').update({
-                      personal_pin: pinSetupInput,
-                      parent_pin: pinSetupInput,
-                      onboarding_pin: pinSetupInput,
-                      is_pin_activated: true
-                    }).eq('id', pinSetupUser.id);
-                  } catch (e) {}
-
-                  try {
-                    await supabase.from('users_raw').update({
-                      personal_pin: pinSetupInput,
-                      parent_pin: pinSetupInput,
-                      onboarding_pin: pinSetupInput,
-                      is_pin_activated: true
-                    }).eq('id', pinSetupUser.id);
-                  } catch (e) {}
-
-                  const userUpdatePayload: any = {
-                    personal_pin: pinSetupInput,
-                    parent_pin: pinSetupInput,
-                    onboarding_pin: pinSetupInput,
-                    is_pin_activated: true
-                  };
-                  let { error } = await supabase
-                    .from('users')
-                    .update(userUpdatePayload)
-                    .eq('id', pinSetupUser.id);
-
-                  if (error && (error.message?.includes('onboarding_pin') || error.message?.includes('record "new" has no field'))) {
-                    delete userUpdatePayload.onboarding_pin;
-                    const fallbackRes = await supabase
-                      .from('users')
-                      .update(userUpdatePayload)
-                      .eq('id', pinSetupUser.id);
-                    error = fallbackRes.error;
+                  if (rpcErr || rpcRes !== true) {
+                    throw new Error(rpcErr?.message || 'Serverfehler beim Setzen der PIN.');
                   }
-
-                  if (error && (error.message?.includes('onboarding_pin') || error.message?.includes('record "new" has no field'))) {
-                    console.warn('[LoginScreen] users view trigger warning ignored because student table was updated:', error);
-                    error = null;
-                  }
-
-                  localStorage.setItem(`groovelab_user_pin_${pinSetupUser.id}`, pinSetupInput);
 
                   sessionStorage.removeItem('groovelab_qr_token');
-
-                  if (error) throw error;
                   
                   const user = {
                     ...pinSetupUser,
-                    personal_pin: pinSetupInput,
-                    is_pin_activated: true
+                    is_pin_activated: true,
+                    has_personal_pin: true
                   };
                   setPinSetupUser(null);
                   

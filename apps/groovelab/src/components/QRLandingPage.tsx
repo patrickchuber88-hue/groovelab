@@ -146,11 +146,10 @@ const computeSha256Hex = async (str: string): Promise<string> => {
   }
 };
 
-const verifyParentPinClient = async (studentId: string, inputPin: string, profileParentPin?: string | null): Promise<boolean> => {
+const verifyParentPinClient = async (studentId: string, inputPin: string, _profileParentPin?: string | null): Promise<boolean> => {
   const cleanInput = inputPin.trim();
   if (!cleanInput) return false;
 
-  // 1. Supabase RPC check (handles SHA-256 in users_raw on server)
   try {
     const { data: rpcRes, error } = await supabase.rpc('verify_parent_pin', {
       student_id: studentId,
@@ -160,19 +159,6 @@ const verifyParentPinClient = async (studentId: string, inputPin: string, profil
       return true;
     }
   } catch (e) {}
-
-  // 2. Client-side PBKDF2-100k / SHA-256 / plaintext check against in-memory profile
-  if (profileParentPin) {
-    const isMatched = await verifyPinPbkdf2(cleanInput, profileParentPin);
-    if (isMatched) return true;
-  }
-
-
-  // 3. LocalStorage parent PIN backup check
-  const cachedParentPin = localStorage.getItem(`groovelab_parent_pin_${studentId}`);
-  if (cachedParentPin && cachedParentPin.trim() === cleanInput) {
-    return true;
-  }
 
   return false;
 };
@@ -244,10 +230,12 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
             p_target_role: finalAdminRole
           });
           if (roleErr) {
-            await supabase.from('users').update({ role: finalAdminRole }).eq('id', userData.id);
+            console.error('[Role Switch] switch_user_active_role error:', roleErr.message);
+          } else {
+            userData.role = finalAdminRole;
           }
-        } catch (e) {
-          await supabase.from('users').update({ role: finalAdminRole }).eq('id', userData.id);
+        } catch (e: any) {
+          console.error('[Role Switch] RPC error:', e);
         }
       }
       sessionStorage.setItem('groovelab_active_workspace', 'secretary');
@@ -883,42 +871,29 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
     }
     setPinChangeLoading(true);
     try {
-      // 1. Primary: Atomic RPC
-      let rpcOk = false;
-      try {
-        const { data: rpcRes, error: rpcErr } = await supabase.rpc('set_initial_student_pin', {
-          p_student_id: profile.id,
-          p_qr_token: token,
-          p_pin: newPinInput
-        });
-        if (!rpcErr && rpcRes === true) {
-          rpcOk = true;
-        }
-      } catch (e) {
-        console.warn('[QRLanding] set_initial_student_pin RPC notice:', e);
-      }
+      // 1. Primary: Atomic Server-Side RPC
+      const { data: rpcRes, error: rpcErr } = await supabase.rpc('set_parent_pin', {
+        p_student_id: profile.id,
+        p_new_pin: newPinInput
+      });
 
-      // 2. Secondary fallback update if RPC was unavailable
-      if (!rpcOk) {
-        const { error } = await supabase
-          .from('users')
-          .update({ 
-            parent_pin: newPinInput,
-            personal_pin: newPinInput,
-            onboarding_pin: newPinInput,
-            is_pin_activated: true,
-            status: 'aktiv'
-          })
-          .eq('id', profile.id);
-
-        if (error && !error.message?.includes('record "new" has no field')) {
-          console.warn('[QRLanding] direct table update fallback notice:', error);
+      if (rpcErr || rpcRes !== true) {
+        // Fallback to set_initial_student_pin if 4 digits
+        if (newPinInput.length === 4) {
+          const { data: initRes, error: initErr } = await supabase.rpc('set_initial_student_pin', {
+            p_student_id: profile.id,
+            p_qr_token: token,
+            p_pin: newPinInput
+          });
+          if (initErr || initRes !== true) {
+            throw new Error(rpcErr?.message || initErr?.message || 'Serverfehler beim Speichern der PIN.');
+          }
+        } else {
+          throw new Error(rpcErr?.message || 'Serverfehler beim Speichern der Eltern-PIN.');
         }
       }
 
-      // 3. Cache credentials locally on this device
-      localStorage.setItem(`groovelab_user_pin_${profile.id}`, newPinInput);
-      localStorage.setItem(`groovelab_pin_${token}`, newPinInput);
+      // Unlock session state without storing plaintext PIN strings in localStorage
       sessionStorage.setItem(`groovelab_parent_unlocked_${token}`, 'true');
       sessionStorage.setItem(`groovelab_parent_unlocked_${profile.id}`, 'true');
       sessionStorage.setItem(`groovelab_lessons_unlocked_${profile.id}`, 'true');
@@ -926,10 +901,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
       setProfile(prev => prev ? { 
         ...prev, 
         has_parent_pin: true, 
-        is_pin_activated: true, 
-        personal_pin: newPinInput, 
-        parent_pin: newPinInput,
-        onboarding_pin: newPinInput
+        is_pin_activated: true
       } : null);
       setIsInitialPinSetup(false);
       setParentUnlocked(true);
@@ -1277,30 +1249,9 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         }
 
 
-        // Vorab Namen des Schülers/Lehrers/Admins holen
-        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(token);
-        const upperToken = token.toUpperCase();
-        const selectFields = 'id, first_name, last_name, role, roles, school_id, teacher_id, is_campus_active, is_groovelab_active, app_usage_mode, joker_used_at, created_at, is_pin_activated, personal_pin, parent_pin, instrument, photo_url, is_trial, trial_ends_at, exempt_from_direct_billing, has_parent_pin, pin_enforced_for_preview, parent_allow_absences, parent_allow_chat, parent_allow_timer, parent_allow_leaderboard, parent_allow_groups, parent_allow_proposals, parent_allow_audio, parent_permissions, campus_ui_level';
-        const minimalFields = 'id, first_name, last_name, role, school_id, is_campus_active, is_groovelab_active, is_pin_activated, has_parent_pin';
-
         let userData: any = null;
 
-        const executeUserQuery = async (builderFn: (fields: string) => any) => {
-          try {
-            const { data, error } = await builderFn(selectFields).maybeSingle();
-            if (!error && data) return data;
-            if (error) {
-              console.warn('[QRLanding] selectFields query warning, falling back to minimalFields:', error);
-              const { data: minData, error: minErr } = await builderFn(minimalFields).maybeSingle();
-              if (!minErr && minData) return minData;
-            }
-          } catch (e) {
-            console.warn('[QRLanding] query exception:', e);
-          }
-          return null;
-        };
-
-        // Stage 0: Tier-1 Server-Side Authentication RPC (OWASP ASVS Level 3)
+        // Stage 0: Tier-1 Server-Side Authentication RPC (OWASP ASVS Level 3 - Fail-Closed)
         try {
           const { data: authResult, error: rpcErr } = await supabase.rpc('authenticate_by_credential', {
             p_credential: token,
@@ -1316,40 +1267,6 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           }
         } catch (e) {
           console.warn('[QRLanding] authenticate_by_credential exception:', e);
-        }
-
-        // Stage 1: Fallback combined OR query if RPC not present
-        if (!userData) {
-          if (isUuid) {
-            userData = await executeUserQuery(fields => 
-              supabase.from('users').select(fields).or(`qr_token.eq.${token},teacher_qr_token.eq.${token}`)
-            );
-          } else {
-            userData = await executeUserQuery(fields => 
-              supabase.from('users').select(fields).or(`teacher_qr_token.eq.${token},ausweis_nummer.eq.${token},ausweis_nummer.eq.${upperToken}`)
-            );
-          }
-        }
-
-        // Stage 3: Fallback direct query by teacher_qr_token
-        if (!userData) {
-          userData = await executeUserQuery(fields => 
-            supabase.from('users').select(fields).eq('teacher_qr_token', token)
-          );
-        }
-
-        // Stage 4: Fallback direct query by qr_token
-        if (!userData) {
-          userData = await executeUserQuery(fields => 
-            supabase.from('users').select(fields).eq('qr_token', token)
-          );
-        }
-
-        // Stage 5: Fallback direct query by ausweis_nummer
-        if (!userData) {
-          userData = await executeUserQuery(fields => 
-            supabase.from('users').select(fields).or(`ausweis_nummer.eq.${token},ausweis_nummer.eq.${upperToken}`)
-          );
         }
 
         if (!userData) {
@@ -1552,21 +1469,12 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
               console.warn('[QRLanding] activation_days check error:', e);
             }
 
-            // Fallback: Check local cached PIN if set on this device
-            if (!hasPinCreated) {
-              const localPin = localStorage.getItem(`groovelab_user_pin_${userData.id}`) || localStorage.getItem(`groovelab_pin_${token}`);
-              if (localPin && localPin.trim().length === 4) {
-                hasPinCreated = true;
-              }
-            }
           }
 
           if (!hasPinCreated) {
             // Purge any stale local unlock caches if PIN was never established
             localStorage.removeItem(`groovelab_parent_unlocked_${token}`);
             localStorage.removeItem(`groovelab_parent_unlocked_${userData.id}`);
-            localStorage.removeItem(`groovelab_user_pin_${userData.id}`);
-            localStorage.removeItem(`groovelab_pin_${token}`);
             sessionStorage.removeItem(`groovelab_lessons_unlocked_${userData.id}`);
           }
         } else {
@@ -3116,86 +3024,28 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         sessionStorage.setItem('groovelab_qr_token', token);
         sessionStorage.setItem('groovelab_user_id', profile.id);
 
-        // Store local PIN backups immediately
-        localStorage.setItem(`groovelab_user_pin_${profile.id}`, pinToVerify);
-        localStorage.setItem(`groovelab_pin_${token}`, pinToVerify);
         sessionStorage.setItem(`groovelab_lessons_unlocked_${profile.id}`, 'true');
         setLessonsUnlocked(true);
         setParentUnlocked(false);
 
-        // Update in-memory profile PIN (Student Personal PIN only)
-        profile.personal_pin = pinToVerify;
-        profile.onboarding_pin = pinToVerify;
+        // Update in-memory profile (only boolean flags)
         profile.is_pin_activated = true;
+        profile.has_personal_pin = true;
         setProfile(prev => prev ? { 
           ...prev, 
-          is_pin_activated: true, 
-          personal_pin: pinToVerify, 
-          onboarding_pin: pinToVerify
+          is_pin_activated: true,
+          has_personal_pin: true
         } : null);
 
         // 1. Primary: Atomic Security Definer RPC
-        let rpcSuccess = false;
-        try {
-          const { data: rpcRes, error: rpcErr } = await supabase.rpc('set_initial_student_pin', {
-            p_student_id: profile.id,
-            p_qr_token: token,
-            p_pin: pinToVerify
-          });
-          if (!rpcErr && rpcRes === true) {
-            rpcSuccess = true;
-          }
-        } catch (e) {
-          console.warn('[QRLanding] set_initial_student_pin RPC notice:', e);
+        const { data: rpcRes, error: rpcErr } = await supabase.rpc('set_initial_student_pin', {
+          p_student_id: profile.id,
+          p_qr_token: token,
+          p_pin: pinToVerify
+        });
+        if (rpcErr || rpcRes !== true) {
+          throw new Error(rpcErr?.message || 'Serverfehler beim Setzen der PIN.');
         }
-
-        // 2. Secondary fallback updates if RPC not deployed yet
-        if (!rpcSuccess) {
-          try {
-            await supabase.from('students').update({
-              personal_pin: pinToVerify,
-              onboarding_pin: pinToVerify,
-              is_pin_activated: true,
-              status: 'aktiv'
-            }).eq('id', profile.id);
-          } catch (e) {}
-
-          const userUpdatePayload: any = {
-            personal_pin: pinToVerify,
-            onboarding_pin: pinToVerify,
-            is_pin_activated: true,
-            status: 'aktiv'
-          };
-          let { error: updateErr } = await supabase
-            .from('users')
-            .update(userUpdatePayload)
-            .eq('id', profile.id);
-
-          if (updateErr && (updateErr.message?.includes('onboarding_pin') || updateErr.message?.includes('record "new" has no field'))) {
-            delete userUpdatePayload.onboarding_pin;
-            const fallbackRes = await supabase
-              .from('users')
-              .update(userUpdatePayload)
-              .eq('id', profile.id);
-            updateErr = fallbackRes.error;
-          }
-        }
-
-        // Ensure activation_days record exists so Secretary Dashboard shows "Aktiv"
-        try {
-          const { data: existingAct } = await supabase
-            .from('activation_days')
-            .select('student_id')
-            .eq('student_id', profile.id)
-            .maybeSingle();
-
-          if (!existingAct) {
-            await supabase.from('activation_days').insert({
-              student_id: profile.id,
-              day_of_birth: (profile as any).day_of_birth || 1
-            });
-          }
-        } catch (e) {}
 
         setPinInput('');
         sessionStorage.setItem('groovelab_qr_token', token);
@@ -3221,49 +3071,33 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
       let isCorrect = false;
       let isParentMatch = false;
 
-      // 1. Try parent PIN verification (6 digits or explicit parent PIN or parent mode)
-      if (pinToVerify.length === 6 || isParentPinMode || (profile && profile.parent_pin)) {
-        const hasParentPinConfigured = Boolean(
-          profile?.has_parent_pin === true ||
-          (profile?.parent_pin && String(profile.parent_pin).trim() !== '') ||
-          localStorage.getItem(`groovelab_parent_pin_${profile.id}`)
-        );
-
-        if (isParentPinMode && !hasParentPinConfigured) {
-          setPinError('Für dieses Profil wurde noch keine Eltern-Master-PIN eingerichtet. Bitte melde dich zuerst mit der Schüler-PIN an und richte sie im Eltern-Bereich ein.');
-          setPinInput('');
-          return;
-        }
-
-        const parentOk = await verifyParentPinClient(profile.id, pinToVerify, profile.parent_pin);
-        if (parentOk) {
+      // 1. Try parent PIN verification (6 digits or explicit parent mode)
+      if (pinToVerify.length === 6 || isParentPinMode) {
+        const { data: parentOk } = await supabase.rpc('verify_parent_pin', {
+          student_id: profile.id,
+          input_pin: pinToVerify
+        });
+        if (parentOk === true) {
           isCorrect = true;
           isParentMatch = true;
         }
       }
 
-      // 2. Try verify_student_pin RPC (4 digits)
+      // 2. Try verify_student_pin / verify_personal_pin RPC (4 digits)
       if (!isCorrect && pinToVerify.length === 4) {
-        try {
-          const { data: rpcRes, error } = await supabase.rpc('verify_student_pin', {
+        const { data: rpcRes } = await supabase.rpc('verify_personal_pin', {
+          user_uuid: profile.id,
+          input_pin: pinToVerify,
+        });
+        if (rpcRes === true) {
+          isCorrect = true;
+        } else {
+          // Fallback to verify_student_pin
+          const { data: studentOk } = await supabase.rpc('verify_student_pin', {
             p_student_id: profile.id,
             p_pin: pinToVerify,
           });
-          if (!error && rpcRes === true) {
-            isCorrect = true;
-          }
-        } catch (e) {}
-      }
-
-      // 3. Fallback comparison for student PIN
-      if (!isCorrect && profile) {
-        const savedPin = localStorage.getItem(`groovelab_user_pin_${profile.id}`) || localStorage.getItem(`groovelab_pin_${token}`);
-        if (
-          (profile.personal_pin && String(profile.personal_pin).trim() === pinToVerify.trim()) ||
-          (profile.onboarding_pin && String(profile.onboarding_pin).trim() === pinToVerify.trim()) ||
-          (savedPin && savedPin.trim() === pinToVerify.trim())
-        ) {
-          isCorrect = true;
+          if (studentOk === true) isCorrect = true;
         }
       }
 
@@ -3277,8 +3111,6 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         } else {
           setParentUnlocked(false);
         }
-        sessionStorage.setItem(`groovelab_user_pin_${profile.id}`, pinToVerify);
-        sessionStorage.setItem(`groovelab_pin_${token}`, pinToVerify);
         sessionStorage.setItem(`groovelab_lessons_unlocked_${profile.id}`, 'true');
         setLessonsUnlocked(true);
         setPinInput('');
@@ -3812,24 +3644,15 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         }
       } catch (e) {}
 
-      // 2. Try verifyParentPinClient (parent PIN)
+      // 2. Try verify_parent_pin RPC
       if (!isVerified) {
-        const parentOk = await verifyParentPinClient(profile.id, inputPin, profile.parent_pin);
-        if (parentOk) {
-          isVerified = true;
-        }
-      }
-
-      // 3. Fallback comparison
-      if (!isVerified && profile) {
-        const savedPin = localStorage.getItem(`groovelab_user_pin_${profile.id}`) || localStorage.getItem(`groovelab_pin_${token}`);
-        if (
-          (profile.personal_pin && String(profile.personal_pin).trim() === inputPin.trim()) ||
-          (profile.onboarding_pin && String(profile.onboarding_pin).trim() === inputPin.trim()) ||
-          (savedPin && savedPin.trim() === inputPin.trim())
-        ) {
-          isVerified = true;
-        }
+        try {
+          const { data: parentOk } = await supabase.rpc('verify_parent_pin', {
+            student_id: profile.id,
+            input_pin: inputPin
+          });
+          if (parentOk === true) isVerified = true;
+        } catch (e) {}
       }
 
       if (isVerified === true) {
@@ -5942,8 +5765,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
     if (!parentUnlocked) {
       const hasConfiguredParentPin = Boolean(
         profile?.has_parent_pin === true ||
-        (profile?.parent_pin && String(profile.parent_pin).trim() !== '') ||
-        (profile && localStorage.getItem(`groovelab_parent_pin_${profile.id}`))
+        (profile?.parent_pin && String(profile.parent_pin).trim() !== '')
       );
 
       return (
@@ -6060,9 +5882,10 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                         const nextVal = parentUnlockInput + key;
                         setParentUnlockInput(nextVal);
                         if (nextVal.length === 6 && profile) {
-                          const isOk = await verifyParentPinClient(profile.id, nextVal.trim(), profile.parent_pin);
+                          const isOk = await verifyParentPinClient(profile.id, nextVal.trim());
                           if (isOk) {
-                            localStorage.setItem(`groovelab_parent_pin_${profile.id}`, nextVal.trim());
+                            sessionStorage.setItem(`groovelab_parent_unlocked_${profile.id}`, 'true');
+                            sessionStorage.setItem(`groovelab_parent_session_${profile.id}`, String(Date.now() + 60 * 60 * 1000));
                             setParentUnlocked(true);
                             setParentUnlockInput('');
                           } else {
@@ -6110,17 +5933,23 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
 
                             if (!profile) return;
 
-                            // Save 6-digit Parent PIN in DB & local backup
+                            // Save 6-digit Parent PIN via Server RPC
                             try {
-                              localStorage.setItem(`groovelab_parent_pin_${profile.id}`, nextVal);
-                              await supabase.from('users').update({ parent_pin: nextVal, has_parent_pin: true }).eq('id', profile.id);
-                              try { await supabase.from('students').update({ parent_pin: nextVal, has_parent_pin: true }).eq('id', profile.id); } catch(err){}
-                              
-                              setProfile(prev => prev ? { ...prev, parent_pin: nextVal, has_parent_pin: true } : null);
+                              const { data: rpcRes, error: rpcErr } = await supabase.rpc('set_parent_pin', {
+                                p_student_id: profile.id,
+                                p_new_pin: nextVal
+                              });
+
+                              if (rpcErr || rpcRes !== true) {
+                                throw new Error(rpcErr?.message || 'Serverfehler beim Setzen der Eltern-PIN.');
+                              }
+
+                              sessionStorage.setItem(`groovelab_parent_unlocked_${profile.id}`, 'true');
+                              sessionStorage.setItem(`groovelab_parent_session_${profile.id}`, String(Date.now() + 60 * 60 * 1000));
+                              setProfile(prev => prev ? { ...prev, has_parent_pin: true } : null);
                               setParentUnlocked(true);
                               setParentSetupPin('');
                               setParentSetupConfirm('');
-                              setParentSetupStep('enter');
                             } catch (e: any) {
                               setParentSetupError('Fehler beim Speichern: ' + e.message);
                               setParentSetupConfirm('');
@@ -9102,8 +8931,8 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                             setParentPinInput('');
                             setParentPinError(false);
                             setParentPinErrorMsg(null);
-                            localStorage.setItem(`groovelab_parent_unlocked_${token}`, 'true');
-                            localStorage.setItem(`groovelab_parent_pin_${profile.id}`, val);
+                            sessionStorage.setItem(`groovelab_parent_unlocked_${token}`, 'true');
+                            sessionStorage.setItem(`groovelab_parent_unlocked_${profile.id}`, 'true');
                           } else if (val.length === 6) {
                             const newAttempts = parentPinAttempts + 1;
                             setParentPinAttempts(newAttempts);

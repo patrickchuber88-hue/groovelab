@@ -100,151 +100,49 @@ export const CampusPinUnlockModal: React.FC<CampusPinUnlockModalProps> = ({
           return;
         }
 
-        // Setup new personal 4-digit PIN
-        const authQrToken = user.qr_token || user.ausweis_nummer || user.id;
-        if (authQrToken) {
-          sessionStorage.setItem('groovelab_qr_token', authQrToken);
-        }
+        // Setup new personal 4-digit PIN via Server-Side Security Definer RPC
+        const authQrToken = user.qr_token || user.ausweis_nummer || user.id || '';
+        
+        const { data: rpcRes, error: rpcErr } = await supabase.rpc('set_initial_student_pin', {
+          p_student_id: user.id,
+          p_qr_token: authQrToken,
+          p_pin: pinToVerify
+        });
 
-        try {
-          await supabase.from('students').update({
-            personal_pin: pinToVerify,
-            parent_pin: pinToVerify,
-            onboarding_pin: pinToVerify,
-            is_pin_activated: true,
-            is_campus_active: true
-          }).eq('id', user.id);
-
-          await supabase.from('pending_students').update({
-            personal_pin: pinToVerify,
-            parent_pin: pinToVerify,
-            onboarding_pin: pinToVerify,
-            is_pin_activated: true,
-            is_campus_active: true
-          }).eq('id', user.id);
-        } catch (e) {}
-
-        try {
-          await supabase.from('users_raw').update({
-            personal_pin: pinToVerify,
-            parent_pin: pinToVerify,
-            onboarding_pin: pinToVerify,
-            is_pin_activated: true,
-            is_campus_active: true
-          }).eq('id', user.id);
-        } catch (e) {}
-
-        const userUpdatePayload: any = {
-          personal_pin: pinToVerify,
-          parent_pin: pinToVerify,
-          onboarding_pin: pinToVerify,
-          is_pin_activated: true,
-          is_campus_active: true
-        };
-        let { error: updateErr } = await supabase
-          .from('users')
-          .update(userUpdatePayload)
-          .eq('id', user.id);
-
-        if (updateErr && (updateErr.message?.includes('onboarding_pin') || updateErr.message?.includes('record "new" has no field'))) {
-          delete userUpdatePayload.onboarding_pin;
-          const fallbackRes = await supabase
-            .from('users')
-            .update(userUpdatePayload)
-            .eq('id', user.id);
-          updateErr = fallbackRes.error;
-        }
-
-        if (updateErr && (updateErr.message?.includes('onboarding_pin') || updateErr.message?.includes('record "new" has no field'))) {
-          updateErr = null;
-        }
-
-        if (updateErr) {
-          console.error('[CampusPinUnlockModal] user update error:', updateErr);
-          alert('Fehler beim Speichern der PIN: ' + updateErr.message);
+        if (rpcErr || rpcRes !== true) {
+          console.error('[CampusPinUnlockModal] set_initial_student_pin error:', rpcErr);
+          alert('Fehler beim Speichern der PIN: ' + (rpcErr?.message || 'Serverfehler'));
           setLoading(false);
           return;
         }
 
-        localStorage.setItem(`groovelab_user_pin_${user.id}`, pinToVerify);
-        if (authQrToken) {
-          localStorage.setItem(`groovelab_pin_${authQrToken}`, pinToVerify);
-        }
-
-        sessionStorage.removeItem('groovelab_qr_token');
-
-        // Ensure activation_days record exists for active student detection
-        try {
-          const { data: existingAct } = await supabase
-            .from('activation_days')
-            .select('student_id')
-            .eq('student_id', user.id)
-            .maybeSingle();
-
-          if (!existingAct) {
-            await supabase.from('activation_days').insert({
-              student_id: user.id,
-              day_of_birth: (user as any).day_of_birth || 1
-            });
-          }
-        } catch (actErr) {
-          console.warn('[CampusPinUnlockModal] Warning inserting activation_days:', actErr);
-        }
-
-        // Update local user object representation if possible
+        // Update local user object representation (only boolean flags, no plaintext secrets)
         user.is_pin_activated = true;
+        user.has_personal_pin = true;
         user.is_campus_active = true;
 
         alert('Deine PIN wurde erfolgreich eingerichtet!');
         onUnlock();
       } else {
-        // Verification Mode (Adaptive: 4-digit student or 6-digit parent)
+        // Verification Mode (Adaptive: 4-digit student or 6-digit parent) via Server-Side RPC
         let isMatch = false;
         let isParentMatch = false;
         const cleanInput = pinToVerify.trim();
-        const userPersonalPin = String(user.personal_pin || user.onboarding_pin || '').trim();
-        const userParentPin = String(user.parent_pin || '').trim();
-        const cachedPin = localStorage.getItem(`groovelab_user_pin_${user.id}`);
 
         if (cleanInput.length === 4) {
-          if (userPersonalPin && (userPersonalPin === cleanInput || userPersonalPin.padStart(4, '0') === cleanInput)) {
-            isMatch = true;
-          } else if (cachedPin && cachedPin.trim() === cleanInput) {
-            isMatch = true;
-          } else {
-            const { data: pinOk } = await supabase.rpc('verify_personal_pin', {
-              user_uuid: user.id,
-              input_pin: cleanInput
-            });
-            if (pinOk === true) isMatch = true;
-          }
+          const { data: pinOk } = await supabase.rpc('verify_personal_pin', {
+            user_uuid: user.id,
+            input_pin: cleanInput
+          });
+          if (pinOk === true) isMatch = true;
         } else if (cleanInput.length === 6 || isSixDigits) {
-          const cachedParentPin = localStorage.getItem(`groovelab_parent_pin_${user.id}`);
-          if (userParentPin && (userParentPin === cleanInput || userParentPin.padStart(6, '0') === cleanInput)) {
+          const { data: parentOk } = await supabase.rpc('verify_parent_pin', {
+            student_id: user.id,
+            input_pin: cleanInput
+          });
+          if (parentOk === true) {
             isMatch = true;
             isParentMatch = true;
-          } else if (cachedParentPin && (cachedParentPin.trim() === cleanInput || cachedParentPin.trim() === cleanInput.padStart(6, '0'))) {
-            isMatch = true;
-            isParentMatch = true;
-          } else {
-            const { data: parentOk } = await supabase.rpc('verify_parent_pin', {
-              student_id: user.id,
-              input_pin: cleanInput
-            });
-            if (parentOk === true) {
-              isMatch = true;
-              isParentMatch = true;
-            } else if (userParentPin) {
-              try {
-                const msgBuffer = new TextEncoder().encode(cleanInput);
-                const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
-                const hashHex = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
-                if (userParentPin.toLowerCase() === hashHex.toLowerCase()) {
-                  isMatch = true;
-                  isParentMatch = true;
-                }
-              } catch (e) {}
-            }
           }
         }
 

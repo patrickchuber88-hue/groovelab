@@ -2081,7 +2081,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
       };
 
       const { error: rawErr } = await supabase
-        .from('users_raw')
+        .from('users')
         .update(teacherPayload)
         .eq('id', updatedData.id);
 
@@ -2111,7 +2111,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
       };
 
       const { error: rawErr } = await supabase
-        .from('users_raw')
+        .from('users')
         .update(moduleUpdates)
         .eq('id', teacher.id);
 
@@ -2160,9 +2160,9 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
         is_groovelab_active: newGrooveValue,
       };
 
-      const { data: existingUser } = await supabase.from('users_raw').select('id').eq('id', student.id).maybeSingle();
+      const { data: existingUser } = await supabase.from('users').select('id').eq('id', student.id).maybeSingle();
       if (!existingUser) {
-        await supabase.from('users_raw').insert({
+        await supabase.from('users').insert({
           id: student.id,
           school_id: student.school_id || schoolId,
           role: 'student',
@@ -2177,7 +2177,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
         });
       } else {
         const { error: rawErr } = await supabase
-          .from('users_raw')
+          .from('users')
           .update(moduleUpdates)
           .eq('id', student.id);
         if (rawErr) throw rawErr;
@@ -4930,7 +4930,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
 
           // Save to users_raw asynchronously so it is permanently in Supabase
           try {
-            await supabase.from('users_raw').insert(healedAdmin);
+            await supabase.from('users').insert(healedAdmin);
           } catch (err: any) {
             console.warn('[SecretaryDashboard] Orphaned school auto-heal notice:', err);
           }
@@ -6930,7 +6930,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
   const handleUpdateEmployeeRole = async (employeeId: string, newRole: string) => {
     try {
       const { data: user, error: fetchErr } = await supabase
-        .from('users_raw')
+        .from('users')
         .select('role, roles')
         .eq('id', employeeId)
         .single();
@@ -6955,7 +6955,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
 
       let updated = false;
       const { error: rawErr } = await supabase
-        .from('users_raw')
+        .from('users')
         .update({ 
           role: newRole,
           roles: newRoles
@@ -7045,7 +7045,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
 
       let updated = false;
       const { error: rawErr } = await supabase
-        .from('users_raw')
+        .from('users')
         .update({ 
           roles: newRoles,
           role: primaryRole,
@@ -11139,9 +11139,9 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                           onChange={async (e) => {
                             const newDur = parseInt(e.target.value);
                             try {
-                              const { data: existingUser } = await supabase.from('users_raw').select('id').eq('id', student.id).maybeSingle();
+                              const { data: existingUser } = await supabase.from('users').select('id').eq('id', student.id).maybeSingle();
                               if (!existingUser) {
-                                await supabase.from('users_raw').insert({
+                                await supabase.from('users').insert({
                                   id: student.id,
                                   school_id: student.school_id || schoolId,
                                   role: 'student',
@@ -11155,7 +11155,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                   is_active: false
                                 });
                               } else {
-                                await supabase.from('users_raw').update({ lesson_duration: newDur }).eq('id', student.id);
+                                await supabase.from('users').update({ lesson_duration: newDur }).eq('id', student.id);
                               }
                               try {
                                 await supabase.from('students').update({ lesson_duration: newDur }).eq('id', student.id);
@@ -11244,9 +11244,9 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                 payment_status: nextActive ? (markAsHardship ? 'hardship' : (isDirectBilling ? 'paid' : 'active')) : 'passive'
                               };
 
-                              const { data: existingUser } = await supabase.from('users_raw').select('id').eq('id', student.id).maybeSingle();
+                              const { data: existingUser } = await supabase.from('users').select('id').eq('id', student.id).maybeSingle();
                               if (!existingUser) {
-                                await supabase.from('users_raw').insert({
+                                await supabase.from('users').insert({
                                   id: student.id,
                                   school_id: student.school_id || schoolId,
                                   role: 'student',
@@ -11262,7 +11262,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                   payment_status: userUpdates.payment_status
                                 });
                               } else {
-                                await supabase.from('users_raw').update(userUpdates).eq('id', student.id);
+                                await supabase.from('users').update(userUpdates).eq('id', student.id);
                                 try {
                                   await supabase.from('users').update(userUpdates).eq('id', student.id);
                                 } catch (e) {}
@@ -11336,9 +11336,9 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                             if (!window.confirm(`GrooveLab-Modul für ${sName} ${actionWord}?`)) return;
                             try {
                               const newVal = !student.is_groovelab_active;
-                              const { data: existingUser } = await supabase.from('users_raw').select('id').eq('id', student.id).maybeSingle();
+                              const { data: existingUser } = await supabase.from('users').select('id').eq('id', student.id).maybeSingle();
                               if (!existingUser) {
-                                await supabase.from('users_raw').insert({
+                                await supabase.from('users').insert({
                                   id: student.id,
                                   school_id: student.school_id || schoolId,
                                   role: 'student',
@@ -11352,7 +11352,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                   is_active: false
                                 });
                               } else {
-                                await supabase.from('users_raw').update({ is_groovelab_active: newVal }).eq('id', student.id);
+                                await supabase.from('users').update({ is_groovelab_active: newVal }).eq('id', student.id);
                                 try {
                                   await supabase.from('users').update({ is_groovelab_active: newVal }).eq('id', student.id);
                                 } catch (e) {}
@@ -11879,7 +11879,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
       try { await supabase.from('duties').delete().eq('teacher_id', id); } catch (e) {}
       try { await supabase.from('pending_students').delete().eq('id', id); } catch (e) {}
 
-      const { error: rawErr } = await supabase.from('users_raw').delete().eq('id', id);
+      const { error: rawErr } = await supabase.from('users').delete().eq('id', id);
       try { await supabase.from('students').delete().eq('id', id); } catch (e) {}
       try { await supabase.from('users').delete().eq('id', id); } catch (e) {}
 
@@ -11896,7 +11896,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
   const handleUpdateTeacherInstrument = async (teacherId: string, newInstrument: string) => {
     try {
       const { error: rawErr } = await supabase
-        .from('users_raw')
+        .from('users')
         .update({ instrument: newInstrument })
         .eq('id', teacherId);
       try {
@@ -11974,10 +11974,10 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
 
       // 1. Update or create in users_raw
       try {
-        const { data: existingUser } = await supabase.from('users_raw').select('id').eq('id', studentId).maybeSingle();
+        const { data: existingUser } = await supabase.from('users').select('id').eq('id', studentId).maybeSingle();
         if (!existingUser) {
           const stObj = students.find((s: any) => s.id === studentId);
-          await supabase.from('users_raw').insert({
+          await supabase.from('users').insert({
             id: studentId,
             school_id: stObj?.school_id || schoolId,
             role: 'student',
@@ -11991,7 +11991,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
             is_active: false
           });
         } else {
-          await supabase.from('users_raw').update(updatePayload).eq('id', studentId);
+          await supabase.from('users').update(updatePayload).eq('id', studentId);
           try {
             await supabase.from('users').update(updatePayload).eq('id', studentId);
           } catch (e) {}
@@ -33995,7 +33995,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
               if (passiveIds.length > 0) {
                 try {
                   await supabase
-                    .from('users_raw')
+                    .from('users')
                     .update({ is_campus_active: true, status: 'active', payment_status: 'active', updated_at: new Date().toISOString() })
                     .in('id', passiveIds);
                   await supabase
@@ -35567,7 +35567,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                     status: 'offen' 
                   };
                   try {
-                    await supabase.from('users_raw').update(userResetPayload).eq('id', s.id);
+                    await supabase.from('users').update(userResetPayload).eq('id', s.id);
                   } catch (e) {}
                   const { error: userResetErr } = await supabase.from('users').update(userResetPayload).eq('id', s.id);
                   if (userResetErr && userResetErr.message?.includes('onboarding_pin')) {

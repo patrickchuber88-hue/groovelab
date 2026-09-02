@@ -40,15 +40,11 @@ export function TeacherActivation({ onSuccess }: TeacherActivationProps) {
 
   const fetchEmailByToken = async (token: string) => {
     try {
-      const { data, error } = await supabase
-        .from('users')
-        .select('email')
-        .eq('teacher_qr_token', token)
-        .eq('role', 'teacher')
-        .maybeSingle();
-
-      if (data && data.email) {
-        setEmail(data.email);
+      const { data: authResult } = await supabase.rpc('authenticate_by_credential', {
+        p_credential: token
+      });
+      if (authResult?.user?.email) {
+        setEmail(authResult.user.email);
       }
     } catch (err) {
       console.error('Error fetching email by token:', err);
@@ -66,19 +62,16 @@ export function TeacherActivation({ onSuccess }: TeacherActivationProps) {
     setError(null);
 
     try {
-      // Find teacher profile in the database matching email and ausweis_nummer (registration_pin)
-      const { data: teacher, error: fetchError } = await supabase
-        .from('users')
-        .select('id, first_name, last_name, teacher_qr_token, email, ausweis_nummer, role, is_active')
-        .eq('email', email.trim().toLowerCase())
-        .eq('ausweis_nummer', pin.trim().toUpperCase())
-        .eq('role', 'teacher')
-        .maybeSingle();
+      // Find teacher profile via server-side Auth RPC
+      const { data: authResult, error: fetchError } = await supabase.rpc('authenticate_by_credential', {
+        p_credential: pin.trim().toUpperCase()
+      });
 
-      if (fetchError || !teacher) {
+      if (fetchError || !authResult?.success || !authResult?.user) {
         throw new Error('Lehrkraft mit diesen Anmeldedaten wurde nicht gefunden. Bitte überprüfe deine Eingaben.');
       }
 
+      const teacher = authResult.user;
       setActivatedTeacherId(teacher.id);
       setTeacherName(`${teacher.first_name || ''} ${teacher.last_name || ''}`.trim());
       setTeacherQrToken(teacher.teacher_qr_token || '');

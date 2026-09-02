@@ -87,6 +87,7 @@ interface MeisterwerkDocumentationModalProps {
   initialPracticeMinutes?: number;
   initialMasteredSongsCount?: number;
   hasTresorStorage?: boolean;
+  groupStudents?: Student[];
 }
 
 interface ProgressItem {
@@ -275,6 +276,68 @@ export const formatStudentNoteDisplay = (note: string): { isStudentNote: boolean
   return { isStudentNote: false, isPrivate: false, text: note };
 };
 
+export interface ParsedStudentAnnotation {
+  targetStudentName: string | null;
+  isSpecificToAnother: boolean;
+  isSpecificToCurrent: boolean;
+  isGeneralOrAll: boolean;
+  cleanText: string;
+  rawText: string;
+}
+
+export const parseStudentAnnotation = (
+  line: string, 
+  currentStudentFirstName: string, 
+  isTeacherMode: boolean = false
+): ParsedStudentAnnotation => {
+  if (!line || typeof line !== 'string') {
+    return { targetStudentName: null, isSpecificToAnother: false, isSpecificToCurrent: false, isGeneralOrAll: true, cleanText: '', rawText: '' };
+  }
+  
+  const trimmed = line.trim();
+  const match = trimmed.match(/^@([a-zA-ZäöüÄÖÜß0-9_-]+)(?::|\s)\s*(.*)$/i);
+  
+  if (!match) {
+    return {
+      targetStudentName: null,
+      isSpecificToAnother: false,
+      isSpecificToCurrent: false,
+      isGeneralOrAll: true,
+      cleanText: trimmed,
+      rawText: trimmed
+    };
+  }
+
+  const target = match[1].trim();
+  const rest = match[2].trim();
+  const targetLower = target.toLowerCase();
+  const currentLower = (currentStudentFirstName || '').toLowerCase().trim();
+
+  const isAll = targetLower === 'alle' || targetLower === 'all' || targetLower === 'gruppe' || targetLower === 'group' || targetLower === 'duo' || targetLower === 'band';
+  
+  if (isAll) {
+    return {
+      targetStudentName: 'Alle',
+      isSpecificToAnother: false,
+      isSpecificToCurrent: false,
+      isGeneralOrAll: true,
+      cleanText: rest || trimmed,
+      rawText: trimmed
+    };
+  }
+
+  const isCurrent = currentLower.length > 0 && (targetLower === currentLower || targetLower.startsWith(currentLower) || currentLower.startsWith(targetLower));
+
+  return {
+    targetStudentName: target,
+    isSpecificToAnother: !isTeacherMode && !isCurrent,
+    isSpecificToCurrent: isCurrent,
+    isGeneralOrAll: false,
+    cleanText: rest || trimmed,
+    rawText: trimmed
+  };
+};
+
 const SKILL_TAGS = [
   { key: 'rhythmus', label: 'Rhythmus & Timing', shortLabel: 'Rhythmus', icon: '🥁', color: '#4338ca', bg: '#e0e7ff', lightBg: '#eef2ff', border: '#c7d2fe', dotColor: '#4338ca', category: 'musical' },
   { key: 'technik', label: 'Spieltechnik & Motorik', shortLabel: 'Technik', icon: '⚡', color: '#1e40af', bg: '#eff6ff', lightBg: '#eff6ff', border: '#bfdbfe', dotColor: '#2563eb', category: 'musical' },
@@ -405,10 +468,36 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   initialStreak,
   initialPracticeMinutes,
   initialMasteredSongsCount,
-  hasTresorStorage: propHasTresor
+  hasTresorStorage: propHasTresor,
+  groupStudents: propGroupStudents
 }) => {
   const isTeacherMode = !readOnly || isTeacherTools;
   const studentFirstName = (student?.first_name || (student as any)?.name?.split(' ')[0] || 'Schüler').trim();
+
+  // 👥 DUO & GRUPPENUNTERRICHT: Compute all participants of the current lesson group
+  const effectiveGroupStudents: Student[] = useMemo(() => {
+    const list: Student[] = [];
+    const addedIds = new Set<string>();
+    const addStud = (s: any) => {
+      if (!s) return;
+      const sId = s.id || s.user_id || s.name || s.first_name;
+      if (sId && !addedIds.has(sId)) {
+        addedIds.add(sId);
+        list.push(s);
+      }
+    };
+    addStud(student);
+    if (Array.isArray(propGroupStudents)) {
+      propGroupStudents.forEach(addStud);
+    }
+    if (Array.isArray(student?.groupStudents)) {
+      student.groupStudents.forEach(addStud);
+    }
+    if (Array.isArray((student as any)?.students)) {
+      (student as any).students.forEach(addStud);
+    }
+    return list;
+  }, [student, propGroupStudents]);
   const [isCampusActive, setIsCampusActive] = useState<boolean>(student.is_campus_active ?? true);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const [showProtokollOnboarding, setShowProtokollOnboarding] = useState<boolean>(() => {
@@ -6011,6 +6100,47 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       }
 
       if (dbError) throw dbError;
+
+      // 👥 DUO & GRUPPENUNTERRICHT: Sync shared homework note row to all sibling students in the group
+      if (effectiveGroupStudents.length > 1) {
+        const otherStudents = effectiveGroupStudents.filter(s => s.id && s.id !== student.id);
+        for (const otherStud of otherStudents) {
+          try {
+            if (!isLehrwerkPage && !isSong) {
+              localStorage.setItem(`campus_homework_notes_${otherStud.id}`, combinedHomeworkNotes);
+            }
+            const otherRow = {
+              student_id: otherStud.id,
+              teacher_id: activeTId,
+              topic_name: finalTopicName,
+              status,
+              is_current_homework: finalIsCurrentHomework,
+              teacher_notes: effectiveTeacherNotes.trim(),
+              homework_notes: rowHomeworkNotes,
+              updated_at: new Date().toISOString()
+            };
+            const { data: existingSiblingRows } = await supabase
+              .from('progress_matrix')
+              .select('id, updated_at')
+              .eq('student_id', otherStud.id)
+              .eq('topic_name', finalTopicName);
+
+            const siblingMatch = existingSiblingRows?.find((r: any) => r.updated_at && getISOWeek(r.updated_at) === currentWeek) || existingSiblingRows?.[0];
+            if (siblingMatch?.id) {
+              await supabase
+                .from('progress_matrix')
+                .update(otherRow)
+                .eq('id', siblingMatch.id);
+            } else {
+              await supabase
+                .from('progress_matrix')
+                .insert(otherRow);
+            }
+          } catch (grpErr) {
+            console.warn('[Meisterwerk] Group student sync notice:', otherStud.id, grpErr);
+          }
+        }
+      }
 
       if (!isLehrwerkPage && !isSong) {
         await syncHomeworkNotes(finalNotesList);
@@ -16734,6 +16864,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                           }
                                           const isSpeakingThis = isTtsSpeaking && activeTtsKey === `book_note_${item.title}_${p}`;
 
+                                          const parsedAnn = parseStudentAnnotation(noteText, studentFirstName, isTeacherMode);
+                                          if (readOnly && parsedAnn.isSpecificToAnother) return null;
+
                                           return (
                                             <div key={`p-note-${p}`} style={{
                                               display: 'flex',
@@ -16744,19 +16877,58 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                               padding: '3px 6px',
                                               marginLeft: '32px',
                                               borderRadius: '6px',
-                                              background: isSpeakingThis ? '#dcfce7' : 'transparent',
+                                              background: isSpeakingThis ? '#dcfce7' : (parsedAnn.isSpecificToCurrent ? '#f0fdf4' : 'transparent'),
+                                              border: parsedAnn.isSpecificToCurrent ? '1px solid #86efac' : 'none',
                                               transition: 'all 0.15s ease'
                                             }}>
                                               <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', minWidth: 0 }}>
                                                 <span style={{ fontWeight: 850, color: '#e11d48', flexShrink: 0 }}>S. {p}:</span>
-                                                <span style={{ fontWeight: 600, color: '#334155', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{noteText}</span>
+                                                {parsedAnn.isSpecificToCurrent && (
+                                                  <span style={{
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    gap: '3px',
+                                                    background: '#dcfce7',
+                                                    color: '#15803d',
+                                                    border: '1px solid #86efac',
+                                                    borderRadius: '6px',
+                                                    padding: '1px 5px',
+                                                    fontSize: '0.66rem',
+                                                    fontWeight: 800,
+                                                    flexShrink: 0
+                                                  }}>
+                                                    <span>🎯</span>
+                                                    <span>Für dich</span>
+                                                  </span>
+                                                )}
+                                                {isTeacherMode && parsedAnn.targetStudentName && parsedAnn.targetStudentName !== 'Alle' && (
+                                                  <span style={{
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    gap: '3px',
+                                                    background: '#ede9fe',
+                                                    color: '#6d28d9',
+                                                    border: '1px solid #c4b5fd',
+                                                    borderRadius: '6px',
+                                                    padding: '1px 5px',
+                                                    fontSize: '0.66rem',
+                                                    fontWeight: 800,
+                                                    flexShrink: 0
+                                                  }}>
+                                                    <span>👤</span>
+                                                    <span>@{parsedAnn.targetStudentName}</span>
+                                                  </span>
+                                                )}
+                                                <span style={{ fontWeight: parsedAnn.isSpecificToCurrent ? 750 : 600, color: '#334155', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                  {parsedAnn.cleanText}
+                                                </span>
                                               </div>
                                               <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
                                                 <button
                                                   type="button"
                                                   onClick={(e) => {
                                                     e.stopPropagation();
-                                                    handleSpeakText(`Seite ${p}: ${noteText}`, `book_note_${item.title}_${p}`);
+                                                    handleSpeakText(`Seite ${p}: ${parsedAnn.cleanText}`, `book_note_${item.title}_${p}`);
                                                   }}
                                                   style={{
                                                     border: 'none',
@@ -16868,51 +17040,93 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                             </div>
 
                                             {/* Specific Song Practice Note (Frameless Editorial Flow + Micro TTS Speaker Pill) */}
-                                            {songNote ? (
-                                              <div style={{
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'space-between',
-                                                gap: '8px',
-                                                fontSize: '0.78rem',
-                                                padding: '3px 6px',
-                                                marginLeft: '32px',
-                                                borderRadius: '6px',
-                                                background: isSpeakingThisSong ? '#e0e7ff' : 'transparent',
-                                                transition: 'all 0.15s ease'
-                                              }}>
-                                                <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', minWidth: 0 }}>
-                                                  <span style={{ fontWeight: 850, color: '#4f46e5', flexShrink: 0 }}>📌 Fahrplan:</span>
-                                                  <span style={{ fontWeight: 600, color: '#334155', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                                    {renderTextWithDidacticBadges(songNote)}
-                                                  </span>
+                                            {songNote ? (() => {
+                                              const parsedAnn = parseStudentAnnotation(songNote, studentFirstName, isTeacherMode);
+                                              if (readOnly && parsedAnn.isSpecificToAnother) return null;
+
+                                              return (
+                                                <div style={{
+                                                  display: 'flex',
+                                                  alignItems: 'center',
+                                                  justifyContent: 'space-between',
+                                                  gap: '8px',
+                                                  fontSize: '0.78rem',
+                                                  padding: '3px 6px',
+                                                  marginLeft: '32px',
+                                                  borderRadius: '6px',
+                                                  background: isSpeakingThisSong ? '#e0e7ff' : (parsedAnn.isSpecificToCurrent ? '#f0fdf4' : 'transparent'),
+                                                  border: parsedAnn.isSpecificToCurrent ? '1px solid #86efac' : 'none',
+                                                  transition: 'all 0.15s ease'
+                                                }}>
+                                                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', minWidth: 0 }}>
+                                                    <span style={{ fontWeight: 850, color: '#4f46e5', flexShrink: 0 }}>📌 Fahrplan:</span>
+                                                    {parsedAnn.isSpecificToCurrent && (
+                                                      <span style={{
+                                                        display: 'inline-flex',
+                                                        alignItems: 'center',
+                                                        gap: '3px',
+                                                        background: '#dcfce7',
+                                                        color: '#15803d',
+                                                        border: '1px solid #86efac',
+                                                        borderRadius: '6px',
+                                                        padding: '1px 5px',
+                                                        fontSize: '0.66rem',
+                                                        fontWeight: 800,
+                                                        flexShrink: 0
+                                                      }}>
+                                                        <span>🎯</span>
+                                                        <span>Für dich</span>
+                                                      </span>
+                                                    )}
+                                                    {isTeacherMode && parsedAnn.targetStudentName && parsedAnn.targetStudentName !== 'Alle' && (
+                                                      <span style={{
+                                                        display: 'inline-flex',
+                                                        alignItems: 'center',
+                                                        gap: '3px',
+                                                        background: '#ede9fe',
+                                                        color: '#6d28d9',
+                                                        border: '1px solid #c4b5fd',
+                                                        borderRadius: '6px',
+                                                        padding: '1px 5px',
+                                                        fontSize: '0.66rem',
+                                                        fontWeight: 800,
+                                                        flexShrink: 0
+                                                      }}>
+                                                        <span>👤</span>
+                                                        <span>@{parsedAnn.targetStudentName}</span>
+                                                      </span>
+                                                    )}
+                                                    <span style={{ fontWeight: parsedAnn.isSpecificToCurrent ? 750 : 600, color: '#334155', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                      {renderTextWithDidacticBadges(parsedAnn.cleanText)}
+                                                    </span>
+                                                  </div>
+                                                  <button
+                                                    type="button"
+                                                    onClick={(e) => {
+                                                      e.stopPropagation();
+                                                      handleSpeakText(`Fahrplan für ${item.topic_name.replace(/\s*\([^)]*\)\s*$/, '')}: ${parsedAnn.cleanText}`, `song_note_${idx}`);
+                                                    }}
+                                                    style={{
+                                                      border: 'none',
+                                                      background: isSpeakingThisSong ? '#c7d2fe' : 'none',
+                                                      color: isSpeakingThisSong ? '#4338ca' : '#94a3b8',
+                                                      cursor: 'pointer',
+                                                      padding: '2px 4px',
+                                                      borderRadius: '4px',
+                                                      display: 'flex',
+                                                      alignItems: 'center',
+                                                      flexShrink: 0,
+                                                      transition: 'transform 0.15s ease'
+                                                    }}
+                                                    onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.2)'; }}
+                                                    onMouseLeave={(e) => { e.currentTarget.style.transform = 'none'; }}
+                                                    title="Fahrplan vorlesen"
+                                                  >
+                                                    <Volume2 size={12} strokeWidth={2.4} />
+                                                  </button>
                                                 </div>
-                                                <button
-                                                  type="button"
-                                                  onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    handleSpeakText(`Fahrplan für ${item.topic_name.replace(/\s*\([^)]*\)\s*$/, '')}: ${songNote}`, `song_note_${idx}`);
-                                                  }}
-                                                  style={{
-                                                    border: 'none',
-                                                    background: isSpeakingThisSong ? '#c7d2fe' : 'none',
-                                                    color: isSpeakingThisSong ? '#4338ca' : '#94a3b8',
-                                                    cursor: 'pointer',
-                                                    padding: '2px 4px',
-                                                    borderRadius: '4px',
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    flexShrink: 0,
-                                                    transition: 'transform 0.15s ease'
-                                                  }}
-                                                  onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.2)'; }}
-                                                  onMouseLeave={(e) => { e.currentTarget.style.transform = 'none'; }}
-                                                  title="Fahrplan vorlesen"
-                                                >
-                                                  <Volume2 size={12} strokeWidth={2.4} />
-                                                </button>
-                                              </div>
-                                            ) : null}
+                                              );
+                                            })() : null}
                                           </div>
                                         );
                                       })}
@@ -16944,47 +17158,118 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                           if (!item || typeof item !== 'string') return false;
                                           const lower = item.toLowerCase();
                                           if (lower.startsWith('latency:') || lower.startsWith('latency_calibration:') || item.startsWith('SYSTEM:') || item.startsWith('STICKER:') || item.startsWith('AUDIO:') || item.startsWith('LOOP:')) return false;
+
+                                          // 👥 DUO & GRUPPENUNTERRICHT: If in student mode (readOnly), filter out notes explicitly targeted to a different student
+                                          if (readOnly) {
+                                            const parsedAnn = parseStudentAnnotation(item, studentFirstName, false);
+                                            if (parsedAnn.isSpecificToAnother) {
+                                              return false;
+                                            }
+                                          }
+
                                           return !selectedCategoryFilter || item.toLowerCase().includes(selectedCategoryFilter.toLowerCase());
                                         })
                                         .map((noteItem, nIdx) => {
-                                        const isSpeakingThisNote = isTtsSpeaking && activeTtsKey === `general_note_${nIdx}`;
-                                        const currentTag = DIDACTIC_QUICK_TAGS.find(t => noteItem.includes(t.tag));
-                                        const cleanNoteText = currentTag 
-                                          ? noteItem.replace(new RegExp(`\\s*${currentTag.tag.replace('#', '\\#')}`, 'g'), '').trim() 
-                                          : noteItem;
-                                        const isPickerOpen = activeTagPickerRowIndex === nIdx;
+                                          const isSpeakingThisNote = isTtsSpeaking && activeTtsKey === `general_note_${nIdx}`;
+                                          const parsedAnn = parseStudentAnnotation(noteItem, studentFirstName, isTeacherMode);
+                                          const currentTag = DIDACTIC_QUICK_TAGS.find(t => noteItem.includes(t.tag));
+                                          const cleanNoteText = currentTag 
+                                            ? parsedAnn.cleanText.replace(new RegExp(`\\s*${currentTag.tag.replace('#', '\\#')}`, 'g'), '').trim() 
+                                            : parsedAnn.cleanText;
+                                          const isPickerOpen = activeTagPickerRowIndex === nIdx;
 
-                                        return (
-                                          <div
-                                            key={`hw-note-row-${nIdx}`}
-                                            style={{
-                                              position: 'relative',
-                                              display: 'flex',
-                                              alignItems: 'center',
-                                              justifyContent: 'space-between',
-                                              gap: '8px',
-                                              padding: '7px 10px',
-                                              fontSize: '0.78rem',
-                                              borderRadius: '8px',
-                                              background: isSpeakingThisNote ? '#dcfce7' : '#ffffff',
-                                              border: '1px solid #e2e8f0',
-                                              boxShadow: '0 1px 2px rgba(0,0,0,0.02)',
-                                              transition: 'all 0.15s ease'
-                                            }}
-                                          >
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '7px', minWidth: 0, flex: 1 }}>
-                                              <FileText size={13} style={{ color: '#16a34a', flexShrink: 0 }} />
-                                              <span style={{
-                                                color: '#334155',
-                                                fontWeight: 650,
-                                                lineHeight: 1.4,
-                                                overflow: 'hidden',
-                                                textOverflow: 'ellipsis',
-                                                whiteSpace: 'nowrap'
-                                              }}>
-                                                {cleanNoteText}
-                                              </span>
-                                            </div>
+                                          return (
+                                            <div
+                                              key={`hw-note-row-${nIdx}`}
+                                              style={{
+                                                position: 'relative',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'space-between',
+                                                gap: '8px',
+                                                padding: '7px 10px',
+                                                fontSize: '0.78rem',
+                                                borderRadius: '8px',
+                                                background: isSpeakingThisNote ? '#dcfce7' : (parsedAnn.isSpecificToCurrent ? '#f0fdf4' : '#ffffff'),
+                                                border: parsedAnn.isSpecificToCurrent ? '1px solid #86efac' : '1px solid #e2e8f0',
+                                                boxShadow: parsedAnn.isSpecificToCurrent ? '0 2px 6px rgba(34, 197, 94, 0.08)' : '0 1px 2px rgba(0,0,0,0.02)',
+                                                transition: 'all 0.15s ease'
+                                              }}
+                                            >
+                                              <div style={{ display: 'flex', alignItems: 'center', gap: '7px', minWidth: 0, flex: 1 }}>
+                                                <FileText size={13} style={{ color: '#16a34a', flexShrink: 0 }} />
+                                                
+                                                {/* Personal Badge if targeted to current student */}
+                                                {parsedAnn.isSpecificToCurrent && (
+                                                  <span style={{
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    gap: '3px',
+                                                    background: '#dcfce7',
+                                                    color: '#15803d',
+                                                    border: '1px solid #86efac',
+                                                    borderRadius: '6px',
+                                                    padding: '1px 6px',
+                                                    fontSize: '0.68rem',
+                                                    fontWeight: 800,
+                                                    flexShrink: 0
+                                                  }}>
+                                                    <span>🎯</span>
+                                                    <span>Für dich ({studentFirstName})</span>
+                                                  </span>
+                                                )}
+
+                                                {/* Teacher view badge if note has specific student tag */}
+                                                {isTeacherMode && parsedAnn.targetStudentName && parsedAnn.targetStudentName !== 'Alle' && (
+                                                  <span style={{
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    gap: '3px',
+                                                    background: '#ede9fe',
+                                                    color: '#6d28d9',
+                                                    border: '1px solid #c4b5fd',
+                                                    borderRadius: '6px',
+                                                    padding: '1px 6px',
+                                                    fontSize: '0.68rem',
+                                                    fontWeight: 800,
+                                                    flexShrink: 0
+                                                  }}>
+                                                    <span>👤</span>
+                                                    <span>@{parsedAnn.targetStudentName}</span>
+                                                  </span>
+                                                )}
+
+                                                {/* Group badge if @Alle */}
+                                                {parsedAnn.targetStudentName === 'Alle' && (
+                                                  <span style={{
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    gap: '3px',
+                                                    background: '#f1f5f9',
+                                                    color: '#475569',
+                                                    border: '1px solid #cbd5e1',
+                                                    borderRadius: '6px',
+                                                    padding: '1px 6px',
+                                                    fontSize: '0.68rem',
+                                                    fontWeight: 800,
+                                                    flexShrink: 0
+                                                  }}>
+                                                    <span>👥</span>
+                                                    <span>@Alle</span>
+                                                  </span>
+                                                )}
+
+                                                <span style={{
+                                                  color: '#334155',
+                                                  fontWeight: parsedAnn.isSpecificToCurrent ? 750 : 650,
+                                                  lineHeight: 1.4,
+                                                  overflow: 'hidden',
+                                                  textOverflow: 'ellipsis',
+                                                  whiteSpace: 'nowrap'
+                                                }}>
+                                                  {cleanNoteText}
+                                                </span>
+                                              </div>
 
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexShrink: 0 }}>
                                               {/* Contextual Inline Tag Picker / Badge */}
@@ -17574,47 +17859,57 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                           <>
                                             {!readOnly && viewingWeekOffset === 0 && (
                                               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px', flexWrap: 'wrap' }}>
-                                                <span style={{ fontSize: '0.70rem', fontWeight: 800, color: '#64748b' }}>Schnell-Zuweisung:</span>
-                                                {student?.first_name && (
-                                                  <button
-                                                    type="button"
-                                                    onClick={() => {
-                                                      const tagToInsert = `@${student.first_name}: `;
-                                                      const currentText = generalHomeworkNotes || '';
-                                                      const cursor = studentNotesSelectionRef.current?.start ?? currentText.length;
-                                                      const nextText = currentText.slice(0, cursor) + (currentText.length > 0 && !currentText.endsWith('\n') ? '\n' : '') + tagToInsert + currentText.slice(cursor);
-                                                      latestGeneralHomeworkNotesRef.current = nextText;
-                                                      setGeneralHomeworkNotes(nextText);
-                                                      const noteLines = nextText.split('\n').map(s => s.trim()).filter(s => s.length > 0 && !isInternalMetadataNote(s));
-                                                      setHomeworkNotesList(noteLines);
-                                                      try { localStorage.setItem(`campus_homework_notes_${student.id}`, JSON.stringify(noteLines)); } catch {}
-                                                      triggerDebouncedAutoSave(350);
-                                                      setTimeout(() => {
-                                                        if (studentNotesTextareaRef.current) {
-                                                          studentNotesTextareaRef.current.focus();
-                                                          const pos = cursor + tagToInsert.length + 1;
-                                                          studentNotesTextareaRef.current.setSelectionRange(pos, pos);
-                                                        }
-                                                      }, 20);
-                                                    }}
-                                                    style={{
-                                                      background: '#e6f4ea',
-                                                      border: '1px solid rgba(52, 168, 83, 0.3)',
-                                                      borderRadius: '6px',
-                                                      padding: '2px 8px',
-                                                      fontSize: '0.70rem',
-                                                      fontWeight: 800,
-                                                      color: '#15803d',
-                                                      cursor: 'pointer',
-                                                      display: 'inline-flex',
-                                                      alignItems: 'center',
-                                                      gap: '4px',
-                                                      transition: 'all 0.15s'
-                                                    }}
-                                                  >
-                                                    + @{student.first_name}
-                                                  </button>
-                                                )}
+                                                <span style={{ fontSize: '0.70rem', fontWeight: 800, color: '#64748b' }}>
+                                                  {effectiveGroupStudents.length > 1 ? 'Duo/Gruppen-Zuweisung:' : 'Schnell-Zuweisung:'}
+                                                </span>
+                                                {effectiveGroupStudents.map((grpStud, gIdx) => {
+                                                  const gName = (grpStud?.first_name || (grpStud as any)?.name?.split(' ')[0] || '').trim();
+                                                  if (!gName) return null;
+                                                  const isCurrentStudent = gName.toLowerCase() === studentFirstName.toLowerCase();
+                                                  return (
+                                                    <button
+                                                      key={`group-tag-btn-${gIdx}-${gName}`}
+                                                      type="button"
+                                                      onClick={() => {
+                                                        const tagToInsert = `@${gName}: `;
+                                                        const currentText = generalHomeworkNotes || '';
+                                                        const cursor = studentNotesSelectionRef.current?.start ?? currentText.length;
+                                                        const nextText = currentText.slice(0, cursor) + (currentText.length > 0 && !currentText.endsWith('\n') ? '\n' : '') + tagToInsert + currentText.slice(cursor);
+                                                        latestGeneralHomeworkNotesRef.current = nextText;
+                                                        setGeneralHomeworkNotes(nextText);
+                                                        const noteLines = nextText.split('\n').map(s => s.trim()).filter(s => s.length > 0 && !isInternalMetadataNote(s));
+                                                        setHomeworkNotesList(noteLines);
+                                                        try { localStorage.setItem(`campus_homework_notes_${student.id}`, JSON.stringify(noteLines)); } catch {}
+                                                        triggerDebouncedAutoSave(350);
+                                                        setTimeout(() => {
+                                                          if (studentNotesTextareaRef.current) {
+                                                            studentNotesTextareaRef.current.focus();
+                                                            const pos = cursor + tagToInsert.length + 1;
+                                                            studentNotesTextareaRef.current.setSelectionRange(pos, pos);
+                                                          }
+                                                        }, 20);
+                                                      }}
+                                                      style={{
+                                                        background: isCurrentStudent ? '#e6f4ea' : '#ede9fe',
+                                                        border: isCurrentStudent ? '1px solid rgba(52, 168, 83, 0.4)' : '1px solid rgba(139, 92, 246, 0.4)',
+                                                        borderRadius: '6px',
+                                                        padding: '2px 8px',
+                                                        fontSize: '0.70rem',
+                                                        fontWeight: 800,
+                                                        color: isCurrentStudent ? '#15803d' : '#6d28d9',
+                                                        cursor: 'pointer',
+                                                        display: 'inline-flex',
+                                                        alignItems: 'center',
+                                                        gap: '4px',
+                                                        transition: 'all 0.15s'
+                                                      }}
+                                                      className="hover-scale-mini"
+                                                      title={`@${gName} zur Hausaufgabe zuweisen`}
+                                                    >
+                                                      + @{gName}
+                                                    </button>
+                                                  );
+                                                })}
                                                 <button
                                                   type="button"
                                                   onClick={() => {

@@ -1062,7 +1062,6 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
         { data: occData },
         { data: groupData },
         { data: teacherProfile },
-        { data: teacherProfileRaw },
         allStudentsDb,
         allSchoolStudentUsers,
         pendingData
@@ -1085,9 +1084,6 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
         // Teacher Profile
         supabase.from('users').select('*').eq('id', selectedTeacherId).maybeSingle(),
 
-        // Teacher Profile Raw
-        supabase.from('users_raw').select('*').eq('id', selectedTeacherId).maybeSingle(),
-
         // School Students Catalog (Cached with SWR 60s)
         queryCache.fetch(`students_table_${schoolId}`, async () => {
           const { data } = await supabase.from('students').select('*').eq('school_id', schoolId);
@@ -1096,7 +1092,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
 
         // School Student Users (Cached with SWR 60s)
         queryCache.fetch(`student_users_${schoolId}`, async () => {
-          const { data } = await supabase.from('users').select('id, first_name, last_name, instrument, lesson_duration, sibling_group_id, group_id, is_campus_active, is_groovelab_active, is_active, teacher_id').eq('school_id', schoolId).eq('role', 'student');
+          const { data } = await supabase.from('users').select('id, first_name, last_name, instrument, lesson_duration, sibling_group_id, group_id, is_campus_active, is_groovelab_active, is_active, status, teacher_id').eq('school_id', schoolId).eq('role', 'student');
           return data || [];
         }, { ttlMs: 60_000, staleWhileRevalidate: true }),
 
@@ -1132,7 +1128,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
         });
       }
 
-      const rawPlannedEarly = teacherProfileRaw?.planned_boards || (teacherProfileRaw as any)?.campus_räume || (teacherProfileRaw as any)?.groovelab_räume || teacherProfile?.planned_boards || (teacherProfile as any)?.campus_räume || (teacherProfile as any)?.groovelab_räume;
+      const rawPlannedEarly = teacherProfile?.planned_boards || (teacherProfile as any)?.campus_räume || (teacherProfile as any)?.groovelab_räume;
       const savedTeacherStudentIds = new Set<string>(
         Array.isArray(rawPlannedEarly?.allTeacherStudentIds)
           ? rawPlannedEarly.allTeacherStudentIds
@@ -2520,21 +2516,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
       // 1. Immediate local storage persistence
       localStorage.setItem(`groovelab_teacher_draft_state_${activePlatform}_${selectedTeacherId}`, JSON.stringify(draftStateToSave));
 
-      // 2. Physical table persistence (users_raw)
-      try {
-        await supabase
-          .from('users_raw')
-          .update({
-            planned_boards: draftStateToSave,
-            campus_räume: draftStateToSave,
-            groovelab_räume: draftStateToSave
-          })
-          .eq('id', selectedTeacherId);
-      } catch (rawErr) {
-        console.warn('[ScheduleBoard] users_raw persistence note:', rawErr);
-      }
-
-      // 3. View persistence (users)
+      // 2. View persistence (users)
       try {
         await supabase
           .from('users')
@@ -4066,16 +4048,6 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
     localStorage.setItem(`groovelab_teacher_draft_state_${activePlatform}_${selectedTeacherId}`, JSON.stringify(draftStateToSave));
     
     supabase
-      .from('users_raw')
-      .update({
-        planned_boards: draftStateToSave,
-        campus_räume: draftStateToSave,
-        groovelab_räume: draftStateToSave
-      })
-      .eq('id', selectedTeacherId)
-      .then();
-
-    supabase
       .from('users')
       .update({
         planned_boards: draftStateToSave,
@@ -4140,16 +4112,6 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
     const columnName = activePlatform === 'campus' ? 'campus_räume' : 'groovelab_räume';
     localStorage.setItem(`groovelab_teacher_draft_state_${activePlatform}_${selectedTeacherId}`, JSON.stringify(draftStateToSave));
     
-    supabase
-      .from('users_raw')
-      .update({
-        planned_boards: draftStateToSave,
-        campus_räume: draftStateToSave,
-        groovelab_räume: draftStateToSave
-      })
-      .eq('id', selectedTeacherId)
-      .then();
-
     supabase
       .from('users')
       .update({

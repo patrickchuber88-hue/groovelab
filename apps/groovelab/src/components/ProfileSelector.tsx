@@ -130,26 +130,18 @@ export const ProfileSelector: React.FC<ProfileSelectorProps> = ({ onLoginSuccess
 
       let isMatch = false;
       const cleanInput = pinToVerify.trim();
-      const userPin = String(user.personal_pin || user.parent_pin || user.onboarding_pin || '').trim();
-      const cachedPin = localStorage.getItem(`groovelab_user_pin_${user.id}`);
 
-      if (userPin && (userPin === cleanInput || userPin.padStart(4, '0') === cleanInput)) {
+      const { data: pinOk, error: pinErr } = await supabase.rpc('verify_personal_pin', {
+        user_uuid: user.id,
+        input_pin: cleanInput
+      });
+      if (!pinErr && pinOk === true) {
         isMatch = true;
-      } else if (cachedPin && cachedPin.trim() === cleanInput) {
-        isMatch = true;
-      } else {
-        const { data: pinOk, error: pinErr } = await supabase.rpc('verify_personal_pin', {
-          user_uuid: user.id,
-          input_pin: cleanInput
-        });
-        if (!pinErr && pinOk === true) {
+      } else if (user.role === 'student') {
+        const dayOfBirthVal = Array.isArray(user.activation_days) ? user.activation_days[0]?.day_of_birth : user.activation_days?.day_of_birth;
+        const studentBirthDay = dayOfBirthVal || user.day_of_birth;
+        if (studentBirthDay && parseInt(cleanInput) === parseInt(String(studentBirthDay))) {
           isMatch = true;
-        } else if (user.role === 'student') {
-          const dayOfBirthVal = Array.isArray(user.activation_days) ? user.activation_days[0]?.day_of_birth : user.activation_days?.day_of_birth;
-          const studentBirthDay = dayOfBirthVal || user.day_of_birth;
-          if (studentBirthDay && parseInt(cleanInput) === parseInt(String(studentBirthDay))) {
-            isMatch = true;
-          }
         }
       }
 

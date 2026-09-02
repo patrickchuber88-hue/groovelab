@@ -2138,23 +2138,13 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
 
   const fetchAdminUser = async () => {
     try {
-      let query = supabase.from('users_raw').select('*');
+      let query = supabase.from('users').select('*');
       if (currentUser?.id && currentUser.id !== 'master_admin') {
         query = query.eq('id', currentUser.id);
       } else {
         query = query.or('is_master_admin.eq.true,master_admin_username.eq.admin,first_name.ilike.%Patrick%').limit(1);
       }
       let { data } = await query.maybeSingle();
-      if (!data) {
-        let viewQuery = supabase.from('users').select('*');
-        if (currentUser?.id && currentUser.id !== 'master_admin') {
-          viewQuery = viewQuery.eq('id', currentUser.id);
-        } else {
-          viewQuery = viewQuery.or('is_master_admin.eq.true,master_admin_username.eq.admin,first_name.ilike.%Patrick%').limit(1);
-        }
-        const viewRes = await viewQuery.maybeSingle();
-        data = viewRes.data;
-      }
 
       if (data) {
         setAdminUser(data);
@@ -7394,7 +7384,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                   const initialAdminPin = Math.floor(100000 + Math.random() * 900000).toString();
 
                   try {
-                    await supabase.from('users_raw').insert({
+                    await supabase.from('users').insert({
                       id: crypto.randomUUID(),
                       school_id: created.id,
                       role: 'admin',

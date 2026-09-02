@@ -113,6 +113,13 @@ if (typeof navigator !== 'undefined' && navigator.mediaDevices && navigator.medi
         (window as any)._activeMediaStreams = [];
       }
     };
+
+    window.addEventListener('beforeunload', () => {
+      (window as any).stopAllCameras();
+    });
+    window.addEventListener('pagehide', () => {
+      (window as any).stopAllCameras();
+    });
   }
 }
 
@@ -2492,47 +2499,28 @@ function App() {
         let schoolData: any = null;
 
         // 1. If explicit user ID provided (e.g. from Ticket or Persona switcher)
-        // 1. If explicit user ID provided (validate school_id to prevent cross-tenant leaks)
         if (ghostUserId) {
-          const { data: uData } = await supabase
-            .from('users_raw')
+          const { data: viewUser } = await supabase
+            .from('users')
             .select('*, schools(*)')
             .eq('id', ghostUserId)
             .maybeSingle();
-          if (uData && (!ghostSchoolId || uData.school_id === ghostSchoolId)) {
-            realUser = uData;
-          } else {
-            const { data: viewUser } = await supabase
-              .from('users')
-              .select('*, schools(*)')
-              .eq('id', ghostUserId)
-              .maybeSingle();
-            if (viewUser && (!ghostSchoolId || viewUser.school_id === ghostSchoolId)) {
-              realUser = viewUser;
-            }
+          if (viewUser && (!ghostSchoolId || viewUser.school_id === ghostSchoolId)) {
+            realUser = viewUser;
           }
         }
 
         // 2. If no user yet, but school ID present -> resolve primary admin or teacher from this school
         if (!realUser && ghostSchoolId) {
-          const { data: uData } = await supabase
-            .from('users_raw')
+          const { data: viewUser } = await supabase
+            .from('users')
             .select('*, schools(*)')
             .eq('school_id', ghostSchoolId)
             .eq('role', ghostRole === 'teacher' ? 'teacher' : 'admin')
             .limit(1)
             .maybeSingle();
-          if (uData) {
-            realUser = uData;
-          } else {
-            const { data: viewUser } = await supabase
-              .from('users')
-              .select('*, schools(*)')
-              .eq('school_id', ghostSchoolId)
-              .eq('role', ghostRole === 'teacher' ? 'teacher' : 'admin')
-              .limit(1)
-              .maybeSingle();
-            if (viewUser) realUser = viewUser;
+          if (viewUser) {
+            realUser = viewUser;
           }
         }
 
@@ -3457,7 +3445,7 @@ function App() {
       console.log(`[PublicPassView] Detected campus pass token in URL: ${urlCampusPassToken}`);
       const fetchPublicPass = async () => {
         try {
-          // Stage 0: Tier-1 Server-Side Authentication RPC
+          // Stage 0: Tier-1 Server-Side Authentication RPC (Fail-Closed)
           let passData: any = null;
           try {
             const { data: authResult, error: rpcErr } = await supabase.rpc('authenticate_by_credential', {
@@ -3472,25 +3460,7 @@ function App() {
               }
             }
           } catch (e) {
-            console.warn('[PublicPassView] authenticate_by_credential fallback:', e);
-          }
-
-          if (!passData) {
-            const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(urlCampusPassToken);
-            const upperToken = urlCampusPassToken.toUpperCase();
-            let passQuery = supabase
-              .from('users')
-              .select('id, first_name, last_name, role, email, instrument, qr_token, photo_url, school_id, ausweis_id, ausweis_nummer');
-            if (isUuid) {
-              passQuery = passQuery.or(`qr_token.eq.${urlCampusPassToken},teacher_qr_token.eq.${urlCampusPassToken}`);
-            } else {
-              passQuery = passQuery.or(`teacher_qr_token.eq.${urlCampusPassToken},ausweis_nummer.eq.${urlCampusPassToken},ausweis_nummer.eq.${upperToken}`);
-            }
-            const { data, error } = await passQuery.maybeSingle();
-            if (error) {
-              console.error('[PublicPassView] Supabase error fetching user for pass:', error);
-            }
-            if (data) passData = data;
+            console.warn('[PublicPassView] authenticate_by_credential failed:', e);
           }
           
           if (passData) {
@@ -5149,15 +5119,14 @@ function App() {
       setStudentActivity(last7);
 
 
-      // Fetch school users strictly belonging to current schoolId (enforce multi-tenant isolation)
-      const [uResExact, uResSchool] = await Promise.all([
-        supabase.from('users').select('*').eq('school_id', schoolId).eq('role', 'student').order('first_name'),
-        supabase.from('users').select('*').eq('school_id', schoolId).order('first_name')
-      ]);
-      const mergedUsersMap = new Map<string, any>();
-      (uResExact.data || []).forEach(u => mergedUsersMap.set(u.id, u));
-      (uResSchool.data || []).forEach(u => mergedUsersMap.set(u.id, u));
-      const allUsers = Array.from(mergedUsersMap.values());
+      // Fetch school users strictly belonging to current schoolId (enforce multi-tenant isolation with zero-redundancy query)
+      const uResSchool = await supabase
+        .from('users')
+        .select('id, first_name, last_name, instrument, avatar_url, photo_url, role, roles, is_active, is_campus_active, is_groovelab_active, teacher_id, school_id, age, birth_date, sick_until, sick_start, phone, nickname, group_id, contract_ends_at, contract_decision_made, qr_token, is_external_vocalist, show_messages_menu, master_admin_username, master_admin_email')
+        .eq('school_id', schoolId)
+        .order('first_name');
+
+      const allUsers = uResSchool.data || [];
       if (typeof window !== 'undefined') {
         (window as any).debugAllUsersLength = allUsers?.length;
       }
@@ -7984,18 +7953,20 @@ function App() {
         sessionStorage.setItem('groovelab_support_ghost', 'true');
       }
 
-      // 2. Await database role update FIRST before triggering platform/tab refetches
+      // 2. Await authoritative database role update via RPC (Fail-Closed, no client table update)
       try {
         const { error: rpcErr } = await supabase.rpc('switch_user_active_role', {
           p_target_role: newRole
         });
         if (rpcErr) {
-          console.warn('[Role Switch] switch_user_active_role fallback notice:', rpcErr.message);
-          await supabase.from('users').update({ role: newRole }).eq('id', userId);
+          console.error('[Role Switch] switch_user_active_role error:', rpcErr.message);
+          alert('Rollenwechsel fehlgeschlagen: ' + rpcErr.message);
+          return;
         }
       } catch (err: any) {
-        console.warn('[Role Switch] Error:', err);
-        await supabase.from('users').update({ role: newRole }).eq('id', userId);
+        console.error('[Role Switch] Error:', err);
+        alert('Rollenwechsel fehlgeschlagen: ' + (err?.message || 'Verbindungsfehler'));
+        return;
       }
 
       // 3. Update active workspace and platform tabs

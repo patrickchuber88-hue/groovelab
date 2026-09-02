@@ -542,10 +542,10 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
 
                     try {
                       const { data } = await supabase
-                        .from('users_raw')
+                        .from('users')
                         .select('id, first_name, last_name, is_campus_active, payment_status, student_billing_payment_method')
                         .eq('school_id', student.school_id)
-                        .or(`id.eq.${inputVal},first_name.ilike.${inputVal},kiosk_pin.eq.${inputVal}`)
+                        .or(`id.eq.${inputVal},first_name.ilike.${inputVal}`)
                         .limit(1);
 
                       if (data && data.length > 0) {

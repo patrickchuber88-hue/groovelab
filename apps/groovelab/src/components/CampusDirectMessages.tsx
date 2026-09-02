@@ -512,42 +512,12 @@ export function CampusDirectMessages({
       const cleanInput = inputPin.trim();
       let isMatch = false;
 
-      // 1. Cached parent pin
-      const cachedParentPin = localStorage.getItem(`groovelab_parent_pin_${user?.id}`);
-      if (cachedParentPin && cachedParentPin === cleanInput) {
-        isMatch = true;
-      }
-
-      // 2. In-memory parent pin
-      if (!isMatch && user?.parent_pin) {
-        if (String(user.parent_pin).trim() === cleanInput) {
-          isMatch = true;
-        }
-      }
-
-      // 3. Supabase RPC verify_parent_pin
-      if (!isMatch && user?.id) {
-        try {
-          const { data: parentOk } = await supabase.rpc('verify_parent_pin', {
-            student_id: user.id,
-            input_pin: cleanInput
-          });
-          if (parentOk === true) isMatch = true;
-        } catch (e) {}
-      }
-
-      // 4. Fallback parent_pin in database
-      if (!isMatch && user?.id) {
-        const { data: uData } = await supabase
-          .from('users')
-          .select('parent_pin')
-          .eq('id', user.id)
-          .maybeSingle();
-        if (uData && uData.parent_pin) {
-          if (String(uData.parent_pin).trim() === cleanInput) {
-            isMatch = true;
-          }
-        }
+      if (user?.id) {
+        const { data: parentOk } = await supabase.rpc('verify_parent_pin', {
+          student_id: user.id,
+          input_pin: cleanInput
+        });
+        if (parentOk === true) isMatch = true;
       }
 
       if (isMatch) {

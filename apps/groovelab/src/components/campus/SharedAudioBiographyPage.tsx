@@ -184,26 +184,12 @@ export const SharedAudioBiographyPage: React.FC<SharedAudioBiographyPageProps> =
       // 1. Check persistent device token (365 days / 1 school year) only if explicit PIN was entered on device
       const persistentKey = `campus_bio_unlocked_${targetKey}_${plKey}`;
       const expiryKey = `campus_bio_expiry_${targetKey}_${plKey}`;
-      const pinHashKey = `campus_bio_pin_${targetKey}_${plKey}`;
 
       const isPersistent = localStorage.getItem(persistentKey) === 'true';
       const expiry = parseInt(localStorage.getItem(expiryKey) || '0', 10);
-      const storedPin = localStorage.getItem(pinHashKey);
-
-      let currentPin = '4829';
-      if (targetPlaylistId) {
-        const pPin = localStorage.getItem(`campus_share_pin_${targetKey}_${targetPlaylistId}`);
-        if (pPin && /^\d{4}$/.test(pPin)) currentPin = pPin;
-      }
-      if (currentPin === '4829') {
-        const sPin = localStorage.getItem(`campus_share_pin_${targetKey}`);
-        if (sPin && /^\d{4}$/.test(sPin)) currentPin = sPin;
-      }
 
       if (isPersistent && expiry > Date.now()) {
-        if (storedPin && (storedPin === currentPin || (urlPinHash && computePinHash(storedPin) === urlPinHash) || storedPin === '4829' || storedPin === '1234')) {
-          return true;
-        }
+        return true;
       }
 
       // 2. Check active session storage
@@ -818,10 +804,9 @@ export const SharedAudioBiographyPage: React.FC<SharedAudioBiographyPageProps> =
     setTimeout(() => {
       setIsVerifying(false);
       const isHashMatch = Boolean(urlPinHash && computePinHash(fullPin) === urlPinHash);
-      const isExpectedMatch = fullPin === expected;
-      const isUniversalFallback = fullPin === '4829' || fullPin === '1234';
+      const isExpectedMatch = Boolean(expected && fullPin === expected);
 
-      if (isHashMatch || isExpectedMatch || isUniversalFallback) {
+      if (isHashMatch || isExpectedMatch) {
         try {
           const plKey = targetPlaylistId || 'all';
           const sessionKey = `campus_bio_session_${targetId}_${plKey}`;
@@ -831,7 +816,6 @@ export const SharedAudioBiographyPage: React.FC<SharedAudioBiographyPageProps> =
             const ONE_SCHOOL_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
             localStorage.setItem(`campus_bio_unlocked_${targetId}_${plKey}`, 'true');
             localStorage.setItem(`campus_bio_expiry_${targetId}_${plKey}`, (Date.now() + ONE_SCHOOL_YEAR_MS).toString());
-            localStorage.setItem(`campus_bio_pin_${targetId}_${plKey}`, fullPin);
           }
         } catch {}
         setIsUnlocked(true);

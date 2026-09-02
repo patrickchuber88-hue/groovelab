@@ -9017,12 +9017,26 @@ useEffect(() => {
                              const activeStudentObj = slot.isGroup ? slot.students[0] : slot.student;
                              if (activeStudentObj) {
                                const foundStud = allStudents.find(s => s.id === activeStudentObj.id);
+                               const groupStudentsList = (slot.isGroup && Array.isArray(slot.students))
+                                 ? slot.students.map((s: any) => {
+                                     const dbS = allStudents.find(as => as.id === s.id);
+                                     return {
+                                       id: s.id,
+                                       first_name: s.name ? s.name.split(' ')[0] : (dbS?.first_name || ''),
+                                       last_name: s.name ? s.name.split(' ').slice(1).join(' ') : (dbS?.last_name || ''),
+                                       photo_url: s.photo_url || dbS?.photo_url || '/avatar_ghost.jpg',
+                                       is_campus_active: dbS ? dbS.is_campus_active : s.is_campus_active
+                                     };
+                                   })
+                                 : undefined;
+
                                setDocStudent({
                                  id: activeStudentObj.id,
                                  first_name: activeStudentObj.name.split(' ')[0],
                                  last_name: activeStudentObj.name.split(' ').slice(1).join(' '),
                                  photo_url: activeStudentObj.photo_url || '/avatar_ghost.jpg',
-                                 is_campus_active: foundStud ? foundStud.is_campus_active : activeStudentObj.is_campus_active
+                                 is_campus_active: foundStud ? foundStud.is_campus_active : activeStudentObj.is_campus_active,
+                                 groupStudents: groupStudentsList
                                });
                              }
                              const todayStr = getSimulatedNow().toLocaleDateString('sv-SE');
@@ -10847,6 +10861,7 @@ useEffect(() => {
             teacherName={teacher?.first_name ? `${teacher.first_name} ${teacher.last_name || ''}`.trim() : (teacher?.name || '')}
             schoolName={schoolData?.name || ''}
             hasTresorStorage={Number(schoolData?.storage_addon_gb || 0) > 0 || checkIsAudioTresorActive(docStudent)}
+            groupStudents={docStudent?.groupStudents || (docStudent?.students && docStudent.students.length > 1 ? docStudent.students : [])}
             onProfileClick={(student) => {
               setDocStudent(null);
               setSelectedStudentProfile(student);
@@ -12669,12 +12684,25 @@ useEffect(() => {
                                      const activeStudentObj = slot.isGroup ? slot.students[0] : slot.student;
                                      if (activeStudentObj) {
                                        const foundStud = allStudents.find(s => s.id === activeStudentObj.id);
+                                       const groupStudentsList = (slot.isGroup && Array.isArray(slot.students))
+                                         ? slot.students.map((s: any) => {
+                                             const dbS = allStudents.find(as => as.id === s.id);
+                                             return {
+                                               id: s.id,
+                                               first_name: s.name ? s.name.split(' ')[0] : (dbS?.first_name || ''),
+                                               last_name: s.name ? s.name.split(' ').slice(1).join(' ') : (dbS?.last_name || ''),
+                                               photo_url: s.photo_url || dbS?.photo_url || '/avatar_ghost.jpg',
+                                               is_campus_active: dbS ? dbS.is_campus_active : s.is_campus_active
+                                             };
+                                           })
+                                         : undefined;
                                        setDocStudent({
                                          id: activeStudentObj.id,
                                          first_name: activeStudentObj.name.split(' ')[0],
                                          last_name: activeStudentObj.name.split(' ').slice(1).join(' '),
                                          photo_url: activeStudentObj.photo_url || '/avatar_ghost.jpg',
-                                         is_campus_active: foundStud ? foundStud.is_campus_active : activeStudentObj.is_campus_active
+                                         is_campus_active: foundStud ? foundStud.is_campus_active : activeStudentObj.is_campus_active,
+                                         groupStudents: groupStudentsList
                                        });
                                      }
                                      // Log the date of the clicked appointment (today's date)

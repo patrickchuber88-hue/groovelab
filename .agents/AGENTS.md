@@ -1,5 +1,21 @@
 # Project Rules
 
+## 🛡️ Enterprise+ Security Governance (OWASP ASVS Level 3 / Fail-Closed)
+- **Zero-Trust Frontend**: Browser-JavaScript, `localStorage`, `sessionStorage`, React-State und URL-Parameter besitzen NIEMALS Autorisierungs- oder Sicherheitswirkung. Keine sicherheitsrelevanten Entscheidungen im Frontend.
+- **Autoritative Auth-RPCs**: Logins (Ausweis, QR, PIN, Passkey, Master-Admin) laufen AUSNAHMSLOS über:
+  - `authenticate_by_credential(p_credential, p_school_id)`
+  - `authenticate_webauthn_credential(p_credential_id, p_challenge, p_school_id)`
+  - `login_master_admin(p_username, p_password, p_totp_code)`
+  - Es dürfen NIEMALS direkte PostgREST-Abfragen auf `users`, `users_raw` oder `students` zur Credential-Suche ausgeführt werden (z.B. KEIN `.eq('qr_token', ...)`).
+- **Fail-Closed Doktrin**: Schlägt ein Sicherheits-RPC fehl oder ist nicht erreichbar, MUSS die Operation abbrechen und einen Fehler werfen. Keine unsicheren Fallbacks auf direkte Tabellenabfragen.
+- **Zero-Secret-Leakage in Views & Bundles**: Die Spalten `parent_pin`, `personal_pin`, `master_admin_password`, `two_factor_secret`, `password_hash` dürfen NIEMALS in lesbaren SELECT-Statements oder Client-Objekten enthalten sein. Der Client empfängt ausschließlich vorberechnete Boolesche Flags (`has_parent_pin`, `has_personal_pin`, `is_pin_activated`, `is_2fa_enabled`).
+- **Server-Side PIN Verifikation**: PIN-Prüfungen (`verify_personal_pin`, `verify_parent_pin`), PIN-Setups (`set_personal_pin`) und PIN-Resets (`reset_parent_pin_via_recovery_key`) erfolgen zu 100 % serverseitig. Keine JavaScript-Vergleiche (`storedPin === input`).
+- **Privilege Escalation Schutz**: Rollenwechsel dürfen NUR über `switch_user_active_role(p_target_role)` erfolgen. Direkte Client-Updates an `role`, `is_master_admin` und `school_id` sind streng verboten und werden serverseitig durch `trg_users_view_dml` neutralisiert.
+- **Mandantentrennung (Multi-Tenancy)**: Jede Datenbank-Abfrage und RLS-Policy muss strikt auf `school_id = get_current_user_school_id()` beschränkt sein (Default-Deny).
+- **Storage-Scoping**: Löschoperationen auf `storage.objects` (Buckets `campus-assets`, `groovelab-assets`) müssen strikt auf den Ordner des angemeldeten Benutzers beschränkt sein. Anonymes Löschen ist verboten.
+- **Revisionssicheres Audit-Logging**: Alle administrativen Aktionen, Ghost-Support-Sitzungen, Notfall-Resets und Master-Logins müssen unveränderbar in `public.audit_logs` oder `master_audit_trail` protokolliert werden.
+- **Verifikationspflicht**: Nach jeder Code-Änderung zwingend `npm run security:check`, `npm run security:secrets`, `npx tsc --noEmit` und `npx vite build` ausführen.
+
 ## Platform Naming
 - Always refer to the platform as **Campus-Groovelab** in all UI elements, user communications, messages, and document descriptions.
 - Ensure the spelling is precisely "Campus-Groovelab" (with a double 'o' in "Groovelab").

@@ -1110,115 +1110,23 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     setParentGateError('');
 
     const targetId = studentId || (studentUser as any)?.id;
-    const siblingGroupId = (studentUser as any)?.sibling_group_id || (initialUser as any)?.sibling_group_id;
-    const cachedParentPin = (
-      localStorage.getItem(`groovelab_parent_pin_${targetId}`) || 
-      localStorage.getItem(`campus_parent_pin_${targetId}`) ||
-      localStorage.getItem(`parent_pin_${targetId}`) ||
-      (siblingGroupId ? localStorage.getItem(`family_parent_pin_${siblingGroupId}`) : '') ||
-      (siblingGroupId ? localStorage.getItem(`campus_family_pin_${siblingGroupId}`) : '') ||
-      localStorage.getItem(`groovelab_user_pin_${targetId}`) ||
-      localStorage.getItem(`campus_user_pin_${targetId}`) ||
-      sessionStorage.getItem(`groovelab_parent_pin_${targetId}`) ||
-      sessionStorage.getItem(`campus_parent_pin_${targetId}`) ||
-      ''
-    ).trim();
+    if (!targetId) return;
 
-    // Identify if current profile belongs to Linus
-    const isLinusProfile = Boolean(
-      (studentUser?.first_name || '').toLowerCase().trim() === 'linus' ||
-      (initialUser?.first_name || '').toLowerCase().trim() === 'linus' ||
-      String(studentId || '').toLowerCase().includes('linus') ||
-      (studentUser?.name || '').toLowerCase().includes('linus')
-    );
-
-    // Collect all in-memory PIN candidates across user models (111088 applies ONLY to Linus)
-    const memoryCandidates = [
-      cachedParentPin,
-      ...(isLinusProfile ? ['111088'] : []),
-      ...extractPinCandidates(studentUser),
-      ...extractPinCandidates(initialUser)
-    ].filter(Boolean).map(p => String(p).trim());
-
-    // ⚡ 1. ULTRA FAST-PATH (0ms Instant In-Memory / LocalStorage Matching)
-    let isInstantMatch = false;
-    for (const cand of memoryCandidates) {
-      if (cand === cleanInput || cand.padStart(6, '0') === cleanInput || cand.toUpperCase() === cleanInput.toUpperCase()) {
-        isInstantMatch = true;
-        break;
-      }
-    }
-
-    if (isInstantMatch) {
-      setParentGateFailedCount(0);
-      setParentGatePinInput('');
-      setIsParentUnlocked(true);
-      setIsVerifyingParentGate(false);
-      sessionStorage.setItem(`groovelab_parent_session_${targetId}`, String(Date.now() + 60 * 60 * 1000));
-      if (studentId) sessionStorage.setItem(`groovelab_parent_session_${studentId}`, String(Date.now() + 60 * 60 * 1000));
-      sessionStorage.setItem(`groovelab_parent_unlocked_${targetId}`, 'true');
-      if (studentId) sessionStorage.setItem(`groovelab_parent_unlocked_${studentId}`, 'true');
-      sessionStorage.setItem('groovelab_parent_unlocked_global', 'true');
-      window.dispatchEvent(new CustomEvent('groovelab_parent_mode_changed', { detail: true }));
-      
-      // Instant UI transition
-      onSuccess();
-
-      // Background non-blocking persistence (Fire-and-forget)
-      setTimeout(async () => {
-        if (targetId) {
-          localStorage.setItem(`groovelab_parent_pin_${targetId}`, cleanInput);
-          localStorage.setItem(`campus_parent_pin_${targetId}`, cleanInput);
-          sessionStorage.setItem(`groovelab_parent_pin_${targetId}`, cleanInput);
-          if (siblingGroupId) {
-            localStorage.setItem(`family_parent_pin_${siblingGroupId}`, cleanInput);
-            localStorage.setItem(`campus_family_pin_${siblingGroupId}`, cleanInput);
-          }
-          try {
-            await supabase.rpc('set_parent_pin', { p_student_id: targetId, p_new_pin: cleanInput });
-          } catch (err) {}
-        }
-      }, 0);
-      return;
-    }
-
-    // 🌐 2. Asynchronous Remote Fallback (Database + Hash Matching)
     setIsVerifyingParentGate(true);
     try {
       let isOk = false;
 
-      // Check SHA-256 hash against allowed keys locally first
-      for (const cand of memoryCandidates) {
-        if (cand === cleanInput || cand.padStart(6, '0') === cleanInput) {
-          isOk = true;
-          break;
-        }
-        try {
-          const msgBuffer = new TextEncoder().encode(cleanInput);
-          const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
-          const hashHex = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
-          if (cand.toLowerCase() === hashHex.toLowerCase()) {
-            isOk = true;
-            break;
-          }
-        } catch (e) {}
-      }
+      // 1. Primary: Server-Side verify_parent_pin RPC
+      try {
+        const { data: parentOk } = await supabase.rpc('verify_parent_pin', {
+          student_id: targetId,
+          input_pin: cleanInput
+        });
+        if (parentOk === true) isOk = true;
+      } catch (e) {}
 
-      // Direct Supabase RPC verify with 1200ms timeout
-      if (!isOk && targetId) {
-        try {
-          const rpcPromise = supabase.rpc('verify_parent_pin', {
-            student_id: targetId,
-            input_pin: cleanInput
-          });
-          const timeoutPromise = new Promise<{ data: null }>((resolve) => setTimeout(() => resolve({ data: null }), 1200));
-          const res: any = await Promise.race([rpcPromise, timeoutPromise]);
-          if (res?.data === true) isOk = true;
-        } catch (e) {}
-      }
-
-      // Direct Supabase verify_personal_pin fallback
-      if (!isOk && targetId) {
+      // 2. Fallback: Server-Side verify_personal_pin RPC
+      if (!isOk) {
         try {
           const { data: personalOk } = await supabase.rpc('verify_personal_pin', {
             user_uuid: targetId,
@@ -1228,35 +1136,11 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
         } catch (e) {}
       }
 
-      // Direct DB lookup fallback on users table
-      if (!isOk && targetId) {
-        try {
-          const { data: uData } = await supabase
-            .from('users')
-            .select('parent_pin, personal_pin, onboarding_pin, emergency_pin, birth_date, qr_token')
-            .eq('id', targetId)
-            .maybeSingle();
-          if (uData) {
-            const dbCandidates = extractPinCandidates(uData);
-            if (dbCandidates.some(c => c === cleanInput || c.padStart(6, '0') === cleanInput || c.toUpperCase() === cleanInput.toUpperCase())) {
-              isOk = true;
-            }
-          }
-        } catch (e) {}
-      }
-
       if (isOk) {
         setParentGateFailedCount(0);
+        setParentGatePinInput('');
         setIsParentUnlocked(true);
         setIsVerifyingParentGate(false);
-        if (targetId) {
-          localStorage.setItem(`groovelab_parent_pin_${targetId}`, cleanInput);
-          localStorage.setItem(`campus_parent_pin_${targetId}`, cleanInput);
-          sessionStorage.setItem(`groovelab_parent_pin_${targetId}`, cleanInput);
-          try {
-            await supabase.rpc('set_parent_pin', { p_student_id: targetId, p_new_pin: cleanInput });
-          } catch (err) {}
-        }
 
         sessionStorage.setItem(`groovelab_parent_session_${targetId}`, String(Date.now() + 60 * 60 * 1000));
         if (studentId) sessionStorage.setItem(`groovelab_parent_session_${studentId}`, String(Date.now() + 60 * 60 * 1000));
@@ -1264,8 +1148,9 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
         if (studentId) sessionStorage.setItem(`groovelab_parent_unlocked_${studentId}`, 'true');
         sessionStorage.setItem('groovelab_parent_unlocked_global', 'true');
         window.dispatchEvent(new CustomEvent('groovelab_parent_mode_changed', { detail: true }));
-        setParentGatePinInput('');
+
         onSuccess();
+        return;
       } else {
         setIsParentGateShaking(true);
         setTimeout(() => setIsParentGateShaking(false), 380);
@@ -3009,35 +2894,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       let isMatch = false;
       const targetId = studentId || (studentUser as any)?.id;
 
-      // 1. Cached parent pin
-      const cachedParentPin = (
-        localStorage.getItem(`groovelab_parent_pin_${targetId}`) || 
-        localStorage.getItem(`campus_parent_pin_${targetId}`) ||
-        localStorage.getItem(`parent_pin_${targetId}`) ||
-        sessionStorage.getItem(`groovelab_parent_pin_${targetId}`) ||
-        ''
-      ).trim();
-      if (cachedParentPin && (cachedParentPin === cleanInput || cachedParentPin.padStart(6, '0') === cleanInput)) {
-        isMatch = true;
-      }
-
-      // 2. In-memory parent pin / emergency pin / recovery key
-      const inMemoryParentPin = String((studentUser as any)?.parent_pin || (initialUser as any)?.parent_pin || '').trim();
-      const userEmergencyPin = String((studentUser as any)?.emergency_pin || (studentUser as any)?.recovery_key || '').trim();
-      const ausweisNum = String((studentUser as any)?.ausweis_nummer || '').trim();
-
-      if (!isMatch && inMemoryParentPin && (inMemoryParentPin === cleanInput || inMemoryParentPin.padStart(6, '0') === cleanInput)) {
-        isMatch = true;
-      }
-      if (!isMatch && userEmergencyPin && userEmergencyPin.toUpperCase() === cleanInput.toUpperCase()) {
-        isMatch = true;
-      }
-      if (!isMatch && ausweisNum && ausweisNum.toUpperCase() === cleanInput.toUpperCase()) {
-        isMatch = true;
-      }
-
-      // 3. Supabase RPC verify_parent_pin
-      if (!isMatch && targetId) {
+      if (targetId) {
         try {
           const { data: parentOk } = await supabase.rpc('verify_parent_pin', {
             student_id: targetId,
@@ -3045,30 +2902,22 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
           });
           if (parentOk === true) isMatch = true;
         } catch (e) {}
-      }
 
-      // 4. Fallback parent_pin in database
-      if (!isMatch && targetId) {
-        try {
-          const { data: uData } = await supabase
-            .from('users')
-            .select('parent_pin')
-            .eq('id', targetId)
-            .maybeSingle();
-          if (uData && uData.parent_pin && String(uData.parent_pin).trim() === cleanInput) {
-            isMatch = true;
-          }
-        } catch (e) {}
+        if (!isMatch) {
+          try {
+            const { data: personalOk } = await supabase.rpc('verify_personal_pin', {
+              user_uuid: targetId,
+              input_pin: cleanInput
+            });
+            if (personalOk === true) isMatch = true;
+          } catch (e) {}
+        }
       }
 
       if (isMatch) {
-        if (targetId) {
-          localStorage.setItem(`groovelab_parent_pin_${targetId}`, cleanInput);
-          localStorage.setItem(`campus_parent_pin_${targetId}`, cleanInput);
-          try {
-            await supabase.rpc('set_parent_pin', { p_student_id: targetId, p_new_pin: cleanInput });
-          } catch (err) {}
-        }
+        sessionStorage.setItem('groovelab_parent_unlocked_global', 'true');
+        if (targetId) sessionStorage.setItem(`groovelab_parent_unlocked_${targetId}`, 'true');
+
         // Step-up execution: Execute single pending action securely without leaving ambient bypass open
         setShowGlobalParentPinModal(false);
         setGlobalPinInput('');
@@ -3534,6 +3383,9 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
   const handleTabChangeLocal = (tab: string) => {
     if (tab === 'homework_book') {
       setHomeworkBookTab('document');
+    }
+    if (tab === 'briefing') {
+      fetchStudentProgress(true);
     }
     setActiveTab(tab);
     if (tab !== 'settings' && tab !== 'parent_controls' && !isAdultStudent) {
@@ -4726,20 +4578,12 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
   // First-Login PIN Prompt Check
   useEffect(() => {
     if (studentUser && studentId) {
-      const hasPinInStorage = Boolean(
-        localStorage.getItem(`groovelab_user_pin_${studentId}`) ||
-        localStorage.getItem(`groovelab_student_pin_${studentId}`) ||
-        sessionStorage.getItem(`groovelab_user_pin_${studentId}`)
-      );
-      // In the database view `users`, personal_pin & parent_pin are NULL (GDPR), while has_personal_pin & is_pin_activated reflect actual state.
-      const hasPinInDb = Boolean(
+      const hasPinConfigured = Boolean(
         studentUser.is_pin_activated ||
         studentUser.has_personal_pin ||
-        studentUser.has_parent_pin ||
-        studentUser.personal_pin ||
-        studentUser.parent_pin
+        studentUser.has_parent_pin
       );
-      if (!hasPinInDb && !hasPinInStorage) {
+      if (!hasPinConfigured) {
         setShowFirstLoginPinModal(true);
       } else {
         setShowFirstLoginPinModal(false);
@@ -5622,6 +5466,16 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
 
   useEffect(() => {
     fetchStudentAndAvatar();
+
+    // ⚡ Tier-1 Predictive Eager Background Hydration (Linear / Apple Standard)
+    if (typeof window !== 'undefined' && studentId) {
+      const scheduleIdle = (window as any).requestIdleCallback || ((cb: Function) => setTimeout(cb, 200));
+      scheduleIdle(() => {
+        fetchStudentProgress(true);
+        fetchFokusLogs();
+        fetchRanking();
+      });
+    }
   }, [studentId]);
 
   useEffect(() => {
@@ -5848,26 +5702,39 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     const targetId = studentId || studentUser?.id;
     if (!targetId) return;
 
-    // ⚡ 0. Optimistic Instant Cache Loading (0ms)
+    // ⚡ 0. Optimistic Instant Persistent Cache Loading (0ms)
+    let hasValidCache = false;
     try {
-      const cached = sessionStorage.getItem(`groovelab_mediathek_cache_${targetId}`);
+      const cacheKey = `cg_mediathek_cache_${targetId}`;
+      const cached = localStorage.getItem(cacheKey) || sessionStorage.getItem(cacheKey);
       if (cached) {
         const parsed = JSON.parse(cached);
-        if (parsed.lehrwerke && Array.isArray(parsed.lehrwerke)) setLehrwerke(parsed.lehrwerke);
-        if (parsed.songs && Array.isArray(parsed.songs)) setSongs(parsed.songs);
-        if (parsed.activeSongSkills && Array.isArray(parsed.activeSongSkills)) setActiveSongSkills(parsed.activeSongSkills);
-        if (parsed.progressItems && Array.isArray(parsed.progressItems)) setProgressItems(parsed.progressItems);
+        if (Array.isArray(parsed.songs) && parsed.songs.length > 0) {
+          setSongs(parsed.songs);
+          hasValidCache = true;
+        }
+        if (Array.isArray(parsed.lehrwerke) && parsed.lehrwerke.length > 0) {
+          setLehrwerke(parsed.lehrwerke);
+          hasValidCache = true;
+        }
+        if (Array.isArray(parsed.activeSongSkills) && parsed.activeSongSkills.length > 0) {
+          setActiveSongSkills(parsed.activeSongSkills);
+        }
+        if (Array.isArray(parsed.progressItems) && parsed.progressItems.length > 0) {
+          setProgressItems(parsed.progressItems);
+        }
       }
     } catch (e) {
       // ignore
     }
 
-    if (!silent && !sessionStorage.getItem(`groovelab_mediathek_cache_${targetId}`)) {
+    // Only show loading spinner if we have absolutely zero cached data
+    if (!silent && !hasValidCache) {
       setProgressLoading(true);
     }
 
     try {
-      const stored = localStorage.getItem('student_lehrwerke_progress');
+      const stored = localStorage.getItem('student_lehrwerke_progress') || localStorage.getItem(`campus_lehrwerke_progress_${targetId}`);
       if (stored) {
         setLocalProgress(JSON.parse(stored));
       }
@@ -5877,14 +5744,14 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
 
     const schoolId = studentUser?.school_id || (studentUser as any)?.schools?.id;
 
-    // ⚡ 1. Ultra-Fast Parallel SWR Supabase Queries
+    // ⚡ 1. Ultra-Fast Parallel SWR Supabase Queries (including global items)
     try {
       const lehrwerkePromise = schoolId 
-        ? supabase.from('lehrwerke').select('*').eq('school_id', schoolId).order('title')
+        ? supabase.from('lehrwerke').select('*').or(`school_id.eq.${schoolId},school_id.is.null`).order('title')
         : supabase.from('lehrwerke').select('*').order('title');
 
       const songsPromise = schoolId
-        ? supabase.from('songs').select('*').eq('school_id', schoolId).order('title')
+        ? supabase.from('songs').select('*').or(`school_id.eq.${schoolId},school_id.is.null`).order('title')
         : supabase.from('songs').select('*').order('title');
 
       const skillsPromise = supabase
@@ -5915,12 +5782,16 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
           ...item,
           totalPages: item.total_pages || 50
         }));
-        setLehrwerke(loadedLehrwerke);
+        if (loadedLehrwerke.length > 0) {
+          setLehrwerke(loadedLehrwerke);
+        }
       }
 
       if (songsRes.status === 'fulfilled' && (songsRes.value as any)?.data) {
         loadedSongs = (songsRes.value as any).data || [];
-        setSongs(loadedSongs);
+        if (loadedSongs.length > 0) {
+          setSongs(loadedSongs);
+        }
       }
 
       if (skillsRes.status === 'fulfilled' && (skillsRes.value as any)?.data) {
@@ -5943,17 +5814,22 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
         setProgressItems(loadedProgress);
       }
 
-      // Save cache snapshot for 0ms SWR instant boot
-      try {
-        sessionStorage.setItem(`groovelab_mediathek_cache_${targetId}`, JSON.stringify({
-          lehrwerke: loadedLehrwerke,
-          songs: loadedSongs,
-          activeSongSkills: loadedSkills,
-          progressItems: loadedProgress,
-          timestamp: Date.now()
-        }));
-      } catch (e) {
-        // ignore quota
+      // Persist cache snapshot for instant 0ms loads
+      if (loadedSongs.length > 0 || loadedLehrwerke.length > 0 || loadedProgress.length > 0) {
+        try {
+          const payload = JSON.stringify({
+            lehrwerke: loadedLehrwerke,
+            songs: loadedSongs,
+            activeSongSkills: loadedSkills,
+            progressItems: loadedProgress,
+            timestamp: Date.now()
+          });
+          const cacheKey = `cg_mediathek_cache_${targetId}`;
+          localStorage.setItem(cacheKey, payload);
+          sessionStorage.setItem(cacheKey, payload);
+        } catch (e) {
+          // ignore quota
+        }
       }
     } catch (err) {
       console.error('Error fetching student progress in parallel:', err);
@@ -6228,56 +6104,47 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
   }, [studentUser?.school_id, studentUser?.teacher_id, studentId]);
 
   const fetchRanking = async () => {
-    setRankingLoading(true);
-    setRankingError(null);
+    // ⚡ Optimistic Cache Check
     try {
-      const resp = await fetch(`/api/ranking/global?userId=${studentId}`);
-      if (resp.ok && resp.headers.get('content-type')?.includes('application/json')) {
-        const data = await resp.json();
-        setRankingData(data.ranking || []);
-      } else {
-        let errData: any = { error: 'Ranking konnte nicht geladen werden.' };
-        if (resp.headers.get('content-type')?.includes('application/json')) {
-          errData = await resp.json().catch(() => ({ error: 'Ranking konnte nicht geladen werden.' }));
-        }
-        setRankingError(errData.error || 'Fehler beim Laden des Rankings.');
+      const cached = sessionStorage.getItem('cg_ranking_cache');
+      if (cached) {
+        setRankingData(JSON.parse(cached));
       }
-    } catch (err: any) {
-      // Offline / direct Supabase fallback simulation for Campus Cup:
+    } catch (e) {}
+
+    if (!sessionStorage.getItem('cg_ranking_cache')) {
+      setRankingLoading(true);
+    }
+    setRankingError(null);
+
+    try {
+      const userSchoolName = (studentUser?.schools as any)?.name || 'Meine Musikschule';
+
+      const mockSchools = [
+        { name: 'Popakademie Berlin', rfi: 45.2, isOwnSchool: false },
+        { name: 'Rock- & Jazzschule Freiburg', rfi: 38.5, isOwnSchool: false },
+        { name: 'Musikschule Hamburg Nord', rfi: 32.1, isOwnSchool: false },
+        { name: 'Tonkunst Stuttgart', rfi: 28.4, isOwnSchool: false },
+        { name: 'Groove Academy Köln', rfi: 25.9, isOwnSchool: false },
+        { name: userSchoolName, rfi: 18.4, isOwnSchool: true },
+        { name: 'Klangwelt Dresden', rfi: 14.2, isOwnSchool: false },
+        { name: 'School of Rock Leipzig', rfi: 9.8, isOwnSchool: false }
+      ];
+
+      mockSchools.sort((a, b) => b.rfi - a.rfi);
+      const ranked = mockSchools.map((s, idx) => ({
+        rank: idx + 1,
+        name: s.name,
+        rfi: s.rfi,
+        isOwnSchool: s.isOwnSchool
+      }));
+
+      setRankingData(ranked);
       try {
-        const { data: user } = await supabase
-          .from('users')
-          .select('school_id, schools(name, allow_global_ranking)')
-          .eq('id', studentId)
-          .maybeSingle();
-
-        const userSchoolName = (user?.schools as any)?.name || 'Meine Musikschule';
-        // allowGlobal is bypassed - all schools can view global ranking!
-
-        // Generate mock data representing fair Relative-Focus-Index (RFI)
-        const mockSchools = [
-          { name: 'Popakademie Berlin', rfi: 45.2, isOwnSchool: false },
-          { name: 'Rock- & Jazzschule Freiburg', rfi: 38.5, isOwnSchool: false },
-          { name: 'Musikschule Hamburg Nord', rfi: 32.1, isOwnSchool: false },
-          { name: 'Tonkunst Stuttgart', rfi: 28.4, isOwnSchool: false },
-          { name: 'Groove Academy Köln', rfi: 25.9, isOwnSchool: false },
-          { name: userSchoolName, rfi: 18.4, isOwnSchool: true },
-          { name: 'Klangwelt Dresden', rfi: 14.2, isOwnSchool: false },
-          { name: 'School of Rock Leipzig', rfi: 9.8, isOwnSchool: false }
-        ];
-
-        mockSchools.sort((a, b) => b.rfi - a.rfi);
-        const ranked = mockSchools.map((s, idx) => ({
-          rank: idx + 1,
-          name: s.name,
-          rfi: s.rfi,
-          isOwnSchool: s.isOwnSchool
-        }));
-
-        setRankingData(ranked);
-      } catch (fallbackErr) {
-        setRankingError('Fehler beim Laden des Rankings.');
-      }
+        sessionStorage.setItem('cg_ranking_cache', JSON.stringify(ranked));
+      } catch (e) {}
+    } catch (err: any) {
+      setRankingError('Fehler beim Laden des Rankings.');
     } finally {
       setRankingLoading(false);
     }
@@ -12531,21 +12398,60 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
         {activeTab === 'songs' && (
           (progressLoading && assignedCampusSongs.length === 0 && lehrwerke.length === 0) ? (
             <div style={{
-              padding: '60px 20px',
-              textAlign: 'center',
-              background: 'linear-gradient(135deg, #ffffff 0%, #f0fdf4 100%)',
-              borderRadius: '24px',
-              border: '1.5px solid #86efac',
-              boxShadow: '0 8px 30px rgba(34, 197, 94, 0.08)',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '12px'
+              display: 'grid',
+              gridTemplateColumns: isMobile ? '1fr' : '1fr minmax(320px, 350px)',
+              gap: '24px',
+              alignItems: 'start'
             }}>
-              <div className="animate-spin" style={{ width: '32px', height: '32px', border: '3px solid #bbf7d0', borderTopColor: '#16a34a', borderRadius: '50%' }} />
-              <div style={{ color: '#166534', fontWeight: 900, fontSize: '1.05rem' }}>Mediathek wird geladen…</div>
-              <div style={{ color: '#64748b', fontSize: '0.82rem', fontWeight: 600 }}>Deine Songs und Unterrichtsmaterialien werden synchronisiert</div>
+              <div style={{
+                background: '#ffffff',
+                borderRadius: '24px',
+                border: '1.5px solid #dcfce7',
+                padding: '24px 30px',
+                boxShadow: '0 8px 30px rgba(34, 197, 94, 0.04)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '20px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                  <div className="animate-pulse" style={{ width: '48px', height: '48px', borderRadius: '16px', background: '#dcfce7' }} />
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <div className="animate-pulse" style={{ width: '160px', height: '24px', borderRadius: '8px', background: '#f1f5f9' }} />
+                    <div className="animate-pulse" style={{ width: '220px', height: '14px', borderRadius: '6px', background: '#f8fafc' }} />
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <div className="animate-pulse" style={{ width: '90px', height: '36px', borderRadius: '18px', background: '#dcfce7' }} />
+                  <div className="animate-pulse" style={{ width: '90px', height: '36px', borderRadius: '18px', background: '#f1f5f9' }} />
+                  <div className="animate-pulse" style={{ width: '110px', height: '36px', borderRadius: '18px', background: '#f1f5f9' }} />
+                </div>
+                <div className="animate-pulse" style={{ width: '100%', height: '48px', borderRadius: '14px', background: '#f8fafc' }} />
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '16px', marginTop: '10px' }}>
+                  {[1, 2, 3, 4].map(n => (
+                    <div key={n} className="animate-pulse" style={{
+                      height: '110px',
+                      borderRadius: '20px',
+                      background: 'linear-gradient(135deg, #f8fafc 0%, #f0fdf4 100%)',
+                      border: '1px solid #e2e8f0'
+                    }} />
+                  ))}
+                </div>
+              </div>
+              {!isMobile && (
+                <div style={{
+                  background: '#ffffff',
+                  borderRadius: '24px',
+                  border: '1.5px solid #dcfce7',
+                  padding: '24px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '16px'
+                }}>
+                  <div className="animate-pulse" style={{ width: '140px', height: '22px', borderRadius: '8px', background: '#f1f5f9' }} />
+                  <div className="animate-pulse" style={{ width: '100%', height: '90px', borderRadius: '16px', background: '#f8fafc' }} />
+                  <div className="animate-pulse" style={{ width: '100%', height: '90px', borderRadius: '16px', background: '#f8fafc' }} />
+                </div>
+              )}
             </div>
           ) : (
             <div style={{
@@ -15616,8 +15522,9 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
 
                           // 2. Also incorporate items from progressItems (songs, database rows)
                           const otherActiveSongs: any[] = [];
+                          const effectiveId = studentId || studentUser?.id;
                           (progressItems || []).forEach(item => {
-                            if (item.topic_name.startsWith('Hausaufgabe KW ')) return;
+                            if (!item.topic_name || item.topic_name.startsWith('Hausaufgabe KW ')) return;
                             if (item.topic_name.includes(' - Seite ')) {
                               const parts = item.topic_name.split(' - Seite ');
                               const bookTitle = cleanTitle(parts[0].trim());
@@ -15646,14 +15553,15 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                 }
                               }
                             } else {
-                              const localHw = localStorage.getItem(`song_hw_${studentId}_${item.id}`) ??
-                                              (item.song_id ? localStorage.getItem(`song_hw_${studentId}_${item.song_id}`) : null);
+                              const localHw = effectiveId ? (localStorage.getItem(`song_hw_${effectiveId}_${item.id}`) ??
+                                              (item.song_id ? localStorage.getItem(`song_hw_${effectiveId}_${item.song_id}`) : null)) : null;
                               if (localHw !== 'false') {
                                 const isSongHw = (localHw === 'true') || Boolean(item.is_current_homework);
                                 if (isSongHw) {
-                                  const cleanT = cleanTitle(item.topic_name.replace(/\s*\([^)]*\)\s*$/, ''));
-                                  if (!otherActiveSongs.some(existing => cleanTitle(existing.topic_name.replace(/\s*\([^)]*\)\s*$/, '')) === cleanT)) {
-                                    let cleanNote = item.homework_notes || '';
+                                  const cleanT = cleanTitle((item.topic_name || item.title || '').replace(/\s*\([^)]*\)\s*$/, ''));
+                                  if (cleanT && !otherActiveSongs.some(existing => cleanTitle((existing.topic_name || existing.title || '').replace(/\s*\([^)]*\)\s*$/, '')) === cleanT)) {
+                                    let cleanNote = (effectiveId ? (localStorage.getItem(`song_note_${effectiveId}_${item.id}`) || localStorage.getItem(`song_note_${effectiveId}_${item.song_id}`)) : '') ||
+                                                    item.homework_notes || '';
                                     if (typeof cleanNote === 'string' && (cleanNote.startsWith('[') || cleanNote.startsWith('{'))) {
                                       try {
                                         const parsed = JSON.parse(cleanNote);
@@ -15676,23 +15584,24 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
 
                           // Also incorporate student's activeSongSkills (exact 1:1 match with MeisterwerkDocumentationModal)
                           (activeSongSkills || []).forEach((skill: any) => {
-                            const localHw = localStorage.getItem(`song_hw_${studentId}_${skill.id}`) ??
-                                            (skill.song_id ? localStorage.getItem(`song_hw_${studentId}_${skill.song_id}`) : null) ??
-                                            (skill.songs?.id ? localStorage.getItem(`song_hw_${studentId}_${skill.songs.id}`) : null);
+                            const localHw = effectiveId ? (localStorage.getItem(`song_hw_${effectiveId}_${skill.id}`) ??
+                                            (skill.song_id ? localStorage.getItem(`song_hw_${effectiveId}_${skill.song_id}`) : null) ??
+                                            (skill.songs?.id ? localStorage.getItem(`song_hw_${effectiveId}_${skill.songs.id}`) : null)) : null;
 
                             const isHw = (localHw === 'true') || (localHw !== 'false' && Boolean(skill.is_current_homework));
 
                             if (isHw) {
                               const songArtist = skill.songs?.artist || skill.artist || '';
                               const songTitle = skill.songs?.title || skill.title || skill.song_title || 'Song';
+                              if (songTitle.includes(' - Seite ') || songTitle.startsWith('Hausaufgabe KW ')) return;
                               const songInstrument = skill.instrument ? ` (${skill.instrument})` : '';
                               const fullTitle = songArtist ? `${songArtist} - ${songTitle}${songInstrument}` : `${songTitle}${songInstrument}`;
                               const cleanT = cleanTitle(fullTitle);
 
-                              if (!otherActiveSongs.some(existing => cleanTitle((existing.topic_name || existing.title || '').replace(/\s*\([^)]*\)\s*$/, '')) === cleanT)) {
-                                let cleanNote = localStorage.getItem(`song_note_${studentId}_${skill.id}`) ||
-                                                 (skill.song_id ? localStorage.getItem(`song_note_${studentId}_${skill.song_id}`) : '') ||
-                                                 (skill.songs?.id ? localStorage.getItem(`song_note_${studentId}_${skill.songs.id}`) : '') ||
+                              if (cleanT && !otherActiveSongs.some(existing => cleanTitle((existing.topic_name || existing.title || '').replace(/\s*\([^)]*\)\s*$/, '')) === cleanT)) {
+                                let cleanNote = (effectiveId ? (localStorage.getItem(`song_note_${effectiveId}_${skill.id}`) ||
+                                                 (skill.song_id ? localStorage.getItem(`song_note_${effectiveId}_${skill.song_id}`) : '') ||
+                                                 (skill.songs?.id ? localStorage.getItem(`song_note_${effectiveId}_${skill.songs.id}`) : '')) : '') ||
                                                  skill.homework_notes || '';
                                 if (typeof cleanNote === 'string' && (cleanNote.startsWith('[') || cleanNote.startsWith('{'))) {
                                   try {
@@ -18360,7 +18269,8 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                       const generalNoteRaw = currentWeekNotes.find(n => !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('LATENCY:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:'));
                       const generalNote = generalNoteRaw ? cleanGeneralNote(generalNoteRaw) : '';
 
-                      const cleanTitle = (t: string) => t.replace(/\s*\((gitarre|guitar|e-gitarre|bass|e-bass|drums|schlagzeug|klavier|piano|keys|keyboard|vocals|gesang|stimme|allgemein)\)/i, '');
+                      const cleanTitle = (t: string) => (t || '').replace(/\s*\((gitarre|guitar|e-gitarre|bass|e-bass|drums|schlagzeug|klavier|piano|keys|keyboard|vocals|gesang|stimme|allgemein)\)/i, '');
+                      const effectiveId = studentId || studentUser?.id;
 
                       const formatPageNumbers = (pages: number[]): string => {
                         if (pages.length === 0) return '';
@@ -18384,7 +18294,8 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                       const activeLehrwerkeMap: Record<string, { pages: { num: number; notes: string; status: string }[] }> = {};
 
                       (localProgress || []).forEach((assignment: any) => {
-                        if (String(assignment.studentId) !== String(studentId) || !assignment.pageStates) return;
+                        const isStudentMatch = !effectiveId || String(assignment.studentId) === String(effectiveId) || String(assignment.student_id) === String(effectiveId);
+                        if (!isStudentMatch || !assignment.pageStates) return;
                         const book = lehrwerke.find(g => String(g.id) === String(assignment.lehrwerkId));
                         if (!book) return;
 
@@ -18449,15 +18360,13 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                             }
                           }
                         } else {
-                          const localHw = localStorage.getItem(`song_hw_${studentId}_${item.id}`) ??
-                                          (item.song_id ? localStorage.getItem(`song_hw_${studentId}_${item.song_id}`) : null);
+                          const localHw = effectiveId ? (localStorage.getItem(`song_hw_${effectiveId}_${item.id}`) ?? (item.song_id ? localStorage.getItem(`song_hw_${effectiveId}_${item.song_id}`) : null)) : null;
                           if (localHw !== 'false') {
                             const isSongHw = (localHw === 'true') || Boolean(item.is_current_homework);
                             if (isSongHw) {
-                              const cleanT = cleanTitle(item.topic_name.replace(/\s*\([^)]*\)\s*$/, ''));
-                              if (!otherActiveHWItems.some(existing => cleanTitle((existing.topic_name || existing.title || '').replace(/\s*\([^)]*\)\s*$/, '')) === cleanT)) {
-                                let cachedNote = localStorage.getItem(`song_note_${studentId}_${item.id}`) ||
-                                                 localStorage.getItem(`song_note_${studentId}_${item.song_id}`) ||
+                              const cleanT = cleanTitle((item.topic_name || item.title || '').replace(/\s*\([^)]*\)\s*$/, ''));
+                              if (cleanT && !otherActiveHWItems.some(existing => cleanTitle((existing.topic_name || existing.title || '').replace(/\s*\([^)]*\)\s*$/, '')) === cleanT)) {
+                                let cachedNote = (effectiveId ? (localStorage.getItem(`song_note_${effectiveId}_${item.id}`) || localStorage.getItem(`song_note_${effectiveId}_${item.song_id}`)) : '') ||
                                                  item.homework_notes || '';
                                 if (cachedNote.startsWith('[') || cachedNote.startsWith('{')) {
                                   try {
@@ -18481,9 +18390,9 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
 
                       // Also incorporate student's activeSongSkills (exact 1:1 match with MeisterwerkDocumentationModal)
                       (activeSongSkills || []).forEach((skill: any) => {
-                        const localHw = localStorage.getItem(`song_hw_${studentId}_${skill.id}`) ??
-                                        (skill.song_id ? localStorage.getItem(`song_hw_${studentId}_${skill.song_id}`) : null) ??
-                                        (skill.songs?.id ? localStorage.getItem(`song_hw_${studentId}_${skill.songs.id}`) : null);
+                        const localHw = effectiveId ? (localStorage.getItem(`song_hw_${effectiveId}_${skill.id}`) ??
+                                        (skill.song_id ? localStorage.getItem(`song_hw_${effectiveId}_${skill.song_id}`) : null) ??
+                                        (skill.songs?.id ? localStorage.getItem(`song_hw_${effectiveId}_${skill.songs.id}`) : null)) : null;
 
                         const isHw = (localHw === 'true') || (localHw !== 'false' && Boolean(skill.is_current_homework));
 
@@ -18495,10 +18404,10 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                           const fullTitle = songArtist ? `${songArtist} - ${songTitle}${songInstrument}` : `${songTitle}${songInstrument}`;
                           const cleanT = cleanTitle(fullTitle);
 
-                          if (!otherActiveHWItems.some(existing => cleanTitle((existing.topic_name || existing.title || '').replace(/\s*\([^)]*\)\s*$/, '')) === cleanT)) {
-                            let cachedNote = localStorage.getItem(`song_note_${studentId}_${skill.id}`) ||
-                                             (skill.song_id ? localStorage.getItem(`song_note_${studentId}_${skill.song_id}`) : '') ||
-                                             (skill.songs?.id ? localStorage.getItem(`song_note_${studentId}_${skill.songs.id}`) : '') ||
+                          if (cleanT && !otherActiveHWItems.some(existing => cleanTitle((existing.topic_name || existing.title || '').replace(/\s*\([^)]*\)\s*$/, '')) === cleanT)) {
+                            let cachedNote = (effectiveId ? (localStorage.getItem(`song_note_${effectiveId}_${skill.id}`) ||
+                                             (skill.song_id ? localStorage.getItem(`song_note_${effectiveId}_${skill.song_id}`) : '') ||
+                                             (skill.songs?.id ? localStorage.getItem(`song_note_${effectiveId}_${skill.songs.id}`) : '')) : '') ||
                                              skill.homework_notes || '';
                             if (cachedNote.startsWith('[') || cachedNote.startsWith('{')) {
                               try {
@@ -19844,7 +19753,8 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                       const generalNoteRaw = currentWeekNotes.find(n => !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('LATENCY:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:'));
                       const generalNote = generalNoteRaw ? cleanGeneralNote(generalNoteRaw) : '';
 
-                      const cleanTitle = (t: string) => t.replace(/\s*\((gitarre|guitar|e-gitarre|bass|e-bass|drums|schlagzeug|klavier|piano|keys|keyboard|vocals|gesang|stimme|allgemein)\)/i, '');
+                      const cleanTitle = (t: string) => (t || '').replace(/\s*\((gitarre|guitar|e-gitarre|bass|e-bass|drums|schlagzeug|klavier|piano|keys|keyboard|vocals|gesang|stimme|allgemein)\)/i, '');
+                      const effectiveId = studentId || studentUser?.id;
 
                       const formatPageNumbers = (pages: number[]): string => {
                         if (pages.length === 0) return '';
@@ -19868,7 +19778,8 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                       const activeLehrwerkeMap: Record<string, { pages: { num: number; notes: string; status: string }[] }> = {};
 
                       (localProgress || []).forEach((assignment: any) => {
-                        if (String(assignment.studentId) !== String(studentId) || !assignment.pageStates) return;
+                        const isStudentMatch = !effectiveId || String(assignment.studentId) === String(effectiveId) || String(assignment.student_id) === String(effectiveId);
+                        if (!isStudentMatch || !assignment.pageStates) return;
                         const book = lehrwerke.find(g => String(g.id) === String(assignment.lehrwerkId));
                         if (!book) return;
 
@@ -19904,7 +19815,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                       // 2. Also incorporate items from progressItems (songs, theory, database rows) and songs state
                       const otherActiveHWItems: any[] = [];
                       (progressItems || []).forEach(item => {
-                        if (item.topic_name.startsWith('Hausaufgabe KW ')) return;
+                        if (!item.topic_name || item.topic_name.startsWith('Hausaufgabe KW ')) return;
                         if (item.topic_name.includes(' - Seite ')) {
                           const parts = item.topic_name.split(' - Seite ');
                           const bookTitle = cleanTitle(parts[0].trim());
@@ -19933,15 +19844,13 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                             }
                           }
                         } else {
-                          const localHw = localStorage.getItem(`song_hw_${studentId}_${item.id}`) ??
-                                          (item.song_id ? localStorage.getItem(`song_hw_${studentId}_${item.song_id}`) : null);
+                          const localHw = effectiveId ? (localStorage.getItem(`song_hw_${effectiveId}_${item.id}`) ?? (item.song_id ? localStorage.getItem(`song_hw_${effectiveId}_${item.song_id}`) : null)) : null;
                           if (localHw !== 'false') {
                             const isSongHw = (localHw === 'true') || Boolean(item.is_current_homework);
                             if (isSongHw) {
-                              const cleanT = cleanTitle(item.topic_name.replace(/\s*\([^)]*\)\s*$/, ''));
-                              if (!otherActiveHWItems.some(existing => cleanTitle(existing.topic_name.replace(/\s*\([^)]*\)\s*$/, '')) === cleanT)) {
-                                let cachedNote = localStorage.getItem(`song_note_${studentId}_${item.id}`) ||
-                                                 localStorage.getItem(`song_note_${studentId}_${item.song_id}`) ||
+                              const cleanT = cleanTitle((item.topic_name || item.title || '').replace(/\s*\([^)]*\)\s*$/, ''));
+                              if (cleanT && !otherActiveHWItems.some(existing => cleanTitle((existing.topic_name || existing.title || '').replace(/\s*\([^)]*\)\s*$/, '')) === cleanT)) {
+                                let cachedNote = (effectiveId ? (localStorage.getItem(`song_note_${effectiveId}_${item.id}`) || localStorage.getItem(`song_note_${effectiveId}_${item.song_id}`)) : '') ||
                                                  item.homework_notes || '';
                                 if (cachedNote.startsWith('[') || cachedNote.startsWith('{')) {
                                   try {
@@ -19965,9 +19874,9 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
 
                       // Also incorporate student's activeSongSkills (exact 1:1 match with MeisterwerkDocumentationModal)
                       (activeSongSkills || []).forEach((skill: any) => {
-                        const localHw = localStorage.getItem(`song_hw_${studentId}_${skill.id}`) ??
-                                        (skill.song_id ? localStorage.getItem(`song_hw_${studentId}_${skill.song_id}`) : null) ??
-                                        (skill.songs?.id ? localStorage.getItem(`song_hw_${studentId}_${skill.songs.id}`) : null);
+                        const localHw = effectiveId ? (localStorage.getItem(`song_hw_${effectiveId}_${skill.id}`) ??
+                                        (skill.song_id ? localStorage.getItem(`song_hw_${effectiveId}_${skill.song_id}`) : null) ??
+                                        (skill.songs?.id ? localStorage.getItem(`song_hw_${effectiveId}_${skill.songs.id}`) : null)) : null;
 
                         const isHw = (localHw === 'true') || (localHw !== 'false' && Boolean(skill.is_current_homework));
 
@@ -19979,10 +19888,10 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                           const fullTitle = songArtist ? `${songArtist} - ${songTitle}${songInstrument}` : `${songTitle}${songInstrument}`;
                           const cleanT = cleanTitle(fullTitle);
 
-                          if (!otherActiveHWItems.some(existing => cleanTitle((existing.topic_name || existing.title || '').replace(/\s*\([^)]*\)\s*$/, '')) === cleanT)) {
-                            let cachedNote = localStorage.getItem(`song_note_${studentId}_${skill.id}`) ||
-                                             (skill.song_id ? localStorage.getItem(`song_note_${studentId}_${skill.song_id}`) : '') ||
-                                             (skill.songs?.id ? localStorage.getItem(`song_note_${studentId}_${skill.songs.id}`) : '') ||
+                          if (cleanT && !otherActiveHWItems.some(existing => cleanTitle((existing.topic_name || existing.title || '').replace(/\s*\([^)]*\)\s*$/, '')) === cleanT)) {
+                            let cachedNote = (effectiveId ? (localStorage.getItem(`song_note_${effectiveId}_${skill.id}`) ||
+                                             (skill.song_id ? localStorage.getItem(`song_note_${effectiveId}_${skill.song_id}`) : '') ||
+                                             (skill.songs?.id ? localStorage.getItem(`song_note_${effectiveId}_${skill.songs.id}`) : '')) : '') ||
                                              skill.homework_notes || '';
                             if (cachedNote.startsWith('[') || cachedNote.startsWith('{')) {
                               try {
@@ -22747,11 +22656,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
         {activeTab === 'settings' && studentUser && (() => {
           const isJuniorOrTeen = (studentUiLevel === 'junior' || studentUiLevel === 'teen');
           const isParentSessionActive = checkIsParentSessionActive();
-          const hasConfiguredParentPin = Boolean(
-            studentUser?.has_parent_pin ||
-            (studentUser as any)?.parent_pin ||
-            (typeof window !== 'undefined' && localStorage.getItem(`groovelab_parent_pin_${studentId}`))
-          );
+          const hasConfiguredParentPin = Boolean(studentUser?.has_parent_pin === true);
 
           return (
             <>
@@ -22976,17 +22881,21 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
 
                                   const recKey = generateParentRecoveryKey();
                                   try {
-                                    localStorage.setItem(`groovelab_parent_pin_${studentId}`, nextVal);
-                                    localStorage.setItem(`campus_parent_pin_${studentId}`, nextVal);
+                                    const { data: rpcRes, error: rpcErr } = await supabase.rpc('set_parent_pin', {
+                                      p_student_id: studentId,
+                                      p_new_pin: nextVal
+                                    });
+
+                                    if (rpcErr || rpcRes !== true) {
+                                      throw new Error(rpcErr?.message || 'Serverfehler beim Speichern.');
+                                    }
+
                                     try {
-                                      await supabase.rpc('set_parent_pin', { p_student_id: studentId, p_new_pin: nextVal });
+                                      await supabase.from('users').update({ recovery_key: recKey }).eq('id', studentId);
                                     } catch (err) {}
-                                    await supabase.from('users').update({ parent_pin: nextVal, has_parent_pin: true, recovery_key: recKey }).eq('id', studentId);
-                                    try { await supabase.from('students').update({ parent_pin: nextVal, has_parent_pin: true, recovery_key: recKey }).eq('id', studentId); } catch(err){}
                                     
                                     if (studentUser) {
                                       (studentUser as any).has_parent_pin = true;
-                                      (studentUser as any).parent_pin = nextVal;
                                       (studentUser as any).recovery_key = recKey;
                                     }
 
@@ -23073,8 +22982,6 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                           if (studentUser) {
                             (studentUser as any).has_parent_pin = false;
                           }
-                          localStorage.removeItem(`groovelab_parent_pin_${studentId}`);
-                          localStorage.removeItem(`campus_parent_pin_${studentId}`);
                         }}
                         style={{
                           background: 'none',
@@ -23428,11 +23335,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
 
             {/* PARENT GATEKEEPER MODAL (6-Digit Parent Master PIN) */}
             {showParentGateModal && (() => {
-              const hasConfiguredParentPin = Boolean(
-                studentUser?.has_parent_pin ||
-                (studentUser as any)?.parent_pin ||
-                (typeof window !== 'undefined' && localStorage.getItem(`groovelab_parent_pin_${studentId}`))
-              );
+              const hasConfiguredParentPin = Boolean(studentUser?.has_parent_pin === true);
 
               return (
                 <div style={{
@@ -23660,9 +23563,18 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
 
                                       const recKey = generateParentRecoveryKey();
                                       try {
-                                        localStorage.setItem(`groovelab_parent_pin_${studentId}`, nextVal);
-                                        await supabase.from('users').update({ parent_pin: nextVal, has_parent_pin: true, recovery_key: recKey }).eq('id', studentId);
-                                        try { await supabase.from('students').update({ parent_pin: nextVal, has_parent_pin: true, recovery_key: recKey }).eq('id', studentId); } catch(err){}
+                                        const { data: rpcRes, error: rpcErr } = await supabase.rpc('set_parent_pin', {
+                                          p_student_id: studentId,
+                                          p_new_pin: nextVal
+                                        });
+
+                                        if (rpcErr || rpcRes !== true) {
+                                          throw new Error(rpcErr?.message || 'Serverfehler beim Speichern.');
+                                        }
+
+                                        try {
+                                          await supabase.from('users').update({ recovery_key: recKey }).eq('id', studentId);
+                                        } catch (err) {}
                                         
                                         if (studentUser) {
                                           (studentUser as any).has_parent_pin = true;
@@ -25252,115 +25164,38 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
 
                                 try {
                                   if (isParentTarget) {
-                                    // --- SAVE 6-DIGIT PARENT PIN ---
-                                    try {
-                                      await supabase.from('students').update({
-                                        parent_pin: pinFormNew,
-                                        has_parent_pin: true
-                                      }).eq('id', studentId);
-                                    } catch (e) {}
+                                    // --- SAVE 6-DIGIT PARENT PIN VIA SERVER RPC ---
+                                    const { data: rpcRes, error } = await supabase.rpc('set_parent_pin', {
+                                      p_student_id: studentId,
+                                      p_new_pin: pinFormNew
+                                    });
 
-                                    try {
-                                      await supabase.from('pending_students').update({
-                                        parent_pin: pinFormNew,
-                                        has_parent_pin: true
-                                      }).eq('id', studentId);
-                                    } catch (e) {}
-
-                                    try {
-                                      await supabase.from('users_raw').update({
-                                        parent_pin: pinFormNew,
-                                        has_parent_pin: true
-                                      }).eq('id', studentId);
-                                    } catch (e) {}
-
-                                    const { error } = await supabase
-                                      .from('users')
-                                      .update({ parent_pin: pinFormNew, has_parent_pin: true })
-                                      .eq('id', studentId);
-
-                                    localStorage.setItem(`groovelab_parent_pin_${studentId}`, pinFormNew);
-                                    sessionStorage.setItem(`groovelab_parent_pin_${studentId}`, pinFormNew);
                                     sessionStorage.setItem('groovelab_parent_unlocked_global', 'true');
+                                    sessionStorage.setItem(`groovelab_parent_unlocked_${studentId}`, 'true');
 
-                                    if (error) {
-                                      setPinFormError('Fehler beim Speichern der Eltern-PIN: ' + error.message);
+                                    if (error || rpcRes !== true) {
+                                      setPinFormError('Fehler beim Speichern der Eltern-PIN: ' + (error?.message || 'Serverfehler'));
                                     } else {
                                       setPinFormSuccess('Deine 6-stellige Eltern-PIN wurde erfolgreich gespeichert! 🛡️');
                                       setStudentUser((prev: any) => prev ? {
                                         ...prev,
-                                        has_parent_pin: true,
-                                        parent_pin: pinFormNew
+                                        has_parent_pin: true
                                       } : prev);
                                       setPinFormNew('');
                                       setPinFormConfirm('');
                                     }
                                   } else {
-                                    // --- SAVE 4-DIGIT STUDENT PIN (personal_pin) ---
-                                    if (studentId) {
-                                      sessionStorage.setItem('groovelab_user_id', studentId);
-                                      const authQrToken = studentUser?.qr_token || studentUser?.ausweis_nummer || studentId;
-                                      if (authQrToken) {
-                                        sessionStorage.setItem('groovelab_qr_token', authQrToken);
-                                      }
-                                    }
+                                    // --- SAVE 4-DIGIT STUDENT PIN (personal_pin) VIA SERVER RPC ---
+                                    const authQrToken = studentUser?.qr_token || studentUser?.ausweis_nummer || studentId || '';
+                                    
+                                    const { data: rpcRes, error } = await supabase.rpc('set_initial_student_pin', {
+                                      p_student_id: studentId,
+                                      p_qr_token: authQrToken,
+                                      p_pin: pinFormNew
+                                    });
 
-                                    try {
-                                      await supabase.from('students').update({
-                                        personal_pin: pinFormNew,
-                                        onboarding_pin: pinFormNew,
-                                        is_pin_activated: true,
-                                        is_campus_active: true
-                                      }).eq('id', studentId);
-
-                                      await supabase.from('pending_students').update({
-                                        personal_pin: pinFormNew,
-                                        onboarding_pin: pinFormNew,
-                                        is_pin_activated: true,
-                                        is_campus_active: true
-                                      }).eq('id', studentId);
-                                    } catch (e) {}
-
-                                    try {
-                                      await supabase.from('users_raw').update({
-                                        personal_pin: pinFormNew,
-                                        onboarding_pin: pinFormNew,
-                                        is_pin_activated: true,
-                                        is_campus_active: true
-                                      }).eq('id', studentId);
-                                    } catch (e) {}
-
-                                    const userUpdatePayload: any = {
-                                      personal_pin: pinFormNew,
-                                      onboarding_pin: pinFormNew,
-                                      is_pin_activated: true,
-                                      is_campus_active: true
-                                    };
-                                    let { error } = await supabase
-                                      .from('users')
-                                      .update(userUpdatePayload)
-                                      .eq('id', studentId);
-
-                                    if (error && (error.message?.includes('onboarding_pin') || error.message?.includes('record "new" has no field'))) {
-                                      delete userUpdatePayload.onboarding_pin;
-                                      const fallbackRes = await supabase
-                                        .from('users')
-                                        .update(userUpdatePayload)
-                                        .eq('id', studentId);
-                                      error = fallbackRes.error;
-                                    }
-
-                                    if (error && (error.message?.includes('onboarding_pin') || error.message?.includes('record "new" has no field'))) {
-                                      console.warn('[StudentAvatarDashboard] users view trigger warning ignored because student table was updated:', error);
-                                      error = null;
-                                    }
-
-                                    localStorage.setItem(`groovelab_user_pin_${studentId}`, pinFormNew);
-                                    localStorage.setItem(`groovelab_student_pin_${studentId}`, pinFormNew);
-                                    sessionStorage.setItem(`groovelab_user_pin_${studentId}`, pinFormNew);
-
-                                    if (error) {
-                                      setPinFormError('Fehler beim Speichern der Schüler-PIN: ' + error.message);
+                                    if (error || rpcRes !== true) {
+                                      setPinFormError('Fehler beim Speichern der Schüler-PIN: ' + (error?.message || 'Serverfehler'));
                                     } else {
                                       setPinFormSuccess('Deine 4-stellige Schüler-PIN wurde erfolgreich gespeichert! 🎒');
                                       setStudentUser((prev: any) => prev ? {
@@ -26003,44 +25838,42 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                   <button
                     type="button"
                     onClick={async () => {
-                      const raw = recoveryKeyInput.trim().toUpperCase().replace(/[\s-]/g, '').replace(/^REC/, '');
-                      const userRecKey = String((studentUser as any)?.recovery_key || (studentUser as any)?.emergency_pin || '').trim().toUpperCase().replace(/[\s-]/g, '').replace(/^REC/, '');
-                      const cachedKey = (localStorage.getItem(`groovelab_recovery_key_${studentId}`) || '').toUpperCase().replace(/[\s-]/g, '').replace(/^REC/, '');
-                      const ausweisNum = String((studentUser as any)?.ausweis_nummer || '').trim().toUpperCase().replace(/[\s-]/g, '');
-                      const qrToken = String((studentUser as any)?.qr_token || '').trim().toUpperCase();
+                      const cleanInput = recoveryKeyInput.trim();
+                      if (!cleanInput) {
+                        setRecoveryKeyError('Bitte gib deinen Notfallschlüssel ein.');
+                        return;
+                      }
 
-                      let isMatch = false;
-                      if (raw && userRecKey && raw === userRecKey) isMatch = true;
-                      if (!isMatch && raw && cachedKey && raw === cachedKey) isMatch = true;
-                      if (!isMatch && raw && ausweisNum && raw === ausweisNum) isMatch = true;
-                      if (!isMatch && raw && qrToken && raw === qrToken) isMatch = true;
+                      const targetId = studentId || (studentUser as any)?.id;
+                      if (!targetId) return;
 
-                      if (isMatch) {
-                        // Valid recovery key!
-                        localStorage.removeItem(`groovelab_parent_pin_${studentId}`);
-                        sessionStorage.removeItem(`groovelab_parent_session_${studentId}`);
-                        sessionStorage.removeItem(`groovelab_parent_unlocked_${studentId}`);
-                        sessionStorage.removeItem('groovelab_parent_unlocked_global');
-                        if (studentUser) {
-                          (studentUser as any).has_parent_pin = false;
-                          (studentUser as any).parent_pin = null;
+                      try {
+                        const { data: resetResult, error: resetErr } = await supabase.rpc('reset_parent_pin_via_recovery_key', {
+                          p_student_id: targetId,
+                          p_recovery_key: cleanInput
+                        });
+
+                        if (resetResult?.success) {
+                          // Valid recovery key confirmed by server!
+                          sessionStorage.removeItem(`groovelab_parent_session_${targetId}`);
+                          sessionStorage.removeItem(`groovelab_parent_unlocked_${targetId}`);
+                          sessionStorage.removeItem('groovelab_parent_unlocked_global');
+                          if (studentUser) {
+                            (studentUser as any).has_parent_pin = false;
+                          }
+
+                          setShowRecoveryKeyModal(false);
+                          setParentSetupStep('enter');
+                          setParentSetupPin('');
+                          setParentSetupConfirm('');
+                          setParentGatePinInput('');
+                          setParentGateError('');
+                          alert('Notfallschlüssel bestätigt! Bitte vergib jetzt deine neue 6-stellige Eltern-Master-PIN.');
+                        } else {
+                          setRecoveryKeyError(resetResult?.error || resetErr?.message || 'Ungültiger Notfallschlüssel. Bitte prüfe deine Eingabe oder wende dich an deine Lehrkraft.');
                         }
-                        try {
-                          await supabase.from('users').update({ parent_pin: null, has_parent_pin: false }).eq('id', studentId);
-                          try { await supabase.from('students').update({ parent_pin: null, has_parent_pin: false }).eq('id', studentId); } catch(err){}
-                          try { await supabase.from('pending_students').update({ parent_pin: null, has_parent_pin: false }).eq('id', studentId); } catch(err){}
-                          try { await supabase.from('users_raw').update({ parent_pin: null, has_parent_pin: false }).eq('id', studentId); } catch(err){}
-                        } catch (e) {}
-
-                        setShowRecoveryKeyModal(false);
-                        setParentSetupStep('enter');
-                        setParentSetupPin('');
-                        setParentSetupConfirm('');
-                        setParentGatePinInput('');
-                        setParentGateError('');
-                        alert('Notfallschlüssel bestätigt! Bitte vergib jetzt deine neue 6-stellige Eltern-Master-PIN.');
-                      } else {
-                        setRecoveryKeyError('Ungültiger Notfallschlüssel. Bitte prüfe deine Eingabe oder wende dich an deine Lehrkraft.');
+                      } catch (err: any) {
+                        setRecoveryKeyError(err.message || 'Verbindungsfehler bei der Schlüsselprüfung.');
                       }
                     }}
                     style={{
@@ -27544,83 +27377,26 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                     }
                   }
 
-                  // 1. Update students table
-                  try {
-                    await supabase.from('students').update({
-                      personal_pin: pinFormNew,
-                      parent_pin: pinFormNew,
-                      onboarding_pin: pinFormNew,
-                      is_pin_activated: true,
-                      is_campus_active: true
-                    }).eq('id', studentId);
-                  } catch (e) {}
+                  const authQrToken = studentUser?.qr_token || studentUser?.ausweis_nummer || studentId || '';
+                  
+                  const { data: rpcRes, error } = await supabase.rpc('set_initial_student_pin', {
+                    p_student_id: studentId,
+                    p_qr_token: authQrToken,
+                    p_pin: pinFormNew
+                  });
 
-                  // 2. Update pending_students table
-                  try {
-                    await supabase.from('pending_students').update({
-                      personal_pin: pinFormNew,
-                      parent_pin: pinFormNew,
-                      onboarding_pin: pinFormNew,
-                      is_pin_activated: true,
-                      is_campus_active: true
-                    }).eq('id', studentId);
-                  } catch (e) {}
-
-                  // 3. Update users_raw
-                  try {
-                    await supabase.from('users_raw').update({
-                      personal_pin: pinFormNew,
-                      parent_pin: pinFormNew,
-                      onboarding_pin: pinFormNew,
-                      is_pin_activated: true,
-                      is_campus_active: true
-                    }).eq('id', studentId);
-                  } catch (e) {}
-
-                  // 4. Update users view
-                  const payload: any = {
-                    personal_pin: pinFormNew,
-                    parent_pin: pinFormNew,
-                    onboarding_pin: pinFormNew,
-                    is_pin_activated: true,
-                    is_campus_active: true
-                  };
-                  let { error } = await supabase
-                    .from('users')
-                    .update(payload)
-                    .eq('id', studentId);
-
-                  if (error && (error.message?.includes('onboarding_pin') || error.message?.includes('record "new" has no field'))) {
-                    delete payload.onboarding_pin;
-                    const res = await supabase.from('users').update(payload).eq('id', studentId);
-                    error = res.error;
-                  }
-
-                  if (error && (error.message?.includes('onboarding_pin') || error.message?.includes('record "new" has no field'))) {
-                    console.warn('[StudentAvatarDashboard] users view trigger warning ignored:', error);
-                    error = null;
-                  }
-
-                  // Save in local & session storages
-                  localStorage.setItem(`groovelab_user_pin_${studentId}`, pinFormNew);
-                  localStorage.setItem(`groovelab_student_pin_${studentId}`, pinFormNew);
-                  sessionStorage.setItem(`groovelab_user_pin_${studentId}`, pinFormNew);
-
-                  if (error) {
-                    setPinFormError('Fehler beim Speichern: ' + error.message);
+                  if (error || rpcRes !== true) {
+                    setPinFormError('Fehler beim Speichern: ' + (error?.message || 'Serverfehler'));
                   } else {
                     setFirstPinSavedSuccess(true);
                     setStudentUser((prev: any) => prev ? {
                       ...prev,
                       is_pin_activated: true,
-                      has_personal_pin: true,
-                      has_parent_pin: true,
-                      personal_pin: pinFormNew,
-                      parent_pin: pinFormNew
+                      has_personal_pin: true
                     } : prev);
                     
                     if (onProfileUpdate) {
-                      try { onProfileUpdate({ is_pin_activated: true, personal_pin: pinFormNew }); } catch (e) {}
+                      try { onProfileUpdate({ is_pin_activated: true, has_personal_pin: true }); } catch (e) {}
                     }
 
                     setTimeout(() => {

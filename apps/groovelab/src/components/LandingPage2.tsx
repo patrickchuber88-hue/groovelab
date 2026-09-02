@@ -3,7 +3,6 @@ import { Sparkles, Search, School, MapPin, Loader2, ArrowRight, ShieldCheck, Loc
 import { supabase } from '../lib/supabase';
 import { isWebAuthnSupported, isMasterPasskeyRegistered, registerMasterPasskey, authenticateMasterPasskey } from '../utils/webauthn';
 import { createMasterSessionLease, logMasterAdminEvent } from '../utils/masterAuditLogger';
-import { verifyTOTP } from '../utils/totp';
 import { RegistrationAccessModal } from './RegistrationAccessModal';
 import { isRegistrationUnlocked } from '../utils/cryptoAuth';
 
@@ -274,7 +273,7 @@ export const LandingPage2: React.FC<LandingPage2Props> = ({
       }
 
       // Check if user has 2FA enabled
-      if (user.is_2fa_enabled && user.two_factor_secret) {
+      if (user.requires_2fa || user.is_2fa_enabled) {
         setPendingMasterUser(user);
         setAuthStep(2);
         setMasterAuthError(null);
@@ -301,11 +300,18 @@ export const LandingPage2: React.FC<LandingPage2Props> = ({
     setIsLoggingInMaster(true);
     setMasterAuthError(null);
     try {
-      const isValid = await verifyTOTP(cleanCode, pendingMasterUser.two_factor_secret);
-      if (!isValid) {
-        throw new Error('Ungültiger 2FA-Code. Bitte prüfen Sie die Uhrzeit auf Ihrem Smartphone.');
+      const { data: verifiedUser, error: verifyErr } = await supabase.rpc('login_master_admin', {
+        p_username: 'admin',
+        p_password: masterKeyInput.trim(),
+        p_totp_code: cleanCode
+      });
+
+      if (!verifyErr && verifiedUser && verifiedUser.id && !verifiedUser.error) {
+        await finalizeMasterSession(verifiedUser);
+        return;
       }
-      await finalizeMasterSession(pendingMasterUser);
+
+      throw new Error(verifiedUser?.error || verifyErr?.message || 'Ungültiger 2FA-Code. Bitte prüfen Sie die Uhrzeit auf Ihrem Smartphone.');
     } catch (err: any) {
       setMasterAuthError(err.message || '2FA-Verifikation fehlgeschlagen.');
       setIsLoggingInMaster(false);

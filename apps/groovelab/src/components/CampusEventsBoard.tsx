@@ -470,22 +470,8 @@ export function CampusEventsBoard({
       const cleanInput = inputPin.trim();
       let isMatch = false;
 
-      // 1. LocalStorage cached PINs
-      // 1. Cached parent pin
-      const cachedParentPin = localStorage.getItem(`groovelab_parent_pin_${userId}`);
-      if (cachedParentPin && cachedParentPin === cleanInput) {
-        isMatch = true;
-      }
-
-      // 2. Direct studentUser prop check
-      if (!isMatch && studentUser?.parent_pin) {
-        if (String(studentUser.parent_pin).trim() === cleanInput) {
-          isMatch = true;
-        }
-      }
-
-      // 3. Supabase RPC verify_parent_pin
-      if (!isMatch) {
+      if (userId) {
+        // 1. Primary: Server-Side verify_parent_pin RPC
         try {
           const { data: parentOk } = await supabase.rpc('verify_parent_pin', {
             student_id: userId,
@@ -493,23 +479,22 @@ export function CampusEventsBoard({
           });
           if (parentOk === true) isMatch = true;
         } catch (e) {}
-      }
 
-      // 4. Fallback users table query
-      if (!isMatch) {
-        const { data: uData } = await supabase
-          .from('users')
-          .select('parent_pin')
-          .eq('id', userId)
-          .maybeSingle();
-        if (uData && uData.parent_pin) {
-          if (String(uData.parent_pin).trim() === cleanInput) {
-            isMatch = true;
-          }
+        // 2. Fallback: Server-Side verify_personal_pin RPC
+        if (!isMatch) {
+          try {
+            const { data: personalOk } = await supabase.rpc('verify_personal_pin', {
+              user_uuid: userId,
+              input_pin: cleanInput
+            });
+            if (personalOk === true) isMatch = true;
+          } catch (e) {}
         }
       }
 
       if (isMatch) {
+        sessionStorage.setItem('groovelab_parent_unlocked_global', 'true');
+        sessionStorage.setItem(`groovelab_parent_unlocked_${userId}`, 'true');
         setShowPinGateModal(false);
         setPinGateInput('');
         setPinGateError('');

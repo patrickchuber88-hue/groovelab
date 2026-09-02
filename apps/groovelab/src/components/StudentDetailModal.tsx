@@ -351,7 +351,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
           status: 'offen'
         };
         try {
-          await supabase.from('users_raw').update(userResetPayload).eq('id', student.id);
+          await supabase.from('users').update(userResetPayload).eq('id', student.id);
         } catch (e) {}
         const { error: userResetErr } = await supabase.from('users').update(userResetPayload).eq('id', student.id);
         if (userResetErr && userResetErr.message?.includes('onboarding_pin')) {
@@ -819,9 +819,9 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
 
   const ensureUserRawRecord = async (st: any) => {
     try {
-      const { data: existingUser } = await supabase.from('users_raw').select('id').eq('id', st.id).maybeSingle();
+      const { data: existingUser } = await supabase.from('users').select('id').eq('id', st.id).maybeSingle();
       if (!existingUser) {
-        await supabase.from('users_raw').insert({
+        await supabase.from('users').insert({
           id: st.id,
           school_id: st.school_id || st.schoolId,
           role: 'student',
@@ -845,7 +845,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
     try {
       await ensureUserRawRecord(student);
       const { error: rawErr } = await supabase
-        .from('users_raw')
+        .from('users')
         .update({ is_campus_active: newVal })
         .eq('id', student.id);
       try {
@@ -871,7 +871,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
     try {
       await ensureUserRawRecord(student);
       const { error: rawErr } = await supabase
-        .from('users_raw')
+        .from('users')
         .update({ exempt_from_direct_billing: newVal })
         .eq('id', student.id);
       try {
@@ -895,7 +895,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
       }
       await ensureUserRawRecord(student);
       const { error: rawErr } = await supabase
-        .from('users_raw')
+        .from('users')
         .update({ custom_student_price: numericVal })
         .eq('id', student.id);
       try {
@@ -917,7 +917,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
     try {
       await ensureUserRawRecord(student);
       const { error: rawErr } = await supabase
-        .from('users_raw')
+        .from('users')
         .update({ is_groovelab_active: newVal })
         .eq('id', student.id);
       try {
@@ -940,7 +940,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
     try {
       await ensureUserRawRecord(student);
       await supabase
-        .from('users_raw')
+        .from('users')
         .update({ lesson_duration: duration })
         .eq('id', student.id);
       try {
@@ -963,7 +963,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
     try {
       await ensureUserRawRecord(student);
       const { error: rawErr } = await supabase
-        .from('users_raw')
+        .from('users')
         .update({ app_usage_mode: mode })
         .eq('id', student.id);
       try {
@@ -986,7 +986,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
       }
       await ensureUserRawRecord(student);
       const { error: rawErr } = await supabase
-        .from('users_raw')
+        .from('users')
         .update({ parent_pin: newPin || null })
         .eq('id', student.id);
       try {
@@ -1006,7 +1006,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
     try {
       await ensureUserRawRecord(student);
       const { error: rawErr } = await supabase
-        .from('users_raw')
+        .from('users')
         .update({ parent_pin: null, recovery_key: null })
         .eq('id', student.id);
       try {
@@ -1030,7 +1030,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
       
       await ensureUserRawRecord(student);
       await supabase
-        .from('users_raw')
+        .from('users')
         .update({ group_id: newGroupId })
         .eq('id', student.id);
       try {
@@ -1041,9 +1041,9 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
       } catch (e) {}
 
       try {
-        const { data: otherUser } = await supabase.from('users_raw').select('id').eq('id', selectedStudentToLink).maybeSingle();
+        const { data: otherUser } = await supabase.from('users').select('id').eq('id', selectedStudentToLink).maybeSingle();
         if (otherUser) {
-          await supabase.from('users_raw').update({ group_id: newGroupId }).eq('id', selectedStudentToLink);
+          await supabase.from('users').update({ group_id: newGroupId }).eq('id', selectedStudentToLink);
         }
       } catch (e) {}
       try {
@@ -1069,7 +1069,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
       const targetGroupId = groupId || student.group_id;
       if (targetGroupId) {
         try {
-          await supabase.from('users_raw').update({ group_id: null }).eq('group_id', targetGroupId);
+          await supabase.from('users').update({ group_id: null }).eq('group_id', targetGroupId);
         } catch (e) {}
         try {
           await supabase.from('users').update({ group_id: null }).eq('group_id', targetGroupId);
@@ -1080,7 +1080,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
       } else {
         await ensureUserRawRecord(student);
         try {
-          await supabase.from('users_raw').update({ group_id: null }).eq('id', student.id);
+          await supabase.from('users').update({ group_id: null }).eq('id', student.id);
         } catch (e) {}
         try {
           await supabase.from('users').update({ group_id: null }).eq('id', student.id);
