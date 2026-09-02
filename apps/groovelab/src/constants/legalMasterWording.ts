@@ -59,8 +59,10 @@ export const LEGAL_MASTER_WORDING = {
   // 4. Rechtshinweise & AGB
   legalDisclaimers: {
     onboardingConsent: 'Mit Klick auf „Kostenfrei freischalten“ akzeptieren Sie unsere AGB für Bildungseinrichtungen sowie die Vereinbarung zur Auftragsverarbeitung (AVV nach Art. 28 DSGVO / Art. 9 nDSG).',
-    b2bContractNature: 'Software-as-a-Service (SaaS)-Mietvertrag gemäß § 535 ff. BGB / Art. 253 ff. OR über schlüsselfertige Cloud-Infrastruktur.',
-    kleinunternehmerUStG19: 'In DE/AT gemäß § 19 UStG umsatzsteuerbefreit (Kleinunternehmerregelung). In der Schweiz gilt Leistungsort Schweiz (nicht im Inland steuerbar gem. Art. 8 Abs. 1 MWSTG).'
+    b2bContractNature: 'Software-as-a-Service (SaaS)-Mietvertrag gemäß § 535 ff. BGB (DE) / §§ 1090 ff. ABGB (AT) / Art. 253 ff. OR (CH) über schlüsselfertige Cloud-Infrastruktur.',
+    pedagogicalAddonDisclaimer: 'Campus-Groovelab ist ein didaktisches Zusatzwerkzeug zur Unterstützung des Fachunterrichts und häuslichen Übens. Die Plattform ersetzt kein amtliches Schulverwaltungssystem.',
+    emergencyFallbackDisclaimer: 'Bei technischen Störungen oder Ausfällen läuft der Schulbetrieb uneingeschränkt über herkömmliche Wege (Telefon, E-Mail) weiter (Ausschluss von Unterrichtsausfall-Haftung).',
+    kleinunternehmerUStG19: 'In DE gemäß § 19 UStG bzw. in AT gemäß § 6 Abs. 1 Z 27 UStG 1994 umsatzsteuerbefreit (Kleinunternehmerregelung). In der Schweiz gilt Leistungsort Schweiz (nicht im Inland steuerbar gem. Art. 8 Abs. 1 MWSTG).'
   },
 
   // 5. Tier-1 Enterprise+ Sicherheits- & Kryptographie-Standards (Banking Goldstandard)
@@ -76,6 +78,7 @@ export const LEGAL_MASTER_WORDING = {
     immutableAuditLedger: 'Revisionssicheres, manipulationsgeschütztes Audit-Ledger mit kryptografischer SHA-512 / SHA-256 Merkle-Chain (GoBD & DSGVO konform).',
     fido2HardwareProtection: 'FIDO2 / WebAuthn Hardware Passkeys mit kryptografischem Signatur-Zähler zum Schutz vor Klon-Angriffen.',
     dataMinimization: '100% DSGVO-konforme Datenminimierung: Keine Speicherung von SEPA-, Bank- oder Kreditkartendaten, keine E-Mail-Adressen Minderjähriger, automatische Nachnamensmaskierung.',
+    voiceBiometricsExclusion: 'Reines didaktisches Audio-Streaming ohne biometrische Stimm-, Sprecher- oder Verhaltensmusteranalysen (Art. 9 DSGVO / Art. 6 nDSG).',
     hostingInfrastructure: '100% Hosting in ISO 27001-zertifizierten deutschen Rechenzentren (Hetzner Online GmbH, Falkenstein/Vogtland & Nürnberg, Deutschland) mit stündlichen verschlüsselten Backups.',
     indexedDbAudioVault: 'Lokaler IndexedDB Audio-Tresor (groovelab_audio_vault) für 0ms Offline-Playback und bandbreitenfreie Proberaumnutzung.'
   }

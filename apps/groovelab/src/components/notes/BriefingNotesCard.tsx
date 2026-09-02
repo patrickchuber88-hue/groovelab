@@ -1386,16 +1386,11 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
             <div style={{
               display: 'flex',
               flexDirection: 'column',
-              background: '#ffffff',
-              borderRadius: '12px',
-              border: '1px solid rgba(226, 232, 240, 0.85)',
-              overflow: 'hidden',
-              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)'
+              gap: '6px'
             }}>
-            {visibleNotes.map((note, idx) => {
+            {visibleNotes.map((note) => {
               const isRecentlyCompleted = recentlyCompletedIds.includes(note.id);
               const isDone = note.is_completed || isRecentlyCompleted;
-              const isLast = idx === visibleNotes.length - 1;
 
               // Intelligent Room Display Calculation
               const detectedRoom = (() => {
@@ -1418,20 +1413,22 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
                 <div
                   key={note.id}
                   style={{
-                    padding: '8px 10px',
+                    background: isDone ? 'rgba(248, 250, 252, 0.7)' : (note.is_pinned ? 'rgba(248, 250, 252, 0.9)' : '#ffffff'),
+                    border: `1px solid ${isDone ? '#e2e8f0' : 'rgba(226, 232, 240, 0.9)'}`,
+                    borderRadius: '12px',
+                    padding: '8px 12px',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
-                    gap: '8px',
-                    minHeight: '36px',
-                    borderBottom: isLast ? 'none' : '1px solid rgba(241, 245, 249, 1)',
-                    background: note.is_pinned ? 'rgba(248, 250, 252, 0.6)' : '#ffffff',
-                    transition: 'background 0.15s ease',
-                    opacity: isRecentlyCompleted ? 0.6 : 1
+                    gap: '10px',
+                    minHeight: '40px',
+                    boxShadow: isDone ? 'none' : '0 2px 5px rgba(0, 0, 0, 0.02)',
+                    opacity: isDone ? 0.6 : 1,
+                    transition: 'all 0.2s ease'
                   }}
-                  className="hover-scale-mini note-row-hover-surface"
+                  className="hover-scale-mini"
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: 0 }}>
                     {/* 1-Tap Apple Checkbox */}
                     <button
                       type="button"
@@ -1441,7 +1438,7 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
                         border: 'none',
                         color: isDone ? '#34a853' : '#94a3b8',
                         cursor: 'pointer',
-                        padding: 0,
+                        padding: '2px',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -1450,112 +1447,120 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
                       title={isDone ? 'Als offen markieren' : 'Abhaken'}
                     >
                       {isDone ? (
-                        <CheckCircle2 size={17} color="#34a853" />
+                        <CheckCircle2 size={18} color="#34a853" />
                       ) : (
-                        <Circle size={17} color="#94a3b8" />
+                        <Circle size={18} color="#94a3b8" />
                       )}
                     </button>
 
-                    <div style={{
-                      flex: 1,
-                      minWidth: 0,
-                      fontSize: '0.82rem',
+                    <span style={{
+                      fontSize: '0.84rem',
                       color: isDone ? '#94a3b8' : '#0f172a',
                       textDecoration: isDone ? 'line-through' : 'none',
-                      fontWeight: note.is_pinned ? 700 : 550,
+                      fontWeight: isDone ? 500 : (note.is_pinned ? 700 : 650),
                       whiteSpace: 'nowrap',
                       overflow: 'hidden',
                       textOverflow: 'ellipsis'
                     }}>
                       {formatCleanNoteContent(note.content, note.student_name)}
-                    </div>
+                    </span>
 
-                    {/* Subtle Badges Flow */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
-                      {note.student_name && (
-                        <span style={{ fontSize: '0.62rem', color: '#166534', fontWeight: 750, background: '#e6f4ea', border: '1px solid #bbf7d0', padding: '1.5px 6px', borderRadius: '5px', display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
-                          <User size={8} />
-                          {maskStudentName(note.student_name)}
+                    {/* Student Badge */}
+                    {note.student_name && (
+                      <span style={{
+                        fontSize: '0.66rem',
+                        color: '#166534',
+                        fontWeight: 750,
+                        background: '#e6f4ea',
+                        border: '1px solid #bbf7d0',
+                        padding: '2px 7px',
+                        borderRadius: '6px',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '3px',
+                        flexShrink: 0
+                      }}>
+                        <User size={8} />
+                        {maskStudentName(note.student_name)}
+                      </span>
+                    )}
+
+                    {/* Room Badge */}
+                    {isRoomItem && (
+                      <span style={{
+                        fontSize: '0.64rem',
+                        fontWeight: 750,
+                        padding: '2px 6px',
+                        borderRadius: '6px',
+                        background: '#fee2e2',
+                        color: '#991b1b',
+                        border: '1px solid #fecaca',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '3px',
+                        flexShrink: 0
+                      }}>
+                        <DoorOpen size={8.5} color="#dc2626" />
+                        <span>{detectedRoom || 'Raum'}</span>
+                      </span>
+                    )}
+
+                    {/* Other Tags */}
+                    {note.tags && note.tags.filter(t => {
+                      const clean = t.replace(/^#/, '').toLowerCase();
+                      if (clean === 'todo' || clean === 'to-do') return false;
+                      if (isRoomItem && (clean === 'raum' || (detectedRoom && clean === detectedRoom.toLowerCase()))) return false;
+                      return true;
+                    }).slice(0, 1).map(tag => {
+                      const style = getTagBadgeStyle(tag);
+                      return (
+                        <span
+                          key={tag}
+                          style={{
+                            fontSize: '0.64rem',
+                            fontWeight: 750,
+                            padding: '2px 6px',
+                            borderRadius: '6px',
+                            background: style.bg,
+                            color: style.color,
+                            border: `1px solid ${style.border}`,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '3px',
+                            flexShrink: 0
+                          }}
+                        >
+                          {renderMonochromeTagIcon(style.iconName, 8, style.color)}
+                          <span>{style.label || tag.replace(/^#/, '')}</span>
                         </span>
-                      )}
-
-                      {/* Room Badge */}
-                      {isRoomItem && (
-                        <span style={{
-                          fontSize: '0.62rem',
-                          fontWeight: 750,
-                          padding: '1.5px 6px',
-                          borderRadius: '5px',
-                          background: '#fee2e2',
-                          color: '#991b1b',
-                          border: '1px solid #fecaca',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '2px'
-                        }}>
-                          <DoorOpen size={8} color="#dc2626" />
-                          <span>{detectedRoom || 'Raum'}</span>
-                        </span>
-                      )}
-
-                      {/* Other Tags */}
-                      {note.tags && note.tags.filter(t => {
-                        const clean = t.replace(/^#/, '').toLowerCase();
-                        if (clean === 'todo' || clean === 'to-do') return false;
-                        if (isRoomItem && (clean === 'raum' || (detectedRoom && clean === detectedRoom.toLowerCase()))) return false;
-                        return true;
-                      }).slice(0, 1).map(tag => {
-                        const style = getTagBadgeStyle(tag);
-                        return (
-                          <span
-                            key={tag}
-                            style={{
-                              fontSize: '0.62rem',
-                              fontWeight: 750,
-                              padding: '1.5px 6px',
-                              borderRadius: '5px',
-                              background: style.bg,
-                              color: style.color,
-                              border: `1px solid ${style.border}`,
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '2px'
-                            }}
-                          >
-                            {renderMonochromeTagIcon(style.iconName, 8, style.color)}
-                            <span>{style.label || tag.replace(/^#/, '')}</span>
-                          </span>
-                        );
-                      })}
-                    </div>
+                      );
+                    })}
                   </div>
 
-                  {/* Actions on hover */}
-                  <div
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '2px',
-                      flexShrink: 0,
-                      opacity: note.is_pinned ? 1 : 0.4,
-                      transition: 'opacity 0.15s ease'
-                    }}
-                    className="hover-reveal-actions"
-                  >
-                    <button
-                      type="button"
-                      onClick={() => togglePin(note.id)}
-                      title={note.is_pinned ? 'Lösen' : 'Anpinnen'}
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        color: note.is_pinned ? '#0f172a' : '#94a3b8',
-                        cursor: 'pointer',
-                        padding: '3px'
-                      }}
-                    >
-                      <Pin size={11} />
-                    </button>
+                  {/* Actions */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '2px', flexShrink: 0 }}>
+                    {note.is_pinned && (
+                      <button
+                        type="button"
+                        onClick={() => togglePin(note.id)}
+                        title="Lösen"
+                        style={{
+                          border: 'none',
+                          background: 'transparent',
+                          color: '#64748b',
+                          cursor: 'pointer',
+                          padding: '4px',
+                          borderRadius: '6px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flexShrink: 0
+                        }}
+                        className="hover-scale-mini"
+                      >
+                        <Pin size={12} />
+                      </button>
+                    )}
                     <button
                       type="button"
                       onClick={() => {
@@ -1564,14 +1569,21 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
                       }}
                       title="Löschen"
                       style={{
-                        background: 'none',
                         border: 'none',
-                        color: '#94a3b8',
+                        background: 'transparent',
+                        color: '#cbd5e1',
                         cursor: 'pointer',
-                        padding: '3px'
+                        padding: '4px',
+                        borderRadius: '6px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0,
+                        transition: 'color 0.15s ease'
                       }}
+                      className="hover-scale-mini"
                     >
-                      <Trash2 size={11} />
+                      <Trash2 size={13} />
                     </button>
                   </div>
                 </div>
@@ -1579,33 +1591,49 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
             })}
           </div>
 
-          {/* SÄULE 4: Subtiler Überlauf-Indikator mit Apple Quick-Peek Trigger */}
+          {/* SÄULE 4: Moderner Überlauf-Indikator mit Apple Quick-Peek Trigger */}
           {remainingCount > 0 && (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', paddingTop: '2px' }}>
               <button
                 type="button"
                 onClick={() => setShowTodayQuickPeek(prev => !prev)}
                 style={{
-                  background: showTodayQuickPeek ? '#0f172a' : '#f1f5f9',
-                  border: '1px solid #e2e8f0',
-                  color: showTodayQuickPeek ? '#ffffff' : '#334155',
+                  background: showTodayQuickPeek ? '#f1f5f9' : '#ffffff',
+                  border: `1px solid ${showTodayQuickPeek ? '#cbd5e1' : 'rgba(226, 232, 240, 0.9)'}`,
+                  color: showTodayQuickPeek ? '#0f172a' : '#475569',
                   borderRadius: '100px',
-                  padding: '3px 10px',
-                  fontSize: '0.66rem',
-                  fontWeight: 750,
+                  padding: '4px 12px',
+                  fontSize: '0.72rem',
+                  fontWeight: 650,
                   cursor: 'pointer',
                   display: 'inline-flex',
                   alignItems: 'center',
-                  gap: '5px',
-                  boxShadow: '0 1px 2px rgba(0,0,0,0.02)',
-                  transition: 'all 0.15s cubic-bezier(0.16, 1, 0.3, 1)'
+                  gap: '6px',
+                  boxShadow: showTodayQuickPeek ? 'none' : '0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02)',
+                  transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
                 }}
                 className="hover-scale-mini"
-                title="Schwebende Vorschau aller Notizen von heute öffnen"
+                title={showTodayQuickPeek ? 'Vorschau schließen' : 'Tages-Fahrplan öffnen'}
               >
-                <Calendar size={11} color={showTodayQuickPeek ? '#ffffff' : '#64748b'} />
-                <span>{todayNotes.length > 0 ? `Heute: Alle ${todayNotes.length} anzeigen` : `+ ${remainingCount} weitere`}</span>
-                <ChevronDown size={11} style={{ transform: showTodayQuickPeek ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s ease' }} />
+                <span style={{
+                  background: showTodayQuickPeek ? '#e2e8f0' : '#f1f5f9',
+                  color: '#0f172a',
+                  borderRadius: '100px',
+                  padding: '1px 6px',
+                  fontSize: '0.68rem',
+                  fontWeight: 750
+                }}>
+                  +{remainingCount}
+                </span>
+                <span>weitere</span>
+                <ChevronDown
+                  size={12}
+                  color={showTodayQuickPeek ? '#0f172a' : '#94a3b8'}
+                  style={{
+                    transform: showTodayQuickPeek ? 'rotate(180deg)' : 'none',
+                    transition: 'transform 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
+                  }}
+                />
               </button>
             </div>
           )}

@@ -211,7 +211,7 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
           {activeTab === 'impressum' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
               <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#0f172a' }}>
-                Angaben gemäß § 5 DDG (Digitale-Dienste-Gesetz) &amp; § 18 Abs. 2 MStV
+                Angaben gemäß § 5 DDG (DE), § 5 ECG / § 25 MedienG (AT) &amp; Art. 3 Abs. 1 lit. s UWG (CH)
               </h4>
 
               <div style={{ background: '#fafbfc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '18px' }}>
@@ -236,12 +236,14 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
               </div>
 
               <div>
-                <strong style={{ color: '#0f172a' }}>Umsatzsteuer &amp; Steuerliche Einstufung (§ 5 Abs. 1 Nr. 6 DDG):</strong><br />
-                Umsatzsteuerbefreit gemäß <strong>§ 19 UStG (Kleinunternehmerregelung)</strong>. Es wird keine Umsatzsteuer erhoben oder ausgewiesen.
+                <strong style={{ color: '#0f172a' }}>Umsatzsteuer &amp; Steuerliche Einstufung (§ 5 Abs. 1 Nr. 6 DDG / § 6 UStG AT / Art. 8 MWSTG CH):</strong><br />
+                - <strong>Deutschland:</strong> Umsatzsteuerbefreit gemäß <strong>§ 19 UStG (Kleinunternehmerregelung)</strong>. Es wird keine Umsatzsteuer erhoben oder ausgewiesen.<br />
+                - <strong>Österreich:</strong> Umsatzsteuerbefreit gemäß <strong>§ 6 Abs. 1 Z 27 UStG 1994 (Kleinunternehmerregelung)</strong>.<br />
+                - <strong>Schweiz:</strong> Leistungsort Schweiz gemäß <strong>Art. 8 Abs. 1 MWSTG</strong> (nicht im Inland steuerbar).
               </div>
 
               <div>
-                <strong style={{ color: '#0f172a' }}>Verantwortlich für den redaktionellen Inhalt gemäß § 18 Abs. 2 MStV:</strong><br />
+                <strong style={{ color: '#0f172a' }}>Verantwortlich für den redaktionellen Inhalt gemäß § 18 Abs. 2 MStV (DE) / § 25 MedienG (AT):</strong><br />
                 Patrick Huber, Karl-Fürstenberg-Str. 59, 79618 Rheinfelden (Baden)
               </div>
 
@@ -252,7 +254,7 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
               </div>
 
               <div style={{ fontSize: '0.82rem', color: '#64748b', lineHeight: 1.5, borderTop: '1px solid #e2e8f0', paddingTop: '12px' }}>
-                <strong>Haftung für Inhalte &amp; Links:</strong> Als Diensteanbieter sind wir gemäß § 7 Abs. 1 DDG für eigene Inhalte auf diesen Seiten nach den allgemeinen Gesetzen verantwortlich. Nach §§ 8 bis 10 DDG sind wir als Diensteanbieter jedoch nicht verpflichtet, übermittelte oder gespeicherte fremde Informationen zu überwachen. Verpflichtungen zur Entfernung oder Sperrung der Nutzung von Informationen nach den allgemeinen Gesetzen bleiben hiervon unberührt.
+                <strong>Haftung für Inhalte &amp; Links:</strong> Als Diensteanbieter sind wir gemäß § 7 Abs. 1 DDG / § 16 ECG für eigene Inhalte auf diesen Seiten nach den allgemeinen Gesetzen verantwortlich. Nach §§ 8 bis 10 DDG sind wir als Diensteanbieter jedoch nicht verpflichtet, übermittelte oder gespeicherte fremde Informationen zu überwachen. Verpflichtungen zur Entfernung oder Sperrung der Nutzung von Informationen nach den allgemeinen Gesetzen bleiben hiervon unberührt.
               </div>
             </div>
           )}
@@ -264,17 +266,17 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
               </h4>
 
               <div>
-                <strong style={{ color: '#0f172a' }}>1. Allgemeine Hinweise & Verantwortlicher</strong><br />
+                <strong style={{ color: '#0f172a' }}>1. Allgemeine Hinweise &amp; Verantwortlicher</strong><br />
                 Der Schutz Ihrer Daten hat für <strong>Campus-Groovelab</strong> höchste Priorität. Verantwortlich im Sinne der DSGVO, des Schweizer nDSG und des österreichischen DSG ist Patrick Huber (Kontaktdaten siehe Impressum).
               </div>
 
               <div>
-                <strong style={{ color: '#0f172a' }}>2. Grundsatz der Datenminimierung & Kinderschutz (Art. 5 DSGVO)</strong><br />
+                <strong style={{ color: '#0f172a' }}>2. Grundsatz der Datenminimierung &amp; Kinderschutz (Art. 5 DSGVO / Art. 6 nDSG)</strong><br />
                 Auf Campus-Groovelab werden keinerlei Bank-, SEPA-, Vertragsdaten oder E-Mail-Adressen von Schülern gespeichert. Schülernamen werden im Lehrer-Dashboard stets anonymisiert im Format "Vorname + N." (z. B. "Max M.") dargestellt. Im Schüler-Dashboard werden ausschließlich generische Bezeichnungen (z. B. "Mein Hausaufgabenheft") verwendet.
               </div>
 
               <div>
-                <strong style={{ color: '#0f172a' }}>3. Backend-for-Frontend (BFF) Architektur &amp; JWE-Session-Cookies (§ 25 Abs. 2 Nr. 2 TDDDG)</strong><br />
+                <strong style={{ color: '#0f172a' }}>3. Backend-for-Frontend (BFF) Architektur &amp; JWE-Session-Cookies (§ 25 Abs. 2 Nr. 2 TDDDG / § 165 TKG)</strong><br />
                 Zur Gewährleistung des Banking-Goldstandards setzt Campus-Groovelab eine <strong>Backend-for-Frontend (BFF) Gateway-Architektur</strong> ein. Der Browser speichert zu <strong>0% Zugriffs- oder Refresh-Tokens</strong> im ungeschützten Speicher (LocalStorage / SessionStorage). Stattdessen wird die Authentifizierung über ein rein serverseitig entschlüsselbares, mit <strong>AES-256-GCM (A256GCM)</strong> verschlüsseltes Session-Cookie (<code style={{ background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px' }}>__Host-session</code>) mit den Schutzattributen <code style={{ background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px' }}>HttpOnly</code>, <code style={{ background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px' }}>Secure</code>, <code style={{ background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px' }}>SameSite=Strict</code> und <code style={{ background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px' }}>Path=/</code> verwaltet.<br />
                 - <strong>Proaktiver Silent Refresh:</strong> Tokens werden 60 Sekunden vor Ablauf im Hintergrund auf dem Server ausgetauscht, ohne dass Unterrichtssitzungen unterbrochen werden.<br />
                 - <strong>Fail-Closed Anti-CSRF Guard:</strong> Alle schreibenden Anfragen werden serverseitig über <code style={{ background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px' }}>Sec-Fetch-Site</code> und strikte Origin/Host-Validierung vor Cross-Site Request Forgery und Host-Header-Poisoning geschützt.<br />
@@ -287,17 +289,18 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
               </div>
 
               <div>
-                <strong style={{ color: '#0f172a' }}>5. Zero-Trust Session-Leasing, IndexedDB Audio-Tresor &amp; Hardware-Sicherheit</strong><br />
-                Audiodaten aus der In-App Loopstation und dem Meisterwerk-Protokoll werden verschlüsselt im EU-Cloud-Speicher abgelegt und sind durch mandanten- und schülerspezifische Storage-RLS-Policies geschützt. Nach dem Löschen einer Aufnahme wird die Datei physisch und vollständig aus dem Cloud-Speicher entfernt. Für Offline-Übephasen in Proberäumen steht ein lokaler, hardware-geschützter <strong>IndexedDB Audio-Tresor (<code style={{ background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px' }}>groovelab_audio_vault</code>)</strong> zur Verfügung. PINs und Zugangsschlüssel werden mit <strong>OWASP- und BSI-konformem PBKDF2 Zero-Knowledge Hashing (100.000 SHA-512 / SHA-256 Runden)</strong> verarbeitet. Das integrierte <strong>Zero-Trust Session-Leasing</strong> ermöglicht Schulleitung und Lehrkräften jederzeit den 1-Click Remote-Logout aktiver Geräte. Bei Verlassen des Moduls oder Tab-Wechsel schaltet ein automatischer Guard alle Mikrofon-Tracks (<code style={{ background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px' }}>MediaStreamTrack.stop()</code>) ab.
+                <strong style={{ color: '#0f172a' }}>5. Zero-Trust Session-Leasing, IndexedDB Audio-Tresor, Hardware-Sicherheit &amp; Ausschluss von Stimmbiometrie</strong><br />
+                Audiodaten aus der In-App Loopstation und dem Meisterwerk-Protokoll werden verschlüsselt im EU-Cloud-Speicher abgelegt und sind durch mandanten- und schülerspezifische Storage-RLS-Policies geschützt. Nach dem Löschen einer Aufnahme wird die Datei physisch und vollständig aus dem Cloud-Speicher entfernt. Für Offline-Übephasen in Proberäumen steht ein lokaler, hardware-geschützter <strong>IndexedDB Audio-Tresor (<code style={{ background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px' }}>groovelab_audio_vault</code>)</strong> zur Verfügung. PINs und Zugangsschlüssel werden mit <strong>OWASP- und BSI-konformem PBKDF2 Zero-Knowledge Hashing (100.000 SHA-512 / SHA-256 Runden)</strong> verarbeitet. Das integrierte <strong>Zero-Trust Session-Leasing</strong> ermöglicht Schulleitung und Lehrkräften jederzeit den 1-Click Remote-Logout aktiver Geräte. Bei Verlassen des Moduls oder Tab-Wechsel schaltet ein automatischer Guard alle Mikrofon-Tracks (<code style={{ background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px' }}>MediaStreamTrack.stop()</code>) ab.<br />
+                <strong>⚡ Strikter Ausschluss von Stimmbiometrie (Art. 9 DSGVO / Art. 6 nDSG):</strong> Audiodaten dienen ausschließlich dem didaktischen Playback und dem häuslichen Üben (Art. 6 Abs. 1 lit. b DSGVO / Art. 6 nDSG). Es werden zu keinem Zeitpunkt biometrische Stimm-, Sprecher- oder Verhaltensmusteranalysen (Art. 9 DSGVO) durchgeführt.
               </div>
 
               <div>
                 <strong style={{ color: '#0f172a' }}>6. Hosting in ISO 27001-zertifizierten Rechenzentren &amp; Stündliche Backups (Art. 28 &amp; 32 DSGVO)</strong><br />
-                Das Hosting von App, BFF-Gateway und PostgreSQL-Datenbank erfolgt zu 100% in ISO 27001-zertifizierten deutschen Rechenzentren (Hetzner Online GmbH, Falkenstein/Nürnberg, Deutschland) mit Auftragsverarbeitungsverträgen (AVV) nach Art. 28 DSGVO. Sämtliche Datenbankbestände werden durch ein stündlich automatisiertes, verschlüsseltes Backup-System auf dedizierten Volumes vor Datenverlust geschützt.
+                Das Hosting von App, BFF-Gateway und PostgreSQL-Datenbank erfolgt zu 100% in ISO 27001-zertifizierten deutschen Rechenzentren (Hetzner Online GmbH, Falkenstein/Nürnberg, Deutschland) mit Auftragsverarbeitungsverträgen (AVV) nach Art. 28 DSGVO bzw. Art. 9 nDSG. Sämtliche Datenbankbestände werden durch ein stündlich automatisiertes, verschlüsseltes Backup-System auf dedizierten Volumes vor Datenverlust geschützt.
               </div>
 
               <div>
-                <strong style={{ color: '#0f172a' }}>7. Betroffenenrechte (Art. 15 bis 22 DSGVO)</strong><br />
+                <strong style={{ color: '#0f172a' }}>7. Betroffenenrechte (Art. 15 bis 22 DSGVO / Art. 25 ff. nDSG)</strong><br />
                 Sie haben das Recht auf Auskunft (Art. 15), Berichtigung (Art. 16), Löschung (Art. 17), Einschränkung (Art. 18) sowie Beschwerde bei der zuständigen Datenschutzaufsichtsbehörde (BfDI / DSB / EDÖB).
               </div>
             </div>
@@ -316,10 +319,12 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
                 </span>
 
                 <div>
-                  <strong style={{ color: '#0f172a' }}>1. Vertragsgegenstand, Rechtsnatur &amp; Datenschutz (SaaS-Mietvertrag)</strong><br />
-                  (1) Diese Bestimmungen regeln die Bereitstellung der cloudbasierten Schulmanagement- und Übeplattform <strong>Campus-Groovelab</strong> durch den Betreiber Patrick Huber (Einzelunternehmer). Der Vertrag qualifiziert sich rechtlich als <strong>Software-as-a-Service (SaaS)-Mietvertrag gemäß § 535 ff. BGB</strong> über die Bereitstellung von Cloud-Infrastruktur, Datenbank-Hosting, Datensicherung und Systemwartung.<br />
-                  (2) Soweit im Rahmen der Bereitstellung personenbezogene Daten verarbeitet werden, gilt ergänzend die Vereinbarung zur Auftragsverarbeitung (AVV gemäß Art. 28 DSGVO bzw. Art. 9 nDSG) als integraler Vertragsbestandteil.<br />
-                  (3) Der Betreiber gewährleistet eine Verfügbarkeit der Cloud-Infrastruktur von 99,5 % im Jahresmittel (ausgenommen angekündigte Wartungsarbeiten außerhalb der Kernunterrichtszeiten).
+                  <strong style={{ color: '#0f172a' }}>1. Vertragsgegenstand, Rechtsnatur, Pädagogischer Add-On-Status &amp; Notfall-Klausel (SaaS-Mietvertrag)</strong><br />
+                  (1) Diese Bestimmungen regeln die Bereitstellung der cloudbasierten Schulmanagement- und Übeplattform <strong>Campus-Groovelab</strong> durch den Betreiber Patrick Huber (Einzelunternehmer). Der Vertrag qualifiziert sich rechtlich als <strong>Software-as-a-Service (SaaS)-Mietvertrag gemäß § 535 ff. BGB (DE) / §§ 1090 ff. ABGB (AT) / Art. 253 ff. OR (CH)</strong> über die Bereitstellung von Cloud-Infrastruktur, Datenbank-Hosting, Datensicherung und Systemwartung.<br />
+                  (2) <strong>Pädagogischer Add-On-Charakter:</strong> Campus-Groovelab ist ein didaktisches Zusatzwerkzeug zur Unterstützung des Fachunterrichts und des häuslichen Übens. Die Plattform ersetzt kein behördliches oder amtliches Schulverwaltungssystem (wie ASV, WinSchool oder Musikschul-Manager).<br />
+                  (3) <strong>Notfall- &amp; Nachrangigkeitsklausel:</strong> Die Musikschule stellt sicher, dass der reguläre Schulbetrieb und die primäre Notfallkommunikation (Telefon, E-Mail, herkömmliche Vertretungspläne) unabhängig von der Plattform gewährleistet bleiben. Bei kurzzeitigen Serverstörungen, Netzausfällen oder Wartungsfenstern findet der Schulunterricht regulär statt. Eine Haftung des Betreibers für ausgefallene Unterrichtsstunden, verpasste Bandproben oder Honorarausfälle ist ausgeschlossen.<br />
+                  (4) Soweit im Rahmen der Bereitstellung personenbezogene Daten verarbeitet werden, gilt ergänzend die Vereinbarung zur Auftragsverarbeitung (AVV gemäß Art. 28 DSGVO bzw. Art. 9 nDSG) als integraler Vertragsbestandteil.<br />
+                  (5) Der Betreiber gewährleistet eine Verfügbarkeit der Cloud-Infrastruktur von 99,5 % im Jahresmittel (ausgenommen angekündigte Wartungsarbeiten außerhalb der Kernunterrichtszeiten).
                 </div>
 
                 <div>
@@ -329,11 +334,11 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
                   - <strong>Cloud- &amp; Datenbank-Hosting: Modul GrooveLab:</strong> 9,90 € / Mo. (DE/AT) bzw. CHF 14.90 / Mo. (CH) (Server-Hosting, Datenbank &amp; Webspace-Flatrate per Musikschule).<br />
                   - <strong>Kombi-Vorteilsrabatt (Infrastruktur-Bündel):</strong> -4,90 € / Mo. (DE/AT) bzw. -4.90 CHF / Mo. (CH) bei gemeinsamer Buchung beider Module (Bündelpreis: 19,90 € / Mo. bzw. CHF 29.90 / Mo.).<br />
                   - <strong>Service- &amp; Administrationspauschale:</strong> 0,49 € / Mo. (DE/AT) bzw. CHF 1.00 / Mo. (CH) je aktive Lehrkraft. Verwaltungs- und Sekretariats-User (<code style={{ background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px' }}>admin</code> und <code style={{ background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px' }}>secretary</code>) sind dauerhaft inklusive (0,00 € / CHF 0.00).<br />
-                  - <strong>Basis-Bereitstellung:</strong> 0,09 € / Mo. (DE/AT) bzw. CHF 0.20 / Mo. (CH) je Schüler (QR-Landingpage, Stundenplan-, Termin-, Raumänderungs-Sync sowie DSGVO-Datensatz-Hosting).<br />
+                  - <strong>Basis-Bereitstellung:</strong> 0,09 € / Mo. (DE/AT) bzw. CHF 0.20 / Mo. (CH) je Schüler (QR-Landingpage, Stundenplan-, Termin-, Raumänderungs-Sync sowie DSGVO/nDSG-Hosting).<br />
                   - <strong>Cloud- &amp; Modul-Bereitstellung Campus:</strong> 0,49 € / Mo. (DE/AT) bzw. CHF 1.00 / Mo. (CH) je aktiver Schüler (interaktive App-Nutzung: Übe-Timer, Loopstation, Meisterwerk-Protokoll).<br />
                   - <strong>Cloud- &amp; Modul-Bereitstellung GrooveLab:</strong> 0,49 € / Mo. (DE/AT) bzw. CHF 1.00 / Mo. (CH) je aktiver Schüler (interaktive Band-Nutzung: Songs, Repertoire, Live Lab; immer zu 100 % von der Musikschule übernommen).<br />
                   - <strong>Sammelzahler vs. Direktabrechnung:</strong> GrooveLab-Aktivierungen werden immer zu 100 % von der Musikschule getragen. Für das Campus-Modul kann wahlweise Direktabrechnung mit Eltern vereinbart werden. Schüler-Direktabrechnungen werden ausnahmslos als einmaliger Jahresbeitrag (5,88 € in DE/AT bzw. CHF 12.00 in CH pro Schuljahr bzw. 4,80 € / CHF 9.60 bei Schulbezuschussung) abgerechnet – niemals monatlich.<br />
-                  - <strong>Steuerliche Hinweise:</strong> In Deutschland und Österreich gemäß § 19 UStG umsatzsteuerbefreit (Kleinunternehmerregelung). Für die Schweiz gilt Leistungsort Schweiz (nicht im Inland steuerbar gem. Art. 8 Abs. 1 MWSTG).
+                  - <strong>Steuerliche Hinweise:</strong> In Deutschland und Österreich gemäß § 19 UStG (DE) bzw. § 6 Abs. 1 Z 27 UStG (AT) umsatzsteuerbefreit (Kleinunternehmerregelung). Für die Schweiz gilt Leistungsort Schweiz (nicht im Inland steuerbar gem. Art. 8 Abs. 1 MWSTG).
                 </div>
 
                 <div>
@@ -345,7 +350,7 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
                 </div>
 
                 <div>
-                  <strong style={{ color: '#0f172a' }}>4. Urheberrecht &amp; Verbot geschützter Notenvervielfältigung (§ 60a UrhG, Art. 6 DSA)</strong><br />
+                  <strong style={{ color: '#0f172a' }}>4. Urheberrecht &amp; Verbot geschützter Notenvervielfältigung (§ 60a UrhG DE / § 42f UrhG AT / Art. 19 URG CH / Art. 6 DSA)</strong><br />
                   Die Musikschule und ihre Lehrkräfte verpflichten sich, keine urheberrechtlich geschützten Notensätze, Gesamtausgaben, Leadsheets oder Play-Along-Aufnahmen Dritter ohne Lizenz hochzuladen (§ 60a Abs. 3 Nr. 2 UrhG Notenvervielfältigungsverbot). Der Betreiber haftet als technischer Host-Provider nach Art. 6 DSA erst ab Kenntnis (Notice-and-Takedown).
                 </div>
 
@@ -355,8 +360,8 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
                 </div>
 
                 <div>
-                  <strong style={{ color: '#0f172a' }}>6. B2B-Gewährleistung &amp; Haftungsbegrenzung (§ 536a BGB)</strong><br />
-                  Gegenüber Unternehmern und juristischen Personen des öffentlichen Rechts wird die verschuldensunabhängige Schadensersatzhaftung des Betreibers für anfängliche Mängel (§ 536a Abs. 1 Alt. 1 BGB) ausdrücklich ausgeschlossen. Bei einfacher Fahrlässigkeit haftet der Betreiber nur bei Verletzung wesentlicher Vertragspflichten (Kardinalpflichten) begrenzt auf den vertragstypisch vorhersehbaren Schaden.
+                  <strong style={{ color: '#0f172a' }}>6. B2B-Gewährleistung &amp; Haftungsbegrenzung (§ 536a BGB DE / § 1096 ABGB AT / Art. 259a OR CH)</strong><br />
+                  Gegenüber Unternehmern und juristischen Personen des öffentlichen Rechts wird die verschuldensunabhängige Schadensersatzhaftung des Betreibers für anfängliche Mängel (§ 536a Abs. 1 Alt. 1 BGB [DE] / § 1096 ABGB [AT] / Art. 259a OR [CH]) ausdrücklich ausgeschlossen. Bei einfacher Fahrlässigkeit haftet der Betreiber nur bei Verletzung wesentlicher Vertragspflichten (Kardinalpflichten) begrenzt auf den vertragstypisch vorhersehbaren Schaden.
                 </div>
               </div>
 
