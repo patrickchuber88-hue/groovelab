@@ -272,11 +272,15 @@ export const notesService = {
 
     const detectedVisibility = (detectedType === 'room_issue') ? 'school_admin' : (params.visibility || 'private');
 
+    const roomTag = rooms.length > 0 ? `#${rooms[0]}` : null;
+    const initialTags = (params.tags || []).filter(t => roomTag ? t.toLowerCase() !== '#raum' : true);
+
     const combinedTags = Array.from(new Set([
       ...tags,
-      ...(params.tags || []),
+      ...initialTags,
+      ...(roomTag ? [roomTag] : []),
       ...(isTodo ? ['todo'] : []),
-      ...(detectedType === 'room_issue' ? ['#Mangel'] : [])
+      ...(detectedType === 'room_issue' && !tags.some(t => t.toLowerCase() === '#mangel') ? ['#Mangel'] : [])
     ]));
 
     const newNote: UserNote = {
@@ -472,8 +476,31 @@ export const notesService = {
 
     // If content changed, re-parse smart tags
     if (updates.content !== undefined) {
-      const { tags, isTodo } = parseSmartTags(updates.content);
-      updatedNote.tags = Array.from(new Set([...tags, ...(isTodo ? ['todo'] : [])]));
+      const { studentMentions, tags, rooms, isTodo } = parseSmartTags(updates.content);
+      const roomTag = rooms.length > 0 ? `#${rooms[0]}` : null;
+      const preservedTags = (existing.tags || []).filter(t => roomTag ? t.toLowerCase() !== '#raum' : true);
+
+      updatedNote.tags = Array.from(new Set([
+        ...preservedTags,
+        ...tags,
+        ...(roomTag ? [roomTag] : []),
+        ...(isTodo ? ['todo'] : [])
+      ]));
+
+      if (rooms.length > 0) {
+        updatedNote.room_id = rooms[0];
+        if (updatedNote.note_type === 'scratchpad') {
+          updatedNote.note_type = 'room_issue';
+        }
+      }
+
+      if (studentMentions.length > 0 && !updatedNote.student_name) {
+        updatedNote.student_name = maskStudentName(studentMentions[0]);
+        if (updatedNote.note_type === 'scratchpad') {
+          updatedNote.note_type = 'student_note';
+        }
+      }
+
       if (isTodo && updatedNote.note_type === 'scratchpad') {
         updatedNote.note_type = 'todo';
       }
@@ -486,6 +513,9 @@ export const notesService = {
     try {
       await supabase.from('user_notes').update({
         ...updates,
+        room_id: updatedNote.room_id,
+        student_name: updatedNote.student_name,
+        note_type: updatedNote.note_type,
         tags: updatedNote.tags,
         updated_at: updatedNote.updated_at
       }).eq('id', noteId);

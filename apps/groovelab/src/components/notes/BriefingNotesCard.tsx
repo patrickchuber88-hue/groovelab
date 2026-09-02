@@ -217,14 +217,50 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [showTresorLockPrompt, setShowTresorLockPrompt] = useState(false);
+  const [recentlyCompletedIds, setRecentlyCompletedIds] = useState<string[]>([]);
+  const [showTodayQuickPeek, setShowTodayQuickPeek] = useState(false);
 
-  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const textareaRef = useRef<HTMLInputElement | HTMLTextAreaElement | null>(null);
+  const quickPeekRef = useRef<HTMLDivElement | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<any>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
   const hasTresor = checkIsAudioTresorActive(user);
+
+  // Close Quick-Peek on Click-Outside or Escape
+  useEffect(() => {
+    if (!showTodayQuickPeek) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (quickPeekRef.current && !quickPeekRef.current.contains(e.target as Node)) {
+        setShowTodayQuickPeek(false);
+      }
+    };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setShowTodayQuickPeek(false);
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [showTodayQuickPeek]);
+
+  // 1.5s Micro-Interaction for Checkbox completion
+  const handleWidgetToggleComplete = (noteId: string, currentCompleted: boolean) => {
+    if (!currentCompleted) {
+      setRecentlyCompletedIds(prev => [...prev, noteId]);
+      setTimeout(async () => {
+        await toggleCompleteTodo(noteId);
+        setRecentlyCompletedIds(prev => prev.filter(id => id !== noteId));
+      }, 1500);
+    } else {
+      toggleCompleteTodo(noteId);
+      setRecentlyCompletedIds(prev => prev.filter(id => id !== noteId));
+    }
+  };
 
   // WebAudio Metronome Control
   const toggleMetronome = (bpm: number) => {
@@ -414,14 +450,16 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
     let detectedRoomName: string | null = null;
 
     // 1. Check for combined format: !Instrument (Raum) or !Instrument or !Raum
-    const rawInstrumentRoomMatch = text.match(/!([A-Za-z0-9äöüÄÖÜß_#-\s]+?)(?:\s*\(([^)]+)\))?(?=[\s,;:\n]|$)/i);
+    const rawInstrumentRoomMatch = text.match(/!([A-Za-z0-9äöüÄÖÜß_-]+(?:\s+(?:\d+|Nebenraum|Studio|Saal|Keller|EG|OG\s*\d*))?)(?:\s*\(([^)]+)\))?/i);
     if (rawInstrumentRoomMatch) {
       const capturedName = rawInstrumentRoomMatch[1].trim();
       const capturedRoom = rawInstrumentRoomMatch[2] ? rawInstrumentRoomMatch[2].trim() : null;
+      const cleanCap = capturedName.toLowerCase();
+      const isRoomPrefix = cleanCap.startsWith('raum') || cleanCap.startsWith('saal') || cleanCap.startsWith('studio') || cleanCap.startsWith('keller') || cleanCap.startsWith('eg') || cleanCap.startsWith('og') || cleanCap.startsWith('konzertsaal');
+      const isRoomMatch = isRoomPrefix || (internalRooms || []).some((r: any) => (r.name || '').toLowerCase() === cleanCap);
       
-      const isRoomMatch = (internalRooms || []).some((r: any) => (r.name || '').toLowerCase() === capturedName.toLowerCase());
       if (isRoomMatch) {
-        detectedRoomName = capturedName;
+        detectedRoomName = capturedName.charAt(0).toUpperCase() + capturedName.slice(1);
       } else {
         detectedEquipmentName = capturedName;
         if (capturedRoom) {
@@ -799,12 +837,12 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
   };
 
   // Handle Input Change with Autocomplete Detection
-  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const val = e.target.value;
     setInputContent(val);
     adjustTextareaHeight();
 
-    const cursor = e.target.selectionStart || 0;
+    const cursor = (e.target as any).selectionStart || 0;
     const textBeforeCursor = val.slice(0, cursor);
     const lastWord = textBeforeCursor.split(/\s/).pop() || '';
 
@@ -885,17 +923,20 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
     const isRoomReport = isEquipmentReport || parsedIntent?.isRoomIssue || !!parsedIntent?.detectedRoomName;
     const authorFullName = `${user?.first_name || ''} ${user?.last_name || ''}`.trim() || 'Lehrkraft';
 
+    const finalRoom = parsedIntent?.detectedRoomName || (parsedIntent?.isRoomIssue ? 'Raum' : null);
+    const roomTag = parsedIntent?.detectedRoomName ? [`#${parsedIntent.detectedRoomName}`] : [];
+
     await createNote(textToSave || 'Audio-Memo', {
       studentId: studentToLink?.id || null,
       studentName: maskedStudentName,
-      roomId: parsedIntent?.detectedRoomName || (parsedIntent?.isRoomIssue ? 'Raum' : null),
+      roomId: finalRoom,
       authorName: authorFullName,
       audioUrl: extraAudioUrl || null,
       audioDurationSeconds: duration || null,
       dueDate: selectedDueDate || parsedIntent?.naturalDueDate || null,
       noteType: extraAudioUrl ? 'audio_memo' : isEquipmentReport ? 'room_issue' : isRoomReport ? 'room_issue' : parsedIntent?.isTodo ? 'todo' : studentToLink ? 'student_note' : 'scratchpad',
       visibility: isRoomReport ? 'school_admin' : 'private',
-      tags: isEquipmentReport ? ['#Ausstattung', '#Mangel'] : undefined
+      tags: isEquipmentReport ? ['#Ausstattung', '#Mangel', ...roomTag] : roomTag.length > 0 ? roomTag : undefined
     });
 
     setInputContent('');
@@ -998,14 +1039,17 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
     setIsRecordingAudio(false);
   };
 
-  // SINGLE FOCUS NOTE: Determine primary active note to show (prioritize pinned, then newest unarchived)
-  const focusNote = useMemo(() => {
-    const unarchivedNotes = notes.filter(n => !n.is_archived);
-    if (unarchivedNotes.length === 0) return null;
-    const pinned = unarchivedNotes.find(n => n.is_pinned);
-    if (pinned) return pinned;
-    return unarchivedNotes[0];
-  }, [notes]);
+  // Smart active notes & today calculation
+  const todayNotes = useMemo(() => {
+    const todayStr = new Date().toISOString().split('T')[0];
+    return notes.filter(n => {
+      if (n.is_archived) return false;
+      const createdToday = (n.created_at || '').startsWith(todayStr);
+      const dueToday = n.due_date === todayStr;
+      const isStudentToday = todayStudents.some(s => String(s.id) === String(n.student_id));
+      return createdToday || dueToday || isStudentToday;
+    });
+  }, [notes, todayStudents]);
 
   const activeNotesCount = useMemo(() => {
     return notes.filter(n => !n.is_archived).length;
@@ -1016,11 +1060,14 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
       background: '#ffffff',
       border: '1px solid rgba(226, 232, 240, 0.9)',
       borderRadius: '20px',
-      padding: '16px 18px',
+      padding: '12px 14px',
       boxShadow: '0 8px 24px -4px rgba(0, 0, 0, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.9)',
       display: 'flex',
       flexDirection: 'column',
-      gap: '10px',
+      justifyContent: 'space-between',
+      gap: '8px',
+      minHeight: '190px',
+      boxSizing: 'border-box',
       position: 'relative',
       fontFamily: "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif"
     }}>
@@ -1028,29 +1075,31 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
       {toastMessage && (
         <div style={{
           position: 'absolute',
-          top: '-12px',
-          right: '16px',
+          top: '-10px',
+          right: '14px',
           background: '#0f172a',
           color: '#ffffff',
-          padding: '5px 12px',
+          padding: '4px 10px',
           borderRadius: '100px',
-          fontSize: '0.72rem',
+          fontSize: '0.68rem',
           fontWeight: 700,
-          boxShadow: '0 6px 16px rgba(0, 0, 0, 0.15)',
+          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
           display: 'flex',
           alignItems: 'center',
-          gap: '5px',
+          gap: '4px',
           zIndex: 40
         }}>
-          <Check size={11} strokeWidth={3} />
+          <Check size={10} strokeWidth={3} />
           <span>{toastMessage}</span>
         </div>
       )}
 
-      {/* 1. Calm Apple Header Bar */}
+      {/* ========================================================================= */}
+      {/* 1. HEADER (Titel, Zähler, Board-Modal Button & Diktier-Mikrofon)         */}
+      {/* ========================================================================= */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ fontSize: '1.0rem', fontWeight: 800, color: '#0f172a', letterSpacing: '-0.02em', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <span style={{ fontSize: '0.92rem', fontWeight: 800, color: '#0f172a', letterSpacing: '-0.02em' }}>
             Notizen
           </span>
           {activeMetronomeBpm && (
@@ -1060,35 +1109,33 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
               gap: '4px',
               background: '#e6f4ea',
               color: '#166534',
-              padding: '2px 8px',
+              padding: '1px 6px',
               borderRadius: '100px',
-              fontSize: '0.66rem',
+              fontSize: '0.62rem',
               fontWeight: 800
             }}>
-              <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#34a853', animation: 'pulse 1s infinite' }} />
-              <span>{activeMetronomeBpm} BPM Klick</span>
+              <div style={{ width: '4px', height: '4px', borderRadius: '50%', background: '#34a853', animation: 'pulse 1s infinite' }} />
+              <span>{activeMetronomeBpm} BPM</span>
               <button
                 type="button"
                 onClick={stopMetronome}
                 style={{ background: 'none', border: 'none', color: '#166534', cursor: 'pointer', padding: 0, display: 'flex' }}
-                title="Metronom stoppen"
               >
-                <X size={10} />
+                <X size={9} />
               </button>
             </div>
           )}
         </div>
 
-        {/* Apple Action Cluster */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          {/* Prominent Apple Board Pill Button */}
+        {/* Action Cluster (Board) */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
           <button
             type="button"
             onClick={() => setShowBoardModal(true)}
             style={{
-              display: 'inline-flex',
+              display: 'flex',
               alignItems: 'center',
-              gap: '5px',
+              gap: '6px',
               background: '#f8fafc',
               color: '#0f172a',
               border: '1px solid #e2e8f0',
@@ -1097,21 +1144,20 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
               fontSize: '0.70rem',
               fontWeight: 750,
               cursor: 'pointer',
-              transition: 'all 0.15s ease',
-              boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
+              transition: 'all 0.15s ease'
             }}
             className="hover-scale-mini"
-            title="Vollwertiges Notizen-Board öffnen (Kanban, Archiv & Suche)"
+            title="Notizen-Board öffnen (⌘J)"
           >
             <Layers size={11} color="#64748b" />
             <span>Notizen-Board</span>
             {activeNotesCount > 0 && (
               <span style={{
                 background: '#ffffff',
-                color: '#475569',
+                color: '#0f172a',
                 borderRadius: '5px',
-                padding: '0px 4px',
-                fontSize: '0.64rem',
+                padding: '0.5px 5px',
+                fontSize: '0.62rem',
                 fontWeight: 800,
                 border: '1px solid #cbd5e1'
               }}>
@@ -1120,186 +1166,49 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
             )}
             <ArrowUpRight size={10} color="#94a3b8" />
           </button>
-
-          {/* Live Voice Dictation Button */}
-          <button
-            type="button"
-            onClick={handleToggleVoiceDictation}
-            title={isListening ? 'Diktat beenden' : 'Live Diktat (Sprache zu Text)'}
-            style={{
-              background: isListening ? '#0f172a' : '#f8fafc',
-              color: isListening ? '#ffffff' : '#64748b',
-              border: isListening ? '1px solid #0f172a' : '1px solid #e2e8f0',
-              borderRadius: '8px',
-              padding: '4px 7px',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px',
-              fontSize: '0.68rem',
-              fontWeight: 700,
-              transition: 'all 0.15s ease'
-            }}
-          >
-            <Mic size={12} color={isListening ? '#ffffff' : '#64748b'} />
-            {isListening && <span>Höre zu...</span>}
-          </button>
         </div>
       </div>
 
-      {/* Overdue / Due Today Attention Banner (if present) */}
-      {dueAlerts.length > 0 && (
-        <div style={{
-          background: '#fff1f2',
-          border: '1px solid #fecdd3',
-          borderRadius: '10px',
-          padding: '6px 10px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: '8px'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0, flex: 1 }}>
-            <AlertTriangle size={13} color="#e11d48" style={{ flexShrink: 0 }} />
-            <div style={{ minWidth: 0, flex: 1 }}>
-              <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#9f1239', letterSpacing: '0.01em' }}>
-                {dueAlerts.length === 1 ? '1 fällige Notiz' : `${dueAlerts.length} fällige Notizen`}
-              </div>
-              <div style={{ fontSize: '0.72rem', color: '#881337', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {dueAlerts[0].content}
-              </div>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={() => {
-              acknowledgeNote(dueAlerts[0].id);
-              showToast('✓ Als erledigt markiert');
-            }}
-            style={{
-              background: '#e11d48',
-              color: '#ffffff',
-              border: 'none',
-              borderRadius: '6px',
-              padding: '3px 7px',
-              fontSize: '0.65rem',
-              fontWeight: 750,
-              cursor: 'pointer',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '3px',
-              whiteSpace: 'nowrap',
-              flexShrink: 0
-            }}
-          >
-            <Check size={10} strokeWidth={3} />
-            <span>Erledigt</span>
-          </button>
-        </div>
-      )}
-
-      {/* 2. The Pure Paper Canvas (Zero Clutter Writing Surface) */}
+      {/* ========================================================================= */}
+      {/* 2. SÄULE 1: SCHLANKER 1-ZEILEN QUICK-CAPTURE INPUT (34px)                */}
+      {/* ========================================================================= */}
       <div style={{
+        position: 'relative',
         background: '#f8fafc',
-        borderRadius: '12px',
-        padding: '10px 12px',
+        borderRadius: '11px',
+        border: autocompleteType ? '1.5px solid #34a853' : isListening ? '1.5px solid #dc2626' : '1px solid #e2e8f0',
+        padding: '0 8px 0 10px',
+        height: '34px',
         display: 'flex',
-        flexDirection: 'column',
+        alignItems: 'center',
         gap: '6px',
-        border: '1px solid #f1f5f9',
-        position: 'relative'
+        boxSizing: 'border-box',
+        transition: 'all 0.15s ease'
       }}>
-        {/* Autocomplete Floating Dropdown */}
+        {/* Floating Autocomplete */}
         {autocompleteType && suggestions.length > 0 && (
           <div style={{
             position: 'absolute',
             bottom: '100%',
-            left: '8px',
+            left: 0,
             background: '#ffffff',
             border: '1px solid #e2e8f0',
-            borderRadius: '14px',
-            padding: '6px',
-            boxShadow: '0 12px 28px -4px rgba(15,23,42,0.14), 0 4px 10px -2px rgba(0,0,0,0.04)',
+            borderRadius: '12px',
+            padding: '5px',
+            boxShadow: '0 12px 28px -4px rgba(15,23,42,0.14)',
             zIndex: 50,
-            minWidth: '290px',
-            maxWidth: '380px',
-            maxHeight: '270px',
+            minWidth: '260px',
+            maxWidth: '340px',
+            maxHeight: '220px',
             overflowY: 'auto',
             display: 'flex',
             flexDirection: 'column',
             gap: '2px',
-            marginBottom: '6px'
+            marginBottom: '4px'
           }}>
-            {autocompleteType === 'room' ? (
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '2px 4px 6px 4px',
-                borderBottom: '1px solid #f1f5f9',
-                marginBottom: '4px',
-                gap: '4px'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
-                  <button
-                    type="button"
-                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); setRoomSegmentTab('all'); }}
-                    style={{
-                      background: roomSegmentTab === 'all' ? '#0f172a' : '#f8fafc',
-                      color: roomSegmentTab === 'all' ? '#ffffff' : '#64748b',
-                      border: roomSegmentTab === 'all' ? '1px solid #0f172a' : '1px solid #e2e8f0',
-                      borderRadius: '6px',
-                      padding: '2px 7px',
-                      fontSize: '0.62rem',
-                      fontWeight: 800,
-                      cursor: 'pointer',
-                      transition: 'all 0.15s ease'
-                    }}
-                  >
-                    ⚡ Alle
-                  </button>
-                  <button
-                    type="button"
-                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); setRoomSegmentTab('equipment'); }}
-                    style={{
-                      background: roomSegmentTab === 'equipment' ? '#0f172a' : '#f8fafc',
-                      color: roomSegmentTab === 'equipment' ? '#ffffff' : '#64748b',
-                      border: roomSegmentTab === 'equipment' ? '1px solid #0f172a' : '1px solid #e2e8f0',
-                      borderRadius: '6px',
-                      padding: '2px 7px',
-                      fontSize: '0.62rem',
-                      fontWeight: 800,
-                      cursor: 'pointer',
-                      transition: 'all 0.15s ease'
-                    }}
-                  >
-                    🎵 Instrumente
-                  </button>
-                  <button
-                    type="button"
-                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); setRoomSegmentTab('rooms'); }}
-                    style={{
-                      background: roomSegmentTab === 'rooms' ? '#0f172a' : '#f8fafc',
-                      color: roomSegmentTab === 'rooms' ? '#ffffff' : '#64748b',
-                      border: roomSegmentTab === 'rooms' ? '1px solid #0f172a' : '1px solid #e2e8f0',
-                      borderRadius: '6px',
-                      padding: '2px 7px',
-                      fontSize: '0.62rem',
-                      fontWeight: 800,
-                      cursor: 'pointer',
-                      transition: 'all 0.15s ease'
-                    }}
-                  >
-                    🏢 Räume
-                  </button>
-                </div>
-                <span style={{ fontSize: '0.58rem', color: '#94a3b8', fontWeight: 600 }}>⇥ Tab</span>
-              </div>
-            ) : (
-              <div style={{ fontSize: '0.64rem', fontWeight: 800, color: '#94a3b8', padding: '3px 6px', letterSpacing: '0.03em', textTransform: 'uppercase' }}>
-                {autocompleteType === 'student' ? 'Schüler auswählen (@)' : autocompleteType === 'tag' ? 'Themen-Tag (#)' : 'Schnell-Baustein (/)'}
-              </div>
-            )}
+            <div style={{ fontSize: '0.62rem', fontWeight: 800, color: '#94a3b8', padding: '2px 4px', textTransform: 'uppercase' }}>
+              {autocompleteType === 'student' ? 'Schüler wählen (@)' : autocompleteType === 'tag' ? 'Tag wählen (#)' : 'Baustein (/)'}
+            </div>
             {suggestions.map((s, idx) => (
               <button
                 key={`sug-${idx}`}
@@ -1309,55 +1218,31 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
-                  gap: '8px',
-                  padding: '5px 8px',
+                  gap: '6px',
+                  padding: '4px 6px',
                   borderRadius: '6px',
                   border: 'none',
                   background: idx === suggestionIndex ? '#f1f5f9' : 'transparent',
                   color: '#0f172a',
                   cursor: 'pointer',
                   textAlign: 'left',
-                  fontSize: '0.76rem',
+                  fontSize: '0.74rem',
                   fontWeight: 650
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                  {s.type === 'student' ? (
-                    <div style={{
-                      width: '16px',
-                      height: '16px',
-                      borderRadius: '50%',
-                      background: s.isToday ? '#e6f4ea' : '#f1f5f9',
-                      color: s.isToday ? '#34a853' : '#64748b',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: '0.58rem',
-                      fontWeight: 800
-                    }}>
-                      {s.label[0] || 'S'}
-                    </div>
-                  ) : s.type === 'tag' ? (
-                    <Hash size={11} color="#64748b" />
-                  ) : s.type === 'macro' ? (
-                    <Zap size={11} color="#64748b" />
-                  ) : s.type === 'equipment' ? (
-                    <Music size={11} color="#eab308" />
-                  ) : (
-                    <DoorOpen size={11} color="#64748b" />
-                  )}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  {s.type === 'student' ? <User size={11} color="#166534" /> : <Hash size={11} color="#64748b" />}
                   <span>{s.label}</span>
                 </div>
-                <span style={{ fontSize: '0.64rem', color: s.isToday ? '#166534' : '#94a3b8', fontWeight: s.isToday ? 700 : 550 }}>
-                  {s.sub}
-                </span>
+                <span style={{ fontSize: '0.62rem', color: '#94a3b8' }}>{s.sub}</span>
               </button>
             ))}
           </div>
         )}
 
-        <textarea
-          ref={textareaRef}
+        <input
+          ref={textareaRef as any}
+          type="text"
           value={inputContent}
           onChange={handleInputChange}
           onKeyDown={(e) => {
@@ -1370,11 +1255,6 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
               if (e.key === 'ArrowUp') {
                 e.preventDefault();
                 setSuggestionIndex(prev => (prev - 1 + suggestions.length) % suggestions.length);
-                return;
-              }
-              if (e.key === 'Tab' && autocompleteType === 'room' && (e.altKey || suggestions.length === 0)) {
-                e.preventDefault();
-                setRoomSegmentTab(prev => prev === 'all' ? 'equipment' : prev === 'equipment' ? 'rooms' : 'all');
                 return;
               }
               if (e.key === 'Enter' || e.key === 'Tab') {
@@ -1391,481 +1271,358 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
               }
             }
 
-            if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+            if (e.key === 'Enter') {
               e.preventDefault();
               handleSave();
             }
           }}
-          placeholder={isListening ? 'Höre zu... Diktat aktiv...' : 'Gedanke, @Schüler, - To-Do, !Raum oder BPM... (⌘J)'}
+          placeholder={isListening ? '🎙️ Höre zu... Diktat aktiv...' : 'Notiz, @Schüler oder - To-Do... (⌘J)'}
           style={{
-            width: '100%',
-            minHeight: '44px',
+            flex: 1,
+            height: '100%',
             background: 'transparent',
             border: 'none',
             outline: 'none',
-            resize: 'none',
-            fontSize: '0.84rem',
+            fontSize: '0.80rem',
             color: '#0f172a',
             fontWeight: 550,
-            lineHeight: 1.4,
-            fontFamily: 'inherit',
-            transition: 'height 0.1s ease',
-            boxSizing: 'border-box'
+            padding: 0
           }}
         />
 
-        {/* Dynamic Context Helpers & Progressive Action Bar */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '4px' }}>
-          {/* Subtle Input Hints / Triggers when empty */}
-          {!inputContent.trim() && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <button
-                type="button"
-                onClick={() => {
-                  setAutocompleteType('student');
-                  setAutocompleteQuery('');
-                  if (!inputContent.includes('@')) setInputContent('@');
-                  setTimeout(() => textareaRef.current?.focus(), 10);
-                }}
-                style={{ background: 'none', border: 'none', color: '#64748b', fontSize: '0.66rem', fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '3px', padding: '2px 4px' }}
-              >
-                <User size={10} />
-                <span>@Schüler</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setInputContent('- ');
-                  setTimeout(() => textareaRef.current?.focus(), 10);
-                }}
-                style={{ background: 'none', border: 'none', color: '#64748b', fontSize: '0.66rem', fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '3px', padding: '2px 4px' }}
-              >
-                <CheckSquare size={10} />
-                <span>To-Do</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowQuickTemplates(prev => !prev)}
-                style={{ background: 'none', border: 'none', color: '#64748b', fontSize: '0.66rem', fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '3px', padding: '2px 4px' }}
-              >
-                <Sparkles size={10} />
-                <span>Vorlagen</span>
-              </button>
+        {/* Integrated Apple Spotlight Dictation Microphone */}
+        <button
+          type="button"
+          onClick={handleToggleVoiceDictation}
+          title={isListening ? 'Diktat beenden' : 'Sprachnotiz diktieren'}
+          style={{
+            background: isListening ? '#dc2626' : 'transparent',
+            color: isListening ? '#ffffff' : '#94a3b8',
+            border: 'none',
+            borderRadius: '6px',
+            padding: '4px',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+            transition: 'all 0.15s ease'
+          }}
+          className="hover-scale-mini"
+        >
+          <Mic size={12} color={isListening ? '#ffffff' : '#94a3b8'} />
+        </button>
+
+        {inputContent.trim() && (
+          <button
+            type="button"
+            onClick={() => handleSave()}
+            style={{
+              border: 'none',
+              background: '#0f172a',
+              color: '#ffffff',
+              borderRadius: '6px',
+              padding: '3px 8px',
+              fontSize: '0.64rem',
+              fontWeight: 800,
+              cursor: 'pointer',
+              flexShrink: 0
+            }}
+          >
+            ↵
+          </button>
+        )}
+      </div>
+
+      {/* ========================================================================= */}
+      {/* 3. SÄULE 2 & 3: SMART-PRIORITY STACK (Max. 2 Karten & 1,5s Micro-Delay)   */}
+      {/* ========================================================================= */}
+      {(() => {
+        const candidateNotes = notes.filter(n => !n.is_archived && (!n.is_completed || recentlyCompletedIds.includes(n.id)));
+
+        // Smart-Priority Sorting:
+        // 1. is_pinned (true first)
+        // 2. due_date (overdue / today first)
+        // 3. created_at (newest first)
+        const sortedNotes = [...candidateNotes].sort((a, b) => {
+          if (a.is_pinned && !b.is_pinned) return -1;
+          if (!a.is_pinned && b.is_pinned) return 1;
+
+          const aIsTodayOrOverdue = a.due_date && a.due_date <= new Date().toISOString().split('T')[0];
+          const bIsTodayOrOverdue = b.due_date && b.due_date <= new Date().toISOString().split('T')[0];
+          if (aIsTodayOrOverdue && !bIsTodayOrOverdue) return -1;
+          if (!aIsTodayOrOverdue && bIsTodayOrOverdue) return 1;
+
+          return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+        });
+
+        const visibleNotes = sortedNotes.slice(0, 2);
+        const remainingCount = Math.max(0, candidateNotes.length - 2);
+
+        if (visibleNotes.length === 0) {
+          return (
+            <div style={{
+              background: '#f8fafc',
+              borderRadius: '11px',
+              padding: '12px',
+              textAlign: 'center',
+              color: '#94a3b8',
+              fontSize: '0.74rem',
+              fontWeight: 600,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px',
+              border: '1px dashed #e2e8f0'
+            }}>
+              <Sparkles size={12} color="#cbd5e1" />
+              <span>Keine offenen Notizen • Tippe oben eine Notiz oder @Schüler</span>
             </div>
-          )}
+          );
+        }
 
-          {/* Progressive Action Pill Bar when text is entered */}
-          {inputContent.trim() && (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: '6px', paddingTop: '4px', borderTop: '1px solid #e2e8f0' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
-                {Boolean(parsedIntent?.detectedStudent) && (
-                  <button
-                    type="button"
-                    onClick={handleDirectHomeworkTransfer}
-                    style={{
-                      background: '#0f172a',
-                      color: '#ffffff',
-                      border: 'none',
-                      borderRadius: '6px',
-                      padding: '4px 8px',
-                      fontSize: '0.70rem',
-                      fontWeight: 750,
-                      cursor: 'pointer',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '4px'
-                    }}
-                  >
-                    <BookOpen size={11} />
-                    <span>Ins Hausaufgabenheft ({parsedIntent?.detectedStudent.first_name || parsedIntent?.detectedStudent.name}) ➔</span>
-                  </button>
-                )}
+        return (
+          <>
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              background: '#ffffff',
+              borderRadius: '12px',
+              border: '1px solid rgba(226, 232, 240, 0.85)',
+              overflow: 'hidden',
+              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)'
+            }}>
+            {visibleNotes.map((note, idx) => {
+              const isRecentlyCompleted = recentlyCompletedIds.includes(note.id);
+              const isDone = note.is_completed || isRecentlyCompleted;
+              const isLast = idx === visibleNotes.length - 1;
 
-                {/* Due Date Trigger */}
-                <div style={{ position: 'relative' }}>
-                  <button
-                    type="button"
-                    onClick={() => setShowDatePicker(prev => !prev)}
-                    style={{
-                      background: (selectedDueDate || parsedIntent?.naturalDueDate) ? '#eff6ff' : '#ffffff',
-                      color: (selectedDueDate || parsedIntent?.naturalDueDate) ? '#1e40af' : '#475569',
-                      border: '1px solid #cbd5e1',
-                      borderRadius: '6px',
-                      padding: '3px 7px',
-                      fontSize: '0.68rem',
-                      fontWeight: 750,
-                      cursor: 'pointer',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '3px'
-                    }}
-                  >
-                    <Calendar size={10} />
-                    <span>{(selectedDueDate || parsedIntent?.naturalDueDate) ? formatDueDateBadge(selectedDueDate || parsedIntent!.naturalDueDate!).label : 'Fälligkeit'}</span>
-                  </button>
-                  {showDatePicker && (
+              // Intelligent Room Display Calculation
+              const detectedRoom = (() => {
+                if (note.room_id && note.room_id.toLowerCase() !== 'raum') return note.room_id;
+                const tagRoom = (note.tags || []).find(t => {
+                  const clean = t.replace(/^#/, '').toLowerCase();
+                  return clean.startsWith('raum') || clean.startsWith('saal') || clean.startsWith('studio') || clean.startsWith('keller') || clean.startsWith('eg') || clean.startsWith('og') || clean.startsWith('konzertsaal');
+                });
+                if (tagRoom) {
+                  const cleanTag = tagRoom.replace(/^#/, '').trim();
+                  if (cleanTag.toLowerCase() !== 'raum') return cleanTag.charAt(0).toUpperCase() + cleanTag.slice(1);
+                }
+                const match = note.content.match(/(?:!|#|\b)(Raum\s*\d+|Saal\s*\d*|Studio\s*\d*|Konzertsaal|Bandraum|Keller|EG|OG\s*\d*)\b/i);
+                if (match) return match[1].trim();
+                return note.room_id || (note.note_type === 'room_issue' ? 'Raum' : null);
+              })();
+              const isRoomItem = Boolean(detectedRoom || note.note_type === 'room_issue');
+
+              return (
+                <div
+                  key={note.id}
+                  style={{
+                    padding: '8px 10px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '8px',
+                    minHeight: '36px',
+                    borderBottom: isLast ? 'none' : '1px solid rgba(241, 245, 249, 1)',
+                    background: note.is_pinned ? 'rgba(248, 250, 252, 0.6)' : '#ffffff',
+                    transition: 'background 0.15s ease',
+                    opacity: isRecentlyCompleted ? 0.6 : 1
+                  }}
+                  className="hover-scale-mini note-row-hover-surface"
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: 0 }}>
+                    {/* 1-Tap Apple Checkbox */}
+                    <button
+                      type="button"
+                      onClick={() => handleWidgetToggleComplete(note.id, Boolean(note.is_completed))}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: isDone ? '#34a853' : '#94a3b8',
+                        cursor: 'pointer',
+                        padding: 0,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0
+                      }}
+                      title={isDone ? 'Als offen markieren' : 'Abhaken'}
+                    >
+                      {isDone ? (
+                        <CheckCircle2 size={17} color="#34a853" />
+                      ) : (
+                        <Circle size={17} color="#94a3b8" />
+                      )}
+                    </button>
+
                     <div style={{
-                      position: 'absolute',
-                      bottom: '100%',
-                      left: 0,
-                      marginBottom: '6px',
-                      background: '#ffffff',
-                      border: '1px solid #e2e8f0',
-                      borderRadius: '10px',
-                      padding: '4px',
-                      boxShadow: '0 10px 25px -5px rgba(0,0,0,0.15)',
-                      zIndex: 60,
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '2px',
-                      minWidth: '120px'
+                      flex: 1,
+                      minWidth: 0,
+                      fontSize: '0.82rem',
+                      color: isDone ? '#94a3b8' : '#0f172a',
+                      textDecoration: isDone ? 'line-through' : 'none',
+                      fontWeight: note.is_pinned ? 700 : 550,
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis'
                     }}>
-                      <button
-                        type="button"
-                        onClick={() => { setSelectedDueDate(getQuickDate('today')); setShowDatePicker(false); }}
-                        style={{ padding: '4px 6px', border: 'none', background: 'transparent', textAlign: 'left', fontSize: '0.72rem', fontWeight: 600, color: '#0f172a', cursor: 'pointer' }}
-                      >
-                        📅 Heute
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => { setSelectedDueDate(getQuickDate('tomorrow')); setShowDatePicker(false); }}
-                        style={{ padding: '4px 6px', border: 'none', background: 'transparent', textAlign: 'left', fontSize: '0.72rem', fontWeight: 600, color: '#0f172a', cursor: 'pointer' }}
-                      >
-                        📅 Morgen
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => { setSelectedDueDate(getQuickDate('friday')); setShowDatePicker(false); }}
-                        style={{ padding: '4px 6px', border: 'none', background: 'transparent', textAlign: 'left', fontSize: '0.72rem', fontWeight: 600, color: '#0f172a', cursor: 'pointer' }}
-                      >
-                        📅 Bis Freitag
-                      </button>
+                      {formatCleanNoteContent(note.content, note.student_name)}
                     </div>
-                  )}
-                </div>
 
-                {parsedIntent?.bpm && (
-                  <button
-                    type="button"
-                    onClick={() => toggleMetronome(parsedIntent.bpm!)}
+                    {/* Subtle Badges Flow */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+                      {note.student_name && (
+                        <span style={{ fontSize: '0.62rem', color: '#166534', fontWeight: 750, background: '#e6f4ea', border: '1px solid #bbf7d0', padding: '1.5px 6px', borderRadius: '5px', display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
+                          <User size={8} />
+                          {maskStudentName(note.student_name)}
+                        </span>
+                      )}
+
+                      {/* Room Badge */}
+                      {isRoomItem && (
+                        <span style={{
+                          fontSize: '0.62rem',
+                          fontWeight: 750,
+                          padding: '1.5px 6px',
+                          borderRadius: '5px',
+                          background: '#fee2e2',
+                          color: '#991b1b',
+                          border: '1px solid #fecaca',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '2px'
+                        }}>
+                          <DoorOpen size={8} color="#dc2626" />
+                          <span>{detectedRoom || 'Raum'}</span>
+                        </span>
+                      )}
+
+                      {/* Other Tags */}
+                      {note.tags && note.tags.filter(t => {
+                        const clean = t.replace(/^#/, '').toLowerCase();
+                        if (clean === 'todo' || clean === 'to-do') return false;
+                        if (isRoomItem && (clean === 'raum' || (detectedRoom && clean === detectedRoom.toLowerCase()))) return false;
+                        return true;
+                      }).slice(0, 1).map(tag => {
+                        const style = getTagBadgeStyle(tag);
+                        return (
+                          <span
+                            key={tag}
+                            style={{
+                              fontSize: '0.62rem',
+                              fontWeight: 750,
+                              padding: '1.5px 6px',
+                              borderRadius: '5px',
+                              background: style.bg,
+                              color: style.color,
+                              border: `1px solid ${style.border}`,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '2px'
+                            }}
+                          >
+                            {renderMonochromeTagIcon(style.iconName, 8, style.color)}
+                            <span>{style.label || tag.replace(/^#/, '')}</span>
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Actions on hover */}
+                  <div
                     style={{
-                      background: activeMetronomeBpm === parsedIntent.bpm ? '#34a853' : '#ffffff',
-                      color: activeMetronomeBpm === parsedIntent.bpm ? '#ffffff' : '#0f172a',
-                      border: '1px solid #cbd5e1',
-                      borderRadius: '6px',
-                      padding: '3px 7px',
-                      fontSize: '0.68rem',
-                      fontWeight: 750,
-                      cursor: 'pointer',
-                      display: 'inline-flex',
+                      display: 'flex',
                       alignItems: 'center',
-                      gap: '3px'
+                      gap: '2px',
+                      flexShrink: 0,
+                      opacity: note.is_pinned ? 1 : 0.4,
+                      transition: 'opacity 0.15s ease'
                     }}
+                    className="hover-reveal-actions"
                   >
-                    <Play size={9} />
-                    <span>{parsedIntent.bpm} BPM</span>
-                  </button>
-                )}
-              </div>
+                    <button
+                      type="button"
+                      onClick={() => togglePin(note.id)}
+                      title={note.is_pinned ? 'Lösen' : 'Anpinnen'}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: note.is_pinned ? '#0f172a' : '#94a3b8',
+                        cursor: 'pointer',
+                        padding: '3px'
+                      }}
+                    >
+                      <Pin size={11} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        deleteNote(note.id);
+                        showToast('Notiz gelöscht');
+                      }}
+                      title="Löschen"
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: '#94a3b8',
+                        cursor: 'pointer',
+                        padding: '3px'
+                      }}
+                    >
+                      <Trash2 size={11} />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
 
+          {/* SÄULE 4: Subtiler Überlauf-Indikator mit Apple Quick-Peek Trigger */}
+          {remainingCount > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', paddingTop: '2px' }}>
               <button
                 type="button"
-                onClick={() => handleSave()}
+                onClick={() => setShowTodayQuickPeek(prev => !prev)}
                 style={{
-                  background: '#0f172a',
-                  color: '#ffffff',
-                  border: 'none',
-                  borderRadius: '6px',
-                  padding: '4px 10px',
-                  fontSize: '0.70rem',
+                  background: showTodayQuickPeek ? '#0f172a' : '#f1f5f9',
+                  border: '1px solid #e2e8f0',
+                  color: showTodayQuickPeek ? '#ffffff' : '#334155',
+                  borderRadius: '100px',
+                  padding: '3px 10px',
+                  fontSize: '0.66rem',
                   fontWeight: 750,
                   cursor: 'pointer',
                   display: 'inline-flex',
                   alignItems: 'center',
-                  gap: '4px'
+                  gap: '5px',
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.02)',
+                  transition: 'all 0.15s cubic-bezier(0.16, 1, 0.3, 1)'
                 }}
+                className="hover-scale-mini"
+                title="Schwebende Vorschau aller Notizen von heute öffnen"
               >
-                <Check size={11} strokeWidth={2.5} />
-                <span>Sichern (⌘↵)</span>
+                <Calendar size={11} color={showTodayQuickPeek ? '#ffffff' : '#64748b'} />
+                <span>{todayNotes.length > 0 ? `Heute: Alle ${todayNotes.length} anzeigen` : `+ ${remainingCount} weitere`}</span>
+                <ChevronDown size={11} style={{ transform: showTodayQuickPeek ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s ease' }} />
               </button>
             </div>
           )}
-        </div>
+        </>
+      );
+    })()}
 
-        {/* Quick Templates Popover Trigger (when clicked) */}
-        {showQuickTemplates && !inputContent.trim() && (
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '4px',
-            overflowX: 'auto',
-            paddingTop: '6px',
-            borderTop: '1px dashed #e2e8f0',
-            scrollbarWidth: 'none'
-          }}>
-            {QUICK_SNIPPETS.map((snippet) => {
-              const IconComp = snippet.icon;
-              const snippetStyles: Record<string, { bg: string; border: string; color: string }> = {
-                takt: { bg: '#eff6ff', border: '#bfdbfe', color: '#1e40af' },
-                tonleiter: { bg: '#fef9c3', border: '#fef08a', color: '#854d0e' },
-                playalong: { bg: '#f3e8ff', border: '#e9d5ff', color: '#6b21a8' },
-                buch: { bg: '#f0fdf4', border: '#bbf7d0', color: '#15803d' },
-                todo: { bg: '#eff6ff', border: '#bfdbfe', color: '#2563eb' },
-                raum: { bg: '#fee2e2', border: '#fecaca', color: '#dc2626' }
-              };
-              const sStyle = snippetStyles[snippet.id] || { bg: '#f8fafc', border: '#e2e8f0', color: '#475569' };
-              return (
-                <button
-                  key={snippet.id}
-                  type="button"
-                  onClick={() => insertSnippet(snippet.snippet)}
-                  style={{
-                    background: sStyle.bg,
-                    border: `1px solid ${sStyle.border}`,
-                    borderRadius: '100px',
-                    padding: '2px 8px',
-                    fontSize: '0.64rem',
-                    fontWeight: 750,
-                    color: sStyle.color,
-                    cursor: 'pointer',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    whiteSpace: 'nowrap',
-                    boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
-                  }}
-                >
-                  <IconComp size={9} color={sStyle.color} />
-                  <span>{snippet.label}</span>
-                </button>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* 3. The Single Focus Note Stage ("Zuletzt Notiert" / "Aktiver Fokus") */}
-      {focusNote ? (
-        <div style={{
-          background: '#ffffff',
-          border: '1px solid #e2e8f0',
-          borderRadius: '12px',
-          padding: '9px 12px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '5px',
-          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.02)',
-          position: 'relative'
-        }}>
-          {/* Focus Card Header */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.03em', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-              <Clock size={9} color="#94a3b8" />
-              <span>{focusNote.is_pinned ? '📌 Angepinnter Fokus' : 'Zuletzt notiert'}</span>
-            </span>
-
-            <button
-              type="button"
-              onClick={() => setShowBoardModal(true)}
-              style={{
-                background: 'none',
-                border: 'none',
-                color: '#64748b',
-                fontSize: '0.65rem',
-                fontWeight: 700,
-                cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '2px',
-                padding: 0
-              }}
-            >
-              <span>Alle {activeNotesCount} im Board</span>
-              <ArrowUpRight size={10} />
-            </button>
-          </div>
-
-          {/* Focus Card Content */}
-          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px' }}>
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '7px', flex: 1, minWidth: 0 }}>
-              {(focusNote.note_type === 'todo' || focusNote.tags.includes('todo') || focusNote.content.startsWith('- ')) && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    toggleCompleteTodo(focusNote.id);
-                    showToast(focusNote.is_completed ? 'Als offen markiert' : '✓ Erledigt');
-                  }}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    color: focusNote.is_completed ? '#34a853' : '#94a3b8',
-                    cursor: 'pointer',
-                    padding: 0,
-                    marginTop: '1px',
-                    display: 'flex',
-                    flexShrink: 0
-                  }}
-                >
-                  {focusNote.is_completed ? <CheckCircle2 size={15} /> : <Circle size={15} />}
-                </button>
-              )}
-
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{
-                  fontSize: '0.80rem',
-                  color: focusNote.is_completed ? '#94a3b8' : '#0f172a',
-                  textDecoration: focusNote.is_completed ? 'line-through' : 'none',
-                  lineHeight: 1.35,
-                  fontWeight: 600,
-                  wordBreak: 'break-word'
-                }}>
-                  {formatCleanNoteContent(focusNote.content, focusNote.student_name)}
-                </div>
-
-                {/* Focus Card Badges (Student, Tag, Due Date) */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap', marginTop: '3px' }}>
-                  {focusNote.student_name && (
-                    <span style={{ fontSize: '0.64rem', color: '#166534', fontWeight: 750, background: '#e6f4ea', padding: '1px 5px', borderRadius: '4px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-                      <User size={8} />
-                      {maskStudentName(focusNote.student_name)}
-                    </span>
-                  )}
-                  {focusNote.tags && focusNote.tags.filter(t => t !== 'todo' && t !== '#To-Do').map(tag => {
-                    const style = getTagBadgeStyle(tag);
-                    return (
-                      <span
-                        key={tag}
-                        style={{
-                          fontSize: '0.62rem',
-                          fontWeight: 750,
-                          padding: '1px 5px',
-                          borderRadius: '4px',
-                          background: style.bg,
-                          color: style.color,
-                          border: `1px solid ${style.border}`,
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '2px'
-                        }}
-                      >
-                        {renderMonochromeTagIcon(style.iconName, 8, style.color)}
-                        <span>{tag.replace(/^#/, '')}</span>
-                      </span>
-                    );
-                  })}
-                  {focusNote.due_date && (
-                    <span style={{
-                      fontSize: '0.62rem',
-                      fontWeight: 750,
-                      padding: '1px 5px',
-                      borderRadius: '4px',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '2px',
-                      background: formatDueDateBadge(focusNote.due_date).isOverdue ? '#fee2e2' : formatDueDateBadge(focusNote.due_date).isToday ? '#fef3c7' : '#eff6ff',
-                      color: formatDueDateBadge(focusNote.due_date).isOverdue ? '#991b1b' : formatDueDateBadge(focusNote.due_date).isToday ? '#92400e' : '#1e40af'
-                    }}>
-                      <Calendar size={8} />
-                      <span>{formatDueDateBadge(focusNote.due_date).label}</span>
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Quick Actions for Focus Note */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '2px', flexShrink: 0 }}>
-              {!syncedIds.has(focusNote.id) && focusNote.visibility !== 'student_shared' && (focusNote.student_id || focusNote.student_name) && (
-                <button
-                  type="button"
-                  onClick={async () => {
-                    const sId = focusNote.student_id;
-                    const sName = focusNote.student_name;
-                    if (sId) {
-                      await syncToHomeworkBook(focusNote, sId, sName || undefined);
-                      setSyncedIds(prev => new Set([...Array.from(prev), focusNote.id]));
-                      showToast('✓ Ins Hausaufgabenheft übertragen');
-                    }
-                  }}
-                  title="Ins Hausaufgabenheft übertragen"
-                  style={{
-                    background: '#f0fdf4',
-                    border: '1px solid #bbf7d0',
-                    color: '#166534',
-                    cursor: 'pointer',
-                    padding: '3px 6px',
-                    borderRadius: '5px',
-                    fontSize: '0.64rem',
-                    fontWeight: 750,
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '3px'
-                  }}
-                >
-                  <BookOpen size={10} />
-                  <span>Hausaufgabe</span>
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={() => togglePin(focusNote.id)}
-                title={focusNote.is_pinned ? 'Lösen' : 'Anpinnen'}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: focusNote.is_pinned ? '#0f172a' : '#94a3b8',
-                  cursor: 'pointer',
-                  padding: '3px'
-                }}
-              >
-                <Pin size={11} />
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  deleteNote(focusNote.id);
-                  showToast('Notiz gelöscht');
-                }}
-                title="Löschen"
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: '#cbd5e1',
-                  cursor: 'pointer',
-                  padding: '3px'
-                }}
-              >
-                <Trash2 size={11} />
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : (
-        <div style={{
-          padding: '8px 10px',
-          textAlign: 'center',
-          fontSize: '0.72rem',
-          color: '#94a3b8',
-          fontWeight: 550,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: '5px'
-        }}>
-          <Sparkles size={11} color="#cbd5e1" />
-          <span>Keine offenen Notizen • Schreibe oben eine Notiz oder ein To-Do</span>
-        </div>
-      )}
-
-      {/* 4. Minimalist Footer */}
+      {/* ========================================================================= */}
+      {/* 4. SÄULE 5: MINIMALISTISCHER FOOTER (Auto-Sync & ⌘J)                      */}
+      {/* ========================================================================= */}
       <div style={{
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingTop: '6px',
+        paddingTop: '3px',
         borderTop: '1px solid #f1f5f9',
-        fontSize: '0.65rem',
+        fontSize: '0.62rem',
         color: '#94a3b8',
         fontWeight: 600
       }}>
@@ -1878,16 +1635,314 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
             onClick={() => setShowBoardModal(true)}
             style={{ color: '#64748b', cursor: 'pointer', fontWeight: 700 }}
           >
-            Board öffnen ➔
+            Alle {activeNotesCount} im Board ➔
           </span>
           <span>
-            Shortcut <kbd style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '4px', padding: '1px 3px', fontFamily: 'monospace' }}>⌘J</kbd>
+            Shortcut <kbd style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '3px', padding: '1px 3px', fontFamily: 'monospace', fontSize: '0.58rem' }}>⌘J</kbd>
           </span>
         </div>
       </div>
 
       {/* ========================================================================= */}
-      {/* 4. FULL-FEATURED TRELLO-INSPIRED NOTIZEN-BOARD MODAL                     */}
+      {/* 4.5 ✨ MASTER APPLE SPOTLIGHT QUICK-PEEK POPOVER (Apple HIG Goldstandard) */}
+      {/* ========================================================================= */}
+      {showTodayQuickPeek && (() => {
+        const pool = todayNotes.length > 0 ? todayNotes : notes.filter(n => !n.is_archived);
+        // Smart Apple Sorting: Open tasks first, completed tasks sorted at bottom with dimmed opacity
+        const sortedPool = [...pool].sort((a, b) => {
+          const aDone = a.is_completed || recentlyCompletedIds.includes(a.id);
+          const bDone = b.is_completed || recentlyCompletedIds.includes(b.id);
+          if (aDone && !bDone) return 1;
+          if (!aDone && bDone) return -1;
+          return 0;
+        });
+        const openCount = sortedPool.filter(n => !(n.is_completed || recentlyCompletedIds.includes(n.id))).length;
+        const doneCount = sortedPool.length - openCount;
+
+        return (
+          <div
+            ref={quickPeekRef}
+            style={{
+              position: 'absolute',
+              bottom: 'calc(100% + 12px)',
+              left: '-6px',
+              right: '-6px',
+              background: 'rgba(255, 255, 255, 0.94)',
+              backdropFilter: 'blur(28px) saturate(190%)',
+              WebkitBackdropFilter: 'blur(28px) saturate(190%)',
+              border: '1px solid rgba(226, 232, 240, 0.85)',
+              borderRadius: '22px',
+              boxShadow: '0 25px 65px -12px rgba(15, 23, 42, 0.24), 0 0 0 1px rgba(255, 255, 255, 0.9) inset',
+              zIndex: 1000,
+              padding: '16px 18px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '12px',
+              animation: 'scaleUp 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
+              maxHeight: '380px'
+            }}
+          >
+            {/* Quick-Peek Header */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(241, 245, 249, 0.9)', paddingBottom: '10px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '10px',
+                  background: '#e6f4ea',
+                  color: '#166534',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '0 2px 6px rgba(22, 101, 52, 0.1)'
+                }}>
+                  <Calendar size={16} />
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.92rem', fontWeight: 850, color: '#0f172a', letterSpacing: '-0.01em' }}>
+                    Tages-Fahrplan
+                  </div>
+                  <div style={{ fontSize: '0.70rem', color: '#64748b', fontWeight: 600 }}>
+                    {openCount} offene Aufgabe{openCount === 1 ? '' : 'n'} {doneCount > 0 ? `• ${doneCount} erledigt` : ''}
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowTodayQuickPeek(false);
+                    setShowBoardModal(true);
+                  }}
+                  style={{
+                    border: '1px solid #e2e8f0',
+                    background: '#ffffff',
+                    color: '#0f172a',
+                    borderRadius: '100px',
+                    padding: '6px 12px',
+                    fontSize: '0.72rem',
+                    fontWeight: 750,
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                    transition: 'all 0.15s ease'
+                  }}
+                  className="hover-scale-mini"
+                >
+                  <Layers size={12} color="#64748b" />
+                  <span>Im Board öffnen ➔</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowTodayQuickPeek(false)}
+                  style={{
+                    border: '1px solid #e2e8f0',
+                    background: '#ffffff',
+                    color: '#64748b',
+                    borderRadius: '50%',
+                    width: '28px',
+                    height: '28px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
+                    transition: 'all 0.15s ease'
+                  }}
+                  className="hover-scale-mini"
+                  title="Schließen (Esc)"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            </div>
+
+            {/* Quick-Peek Items Stream (Apple HIG Standard 40px Touch-Rows) */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', overflowY: 'auto', maxHeight: '250px', paddingRight: '2px' }} className="custom-scrollbar">
+              {sortedPool.map(note => {
+                const isRecentlyCompleted = recentlyCompletedIds.includes(note.id);
+                const isDone = note.is_completed || isRecentlyCompleted;
+                return (
+                  <div
+                    key={`peek-${note.id}`}
+                    style={{
+                      background: isDone ? 'rgba(248, 250, 252, 0.7)' : '#ffffff',
+                      border: `1px solid ${isDone ? '#e2e8f0' : 'rgba(226, 232, 240, 0.9)'}`,
+                      borderRadius: '12px',
+                      padding: '8px 12px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: '10px',
+                      minHeight: '40px',
+                      boxShadow: isDone ? 'none' : '0 2px 5px rgba(0, 0, 0, 0.02)',
+                      opacity: isDone ? 0.6 : 1,
+                      transition: 'all 0.2s ease'
+                    }}
+                    className="hover-scale-mini"
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: 0 }}>
+                      {/* 1-Tap Checkbox */}
+                      <button
+                        type="button"
+                        onClick={() => handleWidgetToggleComplete(note.id, Boolean(note.is_completed))}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: isDone ? '#34a853' : '#94a3b8',
+                          cursor: 'pointer',
+                          padding: '2px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flexShrink: 0
+                        }}
+                        title={isDone ? 'Als offen markieren' : 'Abhaken'}
+                      >
+                        {isDone ? <CheckCircle2 size={18} color="#34a853" /> : <Circle size={18} color="#94a3b8" />}
+                      </button>
+
+                      {/* Content */}
+                      <span style={{
+                        fontSize: '0.84rem',
+                        color: isDone ? '#94a3b8' : '#0f172a',
+                        textDecoration: isDone ? 'line-through' : 'none',
+                        fontWeight: isDone ? 500 : 650,
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis'
+                      }}>
+                        {formatCleanNoteContent(note.content, note.student_name)}
+                      </span>
+
+                      {/* Student Badge */}
+                      {note.student_name && (
+                        <span style={{
+                          fontSize: '0.66rem',
+                          color: '#166534',
+                          fontWeight: 750,
+                          background: '#e6f4ea',
+                          border: '1px solid #bbf7d0',
+                          padding: '2px 7px',
+                          borderRadius: '6px',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '3px',
+                          flexShrink: 0
+                        }}>
+                          <User size={8} />
+                          {maskStudentName(note.student_name)}
+                        </span>
+                      )}
+
+                      {/* Room Badge */}
+                      {(() => {
+                        const popoverRoom = (() => {
+                          if (note.room_id && note.room_id.toLowerCase() !== 'raum') return note.room_id;
+                          const tagRoom = (note.tags || []).find(t => {
+                            const clean = t.replace(/^#/, '').toLowerCase();
+                            return clean.startsWith('raum') || clean.startsWith('saal') || clean.startsWith('studio') || clean.startsWith('keller') || clean.startsWith('eg') || clean.startsWith('og') || clean.startsWith('konzertsaal');
+                          });
+                          if (tagRoom) {
+                            const cleanTag = tagRoom.replace(/^#/, '').trim();
+                            if (cleanTag.toLowerCase() !== 'raum') return cleanTag.charAt(0).toUpperCase() + cleanTag.slice(1);
+                          }
+                          const match = note.content.match(/(?:!|#|\b)(Raum\s*\d+|Saal\s*\d*|Studio\s*\d*|Konzertsaal|Bandraum|Keller|EG|OG\s*\d*)\b/i);
+                          if (match) return match[1].trim();
+                          return note.room_id || (note.note_type === 'room_issue' ? 'Raum' : null);
+                        })();
+                        const isPopRoom = Boolean(popoverRoom || note.note_type === 'room_issue');
+
+                        return (
+                          <>
+                            {isPopRoom && (
+                              <span style={{
+                                fontSize: '0.64rem',
+                                fontWeight: 750,
+                                padding: '2px 6px',
+                                borderRadius: '6px',
+                                background: '#fee2e2',
+                                color: '#991b1b',
+                                border: '1px solid #fecaca',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '3px',
+                                flexShrink: 0
+                              }}>
+                                <DoorOpen size={8.5} color="#dc2626" />
+                                <span>{popoverRoom || 'Raum'}</span>
+                              </span>
+                            )}
+
+                            {note.tags && note.tags.filter(t => {
+                              const clean = t.replace(/^#/, '').toLowerCase();
+                              if (clean === 'todo' || clean === 'to-do') return false;
+                              if (isPopRoom && (clean === 'raum' || (popoverRoom && clean === popoverRoom.toLowerCase()))) return false;
+                              return true;
+                            }).slice(0, 1).map(tag => {
+                              const style = getTagBadgeStyle(tag);
+                              return (
+                                <span
+                                  key={tag}
+                                  style={{
+                                    fontSize: '0.64rem',
+                                    fontWeight: 750,
+                                    padding: '2px 6px',
+                                    borderRadius: '6px',
+                                    background: style.bg,
+                                    color: style.color,
+                                    border: `1px solid ${style.border}`,
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '3px',
+                                    flexShrink: 0
+                                  }}
+                                >
+                                  {renderMonochromeTagIcon(style.iconName, 8, style.color)}
+                                  <span>{style.label || tag.replace(/^#/, '')}</span>
+                                </span>
+                              );
+                            })}
+                          </>
+                        );
+                      })()}
+                    </div>
+
+                    {/* Action button */}
+                    <button
+                      type="button"
+                      onClick={() => { deleteNote(note.id); showToast('Notiz gelöscht'); }}
+                      style={{
+                        border: 'none',
+                        background: 'transparent',
+                        color: '#cbd5e1',
+                        cursor: 'pointer',
+                        padding: '4px',
+                        borderRadius: '6px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0,
+                        transition: 'color 0.15s ease'
+                      }}
+                      className="hover-scale-mini"
+                      title="Löschen"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ========================================================================= */}
+      {/* 5. NOTIZEN-BOARD MODAL                                                    */}
       {/* ========================================================================= */}
       <TeacherNotesBoardModal
         isOpen={showBoardModal}

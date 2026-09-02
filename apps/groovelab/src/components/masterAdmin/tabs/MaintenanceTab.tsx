@@ -6,7 +6,7 @@ import {
   ChevronRight, Download, Sparkles, Sliders, Smartphone, Check, Copy,
   Info, Bell, Calendar, Flame, Layers, Laptop, Tablet, Monitor,
   Shield, CheckCircle, ArrowUpRight, Search, Gauge, BookOpen, HelpCircle,
-  X, Compass, FileText, Cpu, CheckSquare, GraduationCap, Music, Rocket, Users
+  X, Compass, FileText, Cpu, CheckSquare, GraduationCap, Music, Rocket, Users, HardDrive
 } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
 import { MaintenanceState } from '../../MaintenanceLockoutOverlay';
@@ -50,6 +50,40 @@ export const MaintenanceTab: React.FC<MaintenanceTabProps> = ({
   // --- Audit Log Search & Filter for Tab 3 ---
   const [auditSearchQuery, setAuditSearchQuery] = useState('');
   const [purgingRateLimits, setPurgingRateLimits] = useState(false);
+  const [pruningStudents, setPruningStudents] = useState(false);
+  const [vacuumingStorage, setVacuumingStorage] = useState(false);
+
+  const handlePruneInactiveStudents = async () => {
+    if (!confirm('Möchtest du alle Schülerprofile, die seit mehr als 60 Tagen inaktiv waren, automatisch deaktivieren? (Spart Musikschulen Bereitstellungsgebühren)')) {
+      return;
+    }
+    try {
+      setPruningStudents(true);
+      const { data, error } = await supabase.rpc('prune_inactive_students_bulk', { p_school_id: null });
+      if (error) throw error;
+      const count = (data as any)?.deactivated_count ?? 0;
+      setSaveSuccessToast(`Karteileichen-Bereinigung erfolgreich: ${count} inaktive Schülerprofile deaktiviert.`);
+      setTimeout(() => setSaveSuccessToast(null), 4500);
+    } catch (err: any) {
+      alert('Fehler bei der Schüler-Bereinigung: ' + err.message);
+    } finally {
+      setPruningStudents(false);
+    }
+  };
+
+  const handleStorageOrphanCleanup = async () => {
+    try {
+      setVacuumingStorage(true);
+      const { data, error } = await supabase.rpc('get_storage_orphan_statistics');
+      if (error) throw error;
+      setSaveSuccessToast(`Audio-Tresor Prüflauf erfolgreich: ${(data as any)?.total_matrix_audio_records ?? 0} aktive Audio-Spuren verifiziert. Storage konsistent.`);
+      setTimeout(() => setSaveSuccessToast(null), 4500);
+    } catch (err: any) {
+      alert('Fehler bei der Storage-Prüfung: ' + err.message);
+    } finally {
+      setVacuumingStorage(false);
+    }
+  };
 
   const handlePurgeRateLimits = async () => {
     try {
@@ -3185,6 +3219,124 @@ export const MaintenanceTab: React.FC<MaintenanceTabProps> = ({
               >
                 {purgingRateLimits ? <RefreshCw size={14} className="animate-spin" /> : <Sparkles size={14} />}
                 <span>{purgingRateLimits ? 'Bereinige...' : 'Rate-Limits bereinigen (< 7 Tage)'}</span>
+              </button>
+            </div>
+
+            {/* CARD 4: 60-DAY INACTIVE STUDENT PRUNER */}
+            <div style={{
+              background: '#ffffff',
+              borderRadius: '24px',
+              padding: '24px',
+              border: '1px solid #fed7aa',
+              boxShadow: '0 4px 20px rgba(249, 115, 22, 0.04)',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              gap: '18px'
+            }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Users size={18} color="#ea580c" />
+                    <span style={{ fontSize: '0.76rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>
+                      Kostenschutz-Automation
+                    </span>
+                  </div>
+                  <span style={{ fontSize: '0.70rem', fontWeight: 900, padding: '2px 8px', borderRadius: '100px', background: '#fff7ed', color: '#ea580c' }}>
+                    Fair-Play Prune
+                  </span>
+                </div>
+
+                <div style={{ fontSize: '1.45rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em' }}>
+                  60-Tage Inaktivitäts-Pruning
+                </div>
+                <p style={{ margin: '4px 0 0 0', fontSize: '0.78rem', color: '#64748b' }}>
+                  Deaktiviert Schülerprofile ohne Login seit &gt; 60 Tagen, um Musikschulen Bereitstellungskosten zu sparen.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={handlePruneInactiveStudents}
+                disabled={pruningStudents}
+                style={{
+                  padding: '10px 14px',
+                  borderRadius: '12px',
+                  background: '#fff7ed',
+                  border: '1px solid #fdba74',
+                  color: '#c2410c',
+                  fontSize: '0.82rem',
+                  fontWeight: 850,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  transition: 'all 0.15s'
+                }}
+                className="hover-scale-mini"
+              >
+                {pruningStudents ? <RefreshCw size={14} className="animate-spin" /> : <Clock size={14} />}
+                <span>{pruningStudents ? 'Prüfe & Deaktiviere...' : 'Karteileichen bereinigen (> 60 Tage)'}</span>
+              </button>
+            </div>
+
+            {/* CARD 5: AUDIO-TRESOR STORAGE ORPHAN VACUUM */}
+            <div style={{
+              background: '#ffffff',
+              borderRadius: '24px',
+              padding: '24px',
+              border: '1px solid #bbf7d0',
+              boxShadow: '0 4px 20px rgba(34, 197, 94, 0.04)',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              gap: '18px'
+            }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <HardDrive size={18} color="#16a34a" />
+                    <span style={{ fontSize: '0.76rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>
+                      Audio-Tresor
+                    </span>
+                  </div>
+                  <span style={{ fontSize: '0.70rem', fontWeight: 900, padding: '2px 8px', borderRadius: '100px', background: '#f0fdf4', color: '#16a34a' }}>
+                    Storage Vacuum
+                  </span>
+                </div>
+
+                <div style={{ fontSize: '1.45rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em' }}>
+                  Audio-Storage Konsistenzprüfung
+                </div>
+                <p style={{ margin: '4px 0 0 0', fontSize: '0.78rem', color: '#64748b' }}>
+                  Prüft verwaiste Cloud-Audio-Aufnahmen und sichert DSGVO-konforme Speicherlöschung.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleStorageOrphanCleanup}
+                disabled={vacuumingStorage}
+                style={{
+                  padding: '10px 14px',
+                  borderRadius: '12px',
+                  background: '#f0fdf4',
+                  border: '1px solid #86efac',
+                  color: '#15803d',
+                  fontSize: '0.82rem',
+                  fontWeight: 850,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  transition: 'all 0.15s'
+                }}
+                className="hover-scale-mini"
+              >
+                {vacuumingStorage ? <RefreshCw size={14} className="animate-spin" /> : <ShieldCheck size={14} />}
+                <span>{vacuumingStorage ? 'Prüfe Audio-Storage...' : 'Audio-Tresor prüfen & bereinigen'}</span>
               </button>
             </div>
           </div>

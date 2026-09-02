@@ -5229,7 +5229,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       calculatedStreak,
       newlyShieldedDates
     };
-  };
+  }
 
   const getGroupedLogs = () => {
     const groups: Record<string, { 
@@ -5469,7 +5469,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
 
     // ⚡ Tier-1 Predictive Eager Background Hydration (Linear / Apple Standard)
     if (typeof window !== 'undefined' && studentId) {
-      const scheduleIdle = (window as any).requestIdleCallback || ((cb: Function) => setTimeout(cb, 200));
+      const scheduleIdle = (window as any).requestIdleCallback || ((cb: () => void) => setTimeout(cb, 200));
       scheduleIdle(() => {
         fetchStudentProgress(true);
         fetchFokusLogs();

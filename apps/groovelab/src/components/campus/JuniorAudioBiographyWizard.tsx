@@ -75,8 +75,6 @@ export const JuniorAudioBiographyWizard: React.FC<JuniorAudioBiographyWizardProp
   initialPlaylistId,
   onSaveCompleted
 }) => {
-  if (!isOpen) return null;
-
   const studentId = student?.id || student?.student_id || 'student';
   const studentFirstName = student?.first_name || 'Junger Musiker';
   const instrument = (student?.instrument || student?.main_instrument || 'Gitarre').trim();
@@ -433,6 +431,8 @@ export const JuniorAudioBiographyWizard: React.FC<JuniorAudioBiographyWizardProp
     const secs = s % 60;
     return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
   };
+
+  if (!isOpen) return null;
 
   return (
     <div style={{

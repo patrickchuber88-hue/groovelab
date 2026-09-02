@@ -38,8 +38,12 @@ apply_migration() {
 apply_migration "$MIGRATIONS_DIR/330_tier1_enterprise_immediate_protection_and_auth_rpc.sql"
 apply_migration "$MIGRATIONS_DIR/331_tier1_enterprise_role_switch_and_ghost_session_hardening.sql"
 apply_migration "$MIGRATIONS_DIR/332_tier1_enterprise_storage_and_destructive_operations_hardening.sql"
+apply_migration "$MIGRATIONS_DIR/336_restore_session_lease_rpc_and_auth_resolver.sql"
+apply_migration "$MIGRATIONS_DIR/339_enterprise_crisis_governance_and_audit.sql"
+apply_migration "$MIGRATIONS_DIR/340_fix_switch_user_active_role_type_cast.sql"
+apply_migration "$MIGRATIONS_DIR/341_fix_users_view_user_secrets_permission.sql"
 
 echo "🔄 Schema-Cache aktualisieren..."
 ssh "$SERVER" "docker exec -i $DB_CONTAINER psql -U postgres -d postgres -c \"NOTIFY pgrst, 'reload schema';\"" || true
 
-echo "✅ Alle Sicherheitsmigrationen (330, 331, 332) wurden erfolgreich auf dem Produktivserver angewendet!"
+echo "✅ Alle Sicherheitsmigrationen (330, 331, 332, 336, 339, 340, 341) wurden erfolgreich auf dem Produktivserver angewendet!"

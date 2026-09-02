@@ -3246,7 +3246,7 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
 
     let masterUrl = editTempMasterUrl || editingTrackData.masteredAudioUrl || null;
     if (!masterUrl) {
-      targetMasterUrlCheck: try {
+      try {
         masterUrl = await resolvePlayableUrl(editingTrackData.audioUrl, editingTrackData.masteredAudioUrl, editingTrackData.trackId, 'master');
       } catch (e) {}
     }

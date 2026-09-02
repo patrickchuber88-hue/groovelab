@@ -1,18 +1,9 @@
 -- ==============================================================================
--- Migration 331: Tier-1 SaaS Enterprise+ Role Switching & Ghost Session Hardening
--- Standards: OWASP ASVS Level 3 / Zero-Trust Defense-in-Depth / Multi-Tenancy Boundary
---
--- 1. SECURE ROLE SWITCH RPC: switch_user_active_role() allows role switching only
---    if the target role is strictly assigned in the user's verified roles array.
--- 2. SECURE GHOST SUPPORT RPC: activate_support_ghost_session() enables Master Admin
---    support sessions with strict authorization, 2h TTL leases, and audit logging.
--- 3. ZERO-TRUST TRIGGER PROTECTION: handle_users_view_dml() rejects unauthorized
---    mutations to school_id, is_master_admin, roles, or unauthorized role escalation.
+-- MIGRATION 340: FIX ROLE SWITCH & USERS VIEW DML TYPE CASTING
+-- Fixes: "COALESCE could not convert type user_role[] to text[]" in switch_user_active_role
 -- ==============================================================================
 
--- ------------------------------------------------------------------------------
--- 1. SECURE ROLE SWITCH RPC (STRICT AUTHORIZATION BASED ON ROLES ARRAY)
--- ------------------------------------------------------------------------------
+-- 1. FIX SECURE ROLE SWITCH RPC (TYPE-SAFE ROLES ARRAY CASTING)
 CREATE OR REPLACE FUNCTION public.switch_user_active_role(p_target_role text)
 RETURNS jsonb
 LANGUAGE plpgsql
@@ -44,7 +35,8 @@ BEGIN
     END IF;
 
     v_is_master := COALESCE(v_user.is_master_admin, false) OR public.is_master_admin();
-    
+
+    -- Safe array extraction without COALESCE type mismatch between user_role[] and text[]
     IF v_user.roles IS NOT NULL THEN
         v_allowed_roles := v_user.roles::text[];
     ELSE
@@ -58,7 +50,7 @@ BEGIN
 
     -- Update active role in users_raw
     UPDATE public.users_raw
-    SET role = v_target_clean, last_seen = NOW()
+    SET role = v_target_clean::public.user_role, last_seen = NOW()
     WHERE id = v_uid;
 
     -- Update active session leases for this user
@@ -76,131 +68,24 @@ $$;
 
 GRANT EXECUTE ON FUNCTION public.switch_user_active_role(text) TO anon, authenticated, service_role;
 
--- ------------------------------------------------------------------------------
--- 2. SECURE GHOST SUPPORT SESSION RPC (MASTER ADMIN ONLY WITH AUDIT LOG)
--- ------------------------------------------------------------------------------
-CREATE OR REPLACE FUNCTION public.activate_support_ghost_session(
-    p_school_id uuid,
-    p_target_user_id uuid DEFAULT NULL,
-    p_role text DEFAULT 'admin',
-    p_reason text DEFAULT 'Support & Diagnostic Inspection'
-)
-RETURNS jsonb
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public, private_auth, pg_temp, extensions
-AS $$
-DECLARE
-    v_admin_id UUID := public.get_current_authenticated_user_id();
-    v_is_master BOOLEAN := public.is_master_admin();
-    v_ghost_token UUID;
-    v_target_user record;
-    v_school record;
-BEGIN
-    -- Strict Master Admin Verification
-    IF NOT v_is_master THEN
-        RAISE EXCEPTION 'Zugriff verweigert: Nur Master-Administratoren dürfen Support-Ghost-Sitzungen aktivieren.';
-    END IF;
-
-    -- Verify target school exists
-    SELECT * INTO v_school
-    FROM public.schools
-    WHERE id = p_school_id;
-
-    IF v_school.id IS NULL THEN
-        RAISE EXCEPTION 'Musikschule mit der ID % nicht gefunden.', p_school_id;
-    END IF;
-
-    -- Optional target user lookup
-    IF p_target_user_id IS NOT NULL THEN
-        SELECT * INTO v_target_user
-        FROM public.users_raw
-        WHERE id = p_target_user_id AND school_id = p_school_id;
-    END IF;
-
-    -- Generate ephemeral Ghost Session Lease (2-hour TTL)
-    v_ghost_token := gen_random_uuid();
-    INSERT INTO public.session_leases (
-        id,
-        user_id,
-        school_id,
-        role,
-        device_key,
-        created_at,
-        last_active_at,
-        is_revoked
-    ) VALUES (
-        v_ghost_token,
-        COALESCE(p_target_user_id, v_admin_id),
-        p_school_id,
-        COALESCE(LOWER(TRIM(p_role)), 'admin'),
-        'ghost_support_session',
-        NOW(),
-        NOW(),
-        FALSE
-    );
-
-    -- Log immutable audit event
-    INSERT INTO public.audit_logs (
-        user_id,
-        action,
-        target_type,
-        target_id,
-        details,
-        ip_address,
-        created_at
-    ) VALUES (
-        v_admin_id,
-        'GHOST_SUPPORT_SESSION_ACTIVATED',
-        'schools',
-        p_school_id,
-        jsonb_build_object(
-            'target_user_id', p_target_user_id,
-            'role', p_role,
-            'reason', p_reason,
-            'school_name', v_school.name,
-            'ghost_lease_token', v_ghost_token
-        ),
-        NULL,
-        NOW()
-    );
-
-    RETURN jsonb_build_object(
-        'success', true,
-        'ghost_lease_token', v_ghost_token,
-        'school_id', p_school_id,
-        'school_name', v_school.name,
-        'role', COALESCE(LOWER(TRIM(p_role)), 'admin'),
-        'target_user_id', p_target_user_id,
-        'expires_at', (NOW() + INTERVAL '2 hours')
-    );
-END;
-$$;
-
-GRANT EXECUTE ON FUNCTION public.activate_support_ghost_session(uuid, uuid, text, text) TO anon, authenticated, service_role;
-
--- ------------------------------------------------------------------------------
--- 3. REBUILD HANDLE_USERS_VIEW_DML TRIGGER WITH PRIVILEGE-ESCALATION GUARDS
--- ------------------------------------------------------------------------------
+-- 2. FIX USERS VIEW DML TRIGGER FUNCTION
 CREATE OR REPLACE FUNCTION public.handle_users_view_dml()
 RETURNS TRIGGER
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public, pg_catalog, extensions
+SET search_path = public, pg_temp, extensions
 AS $$
 DECLARE
-    email_parts TEXT[];
-    email_prefix TEXT;
-    email_suffix TEXT;
-    hashed_parent_pin TEXT;
-    v_is_master BOOLEAN := public.is_master_admin();
+    v_caller_uid uuid;
+    v_is_master boolean := false;
+    hashed_parent_pin text := NULL;
+    v_allowed_roles text[];
 BEGIN
-    IF TG_OP = 'DELETE' THEN
-        DELETE FROM public.user_email_prefixes WHERE user_id = OLD.id;
-        DELETE FROM public.user_email_suffixes WHERE user_id = OLD.id;
-        DELETE FROM private_auth.user_secrets WHERE user_id = OLD.id;
-        DELETE FROM public.users_raw WHERE id = OLD.id;
-        RETURN OLD;
+    v_caller_uid := public.get_current_authenticated_user_id();
+
+    -- Determine if caller has master admin authority
+    IF public.is_master_admin() THEN
+        v_is_master := true;
     END IF;
 
     -- Parent PIN hashing if supplied
@@ -268,21 +153,20 @@ BEGIN
         RETURN NEW;
     ELSIF TG_OP = 'UPDATE' THEN
         -- ZERO-TRUST PRIVILEGE-ESCALATION GUARDS:
-        -- Non-master admins cannot alter school_id, is_master_admin, roles, or perform unassigned role escalation.
         IF NOT v_is_master THEN
             NEW.school_id := OLD.school_id;
             NEW.is_master_admin := OLD.is_master_admin;
             NEW.roles := OLD.roles;
-            -- Only allow role change if the target role exists in OLD.roles
+            -- Only allow role change if target role exists in OLD.roles
             IF NEW.role IS DISTINCT FROM OLD.role THEN
                 IF OLD.roles IS NOT NULL THEN
-                    IF NOT (NEW.role::text = ANY(OLD.roles::text[])) THEN
-                        NEW.role := OLD.role;
-                    END IF;
+                    v_allowed_roles := OLD.roles::text[];
                 ELSE
-                    IF NOT (NEW.role = OLD.role) THEN
-                        NEW.role := OLD.role;
-                    END IF;
+                    v_allowed_roles := ARRAY[OLD.role::text];
+                END IF;
+
+                IF NOT (NEW.role::text = ANY(v_allowed_roles)) THEN
+                    NEW.role := OLD.role;
                 END IF;
             END IF;
         END IF;
@@ -377,6 +261,9 @@ BEGIN
             qr_token_redeemed_at = COALESCE(NEW.qr_token_redeemed_at, users_raw.qr_token_redeemed_at)
         WHERE id = OLD.id;
         RETURN NEW;
+    ELSIF TG_OP = 'DELETE' THEN
+        DELETE FROM public.users_raw WHERE id = OLD.id;
+        RETURN OLD;
     END IF;
     RETURN NULL;
 END;

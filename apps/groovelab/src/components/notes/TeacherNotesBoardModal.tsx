@@ -46,11 +46,13 @@ import {
   Lock,
   Unlock,
   Users,
-  Filter
+  Filter,
+  Download
 } from 'lucide-react';
 import { UserNote, maskStudentName } from '../../services/notesService';
 import { useVoiceToText } from '../../hooks/useVoiceToText';
 import { checkIsAudioTresorActive } from '../../domain/stickersAndTresor';
+import { generateTeacherNotesDailyPlanPDF } from '../../utils/pdfGenerator';
 import {
   TagDefinition,
   STUDENT_SKILL_TAGS,
@@ -202,6 +204,43 @@ export const TeacherNotesBoardModal: React.FC<TeacherNotesBoardModalProps> = ({
   const [studentFilterScope, setStudentFilterScope] = useState<'today' | 'all'>('today');
   const [studentSearchQuery, setStudentSearchQuery] = useState<string>('');
   const [studentQuickInput, setStudentQuickInput] = useState<{ [studentId: string]: string }>({});
+
+  // 📄 1-Click Apple Quick-Look PDF Preview State
+  const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null);
+  const [pdfPreviewFilename, setPdfPreviewFilename] = useState<string>('Tagesplan.pdf');
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+
+  const handleOpenPdfPreview = async () => {
+    try {
+      setIsGeneratingPdf(true);
+      const res = await generateTeacherNotesDailyPlanPDF({
+        teacherName: user?.first_name ? `${user.first_name} ${user.last_name || ''}` : 'Lehrkraft',
+        schoolName: user?.school_name || 'Campus-Groovelab',
+        notes: notes.map(n => ({
+          id: n.id,
+          content: n.content,
+          studentName: n.student_name || undefined,
+          tag: n.tags?.[0],
+          isCompleted: n.is_completed,
+          dueDate: n.due_date || undefined
+        })),
+        todayStudents
+      }, 'preview');
+      setPdfPreviewUrl(res.blobUrl);
+      setPdfPreviewFilename(res.filename);
+    } catch (err) {
+      console.error('Error generating PDF preview:', err);
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  };
+
+  const handleClosePdfPreview = () => {
+    if (pdfPreviewUrl) {
+      URL.revokeObjectURL(pdfPreviewUrl);
+    }
+    setPdfPreviewUrl(null);
+  };
 
   // 🔍 Omni Typeahead Suggestions Calculation
   const omniSuggestions = useMemo(() => {
@@ -453,12 +492,11 @@ export const TeacherNotesBoardModal: React.FC<TeacherNotesBoardModalProps> = ({
     }
   });
 
-  // Categorize for Kanban
+  // Categorize for 4 Clean Kanban Columns (Apple Blueprint)
   const kanbanColumns = useMemo(() => {
     const inbox: UserNote[] = [];
     const students: UserNote[] = [];
-    const todos: UserNote[] = [];
-    const orga: UserNote[] = [];
+    const todosOrga: UserNote[] = [];
     const completed: UserNote[] = [];
 
     filteredNotes.forEach(note => {
@@ -466,10 +504,13 @@ export const TeacherNotesBoardModal: React.FC<TeacherNotesBoardModalProps> = ({
         completed.push(note);
       } else if (note.student_id || note.student_name || note.note_type === 'student_note' || (note.tags || []).some(t => STUDENT_SKILL_TAGS.some(st => st.key === t.replace(/^#/, '').toLowerCase()))) {
         students.push(note);
-      } else if (note.note_type === 'todo' || (note.content || '').startsWith('- ') || (note.tags || []).includes('todo') || (note.tags || []).includes('#To-Do')) {
-        todos.push(note);
-      } else if (note.room_id || (note.tags || []).some(t => ['raum', 'verwaltung', 'konzert'].includes(t.replace(/^#/, '').toLowerCase()))) {
-        orga.push(note);
+      } else if (
+        note.note_type === 'todo' || 
+        note.room_id || 
+        (note.content || '').startsWith('- ') || 
+        (note.tags || []).some(t => ['todo', '#to-do', 'raum', '#raum', 'verwaltung', '#verwaltung', 'konzert', '#konzert', 'idee', '#idee', 'wichtig', '#wichtig'].includes(t.toLowerCase()))
+      ) {
+        todosOrga.push(note);
       } else {
         inbox.push(note);
       }
@@ -490,9 +531,8 @@ export const TeacherNotesBoardModal: React.FC<TeacherNotesBoardModalProps> = ({
 
     return [
       { id: 'inbox', title: 'Inbox & Gedanken', icon: Inbox, count: inbox.length, items: sortByOrder(inbox), color: '#475569', bg: '#f1f5f9', border: '#e2e8f0', emptyHint: 'Gedanken ohne Schüler-Zuordnung landen hier als persönlicher Zettel' },
-      { id: 'students', title: 'Schüler & Hausaufgaben', icon: User, count: students.length, items: sortByOrder(students), color: '#166534', bg: '#e6f4ea', border: '#bbf7d0', emptyHint: 'Schüler-Notizen und Hausaufgaben erscheinen hier' },
-      { id: 'todos', title: 'Wochen-To-Dos', icon: CheckSquare, count: todos.length, items: sortByOrder(todos), color: '#1e40af', bg: '#eff6ff', border: '#bfdbfe', emptyHint: 'Alle Wochen-Aufgaben erledigt' },
-      { id: 'orga', title: 'Raum & Verwaltung', icon: DoorOpen, count: orga.length, items: sortByOrder(orga), color: '#991b1b', bg: '#fee2e2', border: '#fecaca', emptyHint: 'Keine Raum-Mängel oder Orga-Meldungen offen' },
+      { id: 'students', title: 'Schüler & Didaktik', icon: GraduationCap, count: students.length, items: sortByOrder(students), color: '#166534', bg: '#e6f4ea', border: '#bbf7d0', emptyHint: 'Schüler-Notizen und Hausaufgaben-Beobachtungen' },
+      { id: 'todos_orga', title: 'Wochen-To-Dos & Organisation', icon: CheckSquare, count: todosOrga.length, items: sortByOrder(todosOrga), color: '#1e40af', bg: '#eff6ff', border: '#bfdbfe', emptyHint: 'Aufgaben, Raum-, Noten- & Verwaltungsnotizen' },
       { id: 'completed', title: 'Erledigt & Archiv', icon: Archive, count: completed.length, items: sortByOrder(completed), color: '#15803d', bg: '#f0fdf4', border: '#bbf7d0', emptyHint: 'Erledigte und archivierte Notizen' }
     ];
   }, [filteredNotes, customNotesOrder]);
@@ -627,7 +667,7 @@ export const TeacherNotesBoardModal: React.FC<TeacherNotesBoardModalProps> = ({
     if (colId === 'todos') {
       await onCreateNote(text, { note_type: 'todo', tags: ['#To-Do'] });
     } else if (colId === 'orga') {
-      await onCreateNote(text, { note_type: 'room_issue', tags: ['#Raum'] });
+      await onCreateNote(text, { note_type: 'room_issue' });
     } else if (colId === 'students') {
       await onCreateNote(text, { note_type: 'student_note' });
     } else if (colId === 'completed') {
@@ -866,7 +906,7 @@ export const TeacherNotesBoardModal: React.FC<TeacherNotesBoardModalProps> = ({
         }}
       >
         {/* ========================================================================= */}
-        {/* 1. MASTER HEADER                                                         */}
+        {/* 1. MASTER APPLE HIG HEADER                                               */}
         {/* ========================================================================= */}
         <div style={{
           padding: '16px 24px',
@@ -997,36 +1037,36 @@ export const TeacherNotesBoardModal: React.FC<TeacherNotesBoardModalProps> = ({
             </button>
           </div>
 
-          {/* Right: + Notiz Button + Search + Close */}
+          {/* Right: Print PDF + Filter Toggle + Search + Close */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {/* 1-Click Print Tages-Plan PDF (Apple Quick-Look Preview) */}
             <button
               type="button"
-              onClick={() => {
-                setShowUniversalAdd(prev => !prev);
-                setTimeout(() => quickInputRef.current?.focus(), 50);
-              }}
+              onClick={handleOpenPdfPreview}
+              disabled={isGeneratingPdf}
+              title="Druck-Vorschau (DIN A4) für den Tages-Fahrplan öffnen"
               style={{
-                background: '#0f172a',
-                color: '#ffffff',
-                border: 'none',
+                background: '#f8fafc',
+                color: '#334155',
+                border: '1px solid #cbd5e1',
                 borderRadius: '10px',
-                padding: '6px 14px',
+                padding: '6px 12px',
                 fontSize: '0.76rem',
-                fontWeight: 800,
-                cursor: 'pointer',
+                fontWeight: 750,
+                cursor: isGeneratingPdf ? 'wait' : 'pointer',
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: '6px',
-                boxShadow: '0 2px 6px rgba(15, 23, 42, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.2)',
-                transition: 'all 0.15s ease'
+                transition: 'all 0.15s ease',
+                opacity: isGeneratingPdf ? 0.7 : 1
               }}
               className="hover-scale"
             >
-              <Plus size={13} strokeWidth={2.5} />
-              <span>Notiz erfassen</span>
-              <kbd style={{ background: 'rgba(255,255,255,0.2)', padding: '1px 4px', borderRadius: '4px', fontSize: '0.62rem', fontFamily: 'monospace' }}>⌘N</kbd>
+              <Printer size={13} color="#475569" />
+              <span>{isGeneratingPdf ? 'Lade Vorschau...' : 'Tagesplan PDF'}</span>
             </button>
 
+            {/* Smart Search Bar */}
             <div style={{
               display: 'flex',
               alignItems: 'center',
@@ -1040,7 +1080,7 @@ export const TeacherNotesBoardModal: React.FC<TeacherNotesBoardModalProps> = ({
               <Search size={13} color="#94a3b8" />
               <input
                 type="text"
-                placeholder="Notizen suchen... (J/K)"
+                placeholder="Suchen... (J/K)"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 style={{
@@ -1063,6 +1103,7 @@ export const TeacherNotesBoardModal: React.FC<TeacherNotesBoardModalProps> = ({
               )}
             </div>
 
+            {/* Close Button */}
             <button
               type="button"
               onClick={onClose}
@@ -1087,174 +1128,8 @@ export const TeacherNotesBoardModal: React.FC<TeacherNotesBoardModalProps> = ({
           </div>
         </div>
 
-        {/* Universal Quick Add Banner (When ⌘N or + Notiz clicked) */}
-        {showUniversalAdd && (
-          <div style={{
-            padding: '12px 24px',
-            background: '#f1f5f9',
-            borderBottom: '1px solid #e2e8f0',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '10px',
-            animation: 'slideDown 0.15s ease-out'
-          }}>
-            <input
-              ref={quickInputRef}
-              type="text"
-              placeholder="Gedanke, @Schüler, - Checkbox, !Raum oder BPM eingeben..."
-              value={universalInputContent}
-              onChange={(e) => setUniversalInputContent(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  handleUniversalCreateNote();
-                }
-              }}
-              style={{
-                flex: 1,
-                padding: '8px 14px',
-                background: '#ffffff',
-                border: '1px solid #cbd5e1',
-                borderRadius: '10px',
-                fontSize: '0.82rem',
-                fontWeight: 600,
-                outline: 'none'
-              }}
-            />
-            <button
-              type="button"
-              onClick={handleUniversalCreateNote}
-              style={{
-                background: '#0f172a',
-                color: '#ffffff',
-                border: 'none',
-                borderRadius: '10px',
-                padding: '8px 16px',
-                fontSize: '0.76rem',
-                fontWeight: 800,
-                cursor: 'pointer'
-              }}
-            >
-              Speichern
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowUniversalAdd(false)}
-              style={{
-                background: 'transparent',
-                border: 'none',
-                color: '#64748b',
-                fontSize: '0.76rem',
-                cursor: 'pointer',
-                padding: '8px'
-              }}
-            >
-              Abbrechen
-            </button>
-          </div>
-        )}
-
         {/* ========================================================================= */}
-        {/* 2. TAG FILTER BAR (Didaktik & Orga Filter)                                */}
-        {/* ========================================================================= */}
-        <div style={{
-          padding: '8px 24px',
-          background: '#ffffff',
-          borderBottom: '1px solid #f1f5f9',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '6px',
-          overflowX: 'auto',
-          scrollbarWidth: 'none'
-        }} className="hide-scrollbar">
-          <button
-            type="button"
-            onClick={() => setSelectedTagFilter(null)}
-            style={{
-              border: !selectedTagFilter ? '1px solid #0f172a' : '1px solid #e2e8f0',
-              background: !selectedTagFilter ? '#0f172a' : '#ffffff',
-              color: !selectedTagFilter ? '#ffffff' : '#64748b',
-              fontSize: '0.68rem',
-              fontWeight: 800,
-              padding: '4px 10px',
-              borderRadius: '100px',
-              cursor: 'pointer',
-              whiteSpace: 'nowrap',
-              transition: 'all 0.15s ease'
-            }}
-          >
-            Alle ({notes.length})
-          </button>
-
-          <span style={{ width: '1px', height: '16px', background: '#e2e8f0', margin: '0 4px' }} />
-          <span style={{ fontSize: '0.64rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase' }}>Schüler-Didaktik:</span>
-
-          {STUDENT_SKILL_TAGS.map(t => {
-            const isSelected = selectedTagFilter === t.tag;
-            return (
-              <button
-                key={t.key}
-                type="button"
-                onClick={() => setSelectedTagFilter(prev => prev === t.tag ? null : t.tag)}
-                style={{
-                  border: isSelected ? `1.5px solid ${t.color}` : `1.5px solid ${t.border}`,
-                  background: isSelected ? t.color : t.bg,
-                  color: isSelected ? '#ffffff' : t.color,
-                  fontSize: '0.68rem',
-                  fontWeight: 800,
-                  padding: '3px 10px',
-                  borderRadius: '100px',
-                  cursor: 'pointer',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                  whiteSpace: 'nowrap',
-                  boxShadow: isSelected ? `0 2px 8px ${t.color}35` : '0 1px 2px rgba(0,0,0,0.02)',
-                  transition: 'all 0.15s cubic-bezier(0.16, 1, 0.3, 1)'
-                }}
-              >
-                <span>{renderMonochromeTagIcon(t.iconName, 10, isSelected ? '#ffffff' : t.color)}</span>
-                <span>{t.label}</span>
-              </button>
-            );
-          })}
-
-          <span style={{ width: '1px', height: '16px', background: '#e2e8f0', margin: '0 4px' }} />
-          <span style={{ fontSize: '0.64rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase' }}>Organisation:</span>
-
-          {TEACHER_ORGANIZATION_TAGS.map(t => {
-            const isSelected = selectedTagFilter === t.tag;
-            return (
-              <button
-                key={t.key}
-                type="button"
-                onClick={() => setSelectedTagFilter(prev => prev === t.tag ? null : t.tag)}
-                style={{
-                  border: isSelected ? `1.5px solid ${t.color}` : `1.5px solid ${t.border}`,
-                  background: isSelected ? t.color : t.bg,
-                  color: isSelected ? '#ffffff' : t.color,
-                  fontSize: '0.68rem',
-                  fontWeight: 800,
-                  padding: '3px 10px',
-                  borderRadius: '100px',
-                  cursor: 'pointer',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                  whiteSpace: 'nowrap',
-                  boxShadow: isSelected ? `0 2px 8px ${t.color}35` : '0 1px 2px rgba(0,0,0,0.02)',
-                  transition: 'all 0.15s cubic-bezier(0.16, 1, 0.3, 1)'
-                }}
-              >
-                <span>{renderMonochromeTagIcon(t.iconName, 10, isSelected ? '#ffffff' : t.color)}</span>
-                <span>{t.label}</span>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* ========================================================================= */}
-        {/* 2.5 ✨ PROMINENTE OMNI-CAPTURE TOP STAGE (Spotlight Quick Input Bank)      */}
+        {/* 2. ✨ PROMINENTE OMNI-CAPTURE TOP STAGE (Spotlight Quick Input Bank)      */}
         {/* ========================================================================= */}
         <div style={{
           padding: '10px 24px',
@@ -1295,7 +1170,7 @@ export const TeacherNotesBoardModal: React.FC<TeacherNotesBoardModalProps> = ({
             <input
               ref={omniInputRef}
               type="text"
-              placeholder="Notiz, Hausaufgabe oder Beobachtung blitzschnell erfassen... (@Schüler, #Tag)"
+              placeholder="Notiz, Hausaufgabe oder Beobachtung blitzschnell erfassen... (@Schüler, #Tag, morgen, !Raum)"
               value={omniContent}
               onChange={(e) => {
                 const cursor = e.target.selectionStart || e.target.value.length;
@@ -2534,6 +2409,163 @@ export const TeacherNotesBoardModal: React.FC<TeacherNotesBoardModalProps> = ({
               </button>
             </div>
           )}
+
+          {/* ========================================================================= */}
+          {/* 🍏 APPLE QUICK-LOOK PDF VORSCHAU-MODAL (1-Click Print & Save)             */}
+          {/* ========================================================================= */}
+          {pdfPreviewUrl && (
+            <div style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(15, 23, 42, 0.75)',
+              backdropFilter: 'blur(16px)',
+              WebkitBackdropFilter: 'blur(16px)',
+              zIndex: 999999,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '24px'
+            }}>
+              <div style={{
+                background: '#ffffff',
+                borderRadius: '24px',
+                width: '100%',
+                maxWidth: '960px',
+                height: '90vh',
+                display: 'flex',
+                flexDirection: 'column',
+                overflow: 'hidden',
+                boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.2) inset',
+                animation: 'scaleUp 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
+              }}>
+                {/* Quick-Look Header */}
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '14px 20px',
+                  borderBottom: '1px solid #e2e8f0',
+                  background: 'rgba(248, 250, 252, 0.95)'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div style={{
+                      width: '32px',
+                      height: '32px',
+                      borderRadius: '10px',
+                      background: '#e6f4ea',
+                      color: '#166534',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}>
+                      <Printer size={16} />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '0.94rem', fontWeight: 800, color: '#0f172a' }}>
+                        Tages-Fahrplan (Druck-Vorschau)
+                      </div>
+                      <div style={{ fontSize: '0.70rem', color: '#64748b', fontWeight: 600 }}>
+                        DIN A4 • Für Notenständer & Unterrichtsvorbereitung
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    {/* 1-Click Print */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const iframe = document.getElementById('pdf-quicklook-iframe') as HTMLIFrameElement;
+                        if (iframe && iframe.contentWindow) {
+                          iframe.contentWindow.print();
+                        } else {
+                          window.print();
+                        }
+                      }}
+                      style={{
+                        background: '#0f172a',
+                        color: '#ffffff',
+                        border: 'none',
+                        borderRadius: '10px',
+                        padding: '8px 14px',
+                        fontSize: '0.78rem',
+                        fontWeight: 750,
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        boxShadow: '0 2px 6px rgba(15, 23, 42, 0.2)'
+                      }}
+                      className="hover-scale"
+                    >
+                      <Printer size={14} color="#ffffff" />
+                      <span>Drucken (⌘P)</span>
+                    </button>
+
+                    {/* Direct Download */}
+                    <a
+                      href={pdfPreviewUrl}
+                      download={pdfPreviewFilename}
+                      style={{
+                        background: '#ffffff',
+                        color: '#0f172a',
+                        border: '1px solid #cbd5e1',
+                        borderRadius: '10px',
+                        padding: '8px 14px',
+                        fontSize: '0.78rem',
+                        fontWeight: 750,
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        textDecoration: 'none'
+                      }}
+                      className="hover-scale"
+                    >
+                      <Download size={14} color="#0f172a" />
+                      <span>PDF Speichern</span>
+                    </a>
+
+                    {/* Close */}
+                    <button
+                      type="button"
+                      onClick={handleClosePdfPreview}
+                      style={{
+                        background: '#f1f5f9',
+                        border: 'none',
+                        borderRadius: '50%',
+                        width: '32px',
+                        height: '32px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: '#64748b',
+                        cursor: 'pointer'
+                      }}
+                      className="hover-scale"
+                      title="Schließen (Esc)"
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Embedded PDF Viewer */}
+                <div style={{ flex: 1, background: '#525659', position: 'relative' }}>
+                  <iframe
+                    id="pdf-quicklook-iframe"
+                    src={pdfPreviewUrl}
+                    title="PDF Quick Look"
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      border: 'none'
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -3142,8 +3174,33 @@ export const NoteCardItem: React.FC<NoteCardItemProps> = ({
   const isDuePickerOpen = activeDueDatePickerNoteId === note.id;
   const isStudentPickerOpen = activeStudentPickerNoteId === note.id;
 
-  // Filter out redundant '#To-Do' tag if inside To-Do column unless it has other tags
-  const visibleTags = (note.tags || []).filter(t => columnId === 'todos' ? t.toLowerCase() !== '#to-do' : true);
+  // Intelligent Room Display Calculation (supports note.room_id, dynamic tags, or fallback extraction from content)
+  const detectedRoomLabel = useMemo(() => {
+    if (note.room_id && note.room_id.toLowerCase() !== 'raum') {
+      return note.room_id;
+    }
+    const tagRoom = (note.tags || []).find(t => {
+      const clean = t.replace(/^#/, '').toLowerCase();
+      return clean.startsWith('raum') || clean.startsWith('saal') || clean.startsWith('studio') || clean.startsWith('keller') || clean.startsWith('konzertsaal') || clean.startsWith('eg') || clean.startsWith('og');
+    });
+    if (tagRoom) {
+      const cleanTag = tagRoom.replace(/^#/, '').trim();
+      if (cleanTag.toLowerCase() !== 'raum') return cleanTag.charAt(0).toUpperCase() + cleanTag.slice(1);
+    }
+    const match = note.content.match(/(?:!|#|\b)(Raum\s*\d+|Saal\s*\d*|Studio\s*\d*|Konzertsaal|Bandraum|Keller|EG|OG\s*\d*)\b/i);
+    if (match) return match[1].trim();
+    return note.room_id || (note.note_type === 'room_issue' ? 'Raum' : null);
+  }, [note.room_id, note.tags, note.content, note.note_type]);
+
+  const hasRoomBadge = Boolean(detectedRoomLabel || note.note_type === 'room_issue');
+
+  // Filter out redundant '#To-Do' tag if inside To-Do column AND filter out room tag if room badge is already rendered
+  const visibleTags = (note.tags || []).filter(t => {
+    const clean = t.replace(/^#/, '').toLowerCase();
+    if (columnId === 'todos' && clean === 'to-do') return false;
+    if (hasRoomBadge && (clean === 'raum' || (detectedRoomLabel && clean === detectedRoomLabel.toLowerCase()))) return false;
+    return true;
+  });
   const primaryTag = visibleTags.length > 0 ? visibleTags[0] : null;
   const tagStyle = primaryTag ? getAllTagStyle(primaryTag) : null;
 
@@ -3421,7 +3478,7 @@ export const NoteCardItem: React.FC<NoteCardItemProps> = ({
           )}
 
           {/* Metadata badges: Room, Defect status */}
-          {(note.room_id || note.note_type === 'room_issue') && (
+          {hasRoomBadge && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap', marginTop: '2px' }}>
               <span style={{ 
                 fontSize: '0.60rem', 
@@ -3436,7 +3493,7 @@ export const NoteCardItem: React.FC<NoteCardItemProps> = ({
                 gap: '2px' 
               }}>
                 <DoorOpen size={8} color="#dc2626" />
-                {note.room_id || 'Raum'}
+                {detectedRoomLabel || 'Raum'}
               </span>
               {note.note_type === 'room_issue' && (
                 note.is_completed || note.is_acknowledged ? (

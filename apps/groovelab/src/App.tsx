@@ -7890,9 +7890,12 @@ function App() {
               } catch (e) {}
               sessionStorage.removeItem('groovelab_user_id');
               sessionStorage.removeItem('groovelab_location_mode');
+              sessionStorage.removeItem('groovelab_cached_user');
+              sessionStorage.removeItem('gl_active_session_lease_id');
               localStorage.removeItem('groovelab_user_id');
               localStorage.removeItem('groovelab_location_mode');
               localStorage.removeItem('groovelab_cached_user');
+              localStorage.removeItem('gl_active_session_lease_id');
               setLoggedInUserId(null);
               setUser(null);
               setLoading(false);

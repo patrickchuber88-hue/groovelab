@@ -9,6 +9,10 @@
   "scripts": {
     "dev:groovelab": "npm run dev -w apps/groovelab",
     "build:groovelab": "npm run build -w apps/groovelab",
+    "security:check": "npm run security:check -w apps/groovelab",
+    "security:secrets": "npm run security:secrets -w apps/groovelab",
+    "test:billing": "npm run test:billing -w apps/groovelab",
+    "typecheck": "tsc -p apps/groovelab/tsconfig.json --noEmit",
     "check:budget": "node scripts/check-bundle-budget.js"
   },
   "dependencies": {

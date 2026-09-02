@@ -406,18 +406,8 @@ SELECT
     NULL::text AS two_factor_secret,
     NULL::text AS parent_pin,
     NULL::text AS personal_pin,
-    EXISTS (
-        SELECT 1 FROM private_auth.user_secrets us 
-        WHERE us.user_id = ur.id 
-          AND us.argon2_parent_pin_hash IS NOT NULL 
-          AND us.argon2_parent_pin_hash <> ''
-    ) AS has_parent_pin,
-    EXISTS (
-        SELECT 1 FROM private_auth.user_secrets us 
-        WHERE us.user_id = ur.id 
-          AND us.argon2_personal_pin_hash IS NOT NULL 
-          AND us.argon2_personal_pin_hash <> ''
-    ) AS has_personal_pin,
+    public.user_has_parent_pin(ur.id) AS has_parent_pin,
+    public.user_has_personal_pin(ur.id) AS has_personal_pin,
     ur.failed_pin_attempts,
     ur.pin_locked_until,
     ur.sessions_revoked_at,

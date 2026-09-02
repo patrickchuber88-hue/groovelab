@@ -206,6 +206,50 @@ function InstrumentBadge({ instrument, color }: { instrument: string; color: str
 }
 
 export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
+  const [windowWidth, setWindowWidth] = useState(() => typeof window !== 'undefined' ? window.innerWidth : 1200);
+  const [orientationTick, setOrientationTick] = useState(0);
+
+  useEffect(() => {
+    const handleOrientationChange = () => {
+      setWindowWidth(window.innerWidth);
+      setOrientationTick(t => t + 1);
+    };
+    window.addEventListener('resize', handleOrientationChange);
+    window.addEventListener('orientationchange', handleOrientationChange);
+    window.addEventListener('groovelab_orientation_changed', handleOrientationChange);
+    return () => {
+      window.removeEventListener('resize', handleOrientationChange);
+      window.removeEventListener('orientationchange', handleOrientationChange);
+      window.removeEventListener('groovelab_orientation_changed', handleOrientationChange);
+    };
+  }, []);
+
+  const isMobilePortrait = useMemo(() => {
+    const isInsideSim = typeof document !== 'undefined' && (
+      document.querySelector('.sim-viewport-mobile, .sim-viewport-portrait') !== null ||
+      document.querySelector('.sim-viewport-tablet') !== null
+    );
+
+    const isSimLandscape = typeof document !== 'undefined' && document.querySelector('.sim-viewport-landscape') !== null;
+
+    const isLandscapeMode = isSimLandscape || (
+      !isInsideSim && typeof window !== 'undefined' && window.innerWidth > window.innerHeight && window.innerWidth > 768
+    );
+
+    return !isLandscapeMode && (
+      (typeof document !== 'undefined' && document.querySelector('.sim-viewport-mobile, .sim-viewport-portrait') !== null && !isSimLandscape) ||
+      (!isInsideSim && typeof window !== 'undefined' && window.innerWidth <= 834)
+    );
+  }, [windowWidth, orientationTick]);
+
+  if (!isMobilePortrait) {
+    return <ScheduleBoardDesktop schoolId={schoolId} userId={userId} />;
+  }
+
+  return <ScheduleBoardMobileView schoolId={schoolId} userId={userId} />;
+}
+
+function ScheduleBoardMobileView({ schoolId, userId }: ScheduleBoardProps) {
   const { visible: showRealNames, toggleVisibility: toggleRealNames } = useRealNamesVisibility();
 
   useEffect(() => {
@@ -236,48 +280,8 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
   const [showDayPickerMenu, setShowDayPickerMenu] = useState<boolean>(false);
   const [moveStudentModalState, setMoveStudentModalState] = useState<{ boardId: string; student: Student } | null>(null);
   const [showAutoAssignWizardModal, setShowAutoAssignWizardModal] = useState<boolean>(false);
-  const [windowWidth, setWindowWidth] = useState(() => typeof window !== 'undefined' ? window.innerWidth : 1200);
-  const [orientationTick, setOrientationTick] = useState(0);
 
-  useEffect(() => {
-    const handleOrientationChange = () => {
-      setWindowWidth(window.innerWidth);
-      setOrientationTick(t => t + 1);
-    };
-    window.addEventListener('resize', handleOrientationChange);
-    window.addEventListener('orientationchange', handleOrientationChange);
-    window.addEventListener('groovelab_orientation_changed', handleOrientationChange);
-    return () => {
-      window.removeEventListener('resize', handleOrientationChange);
-      window.removeEventListener('orientationchange', handleOrientationChange);
-      window.removeEventListener('groovelab_orientation_changed', handleOrientationChange);
-    };
-  }, []);
-
-  const { isLandscapeMode, isMobilePortrait } = useMemo(() => {
-    const isInsideSim = typeof document !== 'undefined' && (
-      document.querySelector('.sim-viewport-mobile, .sim-viewport-portrait') !== null ||
-      document.querySelector('.sim-viewport-tablet') !== null
-    );
-
-    const isSimLandscape = typeof document !== 'undefined' && document.querySelector('.sim-viewport-landscape') !== null;
-
-    const isLandscapeMode = isSimLandscape || (
-      !isInsideSim && typeof window !== 'undefined' && window.innerWidth > window.innerHeight && window.innerWidth > 768
-    );
-
-    const isMobilePortrait = !isLandscapeMode && (
-      (typeof document !== 'undefined' && document.querySelector('.sim-viewport-mobile, .sim-viewport-portrait') !== null && !isSimLandscape) ||
-      (!isInsideSim && typeof window !== 'undefined' && window.innerWidth <= 834)
-    );
-
-    return { isLandscapeMode, isMobilePortrait };
-  }, [windowWidth, orientationTick]);
-
-  if (!isMobilePortrait) {
-    return <ScheduleBoardDesktop schoolId={schoolId} userId={userId} />;
-  }
-
+  const isMobilePortrait = true;
   const isProgrammaticScrollingRef = useRef(false);
 
   const navigateToDay = (targetDay: number) => {

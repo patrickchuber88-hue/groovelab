@@ -12,16 +12,16 @@ import { broadcastLogoutToPeerTabs } from './authBroadcastSync';
  * Performs complete cryptographic memory wipe and storage zeroization upon logout or tenant switch.
  */
 export function executeSessionZeroize(options: { preserveDeviceKey?: boolean; redirectUrl?: string; broadcast?: boolean } = {}): void {
-  const { preserveDeviceKey = true, redirectUrl = '/', broadcast = true } = options;
+  const { preserveDeviceKey = true, redirectUrl, broadcast = false } = options;
 
   try {
-    console.info('[Security] Initiating complete session zeroization...');
+    console.info('[Security] Initiating complete session zeroization (broadcast=' + broadcast + ')...');
 
     if (broadcast) {
       broadcastLogoutToPeerTabs();
     }
 
-    // 1. Wipe sensitive localStorage items
+    // 1. Wipe sensitive localStorage items without flooding peer tabs with storage events
     const keysToPreserve = new Set(
       preserveDeviceKey ? ['gl_global_device_key', 'groovelab_kiosk_token', 'groovelab_station_id', 'groovelab_kiosk_room_id'] : []
     );
@@ -29,16 +29,16 @@ export function executeSessionZeroize(options: { preserveDeviceKey?: boolean; re
     const allKeys = Object.keys(localStorage);
     allKeys.forEach((key) => {
       if (!keysToPreserve.has(key)) {
-        // Overwrite before removing (defense against flash memory residual inspection)
         try {
-          localStorage.setItem(key, '00000000000000000000000000000000');
-        } catch (e) {}
-        localStorage.removeItem(key);
+          localStorage.removeItem(key);
+        } catch (_) {}
       }
     });
 
     // 2. Wipe sessionStorage completely
-    sessionStorage.clear();
+    try {
+      sessionStorage.clear();
+    } catch (_) {}
 
     // 3. Purge Auth & Lease Cookies
     removeSecureCookie('cg_session_lease');
@@ -53,14 +53,14 @@ export function executeSessionZeroize(options: { preserveDeviceKey?: boolean; re
 
     console.info('[Security] Session zeroization complete.');
 
-    // 5. Navigate to clean destination if requested
+    // 5. Navigate to clean destination if requested and not already there
     if (redirectUrl && typeof window !== 'undefined') {
-      window.location.href = redirectUrl;
+      const current = window.location.pathname + window.location.search;
+      if (current !== redirectUrl) {
+        window.history.replaceState(null, '', redirectUrl);
+      }
     }
   } catch (err) {
     console.error('[Security] Error during session zeroization:', err);
-    if (redirectUrl && typeof window !== 'undefined') {
-      window.location.href = redirectUrl;
-    }
   }
 }

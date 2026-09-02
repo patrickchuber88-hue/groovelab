@@ -24,6 +24,7 @@ export function sanitizeTextInput(input: string | null | undefined): string {
     .replace(/vbscript:/gi, '')                                       // Strip vbscript: protocol
     .replace(/data:text\/html/gi, '')                                 // Strip data HTML
     .replace(/on\w+\s*=/gi, '')                                       // Strip inline event handlers (e.g. onload=)
+    // eslint-disable-next-line no-control-regex
     .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')                // Strip non-printable control characters
     .trim();
 }

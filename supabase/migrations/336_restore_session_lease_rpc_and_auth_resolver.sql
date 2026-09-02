@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS public.session_leases (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES public.users_raw(id) ON DELETE CASCADE,
     school_id UUID NOT NULL REFERENCES public.schools(id) ON DELETE CASCADE,
-    device_name TEXT NOT NULL,
+    device_name TEXT NOT NULL DEFAULT 'Unbekanntes Gerät',
     device_key TEXT NOT NULL,
     user_agent TEXT,
     role TEXT NOT NULL DEFAULT 'student',
@@ -17,6 +17,13 @@ CREATE TABLE IF NOT EXISTS public.session_leases (
     is_revoked BOOLEAN DEFAULT FALSE,
     revoked_at TIMESTAMPTZ DEFAULT NULL
 );
+
+ALTER TABLE public.session_leases ADD COLUMN IF NOT EXISTS device_name TEXT DEFAULT 'Unbekanntes Gerät';
+ALTER TABLE public.session_leases ADD COLUMN IF NOT EXISTS revoked_at TIMESTAMPTZ DEFAULT NULL;
+ALTER TABLE public.session_leases ADD COLUMN IF NOT EXISTS is_revoked BOOLEAN DEFAULT FALSE;
+ALTER TABLE public.session_leases ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'student';
+ALTER TABLE public.session_leases ADD COLUMN IF NOT EXISTS user_agent TEXT;
+ALTER TABLE public.session_leases ADD COLUMN IF NOT EXISTS last_active_at TIMESTAMPTZ DEFAULT NOW();
 
 CREATE INDEX IF NOT EXISTS idx_session_leases_user_id ON public.session_leases(user_id);
 CREATE INDEX IF NOT EXISTS idx_session_leases_school_id ON public.session_leases(school_id);

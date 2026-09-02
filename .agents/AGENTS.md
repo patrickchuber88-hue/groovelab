@@ -16,6 +16,13 @@
 - **Revisionssicheres Audit-Logging**: Alle administrativen Aktionen, Ghost-Support-Sitzungen, Notfall-Resets und Master-Logins müssen unveränderbar in `public.audit_logs` oder `master_audit_trail` protokolliert werden.
 - **Verifikationspflicht**: Nach jeder Code-Änderung zwingend `npm run security:check`, `npm run security:secrets`, `npx tsc --noEmit` und `npx vite build` ausführen.
 
+## 🌅 Automatischer Guten-Morgen-Sicherheitscheck (Morning Security Routine)
+- **Automatischer Trigger**: Wenn der Benutzer eine Nachricht mit einer morgendlichen Begrüßung (z. B. „Guten Morgen“, „Morning Check“, „Moin“, „Morgen-Audit“) sendet, MUSS automatisch und ohne gesonderte Aufforderung der vollständige Sicherheits- und Integritätscheck ausgeführt werden:
+  1. `npm run security:check` (Security Drift Guard & Architektur-Invarianten-Scan)
+  2. `npm run security:secrets` (Entropie- & Secret-Leak-Scanner)
+  3. `npx tsc --noEmit` (TypeScript Typprüfung)
+- **Ergebnisbericht**: Die Antwort liefert direkt das strukturierte **Morning Health & Security Briefing**, das den aktuellen Systemstatus, Code-Integrität (0 Verstöße, 0 Leaks) und den Status des Live-Systems transparent zusammenfasst.
+
 ## Platform Naming
 - Always refer to the platform as **Campus-Groovelab** in all UI elements, user communications, messages, and document descriptions.
 - Ensure the spelling is precisely "Campus-Groovelab" (with a double 'o' in "Groovelab").

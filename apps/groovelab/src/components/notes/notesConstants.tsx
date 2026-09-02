@@ -74,11 +74,27 @@ export const renderMonochromeTagIcon = (iconName: string, size = 11, color = 'cu
 };
 
 export const getAllTagStyle = (tagStr: string) => {
-  const clean = tagStr.replace(/^#/, '').toLowerCase();
+  if (!tagStr) return { key: '', tag: '', label: '', color: '#475569', bg: '#f1f5f9', border: '#e2e8f0', iconName: 'hash' };
+  const rawClean = tagStr.replace(/^#/, '').trim();
+  const clean = rawClean.toLowerCase();
+
+  // Custom Room Tag Handler (e.g. #Raum 4, #Raum 12, #Konzertsaal)
+  if (clean.startsWith('raum') || clean.startsWith('saal') || clean.startsWith('studio') || clean.startsWith('keller')) {
+    return {
+      key: clean,
+      tag: tagStr.startsWith('#') ? tagStr : `#${tagStr}`,
+      label: rawClean.charAt(0).toUpperCase() + rawClean.slice(1),
+      color: '#dc2626',
+      bg: '#fee2e2',
+      border: '#fca5a5',
+      iconName: 'door'
+    };
+  }
+
   const all = [...STUDENT_SKILL_TAGS, ...TEACHER_ORGANIZATION_TAGS];
   const found = all.find(t => t.key === clean || t.tag.toLowerCase() === `#${clean}` || t.label.toLowerCase() === clean);
   if (found) return found;
-  return { key: clean, tag: `#${clean}`, label: clean, color: '#475569', bg: '#f1f5f9', border: '#e2e8f0', iconName: 'hash' };
+  return { key: clean, tag: `#${clean}`, label: rawClean, color: '#475569', bg: '#f1f5f9', border: '#e2e8f0', iconName: 'hash' };
 };
 
 // Clean Natural Language Note Content for Typography (Strips redundant @Name, - , !Room)
@@ -106,7 +122,7 @@ export const formatCleanNoteContent = (content: string, studentName?: string | n
   }
 
   // Strip leading !Room (e.g. !Raum 4, !Raum 4:, !Konzertsaal, !Groovelab Nebenraum)
-  cleaned = cleaned.replace(/^![A-Za-z0-9äöüÄÖÜß_-]+(?:\s+(?:\d+|Nebenraum|Studio|Saal))?(?=[\s,;!#:]|$)\s*:?\s*/i, '');
+  cleaned = cleaned.replace(/^![A-Za-z0-9äöüÄÖÜß_-]+(?:\s+[A-Za-z0-9äöüÄÖÜß_-]+)?(?=[\s,;!#:]|$)\s*:?\s*/i, '');
   // Strip leading Mangel-Phrases if user used snippet
   cleaned = cleaned.replace(/^(?:Mangel melden|Mangel|Defekt|Reparatur)\s*:?\s*/i, '');
 

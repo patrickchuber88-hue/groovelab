@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { 
   X, Check, RefreshCw, Eye, HardDrive, Building, 
-  Sliders, ShieldCheck, Trash2, ArrowLeft, Disc3, Mic, Music, Sparkles, ShieldAlert, BookOpen, Clock, Volume2, Radio, Headphones
+  Sliders, ShieldCheck, Trash2, ArrowLeft, Disc3, Mic, Music, Sparkles, ShieldAlert, BookOpen, Clock, Volume2, Radio, Headphones, FileText, Download
 } from 'lucide-react';
 import { DpoAuditPortal } from '../../DpoAuditPortal';
 import { supabase } from '../../../lib/supabase';
 import { StorageTier, DEFAULT_STORAGE_TIERS, getStorageTierByGb } from '../../../domain/pricingEngine';
 import { isSchoolTrialActive } from '../../../domain/schoolMetricsAggregator';
+import { generateB2BSchoolInvoicePDF } from '../../../utils/pdfGenerator';
 
 interface SchoolDetailDrawerProps {
   school: any;
@@ -410,6 +411,31 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
 
         {/* Right: Quick-Ghost & Close Action */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <button
+            type="button"
+            onClick={() => generateB2BSchoolInvoicePDF({ school, stats: schoolStats })}
+            style={{
+              padding: '8px 16px',
+              borderRadius: '100px',
+              background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
+              color: '#ffffff',
+              border: 'none',
+              fontSize: '0.80rem',
+              fontWeight: 800,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              boxShadow: '0 4px 12px rgba(22, 163, 74, 0.25)',
+              transition: 'all 0.15s ease'
+            }}
+            className="hover-scale-mini"
+            title="Monatliche B2B-Hosting-Rechnung als PDF herunterladen (RE-Format)"
+          >
+            <FileText size={14} />
+            <span>Rechnung PDF</span>
+          </button>
+
           <button
             type="button"
             onClick={handleTriggerGhostTab}
