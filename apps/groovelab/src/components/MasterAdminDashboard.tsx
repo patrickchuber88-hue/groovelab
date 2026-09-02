@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import QRCode from 'react-qr-code';
 import { supabase } from '../lib/supabase';
 import { 
@@ -206,6 +206,35 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
   const [schoolModuleFilter, setSchoolModuleFilter] = useState<'all' | 'kombi' | 'campus' | 'groovelab'>('all');
   const [activePortalTab, setActivePortalTab] = useState<'executive' | 'schools' | 'briefing' | 'billing' | 'telemetry' | 'pricing' | 'trust_safety' | 'operator' | 'maintenance' | 'backup' | 'feedback'>('executive');
   const [saveSuccessToast, setSaveSuccessToast] = useState<string | null>(null);
+
+  const isGlobalMaintenanceActive = useMemo(() => {
+    if (typeof window !== 'undefined') {
+      const localMaint = localStorage.getItem('cg_master_maintenance_state');
+      if (localMaint) {
+        try {
+          if (JSON.parse(localMaint)?.isActive) return true;
+        } catch {}
+      }
+      const localAnnounce = localStorage.getItem('cg_master_broadcast_announcement');
+      if (localAnnounce) {
+        try {
+          const parsed = JSON.parse(localAnnounce);
+          if (parsed?.isActive && (parsed?.type === 'maintenance' || parsed?.severity === 'emergency' || parsed?.title?.toLowerCase().includes('wartung'))) {
+            return true;
+          }
+        } catch {}
+      }
+    }
+    if (masterPricing?.specialOffers && Array.isArray(masterPricing.specialOffers)) {
+      const m = masterPricing.specialOffers.find((o: any) => o?.id === '__cg_master_maintenance_state__');
+      if (m?.state?.isActive) return true;
+      const a = masterPricing.specialOffers.find((o: any) => o?.id === '__cg_master_broadcast_announcement__');
+      if (a?.state?.isActive && (a?.state?.type === 'maintenance' || a?.state?.severity === 'emergency' || a?.state?.title?.toLowerCase().includes('wartung'))) {
+        return true;
+      }
+    }
+    return false;
+  }, [masterPricing?.specialOffers]);
   
   // Cmd+K Palette & Slide-Over Drawer States
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
@@ -3114,17 +3143,17 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
               </button>
 
               {[
-                { id: 'executive', label: 'Master Cockpit', icon: <Activity size={18} />, color: '#ea4335', bg: 'rgba(234, 67, 53, 0.08)' },
-                { id: 'schools', label: 'Schulen & Tenants', icon: <Layers size={18} />, color: '#059669', bg: 'rgba(16, 185, 129, 0.08)' },
-                { id: 'briefing', label: 'Zahlungsabgleich & Aktivierungen', icon: <CreditCard size={18} />, color: '#0284c7', bg: 'rgba(2, 132, 199, 0.08)' },
-                { id: 'billing', label: 'Financial Control', icon: <GraduationCap size={18} />, color: '#ca8a04', bg: 'rgba(234, 179, 8, 0.08)' },
-                { id: 'telemetry', label: 'Telemetrie & Health', icon: <Cpu size={18} />, color: '#4f46e5', bg: 'rgba(79, 70, 229, 0.08)' },
-                { id: 'pricing', label: 'Preise & Kampagnen', icon: <Tag size={18} />, color: '#d97706', bg: 'rgba(217, 119, 6, 0.08)' },
-                { id: 'trust_safety', label: 'Trust & Safety (Takedowns)', icon: <ShieldAlert size={18} />, color: '#dc2626', bg: 'rgba(220, 38, 38, 0.08)' },
-                { id: 'feedback', label: 'Ideen & Feedback', icon: <Lightbulb size={18} />, color: '#ca8a04', bg: 'rgba(202, 138, 4, 0.08)' },
-                { id: 'maintenance', label: 'Wartung & Betrieb', icon: <Wrench size={18} />, color: '#dc2626', bg: 'rgba(220, 38, 38, 0.08)' },
-                { id: 'backup', label: 'Backup & Reset', icon: <Database size={18} />, color: '#0d9488', bg: 'rgba(13, 148, 136, 0.08)' },
-                { id: 'operator', label: 'Betreiber & Zugang', icon: <Building2 size={18} />, color: '#0284c7', bg: 'rgba(2, 132, 199, 0.08)' }
+                { id: 'executive', label: 'Master Cockpit', icon: <Activity size={18} /> },
+                { id: 'schools', label: 'Schulen & Tenants', icon: <Layers size={18} /> },
+                { id: 'briefing', label: 'Zahlungsabgleich & Aktivierungen', icon: <CreditCard size={18} /> },
+                { id: 'billing', label: 'Financial Control', icon: <GraduationCap size={18} /> },
+                { id: 'telemetry', label: 'Telemetrie & Health', icon: <Cpu size={18} /> },
+                { id: 'pricing', label: 'Preise & Kampagnen', icon: <Tag size={18} /> },
+                { id: 'trust_safety', label: 'Trust & Safety (Takedowns)', icon: <ShieldAlert size={18} /> },
+                { id: 'feedback', label: 'Ideen & Feedback', icon: <Lightbulb size={18} /> },
+                { id: 'maintenance', label: 'Wartung & Betrieb', icon: <Wrench size={18} /> },
+                { id: 'backup', label: 'Backup & Reset', icon: <Database size={18} /> },
+                { id: 'operator', label: 'Betreiber & Zugang', icon: <Building2 size={18} /> }
               ].map((tab) => {
                 const isActive = activePortalTab === tab.id;
                 return (
@@ -3139,20 +3168,20 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                       padding: '12px 16px',
                       borderRadius: '12px',
                       border: 'none',
-                      background: isActive ? tab.bg : 'transparent',
-                      color: isActive ? tab.color : '#475569',
+                      background: isActive ? 'rgba(234, 67, 53, 0.08)' : 'transparent',
+                      color: isActive ? '#ea4335' : '#475569',
                       fontSize: '0.88rem',
                       fontWeight: isActive ? 800 : 600,
                       cursor: 'pointer',
                       textAlign: 'left',
                       transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
-                      boxShadow: isActive ? '0 4px 12px rgba(0, 0, 0, 0.02)' : 'none',
+                      boxShadow: isActive ? '0 4px 12px rgba(234, 67, 53, 0.06)' : 'none',
                       justifyContent: 'space-between'
                     }}
                     className="sidebar-nav-btn"
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                      <span style={{ color: isActive ? tab.color : '#64748b', transition: 'color 0.2s', display: 'flex', alignItems: 'center' }}>
+                      <span style={{ color: isActive ? '#ea4335' : '#64748b', transition: 'color 0.2s', display: 'flex', alignItems: 'center' }}>
                         {tab.icon}
                       </span>
                       <span>{tab.label}</span>
@@ -3170,6 +3199,21 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                         boxShadow: '0 2px 5px rgba(239, 68, 68, 0.25)'
                       }}>
                         {pendingUsers.length}
+                      </span>
+                    )}
+                    {tab.id === 'maintenance' && isGlobalMaintenanceActive && (
+                      <span style={{
+                        background: '#fee2e2',
+                        border: '1px solid #fca5a5',
+                        color: '#dc2626',
+                        fontSize: '0.68rem',
+                        fontWeight: 850,
+                        padding: '2px 6px',
+                        borderRadius: '6px',
+                        boxShadow: '0 0 8px rgba(239, 68, 68, 0.25)',
+                        letterSpacing: '0.02em'
+                      }}>
+                        AKTIV
                       </span>
                     )}
                     {tab.id === 'executive' && pendingStorageSchools.length > 0 && (
@@ -3226,6 +3270,49 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                 </div>
               </div>
             </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                sessionStorage.removeItem('groovelab_is_master_admin');
+                localStorage.removeItem('groovelab_is_master_admin');
+                sessionStorage.setItem('groovelab_active_workspace', 'secretary');
+                localStorage.setItem('groovelab_active_workspace', 'secretary');
+                sessionStorage.setItem('groovelab_active_platform', 'campus');
+                sessionStorage.setItem('campus_active_tab', 'briefing');
+                window.location.reload();
+              }}
+              style={{
+                width: '100%',
+                padding: '11px',
+                marginBottom: '8px',
+                borderRadius: '12px',
+                background: '#f8fafc',
+                border: '1px solid #e2e8f0',
+                color: '#334155',
+                fontWeight: 800,
+                fontSize: '0.82rem',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                transition: 'all 0.2s ease'
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.background = '#f1f5f9';
+                e.currentTarget.style.borderColor = '#cbd5e1';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.background = '#f8fafc';
+                e.currentTarget.style.borderColor = '#e2e8f0';
+              }}
+            >
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', justifyContent: 'center' }}>
+                <Building2 size={15} color="#475569" />
+                <span>Zur Schulleitung wechseln</span>
+              </span>
+            </button>
 
             <button
               onClick={onLogout}
@@ -3288,18 +3375,18 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                   width: '40px',
                   height: '40px',
                   borderRadius: '13px',
-                  background: '#fef3c7',
-                  border: '1px solid #fde68a',
+                  background: '#f1f5f9',
+                  border: '1px solid #e2e8f0',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   flexShrink: 0
                 }}>
-                  <WifiOff size={20} color="#d97706" />
+                  <WifiOff size={20} color="#0f172a" />
                 </div>
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                    <strong style={{ fontSize: '0.88rem', color: '#92400e' }}>
+                    <strong style={{ fontSize: '0.88rem', color: '#0f172a' }}>
                       Server-Verbindung eingeschränkt
                     </strong>
                     <span style={{
@@ -3307,14 +3394,14 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                       fontWeight: 850,
                       padding: '2px 8px',
                       borderRadius: '100px',
-                      background: '#fef3c7',
-                      color: '#b45309',
-                      border: '1px solid #fde68a'
+                      background: '#f1f5f9',
+                      color: '#475569',
+                      border: '1px solid #e2e8f0'
                     }}>
                       {globalFetchError}
                     </span>
                   </div>
-                  <span style={{ fontSize: '0.78rem', color: '#b45309', marginTop: '2px', display: 'block' }}>
+                  <span style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '2px', display: 'block' }}>
                     Die Verbindung zum Hetzner Server / Supabase Cluster ist temporär unterbrochen. Das Cockpit schützt alle Daten im Offline-/Cache-Modus und synchronisiert automatisch bei Wiederverbindung.
                   </span>
                 </div>
@@ -3325,8 +3412,8 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                 disabled={loading}
                 style={{
                   background: '#ffffff',
-                  border: '1px solid #fcd34d',
-                  color: '#92400e',
+                  border: '1px solid #cbd5e1',
+                  color: '#0f172a',
                   padding: '9px 18px',
                   borderRadius: '12px',
                   fontSize: '0.82rem',
@@ -3341,7 +3428,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                 onMouseOver={(e) => {
                   if (!loading) {
                     e.currentTarget.style.transform = 'translateY(-1px)';
-                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(217, 119, 6, 0.12)';
+                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.08)';
                   }
                 }}
                 onMouseOut={(e) => {
@@ -3349,19 +3436,15 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                   e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.04)';
                 }}
               >
-                <RotateCcw size={14} className={loading ? 'animate-spin' : ''} color="#92400e" />
+                <RotateCcw size={14} className={loading ? 'animate-spin' : ''} color="#0f172a" />
                 <span>{loading ? 'Verbinde...' : 'Erneut verbinden'}</span>
               </button>
             </div>
           )}
 
-          {/* Executive Live Maintenance Status Pill */}
-          {(() => {
-            let isMaint = false;
-            try {
-              const local = localStorage.getItem('cg_master_maintenance_state');
-              if (local) isMaint = Boolean(JSON.parse(local)?.isActive);
-            } catch (e) {}
+          {/* Executive Live Maintenance Status Pill (only on sub-tabs; executive tab has integrated Apple HIG toolbar) */}
+          {activePortalTab !== 'executive' && (() => {
+            const isMaint = isGlobalMaintenanceActive;
 
             return (
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
@@ -3393,7 +3476,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                     background: isMaint ? '#dc2626' : '#10b981',
                     boxShadow: isMaint ? '0 0 8px #dc2626' : '0 0 6px #10b981'
                   }} />
-                  <span>{isMaint ? '🔴 Wartungsmodus Aktiv (Plattform eingeschränkt)' : '🟢 System-Status: Normal & Online'}</span>
+                  <span>{isMaint ? 'Wartungsmodus Aktiv (Plattform eingeschränkt)' : 'System-Status: Normal & Online'}</span>
                 </button>
 
                 <div style={{
@@ -3549,13 +3632,13 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                   width: '36px',
                   height: '36px',
                   borderRadius: '10px',
-                  background: '#fef3c7',
-                  border: '1px solid #f59e0b',
+                  background: '#f1f5f9',
+                  border: '1px solid #cbd5e1',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center'
                 }}>
-                  <HardDrive size={18} color="#b45309" />
+                  <HardDrive size={18} color="#0f172a" />
                 </div>
                 <div>
                   <div style={{ fontSize: '0.88rem', fontWeight: 900, color: '#78350f' }}>
@@ -3850,15 +3933,15 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                           background: volumePct >= 80 ? '#fee2e2' : '#d1fae5',
                           color: volumePct >= 80 ? '#dc2626' : '#065f46'
                         }}>
-                          {volumePct >= 80 ? '⚠️ Storage prüfen' : '✓ 100% Intakt'}
+                          {volumePct >= 80 ? 'Storage prüfen' : '100% Intakt'}
                         </span>
                       </div>
 
                       {/* 1. System-NVMe (Root) */}
                       <div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', fontSize: '0.74rem', marginBottom: '3px' }}>
-                          <span style={{ fontWeight: 800, color: '#0f172a' }}>
-                            💽 NVMe System (OS)
+                          <span style={{ fontWeight: 800, color: '#0f172a', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                            <HardDrive size={13} color="#475569" /> NVMe System (OS)
                           </span>
                           <span style={{ fontSize: '0.70rem', fontWeight: 800, color: diskPct >= 80 ? '#dc2626' : '#d97706' }}>
                             {diskUsed.toFixed(1)} / {diskTotal.toFixed(0)} GB ({Math.round(diskPct)}%)
@@ -3878,8 +3961,8 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                       {/* 2. Hetzner Volume (Audio-Tresor & Backups) */}
                       <div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', fontSize: '0.74rem', marginBottom: '3px' }}>
-                          <span style={{ fontWeight: 800, color: '#0f172a' }}>
-                            🎙️ Audio-Tresor Volume
+                          <span style={{ fontWeight: 800, color: '#0f172a', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                            <Server size={13} color="#475569" /> Audio-Tresor Volume
                           </span>
                           <span style={{ fontSize: '0.70rem', fontWeight: 800, color: volumePct >= 80 ? '#dc2626' : '#16a34a' }}>
                             {volumeUsed.toFixed(1)} / {volumeTotal.toFixed(0)} GB ({Math.round(volumePct)}%)
@@ -3963,12 +4046,13 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                       width: '36px',
                       height: '36px',
                       borderRadius: '10px',
-                      background: 'rgba(217, 119, 6, 0.1)',
+                      background: '#f1f5f9',
+                      border: '1px solid #e2e8f0',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center'
                     }}>
-                      <Tag size={20} color="#d97706" />
+                      <Tag size={20} color="#0f172a" />
                     </div>
                     <h2 style={{ fontSize: '1.85rem', fontWeight: 900, color: '#0f172a', margin: 0, letterSpacing: '-0.03em', fontFamily: '"Outfit", sans-serif' }}>
                       Preise &amp; Kampagnen
@@ -4291,7 +4375,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                         </div>
 
                         <div style={{ fontSize: '0.68rem', color: '#64748b', lineHeight: 1.35, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <HardDrive size={13} color="#16a34a" />
+                          <HardDrive size={13} color="#475569" />
                           <span>
                             Staffeln gelten dynamisch für alle Musikschulen bei Buchung über das Schulleitungs-Cockpit oder Zuweisung durch den MasterAdmin.
                           </span>
@@ -4545,7 +4629,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                           e.currentTarget.style.boxShadow = '0 2px 6px rgba(0, 0, 0, 0.02)';
                         }}
                       >
-                        <TrendingUp size={16} color="#d97706" />
+                        <TrendingUp size={16} color="#475569" />
                         <span>MRR-Simulation</span>
                       </button>
                     </div>
@@ -4563,7 +4647,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
                     <div>
                       <h3 style={{ fontSize: '1.2rem', fontWeight: 900, margin: 0, color: '#0f172a', fontFamily: '"Outfit", sans-serif', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <HistoryIcon size={18} color="#2563eb" /> Audit-Logbuch
+                        <HistoryIcon size={18} color="#475569" /> Audit-Logbuch
                       </h3>
                       <p style={{ margin: '4px 0 0 0', fontSize: '0.82rem', color: '#64748b' }}>
                         Lückenlose Historie aller Tarifanpassungen (SOC 2) mit 1-Klick Rollback.
@@ -4718,7 +4802,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
 
                           <div style={{ fontSize: '0.70rem', color: '#64748b', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #f1f5f9', paddingTop: '6px', marginTop: '2px' }}>
                             <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                              <ShieldCheck size={12} color="#16a34a" />
+                              <ShieldCheck size={12} color="#475569" />
                               Admin: <strong>{log.changed_by_name || 'Master Admin Root'}</strong>
                             </span>
                             <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -4751,7 +4835,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
                     <div>
                       <h3 style={{ fontSize: '1.2rem', fontWeight: 900, margin: 0, display: 'flex', alignItems: 'center', gap: '8px', color: '#0f172a', fontFamily: '"Outfit", sans-serif' }}>
-                        <Percent size={18} color="#059669" /> Rabatt-Kampagne erstellen
+                        <Percent size={18} color="#0f172a" /> Rabatt-Kampagne erstellen
                       </h3>
                       <p style={{ margin: '3px 0 0 0', fontSize: '0.80rem', color: '#64748b' }}>
                         Gutscheincodes, Gründer-Aktionen und Skonto-Modelle für Schulträger.
@@ -5316,8 +5400,8 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                                     cursor: 'pointer'
                                   }}
                                 >
-                                  <Users size={12} color="#0284c7" />
-                                  <span>👥 {redemptionsCount} {redemptionsCount === 1 ? 'Schule' : 'Schulen'} genutzt (Details ansehen)</span>
+                                  <Users size={12} color="#475569" />
+                                  <span>{redemptionsCount} {redemptionsCount === 1 ? 'Schule' : 'Schulen'} genutzt (Details ansehen)</span>
                                 </button>
 
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -5962,12 +6046,13 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                       width: '36px',
                       height: '36px',
                       borderRadius: '10px',
-                      background: 'rgba(2, 132, 199, 0.1)',
+                      background: '#f1f5f9',
+                      border: '1px solid #e2e8f0',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center'
                     }}>
-                      <Building2 size={20} color="#0284c7" />
+                      <Building2 size={20} color="#0f172a" />
                     </div>
                     <h2 style={{ fontSize: '1.85rem', fontWeight: 900, color: '#0f172a', margin: 0, letterSpacing: '-0.03em', fontFamily: '"Outfit", sans-serif' }}>
                       Betreiber &amp; Zugang
@@ -5985,13 +6070,13 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                     gap: '8px',
                     padding: '6px 14px',
                     borderRadius: '100px',
-                    background: '#f0f9ff',
-                    border: '1px solid #bae6fd',
-                    color: '#0284c7',
+                    background: '#f1f5f9',
+                    border: '1px solid #e2e8f0',
+                    color: '#475569',
                     fontSize: '0.80rem',
                     fontWeight: 700
                   }}>
-                    <Shield size={14} color="#0284c7" />
+                    <Shield size={14} color="#475569" />
                     Root Superuser Access
                   </div>
                 </div>
@@ -6014,7 +6099,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
                     <h3 style={{ fontSize: '1.2rem', fontWeight: 900, margin: 0, display: 'flex', alignItems: 'center', gap: '8px', color: '#0f172a', fontFamily: '"Outfit", sans-serif' }}>
-                      <Building2 size={18} color="#0284c7" /> Betreibergesellschaft &amp; Stammdaten
+                      <Building2 size={18} color="#0f172a" /> Betreibergesellschaft &amp; Stammdaten
                     </h3>
                     <span style={{
                       fontSize: '0.72rem',
@@ -6027,7 +6112,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                       alignItems: 'center',
                       gap: '5px'
                     }}>
-                      {taxMode === 'standard_vat' ? <Landmark size={12} color="#1e40af" /> : <Building size={12} color="#15803d" />}
+                      {taxMode === 'standard_vat' ? <Landmark size={12} color="#475569" /> : <Building size={12} color="#475569" />}
                       <span>{taxMode === 'standard_vat' ? 'Regelbesteuerung (19% MwSt)' : 'Kleinunternehmer (§ 19 UStG)'}</span>
                     </span>
                   </div>
@@ -6302,7 +6387,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                           }}>
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <ShieldCheck size={16} color="#16a34a" />
+                                <ShieldCheck size={16} color="#475569" />
                                 <span style={{ fontSize: '0.80rem', fontWeight: 800, color: '#0f172a' }}>
                                   Bestandskundenschutz (Grandfathering-Prinzip)
                                 </span>
@@ -6421,7 +6506,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
                     <h3 style={{ fontSize: '1.2rem', fontWeight: 900, margin: 0, display: 'flex', alignItems: 'center', gap: '8px', color: '#0f172a', fontFamily: '"Outfit", sans-serif' }}>
-                      <Landmark size={18} color="#16a34a" /> Bankkonto &amp; SEPA-Suite
+                      <Landmark size={18} color="#0f172a" /> Bankkonto &amp; SEPA-Suite
                     </h3>
                     <button
                       type="button"
@@ -6521,7 +6606,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
 
                     <div style={{ padding: '12px 14px', borderRadius: '12px', background: '#f0fdf4', border: '1px solid #bbf7d0', display: 'flex', flexDirection: 'column', gap: '6px' }}>
                       <span style={{ fontSize: '0.76rem', fontWeight: 800, color: '#15803d', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                        <Lightbulb size={13} color="#15803d" /> Automatisierte Zuordnung (Verwendungszweck-Logik)
+                        <Lightbulb size={13} color="#475569" /> Automatisierte Zuordnung (Verwendungszweck-Logik)
                       </span>
                       <span style={{ fontSize: '0.72rem', color: '#166534', lineHeight: 1.35 }}>
                         • <strong>B2B Schulrechnungen:</strong> Format <code>RE-[SCHUL_ID]-[YYMM]-01</code><br />
@@ -6652,7 +6737,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                           </span>
                         ) : (
                           <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#16a34a', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <ShieldCheck size={12} color="#16a34a" /> Aktiv & verschlüsselt
+                            <ShieldCheck size={12} color="#475569" /> Aktiv & verschlüsselt
                           </span>
                         )}
                       </div>
@@ -6793,7 +6878,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                           fontSize: '0.76rem'
                         }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            {sess.device.includes('MacBook') ? <Laptop size={14} color="#0284c7" /> : <Smartphone size={14} color="#64748b" />}
+                            {sess.device.includes('MacBook') ? <Laptop size={14} color="#475569" /> : <Smartphone size={14} color="#64748b" />}
                             <div>
                               <strong style={{ color: '#0f172a' }}>{sess.device}</strong>
                               <span style={{ color: '#64748b', marginLeft: '6px' }}>({sess.browser} • {sess.location})</span>
@@ -6953,7 +7038,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
                   <div>
                     <h3 style={{ fontSize: '1.25rem', fontWeight: 900, margin: 0, display: 'flex', alignItems: 'center', gap: '8px', color: '#0f172a', fontFamily: '"Outfit", sans-serif' }}>
-                      <Fingerprint size={22} color="#0284c7" /> FIDO2 Hardware-Passkey &amp; DSGVO Zero-Trust Suite
+                      <Fingerprint size={22} color="#0f172a" /> FIDO2 Hardware-Passkey &amp; DSGVO Zero-Trust Suite
                     </h3>
                     <p style={{ margin: '4px 0 0 0', fontSize: '0.82rem', color: '#64748b' }}>
                       Phishing-resistente TouchID / YubiKey Authentifizierung &amp; revisionssicherer Audit-Trail (100% DSGVO &amp; BSI IT-Grundschutz konform).
@@ -6973,7 +7058,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                       alignItems: 'center',
                       gap: '6px'
                     }}>
-                      <Clock size={14} color="#15803d" />
+                      <Clock size={14} color="#475569" />
                       Session-Lease: Noch {leaseMinutesLeft} Min. aktiv
                     </div>
 
@@ -7009,7 +7094,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                     alignItems: 'center',
                     gap: '8px'
                   }}>
-                    <CheckCircle size={18} color="#15803d" />
+                    <CheckCircle size={18} color="#475569" />
                     <span>{passkeySuccessMessage}</span>
                   </div>
                 )}
@@ -7705,14 +7790,14 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
 
               {[
                 { id: 'executive', label: 'Master Cockpit', desc: 'MRR, ARR & Platform Status', icon: <Activity size={16} color="#ea4335" /> },
-                { id: 'schools', label: 'Schulen & Tenants', desc: 'Musikschulen verwalten & anlegen', icon: <Layers size={16} color="#059669" /> },
-                { id: 'briefing', label: 'Briefing Board', desc: 'Schüler-Aktivierungen & CG-Hashes', icon: <Clock size={16} color="#0284c7" /> },
-                { id: 'billing', label: 'Financial Control', desc: 'Rechnungen RE-... und CG-...', icon: <GraduationCap size={16} color="#ca8a04" /> },
-                { id: 'telemetry', label: 'Telemetrie & Health', desc: 'Server CPU, RAM & DB Telemetrie', icon: <Cpu size={16} color="#4f46e5" /> },
-                { id: 'pricing', label: 'Preise & Kampagnen', desc: 'Standard-Abonnementpreise & Rabatt-Aktionen', icon: <Tag size={16} color="#d97706" /> },
-                { id: 'maintenance', label: 'Wartung & Betrieb', desc: 'Notfall-Killswitch, Live-Countdown & Broadcast-Banner', icon: <Wrench size={16} color="#dc2626" /> },
-                { id: 'backup', label: 'Backup & Reset', desc: 'PostgreSQL-Snapshots, DSGVO Art. 20 Export & Resets', icon: <Database size={16} color="#0d9488" /> },
-                { id: 'operator', label: 'Betreiber & Zugang', desc: 'Betreibergesellschaft, Bankkonto & Root-Zugang', icon: <Building2 size={16} color="#0284c7" /> }
+                { id: 'schools', label: 'Schulen & Tenants', desc: 'Musikschulen verwalten & anlegen', icon: <Layers size={16} color="#475569" /> },
+                { id: 'briefing', label: 'Briefing Board', desc: 'Schüler-Aktivierungen & CG-Hashes', icon: <Clock size={16} color="#475569" /> },
+                { id: 'billing', label: 'Financial Control', desc: 'Rechnungen RE-... und CG-...', icon: <GraduationCap size={16} color="#475569" /> },
+                { id: 'telemetry', label: 'Telemetrie & Health', desc: 'Server CPU, RAM & DB Telemetrie', icon: <Cpu size={16} color="#475569" /> },
+                { id: 'pricing', label: 'Preise & Kampagnen', desc: 'Standard-Abonnementpreise & Rabatt-Aktionen', icon: <Tag size={16} color="#475569" /> },
+                { id: 'maintenance', label: 'Wartung & Betrieb', desc: 'Notfall-Killswitch, Live-Countdown & Broadcast-Banner', icon: <Wrench size={16} color="#475569" /> },
+                { id: 'backup', label: 'Backup & Reset', desc: 'PostgreSQL-Snapshots, DSGVO Art. 20 Export & Resets', icon: <Database size={16} color="#475569" /> },
+                { id: 'operator', label: 'Betreiber & Zugang', desc: 'Betreibergesellschaft, Bankkonto & Root-Zugang', icon: <Building2 size={16} color="#475569" /> }
               ]
               .filter(item => !commandSearch || item.label.toLowerCase().includes(commandSearch.toLowerCase()) || item.desc.toLowerCase().includes(commandSearch.toLowerCase()))
               .map(item => (
@@ -7887,6 +7972,57 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                       </div>
                     </div>
 
+                    {/* Audio-Tresor Speicherstatus */}
+                    <div>
+                      <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase' }}>Audio-Tresor Cloud-Speicher</span>
+                      <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{
+                            background: s.storage_addon_gb > 0 ? 'rgba(52, 168, 83, 0.1)' : 'rgba(100, 116, 139, 0.1)',
+                            color: s.storage_addon_gb > 0 ? '#166534' : '#475569',
+                            padding: '6px 12px',
+                            borderRadius: '10px',
+                            fontSize: '0.82rem',
+                            fontWeight: 800
+                          }}>
+                            {s.storage_addon_gb > 0 ? `+${s.storage_addon_gb} GB Paket (${Number(s.storage_addon_monthly_fee || 0).toFixed(2).replace('.', ',')} € / Mo.)` : '1 GB Standard-Basis (0,00 €)'}
+                          </span>
+                        </div>
+                        {s.storage_pending_downgrade_gb !== null && s.storage_pending_downgrade_gb !== undefined && (
+                          <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '10px', padding: '8px 12px', fontSize: '0.74rem', color: '#92400e' }}>
+                            ⏳ <strong>Downgrade vorgemerkt:</strong> Ziel auf +{s.storage_pending_downgrade_gb} GB zum {s.storage_pending_effective_date}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Buchungsjournal Link */}
+                    <div style={{ background: '#f8fafc', padding: '14px 16px', borderRadius: '16px', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <div>
+                        <div style={{ fontSize: '0.80rem', fontWeight: 800, color: '#0f172a' }}>Revisionssicheres Buchungsjournal</div>
+                        <div style={{ fontSize: '0.70rem', color: '#64748b' }}>Tarifhistorie, Upgrades und Belege dieser Schule einsehen.</div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDrawerOpen(false);
+                          setActivePortalTab('billing');
+                        }}
+                        style={{
+                          background: '#ffffff',
+                          border: '1.5px solid #cbd5e1',
+                          borderRadius: '10px',
+                          padding: '7px 12px',
+                          fontSize: '0.74rem',
+                          fontWeight: 800,
+                          color: '#0f172a',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Journal öffnen ➔
+                      </button>
+                    </div>
+
                     <div style={{ background: 'rgba(59, 130, 246, 0.04)', padding: '16px', borderRadius: '16px', border: '1px solid rgba(59, 130, 246, 0.15)' }}>
                       <span style={{ fontSize: '0.72rem', color: '#1e40af', fontWeight: 800, textTransform: 'uppercase' }}>Sekretariat Einladungs-Link</span>
                       <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
@@ -8050,7 +8186,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
 
                   {/* System & Compliance Statement */}
                   <div style={{ background: '#f0fdf4', padding: '16px 20px', borderRadius: '16px', border: '1px solid #bbf7d0', display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <CheckCircle size={24} color="#16a34a" />
+                    <CheckCircle size={24} color="#0f172a" />
                     <div style={{ fontSize: '0.82rem', color: '#166534' }}>
                       <strong>Betreiber-Compliance Bestätigung:</strong> Dieser Bericht wurde automatisch aus den geprüften Supabase RLS-Datenbankeinträgen generiert. 100% DSGVO/COPPA-konform, 0 ungeprüfte Fremd-Zugriffe.
                     </div>
@@ -8396,6 +8532,36 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                   </button>
                 </div>
               )}
+
+              <button
+                type="button"
+                onClick={() => {
+                  sessionStorage.removeItem('groovelab_is_master_admin');
+                  localStorage.removeItem('groovelab_is_master_admin');
+                  sessionStorage.setItem('groovelab_active_workspace', 'secretary');
+                  localStorage.setItem('groovelab_active_workspace', 'secretary');
+                  sessionStorage.setItem('groovelab_active_platform', 'campus');
+                  sessionStorage.setItem('campus_active_tab', 'briefing');
+                  window.location.reload();
+                }}
+                style={{
+                  background: 'rgba(56, 189, 248, 0.1)',
+                  border: '1px solid rgba(56, 189, 248, 0.3)',
+                  color: '#38bdf8',
+                  fontSize: '0.8rem',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  padding: '8px 12px',
+                  borderRadius: '10px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  marginBottom: '6px'
+                }}
+              >
+                🏛️ Zur Schulleitung wechseln
+              </button>
 
               <button
                 type="button"

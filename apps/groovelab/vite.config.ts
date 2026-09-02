@@ -72,7 +72,7 @@ export default defineConfig({
           if (id.includes('AdminDashboard')) {
             return 'admin-core-suite';
           }
-          if (id.includes('SecretaryDashboard')) {
+          if (id.includes('SecretaryDashboard') || id.includes('SecretaryDutiesView') || id.includes('SecretaryCrisisView') || id.includes('SecretaryAuditView') || id.includes('SecretaryEquipmentView')) {
             return 'secretary-suite';
           }
           if (id.includes('TeacherDashboard') || id.includes('CampusTeacherDashboard')) {
@@ -80,6 +80,9 @@ export default defineConfig({
           }
           if (id.includes('MeisterwerkDocumentationModal')) {
             return 'meisterwerk-suite';
+          }
+          if (id.includes('GrooveLoopstation')) {
+            return 'audio-loopstation';
           }
         }
       }

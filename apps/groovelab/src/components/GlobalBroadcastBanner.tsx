@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Megaphone, AlertTriangle, AlertCircle, Info, X, Clock } from 'lucide-react';
+import { Megaphone, AlertTriangle, AlertCircle, Info, X, Clock, ShieldCheck, Wrench } from 'lucide-react';
 
 export interface BroadcastAnnouncement {
   id?: string;
@@ -8,23 +8,36 @@ export interface BroadcastAnnouncement {
   title: string;
   message: string;
   targetAudience: 'all' | 'teachers' | 'students' | 'admins';
+  targetScope?: 'all' | 'campus_only' | 'groovelab_only' | 'schools_only';
+  targetSchoolId?: string;
   countdownMinutes?: number;
+  targetEndTime?: number;
   scheduledTime?: string;
   dismissible?: boolean;
   createdAt?: string;
+  type?: string;
 }
 
 interface GlobalBroadcastBannerProps {
   announcement: BroadcastAnnouncement | null;
   currentRole?: string;
+  activePlatform?: string;
+  currentSchoolId?: string;
 }
 
 export const GlobalBroadcastBanner: React.FC<GlobalBroadcastBannerProps> = ({
   announcement,
-  currentRole
+  currentRole,
+  activePlatform,
+  currentSchoolId
 }) => {
   const [dismissed, setDismissed] = useState(false);
-  const [secondsRemaining, setSecondsRemaining] = useState<number>(0);
+  const [minutesRemaining, setMinutesRemaining] = useState<number | null>(() => {
+    if (announcement?.targetEndTime) {
+      return Math.max(0, Math.ceil((announcement.targetEndTime - Date.now()) / 60000));
+    }
+    return announcement?.countdownMinutes || null;
+  });
 
   useEffect(() => {
     if (!announcement || !announcement.isActive) return;
@@ -36,19 +49,28 @@ export const GlobalBroadcastBanner: React.FC<GlobalBroadcastBannerProps> = ({
     } else {
       setDismissed(false);
     }
-
-    if (announcement.countdownMinutes && announcement.countdownMinutes > 0) {
-      setSecondsRemaining(announcement.countdownMinutes * 60);
-    }
   }, [announcement]);
 
+  // Debounced 15-second countdown timer for smooth, non-flickering ETA
   useEffect(() => {
-    if (secondsRemaining <= 0) return;
-    const timer = setInterval(() => {
-      setSecondsRemaining(prev => Math.max(0, prev - 1));
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [secondsRemaining]);
+    if (!announcement?.targetEndTime) {
+      if (announcement?.countdownMinutes) {
+        setMinutesRemaining(announcement.countdownMinutes);
+      } else {
+        setMinutesRemaining(null);
+      }
+      return;
+    }
+
+    const calcMinutes = () => {
+      const remaining = Math.max(0, Math.ceil((announcement.targetEndTime! - Date.now()) / 60000));
+      setMinutesRemaining(remaining);
+    };
+
+    calcMinutes();
+    const interval = setInterval(calcMinutes, 15000); // 15s entprellt
+    return () => clearInterval(interval);
+  }, [announcement?.targetEndTime, announcement?.countdownMinutes]);
 
   if (!announcement || !announcement.isActive || dismissed) return null;
 
@@ -59,11 +81,12 @@ export const GlobalBroadcastBanner: React.FC<GlobalBroadcastBannerProps> = ({
     if (announcement.targetAudience === 'admins' && currentRole !== 'admin' && currentRole !== 'secretary' && currentRole !== 'master') return null;
   }
 
-  const formatCountdown = (secs: number) => {
-    const m = Math.floor(secs / 60);
-    const s = secs % 60;
-    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-  };
+  // Check target scope filter (Campus only vs GrooveLab only vs Single school)
+  if (announcement.targetScope && announcement.targetScope !== 'all') {
+    if (announcement.targetScope === 'campus_only' && activePlatform === 'groovelab') return null;
+    if (announcement.targetScope === 'groovelab_only' && activePlatform === 'campus') return null;
+    if (announcement.targetScope === 'schools_only' && announcement.targetSchoolId && currentSchoolId && announcement.targetSchoolId !== currentSchoolId) return null;
+  }
 
   const handleDismiss = () => {
     setDismissed(true);
@@ -71,13 +94,68 @@ export const GlobalBroadcastBanner: React.FC<GlobalBroadcastBannerProps> = ({
     sessionStorage.setItem(dismissKey, 'true');
   };
 
-  // Theme styling
+  const isMaintenance = 
+    announcement.severity === 'emergency' || 
+    announcement.type === 'maintenance' ||
+    announcement.title?.toLowerCase().includes('wartung');
+
+  // Dynamic ETA wording
+  const etaText = minutesRemaining !== null
+    ? minutesRemaining > 0
+      ? `Voraussichtliche Restdauer: Noch ca. ${minutesRemaining} Min.`
+      : 'Abschlussarbeiten laufen… Gleich wieder online.'
+    : null;
+
+  // Role-specific Apple HIG Styling & Text Logic (No panic, calm reassurance)
   let bg = '#eff6ff';
   let border = '#bfdbfe';
   let textColor = '#1e40af';
-  let IconComponent = Info;
+  let IconComponent: any = Info;
+  let displayTitle = announcement.title;
+  let displayMessage = announcement.message;
 
-  if (announcement.severity === 'warning') {
+  if (isMaintenance) {
+    if (currentRole === 'student' || currentRole === 'parent') {
+      // Students/Parents: Calm Amber/Slate (#fffbeb, #fde68a, #92400e) - ZERO PANIC
+      bg = '#fffbeb';
+      border = '#fde68a';
+      textColor = '#92400e';
+      IconComponent = ShieldCheck;
+      displayTitle = 'Wartungsarbeiten: Server-Optimierung';
+      displayMessage = etaText 
+        ? `Unser Cloud-Team optimiert derzeit die Server. Alle deine Übe-Erfolge, Notizen und Meisterwerke sind 100% sicher gesichert. ${etaText} Die App synchronisiert sich automatisch.`
+        : 'Unser Cloud-Team optimiert derzeit die Server-Infrastruktur. Alle deine Übe-Erfolge, Notizen und Meisterwerke sind 100% sicher gesichert. Die App synchronisiert sich automatisch.';
+    } else if (currentRole === 'teacher') {
+      // Teachers: Calm Amber with local session-queue notice
+      bg = '#fffbeb';
+      border = '#fde68a';
+      textColor = '#92400e';
+      IconComponent = Wrench;
+      displayTitle = 'Wartungsfenster aktiv';
+      displayMessage = etaText
+        ? `Unterrichtsnotizen und Einträge werden lokal auf deinem Gerät geschützt zwischengespeichert. ${etaText}`
+        : 'Unterrichtsnotizen und Einträge werden lokal auf deinem Gerät geschützt zwischengespeichert und bei Wiederverbindung atomar mit der Schuldatenbank synchronisiert.';
+    } else if (currentRole === 'admin' || currentRole === 'secretary') {
+      // Admins/Secretariat: Calm neutral governance
+      bg = '#f8fafc';
+      border = '#cbd5e1';
+      textColor = '#0f172a';
+      IconComponent = Wrench;
+      displayTitle = 'Plattform-Wartungsmodus aktiv';
+      const reasonDetail = announcement.message || 'Server-Optimierung im Rechenzentrum Frankfurt';
+      displayMessage = etaText
+        ? `Schulbetrieb im geschützten Read-Only-Modus (${reasonDetail}). ${etaText} Uptime-SLA wird überwacht.`
+        : `Schulbetrieb im geschützten Read-Only-Modus (${reasonDetail}). Uptime-SLA wird überwacht.`;
+    } else {
+      // Master or default
+      bg = '#fffbeb';
+      border = '#fde68a';
+      textColor = '#92400e';
+      IconComponent = Wrench;
+      displayTitle = announcement.title;
+      displayMessage = etaText ? `${announcement.message} (${etaText})` : announcement.message;
+    }
+  } else if (announcement.severity === 'warning') {
     bg = '#fffbeb';
     border = '#fde68a';
     textColor = '#92400e';
@@ -110,25 +188,26 @@ export const GlobalBroadcastBanner: React.FC<GlobalBroadcastBannerProps> = ({
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, flexWrap: 'wrap' }}>
         <IconComponent size={16} />
         <span style={{ fontWeight: 850 }}>
-          {announcement.title}
+          {displayTitle}
         </span>
         <span style={{ fontWeight: 600, color: textColor, opacity: 0.9 }}>
-          {announcement.message}
+          {displayMessage}
         </span>
 
-        {secondsRemaining > 0 && (
+        {etaText && (
           <span style={{
             display: 'inline-flex',
             alignItems: 'center',
-            gap: '4px',
-            background: 'rgba(0, 0, 0, 0.07)',
+            gap: '5px',
+            background: isMaintenance ? 'rgba(146, 64, 14, 0.08)' : 'rgba(0, 0, 0, 0.07)',
             padding: '2px 8px',
             borderRadius: '6px',
+            fontSize: '0.74rem',
             fontFamily: 'monospace',
             fontWeight: 800
           }}>
             <Clock size={12} />
-            Countdown: {formatCountdown(secondsRemaining)} min (Bitte Arbeit speichern)
+            {etaText}
           </span>
         )}
       </div>

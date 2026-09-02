@@ -196,7 +196,7 @@ export const ReconciliationTab: React.FC<ReconciliationTabProps> = ({
           fontSize: '0.86rem',
           fontWeight: 700
         }}>
-          <CheckCircle size={16} color="#10b981" />
+          <CheckCircle size={16} color="#475569" />
           <span>{actionSuccessToast || copyToast}</span>
         </div>
       )}
@@ -342,7 +342,7 @@ export const ReconciliationTab: React.FC<ReconciliationTabProps> = ({
           transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
         }} className="hover-scale-mini">
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#64748b', fontSize: '0.70rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            <Clock size={14} color="#f59e0b" /> Offene Zahlungen
+            <Clock size={14} color="#475569" /> Offene Zahlungen
           </div>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginTop: '6px' }}>
             <span style={{ fontSize: '1.6rem', fontWeight: 900, color: '#0f172a', fontFamily: '"Outfit", sans-serif' }}>{openCount}</span>
@@ -359,7 +359,7 @@ export const ReconciliationTab: React.FC<ReconciliationTabProps> = ({
           transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
         }} className="hover-scale-mini">
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#64748b', fontSize: '0.70rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            <CheckCircle size={14} color="#10b981" /> Gematcht & Aktiv
+            <CheckCircle size={14} color="#475569" /> Gematcht & Aktiv
           </div>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginTop: '6px' }}>
             <span style={{ fontSize: '1.6rem', fontWeight: 900, color: '#10b981', fontFamily: '"Outfit", sans-serif' }}>{activeCount}</span>
@@ -376,7 +376,7 @@ export const ReconciliationTab: React.FC<ReconciliationTabProps> = ({
           transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
         }} className="hover-scale-mini">
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#64748b', fontSize: '0.70rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            <Shield size={14} color="#3b82f6" /> Härtefälle / Befreit
+            <Shield size={14} color="#475569" /> Härtefälle / Befreit
           </div>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginTop: '6px' }}>
             <span style={{ fontSize: '1.6rem', fontWeight: 900, color: '#3b82f6', fontFamily: '"Outfit", sans-serif' }}>{exemptCount}</span>
@@ -582,7 +582,7 @@ export const ReconciliationTab: React.FC<ReconciliationTabProps> = ({
               </div>
             ) : filteredUsers.length === 0 ? (
               <div style={{ padding: '60px 20px', textAlign: 'center', color: '#64748b' }}>
-                <CheckCircle size={32} color="#10b981" style={{ margin: '0 auto 10px' }} />
+                <CheckCircle size={32} color="#0f172a" style={{ margin: '0 auto 10px' }} />
                 <div style={{ fontSize: '0.90rem', fontWeight: 800, color: '#0f172a' }}>Keine Zahlungsrückstände</div>
                 <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '4px' }}>Alle angezeigten Schüler-Zahlungen sind abgeglichen.</div>
               </div>
@@ -857,7 +857,7 @@ export const ReconciliationTab: React.FC<ReconciliationTabProps> = ({
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Upload size={18} color="#0284c7" />
+                <Upload size={18} color="#0f172a" />
                 <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 900, color: '#0f172a' }}>
                   Bankauszug / CSV Zahlungsabgleich
                 </h3>

@@ -110,9 +110,13 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
       const storageAddonGbVal = Number(s.storage_addon_gb || 0);
       const storageAddonFeeVal = Number(s.storage_addon_monthly_fee || (storageAddonGbVal === 20 ? 5.49 : storageAddonGbVal === 10 ? 2.99 : storageAddonGbVal === 5 ? 1.49 : storageAddonGbVal === 50 ? 9.99 : 0));
 
+      const isBookedSchool = Boolean(s.is_billing_booked) || s.status === 'active';
+      const hasCampusMod = (isBookedSchool && !s.has_campus_subscription && !s.has_groovelab_subscription) ? true : !!s.has_campus_subscription;
+      const hasGrooveMod = (isBookedSchool && !s.has_campus_subscription && !s.has_groovelab_subscription) ? true : !!s.has_groovelab_subscription;
+
       const billing = calculateCampusGroovelabBilling({
-        hasCampusModule: !!s.has_campus_subscription,
-        hasGroovelabModule: !!s.has_groovelab_subscription,
+        hasCampusModule: hasCampusMod,
+        hasGroovelabModule: hasGrooveMod,
         activeTeacherCount: teachers,
         activeStudentCount: activeStudents,
         campusStudentCount: campusActive,
@@ -216,9 +220,13 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
       const storageAddonGbVal = Number(s.storage_addon_gb || 0);
       const storageAddonFeeVal = Number(s.storage_addon_monthly_fee || (storageAddonGbVal === 20 ? 5.49 : storageAddonGbVal === 10 ? 2.99 : storageAddonGbVal === 5 ? 1.49 : storageAddonGbVal === 50 ? 9.99 : 0));
 
+      const isBookedSchool = Boolean(s.is_billing_booked) || s.status === 'active';
+      const hasCampusMod = (isBookedSchool && !s.has_campus_subscription && !s.has_groovelab_subscription) ? true : !!s.has_campus_subscription;
+      const hasGrooveMod = (isBookedSchool && !s.has_campus_subscription && !s.has_groovelab_subscription) ? true : !!s.has_groovelab_subscription;
+
       const billingCalc = calculateCampusGroovelabBilling({
-        hasCampusModule: !!s.has_campus_subscription,
-        hasGroovelabModule: !!s.has_groovelab_subscription,
+        hasCampusModule: hasCampusMod,
+        hasGroovelabModule: hasGrooveMod,
         activeTeacherCount: teachers,
         activeStudentCount: activeStudents,
         campusStudentCount: campusActive,
@@ -381,7 +389,7 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
               e.currentTarget.style.boxShadow = '0 2px 6px rgba(0, 0, 0, 0.03)';
             }}
           >
-            <Download size={14} color="#059669" /> CSV Export
+            <Download size={14} color="#475569" /> CSV Export
           </button>
 
           <button
@@ -421,9 +429,9 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
             style={{
               padding: '10px 16px',
               borderRadius: '12px',
-              background: '#e6f4ea',
-              border: '1px solid #a7f3d0',
-              color: '#065f46',
+              background: '#f1f5f9',
+              border: '1px solid #e2e8f0',
+              color: '#0f172a',
               fontSize: '0.88rem',
               fontWeight: 800,
               display: 'flex',
@@ -431,7 +439,7 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
               gap: '8px'
             }}
           >
-            <Building2 size={15} color="#047857" />
+            <Building2 size={15} color="#0f172a" />
             <span>{sanitizedSchools.length} Mandanten Aktiv</span>
           </div>
         </div>
@@ -519,8 +527,8 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
             </h3>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '10px', fontSize: '0.70rem', color: '#475569', fontWeight: 700, flexWrap: 'wrap' }}>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#ecfdf5', color: '#059669', padding: '2px 7px', borderRadius: '8px' }}>
-              <Sparkles size={11} color="#059669" /> {totalActiveStudentsCount} Aktiv App
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#f1f5f9', border: '1px solid #e2e8f0', color: '#0f172a', padding: '2px 7px', borderRadius: '8px' }}>
+              <Sparkles size={11} color="#0f172a" /> {totalActiveStudentsCount} Aktiv App
             </span>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#f8fafc', border: '1px solid #e2e8f0', padding: '2px 7px', borderRadius: '8px' }}>
               {totalPassiveStudentsCount} Basis
@@ -764,9 +772,13 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
                 if (storageAddonGbVal === 0 && (school as any).extra_billing_option === 'option1') storageAddonGbVal = 20;
                 const storageAddonFeeVal = Number(school.storage_addon_monthly_fee || (storageAddonGbVal === 25 ? 3.99 : storageAddonGbVal === 20 ? 5.49 : storageAddonGbVal === 10 ? 2.99 : storageAddonGbVal === 5 ? 1.49 : storageAddonGbVal === 50 ? 6.99 : storageAddonGbVal === 100 ? 11.99 : storageAddonGbVal === 250 ? 24.99 : 0));
 
+                const isBookedSchool = Boolean(school.is_billing_booked) || school.status === 'active';
+                const hasCampusMod = (isBookedSchool && !school.has_campus_subscription && !school.has_groovelab_subscription) ? true : !!school.has_campus_subscription;
+                const hasGrooveMod = (isBookedSchool && !school.has_campus_subscription && !school.has_groovelab_subscription) ? true : !!school.has_groovelab_subscription;
+
                 const billingCalc = calculateCampusGroovelabBilling({
-                  hasCampusModule: !!school.has_campus_subscription,
-                  hasGroovelabModule: !!school.has_groovelab_subscription,
+                  hasCampusModule: hasCampusMod,
+                  hasGroovelabModule: hasGrooveMod,
                   activeTeacherCount: teachers,
                   activeStudentCount: activeStudents,
                   campusStudentCount: campusActive,

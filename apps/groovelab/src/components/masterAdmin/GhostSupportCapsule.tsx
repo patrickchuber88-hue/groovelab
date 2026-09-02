@@ -487,7 +487,7 @@ export const GhostSupportCapsule: React.FC<GhostSupportCapsuleProps> = ({
               <>
                 <div style={{ width: '1px', height: '16px', background: 'rgba(255, 255, 255, 0.15)', flexShrink: 0 }} />
                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <UserCheck size={12} color="#38bdf8" />
+                  <UserCheck size={12} color="#475569" />
                   <select
                     value={shadowedTeacherId || ''}
                     onChange={(e) => {

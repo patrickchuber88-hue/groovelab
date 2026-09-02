@@ -25188,14 +25188,44 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                     // --- SAVE 4-DIGIT STUDENT PIN (personal_pin) VIA SERVER RPC ---
                                     const authQrToken = studentUser?.qr_token || studentUser?.ausweis_nummer || studentId || '';
                                     
-                                    const { data: rpcRes, error } = await supabase.rpc('set_initial_student_pin', {
-                                      p_student_id: studentId,
-                                      p_qr_token: authQrToken,
-                                      p_pin: pinFormNew
-                                    });
+                                    let rpcSuccess = false;
+                                    let rpcErrorMsg = '';
 
-                                    if (error || rpcRes !== true) {
-                                      setPinFormError('Fehler beim Speichern der Schüler-PIN: ' + (error?.message || 'Serverfehler'));
+                                    // 1. Primary RPC
+                                    try {
+                                      const { data: rpcRes, error } = await supabase.rpc('set_initial_student_pin', {
+                                        p_student_id: studentId,
+                                        p_qr_token: authQrToken,
+                                        p_pin: pinFormNew
+                                      });
+                                      if (!error && rpcRes === true) {
+                                        rpcSuccess = true;
+                                      } else if (error) {
+                                        rpcErrorMsg = error.message;
+                                      }
+                                    } catch (e: any) {
+                                      rpcErrorMsg = e?.message || '';
+                                    }
+
+                                    // 2. Secondary Fallback RPC
+                                    if (!rpcSuccess) {
+                                      try {
+                                        const { data: pRes, error: pErr } = await supabase.rpc('set_personal_pin', {
+                                          p_user_id: studentId,
+                                          p_new_pin: pinFormNew
+                                        });
+                                        if (!pErr && pRes === true) {
+                                          rpcSuccess = true;
+                                        } else if (pErr) {
+                                          rpcErrorMsg = pErr.message || rpcErrorMsg;
+                                        }
+                                      } catch (e: any) {
+                                        rpcErrorMsg = e?.message || rpcErrorMsg;
+                                      }
+                                    }
+
+                                    if (!rpcSuccess) {
+                                      setPinFormError('Fehler beim Speichern der Schüler-PIN: ' + (rpcErrorMsg || 'Serverfehler'));
                                     } else {
                                       setPinFormSuccess('Deine 4-stellige Schüler-PIN wurde erfolgreich gespeichert! 🎒');
                                       setStudentUser((prev: any) => prev ? {
@@ -27379,14 +27409,44 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
 
                   const authQrToken = studentUser?.qr_token || studentUser?.ausweis_nummer || studentId || '';
                   
-                  const { data: rpcRes, error } = await supabase.rpc('set_initial_student_pin', {
-                    p_student_id: studentId,
-                    p_qr_token: authQrToken,
-                    p_pin: pinFormNew
-                  });
+                  let rpcSuccess = false;
+                  let rpcErrorMsg = '';
 
-                  if (error || rpcRes !== true) {
-                    setPinFormError('Fehler beim Speichern: ' + (error?.message || 'Serverfehler'));
+                  // 1. Primary RPC
+                  try {
+                    const { data: rpcRes, error } = await supabase.rpc('set_initial_student_pin', {
+                      p_student_id: studentId,
+                      p_qr_token: authQrToken,
+                      p_pin: pinFormNew
+                    });
+                    if (!error && rpcRes === true) {
+                      rpcSuccess = true;
+                    } else if (error) {
+                      rpcErrorMsg = error.message;
+                    }
+                  } catch (e: any) {
+                    rpcErrorMsg = e?.message || '';
+                  }
+
+                  // 2. Secondary Fallback RPC
+                  if (!rpcSuccess) {
+                    try {
+                      const { data: pRes, error: pErr } = await supabase.rpc('set_personal_pin', {
+                        p_user_id: studentId,
+                        p_new_pin: pinFormNew
+                      });
+                      if (!pErr && pRes === true) {
+                        rpcSuccess = true;
+                      } else if (pErr) {
+                        rpcErrorMsg = pErr.message || rpcErrorMsg;
+                      }
+                    } catch (e: any) {
+                      rpcErrorMsg = e?.message || rpcErrorMsg;
+                    }
+                  }
+
+                  if (!rpcSuccess) {
+                    setPinFormError('Fehler beim Speichern: ' + (rpcErrorMsg || 'Serverfehler'));
                   } else {
                     setFirstPinSavedSuccess(true);
                     setStudentUser((prev: any) => prev ? {

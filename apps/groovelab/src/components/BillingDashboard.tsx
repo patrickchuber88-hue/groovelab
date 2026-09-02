@@ -44,8 +44,10 @@ import {
   FileText,
   DollarSign,
   Calendar,
+  ScrollText,
   X
 } from 'lucide-react';
+import { generateTariffReceiptPDF } from '../utils/tariffReceiptPdfGenerator';
 import { downloadDatevExportFile, DatevBookingRecord, DATEV_ACCOUNT_MAPPINGS, ChartOfAccounts } from '../utils/datevExporter';
 import { parseBankStatementFile, ParsedBankTransaction, BankStatementParseResult } from '../utils/camtParser';
 import { downloadSepaXmlFile, SepaDirectDebitBatchOptions, SepaDebtorTransaction } from '../utils/sepaXmlGenerator';
@@ -169,7 +171,12 @@ export function BillingDashboard({ preselectedSchoolId }: { preselectedSchoolId?
     [new Date().getFullYear()]: true
   });
 
-  const [activeFinanceSubTab, setActiveFinanceSubTab] = useState<'invoices' | 'datev' | 'banking' | 'prap' | 'dunning'>('invoices');
+  const [activeFinanceSubTab, setActiveFinanceSubTab] = useState<'invoices' | 'datev' | 'banking' | 'prap' | 'dunning' | 'ledger'>('invoices');
+  const [allTariffBookings, setAllTariffBookings] = useState<any[]>([]);
+  const [loadingTariffBookings, setLoadingTariffBookings] = useState<boolean>(false);
+  const [ledgerSearchQuery, setLedgerSearchQuery] = useState<string>('');
+  const [ledgerTypeFilter, setLedgerTypeFilter] = useState<string>('all');
+  const [ledgerSchoolFilter, setLedgerSchoolFilter] = useState<string>('all');
   const [selectedChartOfAccounts, setSelectedChartOfAccounts] = useState<ChartOfAccounts>('SKR03');
   const [datevPeriodMonth, setDatevPeriodMonth] = useState<number>(new Date().getMonth() + 1);
   const [datevPeriodYear, setDatevPeriodYear] = useState<number>(new Date().getFullYear());
@@ -205,6 +212,55 @@ export function BillingDashboard({ preselectedSchoolId }: { preselectedSchoolId?
   };
 
   const [emailSentToast, setEmailSentToast] = useState<string | null>(null);
+
+  const fetchAllTariffBookings = async (loadedInvoices?: Invoice[]) => {
+    setLoadingTariffBookings(true);
+    try {
+      const { data, error } = await supabase
+        .from('school_tariff_bookings')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (!error && data && data.length > 0) {
+        setAllTariffBookings(data);
+      } else {
+        const invList = (loadedInvoices && loadedInvoices.length > 0) ? loadedInvoices : invoices;
+        const baselines: any[] = [];
+        invList.forEach(inv => {
+          if (inv.status === 'active' || inv.total > 0) {
+            const hex = (inv.schoolId || '000000').replace(/-/g, '').slice(0, 6).toUpperCase();
+            baselines.push({
+              id: `baseline-${inv.schoolId}`,
+              school_id: inv.schoolId,
+              school_name: inv.schoolName,
+              receipt_number: `TB-${hex}-260901-INIT`,
+              booking_type: 'SUBSCRIPTION_BOOKING',
+              has_campus_subscription: inv.hasCampus,
+              has_groovelab_subscription: inv.hasGroovelab,
+              student_billing_option: inv.studentBillingOption,
+              storage_addon_gb: inv.storageAddonGb,
+              storage_addon_monthly_fee: inv.storageAddonMonthlyFee,
+              storage_addon_status: inv.storageAddonGb > 0 ? 'active' : 'none',
+              storage_pending_downgrade_gb: null,
+              storage_pending_effective_date: null,
+              total_monthly_rate_net: (inv.hasCampus && inv.hasGroovelab ? 19.90 : inv.hasCampus ? 14.90 : 9.90) + (inv.storageAddonMonthlyFee || 0),
+              currency: 'EUR',
+              effective_date: inv.contractStartDate || '2026-09-01',
+              notes: 'Initialer Schuljahres-Vertragsabschluss 2026/2027 (Campus-Groovelab)',
+              booked_by_name: 'Schulleitung',
+              created_at: inv.contractStartDate ? `${inv.contractStartDate}T09:00:00Z` : (inv.createdAt || new Date().toISOString())
+            });
+          }
+        });
+        setAllTariffBookings(baselines);
+      }
+    } catch (err) {
+      console.error('Error loading tariff bookings in Master Admin:', err);
+    } finally {
+      setLoadingTariffBookings(false);
+    }
+  };
+
 
   const toggleYearExpanded = (year: number) => {
     setExpandedYears(prev => ({ ...prev, [year]: !prev[year] }));
@@ -1024,8 +1080,13 @@ Campus-Groovelab Mahnwesen & Rechtsabteilung`;
         const canonical = getSchoolCanonicalBilling(school, stats, masterPricing);
         const activeCampusUsers = metricsMap[school.id] || stats.campusStudents || 0;
         const isBypass = canonical.isBypass;
-        const hasCampus = Boolean(school.has_campus_subscription);
-        const hasGroovelab = Boolean(school.has_groovelab_subscription);
+        const isBooked = Boolean(school.is_billing_booked) || school.status === 'active';
+        let hasCampus = Boolean(school.has_campus_subscription);
+        let hasGroovelab = Boolean(school.has_groovelab_subscription);
+        if (isBooked && !hasCampus && !hasGroovelab) {
+          hasCampus = true;
+          hasGroovelab = true;
+        }
         const hasKombi = school.has_kombi_discount || (hasCampus && hasGroovelab);
 
         return {
@@ -1199,6 +1260,7 @@ Campus-Groovelab Mahnwesen & Rechtsabteilung`;
         totalUnpaid: parseFloat(totalUnpaid.toFixed(2))
       });
 
+      fetchAllTariffBookings(calculatedInvoices);
     } catch (err: any) {
       console.error('Error fetching billing data:', err);
       setError('Verbindungsfehler beim Laden der Abrechnungsmetriken: ' + (err.message || String(err)));
@@ -1492,6 +1554,7 @@ Campus-Groovelab Mahnwesen & Rechtsabteilung`;
       }}>
         {[
           { id: 'invoices', label: 'Rechnungsjournal & Mandanten', icon: FileText, count: invoices.length },
+          { id: 'ledger', label: 'Buchungsjournal & Tarife', icon: ScrollText, count: allTariffBookings.length },
           { id: 'datev', label: 'DATEV & Erlöskonten (SKR03/04)', icon: FileSpreadsheet },
           { id: 'banking', label: 'Bankabgleich & SEPA pain.008', icon: Landmark },
           { id: 'prap', label: 'PRAP & Erlösabgrenzung (HGB/IFRS)', icon: TrendingUp },
@@ -2958,6 +3021,336 @@ Campus-Groovelab Mahnwesen & Rechtsabteilung`;
           </div>
         </div>
       )}
+
+      {/* ═══════════════════════════════════════════════════════════════════════ */}
+      {/* 📜 SUB-TAB 6: BUCHUNGSJOURNAL & TARIFE (activeFinanceSubTab === 'ledger') */}
+      {/* ═══════════════════════════════════════════════════════════════════════ */}
+      {activeFinanceSubTab === 'ledger' && (() => {
+        // Filter logic for ledger
+        const filteredBookings = allTariffBookings.filter(b => {
+          const q = ledgerSearchQuery.toLowerCase().trim();
+          const schoolName = (b.school_name || invoices.find(i => i.schoolId === b.school_id)?.schoolName || '').toLowerCase();
+          const receipt = (b.receipt_number || '').toLowerCase();
+          const bookedBy = (b.booked_by_name || '').toLowerCase();
+          const matchesQuery = !q || schoolName.includes(q) || receipt.includes(q) || bookedBy.includes(q);
+
+          const matchesSchool = ledgerSchoolFilter === 'all' || b.school_id === ledgerSchoolFilter;
+
+          let matchesType = true;
+          if (ledgerTypeFilter !== 'all') {
+            matchesType = b.booking_type === ledgerTypeFilter;
+          }
+
+          return matchesQuery && matchesSchool && matchesType;
+        });
+
+        // Compute KPIs
+        const totalBaseMrr = allTariffBookings.reduce((acc, b) => {
+          if (b.booking_type === 'STORAGE_UPGRADE' || b.booking_type === 'STORAGE_DOWNGRADE') return acc;
+          const baseRate = (b.has_campus_subscription && b.has_groovelab_subscription) ? 19.90 : b.has_campus_subscription ? 14.90 : 9.90;
+          return acc + baseRate;
+        }, 0);
+
+        const totalStorageMrr = allTariffBookings.reduce((acc, b) => acc + Number(b.storage_addon_monthly_fee || 0), 0);
+        const activeStorageBookingsCount = allTariffBookings.filter(b => Number(b.storage_addon_gb || 0) > 0).length;
+        const pendingDowngradesCount = allTariffBookings.filter(b => b.storage_pending_downgrade_gb !== null && b.storage_pending_downgrade_gb !== undefined).length;
+
+        // Unique school list for filter dropdown
+        const schoolFilterOptions = Array.from(new Set(allTariffBookings.map(b => b.school_id))).map(id => {
+          const name = allTariffBookings.find(b => b.school_id === id)?.school_name || invoices.find(i => i.schoolId === id)?.schoolName || id;
+          return { id, name };
+        });
+
+        // CSV Export handler
+        const handleExportLedgerCsv = () => {
+          const headers = [
+            'Belegnummer',
+            'Datum',
+            'Musikschule',
+            'Buchungstyp',
+            'Campus',
+            'GrooveLab',
+            'AudioTresorGB',
+            'MonatsgebuehrNetto',
+            'GebuchtDurch',
+            'Notizen'
+          ];
+          const rows = filteredBookings.map(b => {
+            const sName = b.school_name || invoices.find(i => i.schoolId === b.school_id)?.schoolName || b.school_id;
+            const dateStr = new Date(b.created_at).toLocaleDateString('de-DE');
+            return [
+              b.receipt_number,
+              dateStr,
+              sName,
+              b.booking_type,
+              b.has_campus_subscription ? 'Ja' : 'Nein',
+              b.has_groovelab_subscription ? 'Ja' : 'Nein',
+              b.storage_addon_gb || 0,
+              Number(b.total_monthly_rate_net || 0).toFixed(2),
+              b.booked_by_name || 'Schulleitung',
+              b.notes || ''
+            ];
+          });
+          downloadCsvFile(`buchungsjournal_campus_groovelab_${new Date().toISOString().split('T')[0]}.csv`, headers, rows);
+        };
+
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }} className="animate-fade-in">
+            {/* KPI Cards */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
+              <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '18px', padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Gebuchte Basis-MRR</span>
+                <div style={{ fontSize: '1.6rem', fontWeight: 900, color: '#0f172a' }}>
+                  {totalBaseMrr.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
+                </div>
+                <span style={{ fontSize: '0.68rem', color: '#16a34a', fontWeight: 700 }}>✓ Campus &amp; GrooveLab Hosting</span>
+              </div>
+
+              <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '18px', padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Audio-Tresor Add-on MRR</span>
+                <div style={{ fontSize: '1.6rem', fontWeight: 900, color: '#16a34a' }}>
+                  {totalStorageMrr.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
+                </div>
+                <span style={{ fontSize: '0.68rem', color: '#64748b' }}>{activeStorageBookingsCount} aktive Speicherpakete</span>
+              </div>
+
+              <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '18px', padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Gesamt-Belege im Ledger</span>
+                <div style={{ fontSize: '1.6rem', fontWeight: 900, color: '#0f172a' }}>
+                  {allTariffBookings.length}
+                </div>
+                <span style={{ fontSize: '0.68rem', color: '#64748b' }}>Append-Only Audit Trail</span>
+              </div>
+
+              <div style={{ background: pendingDowngradesCount > 0 ? '#fffbeb' : '#ffffff', border: pendingDowngradesCount > 0 ? '1px solid #fde68a' : '1px solid #e2e8f0', borderRadius: '18px', padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <span style={{ fontSize: '0.74rem', fontWeight: 800, color: pendingDowngradesCount > 0 ? '#b45309' : '#64748b', textTransform: 'uppercase' }}>Vorgemerkte Downgrades</span>
+                <div style={{ fontSize: '1.6rem', fontWeight: 900, color: pendingDowngradesCount > 0 ? '#d97706' : '#0f172a' }}>
+                  {pendingDowngradesCount}
+                </div>
+                <span style={{ fontSize: '0.68rem', color: pendingDowngradesCount > 0 ? '#b45309' : '#64748b' }}>
+                  {pendingDowngradesCount > 0 ? 'Wirksam zum Monatswechsel' : 'Keine Vormerkungen offen'}
+                </span>
+              </div>
+            </div>
+
+            {/* Filter & Controls Bar */}
+            <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '18px', padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', flex: 1 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#f8fafc', padding: '8px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', minWidth: '240px' }}>
+                  <Search size={15} color="#64748b" />
+                  <input
+                    type="text"
+                    value={ledgerSearchQuery}
+                    onChange={(e) => setLedgerSearchQuery(e.target.value)}
+                    placeholder="Suche nach Schule, Beleg-Nr., Name..."
+                    style={{ border: 'none', background: 'transparent', outline: 'none', fontSize: '0.82rem', width: '100%', color: '#0f172a' }}
+                  />
+                  {ledgerSearchQuery && (
+                    <button onClick={() => setLedgerSearchQuery('')} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#94a3b8' }}>✕</button>
+                  )}
+                </div>
+
+                <select
+                  value={ledgerSchoolFilter}
+                  onChange={(e) => setLedgerSchoolFilter(e.target.value)}
+                  style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #cbd5e1', background: '#ffffff', fontSize: '0.82rem', color: '#0f172a', fontWeight: 650, outline: 'none' }}
+                >
+                  <option value="all">Alle Musikschulen ({schoolFilterOptions.length})</option>
+                  {schoolFilterOptions.map(opt => (
+                    <option key={opt.id} value={opt.id}>{opt.name}</option>
+                  ))}
+                </select>
+
+                <select
+                  value={ledgerTypeFilter}
+                  onChange={(e) => setLedgerTypeFilter(e.target.value)}
+                  style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #cbd5e1', background: '#ffffff', fontSize: '0.82rem', color: '#0f172a', fontWeight: 650, outline: 'none' }}
+                >
+                  <option value="all">Alle Buchungstypen</option>
+                  <option value="SUBSCRIPTION_BOOKING">Schuljahres-Buchungen</option>
+                  <option value="STORAGE_UPGRADE">Speicher-Upgrades</option>
+                  <option value="STORAGE_DOWNGRADE">Downgrade vorgemerkt</option>
+                  <option value="STORAGE_DOWNGRADE_CANCEL">Downgrade widerrufen</option>
+                  <option value="INITIAL_BASELINE">System-Baselines</option>
+                </select>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <button
+                  type="button"
+                  onClick={() => fetchAllTariffBookings()}
+                  style={{ padding: '8px 14px', borderRadius: '10px', background: '#f8fafc', border: '1px solid #e2e8f0', color: '#475569', fontSize: '0.80rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+                >
+                  <RefreshCw size={13} className={loadingTariffBookings ? 'animate-spin' : ''} />
+                  Aktualisieren
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleExportLedgerCsv}
+                  style={{ padding: '8px 16px', borderRadius: '10px', background: '#16a34a', border: 'none', color: '#ffffff', fontSize: '0.80rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', boxShadow: '0 2px 6px rgba(22, 163, 74, 0.2)' }}
+                >
+                  <Download size={13} />
+                  CSV Export
+                </button>
+              </div>
+            </div>
+
+            {/* Table Card */}
+            <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '20px', overflow: 'hidden', boxShadow: '0 4px 16px rgba(15, 23, 42, 0.03)' }}>
+              <div style={{ padding: '16px 20px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.86rem', fontWeight: 800, color: '#0f172a' }}>
+                  Revisionssicheres Buchungsjournal ({filteredBookings.length} Einträge)
+                </span>
+                <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                  Lückenlose GoBD-Belegkette (Multi-Tenant)
+                </span>
+              </div>
+
+              {loadingTariffBookings ? (
+                <div style={{ padding: '48px', textAlign: 'center', color: '#64748b' }}>
+                  <RefreshCw size={24} className="animate-spin" style={{ margin: '0 auto 12px auto', color: '#ea4335' }} />
+                  Buchungsjournal wird geladen...
+                </div>
+              ) : filteredBookings.length === 0 ? (
+                <div style={{ padding: '48px 20px', textAlign: 'center', color: '#64748b' }}>
+                  <ScrollText size={36} style={{ margin: '0 auto 12px auto', opacity: 0.3 }} />
+                  <div style={{ fontWeight: 800, fontSize: '0.92rem', color: '#0f172a' }}>Keine Buchungsbelege gefunden</div>
+                  <div style={{ fontSize: '0.78rem', marginTop: '4px' }}>Passe deine Filterkriterien an oder aktualisiere die Daten.</div>
+                </div>
+              ) : (
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.78rem' }}>
+                    <thead>
+                      <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#64748b', fontSize: '0.70rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                        <th style={{ padding: '12px 18px', fontWeight: 800 }}>Beleg-Nr.</th>
+                        <th style={{ padding: '12px 16px', fontWeight: 800 }}>Datum</th>
+                        <th style={{ padding: '12px 16px', fontWeight: 800 }}>Musikschule</th>
+                        <th style={{ padding: '12px 16px', fontWeight: 800 }}>Ereignistyp</th>
+                        <th style={{ padding: '12px 16px', fontWeight: 800 }}>Module</th>
+                        <th style={{ padding: '12px 16px', fontWeight: 800 }}>Audio-Tresor</th>
+                        <th style={{ padding: '12px 16px', fontWeight: 800, textAlign: 'right' }}>Monatsrate</th>
+                        <th style={{ padding: '12px 16px', fontWeight: 800 }}>Gebucht durch</th>
+                        <th style={{ padding: '12px 18px', fontWeight: 800, textAlign: 'center' }}>Beleg-PDF</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredBookings.map((b, idx) => {
+                        const isUpgrade = b.booking_type === 'STORAGE_UPGRADE';
+                        const isDowngrade = b.booking_type === 'STORAGE_DOWNGRADE' || b.booking_type === 'STORAGE_CANCEL';
+                        const isDowngradeCancel = b.booking_type === 'STORAGE_DOWNGRADE_CANCEL';
+                        const isBaseline = b.booking_type === 'INITIAL_BASELINE';
+                        const isSubBooking = b.booking_type === 'SUBSCRIPTION_BOOKING';
+
+                        const typeLabel = isUpgrade
+                          ? `Speicher +${b.storage_addon_gb} GB`
+                          : isDowngrade
+                            ? `Downgrade vorgemerkt (+${b.storage_pending_downgrade_gb ?? b.storage_addon_gb} GB)`
+                            : isDowngradeCancel
+                              ? 'Downgrade widerrufen'
+                              : isBaseline
+                                ? 'System-Baseline'
+                                : isSubBooking
+                                  ? 'Vertragsabschluss'
+                                  : b.booking_type;
+
+                        const badgeBg = isUpgrade || isSubBooking ? '#dcfce7' : isDowngrade ? '#fef3c7' : isDowngradeCancel ? '#f3e8ff' : '#f1f5f9';
+                        const badgeColor = isUpgrade || isSubBooking ? '#166534' : isDowngrade ? '#92400e' : isDowngradeCancel ? '#6b21a8' : '#475569';
+
+                        const sName = b.school_name || invoices.find(i => i.schoolId === b.school_id)?.schoolName || 'Musikschule';
+                        const sCity = invoices.find(i => i.schoolId === b.school_id)?.schoolCity || '';
+                        const formattedDate = new Date(b.created_at).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+                        return (
+                          <tr
+                            key={b.id || idx}
+                            style={{ borderBottom: idx < filteredBookings.length - 1 ? '1px solid #f1f5f9' : 'none', transition: 'background 0.15s ease' }}
+                            onMouseEnter={(e) => e.currentTarget.style.background = '#fafbfc'}
+                            onMouseLeave={(e) => e.currentTarget.style.background = '#ffffff'}
+                          >
+                            <td style={{ padding: '14px 18px', fontWeight: 900, color: '#0f172a', fontFamily: 'monospace' }}>
+                              {b.receipt_number}
+                            </td>
+                            <td style={{ padding: '14px 16px', color: '#64748b', whiteSpace: 'nowrap' }}>
+                              {formattedDate}
+                            </td>
+                            <td style={{ padding: '14px 16px' }}>
+                              <strong style={{ color: '#0f172a', display: 'block' }}>{sName}</strong>
+                              {sCity && <span style={{ fontSize: '0.70rem', color: '#64748b' }}>{sCity}</span>}
+                            </td>
+                            <td style={{ padding: '14px 16px' }}>
+                              <span style={{ background: badgeBg, color: badgeColor, padding: '3px 8px', borderRadius: '6px', fontSize: '0.68rem', fontWeight: 800, whiteSpace: 'nowrap' }}>
+                                {typeLabel}
+                              </span>
+                            </td>
+                            <td style={{ padding: '14px 16px', color: '#475569', whiteSpace: 'nowrap' }}>
+                              {b.has_campus_subscription && b.has_groovelab_subscription ? 'Campus + GrooveLab' : b.has_campus_subscription ? 'Campus' : 'GrooveLab'}
+                            </td>
+                            <td style={{ padding: '14px 16px', whiteSpace: 'nowrap' }}>
+                              <strong style={{ color: b.storage_addon_gb > 0 ? '#166534' : '#64748b' }}>
+                                {b.storage_addon_gb > 0 ? `+${b.storage_addon_gb} GB (${Number(b.storage_addon_monthly_fee).toFixed(2).replace('.', ',')} €)` : '1 GB Basis (0 €)'}
+                              </strong>
+                              {b.storage_pending_downgrade_gb !== null && b.storage_pending_downgrade_gb !== undefined && (
+                                <div style={{ fontSize: '0.68rem', color: '#d97706', fontWeight: 700 }}>
+                                  ⏳ Ziel: +{b.storage_pending_downgrade_gb} GB zum {b.storage_pending_effective_date}
+                                </div>
+                              )}
+                            </td>
+                            <td style={{ padding: '14px 16px', textAlign: 'right', fontWeight: 900, color: '#0f172a', whiteSpace: 'nowrap' }}>
+                              {Number(b.total_monthly_rate_net || 0).toFixed(2).replace('.', ',')} € / Mo.
+                            </td>
+                            <td style={{ padding: '14px 16px', color: '#475569', fontSize: '0.74rem' }}>
+                              {b.booked_by_name || 'Schulleitung'}
+                            </td>
+                            <td style={{ padding: '14px 18px', textAlign: 'center' }}>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const matchingInv = invoices.find(i => String(i.schoolId || '').toLowerCase() === String(b.school_id || '').toLowerCase())
+                                    || invoices.find(i => (i.schoolName || '').toLowerCase() === (sName || '').toLowerCase());
+                                  generateTariffReceiptPDF({
+                                    receiptNumber: b.receipt_number,
+                                    schoolName: sName,
+                                    schoolAddress: {
+                                      street: matchingInv?.schoolStreet || '',
+                                      zipCode: matchingInv?.schoolZipCode || '',
+                                      city: matchingInv?.schoolCity || '',
+                                      country: b.currency === 'CHF' ? 'CH' : 'DE'
+                                    },
+                                    bookedBy: b.booked_by_name || 'Schulleitung',
+                                    bookingType: b.booking_type,
+                                    hasCampus: b.has_campus_subscription,
+                                    hasGroovelab: b.has_groovelab_subscription,
+                                    studentBillingOption: b.student_billing_option,
+                                    storageAddonGb: b.storage_addon_gb,
+                                    storageAddonFee: Number(b.storage_addon_monthly_fee || 0),
+                                    storageStatus: b.storage_addon_status,
+                                    storagePendingDowngradeGb: b.storage_pending_downgrade_gb,
+                                    storagePendingEffectiveDate: b.storage_pending_effective_date,
+                                    totalMonthlyRateNet: Number(b.total_monthly_rate_net || 0),
+                                    currency: b.currency || 'EUR',
+                                    effectiveDate: b.effective_date,
+                                    createdAt: b.created_at,
+                                    notes: b.notes
+                                  });
+                                }}
+                                style={{ padding: '6px 10px', borderRadius: '8px', border: '1.5px solid #cbd5e1', background: '#ffffff', color: '#0f172a', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                              >
+                                <Download size={12} />
+                                PDF
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ═══════════════════════════════════════════════════════════════════════ */}
       {/* 🏦 SUB-TAB 3: BANKING & SEPA (activeFinanceSubTab === 'banking')        */}

@@ -378,7 +378,7 @@ export function TrustSafetyTab() {
           fontWeight: 800,
           fontSize: '0.86rem'
         }}>
-          <CheckCircle2 size={18} color="#10b981" />
+          <CheckCircle2 size={18} color="#0f172a" />
           <span>{actionSuccessToast}</span>
         </div>
       )}
@@ -412,7 +412,7 @@ export function TrustSafetyTab() {
               alignItems: 'center',
               gap: '5px'
             }}>
-              <ShieldCheck size={12} color="#dc2626" />
+              <ShieldCheck size={12} color="#475569" />
               Trust &amp; Safety • Link-Schutz
             </span>
             <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 600 }}>
@@ -871,7 +871,7 @@ export function TrustSafetyTab() {
                       title="Kryptografischen Prüfsummen-Hash kopieren"
                     >
                       <span>{rec.sha256Hash.slice(0, 10)}...</span>
-                      {copiedHashId === rec.id ? <Check size={11} color="#10b981" /> : <Copy size={11} />}
+                      {copiedHashId === rec.id ? <Check size={11} color="#0f172a" /> : <Copy size={11} />}
                     </button>
                   </td>
                   <td style={{ padding: '14px 16px', textAlign: 'right' }}>

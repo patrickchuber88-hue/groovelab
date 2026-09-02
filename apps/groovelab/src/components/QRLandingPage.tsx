@@ -880,13 +880,28 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
       if (rpcErr || rpcRes !== true) {
         // Fallback to set_initial_student_pin if 4 digits
         if (newPinInput.length === 4) {
-          const { data: initRes, error: initErr } = await supabase.rpc('set_initial_student_pin', {
-            p_student_id: profile.id,
-            p_qr_token: token,
-            p_pin: newPinInput
-          });
-          if (initErr || initRes !== true) {
-            throw new Error(rpcErr?.message || initErr?.message || 'Serverfehler beim Speichern der PIN.');
+          let pinSaved = false;
+          try {
+            const { data: initRes, error: initErr } = await supabase.rpc('set_initial_student_pin', {
+              p_student_id: profile.id,
+              p_qr_token: token,
+              p_pin: newPinInput
+            });
+            if (!initErr && initRes === true) pinSaved = true;
+          } catch (e) {}
+
+          if (!pinSaved) {
+            try {
+              const { data: pRes, error: pErr } = await supabase.rpc('set_personal_pin', {
+                p_user_id: profile.id,
+                p_new_pin: newPinInput
+              });
+              if (!pErr && pRes === true) pinSaved = true;
+            } catch (e) {}
+          }
+
+          if (!pinSaved) {
+            throw new Error(rpcErr?.message || 'Serverfehler beim Speichern der PIN.');
           }
         } else {
           throw new Error(rpcErr?.message || 'Serverfehler beim Speichern der Eltern-PIN.');
@@ -3037,14 +3052,44 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           has_personal_pin: true
         } : null);
 
+        let rpcSuccess = false;
+        let rpcErrorMsg = '';
+
         // 1. Primary: Atomic Security Definer RPC
-        const { data: rpcRes, error: rpcErr } = await supabase.rpc('set_initial_student_pin', {
-          p_student_id: profile.id,
-          p_qr_token: token,
-          p_pin: pinToVerify
-        });
-        if (rpcErr || rpcRes !== true) {
-          throw new Error(rpcErr?.message || 'Serverfehler beim Setzen der PIN.');
+        try {
+          const { data: rpcRes, error: rpcErr } = await supabase.rpc('set_initial_student_pin', {
+            p_student_id: profile.id,
+            p_qr_token: token,
+            p_pin: pinToVerify
+          });
+          if (!rpcErr && rpcRes === true) {
+            rpcSuccess = true;
+          } else if (rpcErr) {
+            rpcErrorMsg = rpcErr.message;
+          }
+        } catch (e: any) {
+          rpcErrorMsg = e?.message || '';
+        }
+
+        // 2. Secondary Fallback RPC
+        if (!rpcSuccess) {
+          try {
+            const { data: pRes, error: pErr } = await supabase.rpc('set_personal_pin', {
+              p_user_id: profile.id,
+              p_new_pin: pinToVerify
+            });
+            if (!pErr && pRes === true) {
+              rpcSuccess = true;
+            } else if (pErr) {
+              rpcErrorMsg = pErr.message || rpcErrorMsg;
+            }
+          } catch (e: any) {
+            rpcErrorMsg = e?.message || rpcErrorMsg;
+          }
+        }
+
+        if (!rpcSuccess) {
+          throw new Error(rpcErrorMsg || 'Serverfehler beim Setzen der PIN.');
         }
 
         setPinInput('');

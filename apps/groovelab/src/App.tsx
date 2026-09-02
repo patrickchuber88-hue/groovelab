@@ -69,7 +69,7 @@ import { usePrivacyShield } from './hooks/usePrivacyShield';
 import { initGlobalErrorSanitizer } from './utils/errorSanitizer';
 import { initAntiTamperShield } from './utils/antiTamper';
 import { runStorageJanitor, runClientStorageJanitor } from './services/storageJanitorService';
-import { verifyMasterSessionLease, revokeMasterSessionLease } from './utils/masterAuditLogger';
+import { verifyMasterSessionLease, revokeMasterSessionLease, createMasterSessionLease } from './utils/masterAuditLogger';
 import { scrubSensitiveUrlParams, scrubSensitiveUrlPath } from './utils/urlSecurityScrubber';
 import { executeSessionZeroize } from './utils/sessionZeroize';
 import { initAuthBroadcastListener } from './utils/authBroadcastSync';
@@ -4095,10 +4095,21 @@ function App() {
       }
 
       if (isInitial) {
+        const isMasterSessionFlag = typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_is_master_admin') === 'true' || localStorage.getItem('groovelab_is_master_admin') === 'true') : false;
+        const isMasterWorkspace = typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_active_workspace') === 'master_admin' || localStorage.getItem('groovelab_active_workspace') === 'master_admin') : false;
+        const isMasterAdmin = Boolean(userData.is_master_admin === true && (isMasterSessionFlag || isMasterWorkspace));
+
         const isTeacher = userData.role?.toLowerCase() === 'teacher';
         const isSecretary = userData.role?.toLowerCase() === 'secretary';
 
-        if (isStudent) {
+        if (isMasterAdmin) {
+          sessionStorage.setItem('groovelab_is_master_admin', 'true');
+          sessionStorage.setItem('groovelab_active_workspace', 'master_admin');
+          localStorage.setItem('groovelab_is_master_admin', 'true');
+          localStorage.setItem('groovelab_active_workspace', 'master_admin');
+          sessionStorage.setItem('groovelab_active_platform', 'campus');
+          setActivePlatform('campus');
+        } else if (isStudent) {
           const startPlat = allowedPlatform;
           setActivePlatform(startPlat);
           sessionStorage.setItem('groovelab_active_platform', startPlat);
@@ -6998,7 +7009,13 @@ function App() {
       sessionStorage.setItem('groovelab_active_platform', 'groovelab');
     }
     
-    if (userToLogin?.role === 'student') {
+    if (isMasterAdmin) {
+      sessionStorage.setItem('groovelab_active_workspace', 'master_admin');
+      sessionStorage.setItem('groovelab_is_master_admin', 'true');
+      localStorage.setItem('groovelab_active_workspace', 'master_admin');
+      localStorage.setItem('groovelab_is_master_admin', 'true');
+      sessionStorage.setItem('campus_active_tab', 'briefing');
+    } else if (userToLogin?.role === 'student') {
       if (selectedPlat === 'groovelab') {
         sessionStorage.setItem('groovelab_active_tab', 'live');
       } else {
@@ -7400,10 +7417,11 @@ function App() {
   // 2. Session was explicitly authenticated via Master-Admin login / Leitstand bypass (sessionStorage.getItem('groovelab_is_master_admin') === 'true')
   // 3. Active workspace is 'master_admin' (never 'teacher', 'secretary', 'admin', 'student')
   // 4. User is not in support-ghost session mode
+  const isMasterSessionExplicit = typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_is_master_admin') === 'true' || localStorage.getItem('groovelab_is_master_admin') === 'true') : false;
   const isMasterAdminSession = Boolean(
     user?.is_master_admin === true &&
-    currentActiveWorkspace === 'master_admin' &&
-    sessionStorage.getItem('groovelab_is_master_admin') === 'true'
+    (currentActiveWorkspace === 'master_admin' || (!currentActiveWorkspace && isMasterSessionExplicit)) &&
+    isMasterSessionExplicit
   ) && !(isGhostParam && ghostSchoolId);
 
   // Enterprise+ Tier 3: Master Admin Ephemeral Session Lease TTL Guard (Zero Standing Privileges)
@@ -7934,6 +7952,19 @@ function App() {
     try {
       const userId = user?.id;
       if (!userId) return;
+
+      if (newRole === 'master_admin') {
+        if (typeof window !== 'undefined') {
+          sessionStorage.setItem('groovelab_is_master_admin', 'true');
+          sessionStorage.setItem('groovelab_active_workspace', 'master_admin');
+          localStorage.setItem('groovelab_is_master_admin', 'true');
+          localStorage.setItem('groovelab_active_workspace', 'master_admin');
+          sessionStorage.setItem('groovelab_user_id', userId);
+        }
+        await createMasterSessionLease(userId, 'bypass_dev');
+        window.location.reload();
+        return;
+      }
 
       // 1. Transition local React state & cached user
       React.startTransition(() => {
@@ -8483,7 +8514,12 @@ function App() {
           activePlatform={activePlatform}
         />
       )}
-      <GlobalBroadcastBanner announcement={broadcastAnnouncement} currentRole={user?.role} />
+      <GlobalBroadcastBanner 
+        announcement={broadcastAnnouncement} 
+        currentRole={user?.role} 
+        activePlatform={activePlatform}
+        currentSchoolId={school?.id}
+      />
       <OfflineSyncIndicator />
       <PrivacyShieldOverlay 
         isActive={isShielded} 

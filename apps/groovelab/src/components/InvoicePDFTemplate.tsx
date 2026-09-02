@@ -64,6 +64,7 @@ export const InvoicePDFTemplate: React.FC<InvoicePDFTemplateProps> = ({
   const isInf = invoice.type === 'INF' || !invoice.type;
   const isAkt = invoice.type === 'AKT';
   const isManual = !isInf && !isAkt;
+  const isPaid = invoice.status === 'Bezahlt' || invoice.status === 'paid';
 
   const currentRates = isChf ? masterPricing.ratesCHF : masterPricing.ratesEUR;
   const billedCampus = school.hasCampus;
@@ -209,7 +210,7 @@ export const InvoicePDFTemplate: React.FC<InvoicePDFTemplateProps> = ({
               <h2 style={{ margin: 0, color: '#34a853', fontFamily: 'Urbanist', fontSize: '1.3rem', fontWeight: 900, display: 'flex', alignItems: 'center' }}>
                 <CampusGroovelabLogo size={22} fontSize="1.3rem" />
               </h2>
-              <span style={{ fontSize: '0.68rem', color: '#64748b', display: 'block', marginTop: '2px' }}><CampusGroovelabText /> Billing System</span>
+              <span style={{ fontSize: '0.68rem', color: '#64748b', display: 'block', marginTop: '2px' }}><CampusGroovelabText /> • Finanz- &amp; Rechnungswesen</span>
             </div>
             <div style={{ textAlign: 'right', fontSize: '0.78rem' }}>
               <strong style={{ display: 'block', fontSize: '0.92rem', color: invoice.status === 'Vorschau' ? '#d97706' : '#0f172a' }}>
@@ -330,13 +331,13 @@ export const InvoicePDFTemplate: React.FC<InvoicePDFTemplateProps> = ({
                     <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
                       <td style={{ padding: dynamicTdPadding }}>
                         <strong style={{ display: 'block', color: '#0f172a' }}>Service- &amp; Administrationspauschale</strong>
-                        <span style={{ fontSize: '0.68rem', color: '#64748b' }}>{school.totalTeachers} Lehrkräfte ({fmt(teacherRate)} / Mo. pro User)</span>
+                        <span style={{ fontSize: '0.68rem', color: '#64748b' }}>{school.totalTeachers} {school.totalTeachers === 1 ? 'Lehrkraft' : 'Lehrkräfte'} ({fmt(teacherRate)} / Mo. pro User)</span>
                       </td>
                       <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
-                        1 Monat
+                        {school.totalTeachers} {school.totalTeachers === 1 ? 'Lehrkraft' : 'Lehrkräfte'}
                       </td>
                       <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
-                        {fmt(school.totalTeachers * teacherRate)}
+                        {fmt(teacherRate)}
                       </td>
                       <td style={{ padding: dynamicTdPadding, textAlign: 'right', fontWeight: 600 }}>
                         {fmt(school.totalTeachers * teacherRate)}
@@ -351,13 +352,13 @@ export const InvoicePDFTemplate: React.FC<InvoicePDFTemplateProps> = ({
                       <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
                         <td style={{ padding: dynamicTdPadding }}>
                           <strong style={{ display: 'block', color: '#0f172a' }}>Cloud- & Modul-Bereitstellung: Campus</strong>
-                          <span style={{ fontSize: '0.68rem', color: '#64748b' }}>{campusCnt} aktive Campus-Schüler ({fmt(studentRate)} / Mo. pro Profil)</span>
+                          <span style={{ fontSize: '0.68rem', color: '#64748b' }}>{campusCnt} freigeschaltete Campus-Schüler ({fmt(studentRate)} / Mo. pro Profil)</span>
                         </td>
                         <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
-                          1 Monat
+                          {campusCnt} Schüler
                         </td>
                         <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
-                          {fmt(campusCnt * studentRate)}
+                          {fmt(studentRate)}
                         </td>
                         <td style={{ padding: dynamicTdPadding, textAlign: 'right', fontWeight: 600 }}>
                           {fmt(campusCnt * studentRate)}
@@ -373,13 +374,13 @@ export const InvoicePDFTemplate: React.FC<InvoicePDFTemplateProps> = ({
                       <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
                         <td style={{ padding: dynamicTdPadding }}>
                           <strong style={{ display: 'block', color: '#0f172a' }}>Cloud- & Modul-Bereitstellung: GrooveLab</strong>
-                          <span style={{ fontSize: '0.68rem', color: '#64748b' }}>{glCnt} aktive GrooveLab-Schüler ({fmt(studentRate)} / Mo. pro Profil)</span>
+                          <span style={{ fontSize: '0.68rem', color: '#64748b' }}>{glCnt} freigeschaltete GrooveLab-Schüler ({fmt(studentRate)} / Mo. pro Profil)</span>
                         </td>
                         <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
-                          1 Monat
+                          {glCnt} Schüler
                         </td>
                         <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
-                          {fmt(glCnt * studentRate)}
+                          {fmt(studentRate)}
                         </td>
                         <td style={{ padding: dynamicTdPadding, textAlign: 'right', fontWeight: 600 }}>
                           {fmt(glCnt * studentRate)}
@@ -398,10 +399,10 @@ export const InvoicePDFTemplate: React.FC<InvoicePDFTemplateProps> = ({
                           <span style={{ fontSize: '0.68rem', color: '#64748b' }}>Cloud-Speicher, Termin-/Hausaufgaben-Sync & QR-Schnittstelle ({passCnt} Schüler × {fmt(passiveRate)} / Mo.)</span>
                         </td>
                         <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
-                          1 Monat
+                          {passCnt} Schüler
                         </td>
                         <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
-                          {fmt(passCnt * passiveRate)}
+                          {fmt(passiveRate)}
                         </td>
                         <td style={{ padding: dynamicTdPadding, textAlign: 'right', fontWeight: 600 }}>
                           {fmt(passCnt * passiveRate)}
@@ -566,7 +567,43 @@ export const InvoicePDFTemplate: React.FC<InvoicePDFTemplateProps> = ({
                 )}
               </div>
               
-              {invoice.amount > 0 ? (
+              {isPaid ? (
+                <div style={{ 
+                  marginTop: '12px', 
+                  padding: '14px 18px', 
+                  background: '#f0fdf4', 
+                  borderRadius: '16px', 
+                  border: '1px solid #bbf7d0', 
+                  fontSize: '0.74rem', 
+                  color: '#166534', 
+                  width: '100%', 
+                  display: 'flex', 
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  textAlign: 'left'
+                }}>
+                  <div>
+                    <strong style={{ display: 'block', color: '#166534', marginBottom: '3px', fontSize: '0.84rem' }}>
+                      ✓ Rechnungsbetrag vollständig beglichen
+                    </strong>
+                    <span>Status: <strong>Bezahlt</strong> • Zahlung dankend erhalten. Es ist keine weitere Überweisung erforderlich.</span>
+                  </div>
+                  <div style={{
+                    border: '2px solid #16a34a',
+                    color: '#16a34a',
+                    fontWeight: 900,
+                    fontSize: '0.82rem',
+                    letterSpacing: '0.12em',
+                    textTransform: 'uppercase',
+                    padding: '5px 12px',
+                    borderRadius: '8px',
+                    transform: 'rotate(-3deg)',
+                    background: 'rgba(255,255,255,0.85)'
+                  }}>
+                    BEZAHLT
+                  </div>
+                </div>
+              ) : invoice.amount > 0 ? (
                 <div style={{ 
                   marginTop: '12px', 
                   padding: '16px', 

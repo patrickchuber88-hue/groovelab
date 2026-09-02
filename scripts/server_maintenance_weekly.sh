@@ -34,8 +34,16 @@ if [ -f "/etc/logrotate.d/campus_groovelab" ]; then
   echo "  ✓ Log-Rotation ausgeführt."
 fi
 
-# 4. Final Storage Report
-echo "📊 4. Aktueller Speicherplatz-Status nach Wartung:"
+# 4. Database Janitor & Session Lease Pruning
+if command -v docker >/dev/null 2>&1 && docker ps --format '{{.Names}}' | grep -q 'supabase-db\|postgres'; then
+  echo "🛡️  4. Führe automatisierten Enterprise Database & Session Lease Janitor aus..."
+  DB_CONTAINER=$(docker ps --format '{{.Names}}' | grep 'supabase-db\|postgres' | head -n 1)
+  docker exec -i "$DB_CONTAINER" psql -U postgres -d postgres -c "SELECT public.cleanup_expired_session_leases(); VACUUM ANALYZE public.session_leases; VACUUM ANALYZE public.progress_matrix; VACUUM ANALYZE public.user_song_skills;" 2>/dev/null || true
+  echo "  ✓ Database Hygiene & Session Janitor erfolgreich ausgeführt."
+fi
+
+# 5. Final Storage Report
+echo "📊 5. Aktueller Speicherplatz-Status nach Wartung:"
 df -h / /mnt/supabase_data 2>/dev/null || df -h /
 
 echo "=============================================================================="

@@ -478,7 +478,7 @@ export const FeedbackTab: React.FC = () => {
             <Timer size={14} /> Offene SLA-Tickets
           </div>
           <div style={{ fontSize: '1.5rem', fontWeight: 950, color: criticalSlaCount > 0 ? '#dc2626' : '#d97706', marginTop: '4px' }}>
-            {criticalSlaCount > 0 ? `${criticalSlaCount} Kritisch 🚨` : `${openSlaCount} aktiv`}
+            {criticalSlaCount > 0 ? `${criticalSlaCount} Kritisch` : `${openSlaCount} aktiv`}
           </div>
         </div>
 
@@ -556,10 +556,10 @@ export const FeedbackTab: React.FC = () => {
               fontWeight: 700
             }}
           >
-            <option value="all">⚡ Alle SLA-Stati</option>
-            <option value="critical">🚨 SLA Dringend (&lt; 15 Min.)</option>
+            <option value="all">Alle SLA-Stati</option>
+            <option value="critical">SLA Dringend (&lt; 15 Min.)</option>
             <option value="active_sla">⏳ SLA Aktiv (&lt; 60 Min.)</option>
-            <option value="fulfilled">✓ SLA Erfüllt (Beantwortet)</option>
+            <option value="fulfilled">SLA Erfüllt (Beantwortet)</option>
           </select>
 
           {/* Type Filter */}
@@ -884,7 +884,7 @@ export const FeedbackTab: React.FC = () => {
             {/* Inspector Header */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f1f5f9', paddingBottom: '12px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                {selectedItem.type === 'support_request' ? <ShieldCheck size={20} color="#0891b2" /> : (selectedItem.type === 'bug' ? <Bug size={20} color="#ea4335" /> : <Lightbulb size={20} color="#ca8a04" />)}
+                {selectedItem.type === 'support_request' ? <ShieldCheck size={20} color="#0f172a" /> : (selectedItem.type === 'bug' ? <Bug size={20} color="#0f172a" /> : <Lightbulb size={20} color="#0f172a" />)}
                 <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#0f172a' }}>
                   {selectedItem.type === 'support_request' ? 'Ghost-Support-Ticket' : (selectedItem.type === 'bug' ? 'Fehlermeldung Detail' : 'App-Idee Detail')}
                 </h3>
@@ -965,7 +965,7 @@ export const FeedbackTab: React.FC = () => {
               }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <ShieldCheck size={16} color="#0891b2" />
+                    <ShieldCheck size={16} color="#475569" />
                     <span style={{ fontSize: '0.80rem', fontWeight: 800, color: '#0e7490' }}>
                       Autorisierter Ghost-Support aktiv
                     </span>
@@ -1102,14 +1102,14 @@ export const FeedbackTab: React.FC = () => {
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <MessageCircle size={16} color="#0284c7" />
+                  <MessageCircle size={16} color="#0f172a" />
                   <span style={{ fontSize: '0.80rem', fontWeight: 800, color: '#0f172a' }}>
                     Offizielle Rückmeldung an den Nutzer (In-App)
                   </span>
                 </div>
                 {selectedItem.admin_responded_at && (
                   <span style={{ fontSize: '0.68rem', color: selectedItem.is_user_read ? '#16a34a' : '#d97706', fontWeight: 700 }}>
-                    {selectedItem.is_user_read ? '✓ Gesehen' : '● Neu (Ungelesen)'}
+                    {selectedItem.is_user_read ? 'Gesehen' : 'Neu (Ungelesen)'}
                   </span>
                 )}
               </div>
@@ -1117,7 +1117,7 @@ export const FeedbackTab: React.FC = () => {
               {/* Template Snippets: Clicking loads text & pre-selects status (no auto-send) */}
               <div>
                 <div style={{ fontSize: '0.70rem', fontWeight: 900, color: '#059669', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <Zap size={12} color="#059669" /> ⚡ ANTWORT-VORLAGEN (Klick fügt Text ein &amp; wählt Status vor):
+                  <Zap size={12} color="#475569" /> ANTWORT-VORLAGEN (Klick fügt Text ein &amp; wählt Status vor):
                 </div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                   {QUICK_RESPONSE_TEMPLATES.map(tpl => {
@@ -1186,11 +1186,11 @@ export const FeedbackTab: React.FC = () => {
                         }}
                         title={`Klicken, um diesen Text ins Textfeld einzufügen und Status "${FEEDBACK_STATUSES.find(s => s.id === tpl.status)?.label}" vorzuwählen`}
                       >
-                        {isSlaTouch && <Zap size={12} color="#059669" />}
-                        {tpl.category === 'legal' && <Scale size={12} color="#b91c1c" />}
+                        {isSlaTouch && <Zap size={12} color="#475569" />}
+                        {tpl.category === 'legal' && <Scale size={12} color="#475569" />}
                         {tpl.category === 'scope' && <Target size={12} color="#64748b" />}
-                        {tpl.category === 'positive' && <Sparkles size={12} color="#15803d" />}
-                        {tpl.category === 'info' && <Lightbulb size={12} color="#1d4ed8" />}
+                        {tpl.category === 'positive' && <Sparkles size={12} color="#475569" />}
+                        {tpl.category === 'info' && <Lightbulb size={12} color="#475569" />}
                         <span>{tpl.label}</span>
                       </button>
                     );
@@ -1245,7 +1245,7 @@ export const FeedbackTab: React.FC = () => {
                   }}
                 >
                   {isSendingResponse ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
-                  <span>{isSendingResponse ? 'Wird gespeichert...' : '⚡ Antwort speichern & SLA erfüllen'}</span>
+                  <span>{isSendingResponse ? 'Wird gespeichert...' : 'Antwort speichern & SLA erfüllen'}</span>
                 </button>
               </div>
             </div>
@@ -1349,7 +1349,7 @@ export const FeedbackTab: React.FC = () => {
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Megaphone size={20} color="#2563eb" />
+                <Megaphone size={20} color="#0f172a" />
                 <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#0f172a' }}>
                   Update im Briefing-Dashboard veröffentlichen
                 </h3>

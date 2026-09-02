@@ -327,7 +327,7 @@ export const ClientErrorTelemetryPanel: React.FC = () => {
         {/* ─── 3. ERROR LOGS TABLE ─── */}
         {filteredLogs.length === 0 ? (
           <div style={{ padding: '60px 20px', textAlign: 'center', color: '#64748b' }}>
-            <CheckCircle2 size={40} color="#10b981" style={{ margin: '0 auto 12px auto' }} />
+            <CheckCircle2 size={40} color="#0f172a" style={{ margin: '0 auto 12px auto' }} />
             <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#0f172a' }}>
               Keine aktiven Fehlereinträge vorhanden
             </h4>
@@ -601,7 +601,7 @@ export const ClientErrorTelemetryPanel: React.FC = () => {
                         gap: '4px'
                       }}
                     >
-                      {copiedStack ? <Check size={12} color="#059669" /> : <Copy size={12} />}
+                      {copiedStack ? <Check size={12} color="#0f172a" /> : <Copy size={12} />}
                       {copiedStack ? 'Kopiert!' : 'Stack kopieren'}
                     </button>
                   </div>

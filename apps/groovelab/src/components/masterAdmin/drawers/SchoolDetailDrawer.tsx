@@ -513,7 +513,7 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
               gap: '20px'
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', borderBottom: '1px solid #f1f5f9', paddingBottom: '16px' }}>
-                <Building size={20} color="#059669" />
+                <Building size={20} color="#0f172a" />
                 <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#0f172a' }}>
                   Stammdaten &amp; Postanschrift
                 </h3>
@@ -1159,7 +1159,7 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
                       color: '#334155',
                       lineHeight: '1.45'
                     }}>
-                      <Volume2 size={16} color="#059669" style={{ flexShrink: 0 }} />
+                      <Volume2 size={16} color="#475569" style={{ flexShrink: 0 }} />
                       <div>
                         {storageUsedBytes <= 0 ? (
                           <>
@@ -1284,7 +1284,7 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
                   e.currentTarget.style.boxShadow = '0 4px 14px rgba(15, 23, 42, 0.18)';
                 }}
               >
-                <ShieldCheck size={18} color="#34a853" />
+                <ShieldCheck size={18} color="#475569" />
                 <span>DSB- &amp; Audit-Portal für diese Schule öffnen</span>
               </button>
             </div>

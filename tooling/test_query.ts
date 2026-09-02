@@ -33,7 +33,6 @@ async function test() {
     { name: 'help_requests', q: supabase.from('help_requests').select('*').eq('school_id', schoolId) },
     { name: 'groovelab_tickets', q: supabase.from('groovelab_tickets').select('*').eq('school_id', schoolId) },
     { name: 'subjects', q: supabase.from('subjects').select('*').eq('school_id', schoolId) },
-    { name: 'cooperations', q: supabase.from('cooperations').select('*').eq('school_id', schoolId) },
     { name: 'campus_announcements', q: supabase.from('campus_announcements').select('*').eq('school_id', schoolId) },
     { name: 'campus_events', q: supabase.from('campus_events').select('*').eq('school_id', schoolId) },
     { name: 'crisis_notifications', q: supabase.from('crisis_notifications').select('*').eq('school_id', schoolId) }

@@ -259,6 +259,29 @@ export const AVVModal: React.FC<AVVModalProps> = ({ isOpen, onClose, school, onA
             </button>
 
             <button
+              type="button"
+              onClick={() => window.print()}
+              title="Auftragsverarbeitungsvertrag als PDF speichern oder drucken"
+              style={{
+                background: '#ffffff',
+                border: '1px solid #cbd5e1',
+                borderRadius: '10px',
+                padding: '6px 12px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                fontSize: '0.78rem',
+                fontWeight: 800,
+                color: '#0f172a',
+                cursor: 'pointer',
+                transition: 'all 0.15s'
+              }}
+            >
+              <Printer size={14} color="#0284c7" />
+              AVV Drucken / PDF
+            </button>
+
+            <button
               onClick={onClose}
               aria-label="Modal schließen"
               style={{
@@ -444,7 +467,7 @@ export const AVVModal: React.FC<AVVModalProps> = ({ isOpen, onClose, school, onA
                   }}
                   className="hover-scale"
                 >
-                  <Printer size={14} /> PDF / Drucken
+                  <Printer size={14} /> Gegenzeichneten AVV drucken / PDF
                 </button>
                 <button
                   type="button"

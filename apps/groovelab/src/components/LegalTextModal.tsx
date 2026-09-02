@@ -243,8 +243,11 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
               </div>
 
               <div>
-                <strong style={{ color: '#0f172a' }}>Verantwortlich für den redaktionellen Inhalt gemäß § 18 Abs. 2 MStV (DE) / § 25 MedienG (AT):</strong><br />
-                Patrick Huber, Karl-Fürstenberg-Str. 59, 79618 Rheinfelden (Baden)
+                <strong style={{ color: '#0f172a' }}>Verantwortlich für den redaktionellen Inhalt gemäß § 18 Abs. 2 MStV (DE) / Offenlegung gem. § 25 MedienG (AT):</strong><br />
+                Patrick Huber, Karl-Fürstenberg-Str. 59, 79618 Rheinfelden (Baden)<br />
+                <span style={{ fontSize: '0.80rem', color: '#475569', display: 'block', marginTop: '4px' }}>
+                  <strong>Grundlegende Richtung des Online-Mediums (Blattlinie gem. § 25 Abs. 4 MedienG AT):</strong> Information und Bereitstellung digitaler Werkzeuge zur pädagogischen Organisation und didaktischen Begleitung von Musikschulunterricht, Raum-, Stundenplan- und Terminplanung sowie didaktischem Instrumentalüben.
+                </span>
               </div>
 
               <div>
@@ -300,8 +303,11 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
               </div>
 
               <div>
-                <strong style={{ color: '#0f172a' }}>7. Betroffenenrechte (Art. 15 bis 22 DSGVO / Art. 25 ff. nDSG)</strong><br />
-                Sie haben das Recht auf Auskunft (Art. 15), Berichtigung (Art. 16), Löschung (Art. 17), Einschränkung (Art. 18) sowie Beschwerde bei der zuständigen Datenschutzaufsichtsbehörde (BfDI / DSB / EDÖB).
+                <strong style={{ color: '#0f172a' }}>7. Betroffenenrechte &amp; Aufsichtsbehörden (Art. 15 bis 22 DSGVO / Art. 25 ff. revDSG)</strong><br />
+                Sie haben das Recht auf Auskunft (Art. 15), Berichtigung (Art. 16), Löschung (Art. 17), Einschränkung (Art. 18) sowie Beschwerde bei der zuständigen Aufsichtsbehörde (Deutschland: Landesbeauftragte für den Datenschutz / BfDI; Österreich: Datenschutzbehörde DSB, Barichgasse 40–42, 1030 Wien; Schweiz: Eidgenössischer Datenschutz- und Öffentlichkeitsbeauftragter EDÖB, Feldeggweg 1, CH-3003 Bern).<br />
+                <span style={{ fontSize: '0.80rem', color: '#475569', display: 'block', marginTop: '4px' }}>
+                  <strong>Hinweis für Nutzer in der Schweiz:</strong> Die Datenverarbeitung erfolgt auf ISO 27001-zertifizierten Servern in Deutschland. Der Schweizer Bundesrat hat mit Beschluss vom 25. August 2023 festgestellt, dass Deutschland über ein angemessenes Schutzniveau für personenbezogene Daten verfügt (Art. 16 Abs. 1 revDSG i. V. m. Anhang 1 VDSG).
+                </span>
               </div>
             </div>
           )}
@@ -322,7 +328,7 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
                   <strong style={{ color: '#0f172a' }}>1. Vertragsgegenstand, Rechtsnatur, Pädagogischer Add-On-Status &amp; Notfall-Klausel (SaaS-Mietvertrag)</strong><br />
                   (1) Diese Bestimmungen regeln die Bereitstellung der cloudbasierten Schulmanagement- und Übeplattform <strong>Campus-Groovelab</strong> durch den Betreiber Patrick Huber (Einzelunternehmer). Der Vertrag qualifiziert sich rechtlich als <strong>Software-as-a-Service (SaaS)-Mietvertrag gemäß § 535 ff. BGB (DE) / §§ 1090 ff. ABGB (AT) / Art. 253 ff. OR (CH)</strong> über die Bereitstellung von Cloud-Infrastruktur, Datenbank-Hosting, Datensicherung und Systemwartung.<br />
                   (2) <strong>Pädagogischer Add-On-Charakter:</strong> Campus-Groovelab ist ein didaktisches Zusatzwerkzeug zur Unterstützung des Fachunterrichts und des häuslichen Übens. Die Plattform ersetzt kein behördliches oder amtliches Schulverwaltungssystem (wie ASV, WinSchool oder Musikschul-Manager).<br />
-                  (3) <strong>Notfall- &amp; Nachrangigkeitsklausel:</strong> Die Musikschule stellt sicher, dass der reguläre Schulbetrieb und die primäre Notfallkommunikation (Telefon, E-Mail, herkömmliche Vertretungspläne) unabhängig von der Plattform gewährleistet bleiben. Bei kurzzeitigen Serverstörungen, Netzausfällen oder Wartungsfenstern findet der Schulunterricht regulär statt. Eine Haftung des Betreibers für ausgefallene Unterrichtsstunden, verpasste Bandproben oder Honorarausfälle ist ausgeschlossen.<br />
+                  (3) <strong>Notfall- &amp; Nachrangigkeitsklausel:</strong> Die Musikschule stellt sicher, dass der reguläre Schulbetrieb und die primäre Notfallkommunikation (Telefon, E-Mail, herkömmliche Vertretungspläne) unabhängig von der Plattform gewährleistet bleiben. Bei kurzzeitigen Serverstörungen, Netzausfällen oder Wartungsfenstern findet der Schulunterricht regulär statt. Eine Haftung des Betreibers für ausgefallene Unterrichtsstunden, verpasste Bandproben oder Honorarausfälle ist ausgeschlossen, es sei denn, der Ausfall beruht auf einer vorsätzlichen oder grob fahrlässigen Pflichtverletzung des Betreibers oder der schuldhaften Verletzung einer wesentlichen Vertragspflicht (Kardinalpflicht). Die Haftungsregelungen gemäß § 6 dieser AGB gelten vollumfänglich.<br />
                   (4) Soweit im Rahmen der Bereitstellung personenbezogene Daten verarbeitet werden, gilt ergänzend die Vereinbarung zur Auftragsverarbeitung (AVV gemäß Art. 28 DSGVO bzw. Art. 9 nDSG) als integraler Vertragsbestandteil.<br />
                   (5) Der Betreiber gewährleistet eine Verfügbarkeit der Cloud-Infrastruktur von 99,5 % im Jahresmittel (ausgenommen angekündigte Wartungsarbeiten außerhalb der Kernunterrichtszeiten).
                 </div>
@@ -338,6 +344,7 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
                   - <strong>Cloud- &amp; Modul-Bereitstellung Campus:</strong> 0,49 € / Mo. (DE/AT) bzw. CHF 1.00 / Mo. (CH) je aktiver Schüler (interaktive App-Nutzung: Übe-Timer, Loopstation, Meisterwerk-Protokoll).<br />
                   - <strong>Cloud- &amp; Modul-Bereitstellung GrooveLab:</strong> 0,49 € / Mo. (DE/AT) bzw. CHF 1.00 / Mo. (CH) je aktiver Schüler (interaktive Band-Nutzung: Songs, Repertoire, Live Lab; immer zu 100 % von der Musikschule übernommen).<br />
                   - <strong>Sammelzahler vs. Direktabrechnung:</strong> GrooveLab-Aktivierungen werden immer zu 100 % von der Musikschule getragen. Für das Campus-Modul kann wahlweise Direktabrechnung mit Eltern vereinbart werden. Schüler-Direktabrechnungen werden ausnahmslos als einmaliger Jahresbeitrag (5,88 € in DE/AT bzw. CHF 12.00 in CH pro Schuljahr bzw. 4,80 € / CHF 9.60 bei Schulbezuschussung) abgerechnet – niemals monatlich.<br />
+                  - <strong>Bestandsschutz-Garantie (Price-Lock):</strong> Der Betreiber garantiert der Musikschule für die Dauer der ununterbrochenen Vertragslaufzeit absolute Preisstabilität auf die bei Vertragsschluss vereinbarten monatlichen Basis-Hosting- und Bereitstellungspauschalen. Preisanpassungen für Neukunden haben keinerlei Auswirkung auf bestehende Verträge. Bei einer Kündigung und späteren Neuanmeldung gilt der zum Zeitpunkt der Neuanmeldung gültige Neukundentarif.<br />
                   - <strong>Steuerliche Hinweise:</strong> In Deutschland und Österreich gemäß § 19 UStG (DE) bzw. § 6 Abs. 1 Z 27 UStG (AT) umsatzsteuerbefreit (Kleinunternehmerregelung). Für die Schweiz gilt Leistungsort Schweiz (nicht im Inland steuerbar gem. Art. 8 Abs. 1 MWSTG).
                 </div>
 
@@ -360,8 +367,9 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
                 </div>
 
                 <div>
-                  <strong style={{ color: '#0f172a' }}>6. B2B-Gewährleistung &amp; Haftungsbegrenzung (§ 536a BGB DE / § 1096 ABGB AT / Art. 259a OR CH)</strong><br />
-                  Gegenüber Unternehmern und juristischen Personen des öffentlichen Rechts wird die verschuldensunabhängige Schadensersatzhaftung des Betreibers für anfängliche Mängel (§ 536a Abs. 1 Alt. 1 BGB [DE] / § 1096 ABGB [AT] / Art. 259a OR [CH]) ausdrücklich ausgeschlossen. Bei einfacher Fahrlässigkeit haftet der Betreiber nur bei Verletzung wesentlicher Vertragspflichten (Kardinalpflichten) begrenzt auf den vertragstypisch vorhersehbaren Schaden.
+                  <strong style={{ color: '#0f172a' }}>6. B2B-Gewährleistung, Haftungsbegrenzung, Rechtswahl &amp; Gerichtsstand (§ 536a BGB DE / § 1096 ABGB AT / Art. 259a OR CH)</strong><br />
+                  (1) Gegenüber Unternehmern und juristischen Personen des öffentlichen Rechts wird die verschuldensunabhängige Schadensersatzhaftung des Betreibers für anfängliche Mängel (§ 536a Abs. 1 Alt. 1 BGB [DE] / § 1096 ABGB [AT] / Art. 259a OR [CH]) ausdrücklich ausgeschlossen. Bei einfacher Fahrlässigkeit haftet der Betreiber nur bei Verletzung wesentlicher Vertragspflichten (Kardinalpflichten) begrenzt auf den vertragstypisch vorhersehbaren Schaden.<br />
+                  (2) <strong>Rechtswahl &amp; Gerichtsstand:</strong> Es gilt das Recht der Bundesrepublik Deutschland unter Ausschluss des UN-Kaufrechts (CISG). Ist die Musikschule bzw. der Vertragspartner Kaufmann, eine juristische Person des öffentlichen Rechts oder ein öffentlich-rechtliches Sondervermögen, ist ausschließlicher Gerichtsstand für alle Streitigkeiten aus diesem Vertrag der Sitz des Betreibers (Lörrach / Rheinfelden).
                 </div>
               </div>
 
@@ -372,8 +380,9 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
                 </span>
 
                 <div>
-                  <strong style={{ color: '#0f172a' }}>7. Kostenfreier Schnuppermonat &amp; Schuljahres-Bereitstellung (Ausschließliche Jahresbeitragszahlung)</strong><br />
-                  Eltern, die das interaktive Campus-Modul für ihr Kind aktivieren, erhalten den laufenden Anmeldemonat zu 100 % kostenfrei zum Kennenlernen. Für die verbleibenden Monate bis zum individuellen Schuljahresende der Schule wird die Bereitstellung als einmaliger Jahresbeitrag (errechnet aus 0,49 € in DE/AT bzw. CHF 1.00 in CH pro bezahltem Monat) abgerechnet. Eine monatliche Einzelabrechnung ist zur Vermeidung unverhältnismäßiger Transaktionsgebühren ausgeschlossen.
+                  <strong style={{ color: '#0f172a' }}>7. Kostenfreier Schnuppermonat, Schuljahres-Bereitstellung &amp; Schüler-Bestandsschutz (Ausschließliche Jahresbeitragszahlung)</strong><br />
+                  (1) Eltern, die das interaktive Campus-Modul für ihr Kind aktivieren, erhalten den laufenden Anmeldemonat zu 100 % kostenfrei zum Kennenlernen. Für die verbleibenden Monate bis zum individuellen Schuljahresende der Schule wird die Bereitstellung als einmaliger Jahresbeitrag (errechnet aus 0,49 € in DE/AT bzw. CHF 1.00 in CH pro bezahltem Monat) abgerechnet. Eine monatliche Einzelabrechnung ist zur Vermeidung unverhältnismäßiger Transaktionsgebühren ausgeschlossen.<br />
+                  (2) <strong>Schuljahresübergang &amp; Schüler-Bestandsschutz:</strong> Bei einer Aktivierung im letzten Monat des Schuljahres ist der Zugang für diesen verbleibenden Restmonat vollständig kostenfrei zum Kennenlernen. Für das Folgeschuljahr gilt für Schüler und Eltern der Bestandsschutz der jeweiligen Musikschule: Solange der Vertrag zwischen der Musikschule und dem Betreiber ununterbrochen fortbesteht, bleibt der Jahresbeitrag für die Schüler dieser Musikschule preisstabil. Eine Erhöhung der Schülerbeiträge für Bestandskunden ist ausgeschlossen.
                 </div>
 
                 <div>

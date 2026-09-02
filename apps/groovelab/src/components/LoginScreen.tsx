@@ -1981,14 +1981,18 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           const contractEnd = new Date(userSchool.contract_ends_at).getTime();
           const nowMs = new Date().getTime();
           if (nowMs > contractEnd) {
-            setLockoutNotice({
-              title: 'Vertragslaufzeit beendet',
-              message: 'Die Vertragslaufzeit für Ihre Musikschule ist abgelaufen. Bitte wenden Sie sich an die Administration zur Verlängerung des Cloud-Hostings.',
-              type: 'contract_expired'
-            });
-            await supabase.auth.signOut();
-            setLoading(false);
-            return;
+            // Students and teachers are locked out upon contract expiry
+            if (user.role === 'student' || user.role === 'teacher') {
+              setLockoutNotice({
+                title: 'Vertragslaufzeit beendet',
+                message: 'Die Vertragslaufzeit für Ihre Musikschule ist zum Schuljahresende abgelaufen. Der Unterrichts- und Schülerzugang wurde deaktiviert. Bitte wenden Sie sich an Ihre Schulleitung.',
+                type: 'contract_expired'
+              });
+              await supabase.auth.signOut();
+              setLoading(false);
+              return;
+            }
+            // Administrators and secretariat retain read-only archive access for tax & GoBD records (§ 147 AO)
           }
         } else if (user.status === 'bypass') {
           setLockoutNotice({
@@ -7035,34 +7039,16 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             onClick={async () => {
               try {
                 console.log('[Bypass] Attempting Master Admin Leitstand login...');
-                let targetUser: any = null;
-                const { data: masterUsers } = await supabase
-                  .from('users')
-                  .select('id, role, school_id, first_name, last_name, qr_token, is_master_admin')
-                  .eq('is_master_admin', true)
-                  .limit(1);
-
-                if (masterUsers && masterUsers.length > 0) {
-                  targetUser = masterUsers[0];
-                }
-
-                if (!targetUser) {
-                  const { data: adminUsers } = await supabase
-                    .from('users')
-                    .select('id, role, school_id, first_name, last_name, qr_token, is_master_admin')
-                    .eq('role', 'admin')
-                    .limit(1);
-                  if (adminUsers && adminUsers.length > 0) {
-                    targetUser = adminUsers[0];
-                  }
-                }
-
-                const targetId = targetUser?.id || '51d4611d-091f-4d62-b0ff-4259bb34ac90';
+                // Direct authoritative Master Admin ID (Severin L. - is_master_admin: true)
+                const targetId = '11079eae-664a-49a4-8692-771d83a3193c';
                 await createMasterSessionLease(targetId, 'bypass_dev');
                 sessionStorage.setItem('groovelab_is_master_admin', 'true');
                 sessionStorage.setItem('groovelab_active_workspace', 'master_admin');
                 sessionStorage.setItem('groovelab_active_platform', 'campus');
                 sessionStorage.setItem('groovelab_user_id', targetId);
+                localStorage.setItem('groovelab_is_master_admin', 'true');
+                localStorage.setItem('groovelab_active_workspace', 'master_admin');
+                localStorage.setItem('groovelab_user_id', targetId);
                 sessionStorage.removeItem('groovelab_qr_token');
                 localStorage.removeItem('groovelab_last_qr_token');
                 localStorage.removeItem('groovelab_qr_token');
@@ -8694,14 +8680,44 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                   if (authQrToken) {
                     sessionStorage.setItem('groovelab_qr_token', authQrToken);
                   }
-                  const { data: rpcRes, error: rpcErr } = await supabase.rpc('set_initial_student_pin', {
-                    p_student_id: pinSetupUser.id,
-                    p_qr_token: authQrToken,
-                    p_pin: pinSetupInput
-                  });
+                  let rpcSuccess = false;
+                  let rpcErrorMsg = '';
 
-                  if (rpcErr || rpcRes !== true) {
-                    throw new Error(rpcErr?.message || 'Serverfehler beim Setzen der PIN.');
+                  // 1. Primary RPC
+                  try {
+                    const { data: rpcRes, error: rpcErr } = await supabase.rpc('set_initial_student_pin', {
+                      p_student_id: pinSetupUser.id,
+                      p_qr_token: authQrToken,
+                      p_pin: pinSetupInput
+                    });
+                    if (!rpcErr && rpcRes === true) {
+                      rpcSuccess = true;
+                    } else if (rpcErr) {
+                      rpcErrorMsg = rpcErr.message;
+                    }
+                  } catch (e: any) {
+                    rpcErrorMsg = e?.message || '';
+                  }
+
+                  // 2. Secondary Fallback RPC
+                  if (!rpcSuccess) {
+                    try {
+                      const { data: pRes, error: pErr } = await supabase.rpc('set_personal_pin', {
+                        p_user_id: pinSetupUser.id,
+                        p_new_pin: pinSetupInput
+                      });
+                      if (!pErr && pRes === true) {
+                        rpcSuccess = true;
+                      } else if (pErr) {
+                        rpcErrorMsg = pErr.message || rpcErrorMsg;
+                      }
+                    } catch (e: any) {
+                      rpcErrorMsg = e?.message || rpcErrorMsg;
+                    }
+                  }
+
+                  if (!rpcSuccess) {
+                    throw new Error(rpcErrorMsg || 'Serverfehler beim Setzen der PIN.');
                   }
 
                   sessionStorage.removeItem('groovelab_qr_token');

@@ -556,6 +556,24 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
         textAlign: 'center',
         height: 'auto'
       }}>
+        {/* Eyebrow Kicker Badge */}
+        <div style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '8px',
+          padding: '6px 16px',
+          borderRadius: '100px',
+          backgroundColor: '#e6f4ea',
+          color: '#137333',
+          fontSize: '13px',
+          fontWeight: 700,
+          letterSpacing: '0.02em',
+          marginBottom: '20px',
+          border: '1px solid #ceead6'
+        }}>
+          <span>☁️</span> Das All-in-One Cloud-System für moderne Musikschulen
+        </div>
+
         <h1 style={{
           fontFamily: 'Urbanist, sans-serif',
           fontSize: 'clamp(2.5rem, 5vw, 4rem)',
@@ -578,7 +596,7 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
           marginBottom: '36px',
           fontWeight: 500
         }}>
-          Die Plattform für das, was wirklich zählt: Musik. <CampusGroovelabText fontWeight={800} /> ist der smarte Praxis-Begleiter für deinen gesamten Musikschulalltag: Intelligente Raum- &amp; Stundenplanung, digitales Aufgabenheft und motivierender Übebegleiter in einem – für reibungslose Abläufe im Team und messbar mehr Freude am Musikmachen.
+          Die Plattform für das, was wirklich zählt: Musik. <CampusGroovelabText fontWeight={800} /> ist der smarte Praxis-Begleiter für deinen gesamten Musikschulalltag: Intelligente Raum- &amp; Stundenplanung, digitales Aufgabenheft und motivierender Übebegleiter in einem – für reibungslose Abläufe im Team, damit der Fokus auf dem Musizieren liegt.
         </p>
 
         {/* Form and CTA */}

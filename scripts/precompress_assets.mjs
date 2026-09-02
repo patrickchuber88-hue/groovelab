@@ -31,6 +31,7 @@ const targetFiles = getAllFiles(distDir);
 let compressedCount = 0;
 
 targetFiles.forEach(filePath => {
+  if (!fs.existsSync(filePath)) return;
   const content = fs.readFileSync(filePath);
   
   // 1. Gzip Level 9

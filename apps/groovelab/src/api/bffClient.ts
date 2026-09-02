@@ -132,7 +132,7 @@ export interface SchoolProfileDTO {
 }
 
 /**
- * Fetches sanitized school profile DTO with resilient fallback.
+ * Fetches sanitized school profile DTO via authoritative RPC (OWASP ASVS Level 3 - Fail-Closed).
  */
 export async function getSchoolProfileDTO(schoolId: string): Promise<SchoolProfileDTO | null> {
   if (!schoolId) return null;
@@ -141,34 +141,15 @@ export async function getSchoolProfileDTO(schoolId: string): Promise<SchoolProfi
     if (!rpcErr && rpcData) {
       return rpcData as SchoolProfileDTO;
     }
-  } catch (e) {}
-
-  // Resilient fallback to direct select
-  try {
-    const { data, error } = await supabase
-      .from('schools')
-      .select('id, name, subdomain, logo_url, city, street, zip_code, email, represented_by, has_campus_subscription, has_groovelab_subscription')
-      .eq('id', schoolId)
-      .maybeSingle();
-
-    if (error || !data) return null;
-    return {
-      id: data.id,
-      name: data.name,
-      subdomain: data.subdomain,
-      logoUrl: data.logo_url,
-      city: data.city,
-      street: data.street,
-      zipCode: data.zip_code,
-      email: data.email,
-      representedBy: data.represented_by,
-      hasCampusSubscription: Boolean(data.has_campus_subscription),
-      hasGroovelabSubscription: Boolean(data.has_groovelab_subscription)
-    };
-  } catch (err) {
-    console.warn('[BFF] getSchoolProfileDTO notice:', err);
-    return null;
+    if (rpcErr) {
+      console.warn('[BFF] getSchoolProfileDTO RPC rejected:', rpcErr.message || rpcErr);
+    }
+  } catch (e) {
+    console.warn('[BFF] getSchoolProfileDTO exception:', e);
   }
+
+  // Fail-Closed: Never fall back to direct client table queries
+  return null;
 }
 
 /**
@@ -182,5 +163,52 @@ export async function getInvoicePreviewDTO(schoolId: string): Promise<InvoicePre
     return null;
   }
   return data as InvoicePreviewDTO;
+}
+
+export interface DashboardBootstrapDTO {
+  user: {
+    id: string;
+    schoolId: string;
+    role: string;
+    roles?: string[];
+    firstName: string;
+    lastName: string;
+    avatarUrl: string | null;
+    isCampusActive: boolean;
+    isGroovelabActive: boolean;
+    isMasterAdmin: boolean;
+  };
+  school: {
+    id: string;
+    name: string;
+    subdomain: string;
+    logoUrl: string | null;
+    hasCampusSubscription: boolean;
+    hasGroovelabSubscription: boolean;
+  } | null;
+  unreadNotificationsCount: number;
+}
+
+/**
+ * Single-roundtrip bootstrap aggregation for mobile and low-latency client initialization.
+ */
+export async function getDashboardBootstrapDTO(
+  userId: string,
+  schoolId?: string
+): Promise<DashboardBootstrapDTO | null> {
+  if (!userId) return null;
+  try {
+    const { data, error } = await supabase.rpc('get_dashboard_bootstrap_dto', {
+      p_user_id: userId,
+      p_school_id: schoolId || null
+    });
+    if (error || !data) {
+      return null;
+    }
+    return data as DashboardBootstrapDTO;
+  } catch (err) {
+    console.warn('[BFF] getDashboardBootstrapDTO notice:', err);
+    return null;
+  }
 }
 

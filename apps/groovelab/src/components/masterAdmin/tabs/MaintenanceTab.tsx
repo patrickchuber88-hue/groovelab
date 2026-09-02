@@ -599,7 +599,7 @@ export const MaintenanceTab: React.FC<MaintenanceTabProps> = ({
               e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.04)';
             }}
           >
-            <BookOpen size={15} color="#059669" />
+            <BookOpen size={15} color="#0f172a" />
             <span>Anleitung &amp; Handbuch</span>
           </button>
 
@@ -680,7 +680,7 @@ export const MaintenanceTab: React.FC<MaintenanceTabProps> = ({
             color: '#065f46'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <Compass size={18} color="#059669" />
+              <Compass size={18} color="#0f172a" />
               <span>
                 <strong>Leitfaden Tab 1:</strong> Wählen Sie zwischen <em>Vorwarn-Countdown</em> (empfohlen für planmäßige Arbeiten) und <em>Sofortigem Killswitch</em> (bei Sicherheitsvorfällen). Der Master-Bypass-PIN ermöglicht Schulleitern jederzeit privilegierten Zugriff.
               </span>
@@ -1293,7 +1293,7 @@ export const MaintenanceTab: React.FC<MaintenanceTabProps> = ({
                         }}
                       >
                         <div style={{ fontWeight: 900, fontSize: '0.84rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          🚨 Sofortiger Killswitch
+                          Sofortiger Killswitch
                         </div>
                         <div style={{ fontSize: '0.70rem', color: '#64748b', marginTop: '3px' }}>
                           Sperrt Nutzer unverzüglich
@@ -1321,7 +1321,7 @@ export const MaintenanceTab: React.FC<MaintenanceTabProps> = ({
                         }}
                       >
                         <div style={{ fontWeight: 900, fontSize: '0.84rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          📅 Geplantes Zeitfenster
+                          Geplantes Zeitfenster
                         </div>
                         <div style={{ fontSize: '0.70rem', color: '#64748b', marginTop: '3px' }}>
                           Vollautomatischer 3-Stufen Zyklus
@@ -1343,7 +1343,7 @@ export const MaintenanceTab: React.FC<MaintenanceTabProps> = ({
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <Calendar size={18} color="#0284c7" />
+                          <Calendar size={18} color="#0f172a" />
                           <strong style={{ fontSize: '0.90rem', color: '#0369a1' }}>
                             Wartungs-Scheduler &amp; Kalender-Automatik
                           </strong>
@@ -1366,7 +1366,7 @@ export const MaintenanceTab: React.FC<MaintenanceTabProps> = ({
                             }}
                             className="hover-scale-mini"
                           >
-                            ⚡ So. 02:00 Uhr
+                            So. 02:00 Uhr
                           </button>
                           <button
                             type="button"
@@ -1383,7 +1383,7 @@ export const MaintenanceTab: React.FC<MaintenanceTabProps> = ({
                             }}
                             className="hover-scale-mini"
                           >
-                            ⚡ Morgen 03:00 Uhr
+                            Morgen 03:00 Uhr
                           </button>
                           <button
                             type="button"
@@ -1400,7 +1400,7 @@ export const MaintenanceTab: React.FC<MaintenanceTabProps> = ({
                             }}
                             className="hover-scale-mini"
                           >
-                            ⚡ 1. des Monats
+                            1. des Monats
                           </button>
                         </div>
                       </div>
@@ -1478,9 +1478,9 @@ export const MaintenanceTab: React.FC<MaintenanceTabProps> = ({
                           cursor: 'pointer'
                         }}
                       >
-                        <option value="all">🌐 Plattformweit (Alle Module &amp; Schulen)</option>
-                        <option value="campus_only">🏫 Nur Modul Campus</option>
-                        <option value="groovelab_only">🎸 Nur Modul GrooveLab</option>
+                        <option value="all">Plattformweit (Alle Module &amp; Schulen)</option>
+                        <option value="campus_only">Nur Modul Campus</option>
+                        <option value="groovelab_only">Nur Modul GrooveLab</option>
                       </select>
                     </div>
 
@@ -1703,7 +1703,7 @@ export const MaintenanceTab: React.FC<MaintenanceTabProps> = ({
                   borderRadius: '100px',
                   border: maintenance.readOnlyMode ? '1px solid #fde68a' : 'none'
                 }}>
-                  {maintenance.readOnlyMode ? '⚠️ Read-Only Degradation' : '1:1 Echtzeit-Synchronisation'}
+                  {maintenance.readOnlyMode ? 'Read-Only Degradation' : '1:1 Echtzeit-Synchronisation'}
                 </span>
               </div>
 
@@ -1932,7 +1932,7 @@ export const MaintenanceTab: React.FC<MaintenanceTabProps> = ({
                               borderRadius: '4px',
                               fontWeight: 800
                             }}>
-                              🔒 Schreibschutz
+                              Schreibschutz
                             </span>
                             <div style={{
                               background: buttonBg,
@@ -2037,12 +2037,12 @@ export const MaintenanceTab: React.FC<MaintenanceTabProps> = ({
                         </div>
 
                         <div style={{ background: '#ffffff', padding: '10px', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '0.70rem', color: '#334155' }}>
-                          <strong>🎸 Song: Smoke on the Water (Intro)</strong>
+                          <strong>Song: Smoke on the Water (Intro)</strong>
                           <div style={{ color: '#64748b', marginTop: '2px' }}>Fokus auf Takt 1-8 mit Metronom 110 BPM.</div>
                         </div>
 
                         <div style={{ background: '#ffffff', padding: '10px', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '0.70rem', color: '#334155' }}>
-                          <strong>📅 Nächste Unterrichtsstunde:</strong>
+                          <strong>Nächste Unterrichtsstunde:</strong>
                           <div style={{ color: '#64748b', marginTop: '2px' }}>Freitag 15:00 Uhr • Raum 2 (EG)</div>
                         </div>
 
@@ -2296,7 +2296,7 @@ export const MaintenanceTab: React.FC<MaintenanceTabProps> = ({
             color: '#0369a1'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <Megaphone size={18} color="#0284c7" />
+              <Megaphone size={18} color="#0f172a" />
               <span>
                 <strong>Leitfaden Tab 2:</strong> Nutzen Sie Broadcast-Banner für allgemeine Informationen oder Feature-Releases. Wählen Sie Dringlichkeit und Zielgruppe. 1-Klick Vorlagen sparen Zeit.
               </span>
@@ -2336,7 +2336,7 @@ export const MaintenanceTab: React.FC<MaintenanceTabProps> = ({
             flexWrap: 'wrap'
           }}>
             <div style={{ fontSize: '0.76rem', fontWeight: 900, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <Sparkles size={15} color="#059669" /> 1-Klick Schnellvorlagen:
+              <Sparkles size={15} color="#0f172a" /> 1-Klick Schnellvorlagen:
             </div>
             {announcementPresets.map((p, idx) => (
               <button
@@ -2509,7 +2509,7 @@ export const MaintenanceTab: React.FC<MaintenanceTabProps> = ({
                   </div>
                   <div>
                     <div style={{ fontSize: '0.88rem', fontWeight: 900, color: announcement.isActive ? '#14532d' : '#334155' }}>
-                      {announcement.isActive ? '🟢 Banner wird aktuell live ausgespielt' : '⚪️ Banner ist aktuell nicht für Nutzer sichtbar'}
+                      {announcement.isActive ? 'Banner wird aktuell live ausgespielt' : 'Banner ist aktuell nicht für Nutzer sichtbar'}
                     </div>
                     <div style={{ fontSize: '0.74rem', color: announcement.isActive ? '#15803d' : '#64748b', marginTop: '2px' }}>
                       {announcement.isActive 
@@ -2950,7 +2950,7 @@ export const MaintenanceTab: React.FC<MaintenanceTabProps> = ({
             color: '#5b21b6'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <Activity size={18} color="#7c3aed" />
+              <Activity size={18} color="#0f172a" />
               <span>
                 <strong>Leitfaden Tab 3:</strong> Messen Sie Datenbank-Latenzen zur Supabase Cloud, erzwingen Sie PWA-Cache-Updates bei neuen Releases und exportieren Sie das DSGVO-Audit-Protokoll als CSV.
               </span>
@@ -2995,7 +2995,7 @@ export const MaintenanceTab: React.FC<MaintenanceTabProps> = ({
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Database size={18} color="#059669" />
+                    <Database size={18} color="#0f172a" />
                     <span style={{ fontSize: '0.76rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>
                       Supabase Cloud DB
                     </span>
@@ -3061,7 +3061,7 @@ export const MaintenanceTab: React.FC<MaintenanceTabProps> = ({
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Smartphone size={18} color="#0284c7" />
+                    <Smartphone size={18} color="#0f172a" />
                     <span style={{ fontSize: '0.76rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>
                       PWA Service Worker
                     </span>
@@ -3120,7 +3120,7 @@ export const MaintenanceTab: React.FC<MaintenanceTabProps> = ({
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <ShieldAlert size={18} color="#dc2626" />
+                    <ShieldAlert size={18} color="#0f172a" />
                     <span style={{ fontSize: '0.76rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>
                       Auth-Session Guard
                     </span>
@@ -3178,7 +3178,7 @@ export const MaintenanceTab: React.FC<MaintenanceTabProps> = ({
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Sparkles size={18} color="#2563eb" />
+                    <Sparkles size={18} color="#0f172a" />
                     <span style={{ fontSize: '0.76rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>
                       Datenbank-Hygiene
                     </span>
@@ -3237,7 +3237,7 @@ export const MaintenanceTab: React.FC<MaintenanceTabProps> = ({
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Users size={18} color="#ea580c" />
+                    <Users size={18} color="#0f172a" />
                     <span style={{ fontSize: '0.76rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>
                       Kostenschutz-Automation
                     </span>
@@ -3296,7 +3296,7 @@ export const MaintenanceTab: React.FC<MaintenanceTabProps> = ({
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <HardDrive size={18} color="#16a34a" />
+                    <HardDrive size={18} color="#0f172a" />
                     <span style={{ fontSize: '0.76rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>
                       Audio-Tresor
                     </span>
@@ -3355,7 +3355,7 @@ export const MaintenanceTab: React.FC<MaintenanceTabProps> = ({
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '14px' }}>
               <div>
                 <h4 style={{ margin: 0, fontSize: '1.20rem', fontWeight: 900, color: '#0f172a' }}>
-                  📜 Revisionssicheres Wartungs- &amp; Incident-Audit-Log
+                  Revisionssicheres Wartungs- &amp; Incident-Audit-Log
                 </h4>
                 <p style={{ margin: '2px 0 0 0', fontSize: '0.80rem', color: '#64748b' }}>
                   Vollständiges DSGVO-Audit-Protokoll aller ausgelösten Betriebsereignisse und Wartungsfenster.

@@ -598,7 +598,7 @@ export const BackupResetTab: React.FC<BackupResetTabProps> = ({
               e.currentTarget.style.boxShadow = '0 2px 6px rgba(0,0,0,0.02)';
             }}
           >
-            <FolderArchive size={16} color="#0284c7" />
+            <FolderArchive size={16} color="#0f172a" />
             <span>Schul-Vollarchiv exportieren</span>
           </button>
 
@@ -743,14 +743,14 @@ export const BackupResetTab: React.FC<BackupResetTabProps> = ({
             <span style={{ fontSize: '0.72rem', color: '#047857', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
               DR Readiness Score
             </span>
-            <Award size={16} color="#059669" />
+            <Award size={16} color="#0f172a" />
           </div>
           <div style={{ fontSize: '1.6rem', fontWeight: 900, color: '#047857', letterSpacing: '-0.02em' }}>
             100 / 100
           </div>
           <div style={{ fontSize: '0.74rem', color: '#059669', fontWeight: 700, marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
             <span>AES-256 &amp; Geo-Redundant</span>
-            <ChevronRight size={12} color="#059669" />
+            <ChevronRight size={12} color="#475569" />
           </div>
         </div>
 
@@ -779,7 +779,7 @@ export const BackupResetTab: React.FC<BackupResetTabProps> = ({
             <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
               Automated Health Drill
             </span>
-            <ShieldCheck size={16} color="#059669" />
+            <ShieldCheck size={16} color="#475569" />
           </div>
           <div style={{ fontSize: '1.4rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', marginTop: '2px' }}>
             Heute 03:00 Uhr
@@ -1934,7 +1934,7 @@ export const BackupResetTab: React.FC<BackupResetTabProps> = ({
                 gap: '16px'
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <AlertTriangle size={20} color="#d97706" />
+                  <AlertTriangle size={20} color="#0f172a" />
                   <div>
                     <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 900, color: '#92400e' }}>
                       2-Stufen Sicherheits-Autorisierung vor Ausführung
@@ -2059,7 +2059,7 @@ export const BackupResetTab: React.FC<BackupResetTabProps> = ({
           }}>
             <div style={{ borderBottom: '1px solid #f1f5f9', paddingBottom: '16px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Archive size={20} color="#0284c7" />
+                <Archive size={20} color="#0f172a" />
                 <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#0f172a' }}>
                   DSGVO Art. 20 Datenportabilitäts-Zentrale
                 </h3>
@@ -2242,7 +2242,7 @@ export const BackupResetTab: React.FC<BackupResetTabProps> = ({
                   <span style={{ fontSize: '0.70rem', fontWeight: 900, background: '#eff6ff', color: '#1d4ed8', padding: '3px 8px', borderRadius: '6px', border: '1px solid #bfdbfe' }}>
                     Stufe 1 • Wartung
                   </span>
-                  <Sparkles size={18} color="#2563eb" />
+                  <Sparkles size={18} color="#0f172a" />
                 </div>
                 <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#0f172a' }}>
                   Demo- &amp; Testdaten Bereinigen
@@ -2274,7 +2274,7 @@ export const BackupResetTab: React.FC<BackupResetTabProps> = ({
                 }}
                 className="hover-scale-mini"
               >
-                {resettingStage === 1 ? 'Bereinige...' : '🧹 Stufe 1 Bereinigung starten'}
+                {resettingStage === 1 ? 'Bereinige...' : 'Stufe 1 Bereinigung starten'}
               </button>
             </div>
 
@@ -2295,7 +2295,7 @@ export const BackupResetTab: React.FC<BackupResetTabProps> = ({
                   <span style={{ fontSize: '0.70rem', fontWeight: 900, background: '#fefce8', color: '#a16207', padding: '3px 8px', borderRadius: '6px', border: '1px solid #fde68a' }}>
                     Stufe 2 • Schuljahresstart
                   </span>
-                  <Calendar size={18} color="#d97706" />
+                  <Calendar size={18} color="#0f172a" />
                 </div>
                 <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#0f172a' }}>
                   Schuljahreswechsel-Rollierung
@@ -2342,7 +2342,7 @@ export const BackupResetTab: React.FC<BackupResetTabProps> = ({
                 }}
                 className="hover-scale-mini"
               >
-                {resettingStage === 2 ? 'Rollieren...' : '🔄 Schuljahreswechsel vollziehen'}
+                {resettingStage === 2 ? 'Rollieren...' : 'Schuljahreswechsel vollziehen'}
               </button>
             </div>
 
@@ -2363,7 +2363,7 @@ export const BackupResetTab: React.FC<BackupResetTabProps> = ({
                   <span style={{ fontSize: '0.70rem', fontWeight: 900, background: '#fee2e2', color: '#dc2626', padding: '3px 8px', borderRadius: '6px', border: '1px solid #fca5a5' }}>
                     Stufe 3 • DSGVO Art. 17
                   </span>
-                  <Trash2 size={18} color="#e11d48" />
+                  <Trash2 size={18} color="#0f172a" />
                 </div>
                 <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#9f1239' }}>
                   Vollständiger Tenant Hard Purge
@@ -2411,7 +2411,7 @@ export const BackupResetTab: React.FC<BackupResetTabProps> = ({
                 }}
                 className="hover-scale-mini"
               >
-                {resettingStage === 3 ? 'Lösche...' : '🗑️ Schule unwiderruflich löschen'}
+                {resettingStage === 3 ? 'Lösche...' : 'Schule unwiderruflich löschen'}
               </button>
             </div>
           </div>

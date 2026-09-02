@@ -20,6 +20,8 @@ export interface UserNote {
   is_pinned: boolean;
   is_archived: boolean;
   is_completed?: boolean;
+  teacher_dismissed?: boolean;
+  resolved_by?: 'teacher' | 'secretary' | 'admin' | null;
   visibility: 'private' | 'school_admin' | 'student_shared';
   color_accent?: string;
   created_at: string;
@@ -122,6 +124,28 @@ export const maskStudentName = (rawName: string | null | undefined): string | nu
   const lName = parts.slice(1).join(' ');
   const maskedL = lName ? `${lName[0]}.` : '';
   return `${fName} ${maskedL}`.trim();
+};
+
+// Intelligente Mängel-Erkennung (konsistent über alle Module & Boards)
+export const isRoomIssueNote = (note: { content?: string; tags?: string[]; room_id?: string | null; note_type?: string; visibility?: string }): boolean => {
+  if (note.note_type === 'room_issue' || note.visibility === 'school_admin') return true;
+
+  const content = (note.content || '').toLowerCase();
+  const tags = (note.tags || []).map(t => t.toLowerCase());
+
+  const hasRoom = Boolean(
+    note.room_id || 
+    /raum|saal|studio|keller|bühne|eg|og/i.test(content) || 
+    tags.some(t => /!raum|#raum/i.test(t))
+  );
+
+  const isDefectTag = tags.some(t => 
+    t === '#mangel' || t === '#defekt' || t === 'mangel' || t === 'defekt'
+  );
+
+  const isDefectText = /mangel|defekt|kaputt|reparatur|stimmen|saite|notenständer|wackelt|fehlt|abgebrochen|beschädigt|problem/i.test(content);
+
+  return Boolean(hasRoom && (isDefectTag || isDefectText));
 };
 
 export const notesService = {
@@ -264,7 +288,7 @@ export const notesService = {
     const { studentMentions, tags, rooms, isTodo } = parseSmartTags(params.content);
 
     const lower = params.content.toLowerCase();
-    const isDefectKeyword = lower.includes('mangel') || lower.includes('defekt') || lower.includes('kaputt') || lower.includes('reparatur') || lower.includes('stimmen') || lower.includes('saite');
+    const isDefectKeyword = lower.includes('mangel') || lower.includes('defekt') || lower.includes('kaputt') || lower.includes('reparatur') || lower.includes('stimmen') || lower.includes('saite') || lower.includes('notenständer') || lower.includes('wackelt') || lower.includes('fehlt') || lower.includes('problem');
     const isRoomRelated = rooms.length > 0 || !!params.roomId || lower.includes('raum');
 
     const detectedType = params.noteType || 
@@ -320,10 +344,10 @@ export const notesService = {
     return newNote;
   },
 
-  // Fetch all room issues for the school (for Secretariat & Admin dashboards)
-  async fetchSchoolRoomIssues(schoolId: number | string): Promise<UserNote[]> {
-    if (!schoolId) return [];
-    
+  // Fetch all room issues for the school (for Secretariat, Admin & Tagesplan)
+  async fetchSchoolRoomIssues(schoolId?: number | string): Promise<UserNote[]> {
+    const effectiveSchoolId = schoolId || 1;
+
     // 1. Get list of persistently resolved note IDs
     let persistentResolvedIds = new Set<string>();
     try {
@@ -336,24 +360,35 @@ export const notesService = {
       }
     } catch (e) {}
 
-    let dbIssues: UserNote[] = [];
+    const issueMap = new Map<string, UserNote>();
+
+    // 2. Scan all local storage note caches (zero-latency offline & active session store)
     try {
-      const { data, error } = await supabase
-        .from('user_notes')
-        .select('*')
-        .eq('school_id', schoolId)
-        .or('note_type.eq.room_issue,visibility.eq.school_admin')
-        .order('created_at', { ascending: false });
-
-      if (!error && data) {
-        dbIssues = data as UserNote[];
+      if (typeof window !== 'undefined' && window.localStorage) {
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && key.startsWith('campus_groovelab_notes_')) {
+            const raw = localStorage.getItem(key);
+            if (raw) {
+              const parsed = JSON.parse(raw);
+              if (Array.isArray(parsed)) {
+                for (const note of parsed) {
+                  if (isRoomIssueNote(note)) {
+                    if (persistentResolvedIds.has(note.id)) {
+                      note.is_completed = true;
+                      note.is_acknowledged = true;
+                    }
+                    issueMap.set(note.id, note);
+                  }
+                }
+              }
+            }
+          }
+        }
       }
-    } catch (err) {
-      console.warn('Could not fetch school room issues from DB:', err);
-    }
+    } catch (e) {}
 
-    // Also check local storage notes as zero-latency cache fallback
-    let localIssues: UserNote[] = [];
+    // 3. Scan IndexedDB
     try {
       const db = await openNotesDB();
       const tx = db.transaction(STORE_NAME, 'readonly');
@@ -363,28 +398,42 @@ export const notesService = {
         req.onsuccess = () => resolve(req.result || []);
         req.onerror = () => resolve([]);
       });
-      localIssues = allLocal.filter(n => 
-        String(n.school_id) === String(schoolId) && 
-        (n.note_type === 'room_issue' || n.visibility === 'school_admin' || n.content.toLowerCase().includes('mangel'))
-      );
+      for (const note of allLocal) {
+        if (isRoomIssueNote(note)) {
+          if (persistentResolvedIds.has(note.id)) {
+            note.is_completed = true;
+            note.is_acknowledged = true;
+          }
+          issueMap.set(note.id, note);
+        }
+      }
     } catch (e) {
       // ignore
     }
 
-    const issueMap = new Map<string, UserNote>();
-    for (const item of localIssues) {
-      if (persistentResolvedIds.has(item.id)) {
-        item.is_completed = true;
-        item.is_acknowledged = true;
+    // 4. Scan Supabase user_notes
+    if (effectiveSchoolId) {
+      try {
+        const { data, error } = await supabase
+          .from('user_notes')
+          .select('*')
+          .eq('school_id', effectiveSchoolId)
+          .order('created_at', { ascending: false });
+
+        if (!error && data) {
+          for (const item of (data as UserNote[])) {
+            if (isRoomIssueNote(item)) {
+              if (persistentResolvedIds.has(item.id)) {
+                item.is_completed = true;
+                item.is_acknowledged = true;
+              }
+              issueMap.set(item.id, item);
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('Could not fetch school room issues from DB:', err);
       }
-      issueMap.set(item.id, item);
-    }
-    for (const item of dbIssues) {
-      if (persistentResolvedIds.has(item.id)) {
-        item.is_completed = true;
-        item.is_acknowledged = true;
-      }
-      issueMap.set(item.id, item);
     }
 
     return Array.from(issueMap.values()).sort((a, b) => 
@@ -393,13 +442,14 @@ export const notesService = {
   },
 
   // Resolve / Mark room issue as completed permanently across Supabase, IndexedDB & LocalStorage
-  async resolveRoomIssue(noteId: string): Promise<void> {
+  async resolveRoomIssue(noteId: string, resolvedBy: 'teacher' | 'secretary' | 'admin' = 'secretary'): Promise<void> {
     const nowIso = new Date().toISOString();
     const patch = {
       is_completed: true,
       is_acknowledged: true,
       acknowledged_at: nowIso,
-      updated_at: nowIso
+      updated_at: nowIso,
+      resolved_by: resolvedBy
     };
 
     // 1. Permanent Registry in LocalStorage
@@ -459,7 +509,50 @@ export const notesService = {
       }
     } catch (e) {}
 
-    this.notifySync('NOTE_RESOLVED', noteId);
+    this.notifySync('NOTE_UPSERTED', noteId);
+  },
+
+  // Dismiss room issue ONLY from teacher's personal focus list without closing the ticket in secretariat
+  async dismissRoomIssueForTeacher(userId: string, noteId: string): Promise<void> {
+    const nowIso = new Date().toISOString();
+    const patch = {
+      teacher_dismissed: true,
+      updated_at: nowIso
+    };
+
+    // 1. Update in IndexedDB
+    try {
+      const db = await openNotesDB();
+      const tx = db.transaction(STORE_NAME, 'readwrite');
+      const store = tx.objectStore(STORE_NAME);
+      const req = store.get(noteId);
+      req.onsuccess = () => {
+        if (req.result) {
+          store.put({ ...req.result, ...patch });
+        }
+      };
+    } catch (e) {}
+
+    // 2. Update local note caches in LocalStorage
+    try {
+      const key = getLocalNotesKey(userId);
+      const raw = localStorage.getItem(key);
+      if (raw) {
+        const notes: UserNote[] = JSON.parse(raw);
+        const updated = notes.map(n => n.id === noteId ? { ...n, ...patch } : n);
+        localStorage.setItem(key, JSON.stringify(updated));
+      }
+    } catch (e) {}
+
+    // 3. Update Supabase if available
+    try {
+      await supabase
+        .from('user_notes')
+        .update(patch)
+        .eq('id', noteId);
+    } catch (e) {}
+
+    this.notifySync('NOTE_UPSERTED', noteId);
   },
 
   // Update existing note

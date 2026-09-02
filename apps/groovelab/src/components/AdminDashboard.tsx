@@ -372,6 +372,15 @@ export function AdminDashboard({
           }
         };
       }
+      const cached = sessionStorage.getItem('groovelab_cached_user') || localStorage.getItem('groovelab_cached_user') || sessionStorage.getItem('campus_user') || localStorage.getItem('campus_user');
+      if (cached) {
+        try {
+          const parsed = JSON.parse(cached);
+          if (parsed && (!userId || parsed.id === userId)) {
+            return parsed;
+          }
+        } catch (e) {}
+      }
     }
     return null;
   });
@@ -730,11 +739,9 @@ export function AdminDashboard({
   const [draftPurpose, setDraftPurpose] = useState<string>('');
   const [dragOverCell, setDragOverCell] = useState<{ dayIdx: number; hour: string } | null>(null);
   
-  // External blocking / cooperations states
+  // External blocking states
   const [bookingTargetType, setBookingTargetType] = useState<'internal' | 'external'>('internal');
-  const [selectedCooperationId, setSelectedCooperationId] = useState<string>('');
-  const [customCooperationName, setCustomCooperationName] = useState<string>('');
-  const [cooperationsList, setCooperationsList] = useState<any[]>([]);
+  const [externalBookingPartnerName, setExternalBookingPartnerName] = useState<string>('');
   const [roomBlockedSlots, setRoomBlockedSlots] = useState<any[]>([]);
 
   // World-Class Room Board Mobile & Search Enhancements
@@ -2186,6 +2193,25 @@ export function AdminDashboard({
   }, [activeTab, activePlatform, bookingDate, missionFilter]);
 
   useEffect(() => {
+    if (!admin && userId) {
+      const timeout = setTimeout(() => {
+        setAdmin((current: any) => {
+          if (current) return current;
+          console.warn('[AdminDashboard] Loading timeout triggered hard fallback profile.');
+          return {
+            id: userId,
+            first_name: 'Lehrer',
+            last_name: 'GrooveLab',
+            role: 'teacher',
+            school_id: null
+          };
+        });
+      }, 4000);
+      return () => clearTimeout(timeout);
+    }
+  }, [admin, userId]);
+
+  useEffect(() => {
     if (!userId) return;
     const channel = supabase.channel(`realtime_teacher_challenges_${userId}`);
     channel
@@ -2386,7 +2412,6 @@ export function AdminDashboard({
             status: 'active'
           }
         };
-        setAdmin(adminData);
       } else {
         const { data, error } = await supabase
           .from('users')
@@ -2398,24 +2423,76 @@ export function AdminDashboard({
         } else {
           adminData = data;
         }
-        if (!adminData && currentAdmin) {
-          adminData = currentAdmin;
-        }
-        if (adminData) {
-          setAdmin((prev: any) => {
-            if (prev && JSON.stringify(prev) === JSON.stringify(adminData)) return prev;
-            return adminData;
-          });
+
+        // Fallback 1: Try shallow select if relation join failed or RLS blocked join
+        if (!adminData) {
+          try {
+            const { data: shallowData, error: shallowErr } = await supabase
+              .from('users')
+              .select('*')
+              .eq('id', userId)
+              .maybeSingle();
+            if (shallowData) {
+              adminData = shallowData;
+              console.warn('[AdminDashboard] Loaded user via fallback query without schools join.');
+            } else if (shallowErr) {
+              console.warn('[AdminDashboard] Shallow fallback error:', shallowErr);
+            }
+          } catch (e) {
+            console.error('[AdminDashboard] Fallback query failed:', e);
+          }
         }
       }
+    } catch (e: any) {
+      fetchError = e;
+    }
 
-      if (!adminData) return;
-
-      const userRole = adminData.role?.toLowerCase() || 'student';
-      if (userRole !== 'admin' && userRole !== 'teacher' && userRole !== 'secretary') {
-        return;
+    // Fallback 2: Retrieve from cached localStorage/sessionStorage user if API failed
+    if (!adminData) {
+      if (fetchError) {
+        console.error('[AdminDashboard] Failed to fetch admin/teacher user profile:', fetchError);
       }
+      const cached = typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_cached_user') || localStorage.getItem('groovelab_cached_user') || sessionStorage.getItem('campus_user') || localStorage.getItem('campus_user')) : null;
+      if (cached) {
+        try {
+          adminData = JSON.parse(cached);
+          console.warn('[AdminDashboard] Recovered user profile from local storage cache.');
+        } catch (e) {}
+      }
+    }
 
+    // Fallback 3: Hard fallback minimal object to prevent layout hangs
+    if (!adminData && currentAdmin) {
+      adminData = currentAdmin;
+    }
+    if (!adminData) {
+      adminData = {
+        id: userId,
+        first_name: 'Lehrer',
+        last_name: 'GrooveLab',
+        role: 'teacher',
+        school_id: null
+      };
+      console.warn('[AdminDashboard] Created hard fallback minimal user profile.');
+    }
+
+    setAdmin((prev: any) => {
+      if (prev && JSON.stringify(prev) === JSON.stringify(adminData)) return prev;
+      return adminData;
+    });
+    currentAdmin = adminData;
+    if (typeof window !== 'undefined' && adminData) {
+      try {
+        sessionStorage.setItem('groovelab_cached_user', JSON.stringify(adminData));
+      } catch (e) {}
+    }
+
+    const userRole = adminData.role?.toLowerCase() || 'student';
+    if (userRole !== 'admin' && userRole !== 'teacher' && userRole !== 'secretary') {
+      return;
+    }
+
+    try {
       if (activeTab === 'live' || activeTab === 'schedule') {
         // Fetch live / schedule resources
       } else if (activeTab === 'students') {
@@ -2537,49 +2614,6 @@ export function AdminDashboard({
       fetchError = e;
     }
 
-    // Fallback 1: Try shallow select if relation join failed or RLS blocked join
-    if (!adminData) {
-      try {
-        const { data, error } = await supabase
-          .from('users')
-          .select('*')
-          .eq('id', userId)
-          .maybeSingle();
-        if (data) {
-          adminData = data;
-          console.warn('[AdminDashboard] Loaded user via fallback query without schools join.');
-        }
-      } catch (e) {
-        console.error('[AdminDashboard] Fallback query failed:', e);
-      }
-    }
-
-    // Fallback 2: Retrieve from cached localStorage/sessionStorage user if API failed
-    if (!adminData) {
-      console.error('[AdminDashboard] Failed to fetch admin/teacher user profile:', fetchError);
-      const cached = typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_cached_user') || localStorage.getItem('groovelab_cached_user')) : null;
-      if (cached) {
-        try {
-          adminData = JSON.parse(cached);
-          console.warn('[AdminDashboard] Recovered user profile from local storage cache.');
-        } catch (e) {}
-      }
-    }
-
-    // Fallback 3: Hard fallback minimal object to prevent layout hangs
-    if (!adminData) {
-      adminData = {
-        id: userId,
-        first_name: 'Lehrer',
-        last_name: 'GrooveLab',
-        role: 'teacher',
-        school_id: null
-      };
-      console.warn('[AdminDashboard] Created hard fallback minimal user profile.');
-    }
-
-    setAdmin(adminData);
-    currentAdmin = adminData;
 
     if (currentAdmin?.school_id) {
       // Fetch kiosks for the school only if not loaded yet
@@ -2791,14 +2825,6 @@ export function AdminDashboard({
             .select('*, teacher:users!schedules_teacher_id_fkey(id, first_name, last_name)')
             .eq('school_id', adminData.school_id);
           setSchedules(schedulesData || []);
-
-          // Fetch cooperations for school
-          const { data: coopsData } = await supabase
-            .from('cooperations')
-            .select('*')
-            .eq('school_id', adminData.school_id)
-            .eq('is_active', true);
-          setCooperationsList(coopsData || []);
 
           // Fetch weekly recurring room blocked slots
           const { data: blockedSlotsData } = await supabase
@@ -7683,12 +7709,7 @@ export function AdminDashboard({
 
       let externalInstitutionName = '';
       if (bookingTargetType === 'external') {
-        if (selectedCooperationId === 'custom') {
-          externalInstitutionName = customCooperationName.trim() || 'Externe Kooperation';
-        } else {
-          const coop = cooperationsList.find((c: any) => c.id === selectedCooperationId);
-          externalInstitutionName = coop ? coop.name : 'Externe Kooperation';
-        }
+        externalInstitutionName = externalBookingPartnerName.trim() || 'Externe Belegung';
       }
 
       if (isRecurring) {
@@ -7794,8 +7815,7 @@ export function AdminDashboard({
       setShowPreviewField(false);
       setRecurringInterval(1);
       setBookingTargetType('internal');
-      setSelectedCooperationId('custom');
-      setCustomCooperationName('');
+      setExternalBookingPartnerName('');
     };
 
     const handleApproveBooking = async (bookingId: string) => {
@@ -10646,11 +10666,6 @@ export function AdminDashboard({
                         type="button"
                         onClick={() => {
                           setBookingTargetType('external');
-                          if (cooperationsList.length > 0) {
-                            setSelectedCooperationId(cooperationsList[0].id);
-                          } else {
-                            setSelectedCooperationId('custom');
-                          }
                         }}
                         style={{
                           flex: 1,
@@ -10666,58 +10681,23 @@ export function AdminDashboard({
                           transition: 'all 0.15s'
                         }}
                       >
-                        Externe Kooperation
+                        Externe Institution
                       </button>
                     </div>
                   </div>
                 )}
 
                 {isStaff && bookingTargetType === 'external' && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#8e8e93', textTransform: 'uppercase', letterSpacing: '0.02em' }}>Kooperation / Schule</label>
-                      <select
-                        value={selectedCooperationId}
-                        onChange={(e) => setSelectedCooperationId(e.target.value)}
-                        className="premium-input"
-                        style={{
-                          appearance: 'none',
-                          WebkitAppearance: 'none',
-                          background: '#ffffff',
-                          color: '#1c1c1e',
-                          height: '36px',
-                          padding: '6px 28px 6px 10px',
-                          fontSize: '0.78rem',
-                          fontWeight: 600,
-                          borderRadius: '10px',
-                          border: '1px solid rgba(0, 0, 0, 0.08)',
-                          backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238e8e93' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`,
-                          backgroundRepeat: 'no-repeat',
-                          backgroundPosition: 'right 10px center',
-                          backgroundSize: '11px',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        {cooperationsList.map((c: any) => (
-                          <option key={c.id} value={c.id}>{c.name}</option>
-                        ))}
-                        <option value="custom">Freitext / Andere Institution...</option>
-                      </select>
-                    </div>
-
-                    {selectedCooperationId === 'custom' && (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#8e8e93', textTransform: 'uppercase', letterSpacing: '0.02em' }}>Name der Institution</label>
-                        <input
-                          type="text"
-                          placeholder="z.B. Grundschule West"
-                          value={customCooperationName}
-                          onChange={(e) => setCustomCooperationName(e.target.value)}
-                          className="premium-input"
-                          style={{ height: '36px', padding: '6px 10px', fontSize: '0.78rem' }}
-                        />
-                      </div>
-                    )}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#8e8e93', textTransform: 'uppercase', letterSpacing: '0.02em' }}>Name der externen Institution / Partner</label>
+                    <input
+                      type="text"
+                      placeholder="z.B. Grundschule West, Kindergarten..."
+                      value={externalBookingPartnerName}
+                      onChange={(e) => setExternalBookingPartnerName(e.target.value)}
+                      className="premium-input"
+                      style={{ height: '36px', padding: '6px 10px', fontSize: '0.78rem' }}
+                    />
                   </div>
                 )}
 

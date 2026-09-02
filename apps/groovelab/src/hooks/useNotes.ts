@@ -79,12 +79,13 @@ export const useNotes = ({ user, schoolId, activeStudent }: UseNotesOptions) => 
       // Explicit Archive View
       if (filterType === 'archived') {
         return note.is_archived || 
+               note.teacher_dismissed ||
                (note.is_completed && now - updatedAtMs > twoDaysMs) ||
                (note.visibility === 'student_shared' && now - createdAtMs > oneDayMs && !note.is_pinned);
       }
 
-      // If user explicitly marked as archived, hide from normal views
-      if (note.is_archived) return false;
+      // If user explicitly marked as archived or dismissed from view, hide from normal views
+      if (note.is_archived || note.teacher_dismissed) return false;
 
       // ── Auto-Sunset Lifecycle Rules for Focus Stream ──
       // If we are in 'all' view (and not searching), apply auto-sunset to keep the focus stream fresh (< 12 items)
@@ -243,6 +244,16 @@ export const useNotes = ({ user, schoolId, activeStudent }: UseNotesOptions) => 
     const existing = notes.find(n => n.id === noteId);
     if (!existing) return;
     await updateNote(noteId, { is_completed: !existing.is_completed });
+  };
+
+  const dismissRoomIssueForTeacher = async (noteId: string) => {
+    await updateNote(noteId, { teacher_dismissed: true });
+    setNotes(prev => prev.map(n => n.id === noteId ? { ...n, teacher_dismissed: true } : n));
+  };
+
+  const resolveRoomIssue = async (noteId: string, resolvedBy: 'teacher' | 'secretary' | 'admin' = 'teacher') => {
+    await notesService.resolveRoomIssue(noteId, resolvedBy);
+    setNotes(prev => prev.map(n => n.id === noteId ? { ...n, is_completed: true, is_acknowledged: true, resolved_by: resolvedBy } : n));
   };
 
   const toggleArchive = async (noteId: string) => {
@@ -444,6 +455,8 @@ export const useNotes = ({ user, schoolId, activeStudent }: UseNotesOptions) => 
     deleteNote,
     togglePin,
     toggleCompleteTodo,
+    dismissRoomIssueForTeacher,
+    resolveRoomIssue,
     toggleArchive,
     syncToHomeworkBook,
     unsyncFromHomeworkBook,

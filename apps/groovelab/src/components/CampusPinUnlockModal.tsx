@@ -103,15 +103,49 @@ export const CampusPinUnlockModal: React.FC<CampusPinUnlockModalProps> = ({
         // Setup new personal 4-digit PIN via Server-Side Security Definer RPC
         const authQrToken = user.qr_token || user.ausweis_nummer || user.id || '';
         
-        const { data: rpcRes, error: rpcErr } = await supabase.rpc('set_initial_student_pin', {
-          p_student_id: user.id,
-          p_qr_token: authQrToken,
-          p_pin: pinToVerify
-        });
+        let setupSuccess = false;
+        let lastErrorMessage = '';
 
-        if (rpcErr || rpcRes !== true) {
-          console.error('[CampusPinUnlockModal] set_initial_student_pin error:', rpcErr);
-          alert('Fehler beim Speichern der PIN: ' + (rpcErr?.message || 'Serverfehler'));
+        // 1. Primary: set_initial_student_pin RPC
+        try {
+          const { data: rpcRes, error: rpcErr } = await supabase.rpc('set_initial_student_pin', {
+            p_student_id: user.id,
+            p_qr_token: authQrToken,
+            p_pin: pinToVerify
+          });
+
+          if (!rpcErr && rpcRes === true) {
+            setupSuccess = true;
+          } else if (rpcErr) {
+            lastErrorMessage = rpcErr.message;
+            console.warn('[CampusPinUnlockModal] set_initial_student_pin fallback:', rpcErr.message);
+          }
+        } catch (e: any) {
+          lastErrorMessage = e?.message || '';
+        }
+
+        // 2. Secondary: set_personal_pin RPC
+        if (!setupSuccess) {
+          try {
+            const { data: pRes, error: pErr } = await supabase.rpc('set_personal_pin', {
+              p_user_id: user.id,
+              p_new_pin: pinToVerify
+            });
+
+            if (!pErr && pRes === true) {
+              setupSuccess = true;
+            } else if (pErr) {
+              lastErrorMessage = pErr.message || lastErrorMessage;
+              console.warn('[CampusPinUnlockModal] set_personal_pin fallback:', pErr.message);
+            }
+          } catch (e: any) {
+            lastErrorMessage = e?.message || lastErrorMessage;
+          }
+        }
+
+        if (!setupSuccess) {
+          console.error('[CampusPinUnlockModal] PIN setup failed:', lastErrorMessage);
+          alert('Fehler beim Speichern der PIN: ' + (lastErrorMessage || 'Serverfehler'));
           setLoading(false);
           return;
         }

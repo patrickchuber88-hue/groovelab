@@ -23,9 +23,9 @@ class DatabaseCircuitBreaker {
   private readonly timeoutMs: number;
 
   constructor(options?: CircuitBreakerOptions) {
-    this.failureThreshold = options?.failureThreshold || 5;
-    this.cooldownMs = options?.cooldownMs || 4000;
-    this.timeoutMs = options?.timeoutMs || 15000;
+    this.failureThreshold = options?.failureThreshold || 8;
+    this.cooldownMs = options?.cooldownMs || 2500;
+    this.timeoutMs = options?.timeoutMs || 20000;
   }
 
   public getState(): CircuitState {
@@ -116,9 +116,9 @@ class DatabaseCircuitBreaker {
 }
 
 export const dbCircuitBreaker = new DatabaseCircuitBreaker({
-  failureThreshold: 5,
-  cooldownMs: 4000,
-  timeoutMs: 15000
+  failureThreshold: 8,
+  cooldownMs: 2500,
+  timeoutMs: 20000
 });
 
 if (typeof window !== 'undefined') {

@@ -113,12 +113,16 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
     deleteNote,
     togglePin,
     toggleCompleteTodo,
+    dismissRoomIssueForTeacher,
+    resolveRoomIssue,
     toggleArchive,
     syncToHomeworkBook,
     unsyncFromHomeworkBook,
     dueAlerts,
     saveStatus
   } = useNotes({ user, schoolId, activeStudent });
+
+  const [selectedRoomIssueNote, setSelectedRoomIssueNote] = useState<UserNote | null>(null);
 
   const [internalRooms, setInternalRooms] = useState<any[]>([]);
   const [internalEquipment, setInternalEquipment] = useState<any[]>([]);
@@ -1408,6 +1412,13 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
                 return note.room_id || (note.note_type === 'room_issue' ? 'Raum' : null);
               })();
               const isRoomItem = Boolean(detectedRoom || note.note_type === 'room_issue');
+              const isDefectTag = note.tags?.some(t => {
+                const c = t.toLowerCase();
+                return c === '#mangel' || c === '#defekt' || c === 'mangel' || c === 'defekt';
+              });
+              const isDefectText = /mangel|defekt|kaputt|reparatur|stimmen|saite|notenständer/i.test(note.content);
+              const isRoomIssue = note.note_type === 'room_issue' || note.visibility === 'school_admin' || (isRoomItem && (isDefectTag || isDefectText));
+              const isRoomIssueOpen = isRoomIssue && !note.is_completed && !note.is_acknowledged;
 
               return (
                 <div
@@ -1429,29 +1440,53 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
                   className="hover-scale-mini"
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: 0 }}>
-                    {/* 1-Tap Apple Checkbox */}
-                    <button
-                      type="button"
-                      onClick={() => handleWidgetToggleComplete(note.id, Boolean(note.is_completed))}
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        color: isDone ? '#34a853' : '#94a3b8',
-                        cursor: 'pointer',
-                        padding: '2px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        flexShrink: 0
-                      }}
-                      title={isDone ? 'Als offen markieren' : 'Abhaken'}
-                    >
-                      {isDone ? (
-                        <CheckCircle2 size={18} color="#34a853" />
-                      ) : (
-                        <Circle size={18} color="#94a3b8" />
-                      )}
-                    </button>
+                    {/* Action Button: Raummangel Action vs 1-Tap Apple Checkbox */}
+                    {isRoomIssueOpen ? (
+                      <button
+                        type="button"
+                        onClick={() => setSelectedRoomIssueNote(note)}
+                        style={{
+                          background: '#fee2e2',
+                          border: '1px solid #fca5a5',
+                          borderRadius: '8px',
+                          padding: '3px 5px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'pointer',
+                          color: '#dc2626',
+                          flexShrink: 0,
+                          boxShadow: '0 1px 3px rgba(220, 38, 38, 0.12)'
+                        }}
+                        title="Beim Sekretariat gemeldet – Klicken für Erledigungs-Optionen"
+                        className="hover-scale-mini"
+                      >
+                        <DoorOpen size={13} color="#dc2626" />
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => handleWidgetToggleComplete(note.id, Boolean(note.is_completed))}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: isDone ? '#34a853' : '#94a3b8',
+                          cursor: 'pointer',
+                          padding: '2px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flexShrink: 0
+                        }}
+                        title={isDone ? 'Als offen markieren' : 'Abhaken'}
+                      >
+                        {isDone ? (
+                          <CheckCircle2 size={18} color="#34a853" />
+                        ) : (
+                          <Circle size={18} color="#94a3b8" />
+                        )}
+                      </button>
+                    )}
 
                     <span style={{
                       fontSize: '0.84rem',
@@ -1793,6 +1828,14 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
               {sortedPool.map(note => {
                 const isRecentlyCompleted = recentlyCompletedIds.includes(note.id);
                 const isDone = note.is_completed || isRecentlyCompleted;
+                const isDefectTag = note.tags?.some(t => {
+                  const c = t.toLowerCase();
+                  return c === '#mangel' || c === '#defekt' || c === 'mangel' || c === 'defekt';
+                });
+                const isDefectText = /mangel|defekt|kaputt|reparatur|stimmen|saite|notenständer/i.test(note.content);
+                const isRoomIssue = note.note_type === 'room_issue' || note.visibility === 'school_admin' || (isDefectTag || isDefectText);
+                const isRoomIssueOpen = isRoomIssue && !note.is_completed && !note.is_acknowledged;
+
                 return (
                   <div
                     key={`peek-${note.id}`}
@@ -1813,25 +1856,49 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
                     className="hover-scale-mini"
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: 0 }}>
-                      {/* 1-Tap Checkbox */}
-                      <button
-                        type="button"
-                        onClick={() => handleWidgetToggleComplete(note.id, Boolean(note.is_completed))}
-                        style={{
-                          background: 'none',
-                          border: 'none',
-                          color: isDone ? '#34a853' : '#94a3b8',
-                          cursor: 'pointer',
-                          padding: '2px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          flexShrink: 0
-                        }}
-                        title={isDone ? 'Als offen markieren' : 'Abhaken'}
-                      >
-                        {isDone ? <CheckCircle2 size={18} color="#34a853" /> : <Circle size={18} color="#94a3b8" />}
-                      </button>
+                      {/* Action Button: Raummangel vs 1-Tap Checkbox */}
+                      {isRoomIssueOpen ? (
+                        <button
+                          type="button"
+                          onClick={() => setSelectedRoomIssueNote(note)}
+                          style={{
+                            background: '#fee2e2',
+                            border: '1px solid #fca5a5',
+                            borderRadius: '8px',
+                            padding: '3px 5px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            cursor: 'pointer',
+                            color: '#dc2626',
+                            flexShrink: 0,
+                            boxShadow: '0 1px 3px rgba(220, 38, 38, 0.12)'
+                          }}
+                          title="Beim Sekretariat gemeldet – Klicken für Erledigungs-Optionen"
+                          className="hover-scale-mini"
+                        >
+                          <DoorOpen size={13} color="#dc2626" />
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleWidgetToggleComplete(note.id, Boolean(note.is_completed))}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: isDone ? '#34a853' : '#94a3b8',
+                            cursor: 'pointer',
+                            padding: '2px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            flexShrink: 0
+                          }}
+                          title={isDone ? 'Als offen markieren' : 'Abhaken'}
+                        >
+                          {isDone ? <CheckCircle2 size={18} color="#34a853" /> : <Circle size={18} color="#94a3b8" />}
+                        </button>
+                      )}
 
                       {/* Content */}
                       <span style={{
@@ -1970,6 +2037,192 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
       })()}
 
       {/* ========================================================================= */}
+      {/* 4b. RAUMMANGEL STATUS & RESOLVER MODAL (Apple HIG Action-Sheet)           */}
+      {/* ========================================================================= */}
+      {selectedRoomIssueNote && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15, 23, 42, 0.45)',
+            backdropFilter: 'blur(8px)',
+            WebkitBackdropFilter: 'blur(8px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 99999,
+            padding: '16px'
+          }}
+          onClick={() => setSelectedRoomIssueNote(null)}
+        >
+          <div
+            style={{
+              background: '#ffffff',
+              borderRadius: '20px',
+              boxShadow: '0 20px 40px -10px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.08)',
+              width: '100%',
+              maxWidth: '440px',
+              padding: '24px',
+              animation: 'modalPop 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{
+                  background: '#fee2e2',
+                  color: '#dc2626',
+                  width: '38px',
+                  height: '38px',
+                  borderRadius: '12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  border: '1px solid #fecaca'
+                }}>
+                  <DoorOpen size={20} />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#0f172a' }}>
+                    Raummangel Status
+                  </h3>
+                  <p style={{ margin: 0, fontSize: '0.76rem', color: '#64748b' }}>
+                    Gemeldet an Schulleitung & Sekretariat
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedRoomIssueNote(null)}
+                style={{
+                  background: '#f1f5f9',
+                  border: 'none',
+                  borderRadius: '50%',
+                  width: '30px',
+                  height: '30px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#64748b',
+                  cursor: 'pointer'
+                }}
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Content Preview */}
+            <div style={{
+              background: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              borderRadius: '12px',
+              padding: '12px 14px',
+              marginBottom: '18px'
+            }}>
+              <div style={{ fontSize: '0.86rem', fontWeight: 700, color: '#1e293b', marginBottom: '6px' }}>
+                {formatCleanNoteContent(selectedRoomIssueNote.content, selectedRoomIssueNote.student_name)}
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.72rem', color: '#dc2626', fontWeight: 650 }}>
+                <span style={{ display: 'inline-block', width: '6px', height: '6px', borderRadius: '50%', background: '#dc2626' }} />
+                <span>Aktiver Reparatur-Auftrag im Sekretariat</span>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {/* Option 1: Selbst behoben */}
+              <button
+                type="button"
+                onClick={async () => {
+                  const nId = selectedRoomIssueNote.id;
+                  setSelectedRoomIssueNote(null);
+                  await resolveRoomIssue(nId, 'teacher');
+                  setToastMessage('✅ Mangel als behoben gemeldet');
+                  setTimeout(() => setToastMessage(null), 3000);
+                }}
+                style={{
+                  background: '#16a34a',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '12px',
+                  padding: '12px 16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  boxShadow: '0 4px 12px rgba(22, 163, 74, 0.25)',
+                  transition: 'transform 0.15s ease'
+                }}
+                className="hover-scale-mini"
+              >
+                <div style={{ background: 'rgba(255,255,255,0.2)', borderRadius: '8px', padding: '6px', display: 'flex' }}>
+                  <CheckCircle2 size={18} color="#ffffff" />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: '0.88rem', fontWeight: 800 }}>Selbst behoben / Entwarnung</div>
+                  <div style={{ fontSize: '0.72rem', opacity: 0.9 }}>Mangel schulweit abschließen (z. B. Schraube festgezogen oder Ersatz geholt)</div>
+                </div>
+              </button>
+
+              {/* Option 2: Nur für mich ausblenden */}
+              <button
+                type="button"
+                onClick={async () => {
+                  const nId = selectedRoomIssueNote.id;
+                  setSelectedRoomIssueNote(null);
+                  await dismissRoomIssueForTeacher(nId);
+                  setToastMessage('👁️ Notiz ausgeblendet (Ticket bleibt im Sekretariat aktiv)');
+                  setTimeout(() => setToastMessage(null), 3000);
+                }}
+                style={{
+                  background: '#ffffff',
+                  color: '#334155',
+                  border: '1px solid #cbd5e1',
+                  borderRadius: '12px',
+                  padding: '12px 16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  transition: 'background 0.15s ease'
+                }}
+                className="hover-scale-mini"
+              >
+                <div style={{ background: '#f1f5f9', borderRadius: '8px', padding: '6px', display: 'flex' }}>
+                  <Archive size={18} color="#475569" />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: '0.88rem', fontWeight: 800 }}>Nur aus meiner Liste ausblenden</div>
+                  <div style={{ fontSize: '0.72rem', color: '#64748b' }}>Ticket bleibt beim Sekretariat aktiv offen, bis Hausmeister/Verwaltung die Reparatur erledigt</div>
+                </div>
+              </button>
+            </div>
+
+            {/* Cancel */}
+            <div style={{ marginTop: '14px', textAlign: 'center' }}>
+              <button
+                type="button"
+                onClick={() => setSelectedRoomIssueNote(null)}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: '#94a3b8',
+                  fontSize: '0.78rem',
+                  fontWeight: 650,
+                  cursor: 'pointer'
+                }}
+              >
+                Abbrechen
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
       {/* 5. NOTIZEN-BOARD MODAL                                                    */}
       {/* ========================================================================= */}
       <TeacherNotesBoardModal
@@ -1985,6 +2238,8 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
         onTogglePin={togglePin}
         onToggleCompleteTodo={toggleCompleteTodo}
         onToggleArchive={toggleArchive}
+        onDismissRoomIssue={dismissRoomIssueForTeacher}
+        onResolveRoomIssue={resolveRoomIssue}
         onSyncToHomeworkBook={syncToHomeworkBook}
         onUnsyncFromHomeworkBook={unsyncFromHomeworkBook}
         onOpenHomeworkModal={onOpenHomeworkModal}

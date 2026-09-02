@@ -43,20 +43,26 @@ export async function logSecurityEvent({
 
     console.info(`[AUDIT LOG] ${timestamp} | Action: ${action} | School: ${schoolId || 'N/A'} | User: ${userId || 'N/A'}`);
 
-    // Try inserting into database if table exists (fail silently if audit table is not yet migrated)
+    const details = {
+      school_id: schoolId || null,
+      target_id: targetId || null,
+      ...cleanMetadata,
+      logged_at: timestamp,
+    };
+
+    // Authoritative Security Definer RPC (Enterprise+ / OWASP ASVS Level 3)
     try {
-      await supabase.from('security_audit_logs').insert([
-        {
-          action,
-          school_id: schoolId,
-          user_id: userId,
-          target_id: targetId,
-          metadata: cleanMetadata,
-          created_at: timestamp,
-        },
-      ]);
+      const { error: rpcErr } = await supabase.rpc('log_security_event', {
+        p_event_type: action,
+        p_actor_id: userId || null,
+        p_details: details,
+      });
+
+      if (rpcErr) {
+        console.warn('[AUDIT LOG] RPC notice:', rpcErr.message || rpcErr);
+      }
     } catch {
-      // Graceful fallback if security_audit_logs table is strictly internal
+      // Non-blocking fallback
     }
   } catch (err) {
     console.warn('[AUDIT LOG] Non-blocking log error:', err);

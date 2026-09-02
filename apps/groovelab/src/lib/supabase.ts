@@ -54,11 +54,6 @@ const customFetch = async (input: RequestInfo | URL, init?: RequestInit): Promis
   if (sessionToken) {
     clientInfo += `;session_token=${sessionToken}`;
   }
-
-  const userId = typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_user_id') || localStorage.getItem('groovelab_user_id')) : null;
-  if (userId) {
-    clientInfo += `;user_id=${userId}`;
-  }
   
   let qrToken = sessionStorage.getItem('groovelab_qr_token');
   if (!qrToken && typeof window !== 'undefined') {
@@ -128,11 +123,12 @@ const customFetch = async (input: RequestInfo | URL, init?: RequestInit): Promis
     let timeoutId: any = null;
     try {
       let fetchInit = newInit;
-      // Wrap request with a resilient failover timeout (12s for normal queries, 45s for large audio/asset uploads)
+      // Wrap request with a resilient failover timeout (20s for normal queries, 60s for large audio/asset uploads)
+      // 20s guarantees the client does not abort prematurely before PostgreSQL finishes its 15s statement_timeout
       if (!newInit.signal && typeof AbortController !== 'undefined') {
         const inputUrlStr = typeof input === 'string' ? input : (input instanceof URL ? input.href : '');
         const isStorageUpload = inputUrlStr.includes('/storage/v1/object/');
-        const queryTimeout = isStorageUpload ? 45000 : 12000;
+        const queryTimeout = isStorageUpload ? 60000 : 20000;
         const controller = new AbortController();
         timeoutId = setTimeout(() => controller.abort(), queryTimeout);
         fetchInit = { ...newInit, signal: controller.signal };
@@ -141,15 +137,17 @@ const customFetch = async (input: RequestInfo | URL, init?: RequestInit): Promis
       const response = await fetch(input, fetchInit);
       if (timeoutId) clearTimeout(timeoutId);
       
-      // If server returned 503 / 502 / 504 (e.g. PostgREST transient schema cache reload), retry before failing
-      if (response.status === 503 || response.status === 502 || response.status === 504 || response.status === 429) {
+      // Security Guardrail: Only retry pure infrastructure transients (502, 503, 504)
+      // NEVER retry 401, 403, or 429 rate limits to prevent brute-force or lockout amplification
+      if (response.status === 503 || response.status === 502 || response.status === 504) {
         if (attempt < maxAttempts) {
           try {
             const clone = response.clone();
             const text = await clone.text();
-            if (text.includes('schema cache') || text.includes('PGRST002') || text.includes('503') || text.includes('502')) {
-              console.warn(`[Supabase Fetch] PostgREST schema cache reload (HTTP ${response.status}). Retrying attempt ${attempt + 1} in ${attempt * 400}ms...`);
-              await new Promise(r => setTimeout(r, attempt * 400));
+            if (text.includes('schema cache') || text.includes('PGRST002') || text.includes('503') || text.includes('502') || text.includes('504')) {
+              const backoff = attempt * 500 + Math.random() * 200;
+              console.warn(`[Supabase Fetch] PostgREST infrastructure transient (HTTP ${response.status}). Retrying attempt ${attempt + 1} in ${Math.round(backoff)}ms...`);
+              await new Promise(r => setTimeout(r, backoff));
               continue;
             }
           } catch (e) {}
@@ -171,25 +169,23 @@ const customFetch = async (input: RequestInfo | URL, init?: RequestInit): Promis
         errMsg.includes('Failed to fetch') || 
         errMsg.includes('NetworkError') || 
         errMsg.includes('Network request failed') ||
-        errMsg.includes('AbortError') ||
-        errMsg.includes('aborted') ||
         (typeof navigator !== 'undefined' && !navigator.onLine);
         
       if (isNetworkError && attempt < maxAttempts) {
-        const delay = Math.min(1200, 200 * Math.pow(2, attempt - 1) + Math.random() * 80);
-        console.warn(`[Supabase Fetch] Attempt ${attempt} failed with "${errMsg}". Retrying in ${Math.round(delay)}ms...`);
+        const delay = Math.min(2000, 300 * Math.pow(2, attempt - 1) + Math.random() * 150);
+        console.warn(`[Supabase Fetch] Attempt ${attempt} failed with transient "${errMsg}". Retrying in ${Math.round(delay)}ms...`);
         await new Promise(resolve => setTimeout(resolve, delay));
         continue;
       }
       
-      // Only record failure when all retry attempts exhausted and not an external abort
+      // Client-side AbortError (navigation or modal close) must NOT trip the circuit breaker
       if (!errMsg.includes('AbortError') && !errMsg.includes('aborted')) {
         dbCircuitBreaker.recordFailure(err);
       }
       throw err;
     }
   }
-  if (lastError && !lastError.message?.includes('AbortError')) {
+  if (lastError && !lastError.message?.includes('AbortError') && !lastError.message?.includes('aborted')) {
     dbCircuitBreaker.recordFailure(lastError);
   }
   throw lastError;
@@ -211,6 +207,9 @@ if (typeof window !== 'undefined') {
       }
       if (supabase && (supabase as any).realtime && typeof (supabase as any).realtime.connect === 'function') {
         (supabase as any).realtime.connect();
+      }
+      if (typeof (window as any).__groovelabRecoverRealtime === 'function') {
+        (window as any).__groovelabRecoverRealtime();
       }
     } catch (e) {
       // Passive probe failed, will auto-retry on next interaction

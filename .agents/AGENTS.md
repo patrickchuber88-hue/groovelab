@@ -23,6 +23,14 @@
   3. `npx tsc --noEmit` (TypeScript Typprüfung)
 - **Ergebnisbericht**: Die Antwort liefert direkt das strukturierte **Morning Health & Security Briefing**, das den aktuellen Systemstatus, Code-Integrität (0 Verstöße, 0 Leaks) und den Status des Live-Systems transparent zusammenfasst.
 
+## 🎯 Prompt Agent Trigger ("prompt Agent starten")
+- **Persona**: Elite Prompt Engineer.
+- **Workflow (3-Round Optimization Cycle)**:
+  1. *Initial Trigger Handling*: Wenn kein Thema mitgegeben wird, antworte mit einer einzigen, direkten Frage nach dem Ziel/Task. Wenn ein Thema mitgegeben wird, starte direkt mit Runde 1.
+  2. *Round 1 (Analysis & Draft v1.0)*: Erstelle Struktur mit `[ROLE / PERSONA]`, `[CONTEXT]`, `[TASK / STEPS]`, `[OUTPUT FORMAT & CONSTRAINTS]` und stelle 3-4 gezielte Klärungsfragen.
+  3. *Round 2 (Hardening & Draft v2.0)*: Antworten einarbeiten, negative Constraints & Few-Shot Slots injizieren, Draft v2.0 präsentieren und nach Feinabstimmung fragen.
+  4. *Round 3 (Master Prompt v3.0)*: Finaler, produktionsreifer Master-Prompt im Codeblock mit standardisierten `[VARIABLE_PLACEHOLDERS]` + 2 konkrete Laufzeit-Ausführungstipps.
+
 ## Platform Naming
 - Always refer to the platform as **Campus-Groovelab** in all UI elements, user communications, messages, and document descriptions.
 - Ensure the spelling is precisely "Campus-Groovelab" (with a double 'o' in "Groovelab").

@@ -76,6 +76,8 @@ interface TeacherNotesBoardModalProps {
   onTogglePin: (id: string) => Promise<any>;
   onToggleCompleteTodo: (id: string) => Promise<any>;
   onToggleArchive: (id: string) => Promise<any>;
+  onDismissRoomIssue?: (id: string) => Promise<any>;
+  onResolveRoomIssue?: (id: string, resolvedBy?: 'teacher' | 'secretary') => Promise<any>;
   onSyncToHomeworkBook?: (note: UserNote) => Promise<any>;
   onUnsyncFromHomeworkBook?: (note: UserNote) => Promise<any>;
   onOpenHomeworkModal?: (student: any) => void;
@@ -95,11 +97,19 @@ export const TeacherNotesBoardModal: React.FC<TeacherNotesBoardModalProps> = ({
   onTogglePin,
   onToggleCompleteTodo,
   onToggleArchive,
+  onDismissRoomIssue,
+  onResolveRoomIssue,
   onSyncToHomeworkBook,
   onUnsyncFromHomeworkBook,
   onOpenHomeworkModal,
   onOpenCommandPalette
 }) => {
+  const [selectedRoomIssueModalNote, setSelectedRoomIssueModalNote] = useState<UserNote | null>(null);
+  const [modalToast, setModalToast] = useState<string | null>(null);
+  const showSuccessNotification = (msg: string) => {
+    setModalToast(msg);
+    setTimeout(() => setModalToast(null), 3000);
+  };
   const [viewMode, setViewMode] = useState<'kanban' | 'list' | 'students'>('kanban');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTagFilter, setSelectedTagFilter] = useState<string | null>(null);
@@ -1813,6 +1823,7 @@ export const TeacherNotesBoardModal: React.FC<TeacherNotesBoardModalProps> = ({
                               onSyncToHomework={onSyncToHomeworkBook ? () => onSyncToHomeworkBook(note) : undefined}
                               onUnsyncFromHomework={onUnsyncFromHomeworkBook ? () => onUnsyncFromHomeworkBook(note) : undefined}
                               onOpenHomeworkModal={onOpenHomeworkModal}
+                              onOpenRoomIssueModal={(n) => setSelectedRoomIssueModalNote(n)}
                             />
                           );
                         })
@@ -1940,6 +1951,7 @@ export const TeacherNotesBoardModal: React.FC<TeacherNotesBoardModalProps> = ({
                       onSyncToHomework={onSyncToHomeworkBook ? () => onSyncToHomeworkBook(note) : undefined}
                       onUnsyncFromHomework={onUnsyncFromHomeworkBook ? () => onUnsyncFromHomeworkBook(note) : undefined}
                       onOpenHomeworkModal={onOpenHomeworkModal}
+                      onOpenRoomIssueModal={(n) => setSelectedRoomIssueModalNote(n)}
                     />
                   );
                 })
@@ -2353,6 +2365,7 @@ export const TeacherNotesBoardModal: React.FC<TeacherNotesBoardModalProps> = ({
                                 onSyncToHomework={onSyncToHomeworkBook ? () => onSyncToHomeworkBook(note) : undefined}
                                 onUnsyncFromHomework={onUnsyncFromHomeworkBook ? () => onUnsyncFromHomeworkBook(note) : undefined}
                                 onOpenHomeworkModal={onOpenHomeworkModal}
+                                onOpenRoomIssueModal={(n) => setSelectedRoomIssueModalNote(n)}
                               />
                             );
                           })
@@ -2407,6 +2420,30 @@ export const TeacherNotesBoardModal: React.FC<TeacherNotesBoardModalProps> = ({
                 <span>Rückgängig</span>
                 <kbd style={{ opacity: 0.6, fontSize: '0.62rem', fontFamily: 'monospace' }}>⌘Z</kbd>
               </button>
+            </div>
+          )}
+
+          {/* Floating Success Toast */}
+          {modalToast && (
+            <div style={{
+              position: 'absolute',
+              bottom: '20px',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              background: '#0f172a',
+              color: '#ffffff',
+              borderRadius: '100px',
+              padding: '8px 18px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              boxShadow: '0 12px 32px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.2)',
+              zIndex: 99999,
+              animation: 'slideUp 0.18s ease-out',
+              fontSize: '0.78rem',
+              fontWeight: 650
+            }}>
+              <span>{modalToast}</span>
             </div>
           )}
 
@@ -2562,6 +2599,196 @@ export const TeacherNotesBoardModal: React.FC<TeacherNotesBoardModalProps> = ({
                       border: 'none'
                     }}
                   />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Raummangel Action Sheet Modal */}
+          {selectedRoomIssueModalNote && (
+            <div
+              style={{
+                position: 'fixed',
+                inset: 0,
+                background: 'rgba(15, 23, 42, 0.45)',
+                backdropFilter: 'blur(8px)',
+                WebkitBackdropFilter: 'blur(8px)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: 99999,
+                padding: '16px'
+              }}
+              onClick={() => setSelectedRoomIssueModalNote(null)}
+            >
+              <div
+                style={{
+                  background: '#ffffff',
+                  borderRadius: '20px',
+                  boxShadow: '0 20px 40px -10px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.08)',
+                  width: '100%',
+                  maxWidth: '440px',
+                  padding: '24px',
+                  animation: 'modalPop 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* Header */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div style={{
+                      background: '#fee2e2',
+                      color: '#dc2626',
+                      width: '38px',
+                      height: '38px',
+                      borderRadius: '12px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      border: '1px solid #fecaca'
+                    }}>
+                      <DoorOpen size={20} />
+                    </div>
+                    <div>
+                      <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#0f172a' }}>
+                        Raummangel Status
+                      </h3>
+                      <p style={{ margin: 0, fontSize: '0.76rem', color: '#64748b' }}>
+                        Gemeldet an Schulleitung & Sekretariat
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedRoomIssueModalNote(null)}
+                    style={{
+                      background: '#f1f5f9',
+                      border: 'none',
+                      borderRadius: '50%',
+                      width: '30px',
+                      height: '30px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#64748b',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+
+                {/* Content Preview */}
+                <div style={{
+                  background: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '12px',
+                  padding: '12px 14px',
+                  marginBottom: '18px'
+                }}>
+                  <div style={{ fontSize: '0.86rem', fontWeight: 700, color: '#1e293b', marginBottom: '6px' }}>
+                    {formatCleanNoteContent(selectedRoomIssueModalNote.content, selectedRoomIssueModalNote.student_name)}
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.72rem', color: '#dc2626', fontWeight: 650 }}>
+                    <span style={{ display: 'inline-block', width: '6px', height: '6px', borderRadius: '50%', background: '#dc2626' }} />
+                    <span>Aktiver Reparatur-Auftrag im Sekretariat</span>
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {/* Option 1: Selbst behoben */}
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const targetNote = selectedRoomIssueModalNote;
+                      setSelectedRoomIssueModalNote(null);
+                      if (onResolveRoomIssue) {
+                        await onResolveRoomIssue(targetNote.id, 'teacher');
+                      } else {
+                        await onToggleCompleteTodo(targetNote.id);
+                      }
+                      showSuccessNotification('Mangel als behoben gemeldet');
+                    }}
+                    style={{
+                      background: '#16a34a',
+                      color: '#ffffff',
+                      border: 'none',
+                      borderRadius: '12px',
+                      padding: '12px 16px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '12px',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                      boxShadow: '0 4px 12px rgba(22, 163, 74, 0.25)',
+                      transition: 'transform 0.15s ease'
+                    }}
+                    className="hover-scale-mini"
+                  >
+                    <div style={{ background: 'rgba(255,255,255,0.2)', borderRadius: '8px', padding: '6px', display: 'flex' }}>
+                      <CheckCircle2 size={18} color="#ffffff" />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: '0.88rem', fontWeight: 800 }}>Selbst behoben / Entwarnung</div>
+                      <div style={{ fontSize: '0.72rem', opacity: 0.9 }}>Mangel schulweit abschließen (z. B. Schraube festgezogen oder Ersatz geholt)</div>
+                    </div>
+                  </button>
+
+                  {/* Option 2: Nur für mich ausblenden */}
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const targetNote = selectedRoomIssueModalNote;
+                      setSelectedRoomIssueModalNote(null);
+                      if (onDismissRoomIssue) {
+                        await onDismissRoomIssue(targetNote.id);
+                      } else {
+                        await onToggleArchive(targetNote.id);
+                      }
+                      showSuccessNotification('Notiz ausgeblendet (Ticket bleibt im Sekretariat aktiv)');
+                    }}
+                    style={{
+                      background: '#ffffff',
+                      color: '#334155',
+                      border: '1px solid #cbd5e1',
+                      borderRadius: '12px',
+                      padding: '12px 16px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '12px',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                      transition: 'background 0.15s ease'
+                    }}
+                    className="hover-scale-mini"
+                  >
+                    <div style={{ background: '#f1f5f9', borderRadius: '8px', padding: '6px', display: 'flex' }}>
+                      <Archive size={18} color="#475569" />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: '0.88rem', fontWeight: 800 }}>Nur aus meiner Liste ausblenden</div>
+                      <div style={{ fontSize: '0.72rem', color: '#64748b' }}>Ticket bleibt beim Sekretariat aktiv offen, bis Hausmeister/Verwaltung die Reparatur erledigt</div>
+                    </div>
+                  </button>
+                </div>
+
+                {/* Cancel */}
+                <div style={{ marginTop: '14px', textAlign: 'center' }}>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedRoomIssueModalNote(null)}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      color: '#94a3b8',
+                      fontSize: '0.78rem',
+                      fontWeight: 650,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Abbrechen
+                  </button>
                 </div>
               </div>
             </div>
@@ -3136,6 +3363,7 @@ interface NoteCardItemProps {
   onSyncToHomework?: () => void;
   onUnsyncFromHomework?: () => void;
   onOpenHomeworkModal?: (student: any) => void;
+  onOpenRoomIssueModal?: (note: UserNote) => void;
 }
 
 export const NoteCardItem: React.FC<NoteCardItemProps> = ({
@@ -3168,7 +3396,8 @@ export const NoteCardItem: React.FC<NoteCardItemProps> = ({
   onDelete,
   onSyncToHomework,
   onUnsyncFromHomework,
-  onOpenHomeworkModal
+  onOpenHomeworkModal,
+  onOpenRoomIssueModal
 }) => {
   const isTagPickerOpen = activeTagPickerNoteId === note.id;
   const isDuePickerOpen = activeDueDatePickerNoteId === note.id;
@@ -3303,28 +3532,70 @@ export const NoteCardItem: React.FC<NoteCardItemProps> = ({
 
       {/* Top / Main Meta row */}
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: '6px', flex: 1, minWidth: 0 }}>
-        {/* Checkbox toggle with Spring Bounce */}
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onToggleComplete();
-          }}
-          style={{
-            border: 'none',
-            background: 'transparent',
-            color: note.is_completed ? '#16a34a' : '#cbd5e1',
-            cursor: 'pointer',
-            padding: 0,
-            marginTop: '1.5px',
-            display: 'flex',
-            flexShrink: 0,
-            transition: 'transform 0.18s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
-          }}
-          className="hover-scale"
-        >
-          {note.is_completed ? <CheckCircle2 size={13.5} /> : <Circle size={13.5} />}
-        </button>
+        {/* Checkbox toggle with Spring Bounce OR Room Issue Button */}
+        {(() => {
+          const isDefectTag = note.tags?.some(t => {
+            const c = t.toLowerCase();
+            return c === '#mangel' || c === '#defekt' || c === 'mangel' || c === 'defekt';
+          });
+          const isDefectText = /mangel|defekt|kaputt|reparatur|stimmen|saite|notenständer/i.test(note.content);
+          const isRoomIssue = note.note_type === 'room_issue' || note.visibility === 'school_admin' || (hasRoomBadge && (isDefectTag || isDefectText));
+          const isRoomIssueOpen = isRoomIssue && !note.is_completed && !note.is_acknowledged;
+
+          if (isRoomIssueOpen) {
+            return (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (onOpenRoomIssueModal) onOpenRoomIssueModal(note);
+                }}
+                style={{
+                  background: '#fee2e2',
+                  border: '1px solid #fca5a5',
+                  borderRadius: '6px',
+                  padding: '2px 4px',
+                  color: '#dc2626',
+                  cursor: 'pointer',
+                  marginTop: '1.5px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                  boxShadow: '0 1px 2px rgba(220, 38, 38, 0.1)'
+                }}
+                title="Beim Sekretariat gemeldet – Klicken für Optionen"
+                className="hover-scale-mini"
+              >
+                <DoorOpen size={11.5} color="#dc2626" />
+              </button>
+            );
+          }
+
+          return (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleComplete();
+              }}
+              style={{
+                border: 'none',
+                background: 'transparent',
+                color: note.is_completed ? '#16a34a' : '#cbd5e1',
+                cursor: 'pointer',
+                padding: 0,
+                marginTop: '1.5px',
+                display: 'flex',
+                flexShrink: 0,
+                transition: 'transform 0.18s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
+              }}
+              className="hover-scale"
+            >
+              {note.is_completed ? <CheckCircle2 size={13.5} /> : <Circle size={13.5} />}
+            </button>
+          );
+        })()}
 
         <div style={{ flex: 1, minWidth: 0 }}>
           {/* Compact Student badge & 1-Klick Sichtbarkeits-Toggle */}
@@ -3717,7 +3988,8 @@ export const NoteListTableRow: React.FC<NoteCardItemProps> = ({
   onDelete,
   onSyncToHomework,
   onUnsyncFromHomework,
-  onOpenHomeworkModal
+  onOpenHomeworkModal,
+  onOpenRoomIssueModal
 }) => {
   const isTagPickerOpen = activeTagPickerNoteId === note.id;
   const isDuePickerOpen = activeDueDatePickerNoteId === note.id;
@@ -3766,22 +4038,62 @@ export const NoteListTableRow: React.FC<NoteCardItemProps> = ({
         />
       </div>
 
-      {/* 1. Status Checkbox */}
+      {/* 1. Status Checkbox / Room Issue Button */}
       <div>
-        <button
-          type="button"
-          onClick={onToggleComplete}
-          style={{
-            border: 'none',
-            background: 'transparent',
-            color: note.is_completed ? '#16a34a' : '#cbd5e1',
-            cursor: 'pointer',
-            padding: 0,
-            display: 'flex'
-          }}
-        >
-          {note.is_completed ? <CheckCircle2 size={15} /> : <Circle size={15} />}
-        </button>
+        {(() => {
+          const isDefectTag = note.tags?.some(t => {
+            const c = t.toLowerCase();
+            return c === '#mangel' || c === '#defekt' || c === 'mangel' || c === 'defekt';
+          });
+          const isDefectText = /mangel|defekt|kaputt|reparatur|stimmen|saite|notenständer/i.test(note.content);
+          const isRoomIssue = note.note_type === 'room_issue' || note.visibility === 'school_admin' || isDefectTag || isDefectText;
+          const isRoomIssueOpen = isRoomIssue && !note.is_completed && !note.is_acknowledged;
+
+          if (isRoomIssueOpen) {
+            return (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (onOpenRoomIssueModal) onOpenRoomIssueModal(note);
+                }}
+                style={{
+                  background: '#fee2e2',
+                  border: '1px solid #fca5a5',
+                  borderRadius: '6px',
+                  padding: '2px 4px',
+                  color: '#dc2626',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '0 1px 2px rgba(220, 38, 38, 0.1)'
+                }}
+                title="Beim Sekretariat gemeldet – Klicken für Optionen"
+                className="hover-scale-mini"
+              >
+                <DoorOpen size={12} color="#dc2626" />
+              </button>
+            );
+          }
+
+          return (
+            <button
+              type="button"
+              onClick={onToggleComplete}
+              style={{
+                border: 'none',
+                background: 'transparent',
+                color: note.is_completed ? '#16a34a' : '#cbd5e1',
+                cursor: 'pointer',
+                padding: 0,
+                display: 'flex'
+              }}
+            >
+              {note.is_completed ? <CheckCircle2 size={15} /> : <Circle size={15} />}
+            </button>
+          );
+        })()}
       </div>
 
       {/* 2. Content (Clean NLP Text + Inline Edit + Audio-Memo Waveform) */}

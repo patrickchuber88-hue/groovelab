@@ -437,7 +437,7 @@ export const FEEDBACK_CATEGORIES: FeedbackCategory[] = [
     shortName: 'Verwaltung & Finanzen',
     iconName: 'CreditCard',
     allowedRoles: ['admin', 'secretary'],
-    tags: ['Zahlungsabgleich', 'Schüler-Aktivierungen', 'Direktabrechnung (Eltern)', 'Lehrkräfte & Klassen', 'Leihinstrumente', 'Kiosk-Terminal']
+    tags: ['Zahlungsabgleich', 'Schüler-Aktivierungen', 'Direktabrechnung (Eltern)', 'Lehrkräfte & Klassen', 'Kiosk-Terminal']
   },
   {
     id: 'general',

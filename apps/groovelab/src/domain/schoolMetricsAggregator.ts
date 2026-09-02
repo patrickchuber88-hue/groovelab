@@ -316,8 +316,13 @@ export function getSchoolCanonicalBilling(
   masterPricing: MasterPricingRates
 ): CanonicalSchoolBillingSummary {
   const effectiveRates = calculateSchoolEffectiveRates(school, masterPricing);
-  const hasCampus = Boolean(school.has_campus_subscription);
-  const hasGroovelab = Boolean(school.has_groovelab_subscription);
+  const isBooked = Boolean(school.is_billing_booked) || school.status === 'active';
+  let hasCampus = Boolean(school.has_campus_subscription);
+  let hasGroovelab = Boolean(school.has_groovelab_subscription);
+  if (isBooked && !hasCampus && !hasGroovelab) {
+    hasCampus = true;
+    hasGroovelab = true;
+  }
 
   const now = new Date();
   const directEffectiveDateStr = school.direct_billing_effective_date;

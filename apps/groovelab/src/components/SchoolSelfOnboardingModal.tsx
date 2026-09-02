@@ -52,6 +52,7 @@ export const SchoolSelfOnboardingModal: React.FC<SchoolSelfOnboardingModalProps>
   // Biometrics State
   const [biometricsStatus, setBiometricsStatus] = useState<'idle' | 'registering' | 'success' | 'error'>('idle');
   const [biometricsErrorMessage, setBiometricsErrorMessage] = useState('');
+  const [isB2BConfirmed, setIsB2BConfirmed] = useState(false);
 
   // Clean Zip Code Helper
   const cleanZip = zipCode.trim().replace(/^(DE|D|AT|A|CH)-?/i, '').trim();
@@ -68,7 +69,8 @@ export const SchoolSelfOnboardingModal: React.FC<SchoolSelfOnboardingModalProps>
     email.trim().includes('@') && email.trim().includes('.') &&
     street.trim().length >= 2 &&
     isZipValid &&
-    city.trim().length >= 2;
+    city.trim().length >= 2 &&
+    isB2BConfirmed;
 
   const handleRegisterSchool = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -651,6 +653,33 @@ export const SchoolSelfOnboardingModal: React.FC<SchoolSelfOnboardingModalProps>
                   <strong style={{ color: '#0f172a' }}>Software-Bereitstellung: {country === 'Schweiz' ? 'CHF 0.00' : '0,00 €'} (Inklusive).</strong> Keine Einrichtungsgebühr. Modul-Auswahl (Campus &amp; GrooveLab) flexibel im Dashboard wählbar.
                 </div>
               </div>
+
+              {/* B2B-Unternehmer-Bestätigungsschranke gem. § 14 BGB */}
+              <label style={{
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '10px',
+                cursor: 'pointer',
+                fontSize: '0.74rem',
+                lineHeight: 1.45,
+                color: '#334155',
+                background: '#f8fafc',
+                padding: '10px 12px',
+                borderRadius: '12px',
+                border: isB2BConfirmed ? '1px solid #86efac' : '1px solid #cbd5e1',
+                marginTop: '4px',
+                textAlign: 'left'
+              }}>
+                <input
+                  type="checkbox"
+                  checked={isB2BConfirmed}
+                  onChange={(e) => setIsB2BConfirmed(e.target.checked)}
+                  style={{ marginTop: '2px', cursor: 'pointer', accentColor: '#15803d', flexShrink: 0 }}
+                />
+                <span>
+                  Ich handele im Namen einer Musikschule, Bildungsinstitution, Gebietskörperschaft oder als selbständiger Unternehmer (§ 14 BGB / § 1 UGB / Art. 1 OR). Mir ist bekannt, dass das Angebot von Teil A der AGB ausschließlich für Geschäftskunden (B2B) gilt.
+                </span>
+              </label>
 
               {/* Submit CTA */}
               <button

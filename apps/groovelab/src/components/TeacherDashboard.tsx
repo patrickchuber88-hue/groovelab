@@ -2,7 +2,9 @@ import React, { useState, useEffect, useMemo, useCallback, useRef, lazy, Suspens
 import { MUSIC_QUOTES, getQuotesForAudience, getDailyQuote } from '@groovelab/shared';
 import { usePremiumOnboardingTour, TourStartButton, TourStep } from './PremiumOnboardingTour';
 import { supabase, deleteUserStorageAssets } from '../lib/supabase';
-import { Monitor, Music, Award, Box, Plus, AlertCircle, AlertTriangle, User, Users, Star, TrendingUp, Shield, Zap, Play, Info, CheckCircle, Check, Search, Trash2, Bell, X, Clock, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, LayoutDashboard, LogOut, Flame, GraduationCap, UserPlus, Edit3, Calendar, Activity, CheckSquare, Mail, Copy, Sparkles, BookOpen, MessageSquare, Lock, Palmtree, Heart, Settings, Key, Sun, ThumbsUp, Building2, Hourglass, Eye, EyeOff, ShieldCheck, CheckCheck, CalendarX, Send, Lightbulb, Download, Sliders, Mic, Disc, Radio, Timer, ArrowRight, Headphones, FileText } from 'lucide-react';
+import { Monitor, Music, Award, Box, Plus, AlertCircle, AlertTriangle, User, Users, Star, TrendingUp, Shield, Zap, Play, Info, CheckCircle, Check, Search, Trash2, Bell, X, Clock, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, LayoutDashboard, LogOut, Flame, GraduationCap, UserPlus, Edit3, Calendar, Activity, CheckSquare, Mail, Copy, Sparkles, BookOpen, MessageSquare, Lock, Palmtree, Heart, Settings, Key, Sun, ThumbsUp, Building2, Hourglass, Eye, EyeOff, ShieldCheck, CheckCheck, CalendarX, Send, Lightbulb, Download, Sliders, Mic, Disc, Radio, Timer, ArrowRight, Headphones, FileText, DoorOpen } from 'lucide-react';
+import { notesService, UserNote } from '../services/notesService';
+import { formatCleanNoteContent } from './notes/notesConstants';
 import { checkIsAudioTresorActive } from '../domain/stickersAndTresor';
 import { UpdateAnnouncementHero } from './common/UpdateAnnouncementHero';
 import { renderInstrumentIcon } from '../utils/instruments';
@@ -1174,12 +1176,15 @@ export function TeacherDashboard({
   useEffect(() => {
     fetchActiveChatOccs();
 
+    if (!userId) return;
+
     const channel = supabase
-      .channel('realtime_tagesplan_shouts')
+      .channel(`realtime_tagesplan_shouts_${userId}`)
       .on('postgres_changes', {
         schema: 'public',
         event: '*',
-        table: 'campus_direct_messages'
+        table: 'campus_direct_messages',
+        filter: `recipient_id=eq.${userId}`
       }, () => {
         fetchActiveChatOccs();
       })
@@ -1188,7 +1193,7 @@ export function TeacherDashboard({
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [userId]);
 
   useEffect(() => {
     if (!activeChatOcc) {
@@ -3171,6 +3176,158 @@ export function TeacherDashboard({
     return todayTagesplanStudentsRaw;
   }, [todayTagesplanStudentsRaw]);
 
+  // 🏢 Raummängel der Musikschule für den Tagesplan (Gezielter Hinweis für Kollegium im selben Raum)
+  const [schoolRoomIssues, setSchoolRoomIssues] = useState<UserNote[]>([]);
+
+  const loadSchoolIssues = useCallback(async () => {
+    try {
+      const effectiveSchoolId = teacher?.school_id || (session?.users?.school_id) || 1;
+      const issues = await notesService.fetchSchoolRoomIssues(effectiveSchoolId);
+      setSchoolRoomIssues(issues || []);
+    } catch (err) {
+      console.warn('[TeacherDashboard] Could not fetch room issues for Tagesplan:', err);
+    }
+  }, [teacher?.school_id, session?.users?.school_id]);
+
+  useEffect(() => {
+    loadSchoolIssues();
+
+    // Multi-Tab & Realtime Sync Subscription
+    const unsubscribe = notesService.onSync(() => {
+      loadSchoolIssues();
+    });
+
+    const handleSync = () => loadSchoolIssues();
+    window.addEventListener('focus', handleSync);
+    window.addEventListener('storage', handleSync);
+
+    return () => {
+      unsubscribe();
+      window.removeEventListener('focus', handleSync);
+      window.removeEventListener('storage', handleSync);
+    };
+  }, [loadSchoolIssues]);
+
+  // 📍 Heute vom Lehrer belegte Unterrichtsräume (aus briefingData.timeline)
+  const teacherTodayRooms = useMemo<string[]>(() => {
+    const roomSet = new Set<string>();
+    const timeline = briefingData?.timeline || [];
+    timeline.forEach((slot: any) => {
+      const r = slot.room || slot.rooms?.name || 'Raum 4';
+      if (r) {
+        const cleaned = cleanRoomName(r).trim();
+        if (cleaned && cleaned !== 'Unbenannter Raum') {
+          roomSet.add(cleaned);
+        }
+      }
+    });
+    // Fallback: If teacher has active slots today, ensure standard 'Raum 4' is included if present in timeline
+    if (roomSet.size === 0 && timeline.length > 0) {
+      roomSet.add('Raum 4');
+    }
+    return Array.from(roomSet);
+  }, [briefingData?.timeline]);
+
+  // Hilfsfunktion: Ermittelt das lesbare Raum-Label eines Mangels
+  const getIssueRoomLabel = useCallback((issue: UserNote, fallbackRoom: string): string => {
+    // 1. Check if room_id matches a room in the rooms list
+    if (issue.room_id && issue.room_id.trim()) {
+      const matchedRoom = rooms.find((r: any) => String(r.id) === String(issue.room_id));
+      if (matchedRoom?.name) {
+        const cl = cleanRoomName(matchedRoom.name).trim();
+        if (cl && cl !== 'Unbenannter Raum') return cl;
+      }
+      const cleaned = cleanRoomName(issue.room_id).trim();
+      if (cleaned && cleaned !== 'Unbenannter Raum' && cleaned !== 'Raum' && !/^[0-9a-f]{8}-[0-9a-f]{4}/i.test(cleaned)) {
+        if (/^\d+$/.test(cleaned)) return `Raum ${cleaned}`;
+        return cleaned;
+      }
+    }
+
+    // 2. Check tags for !raum
+    const roomTag = issue.tags?.find(t => /!raum/i.test(t));
+    if (roomTag) {
+      const cleanTag = roomTag.replace(/^!/i, '').trim();
+      if (/^\d+$/.test(cleanTag)) return `Raum ${cleanTag}`;
+      if (cleanTag && cleanTag !== 'Raum') return cleanTag;
+    }
+
+    // 3. Check content regex for Raum / Saal / Studio
+    const contentMatch = issue.content?.match(/(?:!|#|\b|\/|\[)(raum\s*#?\d+|saal\s*\d*|studio\s*\d*|konzertsaal|bandraum|keller|eg|og\s*\d*)/i);
+    if (contentMatch) {
+      const rm = contentMatch[1].trim();
+      return rm.charAt(0).toUpperCase() + rm.slice(1);
+    }
+
+    // 4. If fallbackRoom is provided, clean and return it
+    if (fallbackRoom && fallbackRoom.trim() && fallbackRoom.trim() !== 'Raum') {
+      return fallbackRoom.trim();
+    }
+
+    // 5. Default fallback to today's active teaching room or 'Raum 4'
+    return teacherTodayRooms[0] || 'Raum 4';
+  }, [rooms, teacherTodayRooms]);
+
+  // Filtert Mängel, die aktiv sind und heute in den Unterrichtsräumen der Lehrkraft liegen
+  const relevantRoomIssuesToday = useMemo(() => {
+    if (schoolRoomIssues.length === 0) return [];
+
+    return schoolRoomIssues.filter(issue => {
+      // Nur noch nicht behobene Mängel
+      if (issue.is_completed || issue.is_acknowledged) return false;
+
+      // Wenn die Lehrkraft heute keine Termine hat, nichts anzeigen
+      if (teacherTodayRooms.length === 0) return false;
+
+      const contentLower = (issue.content || '').toLowerCase();
+      const roomIdLower = (issue.room_id || '').toLowerCase();
+      const tagsLower = (issue.tags || []).map(t => t.toLowerCase());
+
+      return teacherTodayRooms.some(todayRoom => {
+        if (!todayRoom) return false;
+        const roomNorm = todayRoom.toLowerCase().trim();
+
+        // 1. Direkte Übereinstimmung mit room_id
+        if (roomIdLower && (roomIdLower === roomNorm || roomIdLower.includes(roomNorm) || roomNorm.includes(roomIdLower))) {
+          return true;
+        }
+
+        // 2. Tag-Übereinstimmung (z. B. '!raum 4' oder '#raum 4')
+        if (tagsLower.some(t => t.includes(roomNorm) || (roomNorm.includes('raum') && t.includes(roomNorm.replace('raum', '').trim())))) {
+          return true;
+        }
+
+        // 3. Im Inhalt erwähnt (z. B. 'Raum 4' oder '[Raum 4]')
+        if (contentLower.includes(roomNorm)) {
+          return true;
+        }
+
+        // 4. Nummern-Matching (z. B. 'Raum 4' vs '4')
+        const numMatch = roomNorm.match(/\d+/);
+        if (numMatch) {
+          const num = numMatch[0];
+          const regex = new RegExp(`\\braum\\s*#?${num}\\b|!raum\\s*#?${num}\\b|\\[raum\\s*#?${num}\\]`, 'i');
+          if (regex.test(contentLower) || tagsLower.some(t => regex.test(t)) || regex.test(roomIdLower)) {
+            return true;
+          }
+        }
+
+        return false;
+      });
+    });
+  }, [teacherTodayRooms, schoolRoomIssues]);
+
+  // Handler: Mangel direkt aus dem Tagesplan als behoben melden
+  const handleResolveRoomIssueInTagesplan = useCallback(async (issueId: string) => {
+    try {
+      await notesService.resolveRoomIssue(issueId, 'teacher');
+      setSchoolRoomIssues(prev => prev.filter(i => i.id !== issueId));
+      setToastMessage('✅ Raummangel als behoben gemeldet');
+    } catch (err) {
+      console.error('[TeacherDashboard] Error resolving room issue:', err);
+    }
+  }, []);
+
 
   // New Right Sidebar Sickness & Administrative feedback states
   const [isSickWidgetExpanded, setIsSickWidgetExpanded] = useState(() => {
@@ -3233,9 +3390,20 @@ export function TeacherDashboard({
     return saved !== null ? saved === 'true' : true;
   });
 
+  const [lastSeenFeedTime, setLastSeenFeedTime] = useState<number>(() => {
+    if (typeof window === 'undefined') return 0;
+    const val = localStorage.getItem(`campus_last_seen_feed_${userId}`);
+    return val ? parseInt(val, 10) : 0;
+  });
+
   const handleToggleTeacherBriefingSidebar = async (collapsed: boolean) => {
     setIsTeacherBriefingSidebarCollapsed(collapsed);
     localStorage.setItem('campus_teacher_briefing_sidebar_collapsed', String(collapsed));
+    if (!collapsed && userId) {
+      const now = Date.now();
+      setLastSeenFeedTime(now);
+      localStorage.setItem(`campus_last_seen_feed_${userId}`, now.toString());
+    }
     try {
       if (userId) {
         await supabase.from('users').update({ briefing_sidebar_collapsed: collapsed }).eq('id', userId);
@@ -6959,18 +7127,40 @@ useEffect(() => {
     }) || null;
   }, [adminFeedbackRequests, adminFeedbackResponses, teacher, userId]);
 
-  const teacherScheduleChangesCount = (myChangedAppointments || []).length;
+  // Nur UNBESTÄTIGTE Terminänderungen im aktiven 7-Tage-Vorschaufenster zählen (verhindert Phantom-Badges)
+  const teacherScheduleChangesCount = useMemo(() => {
+    return (visibleChangedAppointments || []).filter((a: any) => 
+      !a.teacher_acknowledged && !a.teacherAcknowledged && a.status !== 'cancelled_acknowledged'
+    ).length;
+  }, [visibleChangedAppointments]);
 
   const teacherUnreadFeedCount = useMemo(() => {
     if (!userId) return 0;
+    // Wenn die Sidebar aktuell ausgeklappt ist, sieht die Lehrkraft die Mitteilungen direkt
+    if (!isTeacherBriefingSidebarCollapsed) return 0;
+
     const unreadCampus = (campusFeedAnnouncements || []).filter((post: any) => {
-      return !feedInteractions.some(i => i.post_id === post.id && i.user_id === userId);
+      // Per Emoji interagiert -> gelesen
+      if (feedInteractions.some(i => i.post_id === post.id && i.user_id === userId)) return false;
+      // Vor dem letzten Öffnen der Sidebar gepostet -> bereits gesehen
+      if (lastSeenFeedTime && post.created_at) {
+        const postTime = new Date(post.created_at).getTime();
+        if (postTime <= lastSeenFeedTime) return false;
+      }
+      return true;
     }).length;
+
     const unreadClass = (classFeedPosts || []).filter((post: any) => {
-      return !feedInteractions.some(i => i.post_id === post.id && i.user_id === userId);
+      if (feedInteractions.some(i => i.post_id === post.id && i.user_id === userId)) return false;
+      if (lastSeenFeedTime && post.created_at) {
+        const postTime = new Date(post.created_at).getTime();
+        if (postTime <= lastSeenFeedTime) return false;
+      }
+      return true;
     }).length;
+
     return unreadCampus + unreadClass;
-  }, [campusFeedAnnouncements, classFeedPosts, feedInteractions, userId]);
+  }, [campusFeedAnnouncements, classFeedPosts, feedInteractions, userId, isTeacherBriefingSidebarCollapsed, lastSeenFeedTime]);
 
   const teacherSidebarTotalAlertsCount = teacherScheduleChangesCount + teacherOpenAdminFeedbackCount + teacherUnreadFeedCount;
   const hasTeacherAppointmentAlerts = teacherScheduleChangesCount > 0;
@@ -8548,6 +8738,142 @@ useEffect(() => {
     </div>
   );
 
+  // 🏢 Raummängel-Banner (Apple HIG Goldstandard: Direkt unterhalb des Tagesplans angedockt, transluzent & elegant)
+  const renderTagesplanRoomIssuesBanner = (isDesktop: boolean = true) => {
+    if (relevantRoomIssuesToday.length === 0) return null;
+
+    return (
+      <div 
+        style={{
+          width: '100%',
+          padding: isDesktop ? '10px 16px' : '10px 14px',
+          background: 'rgba(254, 242, 242, 0.85)',
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
+          border: '1px solid rgba(239, 68, 68, 0.2)',
+          borderRadius: '18px',
+          boxShadow: '0 4px 20px -4px rgba(220, 38, 38, 0.08), 0 1px 3px rgba(0, 0, 0, 0.02)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '8px',
+          boxSizing: 'border-box'
+        }}
+      >
+        {relevantRoomIssuesToday.map(issue => {
+          const isMyReport = issue.user_id === (teacher?.id || userId);
+          const authorDisplay = isMyReport 
+            ? 'Von dir' 
+            : (issue.author_name ? `Gemeldet von ${issue.author_name}` : 'Kollegium');
+          const cleanContent = formatCleanNoteContent(issue.content, issue.student_name);
+          const roomLabel = getIssueRoomLabel(issue, teacherTodayRooms[0] || 'Raum 4');
+
+          return (
+            <div
+              key={`tagesplan-issue-${issue.id}`}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '10px',
+                width: '100%',
+                minHeight: '28px'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
+                {/* Apple Squircle Icon Badge */}
+                <div style={{
+                  width: '24px',
+                  height: '24px',
+                  borderRadius: '7px',
+                  background: 'linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)',
+                  border: '1px solid rgba(239, 68, 68, 0.25)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                  boxShadow: '0 1px 3px rgba(239, 68, 68, 0.12)'
+                }}>
+                  <DoorOpen size={13} color="#dc2626" />
+                </div>
+
+                {/* Room Pill */}
+                <span style={{
+                  fontSize: '0.74rem',
+                  fontWeight: 800,
+                  color: '#991b1b',
+                  letterSpacing: '-0.01em',
+                  flexShrink: 0
+                }}>
+                  {roomLabel}
+                </span>
+
+                <span style={{ color: '#fca5a5', fontSize: '0.74rem', flexShrink: 0 }}>•</span>
+
+                {/* Clean Content Text */}
+                <span 
+                  title={cleanContent}
+                  style={{
+                    fontSize: '0.80rem',
+                    fontWeight: 650,
+                    color: '#1e293b',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    minWidth: 0
+                  }}
+                >
+                  {cleanContent}
+                </span>
+
+                {/* Author Capsule */}
+                <span style={{
+                  fontSize: '0.64rem',
+                  fontWeight: 750,
+                  color: isMyReport ? '#0284c7' : '#64748b',
+                  background: isMyReport ? 'rgba(2, 132, 199, 0.10)' : 'rgba(100, 116, 139, 0.10)',
+                  border: isMyReport ? '1px solid rgba(2, 132, 199, 0.20)' : '1px solid rgba(100, 116, 139, 0.15)',
+                  padding: '2px 7px',
+                  borderRadius: '100px',
+                  whiteSpace: 'nowrap',
+                  flexShrink: 0
+                }}>
+                  {authorDisplay}
+                </span>
+              </div>
+
+              {/* 1-Tap Apple Action Pill Button */}
+              <button
+                type="button"
+                onClick={() => handleResolveRoomIssueInTagesplan(issue.id)}
+                style={{
+                  background: '#16a34a',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '100px',
+                  padding: '5px 12px',
+                  fontSize: '0.72rem',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  flexShrink: 0,
+                  boxShadow: '0 2px 6px rgba(22, 163, 74, 0.30)',
+                  transition: 'all 0.15s ease'
+                }}
+                className="hover-scale-mini"
+                title="Mangel als selbst behoben markieren"
+              >
+                <Check size={12} strokeWidth={3} color="#ffffff" />
+                <span>Selbst behoben</span>
+              </button>
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
   const renderTagesplanWidget = () => (
     isTourDemoScheduleActive ? (
       renderTourDemoScheduleJSX()
@@ -9454,6 +9780,7 @@ useEffect(() => {
               <div style={{ padding: '30px', textAlign: 'center', color: '#ef4444' }}>Fehler beim Laden des Briefings.</div>
             )}
           </div>
+          {renderTagesplanRoomIssuesBanner(false)}
         </div>
       )
     )
@@ -12252,20 +12579,25 @@ useEffect(() => {
                          </p>
                       </div>
                     ) : (
-                      <div id="tour-teacher-schedule" className="google-card" style={{ 
+                      <div style={{
                         flex: isFreeDay ? '0.8 1 300px' : '1.2 1 450px', 
-                        minWidth: '300px', 
-                        padding: '20px 24px', 
-                        borderRadius: '20px', 
-                        border: '1px solid #f1f5f9', 
-                        boxShadow: '0 2px 12px rgba(0,0,0,0.04)', 
-                        background: 'white', 
-                        boxSizing: 'border-box',
+                        minWidth: '300px',
                         display: 'flex',
                         flexDirection: 'column',
-                        height: '100%',
-                        maxHeight: windowWidth >= 768 ? '700px' : undefined
+                        gap: '12px'
                       }}>
+                        <div id="tour-teacher-schedule" className="google-card" style={{ 
+                          width: '100%', 
+                          padding: '20px 24px', 
+                          borderRadius: '20px', 
+                          border: '1px solid #f1f5f9', 
+                          boxShadow: '0 2px 12px rgba(0,0,0,0.04)', 
+                          background: 'white', 
+                          boxSizing: 'border-box',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          maxHeight: windowWidth >= 768 ? '700px' : undefined
+                        }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', color: '#1f2937' }}>
                             <Clock size={20} color="#0b57d0" />
@@ -13239,24 +13571,25 @@ useEffect(() => {
                             </div>
                           </div>
                         )}
- 
-
                       </div>
                     </div>
-                  ))}
+                    {/* Raummängel-Banner direkt unterhalb des Tagesplans angedockt */}
+                    {renderTagesplanRoomIssuesBanner(true)}
                   </div>
-                </>
+                )
               )}
-              </div>
-            ) : (
-              <div style={{ padding: '40px', textAlign: 'center', color: '#ef4444' }}>Fehler beim Laden des Briefings.</div>
-            )}
-          </div>
+            </div>
+          </>
+        )}
+        </div>
+      ) : (
+        <div style={{ padding: '40px', textAlign: 'center', color: '#ef4444' }}>Fehler beim Laden des Briefings.</div>
+      )}
+    </div>
 
-            {/* briefing-right-sidebar */}
-            {!isMobileDevice && (
-            <aside style={{ 
-              flex: isTeacherBriefingSidebarCollapsed ? '0 0 0px' : (windowWidth < 768 ? '1 1 100%' : '1 1 320px'),
+    {/* briefing-right-sidebar */}
+    {!isMobileDevice && (
+    <aside style={{
               maxWidth: isTeacherBriefingSidebarCollapsed ? '0px' : (windowWidth < 768 ? '100%' : '320px'),
               minWidth: isTeacherBriefingSidebarCollapsed ? '0px' : (windowWidth < 768 ? '0px' : '320px'),
               width: isTeacherBriefingSidebarCollapsed ? '0px' : '100%',
