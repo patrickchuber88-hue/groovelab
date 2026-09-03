@@ -116,7 +116,7 @@ export const GhostSupportCapsule: React.FC<GhostSupportCapsuleProps> = ({
     } catch (e) {}
   }, [activeRole]);
 
-  const handleEndSession = useCallback(() => {
+  const handleEndSession = useCallback(async () => {
     // Record immutable audit entry in local telemetry before leaving
     try {
       if (typeof window !== 'undefined') {
@@ -141,6 +141,19 @@ export const GhostSupportCapsule: React.FC<GhostSupportCapsuleProps> = ({
           status: 'COMPLETED_CLEANLY'
         };
         localStorage.setItem('campus_ghost_audit_trail', JSON.stringify([newLog, ...existingAudit].slice(0, 50)));
+
+        // Enterprise+ Dual-Audit Logging & Atomic Token Revocation on Database
+        const leaseToken = typeof window !== 'undefined' ? sessionStorage.getItem('groovelab_ghost_lease_token') : null;
+        if (leaseToken) {
+          try {
+            await supabase.rpc('terminate_support_ghost_session', {
+              p_lease_id: leaseToken,
+              p_school_id: ghostSchoolId || null
+            });
+          } catch (rpcErr) {
+            console.warn('[Ghost] Error calling terminate_support_ghost_session RPC:', rpcErr);
+          }
+        }
 
         // Remove live indicator
         if (ghostSchoolId) {

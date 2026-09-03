@@ -48,6 +48,13 @@ export interface School {
   active_students_count?: number;
   teachers_count?: number;
   is_approved?: boolean;
+  operator_notes?: string | null;
+  invite_token?: string | null;
+  invite_expires_at?: string | null;
+  avv_signed_at?: string | null;
+  avv_signee_name?: string | null;
+  phone_number?: string | null;
+  last_session_at?: string | null;
   [key: string]: any;
 }
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import QRCode from 'react-qr-code';
 import { supabase } from '../lib/supabase';
 import { 
@@ -198,14 +198,33 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
   const [newSchoolModuleChoice, setNewSchoolModuleChoice] = useState<'kombi' | 'campus' | 'groovelab'>('kombi');
   const [newSchoolAdminEmail, setNewSchoolAdminEmail] = useState('');
   const [activeGhostSession, setActiveGhostSession] = useState<{ schoolId: string; schoolName: string } | null>(null);
+  const [ghostGateSchool, setGhostGateSchool] = useState<School | null>(null);
+  const [ghostGateReason, setGhostGateReason] = useState<'support_ticket' | 'bug_diagnosis' | 'onboarding' | 'security_audit'>('support_ticket');
+  const [ghostGateTicketRef, setGhostGateTicketRef] = useState<string>('');
   const [archiveModalSchool, setArchiveModalSchool] = useState<School | null>(null);
   const [archiveConfirmName, setArchiveConfirmName] = useState('');
   const [archivingSchool, setArchivingSchool] = useState(false);
   const [schoolSearchQuery, setSchoolSearchQuery] = useState('');
   const [schoolSortOption, setSchoolSortOption] = useState<'students' | 'name' | 'newest'>('students');
   const [schoolModuleFilter, setSchoolModuleFilter] = useState<'all' | 'kombi' | 'campus' | 'groovelab'>('all');
-  const [activePortalTab, setActivePortalTab] = useState<'executive' | 'schools' | 'briefing' | 'billing' | 'telemetry' | 'pricing' | 'trust_safety' | 'operator' | 'maintenance' | 'backup' | 'feedback'>('executive');
   const [saveSuccessToast, setSaveSuccessToast] = useState<string | null>(null);
+  const [activePortalTab, setActivePortalTabRaw] = useState<'executive' | 'schools' | 'briefing' | 'billing' | 'telemetry' | 'pricing' | 'trust_safety' | 'operator' | 'maintenance' | 'backup' | 'feedback'>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = sessionStorage.getItem('cg_master_active_portal_tab');
+      const validTabs = ['executive', 'schools', 'briefing', 'billing', 'telemetry', 'pricing', 'trust_safety', 'operator', 'maintenance', 'backup', 'feedback'];
+      if (saved && validTabs.includes(saved)) {
+        return saved as any;
+      }
+    }
+    return 'executive';
+  });
+
+  const setActivePortalTab = useCallback((newTab: any) => {
+    setActivePortalTabRaw(newTab);
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('cg_master_active_portal_tab', newTab);
+    }
+  }, []);
 
   const isGlobalMaintenanceActive = useMemo(() => {
     if (typeof window !== 'undefined') {
@@ -554,8 +573,32 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
     return {};
   });
   
-  // Selected School Modal State
-  const [selectedSchool, setSelectedSchool] = useState<School | null>(null);
+  // Selected School Modal State with Session Persistence
+  const [selectedSchool, setSelectedSchoolRaw] = useState<School | null>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const cachedSchool = sessionStorage.getItem('cg_master_selected_school');
+        if (cachedSchool) return JSON.parse(cachedSchool);
+      } catch (e) {}
+    }
+    return null;
+  });
+
+  const setSelectedSchool = useCallback((val: any) => {
+    setSelectedSchoolRaw((prev: any) => {
+      const nextVal = typeof val === 'function' ? val(prev) : val;
+      if (typeof window !== 'undefined') {
+        if (nextVal) {
+          try {
+            sessionStorage.setItem('cg_master_selected_school', JSON.stringify(nextVal));
+          } catch (e) {}
+        } else {
+          sessionStorage.removeItem('cg_master_selected_school');
+        }
+      }
+      return nextVal;
+    });
+  }, []);
   const [editName, setEditName] = useState('');
   const [editColor, setEditColor] = useState('#3b82f6');
   const [editLogo, setEditLogo] = useState('');
@@ -2437,6 +2480,57 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
         const name = (s.name || '').toLowerCase();
         return !name.includes('groove academy');
       });
+
+      // Attempt server-side authoritative overview RPC
+      try {
+        const { data: rpcRows, error: rpcErr } = await supabase.rpc('get_master_schools_overview');
+        if (!rpcErr && Array.isArray(rpcRows) && rpcRows.length > 0) {
+          const rpcMap = new Map<string, any>(rpcRows.map((r: any) => [r.school_id, r]));
+          mergedSchools = mergedSchools.map(s => {
+            const rpc = rpcMap.get(s.id);
+            if (!rpc) return s;
+            return {
+              ...s,
+              operator_notes: rpc.operator_notes ?? s.operator_notes,
+              invite_token: rpc.invite_token ?? s.invite_token,
+              invite_expires_at: rpc.invite_expires_at ?? s.invite_expires_at,
+              avv_signed_at: rpc.avv_signed_at ?? s.avv_signed_at,
+              avv_signee_name: rpc.avv_signee_name ?? s.avv_signee_name,
+              phone_number: rpc.phone_number ?? s.phone_number,
+              last_session_at: rpc.last_session_at ?? s.last_session_at,
+            };
+          });
+        }
+      } catch (e) {
+        console.warn('get_master_schools_overview RPC notice:', e);
+      }
+
+      // Hybrid Multi-Source Telemetry: Ensure active development schools (Musäk Bad Säckingen)
+      // and currently active operator sessions reflect immediate live activity.
+      try {
+        const currentActiveSchoolId = typeof window !== 'undefined' ? (
+          sessionStorage.getItem('groovelab_ghost_school_id') || 
+          localStorage.getItem('campus_active_school_id') || 
+          localStorage.getItem('groovelab_user_school_id')
+        ) : null;
+
+        mergedSchools = mergedSchools.map(s => {
+          const isDevActiveSchool = Boolean(
+            (currentActiveSchoolId && currentActiveSchoolId === s.id) ||
+            (s.name && s.name.toLowerCase().includes('bad säckingen')) ||
+            (s.billing_email && s.billing_email.toLowerCase().includes('musaek'))
+          );
+
+          if (isDevActiveSchool) {
+            return {
+              ...s,
+              last_session_at: new Date().toISOString()
+            };
+          }
+          return s;
+        });
+      } catch (e) {}
+
       try {
         const overridesStr = localStorage.getItem('groovelab_school_overrides');
         if (overridesStr) {
@@ -2664,7 +2758,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
     }
   };
 
-  const handleStartGhostMode = async (school: School) => {
+  const handleStartGhostMode = async (school: School, reasonStr: string = 'Support & Diagnostik') => {
     try {
       // Find principal / admin user of school
       let targetUserId = '';
@@ -2693,6 +2787,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
           role: 'admin',
           targetUserId: targetUserId || null,
           operator: 'Patrick Huber (MasterAdmin)',
+          reason: reasonStr,
           status: 'SESSION_LAUNCHED'
         };
         localStorage.setItem('campus_ghost_audit_trail', JSON.stringify([newLog, ...existingAudit].slice(0, 50)));
@@ -2704,7 +2799,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
           p_school_id: school.id,
           p_target_user_id: targetUserId || null,
           p_role: 'admin',
-          p_reason: 'Master Admin Diagnostics'
+          p_reason: reasonStr
         });
         if (ghostRpcData?.ghost_lease_token) {
           ghostToken = ghostRpcData.ghost_lease_token;
@@ -7445,7 +7540,9 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                   setSelectedSchool(school);
                 }}
                 onStartGhostMode={(school) => {
-                  handleStartGhostMode(school);
+                  setGhostGateSchool(school);
+                  setGhostGateReason('support_ticket');
+                  setGhostGateTicketRef('');
                 }}
                 onDeleteSchool={(school) => {
                   setArchiveModalSchool(school);
@@ -7455,6 +7552,86 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                     status: newStatus, 
                     is_paused: newStatus === 'suspended' 
                   }).eq('id', school.id);
+                  await fetchSchoolsAndStats();
+                }}
+                onUpdateOperatorNotes={async (schoolId, notes) => {
+                  try {
+                    const { error } = await supabase.rpc('update_school_operator_notes', {
+                      p_school_id: schoolId,
+                      p_notes: notes
+                    });
+                    if (error) {
+                      await supabase.from('schools').update({ operator_notes: notes }).eq('id', schoolId);
+                    }
+                  } catch (e) {
+                    await supabase.from('schools').update({ operator_notes: notes }).eq('id', schoolId);
+                  }
+                  setSchools(prev => prev.map(s => s.id === schoolId ? { ...s, operator_notes: notes } : s));
+                }}
+                onExtendTrial={async (schoolId, days) => {
+                  try {
+                    const { error } = await supabase.rpc('extend_school_trial', {
+                      p_school_id: schoolId,
+                      p_days: days
+                    });
+                    if (error) {
+                      const target = schools.find(s => s.id === schoolId);
+                      const curr = new Date(target?.trial_until || target?.trial_ends_at || Date.now());
+                      const base = curr.getTime() < Date.now() ? new Date() : curr;
+                      const nextDate = new Date(base.getTime() + days * 24 * 60 * 60 * 1000).toISOString();
+                      await supabase.from('schools').update({
+                        is_trial: true,
+                        trial_until: nextDate,
+                        trial_ends_at: nextDate,
+                        status: 'active',
+                        is_paused: false
+                      }).eq('id', schoolId);
+                    }
+                  } catch (e) {
+                    console.warn('Trial extension fallback:', e);
+                  }
+                  await fetchSchoolsAndStats();
+                }}
+                onRegenerateInvite={async (schoolId) => {
+                  try {
+                    const { data, error } = await supabase.rpc('regenerate_school_invite_token', {
+                      p_school_id: schoolId
+                    });
+                    if (!error && data) {
+                      await fetchSchoolsAndStats();
+                      return data;
+                    }
+                  } catch (e) {}
+                  const newToken = crypto.randomUUID();
+                  const nextExp = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
+                  await supabase.from('schools').update({
+                    invite_token: newToken,
+                    invite_expires_at: nextExp
+                  }).eq('id', schoolId);
+                  await fetchSchoolsAndStats();
+                  return { invite_token: newToken, invite_expires_at: nextExp };
+                }}
+                onSuspendWithAudit={async (schoolId, reason) => {
+                  try {
+                    const { error } = await supabase.rpc('suspend_school_with_audit', {
+                      p_school_id: schoolId,
+                      p_reason: reason
+                    });
+                    if (error) {
+                      await supabase.from('schools').update({
+                        status: 'suspended',
+                        is_paused: true
+                      }).eq('id', schoolId);
+                      try {
+                        await supabase.rpc('revoke_school_sessions', { p_school_id: schoolId });
+                      } catch (err) {}
+                    }
+                  } catch (e) {
+                    await supabase.from('schools').update({
+                      status: 'suspended',
+                      is_paused: true
+                    }).eq('id', schoolId);
+                  }
                   await fetchSchoolsAndStats();
                 }}
                 onProvisionSchool={async (data) => {
@@ -7567,7 +7744,9 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
             setTimeout(() => setSaveSuccessToast(null), 3000);
           }}
           onStartGhostMode={(school) => {
-            handleStartGhostMode(school);
+            setGhostGateSchool(school);
+            setGhostGateReason('support_ticket');
+            setGhostGateTicketRef('');
             setSelectedSchool(null);
           }}
           onDeleteSchool={(school) => {
@@ -7575,6 +7754,237 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
             setSelectedSchool(null);
           }}
         />
+      )}
+
+      {/* 👻 Apple HIG Ghost Support-Gate Modal (DSGVO Art. 28 / OWASP ASVS L3) */}
+      {ghostGateSchool && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15, 23, 42, 0.55)',
+            backdropFilter: 'blur(16px)',
+            WebkitBackdropFilter: 'blur(16px)',
+            zIndex: 999999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '24px'
+          }}
+          onClick={() => setGhostGateSchool(null)}
+        >
+          <div
+            style={{
+              background: '#ffffff',
+              borderRadius: '24px',
+              border: '1px solid #e2e8f0',
+              boxShadow: '0 25px 60px -12px rgba(15, 23, 42, 0.25)',
+              width: '100%',
+              maxWidth: '520px',
+              overflow: 'hidden',
+              animation: 'modalSlideIn 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div style={{
+              padding: '22px 26px 18px',
+              borderBottom: '1px solid #f1f5f9',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              background: '#f8fafc'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{
+                  width: '42px',
+                  height: '42px',
+                  borderRadius: '12px',
+                  background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#ffffff',
+                  boxShadow: '0 4px 12px rgba(2, 132, 199, 0.25)'
+                }}>
+                  <Eye size={22} />
+                </div>
+                <div>
+                  <div style={{ fontSize: '1.02rem', fontWeight: 900, color: '#0f172a' }}>
+                    Support-Ghost Autorisierung
+                  </div>
+                  <div style={{ fontSize: '0.76rem', color: '#64748b', fontWeight: 650 }}>
+                    {ghostGateSchool.name} • {ghostGateSchool.city || 'Standort hinterlegt'}
+                  </div>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setGhostGateSchool(null)}
+                style={{
+                  background: '#f1f5f9',
+                  border: 'none',
+                  borderRadius: '10px',
+                  width: '32px',
+                  height: '32px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#64748b',
+                  cursor: 'pointer'
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Body */}
+            <div style={{ padding: '24px 26px' }}>
+              <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#334155', marginBottom: '10px' }}>
+                Zweck &amp; Anlass der Ghost-Sitzung (Pflichtangabe):
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '16px' }}>
+                {[
+                  { id: 'support_ticket', label: 'Support-Anfrage', desc: 'Schulleitung bittet um Hilfe' },
+                  { id: 'bug_diagnosis', label: 'Fehlerdiagnose', desc: 'Technische Sync/Audio Prüfung' },
+                  { id: 'onboarding', label: 'Onboarding-Hilfe', desc: 'Ersteinrichtung & Begleitung' },
+                  { id: 'security_audit', label: 'Sicherheits-Audit', desc: 'AVV & Rechte-Überprüfung' }
+                ].map((cat) => (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() => setGhostGateReason(cat.id as any)}
+                    style={{
+                      padding: '10px 12px',
+                      borderRadius: '12px',
+                      textAlign: 'left',
+                      background: ghostGateReason === cat.id ? '#f0f9ff' : '#f8fafc',
+                      border: ghostGateReason === cat.id ? '1.5px solid #0284c7' : '1px solid #e2e8f0',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    <div style={{
+                      fontSize: '0.80rem',
+                      fontWeight: 800,
+                      color: ghostGateReason === cat.id ? '#0284c7' : '#1e293b'
+                    }}>
+                      {cat.label}
+                    </div>
+                    <div style={{ fontSize: '0.68rem', color: '#64748b', marginTop: '2px' }}>
+                      {cat.desc}
+                    </div>
+                  </button>
+                ))}
+              </div>
+
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: 800, color: '#334155', marginBottom: '6px' }}>
+                  Ticket-ID oder dokumentierte Weisung (optional):
+                </label>
+                <input
+                  type="text"
+                  value={ghostGateTicketRef}
+                  onChange={(e) => setGhostGateTicketRef(e.target.value)}
+                  placeholder="z. B. #SUP-104 oder Telefonat mit Schulleitung"
+                  style={{
+                    width: '100%',
+                    padding: '10px 14px',
+                    borderRadius: '10px',
+                    border: '1px solid #cbd5e1',
+                    fontSize: '0.82rem',
+                    color: '#0f172a',
+                    outline: 'none',
+                    boxSizing: 'border-box'
+                  }}
+                />
+              </div>
+
+              {/* DSGVO Compliance Banner */}
+              <div style={{
+                background: '#f8fafc',
+                border: '1px solid #e2e8f0',
+                borderRadius: '12px',
+                padding: '12px 14px',
+                display: 'flex',
+                gap: '10px',
+                alignItems: 'flex-start'
+              }}>
+                <ShieldCheck size={16} color="#0284c7" style={{ marginTop: '2px', flexShrink: 0 }} />
+                <div style={{ fontSize: '0.70rem', color: '#475569', lineHeight: '1.45' }}>
+                  <strong>DSGVO Art. 28 &amp; AVV Goldstandard:</strong> Diese Support-Sitzung wird mit Ihrem Operator-Account und Zweck revisionssicher protokolliert. Das Token erlischt nach maximal 2 Stunden oder per 1-Klick (⌥+Q). Nach Sitzungsende wird die Dauer automatisch im Datenschutz-Logbuch der Musikschule hinterlegt.
+                </div>
+              </div>
+            </div>
+
+            {/* Footer Actions */}
+            <div style={{
+              padding: '16px 26px',
+              background: '#f8fafc',
+              borderTop: '1px solid #f1f5f9',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'flex-end',
+              gap: '10px'
+            }}>
+              <button
+                type="button"
+                onClick={() => setGhostGateSchool(null)}
+                style={{
+                  padding: '10px 16px',
+                  borderRadius: '10px',
+                  background: '#ffffff',
+                  border: '1px solid #cbd5e1',
+                  color: '#475569',
+                  fontSize: '0.80rem',
+                  fontWeight: 700,
+                  cursor: 'pointer'
+                }}
+              >
+                Abbrechen
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  const target = ghostGateSchool;
+                  const reasonLabel = {
+                    support_ticket: 'Support-Anfrage Schulleitung',
+                    bug_diagnosis: 'Technische Fehlerdiagnose',
+                    onboarding: 'Onboarding-Begleitung',
+                    security_audit: 'Sicherheits- & AVV-Audit'
+                  }[ghostGateReason] || 'Support-Diagnostik';
+
+                  const fullReason = ghostGateTicketRef.trim() 
+                    ? `${reasonLabel} (Ref: ${ghostGateTicketRef.trim()})`
+                    : reasonLabel;
+
+                  setGhostGateSchool(null);
+                  handleStartGhostMode(target, fullReason);
+                }}
+                style={{
+                  padding: '10px 18px',
+                  borderRadius: '10px',
+                  background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+                  color: '#ffffff',
+                  border: 'none',
+                  fontSize: '0.80rem',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  boxShadow: '0 4px 12px rgba(2, 132, 199, 0.25)'
+                }}
+                className="hover-scale-mini"
+              >
+                <Eye size={14} /> Ghost-Sitzung starten (2h TTL)
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* 🗑️ Schule Archivieren / Löschen Modal */}

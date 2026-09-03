@@ -392,11 +392,21 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode, fallbac
       errorMessage.includes("dynamically imported");
 
     if (isChunkError) {
+      const isLocalhost = typeof window !== 'undefined' && (
+        window.location.hostname === 'localhost' || 
+        window.location.hostname === '127.0.0.1' ||
+        window.location.hostname.endsWith('.local')
+      );
+      if (isLocalhost) {
+        console.warn('[ErrorBoundary] Chunk loading error in development mode. Auto-reload skipped to prevent refresh loop.');
+        return;
+      }
+
       const lastReload = sessionStorage.getItem("last_chunk_error_reload");
       const now = Date.now();
       
-      // Auto-reload to load the fresh code bundle if we haven't reloaded in the last 15 seconds
-      if (!lastReload || now - parseInt(lastReload) > 15000) {
+      // Auto-reload to load the fresh code bundle if we haven't reloaded in the last 60 seconds
+      if (!lastReload || now - parseInt(lastReload) > 60000) {
         sessionStorage.setItem("last_chunk_error_reload", String(now));
         console.warn("Dynamic chunk loading failure detected. Triggering automatic hard reload to fetch the latest application bundle...");
         
@@ -2493,6 +2503,13 @@ function App() {
       if (ghostSchoolId) sessionStorage.setItem('groovelab_ghost_school_id', ghostSchoolId);
       if (ghostUserId) sessionStorage.setItem('groovelab_ghost_impersonated_user_id', ghostUserId);
       if (ghostRole) sessionStorage.setItem('groovelab_ghost_active_role', ghostRole);
+      const ghostLeaseToken = ghostUrlParams.get('ghost_lease_token');
+      if (ghostLeaseToken) sessionStorage.setItem('groovelab_ghost_lease_token', ghostLeaseToken);
+
+      // Enterprise Zero-Trace URL Sanitization: Purge sensitive credentials immediately from browser address bar & history
+      try {
+        window.history.replaceState({}, document.title, window.location.pathname);
+      } catch (e) {}
 
       const resolveGhostIdentity = async () => {
         let realUser: any = null;
@@ -3580,9 +3597,10 @@ function App() {
             }
           }
           // Ignore pure heartbeat / presence updates to prevent continuous re-render cascades
-          if (payload.old && payload.new) {
-            const hasSubstantiveChange = Object.keys(payload.new).some(
-              k => k !== 'last_seen' && payload.old[k] !== payload.new[k]
+          if (payload.new && user) {
+            const substantiveFields = ['role', 'roles', 'school_id', 'is_active', 'is_campus_active', 'is_groovelab_active', 'token_version', 'is_master_admin', 'first_name', 'last_name'];
+            const hasSubstantiveChange = substantiveFields.some(
+              field => payload.new[field] !== undefined && payload.new[field] !== (user as any)[field]
             );
             if (!hasSubstantiveChange) return;
           }
@@ -3598,9 +3616,10 @@ function App() {
         { event: 'UPDATE', schema: 'public', table: 'users', filter: `id=eq.${user.id}` },
         async (payload: any) => {
           // Ignore pure heartbeat / presence updates to prevent continuous re-render cascades
-          if (payload.old && payload.new) {
-            const hasSubstantiveChange = Object.keys(payload.new).some(
-              k => k !== 'last_seen' && payload.old[k] !== payload.new[k]
+          if (payload.new && user) {
+            const substantiveFields = ['role', 'roles', 'school_id', 'is_active', 'is_campus_active', 'is_groovelab_active', 'token_version', 'is_master_admin', 'first_name', 'last_name'];
+            const hasSubstantiveChange = substantiveFields.some(
+              field => payload.new[field] !== undefined && payload.new[field] !== (user as any)[field]
             );
             if (!hasSubstantiveChange) return;
           }
@@ -3793,24 +3812,30 @@ function App() {
 
   useEffect(() => {
     if (loggedInUserId) {
-      // 1. Dashboard Data Fetch (Interval)
-      const dashboardInterval = setInterval(() => {
+      // 1. Dashboard Data Fetch (Interval - Skipped for Master Admin to avoid re-render cascades)
+      const isMasterAdmin = Boolean(
+        user?.is_master_admin === true || 
+        sessionStorage.getItem('groovelab_is_master_admin') === 'true'
+      );
+      const dashboardInterval = isMasterAdmin ? null : setInterval(() => {
         fetchDashboardData(loggedInUserId);
       }, 45000);
 
-      // 2. Continuous Heartbeat Monitor (Students only)
+      // 2. Continuous Heartbeat Monitor (Universal: Students, Teachers, Admins, Secretaries)
       const heartbeatInterval = setInterval(async () => {
-        if (!user || user.role !== 'student' || !session || session.check_out_time) return;
+        if (!user) return;
+        // For students, require an active session without checkout
+        if (user.role === 'student' && (!session || session.check_out_time)) return;
 
-        console.log('[Heartbeat] Updating last_seen...');
-        
-        // Update user's last_seen in DB to keep them active on the dashboard
+        // Update user's last_seen in DB to keep presence active on dashboard and school activity telemetry
         const now = new Date().toISOString();
-        await supabase.from('users').update({ last_seen: now }).eq('id', user.id);
+        try {
+          await supabase.from('users').update({ last_seen: now }).eq('id', user.id);
+        } catch (e) {}
       }, 30000); // Every 30 seconds
 
       return () => {
-        clearInterval(dashboardInterval);
+        if (dashboardInterval) clearInterval(dashboardInterval);
         clearInterval(heartbeatInterval);
       };
     }
