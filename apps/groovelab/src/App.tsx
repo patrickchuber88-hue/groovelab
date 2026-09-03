@@ -2072,6 +2072,13 @@ function App() {
 
   const [campusStudentUiLevel, setCampusStudentUiLevel] = useState<CampusUiLevel>(() => {
     if (typeof window === 'undefined') return 'junior';
+    try {
+      const activeId = localStorage.getItem('groovelab_current_user_id') || localStorage.getItem('campus_active_user_id');
+      if (activeId) {
+        const namespaced = localStorage.getItem(`campus_student_ui_level_${activeId}`);
+        if (namespaced === 'junior' || namespaced === 'teen' || namespaced === 'pro') return namespaced as CampusUiLevel;
+      }
+    } catch {}
     const saved = localStorage.getItem('campus_student_ui_level');
     if (saved === 'junior' || saved === 'teen' || saved === 'pro') return saved as CampusUiLevel;
     return 'junior';
@@ -2086,7 +2093,16 @@ function App() {
 
   useEffect(() => {
     const handleLevelChangeEvt = (e: any) => {
-      if (e?.detail) setCampusStudentUiLevel(e.detail);
+      if (e?.detail) {
+        setCampusStudentUiLevel(e.detail);
+        try {
+          const activeId = localStorage.getItem('groovelab_current_user_id') || localStorage.getItem('campus_active_user_id');
+          if (activeId) {
+            localStorage.setItem(`campus_student_ui_level_${activeId}`, e.detail);
+          }
+        } catch {}
+        localStorage.setItem('campus_student_ui_level', e.detail);
+      }
     };
     const handleParentModeChange = (e: any) => {
       if (typeof e?.detail === 'boolean') setParentUnlocked(e.detail);
@@ -2412,6 +2428,18 @@ function App() {
       return nextVal;
     });
   }, []);
+
+  // 🛡️ REVISIONSSICHERE DATENBANK-SSOT-SYNCHRONISATION
+  // Sobald der autoritative Benutzer aus der Datenbank (Supabase) geladen wird, MUSS sein campus_ui_level sofort übernommen werden.
+  useEffect(() => {
+    if (user?.campus_ui_level && (user.campus_ui_level === 'junior' || user.campus_ui_level === 'teen' || user.campus_ui_level === 'pro')) {
+      setCampusStudentUiLevel(user.campus_ui_level);
+      if (user.id) {
+        localStorage.setItem(`campus_student_ui_level_${user.id}`, user.campus_ui_level);
+      }
+      localStorage.setItem('campus_student_ui_level', user.campus_ui_level);
+    }
+  }, [user?.campus_ui_level, user?.id]);
 
   const { isShielded, dismissShield } = usePrivacyShield(false);
 
@@ -2740,6 +2768,9 @@ function App() {
   const setActiveStudentTab = React.useCallback((val: any) => {
     if (val === 'messages') {
       setSelectedCampusRecipient(null);
+    }
+    if (val === 'homework_book') {
+      window.dispatchEvent(new CustomEvent('campus_reset_homework_board'));
     }
     setActiveStudentTabRaw(val);
     // Persist the tab to the correct sessionStorage and localStorage keys based on the current active platform
@@ -9175,14 +9206,25 @@ function App() {
                   localStorage.setItem('campus_allow_leaderboard', String(next));
                 }
                 if (user?.id) {
-                  try {
-                    supabase.from('users').update({
-                      parent_permissions: {
-                        ...(user?.parent_permissions || {}),
-                        [`board_${boardId}`]: next
-                      }
-                    }).eq('id', user.id).then(() => {});
-                  } catch(err) {}
+                  const nextPerms = {
+                    ...(user?.parent_permissions || {}),
+                    [`board_${boardId}`]: next
+                  };
+                  (async () => {
+                    try {
+                      const { error } = await supabase.rpc('save_parent_controls', {
+                        p_student_id: user.id,
+                        p_settings: { parent_permissions: nextPerms }
+                      });
+                      if (error) throw error;
+                    } catch {
+                      try {
+                        await supabase.from('users').update({
+                          parent_permissions: nextPerms
+                        }).eq('id', user.id);
+                      } catch(err) {}
+                    }
+                  })();
                 }
                 window.dispatchEvent(new CustomEvent('campus_board_permission_changed', { detail: { boardId, allowed: next } }));
                 setParentPermissionsVersion(v => v + 1);
@@ -9224,7 +9266,7 @@ function App() {
                   <button onClick={() => setActiveStudentTab('briefing')} className={`sidebar-item ${['briefing', 'profile'].includes(activeStudentTab) ? `active ${activePlatform}` : ''}`}>
                     <Monitor size={20} style={{ flexShrink: 0 }} /> <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Briefing</span>
                   </button>
-                  <button onClick={() => setActiveStudentTab('homework_book')} className={`sidebar-item ${activeStudentTab === 'homework_book' ? `active ${activePlatform}` : ''}`}>
+                  <button onClick={() => { setActiveStudentTab('homework_book'); window.dispatchEvent(new CustomEvent('campus_reset_homework_board')); }} className={`sidebar-item ${activeStudentTab === 'homework_book' ? `active ${activePlatform}` : ''}`}>
                     <BookOpen size={20} style={{ flexShrink: 0 }} /> <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Aufgaben</span>
                   </button>
                   {(parentUnlocked || (flamesActive && isBoardAllowedForChild('practice_board'))) && (
@@ -9262,8 +9304,9 @@ function App() {
                       onClick={() => setActiveStudentTab('campus_cup')} 
                       className={`sidebar-item ${activeStudentTab === 'campus_cup' ? `active ${activePlatform}` : ''}`}
                       style={{ opacity: parentUnlocked && !isBoardAllowedForChild('campus_cup') ? 0.72 : 1 }}
+                      title="Highlights & Fortschritt"
                     >
-                      <Trophy size={20} style={{ flexShrink: 0 }} /> <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Highlights &amp; Fortschritt</span>
+                      <Trophy size={20} style={{ flexShrink: 0 }} /> <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontSize: '0.82rem', letterSpacing: '-0.02em' }}>Highlights &amp; Fortschritt</span>
                       {renderParentStatusPill('campus_cup')}
                     </button>
                   )}
@@ -10308,20 +10351,8 @@ function App() {
                 </div>
               )}
 
-              {/* Must-Have 2b: Sibling / Family Quick-Switch Capsule in Header (Only when Parent Session is Active) */}
+              {/* Sibling / Family Quick-Switch Capsule in Header (Seamless 1-Tap Switching without PIN) */}
               {user?.role?.toLowerCase() === 'student' && activePlatform === 'campus' && (() => {
-                // Check if parent area / session is actively unlocked
-                const isParentSessionActive = (() => {
-                  if (typeof window === 'undefined') return false;
-                  const globalUnlocked = sessionStorage.getItem('groovelab_parent_unlocked_global') === 'true';
-                  const userUnlocked = user?.id ? sessionStorage.getItem(`groovelab_parent_unlocked_${user.id}`) === 'true' : false;
-                  const parentSessionExpiry = user?.id ? Number(sessionStorage.getItem(`groovelab_parent_session_${user.id}`) || '0') : 0;
-                  const sessionValid = parentSessionExpiry > Date.now();
-                  return globalUnlocked || userUnlocked || sessionValid;
-                })();
-
-                if (!isParentSessionActive) return null;
-
                 const familyProfiles: any[] = (() => {
                   if (typeof window === 'undefined') return [];
                   try {
@@ -10333,6 +10364,14 @@ function App() {
 
                 const siblings = familyProfiles.filter((p: any) => p.id !== user.id);
                 if (siblings.length === 0) return null;
+
+                const isParentSessionActive = (() => {
+                  if (typeof window === 'undefined') return false;
+                  const globalUnlocked = sessionStorage.getItem('groovelab_parent_unlocked_global') === 'true';
+                  const userUnlocked = user?.id ? sessionStorage.getItem(`groovelab_parent_unlocked_${user.id}`) === 'true' : false;
+                  const parentSessionExpiry = user?.id ? Number(sessionStorage.getItem(`groovelab_parent_session_${user.id}`) || '0') : 0;
+                  return globalUnlocked || userUnlocked || (parentSessionExpiry > Date.now());
+                })();
 
                 return (
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -10355,9 +10394,13 @@ function App() {
                           key={sibling.id}
                           type="button"
                           onClick={() => {
-                            // Keep parent session active across family quick-switch
-                            sessionStorage.setItem('groovelab_parent_unlocked_global', 'true');
-                            sessionStorage.setItem(`groovelab_parent_session_${sibling.id}`, String(Date.now() + 60 * 60 * 1000));
+                            if (isParentSessionActive) {
+                              sessionStorage.setItem('groovelab_parent_unlocked_global', 'true');
+                              sessionStorage.setItem(`groovelab_parent_session_${sibling.id}`, String(Date.now() + 60 * 60 * 1000));
+                            } else {
+                              sessionStorage.removeItem('groovelab_parent_unlocked_global');
+                              sessionStorage.removeItem(`groovelab_parent_session_${sibling.id}`);
+                            }
                             localStorage.setItem('campus_active_student_id', sibling.id);
                             localStorage.setItem('groovelab_current_student_id', sibling.id);
                             sessionStorage.setItem('groovelab_user_id', sibling.id);
@@ -10680,14 +10723,25 @@ function App() {
                     localStorage.setItem('campus_allow_leaderboard', String(next));
                   }
                   if (user?.id) {
-                    try {
-                      supabase.from('users').update({
-                        parent_permissions: {
-                          ...(user?.parent_permissions || {}),
-                          [`board_${activeStudentTab}`]: next
-                        }
-                      }).eq('id', user.id).then(() => {});
-                    } catch(err) {}
+                    const nextPerms = {
+                      ...(user?.parent_permissions || {}),
+                      [`board_${activeStudentTab}`]: next
+                    };
+                    (async () => {
+                      try {
+                        const { error } = await supabase.rpc('save_parent_controls', {
+                          p_student_id: user.id,
+                          p_settings: { parent_permissions: nextPerms }
+                        });
+                        if (error) throw error;
+                      } catch {
+                        try {
+                          await supabase.from('users').update({
+                            parent_permissions: nextPerms
+                          }).eq('id', user.id);
+                        } catch(err) {}
+                      }
+                    })();
                   }
                   window.dispatchEvent(new CustomEvent('campus_board_permission_changed', { detail: { boardId: activeStudentTab, allowed: next } }));
                   setParentPermissionsVersion(v => v + 1);
@@ -14878,7 +14932,7 @@ function App() {
                     <button onClick={() => setActiveStudentTab('briefing')} style={getMobileButtonStyle('briefing', 'campus')} className="hover-scale" title="Briefing">
                       <Monitor size={18} /> <span>Briefing</span>
                     </button>
-                    <button onClick={() => setActiveStudentTab('homework_book')} style={getMobileButtonStyle('homework_book', 'campus')} className="hover-scale" title="Aufgaben">
+                    <button onClick={() => { setActiveStudentTab('homework_book'); window.dispatchEvent(new CustomEvent('campus_reset_homework_board')); }} style={getMobileButtonStyle('homework_book', 'campus')} className="hover-scale" title="Aufgaben">
                       <BookOpen size={18} /> <span>Aufgaben</span>
                     </button>
                     {flamesActive && (

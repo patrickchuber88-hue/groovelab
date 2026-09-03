@@ -61,7 +61,7 @@ export const CampusLevelSelectModal: React.FC<CampusLevelSelectModalProps> = ({
         'Aufgeräumte Studio-Übersicht',
         'Track-Checklisten & Audio-Memos 🎙️',
         'Flow-Timer mit Quick-Presets ⏱️',
-        'XP-Score, Badges & Streak-Flammen 🔥'
+        'XP-Score, Badges & Meilensteine 🎯'
       ]
     },
     {

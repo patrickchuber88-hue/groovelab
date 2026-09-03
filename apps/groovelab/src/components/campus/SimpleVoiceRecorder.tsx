@@ -160,6 +160,19 @@ export const SimpleVoiceRecorder: React.FC<SimpleVoiceRecorderProps> = ({
     }
   };
 
+  // 🛡️ Enterprise Kinderschutz: Hardware-Mikrofon sofort trennen bei Tab-Wechsel
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden' && isRecording) {
+        stopRecording();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [isRecording]);
+
   const togglePlayback = () => {
     if (!audioUrl) return;
 
@@ -303,7 +316,7 @@ export const SimpleVoiceRecorder: React.FC<SimpleVoiceRecorderProps> = ({
             <span>Deine Aufnahme ({formatSeconds(recordingDuration)})</span>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', justifyContent: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', justifyContent: 'center', flexWrap: 'wrap' }}>
             {/* Play/Pause Button */}
             <button
               type="button"
@@ -312,13 +325,14 @@ export const SimpleVoiceRecorder: React.FC<SimpleVoiceRecorderProps> = ({
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: '6px',
-                padding: '10px 18px',
+                minHeight: '44px',
+                padding: '10px 20px',
                 borderRadius: '100px',
                 border: 'none',
                 background: '#f1f5f9',
                 color: '#1e293b',
                 fontWeight: 800,
-                fontSize: '0.85rem',
+                fontSize: '0.88rem',
                 cursor: 'pointer'
               }}
             >
@@ -334,13 +348,14 @@ export const SimpleVoiceRecorder: React.FC<SimpleVoiceRecorderProps> = ({
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: '6px',
-                padding: '10px 14px',
+                minHeight: '44px',
+                padding: '10px 16px',
                 borderRadius: '100px',
                 border: '1px solid #e2e8f0',
                 background: '#ffffff',
                 color: '#64748b',
                 fontWeight: 800,
-                fontSize: '0.85rem',
+                fontSize: '0.88rem',
                 cursor: 'pointer'
               }}
               title="Neu aufnehmen"
@@ -357,8 +372,9 @@ export const SimpleVoiceRecorder: React.FC<SimpleVoiceRecorderProps> = ({
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '6px',
-                padding: '10px 20px',
+                gap: '8px',
+                minHeight: '44px',
+                padding: '10px 22px',
                 borderRadius: '100px',
                 border: 'none',
                 background: uploadSuccess
@@ -366,9 +382,9 @@ export const SimpleVoiceRecorder: React.FC<SimpleVoiceRecorderProps> = ({
                   : `linear-gradient(135deg, ${colorTheme} 0%, #15803d 100%)`,
                 color: 'white',
                 fontWeight: 900,
-                fontSize: '0.85rem',
+                fontSize: '0.90rem',
                 cursor: (isUploading || uploadSuccess) ? 'default' : 'pointer',
-                boxShadow: '0 4px 12px rgba(22, 163, 74, 0.25)'
+                boxShadow: '0 4px 14px rgba(22, 163, 74, 0.25)'
               }}
             >
               {isUploading ? (
@@ -384,7 +400,7 @@ export const SimpleVoiceRecorder: React.FC<SimpleVoiceRecorderProps> = ({
               ) : (
                 <>
                   <Check size={16} strokeWidth={3} />
-                  <span>Fertig & Senden</span>
+                  <span>Fertig & Senden 🚀</span>
                 </>
               )}
             </button>

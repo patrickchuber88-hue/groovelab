@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { calculateCampusGroovelabBilling } from '../../../domain/billingCalculator';
 import { isSchoolBypassActive } from '../../../domain/pricingEngine';
-import { isSchoolTrialActive } from '../../../domain/schoolMetricsAggregator';
+import { isSchoolTrialActive, resolveStorageAddonFee } from '../../../domain/schoolMetricsAggregator';
 
 import type { School } from '../MasterAdminTypes';
 
@@ -175,7 +175,7 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
 
   sanitizedSchools.forEach(s => {
     const stats = schoolStats[s.id] || {};
-    const teachers = stats.teachers || 0;
+    const teachers = stats.teachers !== undefined ? stats.teachers : 0;
     const totalStudents = stats.students || 0;
     const campusActive = stats.studentsCampus || 0;
     const groovelabActive = stats.studentsGroovelab || 0;
@@ -196,8 +196,10 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
         pricePassiveStudent: masterPricing?.pricePassiveStudent ?? 0.09
       };
 
-      const storageAddonGbVal = Number(s.storage_addon_gb || 0);
-      const storageAddonFeeVal = Number(s.storage_addon_monthly_fee || (storageAddonGbVal === 20 ? 5.49 : storageAddonGbVal === 10 ? 2.99 : storageAddonGbVal === 5 ? 1.49 : storageAddonGbVal === 50 ? 9.99 : 0));
+      const storageAddonGbVal = (s.storage_addon_status === 'none' || s.storage_addon_status === 'inactive') ? 0 : Number(s.storage_addon_gb || 0);
+      const storageAddonFeeVal = (s.storage_addon_status === 'none' || s.storage_addon_status === 'inactive' || storageAddonGbVal === 0) 
+        ? 0 
+        : resolveStorageAddonFee(storageAddonGbVal, s.storage_addon_monthly_fee);
 
       const isBookedSchool = Boolean(s.is_billing_booked) || s.status === 'active';
       const hasCampusMod = (isBookedSchool && !s.has_campus_subscription && !s.has_groovelab_subscription) ? true : !!s.has_campus_subscription;
@@ -1243,7 +1245,7 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
               <tbody>
                 {filteredSchools.map((school, idx) => {
                   const stats = schoolStats[school.id] || {};
-                  const teachers = stats.teachers || 0;
+                  const teachers = stats.teachers !== undefined ? stats.teachers : 0;
                   const totalStudents = stats.students || 0;
                   const campusActive = stats.studentsCampus || 0;
                   const groovelabActive = stats.studentsGroovelab || 0;
@@ -1266,8 +1268,10 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
                     pricePassiveStudent: masterPricing?.pricePassiveStudent ?? 0.09
                   };
 
-                  const storageAddonGbVal = Number(school.storage_addon_gb || 0);
-                  const storageAddonFeeVal = Number(school.storage_addon_monthly_fee || 0);
+                  const storageAddonGbVal = (school.storage_addon_status === 'none' || school.storage_addon_status === 'inactive') ? 0 : Number(school.storage_addon_gb || 0);
+                  const storageAddonFeeVal = (school.storage_addon_status === 'none' || school.storage_addon_status === 'inactive' || storageAddonGbVal === 0)
+                    ? 0
+                    : resolveStorageAddonFee(storageAddonGbVal, school.storage_addon_monthly_fee);
                   const isBooked = Boolean(school.is_billing_booked) || school.status === 'active';
                   const hasCamp = (isBooked && !school.has_campus_subscription && !school.has_groovelab_subscription) ? true : !!school.has_campus_subscription;
                   const hasGroove = (isBooked && !school.has_campus_subscription && !school.has_groovelab_subscription) ? true : !!school.has_groovelab_subscription;
@@ -1462,7 +1466,7 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
                       {/* Nutzer Quoten */}
                       <td style={{ padding: '9px 10px', verticalAlign: 'middle' }}>
                         <div style={{ fontSize: '0.74rem', color: '#334155', fontWeight: 800, whiteSpace: 'nowrap' }}>
-                          {teachers} Lehrer · {activeStudents} Schüler aktiv
+                          {teachers} Lehrer{stats.totalTeachers && stats.totalTeachers > teachers ? ` (${stats.totalTeachers} inkl.)` : ''} · {activeStudents} Schüler aktiv
                         </div>
                         <div style={{ fontSize: '0.66rem', color: '#64748b', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '3px', marginTop: '1px' }}>
                           <span style={{ color: '#059669', fontWeight: 700 }}>{campusActive} Campus</span>

@@ -180,6 +180,32 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
     localStorage.setItem('groovelab_sync_offset_ms', syncOffsetMs.toString());
   }, [syncOffsetMs]);
 
+  // 🛡️ Hardware & Sperrzeiten Safety: Stop audio when requested
+  useEffect(() => {
+    const handleForceStopAudio = () => {
+      setIsPlaying(false);
+      setIsMetronomeActive(false);
+      setIsAutoSequenceActive(false);
+      setTracks(prev => prev.map(t => ({ ...t, isRecording: false, isWaiting: false })));
+      try {
+        if (typeof window !== 'undefined') {
+          (window as any).__campus_is_audio_recording = false;
+        }
+      } catch (e) {}
+    };
+    window.addEventListener('campus_force_stop_audio', handleForceStopAudio);
+    return () => window.removeEventListener('campus_force_stop_audio', handleForceStopAudio);
+  }, []);
+
+  useEffect(() => {
+    try {
+      if (typeof window !== 'undefined') {
+        const isRecOrPlaying = isPlaying || tracks.some(t => t.isRecording || t.isWaiting) || isAutoSequenceActive;
+        (window as any).__campus_is_audio_recording = isRecOrPlaying;
+      }
+    } catch (e) {}
+  }, [isPlaying, tracks, isAutoSequenceActive]);
+
   useEffect(() => {
     if (homeworkNotesList) {
       const latencyEntry = homeworkNotesList.find(note => note.startsWith('LATENCY:'));

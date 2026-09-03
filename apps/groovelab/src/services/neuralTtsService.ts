@@ -246,6 +246,19 @@ export function formatPageNumbersGerman(pageNums?: number[], formattedPages?: st
       const parts = raw.split(/\s*[-–—]\s*/);
       return `auf den Seiten ${parts[0]} bis ${parts[1]}`;
     }
+    // Kombinierte Bereiche mit & (z.B. "1–3 & 5" oder "1 & 4")
+    if (raw.includes('&')) {
+      const parts = raw.split(/\s*&\s*/);
+      const cleanParts = parts.map(p => {
+        const trimmed = p.trim();
+        if (/^\d+\s*[-–—]\s*\d+$/.test(trimmed)) {
+          const [s, e] = trimmed.split(/\s*[-–—]\s*/);
+          return `${s} bis ${e}`;
+        }
+        return trimmed;
+      });
+      return `auf den Seiten ${cleanParts.join(' und ')}`;
+    }
     // Komma-Liste wie "14, 15"
     if (raw.includes(',')) {
       const nums = raw.split(',').map(s => s.trim()).filter(Boolean);
@@ -377,6 +390,9 @@ export function cleanTextForTts(text: string): string {
     .replace(/\bzu dem Stück\b/gi, 'zum Stück')
     // Kalenderwochen & Termine
     .replace(/KW\s*(\d+)/gi, 'Kalenderwoche $1')
+    // Lehrwerk-Seitenbereiche & Einzelseiten (z. B. S. 1–3 -> auf den Seiten 1 bis 3)
+    .replace(/\bS\.\s*(\d+)\s*[-–—]\s*(\d+)\b/gi, 'auf den Seiten $1 bis $2')
+    .replace(/\bS\.\s*(\d+)\b/gi, 'auf Seite $1')
     // Musikalische Taktarten
     .replace(/\b4\/4\s*(?:-?\s*Takt)?/gi, 'Vier-Viertel-Takt')
     .replace(/\b3\/4\s*(?:-?\s*Takt)?/gi, 'Drei-Viertel-Takt')

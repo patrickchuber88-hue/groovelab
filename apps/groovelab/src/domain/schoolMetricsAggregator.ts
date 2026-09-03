@@ -107,13 +107,16 @@ export function resolveStorageAddonFee(
 ): number {
   const gb = Number(storageAddonGb || 0);
   if (gb <= 0) return 0;
-  if (customMonthlyFee !== null && customMonthlyFee !== undefined && Number(customMonthlyFee) > 0) {
+  if (customMonthlyFee !== null && customMonthlyFee !== undefined && Number(customMonthlyFee) > 0 && Number(customMonthlyFee) !== 3.50) {
     return Number(customMonthlyFee);
   }
   if (gb === 5) return 1.49;
   if (gb === 10) return 2.99;
   if (gb === 20) return 5.49;
+  if (gb === 25) return 3.99;
   if (gb === 50) return 9.99;
+  if (gb === 100) return 11.99;
+  if (gb === 250) return 24.99;
   return 2.99; // baseline fallback
 }
 
@@ -127,6 +130,7 @@ export interface AggregatedSchoolStats {
   exemptActiveStudents: number;
   parentPaidStudents?: number;
   totalTeachers: number;
+  rawTeachersCount?: number;
   activeTeachers: number;
   totalEmployees: number;
   activeEmployees: number;
@@ -216,9 +220,11 @@ export function aggregateSchoolMetrics(
 
   let freeDoubleRoleCount = 0;
   let billableTeacherCount = 0;
+  let rawTeacherCount = 0;
   schoolUsers.forEach(u => {
     const isMgmt = u.role === 'admin' || u.role === 'secretary' || (Array.isArray(u.roles) && (u.roles.includes('admin') || u.roles.includes('secretary')));
     const isTch = u.role === 'teacher' || (Array.isArray(u.roles) && u.roles.includes('teacher'));
+    if (isTch) rawTeacherCount++;
 
     if (isMgmt && isTch) {
       if (freeDoubleRoleCount < 2) {
@@ -232,11 +238,30 @@ export function aggregateSchoolMetrics(
   });
 
   let storageAddonGb = Number(school.storage_addon_gb || school.extra_storage_gb || 0);
-  if (storageAddonGb === 0 && school.extra_billing_option === 'option1') {
+  if (school.storage_addon_status === 'none' || school.storage_addon_status === 'inactive') {
+    storageAddonGb = 0;
+  } else if (storageAddonGb === 0 && school.extra_billing_option === 'option1' && school.storage_addon_status === 'active') {
     storageAddonGb = 20;
   }
-  const storageAddonMonthlyFee = resolveStorageAddonFee(storageAddonGb, school.storage_addon_monthly_fee);
-  const storageUsedBytes = Number(school.storage_used_bytes || 0);
+  const storageAddonMonthlyFee = (school.storage_addon_status === 'none' || school.storage_addon_status === 'inactive' || storageAddonGb === 0) 
+    ? 0 
+    : resolveStorageAddonFee(storageAddonGb, school.storage_addon_monthly_fee);
+  let storageUsedBytes = Number(school.storage_used_bytes || 0);
+  try {
+    if (typeof window !== 'undefined') {
+      const directKey = localStorage.getItem(`groovelab_storage_used_bytes_${schId}`);
+      if (directKey) {
+        storageUsedBytes = Math.max(storageUsedBytes, Number(directKey));
+      }
+      const overridesStr = localStorage.getItem('groovelab_school_overrides');
+      if (overridesStr) {
+        const overrides = JSON.parse(overridesStr);
+        if (overrides[schId]?.storage_used_bytes) {
+          storageUsedBytes = Math.max(storageUsedBytes, Number(overrides[schId].storage_used_bytes));
+        }
+      }
+    }
+  } catch {}
 
   return {
     schoolId: schId,
@@ -247,7 +272,8 @@ export function aggregateSchoolMetrics(
     passiveStudents,
     exemptActiveStudents,
     parentPaidStudents,
-    totalTeachers: billableTeacherCount,
+    totalTeachers: rawTeacherCount > 0 ? rawTeacherCount : billableTeacherCount,
+    rawTeachersCount: rawTeacherCount,
     activeTeachers: billableTeacherCount,
     totalEmployees,
     activeEmployees,
@@ -368,7 +394,7 @@ export function getSchoolCanonicalBilling(
 
   const subtotal = billingResult.totalMonthlySchoolInvoice;
   const total = (isBypass || status === 'trial' || status === 'suspended') ? 0.00 : subtotal;
-  const b2cRevenue = stats.activeStudents * (masterPricing.priceStudent ?? 0.49);
+  const b2cRevenue = (isBypass || status === 'trial' || status === 'suspended') ? 0.00 : Number((billingResult.parentContributionTotal || 0).toFixed(2));
 
   // Runtime Invariant Sanity Guard for Developer Mode
   if (typeof window !== 'undefined' && (import.meta as any)?.env?.DEV) {

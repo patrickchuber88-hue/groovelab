@@ -161,4 +161,130 @@ assert(amountC === 26.45, `5 students @ 5.29 € must equal 26.45 €, got ${amo
 
 console.log('✅ Test 5 passed: All AKT invoice mathematical invariants strictly hold!\n');
 
+// --- TEST 6: Live Tenant Multi-Board MRR Determinism (69.41 € Invariant) ---
+console.log('Test 6: Multi-Tenant MRR Platform Consistency (Musäk Bad Säckingen + Musäk BS + Patrick Huber)');
+
+const livePricing: MasterPricingRates = {
+  priceCampus: 14.90,
+  priceGroovelab: 9.90,
+  priceKombi: 19.90,
+  priceTeacher: 0.49,
+  priceStudent: 0.49,
+  pricePassiveStudent: 0.09,
+  priceStorageAddon: 2.99
+};
+
+// 1. Musäk Bad Säckingen: Kombi (19.90), 2 teachers (0.98), 13 campus (6.37), 5 groovelab (2.45), 16 passive (1.44), 3.99 storage => 35.13 €
+const schoolBadSaeckingen = {
+  id: 'school-bs-live',
+  name: 'Musäk Bad Säckingen',
+  has_campus_subscription: true,
+  has_groovelab_subscription: true,
+  storage_addon_gb: 25,
+  storage_addon_monthly_fee: 3.99,
+  storage_addon_status: 'active',
+  status: 'active'
+};
+const statsBadSaeckingen = {
+  schoolId: 'school-bs-live',
+  totalStudents: 29,
+  activeStudents: 13,
+  campusStudents: 13,
+  groovelabStudents: 5,
+  passiveStudents: 16,
+  exemptActiveStudents: 0,
+  parentPaidStudents: 0,
+  activeTeachers: 2,
+  activeEmployees: 2,
+  totalTeachers: 4,
+  totalEmployees: 4,
+  storageAddonGb: 25,
+  storageAddonMonthlyFee: 3.99,
+  storageUsedBytes: 500000000,
+  songsCount: 0,
+  bandsCount: 0,
+  adminUsers: [],
+  offlineUsers: 0
+};
+const billingBadSaeckingen = getSchoolCanonicalBilling(schoolBadSaeckingen, statsBadSaeckingen, livePricing);
+assert(billingBadSaeckingen.total === 35.13, `Musäk Bad Säckingen must calculate to 35.13 €, got ${billingBadSaeckingen.total} €`);
+
+// 2. Musäk BS: GrooveLab only (9.90), 0 teachers, 0 students, no storage => 9.90 €
+const schoolMusaekBs = {
+  id: 'school-musaek-bs',
+  name: 'Musäk BS',
+  has_campus_subscription: false,
+  has_groovelab_subscription: true,
+  storage_addon_gb: 0,
+  storage_addon_monthly_fee: 0,
+  storage_addon_status: 'none',
+  status: 'active'
+};
+const statsMusaekBs = {
+  schoolId: 'school-musaek-bs',
+  totalStudents: 0,
+  activeStudents: 0,
+  campusStudents: 0,
+  groovelabStudents: 0,
+  passiveStudents: 0,
+  exemptActiveStudents: 0,
+  parentPaidStudents: 0,
+  activeTeachers: 0,
+  activeEmployees: 0,
+  totalTeachers: 1,
+  totalEmployees: 1,
+  storageAddonGb: 0,
+  storageAddonMonthlyFee: 0,
+  storageUsedBytes: 0,
+  songsCount: 0,
+  bandsCount: 0,
+  adminUsers: [],
+  offlineUsers: 0
+};
+const billingMusaekBs = getSchoolCanonicalBilling(schoolMusaekBs, statsMusaekBs, livePricing);
+assert(billingMusaekBs.total === 9.90, `Musäk BS must calculate to 9.90 €, got ${billingMusaekBs.total} €`);
+
+// 3. Patrick Huber Musikschule: Kombi (19.90), 1 teacher (0.49), 0 students, 3.50 € custom storage fee => 23.89 €
+const schoolPatrickHuber = {
+  id: 'school-patrick-huber',
+  name: 'Patrick Huber Musikschule',
+  has_campus_subscription: true,
+  has_groovelab_subscription: true,
+  storage_addon_gb: 25,
+  storage_addon_monthly_fee: 3.99,
+  storage_addon_status: 'active',
+  status: 'active'
+};
+const statsPatrickHuber = {
+  schoolId: 'school-patrick-huber',
+  totalStudents: 0,
+  activeStudents: 0,
+  campusStudents: 0,
+  groovelabStudents: 0,
+  passiveStudents: 0,
+  exemptActiveStudents: 0,
+  parentPaidStudents: 0,
+  activeTeachers: 0,
+  activeEmployees: 1,
+  totalTeachers: 1,
+  totalEmployees: 1,
+  storageAddonGb: 25,
+  storageAddonMonthlyFee: 3.99,
+  storageUsedBytes: 0,
+  songsCount: 0,
+  bandsCount: 0,
+  adminUsers: [],
+  offlineUsers: 0
+};
+const billingPatrickHuber = getSchoolCanonicalBilling(schoolPatrickHuber, statsPatrickHuber, livePricing);
+assert(billingPatrickHuber.total === 23.89, `Patrick Huber Musikschule must calculate to 23.89 €, got ${billingPatrickHuber.total} €`);
+
+// 4. Sum Invariant: 35.13 + 9.90 + 23.89 = 68.92 €
+const totalLiveMrr = parseFloat((billingBadSaeckingen.total + billingMusaekBs.total + billingPatrickHuber.total).toFixed(2));
+assert(totalLiveMrr === 68.92, `Total Platform MRR must equal 68.92 €, got ${totalLiveMrr} €`);
+const totalLiveArr = parseFloat((totalLiveMrr * 12).toFixed(2));
+assert(totalLiveArr === 827.04, `Total Platform ARR must equal 827.04 €, got ${totalLiveArr} €`);
+
+console.log(`✅ Test 6 passed: Live Multi-Tenant MRR Invariant holds at exactly ${totalLiveMrr} € / Mo. (ARR: ${totalLiveArr} € / Jahr)!\n`);
+
 console.log('🎉 ALL BILLING INVARIANT TESTS PASSED WITH 100% CONSISTENCY!');

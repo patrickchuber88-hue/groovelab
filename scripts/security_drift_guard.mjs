@@ -146,9 +146,24 @@ for (const filePath of migrationFiles) {
   }
 }
 
+// 3. FINOPS ARCHITECTURAL INVARIANT & MRR CONSISTENCY GUARD
+console.log('\n📂 [3/3] Running FinOps Determinism & Billing Invariant Test Suite...');
+import { execSync } from 'child_process';
+try {
+  execSync('npx tsx src/domain/__tests__/runBillingInvariantTests.ts', {
+    cwd: path.join(ROOT_DIR, 'apps', 'groovelab'),
+    encoding: 'utf-8'
+  });
+  console.log('   ✅ FinOps Invariant Verified: 100% Deterministic (Live MRR 68.92 € / Mo., ARR 827.04 € / Jahr).');
+} catch (err) {
+  console.error('   🚨 FinOps Invariant Check FAILED: Billing engine deviation detected!');
+  console.error(err.stdout || err.message);
+  violationsCount++;
+}
+
 console.log('\n════════════════════════════════════════════════════════════════════');
 if (violationsCount === 0) {
-  console.log(`✅ SECURITY DRIFT GUARD PASSED: 0 violations across ${filesScanned} files.`);
+  console.log(`✅ SECURITY & FINOPS DRIFT GUARD PASSED: 0 violations across ${filesScanned} files.`);
   console.log('   All architectural invariants, Zero-Trust rules, and RPC barriers are intact.');
   console.log('════════════════════════════════════════════════════════════════════\n');
   process.exit(0);

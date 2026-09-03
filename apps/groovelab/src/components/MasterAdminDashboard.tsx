@@ -6,7 +6,7 @@ import {
   MapPin, LogOut, RefreshCw, Layers, Award, Clock, Music, GraduationCap, BookOpen,
   Edit2, Settings, Sliders, Search, Tag, Percent,
   Activity, Cpu, Database, AlertTriangle, HardDrive, Server, Zap, Link, Key, History as HistoryIcon,
-  Printer, FileText, Calendar, TrendingUp, CheckCircle, Landmark, CreditCard, Building2, Building, Eye, EyeOff, Radio, Heart, ShieldCheck,
+  Printer, FileText, Calendar, TrendingUp, CheckCircle, Landmark, CreditCard, Receipt, Building2, Building, Eye, EyeOff, Radio, Heart, ShieldCheck,
   QrCode, Lock, Smartphone, Laptop, Wrench, Lightbulb, Rocket, Sparkles, RotateCcw, WifiOff, Fingerprint, Download, ArrowRight, ExternalLink
 } from 'lucide-react';
 import { MaintenanceTab } from './masterAdmin/tabs/MaintenanceTab';
@@ -1306,20 +1306,28 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
       setLoadingPending(true);
       const { data, error } = await supabase
         .from('users')
-        .select('id, ausweis_nummer, student_billing_payment_method, student_billing_cash_paid, is_campus_active, is_groovelab_active, is_trial, created_at, school_id')
+        .select('id, first_name, last_name, ausweis_nummer, student_billing_payment_method, student_billing_cash_paid, is_campus_active, is_groovelab_active, is_trial, is_hardship_exempt, created_at, school_id, last_seen')
         .eq('role', 'student')
-        .not('student_billing_payment_method', 'is', null);
+        .order('created_at', { ascending: false });
 
       if (error) throw error;
       
+      const directBillingSchoolIds = new Set(
+        schools
+          .filter(s => ['option2', 'student_full', 'student_partial'].includes((s as any).student_billing_option))
+          .map(s => s.id)
+      );
+
       const filtered = (data || []).filter((u: any) => {
-        const isActive = u.is_campus_active || u.is_groovelab_active;
-        // Only care about users who are active or trying to get active
-        if (!isActive && !u.student_billing_payment_method) return false;
-        
-        const needsActivation = !u.is_campus_active && u.student_billing_payment_method;
-        const needsPayment = !u.student_billing_cash_paid && isActive && !u.is_trial;
-        return needsActivation || needsPayment;
+        const isFromDirectBillingSchool = directBillingSchoolIds.has(u.school_id);
+        const hasPaymentMethod = Boolean(u.student_billing_payment_method);
+        const isPendingActivation = !u.is_campus_active;
+        const isExempt = Boolean(u.is_hardship_exempt);
+
+        if (directBillingSchoolIds.size > 0) {
+          return isFromDirectBillingSchool || hasPaymentMethod || isPendingActivation || isExempt;
+        }
+        return true;
       });
 
       setPendingUsers(filtered);
@@ -1336,21 +1344,23 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
       const user = pendingUsers.find(u => u.id === userId);
       if (!user) return;
 
-      const updates: any = {};
-      if (!user.is_campus_active) {
-        updates.is_campus_active = true;
+      const updates: any = {
+        is_campus_active: true,
+        student_billing_cash_paid: true
+      };
+      if (!user.is_groovelab_active) {
         updates.is_groovelab_active = true;
       }
-      updates.student_billing_cash_paid = true;
 
       const { error } = await supabase
         .from('users')
         .update(updates)
         .eq('id', userId);
       if (error) throw error;
-      setPendingUsers(prev => prev.filter(u => u.id !== userId));
+      
+      setPendingUsers(prev => prev.map(u => u.id === userId ? { ...u, ...updates } : u));
       if (selectedUser?.id === userId) {
-        setSelectedUser(null);
+        setSelectedUser((prev: any) => prev ? { ...prev, ...updates } : null);
       }
       fetchSchoolsAndStats();
     } catch (err: any) {
@@ -1364,22 +1374,25 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
     if (userIds.length === 0) return;
     try {
       setLoadingPending(true);
+      const updates = { 
+        is_campus_active: true,
+        is_groovelab_active: true,
+        student_billing_cash_paid: true
+      };
       const { error } = await supabase
         .from('users')
-        .update({ 
-          is_campus_active: true,
-          is_groovelab_active: true,
-          student_billing_cash_paid: true
-        })
+        .update(updates)
         .in('id', userIds);
       if (error) throw error;
-      setPendingUsers(prev => prev.filter(u => !userIds.includes(u.id)));
+
+      setPendingUsers(prev => prev.map(u => userIds.includes(u.id) ? { ...u, ...updates } : u));
       setSelectedUserIds([]);
-      setSelectedUser(null);
+      if (selectedUser && userIds.includes(selectedUser.id)) {
+        setSelectedUser((prev: any) => prev ? { ...prev, ...updates } : null);
+      }
       fetchSchoolsAndStats();
-      alert(`${userIds.length} Schüler erfolgreich freigeschaltet / als bezahlt markiert!`);
     } catch (err: any) {
-      alert('Fehler bei der Batch-Freischaltung: ' + err.message);
+      alert('Fehler beim Massen-Freischalten: ' + err.message);
     } finally {
       setLoadingPending(false);
     }
@@ -2535,6 +2548,16 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
         const overridesStr = localStorage.getItem('groovelab_school_overrides');
         if (overridesStr) {
           const overrides = JSON.parse(overridesStr);
+          let updatedOverrides = false;
+          Object.keys(overrides).forEach(id => {
+            if (Number(overrides[id]?.storage_addon_gb) === 25 && Number(overrides[id]?.storage_addon_monthly_fee) === 3.5) {
+              overrides[id].storage_addon_monthly_fee = 3.99;
+              updatedOverrides = true;
+            }
+          });
+          if (updatedOverrides) {
+            localStorage.setItem('groovelab_school_overrides', JSON.stringify(overrides));
+          }
           mergedSchools = mergedSchools.map(s => {
             if (!overrides[s.id]) return s;
             return {
@@ -2550,6 +2573,21 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
       } catch (e) {
         console.warn('Could not load localStorage school overrides:', e);
       }
+
+      // Auto-heal database & in-memory models if school has 25GB with legacy 3.50 fee
+      mergedSchools.forEach(s => {
+        const addonGb = Number(s.storage_addon_gb || s.extra_storage_gb || 0);
+        const addonFee = Number(s.storage_addon_monthly_fee || 0);
+        if (addonGb === 25 && (addonFee === 3.5 || addonFee === 3.50)) {
+          s.storage_addon_monthly_fee = 3.99;
+          Promise.resolve(supabase.from('schools').update({ storage_addon_monthly_fee: 3.99 }).eq('id', s.id))
+            .then(() => {
+              console.log(`[Auto-Heal Master] Normalized 25GB storage fee to 3.99 € for school ${s.id}`);
+            })
+            .catch(() => {});
+        }
+      });
+
       setSchools(mergedSchools);
       setSelectedSchool((prev: any) => {
         if (!prev) return prev;
@@ -2596,12 +2634,13 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
         );
 
         sStats[schId] = {
-          teachers: stats.activeTeachers || schoolStatsRow.teachers || 0,
+          teachers: stats.activeTeachers !== undefined ? stats.activeTeachers : (schoolStatsRow.teachers || 0),
+          totalTeachers: stats.totalTeachers || schoolStatsRow.teachers || 0,
           students: stats.totalStudents || schoolStatsRow.students || 0,
           activeStudents: stats.activeStudents,
           passiveStudents: stats.passiveStudents,
-          teachersCampus: stats.activeTeachers || schoolStatsRow.teachers_campus || 0,
-          teachersGroovelab: stats.activeTeachers || schoolStatsRow.teachers_groovelab || 0,
+          teachersCampus: stats.activeTeachers !== undefined ? stats.activeTeachers : (schoolStatsRow.teachers_campus || 0),
+          teachersGroovelab: stats.activeTeachers !== undefined ? stats.activeTeachers : (schoolStatsRow.teachers_groovelab || 0),
           studentsCampus: stats.campusStudents || schoolStatsRow.students_campus || 0,
           studentsGroovelab: stats.groovelabStudents || schoolStatsRow.students_groovelab || 0,
           storageAddonGb: stats.storageAddonGb,
@@ -3241,7 +3280,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                 { id: 'executive', label: 'Master Cockpit', icon: <Activity size={18} /> },
                 { id: 'schools', label: 'Schulen & Tenants', icon: <Layers size={18} /> },
                 { id: 'briefing', label: 'Zahlungsabgleich & Aktivierungen', icon: <CreditCard size={18} /> },
-                { id: 'billing', label: 'Financial Control', icon: <GraduationCap size={18} /> },
+                { id: 'billing', label: 'Financial Control', icon: <Receipt size={18} /> },
                 { id: 'telemetry', label: 'Telemetrie & Health', icon: <Cpu size={18} /> },
                 { id: 'pricing', label: 'Preise & Kampagnen', icon: <Tag size={18} /> },
                 { id: 'trust_safety', label: 'Trust & Safety (Takedowns)', icon: <ShieldAlert size={18} /> },
@@ -3347,6 +3386,9 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
               <img
                 src="/campus_login_hero.png"
                 alt="Master Admin"
+                onError={(e) => {
+                  (e.currentTarget as HTMLImageElement).src = '/campus_login_hero.png';
+                }}
                 style={{
                   width: '38px',
                   height: '38px',
@@ -8202,7 +8244,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                 { id: 'executive', label: 'Master Cockpit', desc: 'MRR, ARR & Platform Status', icon: <Activity size={16} color="#ea4335" /> },
                 { id: 'schools', label: 'Schulen & Tenants', desc: 'Musikschulen verwalten & anlegen', icon: <Layers size={16} color="#475569" /> },
                 { id: 'briefing', label: 'Briefing Board', desc: 'Schüler-Aktivierungen & CG-Hashes', icon: <Clock size={16} color="#475569" /> },
-                { id: 'billing', label: 'Financial Control', desc: 'Rechnungen RE-... und CG-...', icon: <GraduationCap size={16} color="#475569" /> },
+                { id: 'billing', label: 'Financial Control', desc: 'Rechnungen RE-... und CG-...', icon: <Receipt size={16} color="#475569" /> },
                 { id: 'telemetry', label: 'Telemetrie & Health', desc: 'Server CPU, RAM & DB Telemetrie', icon: <Cpu size={16} color="#475569" /> },
                 { id: 'pricing', label: 'Preise & Kampagnen', desc: 'Standard-Abonnementpreise & Rabatt-Aktionen', icon: <Tag size={16} color="#475569" /> },
                 { id: 'maintenance', label: 'Wartung & Betrieb', desc: 'Notfall-Killswitch, Live-Countdown & Broadcast-Banner', icon: <Wrench size={16} color="#475569" /> },

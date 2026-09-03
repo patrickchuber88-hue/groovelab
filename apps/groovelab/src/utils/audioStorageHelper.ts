@@ -142,3 +142,225 @@ export async function uploadAudioWithIntegrityVerification(
     };
   }
 }
+
+/**
+ * Scans Supabase storage buckets, database tables, and local audio caches to calculate
+ * the exact audio storage bytes consumed by a given school tenant, and synchronizes
+ * the result back to `schools.storage_used_bytes` and local overrides.
+ */
+export async function computeSchoolStorageUsedBytes(schoolId: string, knownUserIds?: string[]): Promise<number> {
+  if (!schoolId) return 0;
+
+  let maxDiscoveredBytes = 0;
+
+  // 1. Check local overrides and direct cached keys
+  try {
+    if (typeof window !== 'undefined') {
+      const directKey = localStorage.getItem(`groovelab_storage_used_bytes_${schoolId}`);
+      if (directKey) {
+        maxDiscoveredBytes = Math.max(maxDiscoveredBytes, Number(directKey));
+      }
+      const overridesStr = localStorage.getItem('groovelab_school_overrides');
+      if (overridesStr) {
+        const overrides = JSON.parse(overridesStr);
+        if (overrides[schoolId]?.storage_used_bytes) {
+          maxDiscoveredBytes = Math.max(maxDiscoveredBytes, Number(overrides[schoolId].storage_used_bytes));
+        }
+      }
+    }
+  } catch {}
+
+  // 2. Fetch all user IDs belonging to this school
+  const userIds = new Set<string>(knownUserIds || []);
+  try {
+    const { data: users } = await supabase
+      .from('users')
+      .select('id')
+      .eq('school_id', schoolId);
+    users?.forEach((u: any) => {
+      if (u?.id) userIds.add(String(u.id));
+    });
+  } catch {}
+
+  // 3. Scan DB audio_recordings table using tenant_id
+  try {
+    const { data: recsTenant } = await supabase
+      .from('audio_recordings')
+      .select('file_size_bytes')
+      .eq('tenant_id', schoolId);
+    if (recsTenant && recsTenant.length > 0) {
+      const dbSum = recsTenant.reduce((acc, curr) => acc + Number(curr.file_size_bytes || 0), 0);
+      maxDiscoveredBytes = Math.max(maxDiscoveredBytes, dbSum);
+    }
+  } catch {}
+
+  // 4. Scan Supabase storage buckets ('campus-assets', 'groovelab-assets')
+  let bucketAggregatedBytes = 0;
+  const subFolders = ['recordings', 'loops', 'audio_biography', 'audio', 'meisterwerk'];
+  const buckets = ['campus-assets', 'groovelab-assets'];
+
+  for (const bucket of buckets) {
+    // A. School-scoped folder: schools/${schoolId}/${subFolder}
+    for (const sub of subFolders) {
+      try {
+        const { data: files } = await supabase.storage
+          .from(bucket)
+          .list(`schools/${schoolId}/${sub}`, { limit: 1000 });
+        if (files && files.length > 0) {
+          for (const f of files) {
+            const size = Number(f.metadata?.size || (f as any).size || 0);
+            if (size > 0) bucketAggregatedBytes += size;
+          }
+        }
+      } catch {}
+    }
+
+    // B. Root folders: matching schoolId or any user ID of this school
+    for (const sub of subFolders) {
+      try {
+        const { data: files } = await supabase.storage
+          .from(bucket)
+          .list(sub, { limit: 1000 });
+        if (files && files.length > 0) {
+          for (const f of files) {
+            const size = Number(f.metadata?.size || (f as any).size || 0);
+            if (size <= 0) continue;
+            const name = f.name || '';
+            let belongs = name.includes(schoolId);
+            if (!belongs && userIds.size > 0) {
+              for (const uid of userIds) {
+                if (name.includes(uid)) {
+                  belongs = true;
+                  break;
+                }
+              }
+            }
+            if (belongs) {
+              bucketAggregatedBytes += size;
+            }
+          }
+        }
+      } catch {}
+    }
+  }
+  maxDiscoveredBytes = Math.max(maxDiscoveredBytes, bucketAggregatedBytes);
+
+  // 5. Scan student recordings from localStorage
+  let studentAudioBytes = 0;
+  try {
+    if (typeof window !== 'undefined') {
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (!key) continue;
+
+        let keyBelongsToSchool = key.includes(schoolId);
+        if (!keyBelongsToSchool && userIds.size > 0) {
+          for (const uid of userIds) {
+            if (key.includes(uid)) {
+              keyBelongsToSchool = true;
+              break;
+            }
+          }
+        }
+
+        if (key.startsWith('campus_homework_notes_')) {
+          if (keyBelongsToSchool || userIds.size === 0) {
+            try {
+              const val = localStorage.getItem(key);
+              if (val) {
+                const notes = JSON.parse(val);
+                if (Array.isArray(notes)) {
+                  notes.forEach((note: string) => {
+                    if (typeof note === 'string' && (note.startsWith('AUDIO:') || note.startsWith('LOOP:'))) {
+                      const parts = note.split('|');
+                      const durSec = Number(parts[1] || 10);
+                      studentAudioBytes += Math.max(120000, durSec * 32000);
+                    }
+                  });
+                }
+              }
+            } catch {}
+          }
+        } else if (key.startsWith('campus_junior_recordings_')) {
+          if (keyBelongsToSchool || userIds.size === 0) {
+            try {
+              const val = localStorage.getItem(key);
+              if (val) {
+                const recs = JSON.parse(val);
+                if (Array.isArray(recs)) {
+                  recs.forEach((rec: any) => {
+                    const dur = Number(rec?.duration || 10);
+                    studentAudioBytes += Math.max(120000, dur * 32000);
+                  });
+                }
+              }
+            } catch {}
+          }
+        } else if (key.startsWith('campus_audio_biography_')) {
+          if (keyBelongsToSchool || userIds.size === 0) {
+            try {
+              const val = localStorage.getItem(key);
+              if (val) {
+                const bio = JSON.parse(val);
+                if (Array.isArray(bio)) {
+                  bio.forEach((track: any) => {
+                    const dur = Number(track?.duration || 30);
+                    studentAudioBytes += Math.max(250000, dur * 32000);
+                  });
+                }
+              }
+            } catch {}
+          }
+        } else if (key.startsWith('groovelab_loop_tracks_')) {
+          if (keyBelongsToSchool || userIds.size === 0) {
+            try {
+              const val = localStorage.getItem(key);
+              if (val) {
+                const loops = JSON.parse(val);
+                if (Array.isArray(loops)) {
+                  loops.forEach((lp: any) => {
+                    const dur = Number(lp?.duration || 15);
+                    studentAudioBytes += Math.max(180000, dur * 32000);
+                  });
+                }
+              }
+            } catch {}
+          }
+        }
+      }
+    }
+  } catch {}
+  maxDiscoveredBytes = Math.max(maxDiscoveredBytes, studentAudioBytes);
+
+  // 6. Check school.storage_used_bytes in database
+  try {
+    const { data: sch } = await supabase
+      .from('schools')
+      .select('storage_used_bytes')
+      .eq('id', schoolId)
+      .maybeSingle();
+    if (sch?.storage_used_bytes) {
+      maxDiscoveredBytes = Math.max(maxDiscoveredBytes, Number(sch.storage_used_bytes));
+    }
+  } catch {}
+
+  // 7. Universal Synchronisation: Persistent write-back to Supabase & local caches
+  if (maxDiscoveredBytes > 0 && typeof window !== 'undefined') {
+    try {
+      const overridesStr = localStorage.getItem('groovelab_school_overrides') || '{}';
+      const overrides = JSON.parse(overridesStr);
+      if (!overrides[schoolId]) overrides[schoolId] = {};
+      overrides[schoolId].storage_used_bytes = maxDiscoveredBytes;
+      localStorage.setItem('groovelab_school_overrides', JSON.stringify(overrides));
+      localStorage.setItem(`groovelab_storage_used_bytes_${schoolId}`, String(maxDiscoveredBytes));
+
+      supabase
+        .from('schools')
+        .update({ storage_used_bytes: maxDiscoveredBytes })
+        .eq('id', schoolId)
+        .then(() => {});
+    } catch {}
+  }
+
+  return maxDiscoveredBytes;
+}

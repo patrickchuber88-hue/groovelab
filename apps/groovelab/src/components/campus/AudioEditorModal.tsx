@@ -11,7 +11,8 @@ import {
   RotateCcw, 
   Music2, 
   ShieldCheck, 
-  SlidersHorizontal 
+  SlidersHorizontal,
+  Scissors 
 } from 'lucide-react';
 import { getBlob, storeBlob } from '../../utils/blobStorage';
 
@@ -134,6 +135,17 @@ export const AudioEditorModal: React.FC<AudioEditorModalProps> = ({
   const animFrameRef = useRef<number | null>(null);
   const waveformContainerRef = useRef<HTMLDivElement | null>(null);
   const isDraggingHandleRef = useRef<'start' | 'end' | null>(null);
+  const startTimeRef = useRef(startTime);
+  const endTimeRef = useRef(endTime);
+  const isPlayingRef = useRef(false);
+
+  useEffect(() => {
+    startTimeRef.current = startTime;
+  }, [startTime]);
+
+  useEffect(() => {
+    endTimeRef.current = endTime;
+  }, [endTime]);
 
   const masterOriginalKey = originalAudioUrl || audioUrl;
   const isDifferentFromMaster = Boolean(
@@ -157,36 +169,37 @@ export const AudioEditorModal: React.FC<AudioEditorModalProps> = ({
     const loadData = async () => {
       try {
         let arrayBuffer: ArrayBuffer | null = null;
-        if (activeUrl.startsWith('campus_blob_') || activeUrl.startsWith('campus_audio_')) {
+        if (activeUrl.startsWith('data:audio') || activeUrl.startsWith('blob:') || activeUrl.startsWith('http')) {
+          const resp = await fetch(activeUrl);
+          arrayBuffer = await resp.arrayBuffer();
+        } else {
           const raw = await getBlob(activeUrl);
           if (raw instanceof Blob) {
             arrayBuffer = await raw.arrayBuffer();
           } else if (raw instanceof ArrayBuffer) {
             arrayBuffer = raw;
           }
-        } else {
-          const res = await fetch(activeUrl);
-          arrayBuffer = await res.arrayBuffer();
         }
 
-        if (!arrayBuffer) throw new Error("Audio buffer empty");
-
-        const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-        const ctx = new AudioCtx();
-        audioCtxRef.current = ctx;
-
-        const decoded = await ctx.decodeAudioData(arrayBuffer);
-        if (active) {
-          setAudioBuffer(decoded);
-          const totalSec = decoded.duration;
-          setDuration(totalSec);
-          setStartTime(0);
-          setEndTime(totalSec);
-          setCurrentPlayTime(0);
-          setIsLoading(false);
+        if (!arrayBuffer) {
+          throw new Error('Konnte Audiodaten nicht abrufen');
         }
+
+        const audioCtx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
+        audioCtxRef.current = audioCtx;
+
+        const decoded = await audioCtx.decodeAudioData(arrayBuffer);
+        if (!active) return;
+
+        setAudioBuffer(decoded);
+        const dur = decoded.duration;
+        setDuration(dur);
+        setStartTime(0);
+        setEndTime(dur);
+        setCurrentPlayTime(0);
       } catch (err) {
-        console.error('[AudioEditor] Load error:', err);
+        console.error('AudioEditor: Decode failed:', err);
+      } finally {
         if (active) setIsLoading(false);
       }
     };
@@ -202,36 +215,35 @@ export const AudioEditorModal: React.FC<AudioEditorModalProps> = ({
     };
   }, [isOpen, activeUrl]);
 
-    // 🎚️ Web Worker Offloading: Compute 192 ultra-fine HDR Studio Waveform bars
-  const [waveformBars, setWaveformBars] = useState<number[]>(Array(192).fill(16));
+  // Compute 192 waveform vertical amplitude bars
+  const waveformBars = useMemo(() => {
+    if (!audioBuffer) return [];
+    const channelData = audioBuffer.getChannelData(0);
+    const totalSamples = channelData.length;
+    const barsCount = 192;
+    const blockSize = Math.floor(totalSamples / barsCount);
+    const bars: number[] = [];
 
-  useEffect(() => {
-    if (!audioBuffer) {
-      setWaveformBars(Array(192).fill(16));
-      return;
+    for (let i = 0; i < barsCount; i++) {
+      let blockSum = 0;
+      const start = i * blockSize;
+      const end = Math.min(start + blockSize, totalSamples);
+      for (let j = start; j < end; j += 4) {
+        blockSum += Math.abs(channelData[j]);
+      }
+      const avg = blockSum / ((end - start) / 4 || 1);
+      const heightPercent = Math.min(100, Math.max(12, Math.round(Math.pow(avg, 0.75) * 180)));
+      bars.push(heightPercent);
     }
-    
-    const worker = new Worker(new URL('../../workers/waveformWorker.ts', import.meta.url), { type: 'module' });
-    
-    worker.onmessage = (e) => {
-      setWaveformBars(e.data.waveformBars);
-      worker.terminate();
-    };
-
-    worker.postMessage({
-      channelData: audioBuffer.getChannelData(0),
-      numBars: 192
-    });
-
-    return () => {
-      worker.terminate();
-    };
+    return bars;
   }, [audioBuffer]);
 
   // Stop playback cleanup
   const stopPlayback = () => {
+    isPlayingRef.current = false;
     if (activeSourceRef.current) {
       try {
+        activeSourceRef.current.onended = null;
         activeSourceRef.current.stop();
         activeSourceRef.current.disconnect();
       } catch {}
@@ -242,10 +254,10 @@ export const AudioEditorModal: React.FC<AudioEditorModalProps> = ({
       animFrameRef.current = null;
     }
     setIsPlaying(false);
-    setCurrentPlayTime(startTime);
+    setCurrentPlayTime(startTimeRef.current);
   };
 
-  // Play selection from specific second with pitch shift
+  // Play selection from specific second with automatic endless loop
   const playFrom = (startSec?: number) => {
     if (!audioBuffer || !audioCtxRef.current) return;
     const ctx = audioCtxRef.current;
@@ -253,7 +265,19 @@ export const AudioEditorModal: React.FC<AudioEditorModalProps> = ({
 
     window.dispatchEvent(new CustomEvent('campus-global-audio-play', { detail: { playerId: 'audio_editor_preview' } }));
 
-    stopPlayback();
+    // Stop previous node if running without cancelling loop
+    if (activeSourceRef.current) {
+      try {
+        activeSourceRef.current.onended = null;
+        activeSourceRef.current.stop();
+        activeSourceRef.current.disconnect();
+      } catch {}
+      activeSourceRef.current = null;
+    }
+    if (animFrameRef.current) {
+      cancelAnimationFrame(animFrameRef.current);
+      animFrameRef.current = null;
+    }
 
     const source = ctx.createBufferSource();
     source.buffer = audioBuffer;
@@ -266,34 +290,37 @@ export const AudioEditorModal: React.FC<AudioEditorModalProps> = ({
 
     source.connect(ctx.destination);
 
-    // If startSec is given, play from that spot; otherwise from startTime
-    const requestedStart = startSec !== undefined ? startSec : startTime;
-    const playStart = Math.max(0, Math.min(endTime - 0.05, requestedStart));
-    const playDuration = Math.max(0.1, endTime - playStart);
+    const curStart = startTimeRef.current;
+    const curEnd = endTimeRef.current;
+    const requestedStart = startSec !== undefined ? startSec : curStart;
+    const playStart = Math.max(0, Math.min(curEnd - 0.05, requestedStart));
+    const playDuration = Math.max(0.1, curEnd - playStart);
 
     source.start(0, playStart, playDuration);
     activeSourceRef.current = source;
+    isPlayingRef.current = true;
     setIsPlaying(true);
     setCurrentPlayTime(playStart);
     playbackStartTimestampRef.current = ctx.currentTime;
 
+    // 🔁 Automatisch immer im Loop abspielen:
     source.onended = () => {
-      if (isLoopingSelection) {
-        playFrom(startTime);
+      if (isPlayingRef.current) {
+        playFrom(startTimeRef.current);
       } else {
         stopPlayback();
       }
     };
 
     const updatePlayhead = () => {
-      if (!ctx || !activeSourceRef.current) return;
+      if (!ctx || !activeSourceRef.current || !isPlayingRef.current) return;
       const elapsed = ctx.currentTime - playbackStartTimestampRef.current;
       const current = playStart + elapsed;
-      if (current <= endTime) {
+      if (current <= curEnd) {
         setCurrentPlayTime(current);
         animFrameRef.current = requestAnimationFrame(updatePlayhead);
       } else {
-        setCurrentPlayTime(endTime);
+        setCurrentPlayTime(curEnd);
       }
     };
     animFrameRef.current = requestAnimationFrame(updatePlayhead);
@@ -542,46 +569,37 @@ export const AudioEditorModal: React.FC<AudioEditorModalProps> = ({
     }}>
       <div style={{
         background: '#ffffff',
-        borderRadius: '28px',
-        maxWidth: '540px',
+        borderRadius: '26px',
+        maxWidth: '480px',
         width: '100%',
-        boxShadow: '0 32px 80px -16px rgba(0, 0, 0, 0.28), 0 0 0 1px rgba(0, 0, 0, 0.05)',
+        boxShadow: '0 25px 60px -12px rgba(0, 0, 0, 0.25)',
         display: 'flex',
         flexDirection: 'column',
-        gap: '16px',
-        padding: '24px 26px',
+        gap: '14px',
+        padding: '22px',
         boxSizing: 'border-box',
-        animation: 'scaleIn 0.22s cubic-bezier(0.16, 1, 0.3, 1)',
-        border: '1px solid rgba(255, 255, 255, 0.8)'
+        animation: 'scaleIn 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+        border: '1px solid #e2e8f0'
       }}>
         
-        {/* 🍏 Apple-Style Header: Category + Non-Destructive Audio-Tresor Safe Badge + Close */}
+        {/* ✂️ Header: Clean, Kid-Friendly, Focus on "Aufnahme kürzen" */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '0.66rem', fontWeight: 850, color: '#16a34a', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                Studio Audio-Editor
-              </span>
-              {hasAudioTresor && (
-                <div style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                  background: 'rgba(22, 163, 74, 0.08)',
-                  color: '#15803d',
-                  padding: '2px 8px',
-                  borderRadius: '100px',
-                  fontSize: '0.62rem',
-                  fontWeight: 850,
-                  border: '1px solid rgba(22, 163, 74, 0.2)'
-                }}>
-                  <ShieldCheck size={11} strokeWidth={2.5} />
-                  <span>Audio-Tresor geschützt</span>
-                </div>
-              )}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{
+              width: '38px',
+              height: '38px',
+              borderRadius: '12px',
+              background: '#dcfce7',
+              border: '1px solid #86efac',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#15803d'
+            }}>
+              <Scissors size={20} strokeWidth={2.3} />
             </div>
-            <h3 style={{ margin: '2px 0 0', fontSize: '1.24rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-              Zuschneiden & Pitch
+            <h3 id="audio-editor-title" style={{ margin: 0, fontSize: '1.20rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+              Aufnahme kürzen
             </h3>
           </div>
 
@@ -592,8 +610,8 @@ export const AudioEditorModal: React.FC<AudioEditorModalProps> = ({
               background: '#f1f5f9',
               border: 'none',
               borderRadius: '50%',
-              width: '32px',
-              height: '32px',
+              width: '34px',
+              height: '34px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -601,15 +619,14 @@ export const AudioEditorModal: React.FC<AudioEditorModalProps> = ({
               color: '#64748b',
               transition: 'all 0.15s ease'
             }}
-            onMouseEnter={e => { e.currentTarget.style.background = '#e2e8f0'; e.currentTarget.style.color = '#0f172a'; }}
-            onMouseLeave={e => { e.currentTarget.style.background = '#f1f5f9'; e.currentTarget.style.color = '#64748b'; }}
-            title="Schließen (Esc)"
+            className="hover-scale-mini"
+            title="Schließen"
           >
-            <X size={16} strokeWidth={2.4} />
+            <X size={18} strokeWidth={2.4} />
           </button>
         </div>
 
-        {/* 🏷️ Title Field: Apple Voice Memos Ergonomics */}
+        {/* 🏷️ Title Field: Subtle, Clean */}
         <div style={{ position: 'relative', width: '100%' }}>
           <div style={{
             position: 'absolute',
@@ -630,17 +647,16 @@ export const AudioEditorModal: React.FC<AudioEditorModalProps> = ({
             placeholder="Titel der Aufnahme..."
             style={{
               width: '100%',
-              fontSize: '0.88rem',
+              fontSize: '0.86rem',
               fontWeight: 750,
-              padding: '10px 36px 10px 38px',
-              borderRadius: '14px',
+              padding: '9px 36px 9px 38px',
+              borderRadius: '12px',
               border: '1.5px solid #e2e8f0',
               background: '#f8fafc',
               color: '#0f172a',
               outline: 'none',
               boxSizing: 'border-box',
-              transition: 'all 0.15s ease',
-              boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.02)'
+              transition: 'all 0.15s ease'
             }}
             onFocus={e => { e.currentTarget.style.borderColor = '#16a34a'; e.currentTarget.style.background = '#ffffff'; }}
             onBlur={e => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.background = '#f8fafc'; }}
@@ -673,80 +689,79 @@ export const AudioEditorModal: React.FC<AudioEditorModalProps> = ({
           )}
         </div>
 
-        {/* 🎛️ Ultra-High-Resolution Waveform & Trimmer Stage */}
+        {/* 🎛️ Waveform & Trimmer Stage */}
         <div style={{
-          background: 'linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%)',
-          borderRadius: '22px',
-          border: '1px solid #e2e8f0',
-          padding: '14px 16px',
+          background: '#f8fafc',
+          borderRadius: '20px',
+          border: '1.5px solid #e2e8f0',
+          padding: '14px',
           display: 'flex',
           flexDirection: 'column',
-          gap: '10px',
-          boxSizing: 'border-box',
-          boxShadow: 'inset 0 1px 4px rgba(0,0,0,0.03)'
+          gap: '12px',
+          boxSizing: 'border-box'
         }}>
           
-          {/* Header Numbers & Revert Anchor */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.72rem', fontWeight: 800, color: '#64748b', fontVariantNumeric: 'tabular-nums' }}>
-            <span style={{ color: '#dc2626', fontWeight: 850 }}>
-              Start: {formatTime(startTime)}
+          {/* Header Badges: Grün für Start, Weiß für Dauer, Rot für Ende */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{
+              background: '#dcfce7',
+              border: '1px solid #86efac',
+              color: '#15803d',
+              padding: '4px 10px',
+              borderRadius: '8px',
+              fontSize: '0.78rem',
+              fontWeight: 850,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px'
+            }}>
+              <span>Start: {formatTime(startTime)}</span>
             </span>
             
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span style={{ color: '#0f172a', fontWeight: 900, background: '#ffffff', border: '1px solid #cbd5e1', padding: '3px 10px', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
-                Dauer: {formatTime(Math.max(0, endTime - startTime))}
-              </span>
+            <span style={{
+              color: '#334155',
+              fontWeight: 850,
+              background: '#ffffff',
+              border: '1px solid #cbd5e1',
+              padding: '4px 10px',
+              borderRadius: '8px',
+              fontSize: '0.78rem',
+              boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
+            }}>
+              Dauer: {formatTime(Math.max(0, endTime - startTime))}
+            </span>
 
-              {/* ↩️ Dedicated Non-Destructive Revert to Original Master Button */}
-              {isDifferentFromMaster && (
-                <button
-                  type="button"
-                  onClick={handleRestoreMasterOriginal}
-                  style={{
-                    background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
-                    border: '1px solid #86efac',
-                    borderRadius: '8px',
-                    padding: '3px 8px',
-                    fontSize: '0.68rem',
-                    fontWeight: 850,
-                    color: '#15803d',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    boxShadow: '0 1px 4px rgba(34, 197, 94, 0.15)',
-                    transition: 'all 0.15s ease'
-                  }}
-                  onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.03)'; }}
-                  onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; }}
-                  title="Komplette Originalaufnahme aus dem Audio-Tresor wiederherstellen"
-                >
-                  <RotateCcw size={11} strokeWidth={2.5} />
-                  <span>Original laden ({formatTime(initialOriginalDuration || duration)})</span>
-                </button>
-              )}
-            </div>
-
-            <span style={{ color: '#dc2626', fontWeight: 850 }}>
-              Ende: {formatTime(endTime)}
+            <span style={{
+              background: '#fee2e2',
+              border: '1px solid #fca5a5',
+              color: '#b91c1c',
+              padding: '4px 10px',
+              borderRadius: '8px',
+              fontSize: '0.78rem',
+              fontWeight: 850,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px'
+            }}>
+              <span>Ende: {formatTime(endTime)}</span>
             </span>
           </div>
 
-          {/* 192 Hi-DPI Waveform Stage with Logic Pro Brackets */}
+          {/* Waveform Stage with tactile iOS-style drag handles */}
           <div
             style={{
               position: 'relative',
               width: '100%',
-              height: '94px',
+              height: '100px',
               background: '#ffffff',
               borderRadius: '16px',
               border: '1.5px solid #e2e8f0',
-              padding: '0 10px',
+              padding: '0 12px',
               boxSizing: 'border-box',
               overflow: 'visible',
               userSelect: 'none',
               touchAction: 'none',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
+              boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
             }}
           >
             {/* Coordinate Track */}
@@ -765,43 +780,32 @@ export const AudioEditorModal: React.FC<AudioEditorModalProps> = ({
               title="Klicken zum Vorhören ab dieser Position"
             >
               {isLoading ? (
-                <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', fontSize: '0.75rem', fontWeight: 800 }}>
-                  <Sparkles size={14} className="animate-spin" style={{ marginRight: '6px', color: '#16a34a' }} />
-                  Analysiere High-Definition Studio-Waveform...
+                <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', fontSize: '0.80rem', fontWeight: 800 }}>
+                  <Sparkles size={16} className="animate-spin" style={{ marginRight: '8px', color: '#16a34a' }} />
+                  Lade Audio...
                 </div>
               ) : (
                 <>
-                  {/* 🎼 0dB Subtle Studio Center Reference Line */}
+                  {/* Center Reference Line */}
                   <div style={{
                     position: 'absolute',
                     top: '50%',
                     left: 0,
                     right: 0,
                     height: '1px',
-                    background: 'rgba(226, 232, 240, 0.95)',
+                    background: 'rgba(226, 232, 240, 0.9)',
                     transform: 'translateY(-50%)',
                     pointerEvents: 'none'
                   }} />
 
-                  {/* 🟢 Active Selection Glass Tint */}
-                  <div style={{
-                    position: 'absolute',
-                    top: 0,
-                    bottom: 0,
-                    left: `${startPercent}%`,
-                    width: `${Math.max(0, endPercent - startPercent)}%`,
-                    background: 'rgba(16, 185, 129, 0.05)',
-                    pointerEvents: 'none'
-                  }} />
-
-                  {/* 1. Underlying Dimmed Waveform (Full Track, Slate Gray 28%) */}
+                  {/* 1. Inactive/Dimmed Waveform */}
                   <div style={{
                     position: 'absolute',
                     inset: 0,
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '1px',
-                    opacity: 0.28,
+                    gap: '1.5px',
+                    opacity: 0.22,
                     pointerEvents: 'none'
                   }}>
                     {waveformBars.map((heightPercent, i) => (
@@ -809,22 +813,22 @@ export const AudioEditorModal: React.FC<AudioEditorModalProps> = ({
                         key={`dim-${i}`}
                         style={{
                           flex: 1,
-                          minWidth: '1.2px',
+                          minWidth: '1.5px',
                           height: `${heightPercent}%`,
                           borderRadius: '99px',
-                          background: '#94a3b8'
+                          background: '#64748b'
                         }}
                       />
                     ))}
                   </div>
 
-                  {/* 2. Active Vibrant Emerald Waveform, Exact Pixel-Perfect Cut */}
+                  {/* 2. Active Selection Waveform */}
                   <div style={{
                     position: 'absolute',
                     inset: 0,
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '1px',
+                    gap: '1.5px',
                     clipPath: `inset(0 ${Math.max(0, 100 - endPercent)}% 0 ${startPercent}%)`,
                     WebkitClipPath: `inset(0 ${Math.max(0, 100 - endPercent)}% 0 ${startPercent}%)`,
                     pointerEvents: 'none'
@@ -834,17 +838,17 @@ export const AudioEditorModal: React.FC<AudioEditorModalProps> = ({
                         key={`act-${i}`}
                         style={{
                           flex: 1,
-                          minWidth: '1.2px',
+                          minWidth: '1.5px',
                           height: `${heightPercent}%`,
                           borderRadius: '99px',
-                          background: 'linear-gradient(180deg, #34d399 0%, #10b981 50%, #059669 100%)',
-                          boxShadow: heightPercent > 45 ? '0 0 5px rgba(16, 185, 129, 0.45)' : 'none'
+                          background: 'linear-gradient(180deg, #22c55e 0%, #16a34a 100%)',
+                          boxShadow: heightPercent > 40 ? '0 0 4px rgba(34, 197, 94, 0.35)' : 'none'
                         }}
                       />
                     ))}
                   </div>
 
-                  {/* 3. Live Playhead Needle during Probehören */}
+                  {/* 3. Live Playhead Needle during Playback */}
                   {isPlaying && (
                     <div style={{
                       position: 'absolute',
@@ -854,13 +858,13 @@ export const AudioEditorModal: React.FC<AudioEditorModalProps> = ({
                       transform: 'translateX(-50%)',
                       width: '2px',
                       background: '#0f172a',
-                      boxShadow: '0 0 8px rgba(15, 23, 42, 0.7), 0 0 2px #ffffff',
+                      boxShadow: '0 0 8px rgba(15, 23, 42, 0.5)',
                       pointerEvents: 'none',
                       zIndex: 40
                     }}>
                       <div style={{
                         position: 'absolute',
-                        top: '0',
+                        top: 0,
                         left: '50%',
                         transform: 'translate(-50%, -50%)',
                         width: '8px',
@@ -872,18 +876,18 @@ export const AudioEditorModal: React.FC<AudioEditorModalProps> = ({
                     </div>
                   )}
 
-                  {/* 4. 🔴 Logic Pro Studio Trim Handle - START */}
+                  {/* 4. 🟢 Start-Griff (Grün) mit 1px feiner vertikaler Schnittlinie */}
                   <div
                     onPointerDown={(e) => handlePointerDownHandle(e, 'start')}
                     onMouseEnter={() => setIsHoveringHandle('start')}
                     onMouseLeave={() => setIsHoveringHandle(null)}
                     style={{
                       position: 'absolute',
-                      top: '-6px',
-                      bottom: '-6px',
+                      top: '-10px',
+                      bottom: '-10px',
                       left: `${startPercent}%`,
                       transform: 'translateX(-50%)',
-                      width: '28px',
+                      width: '36px',
                       display: 'flex',
                       flexDirection: 'column',
                       alignItems: 'center',
@@ -899,67 +903,82 @@ export const AudioEditorModal: React.FC<AudioEditorModalProps> = ({
                       <div style={{
                         position: 'absolute',
                         bottom: '100%',
-                        marginBottom: '8px',
+                        marginBottom: '6px',
                         background: '#0f172a',
                         color: '#ffffff',
-                        fontSize: '0.68rem',
+                        fontSize: '0.72rem',
                         fontWeight: 900,
                         padding: '3px 8px',
                         borderRadius: '6px',
                         whiteSpace: 'nowrap',
                         boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-                        pointerEvents: 'none',
-                        border: '1px solid rgba(255,255,255,0.2)'
+                        pointerEvents: 'none'
                       }}>
-                        {formatTimePrecise(startTime)} s
+                        {formatTime(startTime)}
                       </div>
                     )}
 
-                    {/* Top Bracket Cap */}
+                    {/* Top Grip Tab */}
                     <div style={{
-                      width: isHoveringHandle === 'start' || activeDraggingHandle === 'start' ? '12px' : '10px',
-                      height: isHoveringHandle === 'start' || activeDraggingHandle === 'start' ? '12px' : '10px',
-                      borderRadius: '50%',
-                      background: '#ef4444',
+                      width: '22px',
+                      height: '18px',
+                      borderRadius: '6px',
+                      background: '#16a34a',
                       border: '2px solid #ffffff',
-                      boxShadow: '0 2px 6px rgba(239, 68, 68, 0.45)',
+                      boxShadow: '0 2px 6px rgba(22, 163, 74, 0.45)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '2px',
                       flexShrink: 0,
-                      transition: 'all 0.15s ease'
-                    }} />
+                      transition: 'transform 0.1s ease',
+                      transform: activeDraggingHandle === 'start' ? 'scale(1.15)' : 'scale(1)'
+                    }}>
+                      <div style={{ width: '1.5px', height: '8px', background: '#ffffff', borderRadius: '1px' }} />
+                      <div style={{ width: '1.5px', height: '8px', background: '#ffffff', borderRadius: '1px' }} />
+                    </div>
 
-                    {/* Center Needle */}
+                    {/* ⚡ 1px feine vertikale Schnittlinie für absoluten genauen Schnitt */}
                     <div style={{
-                      width: '2px',
+                      width: '1px',
                       flex: 1,
-                      background: '#ef4444',
-                      boxShadow: '0 0 4px rgba(239, 68, 68, 0.5)'
+                      background: '#16a34a',
+                      opacity: 0.95
                     }} />
 
-                    {/* Bottom Bracket Cap */}
+                    {/* Bottom Grip Tab */}
                     <div style={{
-                      width: isHoveringHandle === 'start' || activeDraggingHandle === 'start' ? '12px' : '10px',
-                      height: isHoveringHandle === 'start' || activeDraggingHandle === 'start' ? '12px' : '10px',
-                      borderRadius: '50%',
-                      background: '#ef4444',
+                      width: '22px',
+                      height: '18px',
+                      borderRadius: '6px',
+                      background: '#16a34a',
                       border: '2px solid #ffffff',
-                      boxShadow: '0 2px 6px rgba(239, 68, 68, 0.45)',
+                      boxShadow: '0 2px 6px rgba(22, 163, 74, 0.45)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '2px',
                       flexShrink: 0,
-                      transition: 'all 0.15s ease'
-                    }} />
+                      transition: 'transform 0.1s ease',
+                      transform: activeDraggingHandle === 'start' ? 'scale(1.15)' : 'scale(1)'
+                    }}>
+                      <div style={{ width: '1.5px', height: '8px', background: '#ffffff', borderRadius: '1px' }} />
+                      <div style={{ width: '1.5px', height: '8px', background: '#ffffff', borderRadius: '1px' }} />
+                    </div>
                   </div>
 
-                  {/* 5. 🔴 Logic Pro Studio Trim Handle - END */}
+                  {/* 5. 🔴 Ende-Griff (Rot) mit 1px feiner vertikaler Schnittlinie */}
                   <div
                     onPointerDown={(e) => handlePointerDownHandle(e, 'end')}
                     onMouseEnter={() => setIsHoveringHandle('end')}
                     onMouseLeave={() => setIsHoveringHandle(null)}
                     style={{
                       position: 'absolute',
-                      top: '-6px',
-                      bottom: '-6px',
+                      top: '-10px',
+                      bottom: '-10px',
                       left: `${endPercent}%`,
                       transform: 'translateX(-50%)',
-                      width: '28px',
+                      width: '36px',
                       display: 'flex',
                       flexDirection: 'column',
                       alignItems: 'center',
@@ -975,403 +994,273 @@ export const AudioEditorModal: React.FC<AudioEditorModalProps> = ({
                       <div style={{
                         position: 'absolute',
                         bottom: '100%',
-                        marginBottom: '8px',
+                        marginBottom: '6px',
                         background: '#0f172a',
                         color: '#ffffff',
-                        fontSize: '0.68rem',
+                        fontSize: '0.72rem',
                         fontWeight: 900,
                         padding: '3px 8px',
                         borderRadius: '6px',
                         whiteSpace: 'nowrap',
                         boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-                        pointerEvents: 'none',
-                        border: '1px solid rgba(255,255,255,0.2)'
+                        pointerEvents: 'none'
                       }}>
-                        {formatTimePrecise(endTime)} s
+                        {formatTime(endTime)}
                       </div>
                     )}
 
-                    {/* Top Bracket Cap */}
+                    {/* Top Grip Tab */}
                     <div style={{
-                      width: isHoveringHandle === 'end' || activeDraggingHandle === 'end' ? '12px' : '10px',
-                      height: isHoveringHandle === 'end' || activeDraggingHandle === 'end' ? '12px' : '10px',
-                      borderRadius: '50%',
+                      width: '22px',
+                      height: '18px',
+                      borderRadius: '6px',
                       background: '#ef4444',
                       border: '2px solid #ffffff',
                       boxShadow: '0 2px 6px rgba(239, 68, 68, 0.45)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '2px',
                       flexShrink: 0,
-                      transition: 'all 0.15s ease'
-                    }} />
+                      transition: 'transform 0.1s ease',
+                      transform: activeDraggingHandle === 'end' ? 'scale(1.15)' : 'scale(1)'
+                    }}>
+                      <div style={{ width: '1.5px', height: '8px', background: '#ffffff', borderRadius: '1px' }} />
+                      <div style={{ width: '1.5px', height: '8px', background: '#ffffff', borderRadius: '1px' }} />
+                    </div>
 
-                    {/* Center Needle */}
+                    {/* ⚡ 1px feine vertikale Schnittlinie für absoluten genauen Schnitt */}
                     <div style={{
-                      width: '2px',
+                      width: '1px',
                       flex: 1,
                       background: '#ef4444',
-                      boxShadow: '0 0 4px rgba(239, 68, 68, 0.5)'
+                      opacity: 0.95
                     }} />
 
-                    {/* Bottom Bracket Cap */}
+                    {/* Bottom Grip Tab */}
                     <div style={{
-                      width: isHoveringHandle === 'end' || activeDraggingHandle === 'end' ? '12px' : '10px',
-                      height: isHoveringHandle === 'end' || activeDraggingHandle === 'end' ? '12px' : '10px',
-                      borderRadius: '50%',
+                      width: '22px',
+                      height: '18px',
+                      borderRadius: '6px',
                       background: '#ef4444',
                       border: '2px solid #ffffff',
                       boxShadow: '0 2px 6px rgba(239, 68, 68, 0.45)',
-                      flexShrink: 0,
-                      transition: 'all 0.15s ease'
-                    }} />
-                  </div>
-
-                  {/* ⏱️ Subtle Logic Pro Timeline Ruler */}
-                  {duration > 0 && (
-                    <div style={{
-                      position: 'absolute',
-                      bottom: '1px',
-                      left: 0,
-                      right: 0,
                       display: 'flex',
-                      justifyContent: 'space-between',
-                      pointerEvents: 'none',
-                      userSelect: 'none',
-                      opacity: 0.55
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '2px',
+                      flexShrink: 0,
+                      transition: 'transform 0.1s ease',
+                      transform: activeDraggingHandle === 'end' ? 'scale(1.15)' : 'scale(1)'
                     }}>
-                      {[0, 0.25, 0.5, 0.75, 1].map((pct, idx) => (
-                        <div key={idx} style={{ display: 'flex', flexDirection: 'column', alignItems: idx === 0 ? 'flex-start' : (idx === 4 ? 'flex-end' : 'center') }}>
-                          <span style={{ fontSize: '0.52rem', fontWeight: 750, color: '#94a3b8', fontVariantNumeric: 'tabular-nums' }}>
-                            {formatTime(duration * pct)}
-                          </span>
-                        </div>
-                      ))}
+                      <div style={{ width: '1.5px', height: '8px', background: '#ffffff', borderRadius: '1px' }} />
+                      <div style={{ width: '1.5px', height: '8px', background: '#ffffff', borderRadius: '1px' }} />
                     </div>
-                  )}
+                  </div>
                 </>
               )}
             </div>
           </div>
-
-          {/* Precision Micro-Steppers */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div style={{ display: 'flex', gap: '5px' }}>
-              <button
-                type="button"
-                onClick={() => {
-                  const val = Math.max(0, Number((startTime - 0.1).toFixed(1)));
-                  setStartTime(val);
-                  if (!isPlaying) setCurrentPlayTime(val);
-                }}
-                style={{ background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '7px', padding: '3px 8px', fontSize: '0.68rem', fontWeight: 800, color: '#334155', cursor: 'pointer', boxShadow: '0 1px 2px rgba(0,0,0,0.03)' }}
-              >
-                -0.1s
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  const val = Math.min(endTime - 0.1, Number((startTime + 0.1).toFixed(1)));
-                  setStartTime(val);
-                  if (!isPlaying) setCurrentPlayTime(val);
-                }}
-                style={{ background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '7px', padding: '3px 8px', fontSize: '0.68rem', fontWeight: 800, color: '#334155', cursor: 'pointer', boxShadow: '0 1px 2px rgba(0,0,0,0.03)' }}
-              >
-                +0.1s
-              </button>
-            </div>
-
-            <div style={{ display: 'flex', gap: '5px' }}>
-              <button
-                type="button"
-                onClick={() => setEndTime(prev => Math.max(startTime + 0.1, Number((prev - 0.1).toFixed(1))))}
-                style={{ background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '7px', padding: '3px 8px', fontSize: '0.68rem', fontWeight: 800, color: '#334155', cursor: 'pointer', boxShadow: '0 1px 2px rgba(0,0,0,0.03)' }}
-              >
-                -0.1s
-              </button>
-              <button
-                type="button"
-                onClick={() => setEndTime(prev => Math.min(duration, Number((prev + 0.1).toFixed(1))))}
-                style={{ background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '7px', padding: '3px 8px', fontSize: '0.68rem', fontWeight: 800, color: '#334155', cursor: 'pointer', boxShadow: '0 1px 2px rgba(0,0,0,0.03)' }}
-              >
-                +0.1s
-              </button>
-            </div>
-          </div>
         </div>
 
-        {/* 🎚️ Tonhöhe (Pitch) Transposition Bar with Quick Preset Chips */}
+        {/* 🎚️ Tonhöhe anpassen: Schlichte 3-Button Steuerung (Tiefer / Original / Höher) */}
         <div style={{
           background: '#f8fafc',
-          border: '1px solid #e2e8f0',
-          borderRadius: '18px',
-          padding: '12px 16px',
+          border: '1.5px solid #e2e8f0',
+          borderRadius: '16px',
+          padding: '10px 14px',
           display: 'flex',
-          flexDirection: 'column',
-          gap: '8px'
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '10px',
+          boxSizing: 'border-box'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <SlidersHorizontal size={15} color="#16a34a" />
-              <span style={{ fontSize: '0.82rem', fontWeight: 850, color: '#0f172a' }}>
-                Tonhöhe (Pitch Transpose)
-              </span>
-              {semitones !== 0 && (
-                <button
-                  type="button"
-                  onClick={() => setSemitones(0)}
-                  style={{
-                    background: '#ffffff',
-                    border: '1px solid #cbd5e1',
-                    borderRadius: '6px',
-                    padding: '2px 6px',
-                    fontSize: '0.66rem',
-                    fontWeight: 800,
-                    color: '#64748b',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '3px'
-                  }}
-                  title="Auf Original-Tonhöhe zurücksetzen"
-                >
-                  <RotateCcw size={10} />
-                  <span>Reset</span>
-                </button>
-              )}
-            </div>
-
-            {/* Stepper Capsule */}
-            <div style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              background: '#ffffff',
-              border: '1px solid #cbd5e1',
-              borderRadius: '99px',
-              padding: '2px 4px',
-              boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
-              gap: '2px'
-            }}>
-              <button
-                type="button"
-                onClick={() => setSemitones(prev => Math.max(-12, prev - 1))}
-                disabled={semitones <= -12}
-                style={{
-                  width: '28px',
-                  height: '28px',
-                  border: 'none',
-                  background: 'transparent',
-                  color: semitones <= -12 ? '#cbd5e1' : '#0f172a',
-                  cursor: semitones <= -12 ? 'not-allowed' : 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  borderRadius: '50%'
-                }}
-                title="Halbton tiefer"
-              >
-                <ChevronLeft size={16} strokeWidth={2.5} />
-              </button>
-
-              <span style={{
-                fontSize: '0.78rem',
-                fontWeight: 900,
-                color: semitones !== 0 ? '#16a34a' : '#475569',
-                minWidth: '82px',
-                textAlign: 'center',
-                fontVariantNumeric: 'tabular-nums',
-                userSelect: 'none',
-                padding: '0 4px'
-              }}>
-                {semitones === 0 
-                  ? '0 (Original)' 
-                  : `${semitones > 0 ? `+${semitones}` : semitones} ${Math.abs(semitones) === 1 ? 'Halbton' : 'Halbtöne'}`}
-              </span>
-
-              <button
-                type="button"
-                onClick={() => setSemitones(prev => Math.min(12, prev + 1))}
-                disabled={semitones >= 12}
-                style={{
-                  width: '28px',
-                  height: '28px',
-                  border: 'none',
-                  background: 'transparent',
-                  color: semitones >= 12 ? '#cbd5e1' : '#0f172a',
-                  cursor: semitones >= 12 ? 'not-allowed' : 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  borderRadius: '50%'
-                }}
-                title="Halbton höher"
-              >
-                <ChevronRight size={16} strokeWidth={2.5} />
-              </button>
-            </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+            <SlidersHorizontal size={15} color="#16a34a" />
+            <span style={{ fontSize: '0.82rem', fontWeight: 850, color: '#0f172a' }}>
+              Tonhöhe:
+            </span>
           </div>
 
-          {/* Quick Transpose Chips */}
-          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-            {[
-              { label: '-12 (Oktave)', val: -12 },
-              { label: '-2 (Ganzton)', val: -2 },
-              { label: '0 (Original)', val: 0 },
-              { label: '+2 (Ganzton)', val: 2 },
-              { label: '+12 (Oktave)', val: 12 }
-            ].map(chip => (
-              <button
-                key={chip.val}
-                type="button"
-                onClick={() => setSemitones(chip.val)}
-                style={{
-                  background: semitones === chip.val ? 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)' : '#ffffff',
-                  color: semitones === chip.val ? '#ffffff' : '#475569',
-                  border: semitones === chip.val ? '1px solid #15803d' : '1px solid #cbd5e1',
-                  borderRadius: '8px',
-                  padding: '3px 8px',
-                  fontSize: '0.68rem',
-                  fontWeight: 850,
-                  cursor: 'pointer',
-                  boxShadow: semitones === chip.val ? '0 2px 6px rgba(22, 163, 74, 0.25)' : '0 1px 2px rgba(0,0,0,0.02)',
-                  transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)'
-                }}
-                onMouseEnter={e => {
-                  if (semitones !== chip.val) {
-                    e.currentTarget.style.background = '#f1f5f9';
-                    e.currentTarget.style.borderColor = '#94a3b8';
-                    e.currentTarget.style.transform = 'translateY(-1px)';
-                  }
-                }}
-                onMouseLeave={e => {
-                  if (semitones !== chip.val) {
-                    e.currentTarget.style.background = '#ffffff';
-                    e.currentTarget.style.borderColor = '#cbd5e1';
-                    e.currentTarget.style.transform = 'translateY(0)';
-                  }
-                }}
-              >
-                {chip.label}
-              </button>
-            ))}
+          {/* Genau 3 Buttons: Tiefer | Original | Höher */}
+          <div style={{ display: 'flex', gap: '6px', flex: 1, maxWidth: '290px' }}>
+            <button
+              type="button"
+              onClick={() => setSemitones(prev => Math.max(-12, prev - 1))}
+              style={{
+                flex: 1,
+                padding: '8px 10px',
+                borderRadius: '10px',
+                border: semitones < 0 ? '1.5px solid #15803d' : '1px solid #cbd5e1',
+                background: semitones < 0 ? 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)' : '#ffffff',
+                color: semitones < 0 ? '#ffffff' : '#334155',
+                fontSize: '0.76rem',
+                fontWeight: 850,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '4px',
+                boxShadow: semitones < 0 ? '0 2px 6px rgba(22, 163, 74, 0.25)' : '0 1px 2px rgba(0,0,0,0.02)',
+                transition: 'all 0.15s ease'
+              }}
+              className="hover-scale-mini"
+              title="Tonhöhe tiefer"
+            >
+              <span>Tiefer</span>
+              {semitones < 0 && <span style={{ opacity: 0.9 }}>({semitones})</span>}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setSemitones(0)}
+              style={{
+                flex: 1,
+                padding: '8px 10px',
+                borderRadius: '10px',
+                border: semitones === 0 ? '1.5px solid #0f172a' : '1px solid #cbd5e1',
+                background: semitones === 0 ? '#0f172a' : '#ffffff',
+                color: semitones === 0 ? '#ffffff' : '#334155',
+                fontSize: '0.76rem',
+                fontWeight: 850,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '4px',
+                boxShadow: semitones === 0 ? '0 2px 6px rgba(15, 23, 42, 0.2)' : '0 1px 2px rgba(0,0,0,0.02)',
+                transition: 'all 0.15s ease'
+              }}
+              className="hover-scale-mini"
+              title="Originale Tonhöhe"
+            >
+              <span>Original</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setSemitones(prev => Math.min(12, prev + 1))}
+              style={{
+                flex: 1,
+                padding: '8px 10px',
+                borderRadius: '10px',
+                border: semitones > 0 ? '1.5px solid #15803d' : '1px solid #cbd5e1',
+                background: semitones > 0 ? 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)' : '#ffffff',
+                color: semitones > 0 ? '#ffffff' : '#334155',
+                fontSize: '0.76rem',
+                fontWeight: 850,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '4px',
+                boxShadow: semitones > 0 ? '0 2px 6px rgba(22, 163, 74, 0.25)' : '0 1px 2px rgba(0,0,0,0.02)',
+                transition: 'all 0.15s ease'
+              }}
+              className="hover-scale-mini"
+              title="Tonhöhe höher"
+            >
+              <span>Höher</span>
+              {semitones > 0 && <span style={{ opacity: 0.9 }}>(+{semitones})</span>}
+            </button>
           </div>
         </div>
 
-        {/* 🎧 Playback & Loop Controls */}
-        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-          <button
-            type="button"
-            onClick={togglePlay}
-            style={{
-              flex: 1,
-              background: isPlaying ? '#0f172a' : 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
-              color: '#ffffff',
-              border: 'none',
-              borderRadius: '14px',
-              padding: '11px 18px',
-              fontSize: '0.84rem',
-              fontWeight: 850,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '8px',
-              boxShadow: isPlaying ? '0 2px 10px rgba(15, 23, 42, 0.25)' : '0 4px 14px rgba(22, 163, 74, 0.3)',
-              transition: 'all 0.15s ease'
-            }}
-          >
-            {isPlaying ? (
-              <>
-                <Square size={13} fill="currentColor" />
-                <span>Stopp</span>
-              </>
-            ) : (
-              <>
-                <Play size={13} fill="currentColor" />
-                <span>Probehören (Leertaste)</span>
-              </>
-            )}
-          </button>
+        {/* 🎧 Playback Button: Spielt automatisch immer im Loop ab */}
+        <button
+          type="button"
+          onClick={togglePlay}
+          style={{
+            width: '100%',
+            background: isPlaying ? '#0f172a' : '#f1f5f9',
+            color: isPlaying ? '#ffffff' : '#0f172a',
+            border: '1px solid #e2e8f0',
+            borderRadius: '16px',
+            padding: '12px 18px',
+            fontSize: '0.88rem',
+            fontWeight: 850,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+            transition: 'all 0.15s ease'
+          }}
+          className="hover-scale"
+        >
+          {isPlaying ? (
+            <>
+              <Square size={15} fill="currentColor" />
+              <span>Stopp</span>
+            </>
+          ) : (
+            <>
+              <Repeat size={15} strokeWidth={2.6} style={{ color: '#16a34a' }} />
+              <Play size={15} fill="currentColor" style={{ marginLeft: '-2px' }} />
+              <span>Bereich loopen ({formatTime(Math.max(0, endTime - startTime))})</span>
+            </>
+          )}
+        </button>
 
-          <button
-            type="button"
-            onClick={() => setIsLoopingSelection(!isLoopingSelection)}
-            style={{
-              background: isLoopingSelection ? '#dcfce7' : '#f8fafc',
-              border: isLoopingSelection ? '1.5px solid #16a34a' : '1.5px solid #cbd5e1',
-              color: isLoopingSelection ? '#15803d' : '#475569',
-              borderRadius: '14px',
-              padding: '11px 16px',
-              fontSize: '0.78rem',
-              fontWeight: 850,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              transition: 'all 0.15s ease'
-            }}
-            title="Loop-Wiedergabe umschalten (L)"
-          >
-            <Repeat size={14} strokeWidth={isLoopingSelection ? 2.8 : 2.2} />
-            <span>Loop</span>
-          </button>
-        </div>
+        {/* 💾 Fertig Speichern Button */}
+        <button
+          type="button"
+          disabled={isSaving}
+          onClick={() => handleExportSave('overwrite')}
+          style={{
+            width: '100%',
+            background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
+            border: 'none',
+            borderRadius: '16px',
+            padding: '13px 20px',
+            fontSize: '0.92rem',
+            fontWeight: 900,
+            color: '#ffffff',
+            cursor: isSaving ? 'wait' : 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px',
+            boxShadow: '0 4px 14px rgba(22, 163, 74, 0.3)',
+            transition: 'all 0.15s ease'
+          }}
+          className="hover-scale"
+        >
+          <Check size={18} strokeWidth={2.8} />
+          <span>{isSaving ? 'Wird gespeichert...' : 'Fertig (Zuschnitt speichern)'}</span>
+        </button>
 
-        {/* 💾 Footer Action Buttons */}
-        <div style={{ display: 'flex', gap: '10px', paddingTop: '8px', borderTop: '1px solid #f1f5f9' }}>
-          <button
-            type="button"
-            disabled={isSaving}
-            onClick={() => handleExportSave('duplicate')}
-            style={{
-              flex: 1,
-              background: '#f8fafc',
-              border: '1.5px solid #cbd5e1',
-              borderRadius: '14px',
-              padding: '11px',
-              fontSize: '0.80rem',
-              fontWeight: 850,
-              color: '#334155',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '6px',
-              transition: 'all 0.15s ease'
-            }}
-            onMouseEnter={e => { e.currentTarget.style.background = '#f1f5f9'; e.currentTarget.style.borderColor = '#94a3b8'; }}
-            onMouseLeave={e => { e.currentTarget.style.background = '#f8fafc'; e.currentTarget.style.borderColor = '#cbd5e1'; }}
-          >
-            <Sparkles size={14} color="#6366f1" />
-            <span>Als Kopie sichern</span>
-          </button>
-
-          <button
-            type="button"
-            disabled={isSaving}
-            onClick={() => handleExportSave('overwrite')}
-            style={{
-              flex: 1,
-              background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
-              border: 'none',
-              borderRadius: '14px',
-              padding: '11px',
-              fontSize: '0.82rem',
-              fontWeight: 900,
-              color: '#ffffff',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '6px',
-              boxShadow: '0 4px 14px rgba(22, 163, 74, 0.3)',
-              transition: 'all 0.15s ease'
-            }}
-          >
-            <Check size={15} strokeWidth={3} />
-            <span>{isSaving ? 'Speichert...' : 'Speichern'}</span>
-          </button>
-        </div>
+        {/* ↩️ Dezent unten: Zurück zum Original */}
+        {isDifferentFromMaster && (
+          <div style={{ display: 'flex', justifyContent: 'center', marginTop: '-4px' }}>
+            <button
+              type="button"
+              onClick={handleRestoreMasterOriginal}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: '#64748b',
+                fontSize: '0.74rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
+                padding: '4px 8px',
+                borderRadius: '6px',
+                transition: 'all 0.15s ease'
+              }}
+              onMouseEnter={e => { e.currentTarget.style.color = '#0f172a'; }}
+              onMouseLeave={e => { e.currentTarget.style.color = '#64748b'; }}
+            >
+              <RotateCcw size={11} strokeWidth={2.4} />
+              <span>Original wiederherstellen ({formatTime(initialOriginalDuration || duration)})</span>
+            </button>
+          </div>
+        )}
 
       </div>
     </div>
   );
 };
-

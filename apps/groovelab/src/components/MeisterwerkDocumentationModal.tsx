@@ -17,7 +17,7 @@ const GrooveLoopstation = React.lazy(() => import('./groovelab/GrooveLoopstation
 const CampusTuner = React.lazy(() => import('./campus/CampusTuner').then(m => ({ default: m.CampusTuner })));
 const AudioBiographyView = React.lazy(() => import('./campus/AudioBiographyView').then(m => ({ default: m.AudioBiographyView })));
 const MeisterwerkCertificateModal = React.lazy(() => import('./ui/MeisterwerkCertificateModal').then(m => ({ default: m.MeisterwerkCertificateModal })));
-import { synthesizeNeuralSpeech, playAudioBlob, stopNeuralSpeech, buildContinuousHomeworkNarrative, cleanTextForTts } from '../services/neuralTtsService';
+import { synthesizeNeuralSpeech, playAudioBlob, stopNeuralSpeech, buildContinuousHomeworkNarrative, cleanTextForTts, formatPageNumbersGerman } from '../services/neuralTtsService';
 import { isDevEnvironment } from '../utils/tenantUrlHelper';
 import { generateStudentHomeworkPrintoutPDF } from '../utils/pdfGenerator';
 import { formatTeacherFullName, capitalizeFirstLetter, formatSongTitleCase, copyTextToClipboard } from '../utils/nameHelper';
@@ -438,12 +438,12 @@ export const SpeechDictationButton: React.FC<{
       {isListening ? (
         <>
           <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#dc2626', display: 'inline-block' }} />
-          <span>🔴 Hört zu... (Stopp)</span>
+          <span>Hört zu... (Stopp)</span>
         </>
       ) : (
         <>
           <Mic size={size === 'sm' ? 12 : 14} style={{ color: '#0284c7' }} />
-          <span>🎤 {title}</span>
+          <span>{title}</span>
         </>
       )}
     </button>
@@ -543,7 +543,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   const isInsideSimTabletLandscape = typeof document !== 'undefined' && !!document.querySelector('.sim-viewport-tablet, .sim-viewport-landscape');
   const isInsideSim = isInsideSimMobile || isInsideSimTabletLandscape;
   const isMobileView = (windowWidth <= 768 && !isInsideSimTabletLandscape) || isInsideSimMobile;
-  const [mobileProtokollTab, setMobileProtokollTab] = useState<'repertoire' | 'homework'>((readOnly && uiLevel === 'junior') ? 'homework' : 'repertoire');
+  const [mobileProtokollTab, setMobileProtokollTab] = useState<'repertoire' | 'homework'>(readOnly ? 'homework' : 'repertoire');
   const [hubTab, setHubTab] = useState<'modules' | 'protocol'>('modules');
   const touchStartXRef = useRef<number | null>(null);
   const touchStartYRef = useRef<number | null>(null);
@@ -1356,10 +1356,30 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       if (initialModalTab === 'document') {
         setActiveSubView('hub');
         setHubTab('modules');
-        setActiveViewMode('document');
+        setActiveViewMode(initialViewMode || 'document');
       }
     }
-  }, [initialModalTab]);
+  }, [initialModalTab, initialViewMode]);
+
+  useEffect(() => {
+    if (initialViewMode) {
+      setActiveViewMode(initialViewMode);
+    }
+  }, [initialViewMode]);
+
+  useEffect(() => {
+    const handleResetToStartseite = () => {
+      setActiveModalTab('document');
+      setActiveViewMode('document');
+      setActiveSubView('hub');
+      setHubTab('modules');
+      setMobileProtokollTab('homework');
+      setSelectedActiveSongId('');
+      setActiveLehrwerkId(null);
+    };
+    window.addEventListener('campus_reset_homework_board', handleResetToStartseite);
+    return () => window.removeEventListener('campus_reset_homework_board', handleResetToStartseite);
+  }, []);
   const [simulatedStickers, setSimulatedStickers] = useState<Record<string, { count: number; details: { topic: string; date: string }[] }>>({});
   const currentSchoolYear = useMemo(() => getSchoolYearString(), []);
   const [selectedSchoolYear, setSelectedSchoolYear] = useState<string>(currentSchoolYear);
@@ -8182,14 +8202,6 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                     <Info size={13} color="#ffffff" />
                   </button>
                 </div>
-                <span style={{
-                  fontSize: '0.68rem',
-                  color: 'rgba(230, 244, 234, 0.85)',
-                  fontWeight: 500,
-                  letterSpacing: '0.01em'
-                }}>
-                  {isTeacherTools ? 'Aufgabenheft / Tools' : 'Schüler-Protokoll & Skill-Radar'}
-                </span>
               </div>
             </div>
 
@@ -9018,21 +9030,50 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                     }
                   } catch {}
 
+                  // Also scan progressItems across all lessons/history
+                  (progressItems || []).forEach((pItem) => {
+                    if (pItem.homework_notes && pItem.homework_notes.includes('AUDIO:')) {
+                      try {
+                        const parsed = JSON.parse(pItem.homework_notes);
+                        if (Array.isArray(parsed)) {
+                          parsed.forEach(n => {
+                            if (typeof n === 'string' && n.includes('AUDIO:') && !rawAudioStrings.some(x => x.str === n)) {
+                              rawAudioStrings.push({ str: n, originalIdx: -1 });
+                            }
+                          });
+                        } else if (typeof parsed === 'string' && parsed.includes('AUDIO:') && !rawAudioStrings.some(x => x.str === parsed)) {
+                          rawAudioStrings.push({ str: parsed, originalIdx: -1 });
+                        }
+                      } catch {
+                        if (!rawAudioStrings.some(x => x.str === pItem.homework_notes)) {
+                          rawAudioStrings.push({ str: pItem.homework_notes, originalIdx: -1 });
+                        }
+                      }
+                    }
+                  });
+
                   const teacherAudios: any[] = [];
                   const seenTeacherUrls = new Set<string>();
 
                   rawAudioStrings.forEach(item => {
                     const cleanStr = item.str.startsWith('[') ? item.str.replace(/[\[\]"]/g, '') : item.str;
-                    const parts = cleanStr.substring(cleanStr.indexOf('AUDIO:') + 6).split('|');
-                    const url = parts[0]?.trim();
-                    if (!url || seenTeacherUrls.has(url)) return;
+                    const audioIndex = cleanStr.indexOf('AUDIO:');
+                    if (audioIndex === -1) return;
+                    const parts = cleanStr.substring(audioIndex + 6).split('|');
+                    const url = parts[0]?.trim() || '';
+                    const label = parts[3]?.trim() || `Aufnahme #${teacherAudios.length + 1}`;
+                    const author = parts[4]?.trim() || 'teacher';
+                    // Strict Segregation: Student recordings belong on the right page
+                    if (author === 'student') return;
+                    const uniqueKey = parts[6] || (url && url !== '#' ? url : null) || `teacher_audio_${item.originalIdx}_${label}`;
+                    if (seenTeacherUrls.has(uniqueKey)) return;
 
-                    seenTeacherUrls.add(url);
+                    seenTeacherUrls.add(uniqueKey);
                     teacherAudios.push({
                       url,
                       duration: parseInt(parts[1] || '0', 10),
                       date: parts[2] || new Date().toISOString(),
-                      label: parts[3] || `Aufnahme #${teacherAudios.length + 1}`,
+                      label,
                       originalIdx: item.originalIdx
                     });
                   });
@@ -9068,10 +9109,10 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                         </div>
                         <div>
                           <h4 style={{ margin: '0 0 4px 0', fontSize: '0.92rem', fontWeight: 900, color: '#1e293b' }}>
-                            Noch keine Aufnahmen vom Lehrer
+                            Noch keine Aufnahmen deiner Lehrkraft
                           </h4>
                           <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748b', fontWeight: 600, maxWidth: '260px', lineHeight: 1.45 }}>
-                            Sobald dein Lehrer im Unterricht ein Play-Along oder Übe-Beispiel aufnimmt, findest du es hier!
+                            Sobald deine Lehrkraft im Unterricht ein Übe-Beispiel aufnimmt, findest du es hier.
                           </p>
                         </div>
                       </div>
@@ -10047,7 +10088,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                             Noch keine eigenen Aufnahmen
                           </h4>
                           <p style={{ margin: 0, fontSize: "0.78rem", color: "#64748b", fontWeight: 600, maxWidth: "260px", lineHeight: 1.45 }}>
-                            Nimm dein Üben auf, höre dir selbst zu und sammle deine besten Takes in deinem Übe-Studio!
+                            Nimm dein Spiel im Übe-Studio auf und sammle deine besten Takes.
                           </p>
                         </div>
                       </div>
@@ -12681,7 +12722,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                   /* ========================================================================= */
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }} className="animation-fade-in">
                     {(() => {
-                      const activeModulesCount = uiLevel === 'junior' ? 3 : (uiLevel === 'teen' ? 5 : 6);
+                      const activeModulesCount = readOnly ? 4 : (uiLevel === 'junior' ? 3 : (uiLevel === 'teen' ? 5 : 6));
 
                       return (
                         <>
@@ -12691,9 +12732,6 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                 <Sliders size={15} style={{ color: '#34a853' }} />
                                 <span>Campus Studio Module</span>
                               </span>
-                              <p style={{ margin: '2px 0 0 0', fontSize: '0.74rem', color: '#64748b', fontWeight: 550 }}>
-                                Interaktive Werkzeuge für deinen Unterricht &amp; deine Übe-Sessions
-                              </p>
                             </div>
                             <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#15803d', background: '#e6f4ea', border: '1px solid #bbf7d0', padding: '2px 8px', borderRadius: '100px' }}>
                               {activeModulesCount} Module aktiv
@@ -12704,10 +12742,10 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                             display: 'grid',
                             gridTemplateColumns: 'repeat(3, 1fr)',
                             gap: '14px 12px',
-                            padding: '2px 0 12px 0'
+                            padding: '4px 0 12px 0'
                           }}>
-                            {/* 1. Protokoll (Ausgeblendet für Junior Schüler für maximale Übersicht & Fokus) */}
-                            {!(readOnly && uiLevel === 'junior') && (
+                            {/* 1. Protokoll (Ausgeblendet im Schüler-Hausaufgabenheft für alle Altersstufen, da rechts der Wochenplan liegt) */}
+                            {!readOnly && (
                               <div
                                 onClick={() => {
                                   setHubTab('protocol');
@@ -12715,8 +12753,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                 style={{
                                   background: '#ffffff',
                                   border: '1.5px solid #e2e8f0',
-                                  borderRadius: '16px',
-                                  padding: '14px 8px 12px 8px',
+                                  borderRadius: '18px',
+                                  padding: '16px 8px 14px 8px',
                                   display: 'flex',
                                   flexDirection: 'column',
                                   alignItems: 'center',
@@ -12728,9 +12766,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                 className="hover-scale"
                               >
                                 <div style={{
-                                  width: '62px',
-                                  height: '62px',
-                                  borderRadius: '14px',
+                                  width: '72px',
+                                  height: '72px',
+                                  borderRadius: '18px',
                                   background: 'linear-gradient(135deg, #10b981 0%, #047857 100%)',
                                   boxShadow: '0 6px 14px -2px rgba(16, 185, 129, 0.40)',
                                   display: 'flex',
@@ -12740,21 +12778,18 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                   overflow: 'hidden',
                                   border: '1px solid rgba(255, 255, 255, 0.25)'
                                 }}>
-                                  <BookOpen size={30} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />
+                                  <BookOpen size={34} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />
                                 </div>
-                                <div style={{ marginTop: '8px', padding: '0 2px' }}>
-                                  <div style={{ fontSize: '0.86rem', fontWeight: 850, color: '#0f172a', letterSpacing: '-0.02em', lineHeight: '1.2' }}>
+                                <div style={{ marginTop: '10px', padding: '0 2px' }}>
+                                  <div style={{ fontSize: '0.92rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', lineHeight: '1.2' }}>
                                     Protokoll
-                                  </div>
-                                  <div style={{ fontSize: '0.70rem', fontWeight: 600, color: '#64748b', marginTop: '2px', lineHeight: '1.3' }}>
-                                    Lehrwerke &amp; Stücke
                                   </div>
                                 </div>
                               </div>
                             )}
 
-                            {/* 2. Loopstation (Nur Teen & Pro) */}
-                            {uiLevel !== 'junior' && (
+                            {/* 2. Loopstation (Ausgeblendet auf der Startseite im Schüler-Modus für alle Altersstufen) */}
+                            {!readOnly && uiLevel !== 'junior' && (
                               <div
                                 onClick={() => {
                                   setActiveModalTab('document');
@@ -12764,8 +12799,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                 style={{
                                   background: '#ffffff',
                                   border: '1.5px solid #e2e8f0',
-                                  borderRadius: '16px',
-                                  padding: '14px 8px 12px 8px',
+                                  borderRadius: '18px',
+                                  padding: '16px 8px 14px 8px',
                                   display: 'flex',
                                   flexDirection: 'column',
                                   alignItems: 'center',
@@ -12777,9 +12812,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                 className="hover-scale"
                               >
                                 <div style={{
-                                  width: '62px',
-                                  height: '62px',
-                                  borderRadius: '14px',
+                                  width: '72px',
+                                  height: '72px',
+                                  borderRadius: '18px',
                                   background: 'linear-gradient(135deg, #f43f5e 0%, #be123c 100%)',
                                   boxShadow: '0 6px 14px -2px rgba(244, 63, 94, 0.40)',
                                   display: 'flex',
@@ -12789,14 +12824,11 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                   overflow: 'hidden',
                                   border: '1px solid rgba(255, 255, 255, 0.25)'
                                 }}>
-                                  <Sliders size={30} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />
+                                  <Sliders size={34} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />
                                 </div>
-                                <div style={{ marginTop: '8px', padding: '0 2px' }}>
-                                  <div style={{ fontSize: '0.86rem', fontWeight: 850, color: '#0f172a', letterSpacing: '-0.02em', lineHeight: '1.2' }}>
+                                <div style={{ marginTop: '10px', padding: '0 2px' }}>
+                                  <div style={{ fontSize: '0.92rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', lineHeight: '1.2' }}>
                                     Loopstation
-                                  </div>
-                                  <div style={{ fontSize: '0.70rem', fontWeight: 600, color: '#64748b', marginTop: '2px', lineHeight: '1.3' }}>
-                                    Audio-Mehrspur
                                   </div>
                                 </div>
                               </div>
@@ -12812,8 +12844,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                               style={{
                                 background: '#ffffff',
                                 border: '1.5px solid #e2e8f0',
-                                borderRadius: '16px',
-                                padding: '14px 8px 12px 8px',
+                                borderRadius: '18px',
+                                padding: '16px 8px 14px 8px',
                                 display: 'flex',
                                 flexDirection: 'column',
                                 alignItems: 'center',
@@ -12825,9 +12857,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                               className="hover-scale"
                             >
                               <div style={{
-                                width: '62px',
-                                height: '62px',
-                                borderRadius: '14px',
+                                width: '72px',
+                                height: '72px',
+                                borderRadius: '18px',
                                 background: 'linear-gradient(135deg, #f59e0b 0%, #b45309 100%)',
                                 boxShadow: '0 6px 14px -2px rgba(245, 158, 11, 0.40)',
                                 display: 'flex',
@@ -12837,14 +12869,11 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                 overflow: 'hidden',
                                 border: '1px solid rgba(255, 255, 255, 0.25)'
                               }}>
-                                <Clock size={30} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />
+                                <Clock size={34} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />
                               </div>
-                              <div style={{ marginTop: '8px', padding: '0 2px' }}>
-                                <div style={{ fontSize: '0.86rem', fontWeight: 850, color: '#0f172a', letterSpacing: '-0.02em', lineHeight: '1.2' }}>
+                              <div style={{ marginTop: '10px', padding: '0 2px' }}>
+                                <div style={{ fontSize: '0.92rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', lineHeight: '1.2' }}>
                                   Übe-Begleiter
-                                </div>
-                                <div style={{ fontSize: '0.70rem', fontWeight: 600, color: '#64748b', marginTop: '2px', lineHeight: '1.3' }}>
-                                  Fokus &amp; Metronom
                                 </div>
                               </div>
                             </div>
@@ -12859,8 +12888,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                               style={{
                                 background: '#ffffff',
                                 border: '1.5px solid #e2e8f0',
-                                borderRadius: '16px',
-                                padding: '14px 8px 12px 8px',
+                                borderRadius: '18px',
+                                padding: '16px 8px 14px 8px',
                                 display: 'flex',
                                 flexDirection: 'column',
                                 alignItems: 'center',
@@ -12872,9 +12901,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                               className="hover-scale"
                             >
                               <div style={{
-                                width: '62px',
-                                height: '62px',
-                                borderRadius: '14px',
+                                width: '72px',
+                                height: '72px',
+                                borderRadius: '18px',
                                 background: 'linear-gradient(135deg, #6366f1 0%, #4338ca 100%)',
                                 boxShadow: '0 6px 14px -2px rgba(99, 102, 241, 0.40)',
                                 display: 'flex',
@@ -12884,14 +12913,11 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                 overflow: 'hidden',
                                 border: '1px solid rgba(255, 255, 255, 0.25)'
                               }}>
-                                <Mic size={30} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />
+                                <Mic size={34} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />
                               </div>
-                              <div style={{ marginTop: '8px', padding: '0 2px' }}>
-                                <div style={{ fontSize: '0.86rem', fontWeight: 850, color: '#0f172a', letterSpacing: '-0.02em', lineHeight: '1.2' }}>
+                              <div style={{ marginTop: '10px', padding: '0 2px' }}>
+                                <div style={{ fontSize: '0.92rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', lineHeight: '1.2' }}>
                                   Aufnahmen
-                                </div>
-                                <div style={{ fontSize: '0.70rem', fontWeight: 600, color: '#64748b', marginTop: '2px', lineHeight: '1.3' }}>
-                                  Unterrichts-Memos
                                 </div>
                               </div>
                             </div>
@@ -12906,8 +12932,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                               style={{
                                 background: '#ffffff',
                                 border: '1.5px solid #e2e8f0',
-                                borderRadius: '16px',
-                                padding: '14px 8px 12px 8px',
+                                borderRadius: '18px',
+                                padding: '16px 8px 14px 8px',
                                 display: 'flex',
                                 flexDirection: 'column',
                                 alignItems: 'center',
@@ -12919,9 +12945,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                               className="hover-scale"
                             >
                               <div style={{
-                                width: '62px',
-                                height: '62px',
-                                borderRadius: '14px',
+                                width: '72px',
+                                height: '72px',
+                                borderRadius: '18px',
                                 background: 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)',
                                 boxShadow: '0 6px 14px -2px rgba(6, 182, 212, 0.40)',
                                 display: 'flex',
@@ -12931,14 +12957,11 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                 overflow: 'hidden',
                                 border: '1px solid rgba(255, 255, 255, 0.25)'
                               }}>
-                                <Radio size={30} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />
+                                <Radio size={34} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />
                               </div>
-                              <div style={{ marginTop: '8px', padding: '0 2px' }}>
-                                <div style={{ fontSize: '0.86rem', fontWeight: 850, color: '#0f172a', letterSpacing: '-0.02em', lineHeight: '1.2' }}>
+                              <div style={{ marginTop: '10px', padding: '0 2px' }}>
+                                <div style={{ fontSize: '0.92rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', lineHeight: '1.2' }}>
                                   Stimmgerät
-                                </div>
-                                <div style={{ fontSize: '0.70rem', fontWeight: 600, color: '#64748b', marginTop: '2px', lineHeight: '1.3' }}>
-                                  WebAudio Tuner
                                 </div>
                               </div>
                             </div>
@@ -12953,8 +12976,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                               style={{
                                 background: '#ffffff',
                                 border: '1.5px solid #e2e8f0',
-                                borderRadius: '16px',
-                                padding: '14px 8px 12px 8px',
+                                borderRadius: '18px',
+                                padding: '16px 8px 14px 8px',
                                 display: 'flex',
                                 flexDirection: 'column',
                                 alignItems: 'center',
@@ -12966,9 +12989,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                               className="hover-scale"
                             >
                               <div style={{
-                                width: '62px',
-                                height: '62px',
-                                borderRadius: '14px',
+                                width: '72px',
+                                height: '72px',
+                                borderRadius: '18px',
                                 background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
                                 boxShadow: '0 6px 14px -2px rgba(249, 115, 22, 0.40)',
                                 display: 'flex',
@@ -12978,20 +13001,17 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                 overflow: 'hidden',
                                 border: '1px solid rgba(255, 255, 255, 0.3)'
                               }}>
-                                <Radio size={30} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />
+                                <Radio size={34} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />
                               </div>
-                              <div style={{ marginTop: '8px', padding: '0 2px' }}>
-                                <div style={{ fontSize: '0.86rem', fontWeight: 850, color: '#0f172a', letterSpacing: '-0.02em', lineHeight: '1.2' }}>
+                              <div style={{ marginTop: '10px', padding: '0 2px' }}>
+                                <div style={{ fontSize: '0.92rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', lineHeight: '1.2' }}>
                                   Groove-Trainer
-                                </div>
-                                <div style={{ fontSize: '0.70rem', fontWeight: 600, color: '#64748b', marginTop: '2px', lineHeight: '1.3' }}>
-                                  Rhythmus &amp; Timing
                                 </div>
                               </div>
                             </div>
 
-                            {/* 7. Skill-Radar (Nur Teen & Pro) */}
-                            {uiLevel !== 'junior' && (
+                            {/* 7. Skill-Radar (Ausgeblendet auf der Startseite im Schüler-Modus für alle Altersstufen) */}
+                            {!readOnly && uiLevel !== 'junior' && (
                               <div
                                 onClick={() => {
                                   setActiveModalTab('skillradar');
@@ -12999,8 +13019,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                 style={{
                                   background: '#ffffff',
                                   border: '1.5px solid #e2e8f0',
-                                  borderRadius: '16px',
-                                  padding: '14px 8px 12px 8px',
+                                  borderRadius: '18px',
+                                  padding: '16px 8px 14px 8px',
                                   display: 'flex',
                                   flexDirection: 'column',
                                   alignItems: 'center',
@@ -13012,9 +13032,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                 className="hover-scale"
                               >
                                 <div style={{
-                                  width: '62px',
-                                  height: '62px',
-                                  borderRadius: '14px',
+                                  width: '72px',
+                                  height: '72px',
+                                  borderRadius: '18px',
                                   background: 'linear-gradient(135deg, #d946ef 0%, #a21caf 100%)',
                                   boxShadow: '0 6px 14px -2px rgba(217, 70, 239, 0.40)',
                                   display: 'flex',
@@ -13024,21 +13044,18 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                   overflow: 'hidden',
                                   border: '1px solid rgba(255, 255, 255, 0.25)'
                                 }}>
-                                  <Activity size={30} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />
+                                  <Activity size={34} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />
                                 </div>
-                                <div style={{ marginTop: '8px', padding: '0 2px' }}>
-                                  <div style={{ fontSize: '0.86rem', fontWeight: 850, color: '#0f172a', letterSpacing: '-0.02em', lineHeight: '1.2' }}>
+                                <div style={{ marginTop: '10px', padding: '0 2px' }}>
+                                  <div style={{ fontSize: '0.92rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', lineHeight: '1.2' }}>
                                     Skill-Radar
-                                  </div>
-                                  <div style={{ fontSize: '0.70rem', fontWeight: 600, color: '#64748b', marginTop: '2px', lineHeight: '1.3' }}>
-                                    Kompetenz-Profil
                                   </div>
                                 </div>
                               </div>
                             )}
 
-                            {/* 8. Archiv (Nur Pro - Letztes Modul) */}
-                            {uiLevel === 'pro' && (
+                            {/* 8. Archiv (Ausgeblendet auf der Startseite im Schüler-Modus für alle Altersstufen) */}
+                            {!readOnly && uiLevel === 'pro' && (
                               <div
                                 onClick={() => {
                                   setActiveModalTab('document');
@@ -13047,8 +13064,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                 style={{
                                   background: '#ffffff',
                                   border: '1.5px solid #e2e8f0',
-                                  borderRadius: '16px',
-                                  padding: '14px 8px 12px 8px',
+                                  borderRadius: '18px',
+                                  padding: '16px 8px 14px 8px',
                                   display: 'flex',
                                   flexDirection: 'column',
                                   alignItems: 'center',
@@ -13060,9 +13077,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                 className="hover-scale"
                               >
                                 <div style={{
-                                  width: '62px',
-                                  height: '62px',
-                                  borderRadius: '14px',
+                                  width: '72px',
+                                  height: '72px',
+                                  borderRadius: '18px',
                                   background: 'linear-gradient(135deg, #64748b 0%, #334155 100%)',
                                   boxShadow: '0 6px 14px -2px rgba(100, 116, 139, 0.40)',
                                   display: 'flex',
@@ -13072,14 +13089,11 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                   overflow: 'hidden',
                                   border: '1px solid rgba(255, 255, 255, 0.25)'
                                 }}>
-                                  <History size={30} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />
+                                  <History size={34} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />
                                 </div>
-                                <div style={{ marginTop: '8px', padding: '0 2px' }}>
-                                  <div style={{ fontSize: '0.86rem', fontWeight: 850, color: '#0f172a', letterSpacing: '-0.02em', lineHeight: '1.2' }}>
+                                <div style={{ marginTop: '10px', padding: '0 2px' }}>
+                                  <div style={{ fontSize: '0.92rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', lineHeight: '1.2' }}>
                                     Archiv
-                                  </div>
-                                  <div style={{ fontSize: '0.70rem', fontWeight: 600, color: '#64748b', marginTop: '2px', lineHeight: '1.3' }}>
-                                    Historie &amp; Jahre
                                   </div>
                                 </div>
                               </div>
@@ -14270,13 +14284,15 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                       gap: isMobileOrSim ? '4px' : '5px'
                     }}
                     className="hover-scale"
-                    title={isMobileOrSim ? (uiLevel === 'junior' ? 'Sticker-Album' : uiLevel === 'teen' ? 'Badges & Trophäen' : 'Meilensteine') : undefined}
+                    title={readOnly ? (isMobileOrSim ? 'Sticker-Album' : undefined) : (isMobileOrSim ? (uiLevel === 'junior' ? 'Sticker-Album' : uiLevel === 'teen' ? 'Badges & Trophäen' : 'Meilensteine') : undefined)}
                   >
                     <Star size={isMobileOrSim ? 13 : 14} fill="#fff" />
                     <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {isMobileOrSim 
-                        ? (uiLevel === 'junior' ? 'Sticker' : uiLevel === 'teen' ? 'Trophäen' : 'Meilensteine')
-                        : (uiLevel === 'junior' ? 'Sticker-Album' : uiLevel === 'teen' ? 'Badges & Trophäen' : 'Meilensteine')}
+                      {readOnly
+                        ? (isMobileOrSim ? 'Sticker' : 'Sticker-Album')
+                        : (isMobileOrSim 
+                            ? (uiLevel === 'junior' ? 'Sticker' : uiLevel === 'teen' ? 'Trophäen' : 'Meilensteine')
+                            : (uiLevel === 'junior' ? 'Sticker-Album' : uiLevel === 'teen' ? 'Badges & Trophäen' : 'Meilensteine'))}
                     </span>
                   </button>
                   <button
@@ -15872,11 +15888,11 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                       <Edit3 size={16} style={{ color: '#0f172a' }} />
                       <span>{readOnly ? 'Hausaufgaben & Wochenplan' : 'Eintrag & Hausaufgabe'}</span>
                     </span>
-                    <p style={{ margin: '3px 0 0 0', fontSize: '0.76rem', color: '#71717a', fontWeight: 550, lineHeight: '1.3' }}>
-                      {readOnly 
-                        ? 'Deine aktuellen Aufgaben, Stücke und Übungsmemos für diese Woche.' 
-                        : 'Dokumentiere den heutigen Unterricht für den Schüler.'}
-                    </p>
+                    {!readOnly && (
+                      <p style={{ margin: '3px 0 0 0', fontSize: '0.76rem', color: '#71717a', fontWeight: 550, lineHeight: '1.3' }}>
+                        Dokumentiere den heutigen Unterricht für den Schüler.
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -15909,8 +15925,39 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                           return getISOWeek(d);
                         };
 
+                        const getWeekDateRange = (offset: number) => {
+                          const target = getSimulatedNow();
+                          target.setDate(target.getDate() + (offset * 7));
+
+                          const day = target.getDay();
+                          const diffToMonday = (day === 0 ? -6 : 1) - day;
+                          const monday = new Date(target);
+                          monday.setDate(target.getDate() + diffToMonday);
+
+                          const sunday = new Date(monday);
+                          sunday.setDate(monday.getDate() + 6);
+
+                          const startDay = monday.getDate();
+                          const endDay = sunday.getDate();
+                          const startMonth = monday.toLocaleDateString('de-DE', { month: 'short' }).replace('.', '');
+                          const endMonth = sunday.toLocaleDateString('de-DE', { month: 'short' }).replace('.', '');
+
+                          const dateSpan = startMonth === endMonth
+                            ? `${startDay}. – ${endDay}. ${startMonth}`
+                            : `${startDay}. ${startMonth} – ${endDay}. ${endMonth}`;
+
+                          let label = 'Diese Woche';
+                          if (offset === -1) label = 'Letzte Woche';
+                          else if (offset === 1) label = 'Nächste Woche';
+                          else if (offset < -1) label = `Vor ${Math.abs(offset)} Wochen`;
+                          else if (offset > 1) label = `In ${offset} Wochen`;
+
+                          return { dateSpan, label };
+                        };
+
                         const viewingWeekIso = getTargetWeekIso(viewingWeekOffset);
                         const viewingWeekNum = viewingWeekIso.split('-W')[1] || '';
+                        const weekRange = getWeekDateRange(viewingWeekOffset);
                         const isPastWeek = viewingWeekOffset < 0;
                         const isFutureWeek = viewingWeekOffset > 0;
                         const isCurrentWeek = viewingWeekOffset === 0;
@@ -16205,14 +16252,20 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                     <ChevronLeft size={14} strokeWidth={2.5} />
                                   </button>
 
-                                  <span style={{ fontSize: '0.90rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', padding: '0 4px', whiteSpace: 'nowrap' }}>
-                                    {readOnly ? 'Hausaufgabe' : 'Schülervorschau'} • KW {viewingWeekNum}
+                                  <span 
+                                    title={`Kalenderwoche ${viewingWeekNum} (ISO 8601)`}
+                                    style={{ fontSize: '0.90rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', padding: '0 4px', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                                  >
+                                    <span>{readOnly ? 'Hausaufgabe' : 'Schülervorschau'} • {weekRange.label}</span>
+                                    <span style={{ fontSize: '0.74rem', fontWeight: 650, color: '#64748b' }}>
+                                      ({weekRange.dateSpan})
+                                    </span>
                                   </span>
 
                                   <button
                                     type="button"
                                     onClick={() => setViewingWeekOffset(prev => Math.min(1, prev + 1))}
-                                    title="Nächste Woche (KW)"
+                                    title="Nächste Woche"
                                     style={{
                                       background: '#f8fafc',
                                       border: '1px solid #e2e8f0',
@@ -16618,8 +16671,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                   <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', alignItems: 'center' }}>
                                     <span style={{ fontSize: '0.88rem', color: '#0f172a', fontWeight: 850, letterSpacing: '-0.01em' }}>
                                       {isPastWeek
-                                        ? `Keine Hausaufgaben für KW ${viewingWeekNum} archiviert`
-                                        : `Wochen-Fahrplan für KW ${viewingWeekNum}`}
+                                        ? `Keine Hausaufgaben für ${weekRange.label.toLowerCase()} (${weekRange.dateSpan}) archiviert`
+                                        : `Wochen-Fahrplan für ${weekRange.label.toLowerCase()} (${weekRange.dateSpan})`}
                                     </span>
                                     <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 550, maxWidth: '320px', lineHeight: 1.45 }}>
                                       {isPastWeek
@@ -16729,11 +16782,16 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                       gap: '5px'
                                     }}>
                                       <BookOpen size={11} />
-                                      <span>Wochen-Fahrplan • KW {viewingWeekNum}</span>
+                                      <span>Wochen-Fahrplan • {weekRange.label.toUpperCase()}</span>
+                                      <span style={{ fontSize: '0.64rem', fontWeight: 650, color: '#94a3b8', textTransform: 'none', letterSpacing: '0' }}>
+                                        ({weekRange.dateSpan})
+                                      </span>
                                     </span>
-                                    <span style={{ fontSize: '0.66rem', color: '#94a3b8', fontWeight: 600 }}>
-                                      Live-Schülersicht
-                                    </span>
+                                    {!readOnly && (
+                                      <span style={{ fontSize: '0.66rem', color: '#94a3b8', fontWeight: 600 }}>
+                                        Live-Schülersicht
+                                      </span>
+                                    )}
                                   </div>
 
                                   {/* Lehrwerke Books */}
@@ -16786,22 +16844,41 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                           </div>
 
                                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
-                                            {/* Granular Page Badges */}
-                                            <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
-                                              {item.pages.map((p: number) => (
-                                                <span key={`p-pill-${p}`} style={{
-                                                  fontSize: '0.72rem',
-                                                  fontWeight: 800,
+                                            {readOnly ? (
+                                              /* Kompakte zusammenhängende Seiten-Pille für Schüler (z.B. S. 1–3) */
+                                              <span
+                                                aria-label={formatPageNumbersGerman(item.pages)}
+                                                title={formatPageNumbersGerman(item.pages)}
+                                                style={{
+                                                  fontSize: '0.74rem',
+                                                  fontWeight: 850,
                                                   color: '#15803d',
                                                   background: '#dcfce7',
-                                                  padding: '3px 8px',
+                                                  padding: '3px 10px',
                                                   borderRadius: '99px',
                                                   display: 'inline-flex',
                                                   alignItems: 'center',
-                                                  gap: '4px'
-                                                }}>
-                                                  S. {p}
-                                                  {!readOnly && (
+                                                  letterSpacing: '-0.01em'
+                                                }}
+                                              >
+                                                {formatPageNumbers(item.pages)}
+                                              </span>
+                                            ) : (
+                                              /* Granular Page Badges for Teachers (mit Einzelseiten-Löschen) */
+                                              <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                                                {item.pages.map((p: number) => (
+                                                  <span key={`p-pill-${p}`} style={{
+                                                    fontSize: '0.72rem',
+                                                    fontWeight: 800,
+                                                    color: '#15803d',
+                                                    background: '#dcfce7',
+                                                    padding: '3px 8px',
+                                                    borderRadius: '99px',
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    gap: '4px'
+                                                  }}>
+                                                    S. {p}
                                                     <button
                                                       type="button"
                                                       onClick={(e) => {
@@ -16823,10 +16900,10 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                                     >
                                                       ✕
                                                     </button>
-                                                  )}
-                                                </span>
-                                              ))}
-                                            </div>
+                                                  </span>
+                                                ))}
+                                              </div>
+                                            )}
 
                                             {!readOnly && (
                                               <button
@@ -17540,22 +17617,32 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                 borderTop: '1px solid #f1f5f9'
                               }}>
                                 <div style={{
-                                  background: '#fffbeb',
-                                  border: '1.5px solid #fef3c7',
-                                  borderRadius: '14px',
-                                  padding: '12px 14px',
+                                  background: '#f8fafc',
+                                  border: '1px solid #e2e8f0',
+                                  borderRadius: '16px',
+                                  padding: '10px 14px',
                                   display: 'flex',
                                   alignItems: 'center',
                                   justifyContent: 'space-between',
                                   gap: '12px',
-                                  boxShadow: '0 2px 8px rgba(245, 158, 11, 0.05)'
+                                  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.02)'
                                 }}>
-                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0, flex: 1 }}>
-                                    <span style={{ fontSize: '0.78rem', fontWeight: 850, color: '#92400e', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                                      ❓ Frage für deine nächste Unterrichtsstunde:
-                                    </span>
-                                    <span style={{ fontSize: '0.70rem', color: '#b45309', fontWeight: 550 }}>
-                                      Hakt ein Griff oder Takt? Sprich deine Frage kurz ein – deine Lehrkraft sieht sie direkt in der nächsten Stunde!
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '9px', minWidth: 0 }}>
+                                    <div style={{
+                                      width: '32px',
+                                      height: '32px',
+                                      borderRadius: '10px',
+                                      background: '#e0f2fe',
+                                      color: '#0284c7',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      flexShrink: 0
+                                    }}>
+                                      <MessageSquare size={16} strokeWidth={2.4} />
+                                    </div>
+                                    <span style={{ fontSize: '0.84rem', fontWeight: 800, color: '#1e293b', letterSpacing: '-0.01em' }}>
+                                      Frage an deine Lehrkraft
                                     </span>
                                   </div>
                                   <SpeechDictationButton
@@ -17572,7 +17659,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                       try { localStorage.setItem(`campus_homework_notes_${student.id}`, JSON.stringify(combined)); } catch {}
                                       triggerDebouncedAutoSave(350);
                                     }}
-                                    title="Frage per Spracheingabe einsprechen"
+                                    title="Frage einsprechen"
                                   />
                                 </div>
                               </div>

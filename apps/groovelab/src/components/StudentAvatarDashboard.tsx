@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase';
 import { storeBlob, getBlob, deleteBlob } from '../utils/blobStorage';
 import { subscribeUserToPush, unsubscribeUserFromPush } from '../utils/webPush';
 import { 
-  Award, Lock, Smartphone, HelpCircle, Trophy, Sparkles, Star, 
+  Award, Lock, Smartphone, HelpCircle, Trophy, Sparkles, Star, Rocket,
   ChevronLeft, ChevronRight, Coffee, Clock, Timer, Flame, BookOpen, Share2, Play, 
   Pause, RotateCcw, Volume2, VolumeX, Moon, QrCode, X, Eye, EyeOff, Zap, Music, Library, School, Calendar, CalendarX, Check, CheckCircle, Target, MessageSquare, Send,
   Pencil, Edit3, User, Mail, Phone, MapPin, Activity, Camera, TrendingUp, Users, Shield, Search, Palmtree, Settings, Bell, FileText, ThumbsUp, Heart, AlertTriangle, Anchor, ShieldCheck, CheckCheck, Building,
@@ -31,6 +31,8 @@ import { processPureRawBlob, TARGET_PURE_RAW_LUFS, TARGET_PEAK_DBTP } from '../u
 import { computeGroundTruthMetrics, broadcastPracticeUpdate, DEFAULT_FOKUS_LEVELS, getEngineEffectiveLevel } from '../utils/studentProgressEngine';
 import { synthesizeNeuralSpeech, playAudioBlob, stopNeuralSpeech, buildContinuousHomeworkNarrative, cleanTextForTts } from '../services/neuralTtsService';
 import { fetchHolidaysCached } from '../utils/holidayHelper';
+import { useParentSessionLock } from '../hooks/useParentSessionLock';
+import { AddSiblingModal } from './campus/AddSiblingModal';
 
 // 🚀 High-Performance Lazy Loaded Sub-Suites & Heavy Modals
 const CampusEventsBoard = lazy(() => import('./CampusEventsBoard').then(m => ({ default: m.CampusEventsBoard })));
@@ -624,17 +626,41 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
   const [studentUser, setStudentUser] = useState<any>(() => initialUser || null);
   const currentPlatform: 'campus' | 'groovelab' = parentActiveTab === 'campus' ? 'campus' : (parentActiveTab === 'groovelab' ? 'groovelab' : ((typeof window !== 'undefined' ? localStorage.getItem('groovelab_active_platform') : 'campus') === 'groovelab' ? 'groovelab' : 'campus'));
 
-  // 3-Level Adaptive UI State ('junior' | 'teen' | 'pro')
-  const [studentUiLevel, setStudentUiLevel] = useState<CampusUiLevel | null>(() => {
+  // 3-Level Adaptive UI State ('junior' | 'teen' | 'pro') - SSOT Priority Hierarchy
+  const [studentUiLevel, setStudentUiLevel] = useState<CampusUiLevel>(() => {
+    // 1. Authoritative Server DB Level (Highest Priority)
+    const dbLevel = (initialUser as any)?.campus_ui_level;
+    if (dbLevel === 'junior' || dbLevel === 'teen' || dbLevel === 'pro') {
+      return dbLevel as CampusUiLevel;
+    }
     if (typeof window === 'undefined') return 'junior';
-    const effectiveId = studentId || studentUser?.id;
-    const namespacedSaved = effectiveId ? localStorage.getItem(`campus_student_ui_level_${effectiveId}`) : null;
-    if (namespacedSaved === 'junior' || namespacedSaved === 'teen' || namespacedSaved === 'pro') return namespacedSaved as CampusUiLevel;
-    const saved = localStorage.getItem('campus_student_ui_level');
-    if (saved === 'junior' || saved === 'teen' || saved === 'pro') return saved as CampusUiLevel;
-    return null;
+    // 2. Student-Namespaced Local Cache
+    const effectiveId = studentId || (initialUser as any)?.id;
+    if (effectiveId) {
+      const namespacedSaved = localStorage.getItem(`campus_student_ui_level_${effectiveId}`);
+      if (namespacedSaved === 'junior' || namespacedSaved === 'teen' || namespacedSaved === 'pro') {
+        return namespacedSaved as CampusUiLevel;
+      }
+    }
+    // 3. Fail-Closed Default (Always 'junior' for child protection)
+    return 'junior';
   });
   const [showLevelModal, setShowLevelModal] = useState<boolean>(false);
+
+  // 🎼 Notenständer-Modus (Großschrift & Glanceability für 60–90 cm Distanz am Instrument)
+  const [isMusicStandMode, setIsMusicStandMode] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return localStorage.getItem('campus_music_stand_mode') === 'true';
+  });
+
+  const toggleMusicStandMode = () => {
+    setIsMusicStandMode(prev => {
+      const next = !prev;
+      localStorage.setItem('campus_music_stand_mode', String(next));
+      return next;
+    });
+  };
+
   const [certificateSong, setCertificateSong] = useState<any | null>(null);
   const [resolvedSchoolName, setResolvedSchoolName] = useState<string>(() => {
     return (initialUser as any)?.schools?.name || (initialUser as any)?.school_name || (typeof window !== 'undefined' ? (localStorage.getItem('groovelab_school_name') || localStorage.getItem('campus_school_name')) : '') || 'Campus-Groovelab Musikschule';
@@ -701,6 +727,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
 
   const handleLevelChange = async (newLevel: CampusUiLevel) => {
     setStudentUiLevel(newLevel);
+    setDraftUiLevel(newLevel);
     const effectiveId = studentId || studentUser?.id;
     if (effectiveId) {
       localStorage.setItem(`campus_student_ui_level_${effectiveId}`, newLevel);
@@ -709,13 +736,35 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     window.dispatchEvent(new CustomEvent('campus_ui_level_changed', { detail: newLevel }));
     setShowLevelModal(false);
     try {
-      if (studentUser?.id) {
-        await supabase.from('users').update({ campus_ui_level: newLevel }).eq('id', studentUser.id);
+      if (effectiveId) {
+        // 🛡️ Revisionssichere Persistenz via RPC mit Fallback
+        const { error: rpcErr } = await supabase.rpc('save_parent_controls', {
+          p_student_id: effectiveId,
+          p_settings: { campus_ui_level: newLevel }
+        });
+        if (rpcErr) {
+          console.warn('save_parent_controls RPC failed in handleLevelChange, fallback to users table:', rpcErr);
+          await supabase.from('users').update({ campus_ui_level: newLevel }).eq('id', effectiveId);
+        }
       }
     } catch (e) {
       console.warn('Could not persist campus_ui_level to users table:', e);
     }
   };
+
+  // 🛡️ REVISIONSSICHERE PERSISTENZ: DB-Level synchronisieren
+  useEffect(() => {
+    const currentDbLevel = studentUser?.campus_ui_level;
+    if (currentDbLevel && (currentDbLevel === 'junior' || currentDbLevel === 'teen' || currentDbLevel === 'pro')) {
+      setStudentUiLevel(currentDbLevel);
+      setDraftUiLevel(currentDbLevel);
+      const effectiveId = studentId || studentUser?.id;
+      if (effectiveId) {
+        localStorage.setItem(`campus_student_ui_level_${effectiveId}`, currentDbLevel);
+      }
+      localStorage.setItem('campus_student_ui_level', currentDbLevel);
+    }
+  }, [studentUser?.campus_ui_level, studentId, studentUser?.id]);
 
   const handleJuniorPracticeComplete = async (minutes: number, xpEarned: number) => {
     try {
@@ -809,7 +858,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       {
         selector: 'tour-student-songs',
         title: 'Klassen-Highlights & Team-Power',
-        description: 'Entdecke die Erfolge deiner Mitschüler, sammelt gemeinsame Übe-Minuten und feiert eure Meilensteine.'
+        description: 'Gemeinsam üben & Sterne für die Schule sammeln! ⭐'
       }
     ];
   }, []);
@@ -882,12 +931,18 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
   const [matchCelebrationData, setMatchCelebrationData] = useState<any | null>(null);
 
   // Parent Control Center Draft States & Step-Up Save Modal (Deterministic SSOT)
-  const [draftUiLevel, setDraftUiLevel] = useState<string | null>(() => {
+  const [parentControlsTab, setParentControlsTab] = useState<'governance' | 'insights' | 'cancellations'>('governance');
+  const [draftUiLevel, setDraftUiLevel] = useState<string>(() => {
+    const dbLevel = (initialUser as any)?.campus_ui_level;
+    if (dbLevel === 'junior' || dbLevel === 'teen' || dbLevel === 'pro') return dbLevel;
     if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('campus_student_ui_level');
-      if (saved) return saved;
+      const effectiveId = studentId || (initialUser as any)?.id;
+      if (effectiveId) {
+        const namespaced = localStorage.getItem(`campus_student_ui_level_${effectiveId}`);
+        if (namespaced === 'junior' || namespaced === 'teen' || namespaced === 'pro') return namespaced;
+      }
     }
-    return initialUser?.campus_ui_level || null;
+    return 'junior';
   });
   const [draftAllowAbsences, setDraftAllowAbsences] = useState<boolean | null>(() => {
     if (typeof window !== 'undefined' && studentId) {
@@ -960,6 +1015,15 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     return null;
   });
   const [draftBoardOverrides, setDraftBoardOverrides] = useState<Record<string, boolean>>({});
+  
+  // 🛡️ Goldstandard (Art. 25 & 28 DSA / Art. 12 Abs. 1 S. 2 DSGVO): State für temporäres Diff-Highlighting bei Stufenwechsel
+  const [recentlyChangedDiff, setRecentlyChangedDiff] = useState<{
+    keys: string[];
+    targetLevelLabel: string;
+    targetLevelId: string;
+    changes: Record<string, { from: boolean; to: boolean }>;
+  } | null>(null);
+
   const [showSavePinModal, setShowSavePinModal] = useState<boolean>(false);
   const [savePinInput, setSavePinInput] = useState<string>('');
   const [savePinError, setSavePinError] = useState<string | null>(null);
@@ -1017,13 +1081,76 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     return () => clearInterval(timer);
   }, [parentGateCooldownSeconds]);
 
+  // Master Wall-Clock 1s Heartbeat for exact countdowns & lock synchronicity
+  const [wallClockNow, setWallClockNow] = useState<Date>(() => new Date());
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setWallClockNow(new Date());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // WebAuthn / Passkey availability check for hardware biometrics
+  const [isWebAuthnAvailable, setIsWebAuthnAvailable] = useState<boolean>(false);
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.PublicKeyCredential) {
+      PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()
+        .then(res => setIsWebAuthnAvailable(Boolean(res)))
+        .catch(() => setIsWebAuthnAvailable(false));
+    }
+  }, []);
+
   const handleBiometricUnlock = async () => {
     try {
       setIsVerifyingParentGate(true);
+      setParentGateError('');
       const targetId = studentId || (studentUser as any)?.id;
+      if (!targetId) throw new Error('Kein Schülerprofil zugeordnet.');
+
+      // 1. Request cryptographic challenge from server
+      const { data: chalData, error: chalErr } = await supabase.rpc('generate_webauthn_challenge', {
+        p_user_id: targetId,
+        p_type: 'auth'
+      });
+
+      if (chalErr || !chalData?.challenge) {
+        throw new Error('Sicherheits-Challenge konnte nicht vom Server bezogen werden.');
+      }
+
+      const challengeBuffer = new Uint8Array(
+        chalData.challenge.match(/.{1,2}/g)?.map((byte: string) => parseInt(byte, 16)) || []
+      ).buffer;
+
+      // 2. Perform native WebAuthn get assertion
+      const assertion = (await navigator.credentials.get({
+        publicKey: {
+          challenge: challengeBuffer,
+          userVerification: 'required',
+          timeout: 60000,
+        },
+      })) as PublicKeyCredential;
+
+      if (!assertion) {
+        throw new Error('Keine biometrische Bestätigung empfangen.');
+      }
+
+      const credentialId = assertion.id;
+
+      // 3. Authenticate credential via server RPC
+      const { data: authResult, error: authErr } = await supabase.rpc('authenticate_webauthn_credential', {
+        p_credential_id: credentialId,
+        p_challenge: chalData.challenge,
+        p_school_id: (studentUser as any)?.school_id || null
+      });
+
+      if (authErr || !authResult?.success) {
+        throw new Error(authResult?.error || authErr?.message || 'Biometrischer Passkey nicht erkannt oder nicht für dieses Profil registriert.');
+      }
+
+      // 4. Authorized: Set verified session lease (180s)
       const siblingGroupId = (studentUser as any)?.sibling_group_id || (initialUser as any)?.sibling_group_id;
-      sessionStorage.setItem(`groovelab_parent_session_${targetId}`, String(Date.now() + 60 * 60 * 1000));
-      if (studentId) sessionStorage.setItem(`groovelab_parent_session_${studentId}`, String(Date.now() + 60 * 60 * 1000));
+      sessionStorage.setItem(`groovelab_parent_session_${targetId}`, String(Date.now() + 180 * 1000));
+      if (studentId) sessionStorage.setItem(`groovelab_parent_session_${studentId}`, String(Date.now() + 180 * 1000));
       sessionStorage.setItem(`groovelab_parent_unlocked_${targetId}`, 'true');
       if (studentId) sessionStorage.setItem(`groovelab_parent_unlocked_${studentId}`, 'true');
       sessionStorage.setItem('groovelab_parent_unlocked_global', 'true');
@@ -1036,12 +1163,31 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       window.dispatchEvent(new CustomEvent('groovelab_parent_mode_changed', { detail: true }));
       setSettingsSubTab('overview');
       setActiveStudentSettingsModal(null);
-    } catch (e) {
+    } catch (e: any) {
       console.warn('[Biometrics] Unlock failed:', e);
+      setParentGateError(e.message || 'FaceID/TouchID Entsperrung fehlgeschlagen.');
     } finally {
       setIsVerifyingParentGate(false);
     }
   };
+
+  // 🛡️ Enterprise+ Inactivity Auto-Lock & Tab-Switch Protector (3 Minutes with 10s Warning)
+  const {
+    isWarning: isParentLockWarning,
+    remainingSeconds: parentLockRemainingSeconds,
+    extendSession: extendParentSession
+  } = useParentSessionLock({
+    enabled: isParentUnlocked,
+    studentId,
+    timeoutSeconds: 180,
+    warningThresholdSeconds: 10,
+    onLock: () => {
+      setIsParentUnlocked(false);
+      setSettingsSubTab('overview');
+      setActiveStudentSettingsModal(null);
+      setParentGatePinInput('');
+    }
+  });
 
   const generateParentRecoveryKey = () => {
     const p1 = Math.floor(1000 + Math.random() * 9000);
@@ -1194,6 +1340,9 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     allowProposals: boolean;
     allowAudio: boolean;
     allowTts: boolean;
+    bedtimeEnabled: boolean;
+    bedtimeStart: string;
+    bedtimeEnd: string;
     boardOverrides: Record<string, boolean>;
   }> = {
     junior: {
@@ -1206,6 +1355,9 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       allowProposals: false,
       allowAudio: true,
       allowTts: true,
+      bedtimeEnabled: true,
+      bedtimeStart: '20:00',
+      bedtimeEnd: '07:00',
       boardOverrides: {
         practice_board: true,
         mediathek: false,
@@ -1225,6 +1377,9 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       allowProposals: true,
       allowAudio: true,
       allowTts: false,
+      bedtimeEnabled: true,
+      bedtimeStart: '21:30',
+      bedtimeEnd: '06:30',
       boardOverrides: {
         practice_board: true,
         mediathek: true,
@@ -1244,6 +1399,9 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       allowProposals: true,
       allowAudio: true,
       allowTts: false,
+      bedtimeEnabled: false,
+      bedtimeStart: '22:30',
+      bedtimeEnd: '06:00',
       boardOverrides: {
         practice_board: true,
         mediathek: true,
@@ -1264,30 +1422,43 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     allowProposals?: boolean;
     allowAudio?: boolean;
     allowTts?: boolean;
+    bedtimeEnabled?: boolean;
+    bedtimeStart?: string;
+    bedtimeEnd?: string;
+    daytimeLockEnabled?: boolean;
+    daytimeLockStart?: string;
+    daytimeLockEnd?: string;
+    daytimeLockDays?: 'school_days' | 'everyday';
+    instantLockUntil?: number | null;
     boardOverrides?: Record<string, boolean>;
   }) => {
-    const nextUiLevel = updates.uiLevel ?? draftUiLevel ?? (studentUser as any)?.campus_ui_level ?? (localStorage.getItem('campus_student_ui_level') || 'junior');
-    const nextAllowAbsences = updates.allowAbsences !== undefined 
-      ? updates.allowAbsences 
-      : (draftAllowAbsences !== null ? draftAllowAbsences : ((studentUser as any)?.parent_allow_absences !== undefined && (studentUser as any)?.parent_allow_absences !== null ? Boolean((studentUser as any)?.parent_allow_absences) : (studentId && typeof window !== 'undefined' && localStorage.getItem(`groovelab_parent_allow_absences_${studentId}`) !== null ? localStorage.getItem(`groovelab_parent_allow_absences_${studentId}`) === 'true' : (nextUiLevel === 'pro'))));
+    const targetStudentId = studentId || (studentUser as any)?.id;
+    const nextUiLevel = updates.uiLevel ?? draftUiLevel ?? (studentUser as any)?.campus_ui_level ?? 'junior';
+    const isJuniorLevel = nextUiLevel === 'junior';
+    // 🛡️ BGB/ABGB/ZGB Kinderschutz: Junior (6–10 J.) darf vertragliche Unterrichtsstunden nicht selbst stornieren
+    const nextAllowAbsences = isJuniorLevel
+      ? false
+      : (updates.allowAbsences !== undefined 
+          ? updates.allowAbsences 
+          : (draftAllowAbsences !== null ? draftAllowAbsences : ((studentUser as any)?.parent_allow_absences !== undefined && (studentUser as any)?.parent_allow_absences !== null ? Boolean((studentUser as any)?.parent_allow_absences) : false)));
     const nextAllowChat = updates.allowChat !== undefined 
       ? updates.allowChat 
-      : (draftAllowChat !== null ? draftAllowChat : ((studentUser as any)?.parent_allow_chat !== undefined && (studentUser as any)?.parent_allow_chat !== null ? Boolean((studentUser as any)?.parent_allow_chat) : (studentId && typeof window !== 'undefined' && localStorage.getItem(`groovelab_parent_allow_chat_${studentId}`) !== null ? localStorage.getItem(`groovelab_parent_allow_chat_${studentId}`) === 'true' : (nextUiLevel !== 'junior'))));
+      : (draftAllowChat !== null ? draftAllowChat : ((studentUser as any)?.parent_allow_chat !== undefined && (studentUser as any)?.parent_allow_chat !== null ? Boolean((studentUser as any)?.parent_allow_chat) : false));
     const nextAllowTimer = updates.allowTimer !== undefined 
       ? updates.allowTimer 
-      : (draftAllowTimer !== null ? draftAllowTimer : ((studentUser as any)?.parent_allow_timer !== undefined && (studentUser as any)?.parent_allow_timer !== null ? Boolean((studentUser as any)?.parent_allow_timer) : (studentId && typeof window !== 'undefined' && localStorage.getItem(`groovelab_parent_allow_timer_${studentId}`) !== null ? localStorage.getItem(`groovelab_parent_allow_timer_${studentId}`) === 'true' : true)));
+      : (draftAllowTimer !== null ? draftAllowTimer : ((studentUser as any)?.parent_allow_timer !== undefined && (studentUser as any)?.parent_allow_timer !== null ? Boolean((studentUser as any)?.parent_allow_timer) : true));
     const nextAllowLeaderboard = updates.allowLeaderboard !== undefined 
       ? updates.allowLeaderboard 
-      : (draftAllowLeaderboard !== null ? draftAllowLeaderboard : ((studentUser as any)?.parent_allow_leaderboard !== undefined && (studentUser as any)?.parent_allow_leaderboard !== null ? Boolean((studentUser as any)?.parent_allow_leaderboard) : (studentId && typeof window !== 'undefined' && localStorage.getItem(`groovelab_parent_allow_leaderboard_${studentId}`) !== null ? localStorage.getItem(`groovelab_parent_allow_leaderboard_${studentId}`) === 'true' : (nextUiLevel !== 'junior'))));
+      : (draftAllowLeaderboard !== null ? draftAllowLeaderboard : ((studentUser as any)?.parent_allow_leaderboard !== undefined && (studentUser as any)?.parent_allow_leaderboard !== null ? Boolean((studentUser as any)?.parent_allow_leaderboard) : false));
     const nextAllowProposals = updates.allowProposals !== undefined 
       ? updates.allowProposals 
-      : (draftAllowProposals !== null ? draftAllowProposals : ((studentUser as any)?.parent_allow_proposals !== undefined && (studentUser as any)?.parent_allow_proposals !== null ? Boolean((studentUser as any)?.parent_allow_proposals) : (studentId && typeof window !== 'undefined' && localStorage.getItem(`groovelab_parent_allow_proposals_${studentId}`) !== null ? localStorage.getItem(`groovelab_parent_allow_proposals_${studentId}`) === 'true' : (nextUiLevel !== 'junior'))));
+      : (draftAllowProposals !== null ? draftAllowProposals : ((studentUser as any)?.parent_allow_proposals !== undefined && (studentUser as any)?.parent_allow_proposals !== null ? Boolean((studentUser as any)?.parent_allow_proposals) : false));
     const nextAllowAudio = updates.allowAudio !== undefined 
       ? updates.allowAudio 
-      : (draftAllowAudio !== null ? draftAllowAudio : ((studentUser as any)?.parent_allow_audio !== undefined && (studentUser as any)?.parent_allow_audio !== null ? Boolean((studentUser as any)?.parent_allow_audio) : (studentId && typeof window !== 'undefined' && localStorage.getItem(`groovelab_parent_allow_audio_${studentId}`) !== null ? localStorage.getItem(`groovelab_parent_allow_audio_${studentId}`) === 'true' : true)));
+      : (draftAllowAudio !== null ? draftAllowAudio : ((studentUser as any)?.parent_allow_audio !== undefined && (studentUser as any)?.parent_allow_audio !== null ? Boolean((studentUser as any)?.parent_allow_audio) : true));
     const nextAllowTts = updates.allowTts !== undefined 
       ? updates.allowTts 
-      : (draftAllowTts !== null ? draftAllowTts : ((studentUser as any)?.parent_allow_tts !== undefined && (studentUser as any)?.parent_allow_tts !== null ? Boolean((studentUser as any)?.parent_allow_tts) : (studentId && typeof window !== 'undefined' && localStorage.getItem(`groovelab_parent_allow_tts_${studentId}`) !== null ? localStorage.getItem(`groovelab_parent_allow_tts_${studentId}`) === 'true' : (nextUiLevel === 'junior'))));
+      : (draftAllowTts !== null ? draftAllowTts : ((studentUser as any)?.parent_allow_tts !== undefined && (studentUser as any)?.parent_allow_tts !== null ? Boolean((studentUser as any)?.parent_allow_tts) : false));
     const nextOverrides = {
       ...((studentUser as any)?.parent_permissions?.board_overrides || {}),
       ...draftBoardOverrides,
@@ -1297,13 +1468,17 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     if (updates.uiLevel !== undefined) {
       setDraftUiLevel(updates.uiLevel);
       setStudentUiLevel(updates.uiLevel as any);
+      if (targetStudentId) {
+        localStorage.setItem(`campus_student_ui_level_${targetStudentId}`, updates.uiLevel);
+      }
       localStorage.setItem('campus_student_ui_level', updates.uiLevel);
       window.dispatchEvent(new CustomEvent('campus_ui_level_changed', { detail: updates.uiLevel }));
     }
-    if (updates.allowAbsences !== undefined) {
-      setDraftAllowAbsences(updates.allowAbsences);
-      localStorage.setItem('campus_allow_absences', String(updates.allowAbsences));
-      if (studentId) localStorage.setItem(`groovelab_parent_allow_absences_${studentId}`, String(updates.allowAbsences));
+    if (updates.allowAbsences !== undefined || isJuniorLevel) {
+      const finalAbsences = isJuniorLevel ? false : (updates.allowAbsences ?? nextAllowAbsences);
+      setDraftAllowAbsences(finalAbsences);
+      localStorage.setItem('campus_allow_absences', String(finalAbsences));
+      if (studentId) localStorage.setItem(`groovelab_parent_allow_absences_${studentId}`, String(finalAbsences));
     }
     if (updates.allowChat !== undefined) {
       setDraftAllowChat(updates.allowChat);
@@ -1352,10 +1527,77 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       });
     }
 
+    const nextBedtimeEnabled = updates.bedtimeEnabled !== undefined 
+      ? updates.bedtimeEnabled 
+      : bedtimeModeEnabled;
+    const nextBedtimeStart = updates.bedtimeStart || bedtimeStart;
+    const nextBedtimeEnd = updates.bedtimeEnd || bedtimeEnd;
+
+    if (updates.bedtimeEnabled !== undefined) {
+      setBedtimeModeEnabled(updates.bedtimeEnabled);
+      localStorage.setItem('campus_bedtime_enabled', String(updates.bedtimeEnabled));
+    }
+    if (updates.bedtimeStart) {
+      setBedtimeStart(updates.bedtimeStart);
+      localStorage.setItem('campus_bedtime_start', updates.bedtimeStart);
+    }
+    if (updates.bedtimeEnd) {
+      setBedtimeEnd(updates.bedtimeEnd);
+      localStorage.setItem('campus_bedtime_end', updates.bedtimeEnd);
+    }
+
+    const nextDaytimeLockEnabled = updates.daytimeLockEnabled !== undefined
+      ? updates.daytimeLockEnabled
+      : daytimeLockEnabled;
+    const nextDaytimeLockStart = updates.daytimeLockStart || daytimeLockStart;
+    const nextDaytimeLockEnd = updates.daytimeLockEnd || daytimeLockEnd;
+    const nextDaytimeLockDays = updates.daytimeLockDays || daytimeLockDays;
+
+    if (updates.daytimeLockEnabled !== undefined) {
+      setDaytimeLockEnabled(updates.daytimeLockEnabled);
+      localStorage.setItem('campus_daytime_lock_enabled', String(updates.daytimeLockEnabled));
+    }
+    if (updates.daytimeLockStart) {
+      setDaytimeLockStart(updates.daytimeLockStart);
+      localStorage.setItem('campus_daytime_lock_start', updates.daytimeLockStart);
+    }
+    if (updates.daytimeLockEnd) {
+      setDaytimeLockEnd(updates.daytimeLockEnd);
+      localStorage.setItem('campus_daytime_lock_end', updates.daytimeLockEnd);
+    }
+    if (updates.daytimeLockDays) {
+      setDaytimeLockDays(updates.daytimeLockDays);
+      localStorage.setItem('campus_daytime_lock_days', updates.daytimeLockDays);
+    }
+
+    const nextInstantLockUntil = updates.instantLockUntil !== undefined
+      ? updates.instantLockUntil
+      : instantLockUntil;
+    if (updates.instantLockUntil !== undefined) {
+      setInstantLockUntil(updates.instantLockUntil);
+      if (updates.instantLockUntil) {
+        localStorage.setItem('campus_instant_lock_until', String(updates.instantLockUntil));
+      } else {
+        localStorage.removeItem('campus_instant_lock_until');
+      }
+    }
+
     const nextPermissions = {
       ...((studentUser as any)?.parent_permissions || {}),
       board_overrides: nextOverrides,
-      parent_allow_tts: nextAllowTts
+      parent_allow_tts: nextAllowTts,
+      bedtime_mode: {
+        enabled: nextBedtimeEnabled,
+        start: nextBedtimeStart,
+        end: nextBedtimeEnd
+      },
+      daytime_lock: {
+        enabled: nextDaytimeLockEnabled,
+        start: nextDaytimeLockStart,
+        end: nextDaytimeLockEnd,
+        days: nextDaytimeLockDays
+      },
+      instant_lock_until: nextInstantLockUntil
     };
 
     const payload: any = {
@@ -1382,23 +1624,21 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     }
 
     try {
-      const { error: userErr } = await supabase.from('users').update(payload).eq('id', studentId);
-      if (userErr) {
-        console.warn('Primary update with JSONB failed, executing column fallback:', userErr);
-        const fallbackPayload: any = {
-          campus_ui_level: nextUiLevel,
-          parent_allow_absences: nextAllowAbsences,
-          parent_allow_chat: nextAllowChat,
-          parent_allow_timer: nextAllowTimer,
-          parent_allow_leaderboard: nextAllowLeaderboard,
-          parent_allow_proposals: nextAllowProposals,
-          parent_allow_audio: nextAllowAudio
-        };
-        await supabase.from('users').update(fallbackPayload).eq('id', studentId);
+      if (targetStudentId) {
+        // 🛡️ Call immutable RPC for authoritative database storage with GoBD audit trail
+        const { data: rpcRes, error: rpcErr } = await supabase.rpc('save_parent_controls', {
+          p_student_id: targetStudentId,
+          p_settings: payload
+        });
+
+        if (rpcErr) {
+          console.warn('save_parent_controls RPC failed, falling back to direct table update:', rpcErr);
+          const { error: userErr } = await supabase.from('users').update(payload).eq('id', targetStudentId);
+          if (userErr) {
+            console.warn('Fallback update on users failed:', userErr);
+          }
+        }
       }
-      try {
-        await supabase.from('students').update(payload).eq('id', studentId);
-      } catch(e) {}
     } catch (err) {
       console.error('Error auto-saving parent controls:', err);
     }
@@ -1406,23 +1646,34 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
 
   // Must-Have 1: Bedtime Mode (Ruhezeiten)
   const [bedtimeModeEnabled, setBedtimeModeEnabled] = useState<boolean>(() => {
-    if (typeof window === 'undefined') return false;
+    if (typeof window === 'undefined') return true;
     const saved = localStorage.getItem('campus_bedtime_enabled');
-    return saved !== null ? saved === 'true' : false;
+    if (saved !== null) return saved === 'true';
+    const savedLvl = localStorage.getItem('campus_student_ui_level');
+    return savedLvl !== 'pro';
   });
   const [bedtimeStart, setBedtimeStart] = useState<string>(() => {
     if (typeof window === 'undefined') return '20:00';
-    return localStorage.getItem('campus_bedtime_start') || '20:00';
+    const saved = localStorage.getItem('campus_bedtime_start');
+    if (saved) return saved;
+    const savedLvl = localStorage.getItem('campus_student_ui_level');
+    if (savedLvl === 'teen') return '21:30';
+    if (savedLvl === 'pro') return '22:30';
+    return '20:00';
   });
   const [bedtimeEnd, setBedtimeEnd] = useState<string>(() => {
     if (typeof window === 'undefined') return '07:00';
-    return localStorage.getItem('campus_bedtime_end') || '07:00';
+    const saved = localStorage.getItem('campus_bedtime_end');
+    if (saved) return saved;
+    const savedLvl = localStorage.getItem('campus_student_ui_level');
+    if (savedLvl === 'teen') return '06:30';
+    if (savedLvl === 'pro') return '06:00';
+    return '07:00';
   });
 
   const isCurrentlyInBedtime = useMemo(() => {
     if (!bedtimeModeEnabled) return false;
-    const now = new Date();
-    const currentMinutes = now.getHours() * 60 + now.getMinutes();
+    const currentMinutes = wallClockNow.getHours() * 60 + wallClockNow.getMinutes();
 
     const [startH, startM] = bedtimeStart.split(':').map(Number);
     const [endH, endM] = bedtimeEnd.split(':').map(Number);
@@ -1436,45 +1687,141 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       // Same day
       return currentMinutes >= startMinutes && currentMinutes < endMinutes;
     }
-  }, [bedtimeModeEnabled, bedtimeStart, bedtimeEnd]);
+  }, [bedtimeModeEnabled, bedtimeStart, bedtimeEnd, wallClockNow]);
 
   const handleUpdateBedtime = async (enabled: boolean, start?: string, end?: string) => {
-    setBedtimeModeEnabled(enabled);
-    localStorage.setItem('campus_bedtime_enabled', String(enabled));
     const nextStart = start || bedtimeStart;
     const nextEnd = end || bedtimeEnd;
-    if (start) {
-      setBedtimeStart(start);
-      localStorage.setItem('campus_bedtime_start', start);
+    await applyAndSaveParentControls({
+      bedtimeEnabled: enabled,
+      bedtimeStart: nextStart,
+      bedtimeEnd: nextEnd
+    });
+  };
+
+  // Must-Have 1b: Tages-Sperrfenster (Schulzeit & Hausaufgaben-Fokus)
+  const [daytimeLockEnabled, setDaytimeLockEnabled] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    const saved = localStorage.getItem('campus_daytime_lock_enabled');
+    return saved !== null ? saved === 'true' : false;
+  });
+  const [daytimeLockStart, setDaytimeLockStart] = useState<string>(() => {
+    if (typeof window === 'undefined') return '08:00';
+    return localStorage.getItem('campus_daytime_lock_start') || '08:00';
+  });
+  const [daytimeLockEnd, setDaytimeLockEnd] = useState<string>(() => {
+    if (typeof window === 'undefined') return '13:00';
+    return localStorage.getItem('campus_daytime_lock_end') || '13:00';
+  });
+  const [daytimeLockDays, setDaytimeLockDays] = useState<'school_days' | 'everyday'>(() => {
+    if (typeof window === 'undefined') return 'school_days';
+    return (localStorage.getItem('campus_daytime_lock_days') as any) || 'school_days';
+  });
+
+  // Must-Have 1c: 1-Tap Sofortpause ("Familienzeit / Bildschirm-Auszeit")
+  const [instantLockUntil, setInstantLockUntil] = useState<number | null>(() => {
+    if (typeof window === 'undefined') return null;
+    const saved = localStorage.getItem('campus_instant_lock_until');
+    if (!saved) return null;
+    const ts = Number(saved);
+    return !isNaN(ts) && ts > Date.now() ? ts : null;
+  });
+
+  const isCurrentlyInDaytimeLock = useMemo(() => {
+    if (!daytimeLockEnabled) return false;
+    const day = wallClockNow.getDay(); // 0 = Sun, 1 = Mon, ..., 6 = Sat
+    if (daytimeLockDays === 'school_days' && (day === 0 || day === 6)) {
+      return false; // Am Wochenende schulfrei
     }
-    if (end) {
-      setBedtimeEnd(end);
-      localStorage.setItem('campus_bedtime_end', end);
+    const currentMinutes = wallClockNow.getHours() * 60 + wallClockNow.getMinutes();
+    const [startH, startM] = daytimeLockStart.split(':').map(Number);
+    const [endH, endM] = daytimeLockEnd.split(':').map(Number);
+    const startMinutes = (startH ?? 8) * 60 + (startM ?? 0);
+    const endMinutes = (endH ?? 13) * 60 + (endM ?? 0);
+
+    if (startMinutes > endMinutes) {
+      return currentMinutes >= startMinutes || currentMinutes < endMinutes;
+    } else {
+      return currentMinutes >= startMinutes && currentMinutes < endMinutes;
+    }
+  }, [daytimeLockEnabled, daytimeLockStart, daytimeLockEnd, daytimeLockDays, wallClockNow]);
+
+  const isCurrentlyInInstantLock = useMemo(() => {
+    if (!instantLockUntil) return false;
+    return wallClockNow.getTime() < instantLockUntil;
+  }, [instantLockUntil, wallClockNow]);
+
+  // 5-Minuten-Vorwarnung / Pufferzeit vor Sperrbeginn (Grace Window)
+  const lockWarningInfo = useMemo(() => {
+    if (isParentUnlocked) return null;
+    const currentMinutes = wallClockNow.getHours() * 60 + wallClockNow.getMinutes();
+
+    // 1. Bedtime Vorwarnung
+    if (bedtimeModeEnabled) {
+      const [startH, startM] = bedtimeStart.split(':').map(Number);
+      const bedtimeMinutes = (startH ?? 20) * 60 + (startM ?? 0);
+      const diff = bedtimeMinutes - currentMinutes;
+      if (diff > 0 && diff <= 5) {
+        return {
+          type: 'bedtime',
+          minutesLeft: diff,
+          targetTime: bedtimeStart,
+          title: 'Schlafenszeit naht 🌙',
+          message: `Noch ${diff} Min. bis ${bedtimeStart} Uhr • Bitte aktuelle Übung sichern!`
+        };
+      }
     }
 
-    const bedtimeObj = { enabled, start: nextStart, end: nextEnd };
-    const nextPerms = {
-      ...((studentUser as any)?.parent_permissions || {}),
-      bedtime_mode: bedtimeObj
-    };
-
-    setStudentUser((prev: any) => prev ? {
-      ...prev,
-      parent_permissions: nextPerms
-    } : prev);
-
-    try {
-      await supabase.from('users').update({
-        parent_permissions: nextPerms
-      }).eq('id', studentId);
-      try {
-        await supabase.from('students').update({
-          parent_permissions: nextPerms
-        }).eq('id', studentId);
-      } catch(e) {}
-    } catch(e) {
-      console.warn('Could not persist bedtime mode:', e);
+    // 2. Daytime Lock Vorwarnung
+    if (daytimeLockEnabled) {
+      const day = wallClockNow.getDay();
+      if (!(daytimeLockDays === 'school_days' && (day === 0 || day === 6))) {
+        const [startH, startM] = daytimeLockStart.split(':').map(Number);
+        const dayMinutes = (startH ?? 8) * 60 + (startM ?? 0);
+        const diff = dayMinutes - currentMinutes;
+        if (diff > 0 && diff <= 5) {
+          return {
+            type: 'daytime',
+            minutesLeft: diff,
+            targetTime: daytimeLockStart,
+            title: 'Schulzeit-Fokus naht 🎒',
+            message: `Noch ${diff} Min. bis ${daytimeLockStart} Uhr • Schul-Fokus startet gleich!`
+          };
+        }
+      }
     }
+
+    return null;
+  }, [bedtimeModeEnabled, bedtimeStart, daytimeLockEnabled, daytimeLockStart, daytimeLockDays, isParentUnlocked, wallClockNow]);
+
+  const handleUpdateDaytimeLock = async (enabled: boolean, start?: string, end?: string, days?: 'school_days' | 'everyday') => {
+    const nextStart = start || daytimeLockStart;
+    const nextEnd = end || daytimeLockEnd;
+    const nextDays = days || daytimeLockDays;
+    await applyAndSaveParentControls({
+      daytimeLockEnabled: enabled,
+      daytimeLockStart: nextStart,
+      daytimeLockEnd: nextEnd,
+      daytimeLockDays: nextDays
+    });
+  };
+
+  const handleSetInstantLock = async (durationMinutes: number | null) => {
+    let untilTs: number | null = null;
+    if (durationMinutes !== null) {
+      if (durationMinutes === -1) {
+        // Bis morgen früh 07:00 Uhr pausieren
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        tomorrow.setHours(7, 0, 0, 0);
+        untilTs = tomorrow.getTime();
+      } else {
+        untilTs = Date.now() + durationMinutes * 60 * 1000;
+      }
+    }
+    await applyAndSaveParentControls({
+      instantLockUntil: untilTs
+    });
   };
 
   // Must-Have 2: Family Profiles (Geschwister-Schnellwechsel)
@@ -1487,6 +1834,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       return [];
     }
   });
+  const [isAddSiblingModalOpen, setIsAddSiblingModalOpen] = useState<boolean>(false);
 
   const handleSwitchFamilyStudent = (targetStudentId: string, keepParentUnlocked = false) => {
     if (targetStudentId === studentId) return;
@@ -1965,6 +2313,18 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     });
   }, [rawSchoolYearOccurrences, holidays]);
 
+  const cancelledSchoolYearOccurrences = useMemo(() => {
+    return (rawSchoolYearOccurrences || [])
+      .filter((occ: any) => {
+        const s = String(occ.status || '').toLowerCase();
+        return s === 'cancelled' || s === 'canceled_by_student' || s === 'canceled' || s === 'teacher_sick' || s === 'canceled_by_teacher_sick' || s === 'absent';
+      })
+      .sort((a, b) => {
+        if (b.date !== a.date) return b.date.localeCompare(a.date);
+        return (b.start_time || '').localeCompare(a.start_time || '');
+      });
+  }, [rawSchoolYearOccurrences]);
+
   const isTodayHoliday = useMemo(() => {
     const todayStr = toLocalYYYYMMDD(new Date());
     return holidays.find(h => todayStr >= h.start && todayStr <= h.end);
@@ -2339,9 +2699,12 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                 schedule_id: sch.id,
                 student_id: studentId,
                 teacher_id: sch.teacher_id,
+                school_id: sch.school_id,
                 date: dateStr,
                 start_time: sch.time_slot,
+                duration: sch.duration || 45,
                 status: sch.status || 'scheduled',
+                is_virtual: true,
                 teacher: sch.teacher,
                 schedule: sch
               });
@@ -2864,23 +3227,19 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     if (draftAllowAbsences !== null) return draftAllowAbsences;
     const userAbs = (studentUser as any)?.parent_allow_absences;
     if (userAbs !== undefined && userAbs !== null) return Boolean(userAbs);
-    const localUserSetting = typeof window !== 'undefined' && studentId ? localStorage.getItem(`groovelab_parent_allow_absences_${studentId}`) : null;
-    if (localUserSetting !== null) return localUserSetting === 'true';
     const currentLvl = draftUiLevel || (studentUser as any)?.campus_ui_level || (typeof window !== 'undefined' ? localStorage.getItem('campus_student_ui_level') : 'junior') || 'junior';
     if (currentLvl === 'junior' || currentLvl === 'teen') return false;
     return true;
-  }, [studentUser, studentId, draftAllowAbsences, draftUiLevel]);
+  }, [studentUser, draftAllowAbsences, draftUiLevel]);
 
   const isStudentChatAllowed = useMemo(() => {
     if (draftAllowChat !== null) return draftAllowChat;
     const userChat = (studentUser as any)?.parent_allow_chat;
     if (userChat !== undefined && userChat !== null) return Boolean(userChat);
-    const localUserSetting = typeof window !== 'undefined' && studentId ? localStorage.getItem(`groovelab_parent_allow_chat_${studentId}`) : null;
-    if (localUserSetting !== null) return localUserSetting === 'true';
     const currentLvl = draftUiLevel || (studentUser as any)?.campus_ui_level || (typeof window !== 'undefined' ? localStorage.getItem('campus_student_ui_level') : 'junior') || 'junior';
     if (currentLvl === 'junior') return false;
     return true;
-  }, [studentUser, studentId, draftAllowChat, draftUiLevel]);
+  }, [studentUser, draftAllowChat, draftUiLevel]);
 
   const handleVerifyGlobalParentPin = async (inputPin: string) => {
     if (!inputPin || inputPin.length < 4) {
@@ -2968,14 +3327,63 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       setShowGlobalParentPinModal(true);
       return;
     }
-    if (!confirm('Möchtest du die Absage zurücknehmen und diesen Unterrichtstermin wieder reaktivieren?')) return;
+
+    const undoConfirmMsg = studentUiLevel === 'junior'
+      ? 'Möchtest du die Absage zurücknehmen und deine Musikstunde wieder stattfinden lassen?'
+      : 'Möchtest du die Absage zurücknehmen und diesen Unterrichtstermin wieder reaktivieren?';
+    if (!confirm(undoConfirmMsg)) return;
+
     try {
-      if (occ.id && !String(occ.id).startsWith('virt_')) {
-        await supabase
+      const isVirtual = Boolean(
+        occ.is_virtual || 
+        (occ.id && (String(occ.id).startsWith('virt_') || String(occ.id).startsWith('virtual-')))
+      );
+
+      if (occ.id && !isVirtual) {
+        const { error: updErr } = await supabase
           .from('schedule_occurrences')
-          .update({ status: 'scheduled', student_acknowledged: true })
+          .update({ 
+            status: 'scheduled', 
+            student_acknowledged: true,
+            updated_at: new Date().toISOString()
+          })
           .eq('id', occ.id);
+        if (updErr) throw updErr;
+      } else {
+        // Look up inserted occurrence in database for this student and date
+        const { data: existingOcc } = await supabase
+          .from('schedule_occurrences')
+          .select('id')
+          .eq('student_id', studentId)
+          .eq('date', occ.date)
+          .maybeSingle();
+
+        if (existingOcc?.id) {
+          const { error: updErr } = await supabase
+            .from('schedule_occurrences')
+            .update({ 
+              status: 'scheduled', 
+              student_acknowledged: true,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', existingOcc.id);
+          if (updErr) throw updErr;
+        }
       }
+
+      // Optimistic state update
+      setRawScheduleOccurrences((prev: any[]) => prev.map((o: any) => {
+        if (o.id === occ.id || (o.date === occ.date && (o.student_id === studentId || !o.student_id))) {
+          return { ...o, status: 'scheduled', student_acknowledged: true };
+        }
+        return o;
+      }));
+      setRawSchoolYearOccurrences((prev: any[]) => prev.map((o: any) => {
+        if (o.id === occ.id || (o.date === occ.date && (o.student_id === studentId || !o.student_id))) {
+          return { ...o, status: 'scheduled', student_acknowledged: true };
+        }
+        return o;
+      }));
 
       // Send system message to Direct Messages & Alerts
       try {
@@ -3011,10 +3419,10 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
         const userName = userData ? `${userData.first_name} ${maskLastName(userData.last_name)}` : 'Ein Schüler';
 
         await supabase.from('system_alerts').insert({
-          school_id: occ.schedule?.school_id || studentUser?.school_id || null,
+          school_id: occ.schedule?.school_id || occ.school_id || studentUser?.school_id || null,
           teacher_id: teacherUserId,
           type: 'Termin wiederhergestellt',
-          message: `✅ Reaktiviert: Schüler ${userName} hat den Termin am ${shortDay} ${shortDate} um ${timeLabel} Uhr wieder reaktiviert.`
+          message: `✅ Reaktiviert: ${userName} hat den Termin am ${shortDay} ${shortDate} um ${timeLabel} Uhr wieder reaktiviert.`
         });
       } catch (notifErr) {
         console.warn('Could not create system notification on undo cancel:', notifErr);
@@ -3022,9 +3430,13 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
 
       fetchSchedule();
       fetchSchoolYearSchedule();
-      alert('Der Termin wurde erfolgreich reaktiviert.');
+
+      const successUndoMsg = studentUiLevel === 'junior'
+        ? 'Deine Musikstunde wurde wieder reaktiviert! 🎶'
+        : 'Der Termin wurde erfolgreich reaktiviert.';
+      alert(successUndoMsg);
     } catch(e) {
-      console.error(e);
+      console.error('Error undoing cancellation:', e);
       alert('Fehler beim Reaktivieren des Termins.');
     }
   };
@@ -3040,44 +3452,119 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
 
     const d = new Date(occ.date);
     const formattedDate = d.toLocaleDateString('de-DE');
-    if (!confirm(`Möchtest du deinen Termin am ${formattedDate} um ${occ.start_time?.substring(0,5)} Uhr wirklich absagen?`)) return;
+
+    // 🛡️ Kanonische Lehrkräfte-Namensauflösung (immer vollständiger Name Vorname + Nachname)
+    const teacherFirst = occ.teacher?.first_name || (studentUser as any)?.teacher?.first_name || '';
+    const teacherLast = occ.teacher?.last_name || (studentUser as any)?.teacher?.last_name || '';
+    const rawTeacherFullName = `${teacherFirst} ${teacherLast}`.trim();
+    const fallbackTeacherName = briefingData?.todayLesson?.teacher_name || (studentUser as any)?.teacher_name || (studentUser as any)?.teacher?.name || '';
+    const fullTeacherName = rawTeacherFullName || fallbackTeacherName;
+    const teacherPhrase = fullTeacherName ? `deiner Lehrkraft ${fullTeacherName}` : 'deiner Lehrkraft';
+
+    // Altersgerechtes Wording für Junior, Teen und Pro
+    let confirmMsg = '';
+    if (skipPinCheck) {
+      confirmMsg = `Möchtest du den Unterrichtstermin am ${formattedDate} bei ${teacherPhrase} verbindlich absagen?`;
+    } else if (studentUiLevel === 'junior') {
+      confirmMsg = `Möchtest du ${teacherPhrase} Bescheid geben, dass du am ${formattedDate} fehlst?\n\n(Deine Eltern haben dir erlaubt, dich für diesen Termin selbst abzumelden.)`;
+    } else if (studentUiLevel === 'teen') {
+      confirmMsg = `Möchtest du deinen Unterrichtstermin am ${formattedDate} bei ${teacherPhrase} absagen?`;
+    } else {
+      confirmMsg = `Möchtest du deinen Unterrichtstermin am ${formattedDate} bei ${teacherPhrase} verbindlich absagen?`;
+    }
+
+    if (!confirm(confirmMsg)) return;
 
     try {
-      if (occ.is_virtual) {
-        const { error: insertErr } = await supabase
+      const isVirtual = Boolean(
+        occ.is_virtual || 
+        (occ.id && (String(occ.id).startsWith('virtual-') || String(occ.id).startsWith('virt_')))
+      );
+
+      if (isVirtual) {
+        // Prüfen, ob für dieses Datum bereits ein Eintrag existiert
+        const { data: existingOcc } = await supabase
           .from('schedule_occurrences')
-          .insert({
-            schedule_id: occ.schedule_id,
+          .select('id')
+          .eq('student_id', studentId)
+          .eq('date', occ.date)
+          .maybeSingle();
+
+        if (existingOcc?.id) {
+          const { error: updateErr } = await supabase
+            .from('schedule_occurrences')
+            .update({ 
+              status: 'cancelled', 
+              student_acknowledged: true,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', existingOcc.id);
+          if (updateErr) throw updateErr;
+        } else {
+          const occPayload: any = {
+            schedule_id: occ.schedule_id || occ.schedule?.id || null,
             student_id: studentId,
-            teacher_id: occ.teacher_id,
+            teacher_id: occ.teacher_id || occ.teacher?.id,
             date: occ.date,
-            start_time: occ.start_time,
+            start_time: occ.start_time || '15:00',
             duration: occ.duration || 45,
             status: 'cancelled',
             student_acknowledged: true
-          });
-        if (insertErr) throw insertErr;
+          };
+          const schoolId = occ.schedule?.school_id || occ.school_id || studentUser?.school_id;
+          if (schoolId) occPayload.school_id = schoolId;
+
+          const { error: insertErr } = await supabase
+            .from('schedule_occurrences')
+            .insert(occPayload);
+          if (insertErr) throw insertErr;
+        }
       } else {
         const { error: updateErr } = await supabase
           .from('schedule_occurrences')
-          .update({ status: 'cancelled', student_acknowledged: true })
+          .update({ 
+            status: 'cancelled', 
+            student_acknowledged: true,
+            updated_at: new Date().toISOString()
+          })
           .eq('id', occ.id);
         if (updateErr) throw updateErr;
       }
 
-      const { data: userData } = await supabase
-        .from('users')
-        .select('first_name, last_name')
-        .eq('id', studentId)
-        .single();
-      const studentName = userData ? `${userData.first_name} ${maskLastName(userData.last_name)}` : 'Ein Schüler';
+      // Optimistic state update
+      setRawScheduleOccurrences((prev: any[]) => prev.map((o: any) => {
+        if (o.id === occ.id || (o.date === occ.date && (o.student_id === studentId || !o.student_id))) {
+          return { ...o, status: 'cancelled', student_acknowledged: true };
+        }
+        return o;
+      }));
+      setRawSchoolYearOccurrences((prev: any[]) => prev.map((o: any) => {
+        if (o.id === occ.id || (o.date === occ.date && (o.student_id === studentId || !o.student_id))) {
+          return { ...o, status: 'cancelled', student_acknowledged: true };
+        }
+        return o;
+      }));
 
-      await supabase.from('system_alerts').insert({
-        school_id: occ.schedule?.school_id || studentUser?.school_id || null,
-        teacher_id: occ.teacher_id,
-        type: 'Termin abgesagt',
-        message: `❌ Absage: ${studentName} hat den Termin am ${formattedDate} um ${occ.start_time?.substring(0,5)} Uhr abgesagt.`
-      });
+      // Resilient System Alerts & Direct Messages
+      try {
+        const { data: userData } = await supabase
+          .from('users')
+          .select('first_name, last_name')
+          .eq('id', studentId)
+          .single();
+        const studentName = userData ? `${userData.first_name} ${maskLastName(userData.last_name)}` : 'Ein Schüler';
+        const actorDesc = skipPinCheck ? 'mit Eltern-PIN' : 'mit elterlicher Erlaubnis';
+        const timeLabel = (occ.start_time || '16:30').substring(0, 5);
+
+        await supabase.from('system_alerts').insert({
+          school_id: occ.schedule?.school_id || occ.school_id || studentUser?.school_id || null,
+          teacher_id: occ.teacher_id || occ.teacher?.id,
+          type: 'Termin abgesagt',
+          message: `❌ Absage: ${studentName} hat den Termin am ${formattedDate} um ${timeLabel} Uhr ${actorDesc} abgesagt.`
+        });
+      } catch (alertErr) {
+        console.warn('Could not insert cancellation system alert:', alertErr);
+      }
 
       // Send a system message to Direct Messages
       try {
@@ -3087,11 +3574,12 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
         const shortDate = occDate.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' });
         const timeLabel = (occ.start_time || '16:30').slice(0, 5);
         const targetOccId = occ.schedule_id ? `virtual-${occ.schedule_id}-${occ.date}` : occ.id;
+        const teacherUserId = occ.teacher_id || occ.teacher?.id;
 
-        if (studentId && occ.teacher_id) {
+        if (studentId && teacherUserId) {
           await supabase.from('campus_direct_messages').insert({
             sender_id: studentId,
-            recipient_id: occ.teacher_id,
+            recipient_id: teacherUserId,
             content: `Dein Unterrichtstermin am ${shortDay} ${shortDate} um ${timeLabel} Uhr fällt aus.`,
             occurrence_id: targetOccId,
             is_system: true,
@@ -3104,7 +3592,11 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
 
       fetchSchedule();
       fetchSchoolYearSchedule();
-      alert('Der Termin wurde erfolgreich abgesagt.');
+
+      const successCancelMsg = studentUiLevel === 'junior'
+        ? 'Deine Musikstunde wurde abgemeldet. Deine Lehrkraft wurde benachrichtigt! 🎵'
+        : 'Der Termin wurde erfolgreich abgesagt.';
+      alert(successCancelMsg);
     } catch (err) {
       console.error('Error canceling occurrence:', err);
       alert('Fehler beim Absagen des Termins.');
@@ -3175,12 +3667,35 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     }
   };
   const [homeworkBookTab, setHomeworkBookTab] = useState<'document' | 'logbook' | 'stickeralbum' | 'skillradar' | 'audiobiography'>('document');
+  const [homeworkBookViewMode, setHomeworkBookViewMode] = useState<'document' | 'recordings' | 'loopstation' | 'practice'>('document');
 
   useEffect(() => {
-    if (activeTab === 'homework_book' || parentActiveTab === 'homework_book') {
+    if (parentActiveTab === 'homework_book') {
       setHomeworkBookTab('document');
+      setHomeworkBookViewMode('document');
     }
-  }, [activeTab, parentActiveTab]);
+  }, [parentActiveTab]);
+
+  useEffect(() => {
+    const handleReset = () => {
+      setHomeworkBookTab('document');
+      setHomeworkBookViewMode('document');
+    };
+    window.addEventListener('campus_reset_homework_board', handleReset);
+    return () => window.removeEventListener('campus_reset_homework_board', handleReset);
+  }, []);
+
+  const handleOpenHomeworkBookWithView = (
+    targetTab: 'document' | 'logbook' | 'stickeralbum' | 'skillradar' | 'audiobiography' = 'document',
+    targetViewMode: 'document' | 'recordings' | 'loopstation' | 'practice' = 'document'
+  ) => {
+    setHomeworkBookTab(targetTab);
+    setHomeworkBookViewMode(targetViewMode);
+    setActiveTab('homework_book');
+    if (onTabChange) {
+      onTabChange('homework_book');
+    }
+  };
 
   // ── Asset Preloading Hook (3.2) ──
   useEffect(() => {
@@ -3380,9 +3895,11 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     }
   };
 
-  const handleTabChangeLocal = (tab: string) => {
-    if (tab === 'homework_book') {
+  const handleTabChangeLocal = (tab: string, skipResetHwTab = false) => {
+    if (tab === 'homework_book' && !skipResetHwTab) {
       setHomeworkBookTab('document');
+      setHomeworkBookViewMode('document');
+      window.dispatchEvent(new CustomEvent('campus_reset_homework_board'));
     }
     if (tab === 'briefing') {
       fetchStudentProgress(true);
@@ -3733,6 +4250,14 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
 
     handleStopSpeaking();
 
+    // 🛑 Audio-Kollisionsschutz: Laufende Audio-Vorschau sofort pausieren!
+    if (juniorPreviewAudioRef.current) {
+      try {
+        juniorPreviewAudioRef.current.pause();
+      } catch {}
+      setJuniorPreviewPlaying(false);
+    }
+
     const rawPhrases = Array.isArray(textOrPhrases)
       ? [...textOrPhrases]
       : textOrPhrases
@@ -3770,8 +4295,8 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
         const utterance = new SpeechSynthesisUtterance(phrase);
         utterance.lang = 'de-DE';
         utterance.pitch = 1.04; // 🌟 Fröhliche, sympathisch modulierte Tonhöhe
-        utterance.rate = 0.91;  // 🌟 Entspannter, verständlicher Redefluss
-        utterance.volume = 0.65; // 🔉 Sanfte Zimmerlautstärke
+        utterance.rate = 0.88;  // 🌟 Kindgerechte, verständliche Vorlesegeschwindigkeit
+        utterance.volume = 0.72; // 🔉 Klare, angenehme Zimmerlautstärke
 
         if (bestVoice) utterance.voice = bestVoice;
         utterance.onend = () => resolve();
@@ -3864,15 +4389,17 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       juniorPreviewAudioRef.current.pause();
       setJuniorPreviewPlaying(false);
     } else {
+      // 🛑 Audio-Kollisionsschutz: Sprachausgabe sofort stoppen, bevor Musik abgespielt wird
+      handleStopSpeaking();
       juniorPreviewAudioRef.current.play().then(() => {
         setJuniorPreviewPlaying(true);
       }).catch(e => console.warn('Preview play error:', e));
     }
   };
 
-  // Clean Audio Stream on Unmount
+  // Clean Audio Stream on Unmount & Stop on Tab Switch
   useEffect(() => {
-    return () => {
+    const cleanup = () => {
       if (juniorPreviewAudioRef.current) {
         juniorPreviewAudioRef.current.pause();
         juniorPreviewAudioRef.current = null;
@@ -3893,6 +4420,24 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
         clearInterval(juniorRecordTimerRef.current);
         juniorRecordTimerRef.current = null;
       }
+      setJuniorPreviewPlaying(false);
+      setJuniorIsRecording(false);
+    };
+
+    const handleHardwareAudioVisibility = () => {
+      if (document.visibilityState === 'hidden') {
+        cleanup();
+        if (typeof (window as any).stopAllCameras === 'function') {
+          (window as any).stopAllCameras();
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleHardwareAudioVisibility);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleHardwareAudioVisibility);
+      cleanup();
     };
   }, []);
 
@@ -4088,6 +4633,19 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     }
     setJuniorIsRecording(false);
   };
+
+  // 🛡️ Enterprise Kinderschutz: Hardware-Mikrofon sofort trennen bei Tab-Wechsel
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden' && juniorIsRecording) {
+        stopJuniorRecording();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [juniorIsRecording]);
 
   // 🛑 2. Clean Teardown & Immediate Modal Close on 'X'
   const cancelJuniorRecording = () => {
@@ -4386,12 +4944,11 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       if (audioIndex === -1) return;
       const parts = cleanStr.substring(audioIndex + 6).split('|');
       const audioUrl = parts[0]?.trim() || '';
-      if (!audioUrl && !parts[6]) return;
       const duration = parseFloat(parts[1]) || 0;
       const audioDate = parts[2] || fallbackDate || new Date().toISOString();
       const label = parts[3] || fallbackTopic || `Aufnahme #${defaultIdx + 1}`;
       const author = parts[4] || 'teacher';
-      const uniqueKey = parts[6] || audioUrl || `audio_${defaultIdx}`;
+      const uniqueKey = parts[6] || (audioUrl && audioUrl !== '#' ? audioUrl : null) || `audio_${defaultIdx}_${label}_${audioDate}`;
 
       if (!recsMap.has(uniqueKey) && author !== 'student') {
         recsMap.set(uniqueKey, {
@@ -7935,6 +8492,56 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
             setBedtimeEnd(bt.end);
             localStorage.setItem('campus_bedtime_end', bt.end);
           }
+        } else {
+          // 🛡️ Safety by Default: Falls noch keine DB-Einstellung vorliegt, prüfen ob lokal bereits konfiguriert
+          const localSaved = localStorage.getItem('campus_bedtime_enabled');
+          if (localSaved !== null) {
+            setBedtimeModeEnabled(localSaved === 'true');
+          } else {
+            // Automatische Altersstandards bei Erstaufruf
+            const lvl = (user.campus_ui_level && CAMPUS_AGE_STANDARDS[user.campus_ui_level]) ? user.campus_ui_level : 'junior';
+            const std = CAMPUS_AGE_STANDARDS[lvl] || CAMPUS_AGE_STANDARDS.junior;
+            setBedtimeModeEnabled(std.bedtimeEnabled);
+            setBedtimeStart(std.bedtimeStart);
+            setBedtimeEnd(std.bedtimeEnd);
+            localStorage.setItem('campus_bedtime_enabled', String(std.bedtimeEnabled));
+            localStorage.setItem('campus_bedtime_start', std.bedtimeStart);
+            localStorage.setItem('campus_bedtime_end', std.bedtimeEnd);
+          }
+        }
+        if (user.parent_permissions?.daytime_lock) {
+          const dt = user.parent_permissions.daytime_lock;
+          if (dt.enabled !== undefined) {
+            setDaytimeLockEnabled(Boolean(dt.enabled));
+            localStorage.setItem('campus_daytime_lock_enabled', String(dt.enabled));
+          }
+          if (dt.start) {
+            setDaytimeLockStart(dt.start);
+            localStorage.setItem('campus_daytime_lock_start', dt.start);
+          }
+          if (dt.end) {
+            setDaytimeLockEnd(dt.end);
+            localStorage.setItem('campus_daytime_lock_end', dt.end);
+          }
+          if (dt.days) {
+            setDaytimeLockDays(dt.days);
+            localStorage.setItem('campus_daytime_lock_days', dt.days);
+          }
+        } else {
+          const localDaytimeSaved = localStorage.getItem('campus_daytime_lock_enabled');
+          if (localDaytimeSaved !== null) {
+            setDaytimeLockEnabled(localDaytimeSaved === 'true');
+          }
+        }
+        if (user.parent_permissions?.instant_lock_until) {
+          const ts = Number(user.parent_permissions.instant_lock_until);
+          if (!isNaN(ts) && ts > Date.now()) {
+            setInstantLockUntil(ts);
+            localStorage.setItem('campus_instant_lock_until', String(ts));
+          } else {
+            setInstantLockUntil(null);
+            localStorage.removeItem('campus_instant_lock_until');
+          }
         }
       }
       if (user?.briefing_sidebar_collapsed !== undefined && user?.briefing_sidebar_collapsed !== null) {
@@ -8704,73 +9311,864 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
 
 
 
-  // Must-Have 1: Nachtruhe / Ruhezeiten Sperrbildschirm
-  if (isCurrentlyInBedtime && !checkIsParentSessionActive()) {
+  // 🛡️ REUSABLE MODALS: Parent Gate Master PIN & Recovery Key
+  const renderParentGateModal = () => {
+    if (!showParentGateModal) return null;
+    const hasConfiguredParentPin = Boolean(studentUser?.has_parent_pin === true);
+
     return (
       <div style={{
-        minHeight: '70vh',
+        position: 'fixed',
+        inset: 0,
+        background: 'rgba(15, 23, 42, 0.75)',
+        backdropFilter: 'blur(16px)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 100002,
+        padding: '20px'
+      }}>
+        <div style={{
+          background: '#ffffff',
+          borderRadius: '32px',
+          padding: '32px 28px',
+          width: '100%',
+          maxWidth: '380px',
+          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+          border: '1px solid #f1f5f9',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          textAlign: 'center',
+          position: 'relative',
+          color: '#0f172a'
+        }}>
+          <button
+            onClick={() => {
+              setShowParentGateModal(false);
+              setPendingParentTarget(null);
+              setParentSetupPin('');
+              setParentSetupConfirm('');
+              setParentSetupStep('enter');
+              setParentGatePinInput('');
+              setParentGateError('');
+              setParentSetupError('');
+            }}
+            style={{
+              position: 'absolute',
+              top: '20px',
+              right: '20px',
+              background: '#f1f5f9',
+              border: 'none',
+              borderRadius: '50%',
+              width: '36px',
+              height: '36px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              color: '#64748b'
+            }}
+          >
+            <X size={18} />
+          </button>
+
+          <div style={{
+            width: '60px',
+            height: '60px',
+            borderRadius: '20px',
+            background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#ffffff',
+            marginBottom: '16px',
+            boxShadow: '0 8px 20px -4px rgba(2, 132, 199, 0.4)'
+          }}>
+            <ShieldCheck size={32} />
+          </div>
+
+          <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#0f172a' }}>
+            {hasConfiguredParentPin ? 'Eltern-Bereich geschützt 🛡️' : '6-stellige Eltern-Master-PIN vergeben 🛡️'}
+          </h3>
+          
+          <p style={{ margin: '8px 0 16px 0', fontSize: '0.8rem', color: '#64748b', fontWeight: 600, lineHeight: '1.4' }}>
+            {hasConfiguredParentPin
+              ? 'Bitte gib deine 6-stellige Eltern-Master-PIN ein, um diesen geschützten Bereich zu öffnen.'
+              : (parentSetupStep === 'enter'
+                  ? 'Erstelle eine neue 6-stellige Master-PIN für den geschützten Elternbereich.'
+                  : 'Wiederhole deine 6-stellige Master-PIN zur Bestätigung.')}
+          </p>
+
+          {(parentGateError || parentSetupError) && (
+            <div style={{
+              padding: '10px 14px',
+              background: '#fee2e2',
+              border: '1px solid #fca5a5',
+              borderRadius: '12px',
+              color: '#dc2626',
+              fontSize: '0.78rem',
+              fontWeight: 700,
+              marginBottom: '14px',
+              width: '100%',
+              boxSizing: 'border-box'
+            }}>
+              {parentGateError || parentSetupError}
+            </div>
+          )}
+
+          {parentGateCooldownSeconds > 0 && (
+            <div style={{
+              padding: '10px 14px',
+              background: '#fef3c7',
+              border: '1px solid #fde68a',
+              borderRadius: '12px',
+              color: '#92400e',
+              fontSize: '0.8rem',
+              fontWeight: 800,
+              marginBottom: '14px',
+              width: '100%',
+              boxSizing: 'border-box',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px'
+            }}>
+              <span>⏳ Sicherheitssperre: Bitte warte noch <strong>{parentGateCooldownSeconds}s</strong></span>
+            </div>
+          )}
+
+          {/* 6 Dots Display with Shake Animation */}
+          <div style={{ 
+            display: 'flex', 
+            gap: '12px', 
+            marginBottom: '16px',
+            animation: isParentGateShaking ? 'pinShakeAnim 0.35s cubic-bezier(0.36, 0.07, 0.19, 0.97) both' : 'none'
+          }}>
+            {[0, 1, 2, 3, 4, 5].map((idx) => {
+              const curLen = hasConfiguredParentPin
+                ? parentGatePinInput.length
+                : (parentSetupStep === 'enter' ? parentSetupPin.length : parentSetupConfirm.length);
+              const isFilled = curLen > idx;
+              const isError = isParentGateShaking;
+              return (
+                <div
+                  key={idx}
+                  style={{
+                    width: '16px',
+                    height: '16px',
+                    borderRadius: '50%',
+                    border: `2px solid ${isError ? '#dc2626' : (isFilled ? '#0284c7' : '#cbd5e1')}`,
+                    background: isError ? '#dc2626' : (isFilled ? '#0284c7' : 'transparent'),
+                    transition: 'all 0.15s ease'
+                  }}
+                />
+              );
+            })}
+          </div>
+
+          {/* 3x4 Keypad */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(3, 1fr)',
+            gap: '10px',
+            width: '100%'
+          }}>
+            {['1', '2', '3', '4', '5', '6', '7', '8', '9', 'C', '0', 'back'].map((key) => {
+              const isSpecial = key === 'C' || key === 'back';
+              const isDisabled = isVerifyingParentGate || parentGateCooldownSeconds > 0;
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  disabled={isDisabled}
+                  onClick={async () => {
+                    if (parentGateCooldownSeconds > 0) return;
+                    setParentGateError('');
+                    setParentSetupError('');
+
+                    if (hasConfiguredParentPin) {
+                      if (key === 'C') {
+                        setParentGatePinInput('');
+                      } else if (key === 'back') {
+                        setParentGatePinInput(prev => prev.slice(0, -1));
+                      } else if (parentGatePinInput.length < 6) {
+                        const nextVal = parentGatePinInput + key;
+                        setParentGatePinInput(nextVal);
+                        if (nextVal.length === 6) {
+                          handleVerifyParentPinAttempt(nextVal, () => {
+                            setShowParentGateModal(false);
+                            if (pendingParentTarget) {
+                              setSettingsSubTab(pendingParentTarget);
+                              setActiveStudentSettingsModal(pendingParentTarget);
+                            }
+                          });
+                        }
+                      }
+                    } else {
+                      // First-time PIN setup
+                      if (parentSetupStep === 'enter') {
+                        if (key === 'C') {
+                          setParentSetupPin('');
+                        } else if (key === 'back') {
+                          setParentSetupPin(prev => prev.slice(0, -1));
+                        } else if (parentSetupPin.length < 6) {
+                          const nextVal = parentSetupPin + key;
+                          setParentSetupPin(nextVal);
+                          if (nextVal.length === 6) {
+                            if (/^(\d)\1+$/.test(nextVal) || nextVal === '123456' || nextVal === '654321') {
+                              setParentSetupError('Bitte wähle eine sicherere PIN (nicht 123456 oder 000000).');
+                              setParentSetupPin('');
+                              return;
+                            }
+                            setParentSetupStep('confirm');
+                          }
+                        }
+                      } else {
+                        if (key === 'C') {
+                          setParentSetupConfirm('');
+                        } else if (key === 'back') {
+                          setParentSetupConfirm(prev => prev.slice(0, -1));
+                        } else if (parentSetupConfirm.length < 6) {
+                          const nextVal = parentSetupConfirm + key;
+                          setParentSetupConfirm(nextVal);
+                          if (nextVal.length === 6) {
+                            if (nextVal !== parentSetupPin) {
+                              setParentSetupError('Die PINs stimmen nicht überein.');
+                              setParentSetupConfirm('');
+                              setParentSetupPin('');
+                              setParentSetupStep('enter');
+                              return;
+                            }
+
+                            const recKey = generateParentRecoveryKey();
+                            try {
+                              const { data: rpcRes, error: rpcErr } = await supabase.rpc('set_parent_pin', {
+                                p_student_id: studentId,
+                                p_new_pin: nextVal
+                              });
+
+                              if (rpcErr || rpcRes !== true) {
+                                throw new Error(rpcErr?.message || 'Serverfehler beim Speichern.');
+                              }
+
+                              try {
+                                await supabase.from('users').update({ recovery_key: recKey }).eq('id', studentId);
+                              } catch (err) {}
+                              
+                              if (studentUser) {
+                                (studentUser as any).has_parent_pin = true;
+                                (studentUser as any).recovery_key = recKey;
+                              }
+
+                              sessionStorage.setItem(`groovelab_parent_session_${studentId}`, String(Date.now() + 15 * 60 * 1000));
+                              sessionStorage.setItem(`groovelab_parent_unlocked_${studentId}`, 'true');
+                              sessionStorage.setItem('groovelab_parent_unlocked_global', 'true');
+                              window.dispatchEvent(new CustomEvent('groovelab_parent_mode_changed', { detail: true }));
+
+                              setShowParentGateModal(false);
+                              setParentSetupPin('');
+                              setParentSetupConfirm('');
+                              setParentSetupStep('enter');
+                              if (pendingParentTarget) {
+                                setSettingsSubTab(pendingParentTarget);
+                                setActiveStudentSettingsModal(pendingParentTarget);
+                              }
+
+                              // Trigger Schicht 1: One-Time Emergency Kit Modal!
+                              setNewGeneratedRecoveryKey(recKey);
+                              setHasCopiedRecoveryKey(false);
+                              setShowEmergencyKitModal(true);
+                            } catch (e: any) {
+                              setParentSetupError('Fehler beim Speichern: ' + e.message);
+                              setParentSetupConfirm('');
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }}
+                  style={{
+                    padding: '14px 0',
+                    borderRadius: '16px',
+                    border: '1px solid #e2e8f0',
+                    background: isSpecial ? '#f1f5f9' : '#ffffff',
+                    color: '#0f172a',
+                    fontSize: isSpecial ? '0.9rem' : '1.25rem',
+                    fontWeight: 800,
+                    cursor: isDisabled ? 'not-allowed' : 'pointer',
+                    opacity: isDisabled ? 0.45 : 1,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
+                    transition: 'all 0.1s'
+                  }}
+                  className="hover-scale"
+                >
+                  {key === 'back' ? <Delete size={20} /> : key}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Secure Tier-1 PIN Recovery Link */}
+          {hasConfiguredParentPin && (
+            <button
+              type="button"
+              onClick={() => {
+                setRecoveryKeyInput('');
+                setRecoveryKeyError('');
+                setShowRecoveryKeyModal(true);
+              }}
+              style={{
+                marginTop: '18px',
+                background: 'none',
+                border: 'none',
+                color: '#0284c7',
+                fontSize: '0.78rem',
+                fontWeight: 750,
+                cursor: 'pointer',
+                textDecoration: 'underline',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}
+            >
+              <ShieldCheck size={14} />
+              <span>Eltern-PIN vergessen? Mit Notfall-Schlüssel wiederherstellen</span>
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  const renderRecoveryKeyModal = () => {
+    if (!showRecoveryKeyModal) return null;
+    return (
+      <div
+        style={{
+          position: 'fixed',
+          inset: 0,
+          zIndex: 100003,
+          background: 'rgba(15, 23, 42, 0.75)',
+          backdropFilter: 'blur(10px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '20px'
+        }}
+        onClick={(e) => {
+          if (e.target === e.currentTarget) setShowRecoveryKeyModal(false);
+        }}
+      >
+        <div
+          style={{
+            background: '#ffffff',
+            borderRadius: '28px',
+            width: '100%',
+            maxWidth: '480px',
+            padding: '32px 28px',
+            boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.35)',
+            border: '1.5px solid #e2e8f0',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            textAlign: 'center',
+            color: '#0f172a'
+          }}
+          className="animation-slide-up"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div style={{
+            width: '60px',
+            height: '60px',
+            borderRadius: '20px',
+            background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#ffffff',
+            marginBottom: '16px'
+          }}>
+            <Key size={30} />
+          </div>
+
+          <h3 style={{ margin: '0 0 6px 0', fontSize: '1.3rem', fontWeight: 1000, color: '#0f172a' }}>
+            Elternbereich wiederherstellen 🛡️
+          </h3>
+          <p style={{ margin: '0 0 18px 0', fontSize: '0.82rem', color: '#64748b', fontWeight: 600, lineHeight: 1.45 }}>
+            Gib deinen 8-stelligen Notfallschlüssel (z. B. <code>REC-7492-3810</code>) ein, um eine neue PIN festzulegen.
+          </p>
+
+          {recoveryKeyError && (
+            <div style={{
+              width: '100%',
+              padding: '10px 14px',
+              background: '#fee2e2',
+              border: '1px solid #fca5a5',
+              borderRadius: '12px',
+              color: '#dc2626',
+              fontSize: '0.78rem',
+              fontWeight: 700,
+              marginBottom: '16px',
+              boxSizing: 'border-box'
+            }}>
+              {recoveryKeyError}
+            </div>
+          )}
+
+          {/* Monospace Key Input */}
+          <input
+            type="text"
+            placeholder="REC-XXXX-XXXX"
+            value={recoveryKeyInput}
+            onChange={(e) => {
+              setRecoveryKeyError('');
+              setRecoveryKeyInput(e.target.value.toUpperCase());
+            }}
+            style={{
+              width: '100%',
+              padding: '14px 16px',
+              borderRadius: '16px',
+              border: '2px solid #cbd5e1',
+              fontSize: '1.15rem',
+              fontWeight: 900,
+              fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+              textAlign: 'center',
+              letterSpacing: '0.08em',
+              outline: 'none',
+              marginBottom: '16px',
+              boxSizing: 'border-box',
+              color: '#0f172a',
+              background: '#f8fafc'
+            }}
+            autoFocus
+          />
+
+          {/* Verify Button */}
+          <button
+            type="button"
+            onClick={async () => {
+              const cleanInput = recoveryKeyInput.trim();
+              if (!cleanInput) {
+                setRecoveryKeyError('Bitte gib deinen Notfallschlüssel ein.');
+                return;
+              }
+
+              const targetId = studentId || (studentUser as any)?.id;
+              if (!targetId) return;
+
+              try {
+                const { data: resetResult, error: resetErr } = await supabase.rpc('reset_parent_pin_via_recovery_key', {
+                  p_student_id: targetId,
+                  p_recovery_key: cleanInput
+                });
+
+                if (resetResult?.success) {
+                  sessionStorage.removeItem(`groovelab_parent_session_${targetId}`);
+                  sessionStorage.removeItem(`groovelab_parent_unlocked_${targetId}`);
+                  sessionStorage.removeItem('groovelab_parent_unlocked_global');
+                  if (studentUser) {
+                    (studentUser as any).has_parent_pin = false;
+                  }
+
+                  setShowRecoveryKeyModal(false);
+                  setParentSetupStep('enter');
+                  setParentSetupPin('');
+                  setParentSetupConfirm('');
+                  setParentGatePinInput('');
+                  setParentGateError('');
+                  alert('Notfallschlüssel bestätigt! Bitte vergib jetzt deine neue 6-stellige Eltern-Master-PIN.');
+                } else {
+                  setRecoveryKeyError(resetResult?.error || resetErr?.message || 'Ungültiger Notfallschlüssel. Bitte prüfe deine Eingabe oder wende dich an deine Lehrkraft.');
+                }
+              } catch (err: any) {
+                setRecoveryKeyError(err.message || 'Verbindungsfehler bei der Schlüsselprüfung.');
+              }
+            }}
+            style={{
+              width: '100%',
+              padding: '14px',
+              borderRadius: '14px',
+              background: '#0284c7',
+              color: '#ffffff',
+              border: 'none',
+              fontSize: '0.88rem',
+              fontWeight: 800,
+              cursor: 'pointer',
+              marginBottom: '16px',
+              transition: 'all 0.15s ease'
+            }}
+            className="hover-scale"
+          >
+            Notfallschlüssel prüfen ➔
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  // ⏱️ Auto-Save Notice & Active Practice Tracking for Grace Period
+  const [autoSavedNotice, setAutoSavedNotice] = useState<string | null>(null);
+  const practiceGraceActiveRef = useRef<boolean>(false);
+  const hasAutoFlushedRef = useRef<boolean>(false);
+
+  // Is an active practice currently in progress?
+  const isAnyPracticeActive = Boolean(
+    sessionActive ||
+    juniorIsRecording ||
+    (typeof window !== 'undefined' && (window as any).__campus_is_audio_recording === true)
+  );
+
+  // Helper: compute seconds since scheduled start time (handles midnight rollover)
+  const getSecondsSinceScheduledStart = (startTimeStr: string, now: Date): number => {
+    const [startH, startM] = startTimeStr.split(':').map(Number);
+    const currentTotalSeconds = (now.getHours() * 60 + now.getMinutes()) * 60 + now.getSeconds();
+    const startTotalSeconds = ((startH ?? 0) * 60 + (startM ?? 0)) * 60;
+    let diff = currentTotalSeconds - startTotalSeconds;
+    if (diff < -43200) {
+      diff += 86400;
+    }
+    return diff;
+  };
+
+  // 1. Bedtime Grace Check (5 Min. Toleranz bei aktiver Übung nach Sperrbeginn)
+  const bedtimeGraceInfo = useMemo(() => {
+    if (!bedtimeModeEnabled || checkIsParentSessionActive()) return null;
+    const diff = getSecondsSinceScheduledStart(bedtimeStart, wallClockNow);
+    
+    // In der 5-Minuten Pufferzeit (0 bis 299 Sekunden nach Start)
+    if (diff >= 0 && diff < 300) {
+      if (isAnyPracticeActive || practiceGraceActiveRef.current) {
+        practiceGraceActiveRef.current = true;
+        return {
+          type: 'bedtime' as const,
+          targetName: 'zur Nachtruhe 🌙',
+          secondsLeft: 300 - diff,
+          cutoffTime: bedtimeStart
+        };
+      }
+    } else {
+      if (diff >= 300) {
+        practiceGraceActiveRef.current = false;
+      }
+    }
+    return null;
+  }, [bedtimeModeEnabled, bedtimeStart, wallClockNow, isAnyPracticeActive]);
+
+  // 2. Daytime Lock Grace Check (5 Min. Toleranz bei aktiver Übung nach Startzeit)
+  const daytimeGraceInfo = useMemo(() => {
+    if (!daytimeLockEnabled || checkIsParentSessionActive()) return null;
+    const day = wallClockNow.getDay();
+    if (daytimeLockDays === 'school_days' && (day === 0 || day === 6)) {
+      return null;
+    }
+    const diff = getSecondsSinceScheduledStart(daytimeLockStart, wallClockNow);
+
+    if (diff >= 0 && diff < 300) {
+      if (isAnyPracticeActive || practiceGraceActiveRef.current) {
+        practiceGraceActiveRef.current = true;
+        return {
+          type: 'daytime' as const,
+          targetName: 'zum Schulzeit-Fokus 🎒',
+          secondsLeft: 300 - diff,
+          cutoffTime: daytimeLockStart
+        };
+      }
+    } else {
+      if (diff >= 300) {
+        practiceGraceActiveRef.current = false;
+      }
+    }
+    return null;
+  }, [daytimeLockEnabled, daytimeLockStart, daytimeLockDays, wallClockNow, isAnyPracticeActive]);
+
+  const activePracticeGrace = bedtimeGraceInfo || daytimeGraceInfo;
+
+  // Atomare Auto-Flush Funktion: Sichert Fokus-Timer, stoppt Aufnahmen, schaltet Mikrofon aus
+  const autoFlushAndFinalizePractice = async () => {
+    try {
+      const nowTimeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      
+      // 1. Fokus-Timer sichern
+      if (sessionActive) {
+        await finishPracticeSession();
+      }
+
+      // 2. Audioaufnahme stoppen
+      if (juniorMediaRecorderRef.current && juniorMediaRecorderRef.current.state !== 'inactive') {
+        try {
+          juniorMediaRecorderRef.current.stop();
+        } catch (e) {}
+      }
+      setJuniorIsRecording(false);
+
+      // 3. Hardware-Sicherheit: Mikrofon-Tracks sofort stoppen (Licht geht aus)
+      if (juniorAudioStreamRef.current) {
+        try {
+          juniorAudioStreamRef.current.getTracks().forEach(t => t.stop());
+        } catch (e) {}
+        juniorAudioStreamRef.current = null;
+      }
+
+      // 4. Globale Events für Loopstation & Metronom
+      if (typeof window !== 'undefined') {
+        (window as any).__campus_is_audio_recording = false;
+        window.dispatchEvent(new CustomEvent('campus_force_stop_audio'));
+        window.dispatchEvent(new CustomEvent('campus_force_save_practice'));
+      }
+
+      practiceGraceActiveRef.current = false;
+      setAutoSavedNotice(`Deine Übung wurde um ${nowTimeStr} Uhr automatisch und sicher im Logbuch verbucht! 🎶`);
+    } catch (err) {
+      console.warn('[AutoFlushPractice] Error during practice auto-flush:', err);
+    }
+  };
+
+  // Hard-Deadline Trigger: Sobald 5 Min. nach Sperrbeginn erreicht sind, wird sofort abgebrochen & eingebucht
+  useEffect(() => {
+    if (!checkIsParentSessionActive() && (isCurrentlyInBedtime || isCurrentlyInDaytimeLock)) {
+      const bedtimeDiff = bedtimeModeEnabled ? getSecondsSinceScheduledStart(bedtimeStart, wallClockNow) : -1;
+      const daytimeDiff = daytimeLockEnabled ? getSecondsSinceScheduledStart(daytimeLockStart, wallClockNow) : -1;
+
+      const isJustExpired = (bedtimeDiff >= 300 && bedtimeDiff < 310) || (daytimeDiff >= 300 && daytimeDiff < 310);
+
+      if (isJustExpired && !hasAutoFlushedRef.current) {
+        hasAutoFlushedRef.current = true;
+        autoFlushAndFinalizePractice();
+      }
+    } else {
+      hasAutoFlushedRef.current = false;
+    }
+  }, [wallClockNow, isCurrentlyInBedtime, isCurrentlyInDaytimeLock, bedtimeModeEnabled, daytimeLockEnabled]);
+
+  // Sofortpause durch Eltern: Wenn aktiv, auch sofortige Sicherung
+  useEffect(() => {
+    if (isCurrentlyInInstantLock && isAnyPracticeActive) {
+      autoFlushAndFinalizePractice();
+    }
+  }, [isCurrentlyInInstantLock, isAnyPracticeActive]);
+
+  // Must-Have 1: Nachtruhe & Zeit-Sperren Sperrbildschirm (100% VOLLFORMAT PORTAL)
+  // Wenn die Übungs-Pufferzeit aktiv ist (bis zu 5 Min. nach Sperrbeginn), bleibt die App für das Beenden offen!
+  const isGracePuffering = Boolean(activePracticeGrace && activePracticeGrace.secondsLeft > 0);
+
+  const isCurrentlyLocked = (isCurrentlyInInstantLock || ((isCurrentlyInBedtime || isCurrentlyInDaytimeLock) && !isGracePuffering)) && !checkIsParentSessionActive();
+
+  if (isCurrentlyLocked) {
+    const lockConfig = isCurrentlyInInstantLock ? {
+      title: 'Familien-Pause ☕',
+      badge: 'Sofortpause aktiv',
+      badgeBg: 'rgba(245, 158, 11, 0.2)',
+      badgeColor: '#fde047',
+      subtitle: (
+        <>Deine Eltern haben eine gemeinsame Bildschirmpause aktiviert. Zeit für Familie, Essen oder frische Luft!{instantLockUntil && <> Pause aktiv bis ca. <strong style={{ color: '#ffffff' }}>{new Date(instantLockUntil).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} Uhr</strong>.</>}</>
+      ),
+      icon: <Coffee size={44} color="#fbbf24" />,
+      iconBg: 'radial-gradient(circle, rgba(245, 158, 11, 0.25) 0%, rgba(245, 158, 11, 0.05) 100%)',
+      iconBorder: 'rgba(245, 158, 11, 0.5)',
+      quote: '„Gemeinsame Zeit ist wie Musik – sie verbindet die Familie.“'
+    } : isCurrentlyInDaytimeLock ? {
+      title: 'Schulzeit- & Hausaufgaben-Fokus 🎒',
+      badge: `Fokuszeit (${daytimeLockStart} – ${daytimeLockEnd} Uhr)`,
+      badgeBg: 'rgba(129, 140, 248, 0.2)',
+      badgeColor: '#c7d2fe',
+      subtitle: (
+        <>Jetzt konzentrieren wir uns auf die Schule und Hausaufgaben! Die Übe-App ist von <strong style={{ color: '#ffffff' }}>{daytimeLockStart} Uhr</strong> bis <strong style={{ color: '#ffffff' }}>{daytimeLockEnd} Uhr</strong> pausiert. Deine Instrumente warten nach dem Unterricht auf dich!</>
+      ),
+      icon: <BookOpen size={44} color="#a5b4fc" />,
+      iconBg: 'radial-gradient(circle, rgba(129, 140, 248, 0.25) 0%, rgba(129, 140, 248, 0.05) 100%)',
+      iconBorder: 'rgba(129, 140, 248, 0.5)',
+      quote: '„Erst die Schule, dann die Töne – so werden Champions gemacht!“'
+    } : {
+      title: 'Gute Nacht, kleiner Musiker! 🌙',
+      badge: `Nachtruhe (${bedtimeStart} – ${bedtimeEnd} Uhr)`,
+      badgeBg: 'rgba(56, 189, 248, 0.2)',
+      badgeColor: '#bae6fd',
+      subtitle: (
+        <>Toll geübt heute! Deine Instrumente schlafen schon tief und fest. Die Übe-App ruht von <strong style={{ color: '#ffffff' }}>{bedtimeStart} Uhr</strong> bis <strong style={{ color: '#ffffff' }}>{bedtimeEnd} Uhr</strong>, damit du morgen wieder fit und ausgeschlafen bist!</>
+      ),
+      icon: <Moon size={44} color="#7dd3fc" />,
+      iconBg: 'radial-gradient(circle, rgba(56, 189, 248, 0.25) 0%, rgba(56, 189, 248, 0.05) 100%)',
+      iconBorder: 'rgba(56, 189, 248, 0.5)',
+      quote: '„Im Schlaf wächst dein musikalisches Gehör. Träum süß von neuen Melodien!“'
+    };
+
+    return createPortal(
+      <div style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 99999,
+        width: '100vw',
+        height: '100vh',
+        background: 'radial-gradient(circle at 50% 20%, #1e1b4b 0%, #0f172a 45%, #020617 100%)',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: '36px 24px',
+        padding: '32px 24px',
         textAlign: 'center',
-        background: 'linear-gradient(145deg, #0f172a 0%, #1e1b4b 100%)',
-        borderRadius: '32px',
         color: '#ffffff',
-        margin: '24px auto',
-        maxWidth: '560px',
-        boxShadow: '0 25px 60px rgba(0,0,0,0.35)',
-        border: '1px solid rgba(255,255,255,0.1)'
+        overflowY: 'auto',
+        boxSizing: 'border-box'
       }}>
+        {/* Sleeping Ambient Stars */}
         <div style={{
-          width: '76px',
-          height: '76px',
-          borderRadius: '50%',
-          background: 'rgba(56, 189, 248, 0.15)',
+          position: 'absolute',
+          inset: 0,
+          pointerEvents: 'none',
+          backgroundImage: 'radial-gradient(rgba(255,255,255,0.2) 1px, transparent 1px), radial-gradient(rgba(255,255,255,0.08) 1.5px, transparent 1.5px)',
+          backgroundSize: '48px 48px, 96px 96px',
+          backgroundPosition: '0 0, 24px 24px',
+          opacity: 0.6
+        }} />
+
+        <div style={{
+          position: 'relative',
+          maxWidth: '520px',
+          width: '100%',
           display: 'flex',
+          flexDirection: 'column',
           alignItems: 'center',
-          justifyContent: 'center',
-          marginBottom: '20px',
-          border: '1px solid rgba(56, 189, 248, 0.3)'
+          animation: 'fadeIn 0.5s ease',
+          zIndex: 1
         }}>
-          <Moon size={38} color="#38bdf8" />
-        </div>
+          {/* Auto-Save Reassurance Notice */}
+          {autoSavedNotice && (
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              padding: '10px 18px',
+              borderRadius: '16px',
+              background: 'rgba(34, 197, 94, 0.15)',
+              border: '1.5px solid rgba(34, 197, 94, 0.35)',
+              color: '#86efac',
+              fontSize: '0.84rem',
+              fontWeight: 800,
+              marginBottom: '20px',
+              maxWidth: '440px',
+              boxShadow: '0 4px 15px rgba(34, 197, 94, 0.15)',
+              animation: 'fadeIn 0.3s ease'
+            }}>
+              <Check size={18} color="#4ade80" />
+              <span>{autoSavedNotice}</span>
+            </div>
+          )}
 
-        <h2 style={{ fontSize: '1.65rem', fontWeight: 900, margin: '0 0 8px 0', letterSpacing: '-0.02em' }}>
-          Gute Nacht! 🌙
-        </h2>
-        <p style={{ fontSize: '0.96rem', color: '#94a3b8', maxWidth: '420px', margin: '0 0 24px 0', lineHeight: 1.5, fontWeight: 500 }}>
-          Deine Instrumente schlafen schon. Die Übe-App ist von <strong style={{ color: '#ffffff' }}>{bedtimeStart} Uhr</strong> bis <strong style={{ color: '#ffffff' }}>{bedtimeEnd} Uhr</strong> in der Ruhepause, damit du fit für den nächsten Schultag bist!
-        </p>
-
-        <button
-          type="button"
-          onClick={() => {
-            setPendingParentTarget('parent_controls');
-            setShowParentGateModal(true);
-          }}
-          style={{
+          {/* Badge */}
+          <div style={{
             display: 'inline-flex',
             alignItems: 'center',
-            gap: '8px',
-            padding: '12px 24px',
+            gap: '6px',
+            padding: '6px 14px',
             borderRadius: '100px',
-            background: 'rgba(255, 255, 255, 0.12)',
-            border: '1px solid rgba(255, 255, 255, 0.25)',
-            color: '#ffffff',
-            fontSize: '0.85rem',
+            background: lockConfig.badgeBg,
+            border: `1px solid ${lockConfig.iconBorder}`,
+            color: lockConfig.badgeColor,
+            fontSize: '0.78rem',
             fontWeight: 800,
-            cursor: 'pointer',
-            backdropFilter: 'blur(10px)',
-            transition: 'all 0.2s ease'
-          }}
-          className="hover-scale"
-        >
-          <Lock size={15} />
-          <span>Eltern-PIN eingeben (Entsperren)</span>
-        </button>
-      </div>
+            marginBottom: '26px',
+            letterSpacing: '0.02em',
+            textTransform: 'uppercase'
+          }}>
+            <Sparkles size={13} />
+            <span>{lockConfig.badge}</span>
+          </div>
+
+          {/* Hero Icon with Ambient Glow */}
+          <div style={{
+            width: '92px',
+            height: '92px',
+            borderRadius: '30px',
+            background: lockConfig.iconBg,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginBottom: '22px',
+            border: `1.5px solid ${lockConfig.iconBorder}`,
+            boxShadow: '0 20px 40px -10px rgba(0,0,0,0.5)'
+          }}>
+            {lockConfig.icon}
+          </div>
+
+          {/* Title */}
+          <h1 style={{
+            fontSize: '2.1rem',
+            fontWeight: 900,
+            margin: '0 0 14px 0',
+            letterSpacing: '-0.025em',
+            lineHeight: 1.2,
+            color: '#ffffff'
+          }}>
+            {lockConfig.title}
+          </h1>
+
+          {/* Subtitle */}
+          <p style={{
+            fontSize: '1.02rem',
+            color: '#e2e8f0',
+            lineHeight: 1.65,
+            fontWeight: 500,
+            margin: '0 0 22px 0',
+            maxWidth: '460px'
+          }}>
+            {lockConfig.subtitle}
+          </p>
+
+          {/* Quote Card */}
+          <div style={{
+            padding: '14px 22px',
+            borderRadius: '18px',
+            background: 'rgba(255, 255, 255, 0.07)',
+            border: '1px solid rgba(255, 255, 255, 0.16)',
+            color: '#cbd5e1',
+            fontSize: '0.88rem',
+            fontStyle: 'italic',
+            marginBottom: '32px',
+            maxWidth: '420px',
+            lineHeight: 1.5
+          }}>
+            {lockConfig.quote}
+          </div>
+
+          {/* Unlock Button */}
+          <button
+            type="button"
+            onClick={() => {
+              setPendingParentTarget('parent_controls');
+              setShowParentGateModal(true);
+            }}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '10px',
+              padding: '14px 28px',
+              borderRadius: '100px',
+              background: 'rgba(255, 255, 255, 0.16)',
+              border: '1.5px solid rgba(255, 255, 255, 0.35)',
+              color: '#ffffff',
+              fontSize: '0.92rem',
+              fontWeight: 800,
+              cursor: 'pointer',
+              backdropFilter: 'blur(16px)',
+              boxShadow: '0 10px 25px rgba(0,0,0,0.35)',
+              transition: 'all 0.2s ease'
+            }}
+            className="hover-scale"
+          >
+            <Lock size={16} />
+            <span>Eltern-PIN eingeben (Entsperren)</span>
+          </button>
+        </div>
+
+        {/* Directly render parent gate & recovery modals on top of the portal with z-index 100002! */}
+        {renderParentGateModal()}
+        {renderRecoveryKeyModal()}
+      </div>,
+      document.body
     );
   }
 
@@ -8825,8 +10223,229 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
   const strokeDashoffset = circleCircumference - (xpPercentage / 100) * circleCircumference;
 
   return (
-    <div className="cg-full-height-board fluid-board-scroll-container" style={{ fontFamily: '"Outfit", "Inter", sans-serif', maxWidth: '100%', margin: '0 auto', width: '100%', padding: isMobile ? '0 0 140px 0' : '0 0 40px 0', boxSizing: 'border-box' }}>
+    <div 
+      className={`cg-full-height-board fluid-board-scroll-container ${isMusicStandMode ? 'cg-music-stand-mode' : ''}`} 
+      style={{ 
+        fontFamily: '"Outfit", "Inter", sans-serif', 
+        maxWidth: '100%', 
+        margin: '0 auto', 
+        width: '100%', 
+        padding: isMobile ? '0 0 140px 0' : '0 0 40px 0', 
+        boxSizing: 'border-box',
+        ...(isMusicStandMode ? {
+          fontSize: '115%',
+          letterSpacing: '-0.005em'
+        } : {})
+      }}
+    >
       
+      {/* 🎼 Notenständer- & Typografie-Kontrollleiste */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: '12px',
+        marginBottom: '16px',
+        flexWrap: 'wrap'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <button
+            type="button"
+            onClick={() => setShowLevelModal(true)}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              background: '#ffffff',
+              border: '1.5px solid #e2e8f0',
+              borderRadius: '100px',
+              padding: isMusicStandMode ? '8px 16px' : '6px 14px',
+              fontSize: isMusicStandMode ? '0.92rem' : '0.82rem',
+              fontWeight: 850,
+              color: '#1e293b',
+              cursor: 'pointer',
+              boxShadow: '0 2px 6px rgba(0,0,0,0.03)',
+              transition: 'all 0.2s ease'
+            }}
+            className="hover-scale"
+          >
+            <span>{studentUiLevel === 'junior' ? '🌟 Junior-Star (7–10 J.)' : (studentUiLevel === 'teen' ? '⚡ Teen-Flow (11–15 J.)' : '🎓 Pro-Studio (16+ J.)')}</span>
+            <ChevronRight size={14} color="#64748b" />
+          </button>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <button
+            type="button"
+            onClick={toggleMusicStandMode}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              background: isMusicStandMode ? '#ecfdf5' : '#ffffff',
+              border: isMusicStandMode ? '1.5px solid #34a853' : '1.5px solid #e2e8f0',
+              borderRadius: '100px',
+              padding: isMusicStandMode ? '8px 18px' : '6px 14px',
+              fontSize: isMusicStandMode ? '0.92rem' : '0.82rem',
+              fontWeight: 900,
+              color: isMusicStandMode ? '#15803d' : '#475569',
+              cursor: 'pointer',
+              boxShadow: isMusicStandMode ? '0 4px 14px rgba(52, 168, 83, 0.2)' : '0 2px 6px rgba(0,0,0,0.03)',
+              transition: 'all 0.2s ease'
+            }}
+            className="hover-scale"
+            title="Großschrift für Notenständer & Distanz am Instrument (60–90 cm)"
+          >
+            <span>🎼</span>
+            <span>Notenständer-Modus</span>
+            <span style={{
+              background: isMusicStandMode ? '#34a853' : '#f1f5f9',
+              color: isMusicStandMode ? '#ffffff' : '#64748b',
+              fontSize: '0.70rem',
+              fontWeight: 950,
+              padding: '2px 8px',
+              borderRadius: '100px',
+              letterSpacing: '0.02em'
+            }}>
+              {isMusicStandMode ? 'AKTIV (+25%)' : 'AUS'}
+            </span>
+          </button>
+        </div>
+      </div>
+
+      {/* ⏱️ Floating Übungs-Pufferzeit Countdown Widget (5 Min. Toleranz bei aktiver Übung) */}
+      {activePracticeGrace && (
+        <div style={{
+          position: 'fixed',
+          top: '16px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          zIndex: 99998,
+          background: 'rgba(15, 23, 42, 0.94)',
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
+          border: '1.5px solid #f59e0b',
+          borderRadius: '100px',
+          padding: isMusicStandMode ? '10px 22px' : '8px 18px',
+          boxShadow: '0 10px 30px -4px rgba(245, 158, 11, 0.35), 0 4px 12px rgba(0,0,0,0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px',
+          color: '#ffffff',
+          animation: 'fadeIn 0.3s ease'
+        }}>
+          <div style={{
+            width: '10px',
+            height: '10px',
+            borderRadius: '50%',
+            background: '#f59e0b',
+            boxShadow: '0 0 10px #f59e0b'
+          }} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ fontSize: isMusicStandMode ? '0.94rem' : '0.86rem', fontWeight: 800, color: '#fde68a' }}>
+              Übungs-Pufferzeit:
+            </span>
+            <span style={{
+              fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+              fontSize: isMusicStandMode ? '1.15rem' : '1.02rem',
+              fontWeight: 900,
+              color: '#ffffff',
+              background: 'rgba(245, 158, 11, 0.2)',
+              padding: '2px 8px',
+              borderRadius: '6px',
+              border: '1px solid rgba(245, 158, 11, 0.3)'
+            }}>
+              {String(Math.floor(activePracticeGrace.secondsLeft / 60)).padStart(2, '0')}:
+              {String(activePracticeGrace.secondsLeft % 60).padStart(2, '0')}
+            </span>
+            <span style={{ fontSize: isMusicStandMode ? '0.90rem' : '0.82rem', color: '#cbd5e1', fontWeight: 600 }}>
+              {activePracticeGrace.targetName}
+            </span>
+          </div>
+
+          <button
+            type="button"
+            onClick={async () => {
+              await autoFlushAndFinalizePractice();
+            }}
+            style={{
+              background: '#f59e0b',
+              color: '#0f172a',
+              border: 'none',
+              borderRadius: '100px',
+              padding: isMusicStandMode ? '8px 16px' : '6px 14px',
+              fontSize: isMusicStandMode ? '0.88rem' : '0.80rem',
+              fontWeight: 900,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              boxShadow: '0 2px 8px rgba(245, 158, 11, 0.3)',
+              transition: 'all 0.15s ease'
+            }}
+            className="hover-scale"
+          >
+            <Check size={14} />
+            <span>Jetzt sichern &amp; beenden</span>
+          </button>
+        </div>
+      )}
+
+      {/* 5-Minuten-Vorwarnung (Grace Window vor Schlafenszeit / Sperrzeit) */}
+      {lockWarningInfo && (
+        <div style={{
+          background: 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)',
+          border: '1.5px solid #fde68a',
+          padding: isMusicStandMode ? '20px 24px' : '16px 20px',
+          borderRadius: '24px',
+          marginBottom: '20px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '16px',
+          boxShadow: '0 8px 24px -4px rgba(217, 119, 6, 0.12)',
+          position: 'relative',
+          animation: 'fadeIn 0.4s ease'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+            <div style={{
+              width: isMusicStandMode ? '52px' : '44px',
+              height: isMusicStandMode ? '52px' : '44px',
+              borderRadius: '16px',
+              background: '#fef3c7',
+              border: '1px solid #fde68a',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0
+            }}>
+              {lockWarningInfo.type === 'bedtime' ? <Moon size={isMusicStandMode ? 28 : 24} color="#d97706" /> : <BookOpen size={isMusicStandMode ? 28 : 24} color="#4338ca" />}
+            </div>
+            <div>
+              <div style={{ fontSize: isMusicStandMode ? '1.20rem' : '1.05rem', fontWeight: 900, color: '#92400e' }}>
+                {lockWarningInfo.title}
+              </div>
+              <div style={{ fontSize: isMusicStandMode ? '1.02rem' : '0.90rem', color: '#b45309', fontWeight: 650, marginTop: '2px', lineHeight: 1.4 }}>
+                {lockWarningInfo.message}
+              </div>
+            </div>
+          </div>
+          <div style={{
+            fontSize: isMusicStandMode ? '0.90rem' : '0.82rem',
+            fontWeight: 850,
+            background: '#ffffff',
+            padding: isMusicStandMode ? '8px 16px' : '6px 14px',
+            borderRadius: '100px',
+            border: '1px solid #fde68a',
+            color: '#b45309',
+            whiteSpace: 'nowrap',
+            boxShadow: '0 2px 6px rgba(217, 119, 6, 0.08)'
+          }}>
+            Automatische Sicherung aktiv 🛡️
+          </div>
+        </div>
+      )}
+
       {/* Holiday Banner */}
       {isTodayHoliday && (
         <div style={{
@@ -9051,7 +10670,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                   gap: '6px'
                 }} className="kpi-card">
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '0.66rem', fontWeight: 800, opacity: 0.9, textTransform: 'uppercase', letterSpacing: '0.05em' }} className="kpi-card-title">Gesammelte XP</span>
+                    <span style={{ fontSize: isMusicStandMode ? '0.84rem' : '0.74rem', fontWeight: 800, opacity: 0.95, textTransform: 'uppercase', letterSpacing: '0.05em' }} className="kpi-card-title">Gesammelte XP</span>
                     <Star size={15} fill="currentColor" />
                   </div>
                   <span style={{ fontSize: '1.3rem', fontWeight: 900, fontFamily: "'Urbanist', sans-serif" }} className="kpi-card-value">{(() => {
@@ -9122,7 +10741,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                   gap: '6px'
                 }} className="kpi-card">
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '0.66rem', fontWeight: 800, opacity: 0.9, textTransform: 'uppercase', letterSpacing: '0.05em' }} className="kpi-card-title">Gesamtzeit</span>
+                    <span style={{ fontSize: isMusicStandMode ? '0.84rem' : '0.74rem', fontWeight: 800, opacity: 0.95, textTransform: 'uppercase', letterSpacing: '0.05em' }} className="kpi-card-title">Gesamtzeit</span>
                     <Clock size={15} />
                   </div>
                   <span style={{ fontSize: '1.3rem', fontWeight: 900, fontFamily: "'Urbanist', sans-serif" }} className="kpi-card-value">{(() => {
@@ -9157,7 +10776,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                 gap: '6px'
               }} className="kpi-card">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '0.66rem', fontWeight: 900, color: '#713f12', textTransform: 'uppercase', letterSpacing: '0.05em' }} className="kpi-card-title">Fokus Heute</span>
+                  <span style={{ fontSize: isMusicStandMode ? '0.84rem' : '0.74rem', fontWeight: 900, color: '#713f12', textTransform: 'uppercase', letterSpacing: '0.05em' }} className="kpi-card-title">Fokus Heute</span>
                   <Activity size={15} color="#713f12" />
                 </div>
                 <span style={{ fontSize: '1.2rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Urbanist', sans-serif", display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: '5px' }} className="kpi-card-value">{(() => {
@@ -9227,7 +10846,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                   minHeight: '76px'
                 }} className="kpi-card">
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '0.66rem', fontWeight: 800, opacity: 0.9, textTransform: 'uppercase', letterSpacing: '0.05em' }} className="kpi-card-title">Streak-Pfad</span>
+                    <span style={{ fontSize: isMusicStandMode ? '0.84rem' : '0.74rem', fontWeight: 800, opacity: 0.95, textTransform: 'uppercase', letterSpacing: '0.05em' }} className="kpi-card-title">Streak-Pfad</span>
                     <Flame size={15} fill="currentColor" />
                   </div>
                   
@@ -9254,34 +10873,34 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                       if (isTodayHoliday) {
                         return (
                           <span style={{ 
-                            fontSize: '0.6rem', 
+                            fontSize: isMusicStandMode ? '0.85rem' : '0.75rem', 
                             fontWeight: 800, 
                             background: 'rgba(255, 255, 255, 0.2)', 
                             backdropFilter: 'blur(8px)',
                             WebkitBackdropFilter: 'blur(8px)',
                             border: '1px solid rgba(255, 255, 255, 0.4)', 
                             color: '#ffffff',
-                            padding: '5px 8px', 
+                            padding: '6px 10px', 
                             borderRadius: '10px',
                             display: 'flex',
                             flexDirection: 'column',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            lineHeight: '1.1',
-                            gap: '1px'
+                            lineHeight: '1.15',
+                            gap: '2px'
                           }}>
-                            <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
-                              <Palmtree size={12} color="#ffffff" />
+                            <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <Palmtree size={13} color="#ffffff" />
                               <span>Ferienpause</span>
                             </span>
-                            <span style={{ fontSize: '0.52rem', opacity: 0.85 }}>Streak sicher</span>
+                            <span style={{ fontSize: isMusicStandMode ? '0.78rem' : '0.68rem', opacity: 0.95, fontWeight: 700 }}>Streak sicher</span>
                           </span>
                         );
                       }
                       
                       return (
                         <span style={{ 
-                          fontSize: '0.6rem', 
+                          fontSize: isMusicStandMode ? '0.82rem' : '0.74rem', 
                           fontWeight: 800, 
                           background: availableShields > 0 
                             ? 'rgba(255, 255, 255, 0.18)' 
@@ -9291,29 +10910,29 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                           border: availableShields > 0 
                             ? '1px solid rgba(255, 255, 255, 0.45)' 
                             : '1px solid rgba(255, 255, 255, 0.1)',
-                          color: availableShields > 0 ? '#ffffff' : 'rgba(255, 255, 255, 0.45)',
-                          padding: '5px 8px', 
+                          color: availableShields > 0 ? '#ffffff' : 'rgba(255, 255, 255, 0.55)',
+                          padding: '6px 10px', 
                           borderRadius: '10px',
                           display: 'flex',
                           flexDirection: 'column',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          lineHeight: '1.1',
+                          lineHeight: '1.15',
                           textAlign: 'center',
                           letterSpacing: '0.03em',
                           flexShrink: 0
-                        }} title={`${availableShields}/3 Schutzschilde in KW ${currentWeek} bereit (Glut-Schutz bei verpassten Tagen)`}>
-                          <div style={{ display: 'flex', gap: '2px', marginBottom: '2px' }}>
+                        }} title={`${availableShields}/3 Schutzschilde diese Woche bereit (Glut-Schutz bei verpassten Tagen)`}>
+                          <div style={{ display: 'flex', gap: '3px', marginBottom: '3px' }}>
                             {[1, 2, 3].map(sNum => (
                               <Shield 
                                 key={`kpi-s-${sNum}`} 
-                                size={9} 
+                                size={10} 
                                 fill={sNum <= availableShields ? '#ffffff' : 'none'} 
                                 color={sNum <= availableShields ? '#ffffff' : 'rgba(255,255,255,0.4)'} 
                               />
                             ))}
                           </div>
-                          <span style={{ fontWeight: 900 }}>{availableShields}/3 Schilde</span>
+                          <span style={{ fontWeight: 900, fontSize: isMusicStandMode ? '0.82rem' : '0.74rem' }}>{availableShields}/3 Schilde</span>
                         </span>
                       );
                     })()}
@@ -9371,10 +10990,10 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                     <Award size={17} color="#fde047" />
                   </div>
                   <div>
-                    <div style={{ fontSize: '0.64rem', fontWeight: 800, color: '#a7f3d0', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                    <div style={{ fontSize: isMusicStandMode ? '0.86rem' : '0.78rem', fontWeight: 800, color: '#a7f3d0', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
                       Dein Sticker-Pfad & Übe-Level
                     </div>
-                    <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#ffffff' }}>
+                    <h3 style={{ margin: 0, fontSize: isMusicStandMode ? '1.30rem' : '1.18rem', fontWeight: 900, color: '#ffffff' }}>
                       {(() => {
                         const logsMins = Math.floor((fokusLogs || []).reduce((sum, log) => sum + (log.duration_seconds || ((log.duration_minutes || 0) * 60)), 0) / 60);
                         const effMins = Math.max(totalFocusMinutes || 0, logsMins);
@@ -9413,11 +11032,11 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                     const progressPct = isMax ? 100 : Math.min(100, Math.max(0, ((effMins - prevMin) / (targetMin - prevMin)) * 100));
 
                     return (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(0, 0, 0, 0.18)', padding: '4px 10px', borderRadius: '999px', border: '1px solid rgba(255, 255, 255, 0.2)' }}>
-                        <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#ffffff' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(0, 0, 0, 0.18)', padding: isMusicStandMode ? '6px 14px' : '4px 10px', borderRadius: '999px', border: '1px solid rgba(255, 255, 255, 0.2)' }}>
+                        <span style={{ fontSize: isMusicStandMode ? '0.90rem' : '0.82rem', fontWeight: 800, color: '#ffffff' }}>
                           {isMax ? 'Großmeister-Status erreicht' : `${effMins}/${targetMin} Min. zu ${nextStickerName}`}
                         </span>
-                        <div style={{ width: '48px', height: '5px', background: 'rgba(255, 255, 255, 0.2)', borderRadius: '999px', overflow: 'hidden' }}>
+                        <div style={{ width: isMusicStandMode ? '60px' : '48px', height: '6px', background: 'rgba(255, 255, 255, 0.2)', borderRadius: '999px', overflow: 'hidden' }}>
                           <div style={{ width: `${progressPct}%`, height: '100%', background: 'linear-gradient(90deg, #facc15 0%, #fde047 100%)', borderRadius: '999px', transition: 'width 0.5s ease' }} />
                         </div>
                       </div>
@@ -9426,28 +11045,27 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
 
                   <button
                     onClick={() => {
-                      setHomeworkBookTab('stickeralbum');
-                      handleTabChangeLocal('homework_book');
+                      handleOpenHomeworkBookWithView('stickeralbum', 'document');
                     }}
                     style={{
                       background: 'rgba(255, 255, 255, 0.2)',
                       border: '1px solid rgba(255, 255, 255, 0.35)',
                       color: '#ffffff',
                       borderRadius: '999px',
-                      padding: '4px 10px',
+                      padding: isMusicStandMode ? '6px 14px' : '4px 10px',
                       fontWeight: 800,
-                      fontSize: '0.68rem',
+                      fontSize: isMusicStandMode ? '0.88rem' : '0.80rem',
                       cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '4px',
+                      gap: '5px',
                       backdropFilter: 'blur(8px)',
                       transition: 'all 0.2s ease'
                     }}
                     className="hover-scale"
                     title="Zum virtuellen Sticker-Album"
                   >
-                    <BookOpen size={12} />
+                    <BookOpen size={isMusicStandMode ? 14 : 12} />
                     <span>Sticker-Album</span>
                   </button>
                 </div>
@@ -9506,14 +11124,14 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                         alignItems: 'center',
                         gap: '4px',
                         zIndex: 1,
-                        minWidth: '68px'
+                        minWidth: isMusicStandMode ? '76px' : '68px'
                       }}
                     title={`${node.title}: ${node.desc}`}
                   >
                     <div style={{
-                      width: '46px',
-                      height: '46px',
-                      borderRadius: '14px',
+                      width: isMusicStandMode ? '54px' : '46px',
+                      height: isMusicStandMode ? '54px' : '46px',
+                      borderRadius: '16px',
                       background: node.done ? '#ffffff' : (node.current ? 'rgba(253, 224, 71, 0.25)' : 'rgba(255, 255, 255, 0.12)'),
                       border: node.done ? '2px solid #facc15' : (node.current ? '1.5px dashed #fde047' : '1px dashed rgba(255, 255, 255, 0.3)'),
                       display: 'flex',
@@ -9539,7 +11157,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                           const parent = e.currentTarget.parentElement;
                           if (parent) {
                             const span = document.createElement('span');
-                            span.style.fontSize = '1.15rem';
+                            span.style.fontSize = isMusicStandMode ? '1.35rem' : '1.15rem';
                             span.style.filter = node.done ? 'none' : 'grayscale(100%) opacity(0.4)';
                             span.innerText = node.icon;
                             parent.appendChild(span);
@@ -9548,7 +11166,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                       />
                     </div>
                     <span style={{
-                      fontSize: '0.62rem',
+                      fontSize: isMusicStandMode ? '0.82rem' : '0.74rem',
                       fontWeight: node.current ? 900 : 750,
                       color: node.done ? '#ffffff' : (node.current ? '#fde047' : 'rgba(255, 255, 255, 0.75)'),
                       textAlign: 'center',
@@ -9640,7 +11258,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                     {!sessionActive && (
                       <h4 style={{ 
                         fontWeight: 850, 
-                        fontSize: '18px', 
+                        fontSize: isMusicStandMode ? '22px' : '19px', 
                         color: '#0f172a', 
                         margin: 0, 
                         letterSpacing: '-0.02em',
@@ -9650,7 +11268,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                       </h4>
                     )}
                     <p style={{ 
-                      fontSize: '0.74rem', 
+                      fontSize: isMusicStandMode ? '0.96rem' : '0.86rem', 
                       color: sessionActive ? 'rgba(255, 255, 255, 0.7)' : '#64748b', 
                       margin: '2px 0 0 0', 
                       fontWeight: 550, 
@@ -9684,14 +11302,14 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                     const { practicedDays, targetDays, nextLevel, progressPercentage, isMaxLevel } = getTrimesterProgressDetails();
                     return (
                       <div style={{ marginLeft: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px' }}>
-                        <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#34a853', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                        <span style={{ fontSize: isMusicStandMode ? '0.80rem' : '0.72rem', fontWeight: 800, color: '#34a853', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                           {isMaxLevel ? 'Stufe Max' : `Weg zu Level ${nextLevel}`}
                         </span>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                          <span style={{ fontSize: '0.76rem', fontWeight: 800, color: '#125026', fontFamily: "'Urbanist', sans-serif" }}>
+                          <span style={{ fontSize: isMusicStandMode ? '0.94rem' : '0.85rem', fontWeight: 800, color: '#125026', fontFamily: "'Urbanist', sans-serif" }}>
                             {practicedDays} / {targetDays} Tage
                           </span>
-                          <div style={{ width: '50px', height: '4.5px', background: '#e6f4ea', borderRadius: '100px', overflow: 'hidden' }}>
+                          <div style={{ width: isMusicStandMode ? '60px' : '50px', height: '5px', background: '#e6f4ea', borderRadius: '100px', overflow: 'hidden' }}>
                             <div style={{ width: `${progressPercentage}%`, height: '100%', background: '#34a853', borderRadius: '100px' }} />
                           </div>
                         </div>
@@ -11215,7 +12833,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                           </div>
                         ) : (
                           <p style={{ margin: 0, fontSize: '0.76rem', color: 'rgba(255, 255, 255, 0.7)', fontStyle: 'italic' }}>
-                            Keine festen Hausaufgaben hinterlegt. Viel Spaß bei deiner freien Übe-Session! 🎸
+                            Keine festen Hausaufgaben hinterlegt. Viel Spaß bei deiner freien Übe-Session! 🎶
                           </p>
                         )}
                       </div>
@@ -11503,8 +13121,8 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                       background: '#f8fafc',
                       borderRadius: '12px',
                       border: '1px solid #f1f5f9',
-                      fontSize: '0.58rem', 
-                      color: '#94a3b8', 
+                      fontSize: isMusicStandMode ? '0.78rem' : '0.70rem', 
+                      color: '#64748b', 
                       fontWeight: 700
                     }}>
                       <span style={{ textTransform: 'uppercase', letterSpacing: '0.02em' }}>Heatmap:</span>
@@ -11825,13 +13443,13 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
 
                           return (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', borderTop: '1px solid #f1f5f9', paddingTop: '10px' }}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.68rem', color: '#64748b', fontWeight: 700, flexWrap: 'wrap', gap: '6px' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: isMusicStandMode ? '0.80rem' : '0.72rem', color: '#64748b', fontWeight: 700, flexWrap: 'wrap', gap: '6px' }}>
                                 <span>Wochenzeit: <strong style={{ color: '#1e293b' }}>{weekTotalMins} Min.</strong></span>
                                 
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                                  <span style={{ fontSize: '0.64rem', fontWeight: 800, color: '#475569', display: 'flex', alignItems: 'center', gap: '3px' }}>
-                                    <Shield size={11} color="#0284c7" />
-                                    3 Schilde (KW {currentWeek}):
+                                  <span style={{ fontSize: isMusicStandMode ? '0.78rem' : '0.68rem', fontWeight: 800, color: '#475569', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                    <Shield size={12} color="#0284c7" />
+                                    Wochen-Schutzschilde:
                                   </span>
                                   <div style={{ display: 'flex', gap: '3px' }}>
                                     {[1, 2, 3].map((shieldNum) => {
@@ -11869,17 +13487,17 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                               </div>
 
                               {/* Offline-Puffer & Sync Indikator (HM3) */}
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.62rem', color: '#94a3b8', fontWeight: 650, paddingTop: '4px', borderTop: '1px dashed #f1f5f9' }}>
-                                <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#166534' }}>
-                                  <ShieldCheck size={11} color="#16a34a" />
-                                  <span>Lokal gesichert &amp; Cloud-Sync aktiv</span>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: isMusicStandMode ? '0.76rem' : '0.68rem', color: '#64748b', fontWeight: 650, paddingTop: '4px', borderTop: '1px dashed #f1f5f9' }}>
+                                <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#166534', fontWeight: 700 }}>
+                                  <ShieldCheck size={12} color="#16a34a" />
+                                  <span>Automatisch gesichert</span>
                                 </span>
                                 <span 
-                                  title="Verschlüsselungs- &amp; Sicherheitsarchitektur: TLS 1.3 Transport- und AES-256 Server-Verschlüsselung nach Art. 32 DSGVO. Privacy-by-Default (0 E-Mails, 0 Passwörter) &amp; Postgres Row-Level Security (RLS) Mandantentrennung."
-                                  style={{ cursor: 'help', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                                  title="DSGVO-konforme Ende-zu-Ende-Verschlüsselung"
+                                  style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#64748b' }}
                                 >
-                                  <Lock size={10} color="#94a3b8" />
-                                  <span>TLS 1.3 &amp; AES-256 verschlüsselt (Art. 32 DSGVO)</span>
+                                  <Lock size={11} color="#64748b" />
+                                  <span>Verschlüsselt</span>
                                 </span>
                               </div>
                             </div>
@@ -11920,11 +13538,11 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                   <span style={{ fontSize: '0.84rem', fontWeight: 900, color: '#166534' }}>
                                     Heute ({dayNamesFull[now.getDay()]})
                                   </span>
-                                  <span style={{ fontSize: '0.58rem', fontWeight: 900, background: '#34a853', color: '#ffffff', padding: '1px 7px', borderRadius: '100px', textTransform: 'uppercase' }}>
+                                  <span style={{ fontSize: isMusicStandMode ? '0.78rem' : '0.68rem', fontWeight: 900, background: '#34a853', color: '#ffffff', padding: '2px 8px', borderRadius: '100px', textTransform: 'uppercase' }}>
                                     Gemeistert
                                   </span>
                                 </div>
-                                <p style={{ margin: '2px 0 0 0', fontSize: '0.72rem', fontWeight: 700, color: '#15803d' }}>
+                                <p style={{ margin: '2px 0 0 0', fontSize: isMusicStandMode ? '0.84rem' : '0.76rem', fontWeight: 700, color: '#15803d' }}>
                                   {(() => {
                                     const focusSecs = Math.min(180, todayGroup?.focusSeconds ?? (todayHasMastered ? 180 : 0));
                                     const extraSecs = (todayGroup?.extraSeconds !== undefined)
@@ -12000,7 +13618,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                 <p style={{ margin: '2px 0 0 0', fontSize: '0.72rem', fontWeight: 700, color: '#a16207' }}>
                                   {todayTotalSecs > 0 
                                     ? `Bereits ${Math.floor(todayTotalSecs / 60)} Min. geübt • Noch ${Math.max(1, Math.ceil((180 - todayTotalSecs) / 60))} Min. am Stück zur Flamme!`
-                                    : 'Entfache heute deine Tages-Flamme! (3 Min. am Stück) 🎸'}
+                                    : 'Entfache heute deine Tages-Flamme! (3 Min. am Stück) 🎶'}
                                 </p>
                               </div>
                             </div>
@@ -12989,7 +14607,6 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                     <div style={{ flex: 1, minWidth: 0 }}>
                                       <h4 style={{ margin: '0 0 2px 0', fontSize: '0.96rem', fontWeight: 850, color: '#1e293b', lineHeight: '1.25', wordBreak: 'break-word' }}>{item.title}</h4>
                                       {item.author && <p style={{ margin: '0 0 2px 0', fontSize: '0.78rem', color: '#64748b', fontWeight: 600, lineHeight: '1.2', wordBreak: 'break-word' }}>von {item.author}</p>}
-                                      <p style={{ margin: 0, fontSize: '0.72rem', color: '#94a3b8', fontWeight: 700 }}>📖 {item.totalPages || 50} Seiten</p>
                                       
                                       {masteredCount > 0 && (
                                         <div style={{ marginTop: '6px' }}>
@@ -13371,7 +14988,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                         </div>
                         <div style={{ minWidth: 0, flex: 1 }}>
                           <h2 style={{ fontSize: isMobile ? '1.35rem' : '1.75rem', fontWeight: 900, color: '#1e293b', margin: 0, wordBreak: 'break-word' }}>Klassen-Highlights &amp; Team-Power</h2>
-                          <p style={{ color: '#475569', margin: '3px 0 0 0', fontWeight: 600, fontSize: isMobile ? '0.8rem' : '0.9rem' }}>Entdecke die Erfolge deiner Mitschüler, sammelt gemeinsame Übe-Minuten und feiert eure Meilensteine!</p>
+                          <p style={{ color: '#475569', margin: '3px 0 0 0', fontWeight: 600, fontSize: isMobile ? '0.8rem' : '0.9rem' }}>Gemeinsam üben &amp; Sterne für die Schule sammeln! ⭐</p>
                         </div>
                       </div>
 
@@ -13978,6 +15595,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
               readOnly={true}
               isEmbed={true}
               initialModalTab={homeworkBookTab}
+              initialViewMode={homeworkBookViewMode}
               uiLevel={studentUiLevel || 'junior'}
               initialXp={avatar?.xp || 0}
               initialStreak={avatar?.streak_flame || 0}
@@ -14207,17 +15825,17 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                         </div>
                         <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginTop: '6px' }}>
                           <span style={{ 
-                            fontSize: '2.6rem', 
+                            fontSize: (avatar?.streak_flame || 0) === 0 ? '2.1rem' : '2.6rem', 
                             fontWeight: 950, 
                             fontFamily: "'Plus Jakarta Sans', sans-serif", 
                             letterSpacing: '-0.02em',
                             color: 'white',
                             lineHeight: 1
                           }}>
-                            {avatar?.streak_flame || 0}
+                            {(avatar?.streak_flame || 0) === 0 ? 'Startklar' : (avatar?.streak_flame || 0)}
                           </span>
                           <span style={{ fontSize: '0.95rem', fontWeight: 800, opacity: 0.95, color: 'white' }}>
-                            {(avatar?.streak_flame || 0) === 1 ? 'Tag' : 'Tage'}
+                            {(avatar?.streak_flame || 0) === 0 ? 'Tag 1' : ((avatar?.streak_flame || 0) === 1 ? 'Tag' : 'Tage')}
                           </span>
                         </div>
                       </div>
@@ -14303,10 +15921,10 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                             <div style={{
                               background: '#dcfce7',
                               color: '#15803d',
-                              fontSize: '0.72rem',
+                              fontSize: isMusicStandMode ? '0.90rem' : '0.82rem',
                               fontWeight: 950,
                               borderRadius: '100px',
-                              padding: '5px 14px',
+                              padding: '6px 16px',
                               textTransform: 'uppercase',
                               letterSpacing: '0.04em'
                             }}>
@@ -14316,7 +15934,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
 
                           <h3 style={{ 
                             margin: 0, 
-                            fontSize: '28px', 
+                            fontSize: isMusicStandMode ? '34px' : '30px', 
                             fontWeight: 950, 
                             color: '#0f172a', 
                             fontFamily: "'Plus Jakarta Sans', sans-serif", 
@@ -14328,13 +15946,13 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                           
                           <p style={{ 
                             margin: '8px 0 0 0', 
-                            fontSize: '0.95rem', 
+                            fontSize: isMusicStandMode ? '1.18rem' : '1.05rem', 
                             color: '#475569', 
                             fontWeight: 650, 
                             lineHeight: 1.45, 
                             maxWidth: '95%' 
                           }}>
-                            Heute ist ein toller Tag zum Musizieren! Schnapp dir {pronoun} und hol dir deine Übe-Flamme! ✨
+                            Schnapp dir {pronoun} und hol dir deine Flamme! ✨
                           </p>
 
                           {(() => {
@@ -14370,15 +15988,15 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                   gap: '8px', 
                                   background: isCanceled ? 'rgba(239, 68, 68, 0.08)' : 'linear-gradient(135deg, rgba(52, 168, 83, 0.09) 0%, rgba(52, 168, 83, 0.03) 100%)', 
                                   color: isCanceled ? '#dc2626' : '#2e7d32', 
-                                  padding: '8px 16px', 
-                                  minHeight: '38px', 
+                                  padding: isMusicStandMode ? '10px 20px' : '8px 16px', 
+                                  minHeight: isMusicStandMode ? '44px' : '38px', 
                                   boxSizing: 'border-box',
-                                  borderRadius: '12px', 
-                                  fontSize: '0.78rem', 
+                                  borderRadius: '14px', 
+                                  fontSize: isMusicStandMode ? '0.94rem' : '0.86rem', 
                                   fontWeight: 850, 
                                   border: isCanceled ? '1px dashed rgba(239, 68, 68, 0.3)' : '1.5px solid rgba(52, 168, 83, 0.2)'
                                 }}>
-                                  <Calendar size={14} color={isCanceled ? '#dc2626' : '#34a853'} />
+                                  <Calendar size={isMusicStandMode ? 16 : 14} color={isCanceled ? '#dc2626' : '#34a853'} />
                                   <span>{isCanceled ? `Abgesagt: ${lessonText}` : `Nächste Musikstunde: ${lessonText}`}</span>
                                 </div>
 
@@ -14403,11 +16021,11 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                       gap: '8px', 
                                       background: hasMessage ? '#fefce8' : '#ffffff', 
                                       color: hasMessage ? '#ca8a04' : '#475569', 
-                                      padding: '8px 16px', 
-                                      minHeight: '38px',
+                                      padding: isMusicStandMode ? '10px 20px' : '8px 16px', 
+                                      minHeight: isMusicStandMode ? '44px' : '38px',
                                       boxSizing: 'border-box',
                                       borderRadius: '14px', 
-                                      fontSize: '0.80rem', 
+                                      fontSize: isMusicStandMode ? '0.94rem' : '0.86rem', 
                                       fontWeight: 900, 
                                       border: hasMessage ? '1px solid #fde047' : '1px solid #cbd5e1', 
                                       cursor: 'pointer',
@@ -14467,12 +16085,12 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                       gap: '8px',
                                       background: isCanceled ? '#fee2e2' : '#ffffff',
                                       color: isCanceled ? '#dc2626' : '#475569',
-                                      padding: '8px 16px',
-                                      minHeight: '38px',
+                                      padding: isMusicStandMode ? '10px 20px' : '8px 16px',
+                                      minHeight: isMusicStandMode ? '44px' : '38px',
                                       boxSizing: 'border-box',
-                                      borderRadius: '12px',
-                                      fontSize: '0.78rem',
-                                      fontWeight: 800,
+                                      borderRadius: '14px',
+                                      fontSize: isMusicStandMode ? '0.94rem' : '0.86rem',
+                                      fontWeight: 850,
                                       border: isCanceled ? '1px solid #f87171' : '1px solid #e2e8f0',
                                       cursor: 'pointer',
                                       boxShadow: '0 2px 6px rgba(0, 0, 0, 0.04)',
@@ -14488,8 +16106,8 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                       </>
                                     ) : (
                                       <>
-                                        <CalendarX size={14} color="#64748b" />
-                                        <span>Unterricht absagen</span>
+                                        {!isStudentAbsenceAllowed ? <Lock size={14} color="#64748b" /> : <CalendarX size={14} color="#64748b" />}
+                                        <span>{!isStudentAbsenceAllowed ? 'Unterricht absagen (Eltern-PIN)' : 'Unterricht absagen'}</span>
                                       </>
                                     )}
                                   </button>
@@ -14503,165 +16121,15 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                   })()}
 
                   {/* ========================================================================= */}
-                  {/* JUNIOR: TROPHÄEN-BANNER (STICKER-PFAD OBEN)                               */}
-                  {/* ========================================================================= */}
-                  {(() => {
-                    let nextStickerTitle = 'Fleiß-Pionier';
-                    let nextStickerDesc = `Noch ${Math.max(1, 20 - totalFocusMinutes)} Min. üben für deinen 1. Meilenstein! ✨`;
-                    let nextStickerEmoji = '🐝';
-                    let nextStickerId = 'fleiss-pionier';
-                    let currentProgressVal = totalFocusMinutes;
-                    let targetProgressVal = 20;
-
-                    if (totalFocusMinutes < 20) {
-                      nextStickerTitle = 'Fleiß-Pionier';
-                      nextStickerDesc = `Noch ${Math.max(1, 20 - totalFocusMinutes)} Min. üben bis zur Freischaltung ✨`;
-                      nextStickerEmoji = '🐝';
-                      nextStickerId = 'fleiss-pionier';
-                      currentProgressVal = totalFocusMinutes;
-                      targetProgressVal = 20;
-                    } else if ((avatar?.streak_flame || 0) < 3) {
-                      nextStickerTitle = 'Dranbleiber';
-                      nextStickerDesc = `Noch ${3 - (avatar?.streak_flame || 0)} Tage Streak bis zum Disziplin-Sticker! 🔥`;
-                      nextStickerEmoji = '🔥';
-                      nextStickerId = 'dranbleiber';
-                      currentProgressVal = avatar?.streak_flame || 0;
-                      targetProgressVal = 3;
-                    } else if (totalFocusMinutes < 100) {
-                      nextStickerTitle = 'Übe-Meister';
-                      nextStickerDesc = `Noch ${Math.max(1, 100 - totalFocusMinutes)} Min. bis zum seltenen Sticker! 🦉`;
-                      nextStickerEmoji = '🦉';
-                      nextStickerId = 'uebe-meister';
-                      currentProgressVal = totalFocusMinutes;
-                      targetProgressVal = 100;
-                    } else if ((avatar?.streak_flame || 0) < 7) {
-                      nextStickerTitle = 'Wochen-Held';
-                      nextStickerDesc = `Noch ${7 - (avatar?.streak_flame || 0)} Tage Streak bis zum Wochen-Held! 📆`;
-                      nextStickerEmoji = '📆';
-                      nextStickerId = 'wochen-held';
-                      currentProgressVal = avatar?.streak_flame || 0;
-                      targetProgressVal = 7;
-                    } else if (totalFocusMinutes < 500) {
-                      nextStickerTitle = 'Übe-Legende';
-                      nextStickerDesc = `Noch ${Math.max(1, 500 - totalFocusMinutes)} Min. bis zum epischen Meilenstein! 👑`;
-                      nextStickerEmoji = '👑';
-                      nextStickerId = 'uebe-legende';
-                      currentProgressVal = totalFocusMinutes;
-                      targetProgressVal = 500;
-                    } else {
-                      nextStickerTitle = 'Übe-Großmeister';
-                      nextStickerDesc = `Sammle alle Trophäen in deinem Panini-Album! 🏆`;
-                      nextStickerEmoji = '🏆';
-                      nextStickerId = 'uebe-grossmeister';
-                      currentProgressVal = 100;
-                      targetProgressVal = 100;
-                    }
-
-                    const progressPercent = Math.min(100, Math.max(0, Math.round((currentProgressVal / (targetProgressVal || 1)) * 100)));
-
-                    return (
-                      <div 
-                        onClick={() => setShowJuniorStickerModal(true)}
-                        style={{
-                          background: 'linear-gradient(135deg, #fffdfa 0%, #fef3c7 100%)',
-                          borderRadius: '24px',
-                          padding: '16px 24px',
-                          border: '2px solid #fde68a',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          gap: '16px',
-                          cursor: 'pointer',
-                          boxShadow: '0 8px 24px rgba(217, 119, 6, 0.08)',
-                          flexWrap: 'wrap'
-                        }}
-                        className="hover-scale"
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flex: 1, minWidth: '240px' }}>
-                          <div style={{
-                            background: '#ffffff',
-                            border: '2.5px solid #f59e0b',
-                            width: '50px',
-                            height: '50px',
-                            borderRadius: '18px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            boxShadow: '0 6px 16px rgba(245, 158, 11, 0.25)',
-                            overflow: 'hidden',
-                            padding: '4px',
-                            flexShrink: 0
-                          }}>
-                            <img 
-                              src={`/stickers/${nextStickerId}.png?v=1`} 
-                              alt={nextStickerTitle}
-                              style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-                              onError={(e) => {
-                                e.currentTarget.style.display = 'none';
-                                const parent = e.currentTarget.parentElement;
-                                if (parent) {
-                                  parent.innerText = nextStickerEmoji;
-                                  parent.style.fontSize = '1.6rem';
-                                }
-                              }}
-                            />
-                          </div>
-                          <div style={{ flex: 1 }}>
-                            <div style={{ fontSize: '1.05rem', fontWeight: 950, color: '#92400e', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                              Nächster Sticker: {nextStickerTitle}
-                            </div>
-                            <div style={{ fontSize: '0.82rem', color: '#b45309', fontWeight: 700, marginTop: '2px' }}>
-                              {nextStickerDesc}
-                            </div>
-
-                            {/* Mini Gamification Progress Bar */}
-                            <div style={{ marginTop: '6px', display: 'flex', alignItems: 'center', gap: '8px', width: '100%', maxWidth: '320px' }}>
-                              <div style={{ flex: 1, height: '6px', background: 'rgba(245, 158, 11, 0.2)', borderRadius: '100px', overflow: 'hidden' }}>
-                                <div style={{
-                                  width: `${progressPercent}%`,
-                                  height: '100%',
-                                  background: 'linear-gradient(90deg, #f59e0b 0%, #d97706 100%)',
-                                  borderRadius: '100px',
-                                  transition: 'width 0.4s ease'
-                                }} />
-                              </div>
-                              <span style={{ fontSize: '0.72rem', fontWeight: 900, color: '#b45309', whiteSpace: 'nowrap' }}>
-                                {progressPercent}%
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div style={{
-                          background: '#f59e0b',
-                          color: '#ffffff',
-                          padding: '10px 20px',
-                          borderRadius: '100px',
-                          fontSize: '0.9rem',
-                          fontWeight: 950,
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '8px',
-                          boxShadow: '0 4px 12px rgba(245, 158, 11, 0.3)',
-                          flexShrink: 0
-                        }}>
-                          <span>Sticker-Album</span>
-                          <span>★</span>
-                        </div>
-                      </div>
-                    );
-                  })()}
-
-                  {/* ========================================================================= */}
-                  {/* JUNIOR: 4 MINIMALISTISCHE AKTIONS-BOXEN (2x2 GRID)                         */}
+                  {/* JUNIOR: 3 GOLDSTANDARD HELDEN-KARTEN (HAUSAUFGABE • RAKETE • STICKER)     */}
                   {/* ========================================================================= */}
                   {(() => {
                     const latestItem = progressItems.find(item => item.is_current_homework || item.topic_name.startsWith('Hausaufgabe KW '));
                     const currentWeekStr = latestItem ? getItemWeek(latestItem) : getISOWeekRaw(new Date(), 1);
-                    const cleanTitle = (t: string) => (t || '').replace(/\s*\((gitarre|guitar|e-gitarre|bass|e-bass|drums|schlagzeug|klavier|piano|keys|keyboard|vocals|gesang|stimme|allgemein)\)/i, '');
+                    const cleanTitle = (t: string) => (t || '').replace(/linken park/gi, 'Linkin Park').replace(/\s*\((gitarre|guitar|e-gitarre|bass|e-bass|drums|schlagzeug|klavier|piano|keys|keyboard|vocals|gesang|stimme|allgemein)\)/i, '');
 
                     {/* 1. Gather all active homework books & pages from localProgress */}
-                    const activeJuniorBooks: { title: string; pages: number[]; formattedPages: string; notes?: string[] }[] = [];
+                    const activeJuniorBooks: { title: string; pages: number[]; formattedPages: string; notes?: string[]; book?: any }[] = [];
                     (localProgress || []).forEach((assignment: any) => {
                       if (String(assignment.studentId) !== String(studentId) || !assignment.pageStates) return;
                       const book = lehrwerke.find(g => String(g.id) === String(assignment.lehrwerkId));
@@ -14690,7 +16158,22 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                       if (pages.length > 0) {
                         pages.sort((a, b) => a - b);
                         const formattedPages = pages.length === 1 ? `S. ${pages[0]}` : `S. ${pages[0]}–${pages[pages.length - 1]}`;
-                        activeJuniorBooks.push({ title: book.title, pages, formattedPages, notes });
+                        const existingBook = activeJuniorBooks.find(b => b.title === book.title);
+                        if (existingBook) {
+                          existingBook.book = existingBook.book || book;
+                          pages.forEach(p => {
+                            if (!existingBook.pages.includes(p)) existingBook.pages.push(p);
+                          });
+                          existingBook.pages.sort((a, b) => a - b);
+                          existingBook.formattedPages = existingBook.pages.length === 1 
+                            ? `S. ${existingBook.pages[0]}` 
+                            : `S. ${existingBook.pages[0]}–${existingBook.pages[existingBook.pages.length - 1]}`;
+                          if (notes.length > 0) {
+                            existingBook.notes = Array.from(new Set([...(existingBook.notes || []), ...notes]));
+                          }
+                        } else {
+                          activeJuniorBooks.push({ title: book.title, pages, formattedPages, notes, book });
+                        }
                       }
                     });
 
@@ -14859,47 +16342,47 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                     return (
                       <div style={{ 
                         display: 'grid', 
-                        gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', 
-                        gap: '20px', 
+                        gridTemplateColumns: 'repeat(auto-fit, minmax(290px, 1fr))', 
+                        gap: '24px', 
                         width: '100%' 
                       }}>
                         
-                        {/* BOX 1: HAUSAUFGABEN */}
+                        {/* HELDEN-KARTE 1: MEINE HAUSAUFGABE (mit integriertem Audio-Zugriff & TTS) */}
                         <div 
                           onClick={() => setShowJuniorHomeworkModal(true)}
                           style={{
-                            background: '#ffffff',
+                            background: isTtsSpeaking && activeTtsKey === 'junior_box1' ? 'linear-gradient(180deg, #ffffff 0%, #f0fdf4 100%)' : '#ffffff',
                             borderRadius: '32px',
-                            padding: '28px',
-                            boxShadow: '0 12px 30px rgba(15, 23, 42, 0.04)',
-                            border: '2px solid #e2e8f0',
+                            padding: isMusicStandMode ? '32px' : '28px',
+                            boxShadow: isTtsSpeaking && activeTtsKey === 'junior_box1' ? '0 16px 36px rgba(34, 197, 94, 0.16)' : '0 12px 30px rgba(15, 23, 42, 0.04)',
+                            border: isTtsSpeaking && activeTtsKey === 'junior_box1' ? '2px solid #86efac' : '2px solid #e2e8f0',
                             display: 'flex',
                             flexDirection: 'column',
                             justifyContent: 'space-between',
                             gap: '20px',
                             cursor: 'pointer',
-                            transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
+                            transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)'
                           }}
                           className="hover-scale"
                         >
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
                               <div style={{
-                                background: '#dcfce7',
-                                color: '#15803d',
-                                width: '56px',
-                                height: '56px',
+                                background: 'linear-gradient(135deg, #e6f4ea 0%, #d1fae5 100%)',
+                                color: '#34a853',
+                                width: isMusicStandMode ? '64px' : '56px',
+                                height: isMusicStandMode ? '64px' : '56px',
                                 borderRadius: '20px',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
-                                boxShadow: '0 6px 16px rgba(34, 197, 94, 0.15)'
+                                boxShadow: '0 6px 16px rgba(52, 168, 83, 0.18)'
                               }}>
-                                <BookOpen size={30} />
+                                <BookOpen size={isMusicStandMode ? 32 : 28} />
                               </div>
 
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                {/* 3D-TOY-BUTTON FÜR VORLESEN (JUNIOR BOX 1) */}
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                {/* 3D-TOY-BUTTON FÜR VORLESEN (Hör zu!) */}
                                 {(draftAllowTts ?? (studentUser as any)?.parent_allow_tts ?? (studentUiLevel === 'junior')) && (
                                   <button
                                     type="button"
@@ -14926,160 +16409,335 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                     style={{
                                       background: isTtsSpeaking && activeTtsKey === 'junior_box1' 
                                         ? 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)' 
-                                        : 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
+                                        : 'linear-gradient(135deg, #34a853 0%, #2e9549 100%)',
                                       border: 'none',
                                       borderRadius: '100px',
-                                      padding: '7px 14px',
+                                      padding: '8px 16px',
+                                      minHeight: '44px',
                                       display: 'flex',
                                       alignItems: 'center',
-                                      gap: '7px',
+                                      gap: '8px',
                                       cursor: 'pointer',
                                       color: '#ffffff',
-                                      fontSize: '0.80rem',
+                                      fontSize: '0.84rem',
                                       fontWeight: 950,
                                       boxShadow: isTtsSpeaking && activeTtsKey === 'junior_box1' 
                                         ? '0 3px 0 #991b1b, 0 6px 14px rgba(239, 68, 68, 0.35)' 
-                                        : '0 3px 0 #15803d, 0 6px 14px rgba(34, 197, 94, 0.35)',
-                                      transform: isTtsSpeaking && activeTtsKey === 'junior_box1' ? 'translateY(1px)' : 'none',
+                                        : '0 3px 0 #1e7037, 0 6px 14px rgba(52, 168, 83, 0.32)',
                                       transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)'
-                                    }}
-                                    onMouseEnter={(e) => {
-                                      e.currentTarget.style.filter = 'brightness(1.06)';
-                                      e.currentTarget.style.transform = 'translateY(-1px)';
-                                    }}
-                                    onMouseLeave={(e) => {
-                                      e.currentTarget.style.filter = 'none';
-                                      e.currentTarget.style.transform = isTtsSpeaking && activeTtsKey === 'junior_box1' ? 'translateY(1px)' : 'none';
-                                    }}
-                                    onMouseDown={(e) => {
-                                      e.currentTarget.style.transform = 'translateY(2px)';
-                                      e.currentTarget.style.boxShadow = isTtsSpeaking && activeTtsKey === 'junior_box1' ? '0 1px 0 #991b1b' : '0 1px 0 #15803d';
-                                    }}
-                                    onMouseUp={(e) => {
-                                      e.currentTarget.style.transform = 'translateY(-1px)';
-                                      e.currentTarget.style.boxShadow = isTtsSpeaking && activeTtsKey === 'junior_box1' 
-                                        ? '0 3px 0 #991b1b, 0 6px 14px rgba(239, 68, 68, 0.35)' 
-                                        : '0 3px 0 #15803d, 0 6px 14px rgba(34, 197, 94, 0.35)';
                                     }}
                                     title={isTtsSpeaking && activeTtsKey === 'junior_box1' ? "Vorlesen stoppen" : "Hausaufgaben vorlesen lassen"}
                                   >
                                     {isTtsSpeaking && activeTtsKey === 'junior_box1' ? (
-                                      <>
-                                        <VolumeX size={15} color="#ffffff" strokeWidth={2.8} />
-                                        <span>Stopp ⏹</span>
-                                      </>
+                                      <span>Stopp ⏹</span>
                                     ) : (
                                       <>
-                                        <Volume2 size={15} color="#ffffff" strokeWidth={2.8} />
+                                        <Volume2 size={16} color="#ffffff" strokeWidth={2.8} />
                                         <span>Hör zu! ✨</span>
                                       </>
                                     )}
                                   </button>
                                 )}
 
+                                {/* Audio-Pille direkt in Karte 1 */}
                                 {audioTracks.length > 0 && (
-                                  <div style={{
-                                    background: 'linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%)',
-                                    border: '1px solid #bbf7d0',
-                                    borderRadius: '100px',
-                                    padding: '5px 12px',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '6px',
-                                    boxShadow: '0 2px 6px rgba(34, 197, 94, 0.08)'
-                                  }}>
-                                    <Headphones size={13} color="#15803d" />
-                                    <span style={{ fontSize: '0.75rem', fontWeight: 900, color: '#15803d' }}>
-                                      {audioTracks.length === 1 ? '1 Aufnahme' : `${audioTracks.length} Aufnahmen`}
-                                    </span>
-                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleOpenHomeworkBookWithView('document', 'recordings');
+                                    }}
+                                    style={{
+                                      background: '#e6f4ea',
+                                      border: '1.5px solid #c7eed2',
+                                      borderRadius: '100px',
+                                      padding: '8px 15px',
+                                      minHeight: '44px',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '7px',
+                                      cursor: 'pointer',
+                                      color: '#1e7037',
+                                      fontSize: '0.84rem',
+                                      fontWeight: 900,
+                                      boxShadow: '0 2px 8px rgba(52, 168, 83, 0.12)',
+                                      transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)'
+                                    }}
+                                    className="hover-scale-mini"
+                                    title="Aufnahmen deiner Lehrkraft anhören"
+                                  >
+                                    <Headphones size={16} color="#1e7037" strokeWidth={2.4} />
+                                    <span>{audioTracks.length === 1 ? '1 Aufnahme' : `${audioTracks.length} Aufnahmen`}</span>
+                                  </button>
                                 )}
                               </div>
                             </div>
 
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                              <div style={{ fontSize: '0.75rem', fontWeight: 950, color: '#15803d', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                              <div style={{ fontSize: isMusicStandMode ? '0.92rem' : '0.84rem', fontWeight: 950, color: '#34a853', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                                 Hausaufgaben
                               </div>
                               
-                              {/* Lehrwerke */}
-                              {activeJuniorBooks.map((b, idx) => (
-                                <h3 key={`j-b-${idx}`} style={{ margin: '2px 0 0 0', fontSize: '1.28rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                                  {b.title} ({b.formattedPages})
-                                </h3>
-                              ))}
+                              {/* Lehrwerke mit 3D-Buchcover vorne dran */}
+                              {activeJuniorBooks.map((b, idx) => {
+                                const bookObj = b.book || lehrwerke.find(lw => lw.title === b.title);
+                                const bookColor = getLehrwerkColor(b.title, lehrwerke);
+                                const coverUrl = bookObj?.cover_image_url || bookObj?.cover_url || bookObj?.image_url;
 
-                              {/* Wenn keine Lehrwerke, aber Songs aktiv sind */}
-                              {activeJuniorBooks.length === 0 && activeJuniorSongs.length > 0 && (
-                                <h3 style={{ margin: '2px 0 0 0', fontSize: '1.28rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                                  {cleanTitle(activeJuniorSongs[0]?.topic_name || activeJuniorSongs[0]?.title || 'Song')}
-                                </h3>
-                              )}
-
-                              {/* Kompakte Songs Liste (ohne Bemerkungen für komprimiertes Widget) */}
-                              {activeJuniorSongs.length > 0 && (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: activeJuniorBooks.length > 0 ? '4px' : '0' }}>
-                                  {(activeJuniorBooks.length > 0 ? activeJuniorSongs : activeJuniorSongs.slice(1)).map((s, idx) => (
-                                    <div key={`j-s-${idx}`} style={{
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      gap: '8px',
-                                      padding: '8px 12px',
-                                      background: '#f8fafc',
-                                      borderRadius: '12px',
-                                      border: '1px solid #f1f5f9'
+                                return (
+                                  <div key={`j-b-${idx}`} style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '14px',
+                                    marginTop: '4px'
+                                  }}>
+                                    {/* 3D Lehrwerk Cover */}
+                                    <div style={{
+                                      position: 'relative',
+                                      width: isMusicStandMode ? '46px' : '38px',
+                                      height: isMusicStandMode ? '60px' : '50px',
+                                      flexShrink: 0
                                     }}>
+                                      {/* Pages peeking out */}
                                       <div style={{
-                                        width: '22px',
-                                        height: '22px',
-                                        borderRadius: '6px',
-                                        background: '#e0e7ff',
+                                        position: 'absolute',
+                                        right: '-2px',
+                                        top: '3px',
+                                        width: isMusicStandMode ? '40px' : '33px',
+                                        height: isMusicStandMode ? '54px' : '44px',
+                                        borderRadius: '3px 6px 6px 3px',
+                                        background: '#f8fafc',
+                                        border: '1px solid #e2e8f0',
+                                        boxShadow: '0 2px 6px rgba(0,0,0,0.06)',
+                                        zIndex: 1
+                                      }} />
+
+                                      {/* Front Book Cover Sleeve */}
+                                      <div style={{
+                                        position: 'absolute',
+                                        left: 0,
+                                        top: 0,
+                                        width: isMusicStandMode ? '42px' : '35px',
+                                        height: isMusicStandMode ? '60px' : '50px',
+                                        borderRadius: '3px 7px 7px 3px',
+                                        background: `linear-gradient(135deg, ${bookColor.from} 0%, ${bookColor.to} 100%)`,
+                                        boxShadow: 'inset 3px 0 0 rgba(0,0,0,0.22), 0 5px 12px rgba(0,0,0,0.12)',
+                                        border: `1px solid ${bookColor.text}25`,
                                         display: 'flex',
                                         alignItems: 'center',
                                         justifyContent: 'center',
-                                        color: '#4338ca',
-                                        flexShrink: 0
+                                        zIndex: 2,
+                                        overflow: 'hidden'
                                       }}>
-                                        <Music size={12} strokeWidth={2.4} />
+                                        {coverUrl ? (
+                                          <img
+                                            src={coverUrl}
+                                            alt={b.title}
+                                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                          />
+                                        ) : (
+                                          <div style={{
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            padding: '2px',
+                                            width: '100%'
+                                          }}>
+                                            <BookOpen size={isMusicStandMode ? 18 : 15} color={bookColor.text} strokeWidth={2.4} />
+                                          </div>
+                                        )}
                                       </div>
-                                      <span style={{ fontWeight: 850, fontSize: '0.88rem', color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                        {cleanTitle(s.topic_name || s.title)}
-                                      </span>
                                     </div>
-                                  ))}
-                                </div>
+
+                                    {/* Book Title & Page Badge */}
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0, flex: 1 }}>
+                                      <h3 style={{
+                                        margin: 0,
+                                        fontSize: isMusicStandMode ? '1.45rem' : '1.32rem',
+                                        fontWeight: 950,
+                                        color: '#0f172a',
+                                        fontFamily: "'Plus Jakarta Sans', sans-serif",
+                                        letterSpacing: '-0.02em',
+                                        lineHeight: 1.25,
+                                        overflow: 'hidden',
+                                        textOverflow: 'ellipsis',
+                                        whiteSpace: 'nowrap'
+                                      }}>
+                                        {b.title}
+                                      </h3>
+                                      <div>
+                                        <span style={{
+                                          display: 'inline-block',
+                                          background: '#e6f4ea',
+                                          color: '#2e9549',
+                                          fontSize: isMusicStandMode ? '0.84rem' : '0.78rem',
+                                          fontWeight: 900,
+                                          padding: '2px 8px',
+                                          borderRadius: '6px',
+                                          border: '1px solid #c7eed2',
+                                          whiteSpace: 'nowrap'
+                                        }}>
+                                          {b.formattedPages}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+
+                              {/* Songs mit 3D-Vinyl-Single-Sleeve für didaktische & visuelle Parität */}
+                              {activeJuniorSongs.map((s, idx) => {
+                                const rawTitle = cleanTitle(s.topic_name || s.title || 'Song');
+                                let songArtist = s.songs?.artist || s.artist || '';
+                                let displayTitle = rawTitle;
+                                if (!songArtist && rawTitle.includes(' - ')) {
+                                  const parts = rawTitle.split(' - ');
+                                  songArtist = parts[0].trim();
+                                  displayTitle = parts.slice(1).join(' - ').trim();
+                                }
+
+                                return (
+                                  <div key={`j-s-${idx}`} style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '14px',
+                                    marginTop: activeJuniorBooks.length > 0 || idx > 0 ? '8px' : '4px'
+                                  }}>
+                                    {/* 3D Vinyl Single Sleeve */}
+                                    <div style={{
+                                      position: 'relative',
+                                      width: isMusicStandMode ? '46px' : '38px',
+                                      height: isMusicStandMode ? '46px' : '38px',
+                                      flexShrink: 0
+                                    }}>
+                                      {/* Peeking black vinyl record disc */}
+                                      <div style={{
+                                        position: 'absolute',
+                                        right: '-6px',
+                                        top: '2px',
+                                        width: isMusicStandMode ? '42px' : '34px',
+                                        height: isMusicStandMode ? '42px' : '34px',
+                                        borderRadius: '50%',
+                                        background: 'radial-gradient(circle, #0f172a 0%, #1e293b 40%, #0f172a 60%, #334155 85%, #0f172a 100%)',
+                                        boxShadow: '0 3px 8px rgba(0,0,0,0.25)',
+                                        zIndex: 1,
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center'
+                                      }}>
+                                        {/* Center spindle label / hole */}
+                                        <div style={{
+                                          width: isMusicStandMode ? '14px' : '11px',
+                                          height: isMusicStandMode ? '14px' : '11px',
+                                          borderRadius: '50%',
+                                          background: '#f8fafc',
+                                          border: '2px solid #0f172a',
+                                          boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.4)'
+                                        }} />
+                                      </div>
+
+                                      {/* Front Vinyl Sleeve Card */}
+                                      <div style={{
+                                        position: 'absolute',
+                                        left: 0,
+                                        top: 0,
+                                        width: isMusicStandMode ? '46px' : '38px',
+                                        height: isMusicStandMode ? '46px' : '38px',
+                                        borderRadius: '8px',
+                                        background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
+                                        boxShadow: '0 4px 10px rgba(124, 58, 237, 0.25), inset 0 1px 1px rgba(255,255,255,0.3)',
+                                        border: '1px solid rgba(124, 58, 237, 0.3)',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        zIndex: 2,
+                                        overflow: 'hidden'
+                                      }}>
+                                        <Music size={isMusicStandMode ? 20 : 16} color="#ffffff" strokeWidth={2.5} />
+                                      </div>
+                                    </div>
+
+                                    {/* Song Title & Artist Badge */}
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0, flex: 1 }}>
+                                      <h3 style={{
+                                        margin: 0,
+                                        fontSize: isMusicStandMode ? '1.45rem' : '1.32rem',
+                                        fontWeight: 950,
+                                        color: '#0f172a',
+                                        fontFamily: "'Plus Jakarta Sans', sans-serif",
+                                        letterSpacing: '-0.02em',
+                                        lineHeight: 1.25,
+                                        overflow: 'hidden',
+                                        textOverflow: 'ellipsis',
+                                        whiteSpace: 'nowrap'
+                                      }}>
+                                        {displayTitle}
+                                      </h3>
+                                      <div>
+                                        <span style={{
+                                          display: 'inline-block',
+                                          background: '#ede9fe',
+                                          color: '#7c3aed',
+                                          fontSize: isMusicStandMode ? '0.84rem' : '0.78rem',
+                                          fontWeight: 900,
+                                          padding: '2px 8px',
+                                          borderRadius: '6px',
+                                          border: '1px solid #ddd6fe',
+                                          whiteSpace: 'nowrap'
+                                        }}>
+                                          🎵 {songArtist || 'Song'}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+
+                              {/* Wenn weder noch */}
+                              {activeJuniorBooks.length === 0 && activeJuniorSongs.length === 0 && (
+                                <h3 style={{ margin: '2px 0 0 0', fontSize: isMusicStandMode ? '1.40rem' : '1.25rem', fontWeight: 900, color: '#059669' }}>
+                                  Alles erledigt! Super! 🎉
+                                </h3>
                               )}
                             </div>
                           </div>
 
                           <button
+                            type="button"
                             onClick={(e) => { e.stopPropagation(); setShowJuniorHomeworkModal(true); }}
                             style={{
                               width: '100%',
-                              padding: '14px',
+                              padding: isMusicStandMode ? '18px' : '16px',
+                              minHeight: '48px',
                               borderRadius: '20px',
                               border: 'none',
-                              background: '#f0fdf4',
-                              color: '#15803d',
-                              fontSize: '1rem',
+                              background: 'linear-gradient(135deg, #34a853 0%, #2e9549 100%)',
+                              color: '#ffffff',
+                              fontSize: isMusicStandMode ? '1.15rem' : '1.05rem',
                               fontWeight: 950,
                               cursor: 'pointer',
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
-                              gap: '10px'
+                              gap: '10px',
+                              boxShadow: '0 6px 18px rgba(52, 168, 83, 0.28)'
                             }}
+                            className="hover-scale"
                           >
-                            <BookOpen size={18} />
+                            <BookOpen size={isMusicStandMode ? 20 : 18} />
                             <span>Hausaufgaben öffnen</span>
                           </button>
                         </div>
 
-                        {/* BOX 2: ÜBE-RAKETE */}
+                        {/* HELDEN-KARTE 2: MEINE ÜBE-RAKETE (mit 3 Flammen-Stufen & Open-End Flow) */}
                         {(() => {
                           const streak = avatar?.streak_flame || 0;
                           const levelKey = `level${effectiveLevel}` as 'level1' | 'level2' | 'level3';
                           const schoolConfig = (schoolFokusLevels && schoolFokusLevels[levelKey]) || DEFAULT_FOKUS_LEVELS[levelKey];
+                          const kleineMins = schoolConfig.kleine || DEFAULT_FOKUS_LEVELS[levelKey].kleine;
+                          const mittlereMins = schoolConfig.mittlere || DEFAULT_FOKUS_LEVELS[levelKey].mittlere;
+                          const heldenMins = schoolConfig.helden || DEFAULT_FOKUS_LEVELS[levelKey].helden;
                           const requiredMins = streak >= 9 ? (schoolConfig.helden || 10) : streak >= 4 ? (schoolConfig.mittlere || 5) : (schoolConfig.kleine || 3);
 
                           const todayStr = toLocalYYYYMMDD(new Date());
@@ -15097,81 +16755,80 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                               onClick={() => setShowJuniorTimerModal(true)}
                               style={{
                                 background: '#ffffff',
-                                borderRadius: '28px',
-                                padding: '24px',
+                                borderRadius: '32px',
+                                padding: isMusicStandMode ? '32px' : '28px',
                                 boxShadow: isGoalAchieved ? '0 12px 32px rgba(16, 185, 129, 0.08)' : '0 12px 30px rgba(15, 23, 42, 0.04)',
-                                border: isGoalAchieved ? '1.5px solid rgba(16, 185, 129, 0.35)' : '1.5px solid rgba(251, 191, 36, 0.35)',
+                                border: isGoalAchieved ? '2px solid rgba(16, 185, 129, 0.35)' : '2px solid rgba(99, 102, 241, 0.28)',
                                 display: 'flex',
                                 flexDirection: 'column',
                                 justifyContent: 'space-between',
                                 gap: '20px',
                                 cursor: 'pointer',
-                                transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
+                                transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)'
                               }}
                               className="hover-scale"
                             >
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                   <div style={{
-                                    background: isGoalAchieved ? 'linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)' : '#fef3c7',
-                                    color: isGoalAchieved ? '#15803d' : '#d97706',
-                                    width: '56px',
-                                    height: '56px',
+                                    background: isGoalAchieved ? 'linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)' : 'linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%)',
+                                    color: isGoalAchieved ? '#15803d' : '#4f46e5',
+                                    width: isMusicStandMode ? '64px' : '56px',
+                                    height: isMusicStandMode ? '64px' : '56px',
                                     borderRadius: '18px',
                                     display: 'flex',
                                     alignItems: 'center',
                                     justifyContent: 'center',
-                                    boxShadow: isGoalAchieved ? '0 6px 16px rgba(34, 197, 94, 0.22)' : '0 6px 16px rgba(245, 158, 11, 0.15)'
+                                    boxShadow: isGoalAchieved ? '0 6px 16px rgba(34, 197, 94, 0.22)' : '0 6px 16px rgba(99, 102, 241, 0.2)'
                                   }}>
                                     {isGoalAchieved ? (
-                                      <Star size={28} fill="currentColor" />
+                                      <Star size={isMusicStandMode ? 32 : 28} fill="currentColor" />
                                     ) : (
-                                      <Flame size={28} fill="currentColor" />
+                                      <Rocket size={isMusicStandMode ? 32 : 28} />
                                     )}
                                   </div>
 
                                   <span style={{
-                                    background: isGoalAchieved ? '#ecfdf5' : '#ffedd5',
-                                    color: isGoalAchieved ? '#047857' : '#ea580c',
-                                    fontSize: '0.78rem',
+                                    background: isGoalAchieved ? '#ecfdf5' : '#eef2ff',
+                                    color: isGoalAchieved ? '#047857' : '#4f46e5',
+                                    fontSize: isMusicStandMode ? '0.92rem' : '0.84rem',
                                     fontWeight: 900,
-                                    padding: '5px 12px',
+                                    padding: isMusicStandMode ? '6px 14px' : '5px 12px',
                                     borderRadius: '100px',
-                                    border: isGoalAchieved ? '1px solid #a7f3d0' : '1px solid rgba(249, 115, 22, 0.2)',
-                                    whiteSpace: 'nowrap',
-                                    letterSpacing: '-0.01em'
+                                    border: isGoalAchieved ? '1px solid #a7f3d0' : '1px solid #c7d2fe',
+                                    whiteSpace: 'nowrap'
                                   }}>
-                                    {isGoalAchieved ? `🔥 ${streak} ${streak === 1 ? 'Tag' : 'Tage'} • Gesichert ✅` : `🔥 ${streak} ${streak === 1 ? 'Tag' : 'Tage'}`}
+                                    {isGoalAchieved 
+                                      ? `🔥 ${streak === 0 ? 'Startklar' : streak} ${streak === 1 ? 'Tag' : 'Tage'} • Gesichert ✅` 
+                                      : (streak === 0 ? 'Startklar 🚀' : `🚀 ${streak} ${streak === 1 ? 'Tag' : 'Tage'}`)}
                                   </span>
                                 </div>
 
                                 <div>
-                                  <div style={{ fontSize: '0.72rem', fontWeight: 900, color: isGoalAchieved ? '#059669' : '#d97706', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                                  <div style={{ fontSize: isMusicStandMode ? '0.92rem' : '0.84rem', fontWeight: 900, color: isGoalAchieved ? '#059669' : '#4f46e5', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                                     Übe-Rakete
                                   </div>
-                                  <h3 style={{ margin: '4px 0 0 0', fontSize: '1.35rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em' }}>
+                                  <h3 style={{ margin: '4px 0 0 0', fontSize: isMusicStandMode ? '1.55rem' : '1.38rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em' }}>
                                     {isGoalAchieved 
                                       ? 'Tagesziel erreicht! 🌟' 
-                                      : hasPracticedSome 
-                                        ? `${todayMins} von ${requiredMins} Min. geschafft` 
-                                        : `Nur ${requiredMins} Minuten`}
+                                      : `Tagesziel: ${requiredMins} Minuten`}
                                   </h3>
-                                  <p style={{ margin: '4px 0 0 0', fontSize: '0.82rem', color: isGoalAchieved ? '#047857' : '#64748b', fontWeight: 650, lineHeight: 1.4 }}>
+                                  <p style={{ margin: '4px 0 0 0', fontSize: isMusicStandMode ? '1.05rem' : '0.92rem', color: isGoalAchieved ? '#047857' : '#64748b', fontWeight: 650, lineHeight: 1.4 }}>
                                     {isGoalAchieved 
                                       ? `Heute ${todayMins} Min. geübt • Deine Flamme brennt sicher!` 
                                       : hasPracticedSome 
-                                        ? `Noch ${Math.max(1, requiredMins - todayMins)} Min. bis zur Flamme! 🚀` 
-                                        : 'Runder Timer • Flamme holen!'}
+                                        ? `${todayMins} von ${requiredMins} Min. geschafft 🚀` 
+                                        : `${requiredMins} Min. üben & Flamme sichern! 🔥`}
                                   </p>
 
-                                  {/* Sleek Progress bar */}
-                                  <div style={{ marginTop: '10px', width: '100%', height: '6px', background: '#f1f5f9', borderRadius: '100px', overflow: 'hidden' }}>
+                                  {/* Progress bar */}
+                                  <div style={{ marginTop: '12px', width: '100%', height: '8px', background: '#f1f5f9', borderRadius: '100px', overflow: 'hidden' }}>
                                     <div style={{
                                       width: `${progressPercent}%`,
                                       height: '100%',
                                       background: isGoalAchieved 
                                         ? 'linear-gradient(90deg, #10b981 0%, #059669 100%)' 
-                                        : 'linear-gradient(90deg, #f59e0b 0%, #d97706 100%)',
+                                        : 'linear-gradient(90deg, #818cf8 0%, #6366f1 100%)',
                                       borderRadius: '100px',
                                       transition: 'width 0.4s ease'
                                     }} />
@@ -15179,20 +16836,51 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                 </div>
                               </div>
 
+                              {/* Flammen-Stufe Status & Zielzeit (Pädagogische Auto-Progression) */}
+                              <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                padding: '10px 14px',
+                                background: '#f8fafc',
+                                borderRadius: '16px',
+                                border: '1.5px solid #e2e8f0',
+                                fontSize: '0.86rem',
+                                fontWeight: 900
+                              }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  <span style={{ fontSize: '1.1rem' }}>{streak >= 9 ? '👑' : streak >= 4 ? '🔥🔥' : '🔥'}</span>
+                                  <span style={{ color: '#334155' }}>
+                                    {streak >= 9 ? 'Königsstufe' : streak >= 4 ? 'Flammen-Stufe 2' : 'Start-Stufe 1'}
+                                  </span>
+                                </div>
+                                <span style={{
+                                  background: '#ecfdf5',
+                                  color: '#059669',
+                                  padding: '4px 10px',
+                                  borderRadius: '100px',
+                                  border: '1px solid #a7f3d0'
+                                }}>
+                                  {requiredMins} Min. Fokus-Ziel
+                                </span>
+                              </div>
+
                               <button
-                                onClick={(e) => { e.stopPropagation(); setShowJuniorTimerModal(true); }}
+                                type="button"
+                                onClick={(e) => { 
+                                  e.stopPropagation(); 
+                                  setShowJuniorTimerModal(true); 
+                                }}
                                 style={{
                                   width: '100%',
-                                  padding: '14px 18px',
-                                  minHeight: '44px',
+                                  padding: isMusicStandMode ? '18px 22px' : '16px 20px',
+                                  minHeight: '48px',
                                   boxSizing: 'border-box',
-                                  borderRadius: '16px',
+                                  borderRadius: '20px',
                                   border: 'none',
-                                  background: isGoalAchieved 
-                                    ? 'linear-gradient(135deg, #10b981 0%, #047857 100%)' 
-                                    : 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
+                                  background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
                                   color: '#ffffff',
-                                  fontSize: '0.92rem',
+                                  fontSize: isMusicStandMode ? '1.12rem' : '1.02rem',
                                   fontWeight: 900,
                                   cursor: 'pointer',
                                   display: 'flex',
@@ -15200,9 +16888,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                   justifyContent: 'center',
                                   gap: '8px',
                                   whiteSpace: 'nowrap',
-                                  boxShadow: isGoalAchieved 
-                                    ? '0 8px 20px rgba(5, 150, 105, 0.28)' 
-                                    : '0 8px 20px rgba(22, 163, 74, 0.28)',
+                                  boxShadow: '0 8px 20px rgba(99, 102, 241, 0.32)',
                                   transition: 'all 0.2s ease'
                                 }}
                                 className="hover-scale"
@@ -15223,171 +16909,168 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                           );
                         })()}
 
-                        {/* BOX 3: AUFNAHME STARTEN (mit Eltern-Gating) */}
+                        {/* HELDEN-KARTE 3: MEIN STICKER-ALBUM (Belohnung & Meilenstein) */}
                         {(() => {
-                          const isAudioAllowed = draftAllowAudio ?? (studentUser as any)?.parent_allow_audio ?? (draftBoardOverrides.recordings ?? (typeof window !== 'undefined' ? localStorage.getItem('campus_board_override_recordings') !== 'false' : true));
-
-                          if (!isAudioAllowed) {
-                            return null; // Gracefully collapse Box 3 when microphone is deactivated in parent controls
-                          }
+                          const totalStickersCount = (typeof ALL_STICKERS !== 'undefined' && ALL_STICKERS?.length) ? ALL_STICKERS.length : 20;
+                          const unlockedStickersCount = (ALL_STICKERS || []).filter(st => unifiedStickersMap[st.id]?.isUnlocked).length;
+                          const nextLockedSticker = (ALL_STICKERS || []).find(st => !unifiedStickersMap[st.id]?.isUnlocked) || (ALL_STICKERS || [])[0];
+                          const nextStickerStatus = nextLockedSticker ? unifiedStickersMap[nextLockedSticker.id] : null;
+                          const stickerProgressPercent = Math.min(100, Math.round((unlockedStickersCount / (totalStickersCount || 1)) * 100));
 
                           return (
                             <div 
-                              onClick={() => { setShowJuniorRecordModal(true); startJuniorRecordingFlow(); }}
+                              onClick={() => setShowJuniorStickerModal(true)}
                               style={{
                                 background: '#ffffff',
                                 borderRadius: '32px',
-                                padding: '28px',
+                                padding: isMusicStandMode ? '32px' : '28px',
                                 boxShadow: '0 12px 30px rgba(15, 23, 42, 0.04)',
-                                border: '2px solid #e2e8f0',
+                                border: '2px solid rgba(245, 158, 11, 0.35)',
                                 display: 'flex',
                                 flexDirection: 'column',
                                 justifyContent: 'space-between',
-                                gap: '24px',
+                                gap: '20px',
                                 cursor: 'pointer',
-                                transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
+                                transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)'
                               }}
                               className="hover-scale"
                             >
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                                <div style={{
-                                  background: '#fee2e2',
-                                  color: '#ef4444',
-                                  width: '64px',
-                                  height: '64px',
-                                  borderRadius: '22px',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  boxShadow: '0 6px 16px rgba(239, 68, 68, 0.15)'
-                                }}>
-                                  <Mic size={34} />
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                  <div style={{
+                                    background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
+                                    color: '#d97706',
+                                    width: isMusicStandMode ? '64px' : '56px',
+                                    height: isMusicStandMode ? '64px' : '56px',
+                                    borderRadius: '18px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    boxShadow: '0 6px 16px rgba(245, 158, 11, 0.18)'
+                                  }}>
+                                    <Trophy size={isMusicStandMode ? 32 : 28} color="#d97706" />
+                                  </div>
+
+                                  <span style={{
+                                    background: '#fef3c7',
+                                    color: '#b45309',
+                                    fontSize: isMusicStandMode ? '0.92rem' : '0.84rem',
+                                    fontWeight: 900,
+                                    padding: isMusicStandMode ? '6px 14px' : '5px 12px',
+                                    borderRadius: '100px',
+                                    border: '1px solid #fde68a',
+                                    whiteSpace: 'nowrap'
+                                  }}>
+                                    ★ {unlockedStickersCount} von {totalStickersCount} gesammelt
+                                  </span>
                                 </div>
 
                                 <div>
-                                  <div style={{ fontSize: '0.75rem', fontWeight: 950, color: '#ef4444', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                                    Aufnahme
+                                  <div style={{ fontSize: isMusicStandMode ? '0.92rem' : '0.84rem', fontWeight: 900, color: '#d97706', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                                    Sticker-Album
                                   </div>
-                                  <h3 style={{ margin: '4px 0 0 0', fontSize: '1.45rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                                    Song aufnehmen
+                                  <h3 style={{ margin: '4px 0 0 0', fontSize: isMusicStandMode ? '1.55rem' : '1.38rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em' }}>
+                                    {nextLockedSticker ? `Nächster: ${nextLockedSticker.title}` : 'Alle Sticker gesammelt! 🌟'}
                                   </h3>
-                                  <p style={{ margin: '6px 0 0 0', fontSize: '0.88rem', color: '#64748b', fontWeight: 650 }}>
-                                    3-2-1 Countdown &amp; Mikrofon
+                                  <p style={{ margin: '4px 0 0 0', fontSize: isMusicStandMode ? '1.05rem' : '0.92rem', color: '#64748b', fontWeight: 650, lineHeight: 1.4 }}>
+                                    {nextStickerStatus?.progressText || nextLockedSticker?.desc || 'Öffne dein Panini-Album und entdecke deine Meilensteine!'}
                                   </p>
+
+                                  {/* Progress bar */}
+                                  <div style={{ marginTop: '12px', width: '100%', height: '8px', background: '#f1f5f9', borderRadius: '100px', overflow: 'hidden' }}>
+                                    <div style={{
+                                      width: `${stickerProgressPercent}%`,
+                                      height: '100%',
+                                      background: 'linear-gradient(90deg, #f59e0b 0%, #d97706 100%)',
+                                      borderRadius: '100px',
+                                      transition: 'width 0.4s ease'
+                                    }} />
+                                  </div>
                                 </div>
                               </div>
 
+                              {/* Teaser Pill for next sticker with REAL collectible sticker graphic */}
+                              {nextLockedSticker && (
+                                <div style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '12px',
+                                  padding: '10px 14px',
+                                  background: 'linear-gradient(135deg, #ffffff 0%, #fffbeb 100%)',
+                                  borderRadius: '18px',
+                                  border: '1.5px solid #fde68a',
+                                  boxShadow: '0 3px 10px rgba(245, 158, 11, 0.08)'
+                                }}>
+                                  <div style={{
+                                    width: isMusicStandMode ? '52px' : '44px',
+                                    height: isMusicStandMode ? '52px' : '44px',
+                                    borderRadius: '14px',
+                                    background: '#0a0e1a',
+                                    border: '1.5px solid #f59e0b',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    padding: '3px',
+                                    flexShrink: 0,
+                                    boxShadow: '0 3px 8px rgba(0,0,0,0.15)',
+                                    overflow: 'hidden'
+                                  }}>
+                                    <img
+                                      src={`/stickers/${nextLockedSticker.id}.png`}
+                                      alt={nextLockedSticker.title}
+                                      style={{
+                                        width: '100%',
+                                        height: '100%',
+                                        objectFit: 'contain',
+                                        borderRadius: '10px',
+                                        filter: 'drop-shadow(0 2px 4px rgba(255,255,255,0.15))'
+                                      }}
+                                      onError={(e) => {
+                                        (e.currentTarget as any).style.display = 'none';
+                                        if (e.currentTarget.parentElement) {
+                                          e.currentTarget.parentElement.innerText = nextLockedSticker.emoji;
+                                        }
+                                      }}
+                                    />
+                                  </div>
+                                  <div style={{ flex: 1, minWidth: 0 }}>
+                                    <div style={{ fontSize: '0.70rem', fontWeight: 950, color: '#b45309', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                                      {nextLockedSticker.rarityLabel || 'Auszeichnung'}
+                                    </div>
+                                    <div style={{ fontSize: isMusicStandMode ? '1.02rem' : '0.94rem', fontWeight: 950, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                      {nextLockedSticker.title}
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+
                               <button
-                                onClick={(e) => { e.stopPropagation(); setShowJuniorRecordModal(true); startJuniorRecordingFlow(); }}
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); setShowJuniorStickerModal(true); }}
                                 style={{
                                   width: '100%',
-                                  padding: '16px',
+                                  padding: isMusicStandMode ? '18px 22px' : '16px 20px',
+                                  minHeight: '48px',
+                                  boxSizing: 'border-box',
                                   borderRadius: '20px',
                                   border: 'none',
-                                  background: '#fef2f2',
-                                  color: '#ef4444',
-                                  fontSize: '1.05rem',
+                                  background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                                  color: '#ffffff',
+                                  fontSize: isMusicStandMode ? '1.12rem' : '1.02rem',
                                   fontWeight: 950,
                                   cursor: 'pointer',
                                   display: 'flex',
                                   alignItems: 'center',
                                   justifyContent: 'center',
-                                  gap: '10px'
+                                  gap: '10px',
+                                  whiteSpace: 'nowrap',
+                                  boxShadow: '0 8px 20px rgba(217, 119, 6, 0.28)',
+                                  transition: 'all 0.2s ease'
                                 }}
+                                className="hover-scale"
                               >
-                                <Mic size={20} />
-                                <span>Jetzt aufnehmen</span>
-                              </button>
-                            </div>
-                          );
-                        })()}
-
-                        {/* BOX 4: AUFNAHMEN (UNTERRICHT & ÜBE-STUDIO) */}
-                        {(() => {
-                          const teacherNameDisplay = briefingData?.todayLesson?.teacher_name || (studentUser as any)?.teacher_name || 'deiner Lehrkraft';
-                          const totalAudiosCount = juniorTeacherRecordings.length + juniorStudentRecordings.length;
-
-                          const handleOpenRecordings = (e?: React.MouseEvent) => {
-                            if (e) e.stopPropagation();
-                            setHomeworkBookTab('audiobiography');
-                            handleTabChangeLocal('homework_book');
-                          };
-
-                          let subtitle = 'Alle Aufnahmen aus Unterricht & Studio';
-                          if (juniorTeacherRecordings.length > 0 && juniorStudentRecordings.length > 0) {
-                            subtitle = `${juniorTeacherRecordings.length} vom Unterricht • ${juniorStudentRecordings.length} eigene`;
-                          } else if (juniorTeacherRecordings.length > 0) {
-                            subtitle = `Alle ${juniorTeacherRecordings.length} Aufnahmen von ${teacherNameDisplay}`;
-                          } else if (juniorStudentRecordings.length > 0) {
-                            subtitle = `Alle ${juniorStudentRecordings.length} Aufnahmen aus deinem Studio`;
-                          }
-
-                          return (
-                            <div 
-                              onClick={handleOpenRecordings}
-                              style={{
-                                background: '#ffffff',
-                                borderRadius: '32px',
-                                padding: '28px',
-                                boxShadow: '0 12px 30px rgba(15, 23, 42, 0.04)',
-                                border: '2px solid #e2e8f0',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                justifyContent: 'space-between',
-                                gap: '24px',
-                                cursor: 'pointer',
-                                transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
-                              }}
-                              className="hover-scale"
-                            >
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                                <div style={{
-                                  background: '#ede9fe',
-                                  color: '#7c3aed',
-                                  width: '64px',
-                                  height: '64px',
-                                  borderRadius: '22px',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  boxShadow: '0 6px 16px rgba(124, 58, 237, 0.15)'
-                                }}>
-                                  <Headphones size={34} />
-                                </div>
-
-                                <div>
-                                  <div style={{ fontSize: '0.75rem', fontWeight: 950, color: '#7c3aed', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                                    Aufnahmen
-                                  </div>
-                                  <h3 style={{ margin: '4px 0 0 0', fontSize: '1.45rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                                    {totalAudiosCount} {totalAudiosCount === 1 ? 'Aufnahme' : 'Aufnahmen'}
-                                  </h3>
-                                  <p style={{ margin: '6px 0 0 0', fontSize: '0.88rem', color: '#64748b', fontWeight: 650, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={subtitle}>
-                                    {subtitle}
-                                  </p>
-                                </div>
-                              </div>
-
-                              <button
-                                onClick={handleOpenRecordings}
-                                style={{
-                                  width: '100%',
-                                  padding: '16px',
-                                  borderRadius: '20px',
-                                  border: 'none',
-                                  background: '#f5f3ff',
-                                  color: '#7c3aed',
-                                  fontSize: '1.05rem',
-                                  fontWeight: 950,
-                                  cursor: 'pointer',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  gap: '10px'
-                                }}
-                              >
-                                <Headphones size={20} />
-                                <span>Alle Aufnahmen anhören</span>
+                                <Trophy size={18} fill="white" color="white" />
+                                <span>Sticker-Album öffnen</span>
                               </button>
                             </div>
                           );
@@ -15455,7 +17138,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                         <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
                           <div style={{
                             background: 'linear-gradient(135deg, #e6f4ea 0%, #d1fae5 100%)',
-                            color: '#15803d',
+                            color: '#34a853',
                             width: '48px',
                             height: '48px',
                             borderRadius: '16px',
@@ -15467,7 +17150,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                             <BookOpen size={24} strokeWidth={2.4} />
                           </div>
                           <div>
-                            <span style={{ fontSize: '0.72rem', fontWeight: 950, color: '#15803d', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                            <span style={{ fontSize: '0.72rem', fontWeight: 950, color: '#34a853', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                               Mein Aufgabenheft
                             </span>
                             <h2 style={{ margin: '2px 0 0 0', fontSize: '1.35rem', fontWeight: 950, color: '#0f172a', letterSpacing: '-0.02em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
@@ -15818,7 +17501,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                       style={{
                                         background: isTtsSpeaking && activeTtsKey === 'junior_modal' 
                                           ? 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)' 
-                                          : 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
+                                          : 'linear-gradient(135deg, #34a853 0%, #2e9549 100%)',
                                         color: '#ffffff',
                                         border: 'none',
                                         padding: '11px 20px',
@@ -15831,7 +17514,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                         gap: '8px',
                                         boxShadow: isTtsSpeaking && activeTtsKey === 'junior_modal' 
                                           ? '0 4px 0 #991b1b, 0 8px 18px rgba(239, 68, 68, 0.4)' 
-                                          : '0 4px 0 #15803d, 0 8px 18px rgba(34, 197, 94, 0.4)',
+                                          : '0 4px 0 #1e7037, 0 8px 18px rgba(52, 168, 83, 0.32)',
                                         transform: isTtsSpeaking && activeTtsKey === 'junior_modal' ? 'translateY(2px)' : 'none',
                                         flexShrink: 0,
                                         transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)'
@@ -15846,13 +17529,13 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                       }}
                                       onMouseDown={(e) => {
                                         e.currentTarget.style.transform = 'translateY(3px)';
-                                        e.currentTarget.style.boxShadow = isTtsSpeaking && activeTtsKey === 'junior_modal' ? '0 1px 0 #991b1b' : '0 1px 0 #15803d';
+                                        e.currentTarget.style.boxShadow = isTtsSpeaking && activeTtsKey === 'junior_modal' ? '0 1px 0 #991b1b' : '0 1px 0 #1e7037';
                                       }}
                                       onMouseUp={(e) => {
                                         e.currentTarget.style.transform = 'translateY(-1px)';
                                         e.currentTarget.style.boxShadow = isTtsSpeaking && activeTtsKey === 'junior_modal' 
                                           ? '0 4px 0 #991b1b, 0 8px 18px rgba(239, 68, 68, 0.4)' 
-                                          : '0 4px 0 #15803d, 0 8px 18px rgba(34, 197, 94, 0.4)';
+                                          : '0 4px 0 #1e7037, 0 8px 18px rgba(52, 168, 83, 0.32)';
                                       }}
                                       title={isTtsSpeaking && activeTtsKey === 'junior_modal' ? "Vorlesen stoppen" : "Hausaufgaben vorlesen lassen"}
                                     >
@@ -15915,12 +17598,13 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                           <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap' }}>
                                             {bookItem.pageNums.map((pNum) => (
                                               <span key={`p-${pNum}`} style={{
-                                                background: '#dcfce7',
-                                                color: '#15803d',
+                                                background: '#e6f4ea',
+                                                color: '#2e9549',
                                                 fontSize: '0.80rem',
                                                 fontWeight: 900,
                                                 padding: '3px 9px',
                                                 borderRadius: '7px',
+                                                border: '1px solid #c7eed2',
                                                 flexShrink: 0
                                               }}>
                                                 S. {pNum}
@@ -15956,27 +17640,68 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                         paddingBottom: (idx < otherActiveSongs.length - 1 || audioTracks.length > 0) ? '12px' : '0',
                                         borderBottom: (idx < otherActiveSongs.length - 1 || audioTracks.length > 0) ? '1px solid rgba(0,0,0,0.06)' : 'none'
                                       }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                          {/* 3D Vinyl Single Sleeve mit CD/Schallplatte */}
                                           <div style={{
-                                            width: '28px',
-                                            height: '28px',
-                                            borderRadius: '8px',
-                                            background: '#ede9fe',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            color: '#7c3aed',
+                                            position: 'relative',
+                                            width: '32px',
+                                            height: '32px',
                                             flexShrink: 0
                                           }}>
-                                            <Music size={14} />
+                                            {/* Peeking black vinyl record disc */}
+                                            <div style={{
+                                              position: 'absolute',
+                                              right: '-5px',
+                                              top: '2px',
+                                              width: '28px',
+                                              height: '28px',
+                                              borderRadius: '50%',
+                                              background: 'radial-gradient(circle, #0f172a 0%, #1e293b 40%, #0f172a 60%, #334155 85%, #0f172a 100%)',
+                                              boxShadow: '0 2px 6px rgba(0,0,0,0.25)',
+                                              zIndex: 1,
+                                              display: 'flex',
+                                              alignItems: 'center',
+                                              justifyContent: 'center'
+                                            }}>
+                                              {/* Center spindle label / hole */}
+                                              <div style={{
+                                                width: '9px',
+                                                height: '9px',
+                                                borderRadius: '50%',
+                                                background: '#f8fafc',
+                                                border: '1.5px solid #0f172a',
+                                                boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.4)'
+                                              }} />
+                                            </div>
+
+                                            {/* Front Vinyl Sleeve Card */}
+                                            <div style={{
+                                              position: 'absolute',
+                                              left: 0,
+                                              top: 0,
+                                              width: '32px',
+                                              height: '32px',
+                                              borderRadius: '7px',
+                                              background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
+                                              boxShadow: '0 3px 8px rgba(124, 58, 237, 0.25), inset 0 1px 1px rgba(255,255,255,0.3)',
+                                              border: '1px solid rgba(124, 58, 237, 0.3)',
+                                              display: 'flex',
+                                              alignItems: 'center',
+                                              justifyContent: 'center',
+                                              zIndex: 2,
+                                              overflow: 'hidden'
+                                            }}>
+                                              <Music size={15} color="#ffffff" strokeWidth={2.4} />
+                                            </div>
                                           </div>
+
                                           <span style={{ fontSize: '1.05rem', fontWeight: 900, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
                                             {cleanTitle(item.topic_name || item.title)}
                                           </span>
                                         </div>
 
                                         {item.homework_notes && (
-                                          <div style={{ marginLeft: '38px', fontSize: '0.88rem', color: '#475569', fontWeight: 600, lineHeight: 1.4 }}>
+                                          <div style={{ marginLeft: '44px', fontSize: '0.88rem', color: '#475569', fontWeight: 600, lineHeight: 1.4 }}>
                                             <span style={{ color: '#6366f1', fontWeight: 850 }}>🚀 Fahrplan:</span> {item.homework_notes}
                                           </div>
                                         )}
@@ -15991,7 +17716,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                         gap: '8px',
                                         paddingTop: (formattedJuniorBooks.length > 0 || otherActiveSongs.length > 0) ? '4px' : '0'
                                       }}>
-                                        <div style={{ fontSize: '0.74rem', fontWeight: 900, color: '#15803d', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                        <div style={{ fontSize: '0.74rem', fontWeight: 900, color: '#34a853', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: '6px' }}>
                                           <Headphones size={13} />
                                           <span>Unterrichtsaufnahmen ({audioTracks.length})</span>
                                         </div>
@@ -16141,8 +17866,8 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                             display: 'inline-flex',
                             alignItems: 'center',
                             gap: '8px',
-                            background: isExtraTime ? '#dcfce7' : '#fef3c7',
-                            color: isExtraTime ? '#15803d' : '#d97706',
+                            background: isExtraTime ? '#dcfce7' : '#eef2ff',
+                            color: isExtraTime ? '#15803d' : '#4f46e5',
                             padding: '6px 18px',
                             borderRadius: '100px',
                             fontSize: '0.85rem',
@@ -16176,13 +17901,41 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                           </div>
                         )}
 
+                        {/* Flammen-Stufe Status-Pille (Pädagogische Auto-Progression) */}
+                        {!sessionActive && (
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '10px',
+                            background: '#f8fafc',
+                            border: '1.5px solid #e2e8f0',
+                            borderRadius: '18px',
+                            padding: '10px 22px',
+                            color: '#1e293b',
+                            fontSize: '0.92rem',
+                            fontWeight: 900
+                          }}>
+                            {(() => {
+                              const streak = avatar?.streak_flame || 0;
+                              const targetMins = getTargetMinutes(streak);
+                              return (
+                                <>
+                                  <span style={{ fontSize: '1.1rem' }}>{streak >= 9 ? '👑' : streak >= 4 ? '🔥🔥' : '🔥'}</span>
+                                  <span>Flammen-Stufe {streak >= 9 ? '3 (Königsstufe)' : streak >= 4 ? '2 (Flammen-Stufe)' : '1 (Start-Stufe)'}:</span>
+                                  <span style={{ color: '#15803d', fontWeight: 950 }}>{targetMins} Min. Fokus-Ziel</span>
+                                </>
+                              );
+                            })()}
+                          </div>
+                        )}
+
                         {/* Runder Countdown-Ring */}
                         {(() => {
                           const streak = avatar?.streak_flame || 0;
                           const targetMins = getTargetMinutes(streak);
                           const targetSecs = targetMins * 60;
                           const secs = secondsElapsed;
-                          const minsLeft = Math.max(0, Math.ceil((targetSecs - secs) / 60));
                           const displayMins = String(Math.floor(secs / 60)).padStart(2, '0');
                           const displaySecs = String(secs % 60).padStart(2, '0');
 
@@ -16206,7 +17959,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                   cx="115"
                                   cy="115"
                                   r={circleRadius}
-                                  stroke={isExtraTime ? '#10b981' : '#34a853'}
+                                  stroke={isExtraTime ? '#10b981' : '#6366f1'}
                                   strokeWidth="16"
                                   strokeDasharray={circumference}
                                   strokeDashoffset={strokeDashoffset}
@@ -16232,6 +17985,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', width: '100%' }}>
                           {!sessionActive ? (
                             <button
+                              type="button"
                               onClick={() => {
                                 setSessionActive(true);
                                 setIsPhoneFlat(true);
@@ -16239,9 +17993,10 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                               style={{
                                 width: '100%',
                                 padding: '20px',
+                                minHeight: '48px',
                                 borderRadius: '22px',
                                 border: 'none',
-                                background: 'linear-gradient(135deg, #34a853 0%, #2e7d32 100%)',
+                                background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
                                 color: '#ffffff',
                                 fontSize: '1.25rem',
                                 fontWeight: 950,
@@ -16250,15 +18005,74 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                 alignItems: 'center',
                                 justifyContent: 'center',
                                 gap: '12px',
-                                boxShadow: '0 12px 25px rgba(52, 168, 83, 0.4)'
+                                boxShadow: '0 12px 25px rgba(99, 102, 241, 0.4)'
                               }}
                               className="hover-scale"
                             >
                               <Play size={26} fill="currentColor" />
                               <span>Jetzt Timer starten! ▶️</span>
                             </button>
+                          ) : isExtraTime ? (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  // Keep practicing (Open-End Flow)
+                                }}
+                                style={{
+                                  width: '100%',
+                                  padding: '18px',
+                                  minHeight: '48px',
+                                  borderRadius: '20px',
+                                  border: 'none',
+                                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                                  color: '#ffffff',
+                                  fontSize: '1.15rem',
+                                  fontWeight: 950,
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  gap: '10px',
+                                  boxShadow: '0 10px 25px rgba(5, 150, 105, 0.35)'
+                                }}
+                                className="hover-scale"
+                              >
+                                <Sparkles size={22} fill="white" />
+                                <span>Weiterüben (+Bonus XP) 🚀</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  await finishPracticeSession();
+                                  setShowJuniorTimerModal(false);
+                                }}
+                                style={{
+                                  width: '100%',
+                                  padding: '14px',
+                                  minHeight: '44px',
+                                  borderRadius: '16px',
+                                  border: '1.5px solid #cbd5e1',
+                                  background: '#ffffff',
+                                  color: '#475569',
+                                  fontSize: '0.95rem',
+                                  fontWeight: 900,
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  gap: '8px'
+                                }}
+                                className="hover-scale"
+                              >
+                                <Check size={18} />
+                                <span>Fertig! Session beenden 🏁</span>
+                              </button>
+                            </>
                           ) : (
                             <button
+                              type="button"
                               onClick={async () => {
                                 await finishPracticeSession();
                                 setShowJuniorTimerModal(false);
@@ -16266,6 +18080,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                               style={{
                                 width: '100%',
                                 padding: '20px',
+                                minHeight: '48px',
                                 borderRadius: '22px',
                                 border: 'none',
                                 background: '#0f172a',
@@ -16276,7 +18091,8 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
-                                gap: '12px'
+                                gap: '12px',
+                                boxShadow: '0 8px 24px rgba(15, 23, 42, 0.25)'
                               }}
                               className="hover-scale"
                             >
@@ -16343,7 +18159,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                         {juniorCountdown !== null && (
                           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', padding: '24px 0' }}>
                             <span style={{ fontSize: '1.05rem', fontWeight: 950, color: '#ef4444', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                              Mach dich bereit! 🎸
+                              Mach dich bereit! 🎶
                             </span>
                             <div
                               key={`cd-${juniorCountdown}`}
@@ -17081,18 +18897,26 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                       {st.rarityLabel}
                                     </span>
 
-                                    {/* STICKER IMAGE CONTAINER */}
+                                    {/* STICKER IMAGE CONTAINER - COLLECTIBLE PANINI BADGE */}
                                     <div style={{
-                                      width: '84px',
-                                      height: '84px',
+                                      width: '92px',
+                                      height: '92px',
                                       position: 'relative',
                                       display: 'flex',
                                       alignItems: 'center',
                                       justifyContent: 'center',
-                                      borderRadius: '20px',
-                                      padding: '4px'
+                                      borderRadius: '22px',
+                                      background: '#0a0e1a',
+                                      border: isUnlocked 
+                                        ? (isLegendary ? '2.5px solid #facc15' : isEpic ? '2.5px solid #c084fc' : isRare ? '2.5px solid #93c5fd' : '2.5px solid #4ade80')
+                                        : '2px solid #334155',
+                                      boxShadow: isUnlocked
+                                        ? `0 8px 20px ${rarityGlow}`
+                                        : 'inset 0 2px 6px rgba(0,0,0,0.4)',
+                                      overflow: 'hidden',
+                                      padding: '5px'
                                     }}>
-                                      {/* Genuine Full Color Image (Always vibrant) */}
+                                      {/* Genuine Full Color Image */}
                                       <img
                                         src={`/stickers/${st.id}.png?v=1`}
                                         alt={st.title}
@@ -17100,9 +18924,10 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                           width: '100%',
                                           height: '100%',
                                           objectFit: 'contain',
+                                          borderRadius: '16px',
                                           filter: isUnlocked 
-                                            ? 'drop-shadow(0 6px 12px rgba(0,0,0,0.15))' 
-                                            : 'drop-shadow(0 4px 8px rgba(0,0,0,0.08))',
+                                            ? 'drop-shadow(0 4px 10px rgba(255,255,255,0.18))' 
+                                            : 'grayscale(25%) contrast(0.9) brightness(0.72)',
                                           transition: 'transform 0.3s ease'
                                         }}
                                         onError={(e) => {
@@ -17117,69 +18942,91 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                         }}
                                       />
 
-                                      {/* Magical Apple Holo-Phantom Diagonal Striping Overlay for Locked Stickers */}
+                                      {/* Gentle Mystery Shimmer Overlay for Locked Stickers */}
                                       {!isUnlocked && (
                                         <div 
-                                          className="holo-phantom-overlay"
                                           style={{
                                             position: 'absolute',
                                             inset: 0,
-                                            borderRadius: '18px',
-                                            background: 'repeating-linear-gradient(45deg, rgba(255,255,255,0.72) 0px, rgba(255,255,255,0.72) 3.5px, transparent 3.5px, transparent 7px)',
+                                            borderRadius: '20px',
+                                            background: 'radial-gradient(circle at 30% 30%, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0.02) 60%, transparent 100%)',
                                             pointerEvents: 'none'
                                           }}
                                         />
                                       )}
 
-                                      {/* Floating Lock Icon with Gentle Glow */}
-                                      {!isUnlocked && (
+                                      {/* Floating Mystery Badge or Checkmark */}
+                                      {!isUnlocked ? (
                                         <div style={{
                                           position: 'absolute',
-                                          bottom: '-4px',
-                                          right: '-4px',
-                                          background: '#0f172a',
-                                          color: '#facc15',
+                                          bottom: '-2px',
+                                          right: '-2px',
+                                          background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                                          color: '#ffffff',
                                           width: '24px',
                                           height: '24px',
                                           borderRadius: '50%',
                                           display: 'flex',
                                           alignItems: 'center',
                                           justifyContent: 'center',
-                                          fontSize: '0.72rem',
-                                          boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
-                                          border: '1.5px solid #ffffff'
+                                          boxShadow: '0 3px 10px rgba(245, 158, 11, 0.45)',
+                                          border: '2px solid #ffffff'
                                         }}>
-                                          🔒
+                                          <Sparkles size={12} color="#ffffff" />
+                                        </div>
+                                      ) : (
+                                        <div style={{
+                                          position: 'absolute',
+                                          bottom: '-2px',
+                                          right: '-2px',
+                                          background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                                          color: '#ffffff',
+                                          width: '24px',
+                                          height: '24px',
+                                          borderRadius: '50%',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center',
+                                          boxShadow: '0 3px 10px rgba(16, 185, 129, 0.45)',
+                                          border: '2px solid #ffffff'
+                                        }}>
+                                          <Check size={13} strokeWidth={3} color="#ffffff" />
                                         </div>
                                       )}
                                     </div>
 
                                     {/* TITLE & CHILD-FRIENDLY PROGRESS/STATUS */}
                                     <div style={{ width: '100%' }}>
-                                      <h4 style={{ margin: '0 0 3px 0', fontSize: '0.94rem', fontWeight: 950, color: '#0f172a', lineHeight: 1.2 }}>
+                                      <h4 style={{ margin: '0 0 4px 0', fontSize: '0.94rem', fontWeight: 950, color: '#0f172a', lineHeight: 1.2 }}>
                                         {st.title}
                                       </h4>
                                       {isUnlocked ? (
                                         <span style={{
-                                          display: 'inline-block',
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          gap: '4px',
                                           background: '#dcfce7',
                                           color: '#15803d',
-                                          fontSize: '0.66rem',
+                                          fontSize: '0.68rem',
                                           fontWeight: 950,
-                                          padding: '2px 8px',
-                                          borderRadius: '100px'
+                                          padding: '3px 10px',
+                                          borderRadius: '100px',
+                                          border: '1px solid #bbf7d0'
                                         }}>
                                           ★ Im Album!
                                         </span>
                                       ) : (
                                         <span style={{
-                                          display: 'inline-block',
-                                          fontSize: '0.68rem',
-                                          color: '#d97706',
-                                          fontWeight: 850,
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          gap: '4px',
+                                          fontSize: '0.70rem',
+                                          color: '#b45309',
+                                          fontWeight: 900,
                                           background: '#fef3c7',
-                                          padding: '2px 8px',
-                                          borderRadius: '100px'
+                                          padding: '3px 10px',
+                                          borderRadius: '100px',
+                                          border: '1px solid #fde68a'
                                         }}>
                                           {progressText || 'Noch gesperrt'}
                                         </span>
@@ -17192,7 +19039,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                         </div>
 
                         {/* BOTTOM ACTION BAR */}
-                        <div style={{ flexShrink: 0, paddingTop: '12px', borderTop: '1px solid #f1f5f9' }}>
+                        <div style={{ flexShrink: 0, paddingTop: '14px', borderTop: '1px solid #f1f5f9' }}>
                           <button
                             onClick={() => setShowJuniorStickerModal(false)}
                             style={{
@@ -17200,7 +19047,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                               padding: '16px',
                               borderRadius: '20px',
                               border: 'none',
-                              background: '#0f172a',
+                              background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
                               color: '#ffffff',
                               fontSize: '1.05rem',
                               fontWeight: 950,
@@ -17208,11 +19055,14 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
-                              gap: '8px'
+                              gap: '10px',
+                              boxShadow: '0 8px 24px rgba(217, 119, 6, 0.35)',
+                              transition: 'all 0.2s ease'
                             }}
                             className="hover-scale"
                           >
-                            <span>Super! Zurück zum Briefing 👍</span>
+                            <Sparkles size={20} fill="#ffffff" />
+                            <span>Auf zum Instrument! 🚀</span>
                           </button>
                         </div>
                       </div>
@@ -17302,16 +19152,16 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                 width: '150px',
                                 height: '150px',
                                 borderRadius: '34px',
-                                background: '#ffffff',
+                                background: '#0a0e1a',
                                 border: juniorSelectedPreviewSticker.isUnlocked 
-                                  ? '4px solid #34a853' 
-                                  : '4px solid #facc15',
+                                  ? (juniorSelectedPreviewSticker.rarity === 'legendary' ? '4px solid #facc15' : juniorSelectedPreviewSticker.rarity === 'epic' ? '4px solid #c084fc' : juniorSelectedPreviewSticker.rarity === 'rare' ? '4px solid #93c5fd' : '4px solid #34a853')
+                                  : '4px solid #f59e0b',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
                                 boxShadow: juniorSelectedPreviewSticker.isUnlocked 
                                   ? '0 16px 40px rgba(52, 168, 83, 0.35)' 
-                                  : '0 16px 40px rgba(250, 204, 21, 0.35)',
+                                  : '0 16px 40px rgba(245, 158, 11, 0.35)',
                                 position: 'relative',
                                 overflow: 'hidden',
                                 padding: '10px'
@@ -17323,7 +19173,10 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                     width: '100%',
                                     height: '100%',
                                     objectFit: 'contain',
-                                    filter: 'drop-shadow(0 6px 14px rgba(0,0,0,0.18))'
+                                    borderRadius: '24px',
+                                    filter: juniorSelectedPreviewSticker.isUnlocked 
+                                      ? 'drop-shadow(0 6px 14px rgba(255,255,255,0.2))' 
+                                      : 'grayscale(20%) brightness(0.85)'
                                   }}
                                   onError={(e) => {
                                     e.currentTarget.style.display = 'none';
@@ -17339,12 +19192,11 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
 
                                 {!juniorSelectedPreviewSticker.isUnlocked && (
                                   <div 
-                                    className="holo-phantom-overlay"
                                     style={{
                                       position: 'absolute',
                                       inset: 0,
                                       borderRadius: '30px',
-                                      background: 'repeating-linear-gradient(45deg, rgba(255,255,255,0.7) 0px, rgba(255,255,255,0.7) 4px, transparent 4px, transparent 8px)',
+                                      background: 'radial-gradient(circle at 30% 30%, rgba(255,255,255,0.22) 0%, rgba(255,255,255,0.02) 60%, transparent 100%)',
                                       pointerEvents: 'none'
                                     }}
                                   />
@@ -17540,7 +19392,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                           width: '150px',
                           height: '150px',
                           borderRadius: '32px',
-                          background: '#ffffff',
+                          background: '#0a0e1a',
                           border: '4px solid #facc15',
                           display: 'flex',
                           alignItems: 'center',
@@ -17553,7 +19405,13 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                           <img
                             src={`/stickers/${juniorAwardedStickerToCelebrate.id}.png?v=1`}
                             alt={juniorAwardedStickerToCelebrate.title}
-                            style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                            style={{
+                              width: '100%',
+                              height: '100%',
+                              objectFit: 'contain',
+                              borderRadius: '22px',
+                              filter: 'drop-shadow(0 6px 14px rgba(255,255,255,0.2))'
+                            }}
                             onError={(e) => {
                               e.currentTarget.style.display = 'none';
                               const parent = e.currentTarget.parentElement;
@@ -17893,18 +19751,37 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                           </div>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '6px' }}>
-                          <span style={{ 
-                            fontSize: '1.6rem', 
-                            fontWeight: 950, 
-                            fontFamily: "'Plus Jakarta Sans', sans-serif", 
-                            letterSpacing: '-0.02em',
-                            color: 'white'
-                          }}>
-                            {avatar?.streak_flame || 0}
-                          </span>
-                          <span style={{ fontSize: '0.72rem', fontWeight: 800, opacity: 0.95, color: 'white' }}>
-                            {(avatar?.streak_flame || 0) === 1 ? 'Tag' : 'Tage'}
-                          </span>
+                          {(avatar?.streak_flame || 0) === 0 ? (
+                            <>
+                              <span style={{ 
+                                fontSize: '1.25rem', 
+                                fontWeight: 950, 
+                                fontFamily: "'Plus Jakarta Sans', sans-serif", 
+                                letterSpacing: '-0.02em',
+                                color: 'white'
+                              }}>
+                                Startklar
+                              </span>
+                              <span style={{ fontSize: '0.72rem', fontWeight: 800, opacity: 0.95, color: 'white' }}>
+                                Tag 1
+                              </span>
+                            </>
+                          ) : (
+                            <>
+                              <span style={{ 
+                                fontSize: '1.6rem', 
+                                fontWeight: 950, 
+                                fontFamily: "'Plus Jakarta Sans', sans-serif", 
+                                letterSpacing: '-0.02em',
+                                color: 'white'
+                              }}>
+                                {avatar?.streak_flame}
+                              </span>
+                              <span style={{ fontSize: '0.72rem', fontWeight: 800, opacity: 0.95, color: 'white' }}>
+                                {avatar?.streak_flame === 1 ? 'Tag' : 'Tage'}
+                              </span>
+                            </>
+                          )}
                         </div>
                       </div>
                     )}
@@ -17985,9 +19862,13 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                         color: '#0f172a', 
                         fontFamily: "'Plus Jakarta Sans', sans-serif", 
                         lineHeight: 1.1,
-                        letterSpacing: '-0.02em'
+                        letterSpacing: '-0.02em',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px'
                       }}>
-                        Hi {studentUser?.first_name || 'Musiker'}! 🎧
+                        <span>Hi {studentUser?.first_name || 'Musiker'}!</span>
+                        <Headphones size={24} color="#0f172a" style={{ opacity: 0.85 }} />
                       </h3>
                       
                       {(() => {
@@ -18001,13 +19882,13 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                         return (
                           <p style={{ 
                             margin: '8px 0 0 0', 
-                            fontSize: '0.9rem', 
+                            fontSize: isMusicStandMode ? '1.10rem' : '0.96rem', 
                             color: '#475569', 
-                            fontWeight: 600, 
+                            fontWeight: 650, 
                             lineHeight: 1.45, 
                             maxWidth: '95%' 
                           }}>
-                            Feile an deinen Songs, halte deine Serie und starte deine heutige Übezeit {instPrep}!
+                            Track deine Songs, halte deinen Streak &amp; hol dir XP! 🎸
                           </p>
                         );
                       })()}
@@ -18157,9 +20038,9 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                 {isCanceled ? (
                                   !isStudentAbsenceAllowed ? <Lock size={14} color="#dc2626" /> : <CalendarX size={14} color="#dc2626" />
                                 ) : (
-                                  <CalendarX size={14} color="#64748b" />
+                                  !isStudentAbsenceAllowed ? <Lock size={14} color="#64748b" /> : <CalendarX size={14} color="#64748b" />
                                 )}
-                                <span>{isCanceled ? (!isStudentAbsenceAllowed ? 'Absage zurücknehmen (Eltern-PIN)' : 'Absage zurücknehmen') : 'Unterricht absagen'}</span>
+                                <span>{isCanceled ? (!isStudentAbsenceAllowed ? 'Absage zurücknehmen (Eltern-PIN)' : 'Absage zurücknehmen') : (!isStudentAbsenceAllowed ? 'Unterricht absagen (Eltern-PIN)' : 'Unterricht absagen')}</span>
                               </button>
                             )}
                           </div>
@@ -18269,7 +20150,9 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                       const generalNoteRaw = currentWeekNotes.find(n => !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('LATENCY:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:'));
                       const generalNote = generalNoteRaw ? cleanGeneralNote(generalNoteRaw) : '';
 
-                      const cleanTitle = (t: string) => (t || '').replace(/\s*\((gitarre|guitar|e-gitarre|bass|e-bass|drums|schlagzeug|klavier|piano|keys|keyboard|vocals|gesang|stimme|allgemein)\)/i, '');
+                      const cleanTitle = (t: string) => (t || '')
+                        .replace(/\s*\((gitarre|guitar|e-gitarre|bass|e-bass|drums|schlagzeug|klavier|piano|keys|keyboard|vocals|gesang|stimme|allgemein)\)/i, '')
+                        .replace(/^Linken Park/i, 'Linkin Park');
                       const effectiveId = studentId || studentUser?.id;
 
                       const formatPageNumbers = (pages: number[]): string => {
@@ -18485,8 +20368,8 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                   <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 950, color: '#1e293b', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
                                     Hausaufgaben
                                   </h4>
-                                  <span style={{ fontSize: '0.65rem', fontWeight: 850, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                                    KW {currentWeekNum} · Deine Wochenziele
+                                  <span style={{ fontSize: isMusicStandMode ? '0.80rem' : '0.72rem', fontWeight: 850, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                    Diese Woche · Deine Aufgaben
                                   </span>
                                 </div>
                               </div>
@@ -18534,7 +20417,9 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                         justifyContent: 'space-between',
                                         gap: '8px',
                                         padding: '10px 12px',
-                                        background: '#f8fafc',
+                                        background: '#ffffff',
+                                        border: '1px solid #f1f5f9',
+                                        boxShadow: '0 2px 8px -2px rgba(0, 0, 0, 0.04)',
                                         borderRadius: '12px'
                                       }}>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
@@ -18575,7 +20460,9 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
 
                                   {otherActiveHWItems.map((item, idx) => (
                                     <div key={`teen-song-${idx}`} style={{
-                                      background: '#f8fafc',
+                                      background: '#ffffff',
+                                      border: '1px solid #f1f5f9',
+                                      boxShadow: '0 2px 8px -2px rgba(0, 0, 0, 0.04)',
                                       padding: '10px 12px',
                                       borderRadius: '12px',
                                       display: 'flex',
@@ -18601,7 +20488,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                   ))}
 
                                   {/* Zusätzliche Bemerkung */}
-                                  {generalNote && (
+                                  {generalNote && generalNote.trim().toLowerCase() !== 'zusätzliche bemerkung' && (
                                     <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', fontSize: '0.78rem', color: '#334155', fontWeight: 600, paddingTop: '6px', borderTop: '1px dashed #e2e8f0' }}>
                                       <FileText size={14} style={{ color: '#16a34a', flexShrink: 0 }} />
                                       <strong style={{ color: '#15803d', fontWeight: 850, flexShrink: 0 }}>Zusätzliche Bemerkung:</strong>
@@ -18772,55 +20659,43 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                               <div style={{ background: 'rgba(251, 188, 5, 0.12)', color: '#d97706', width: '32px', height: '32px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                 <Zap size={16} fill="currentColor" />
                               </div>
-                              <span style={{ fontSize: '0.65rem', fontWeight: 900, color: '#64748b', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
-                                Dein tägliches Ritual
-                              </span>
-                            </div>
-                            <div>
-                              <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                              <h4 style={{ margin: 0, fontSize: isMusicStandMode ? '1.18rem' : '1.05rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
                                 Tägliche Übezeit ⚡
                               </h4>
-                              <p style={{ margin: '6px 0 0 0', fontSize: '0.78rem', color: '#64748b', lineHeight: 1.45 }}>
-                                Schön, dass du da bist! Jede Minute, die du heute übst, stärkt deine Fähigkeiten {instPrep} und bringt dich deinen Zielen näher. 🎸✨
+                            </div>
+                            <div>
+                              <p style={{ margin: 0, fontSize: isMusicStandMode ? '0.96rem' : '0.86rem', color: '#475569', lineHeight: 1.45, fontWeight: 600 }}>
+                                Kurze Session, maximaler Groove: Schon {requiredMins} Minuten {instPrep} sichern heute deinen Flammen-Streak. ⚡
                               </p>
                             </div>
                           </div>
 
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                            <div style={{ background: 'rgba(251, 188, 5, 0.08)', borderRadius: '14px', padding: '10px 14px', border: '1px dashed rgba(251, 188, 5, 0.35)', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                              <div style={{ width: '9px', height: '9px', borderRadius: '50%', background: '#f59e0b', animation: 'pulse 1.5s infinite' }} />
-                              <span style={{ fontSize: '0.75rem', fontWeight: 900, color: '#854d0e' }}>
-                                Ziel für heute: Mindestens {requiredMins} Min. üben
-                              </span>
-                            </div>
-
-                            <button 
-                              onClick={() => setActiveTab('practice_board')}
-                              style={{ 
-                                background: 'linear-gradient(135deg, #4f46e5 0%, #3730a3 100%)', 
-                                color: 'white', 
-                                border: 'none', 
-                                borderRadius: '14px', 
-                                padding: '14px 20px', 
-                                minHeight: '44px',
-                                boxSizing: 'border-box',
-                                fontWeight: 950, 
-                                fontSize: '0.88rem', 
-                                cursor: 'pointer', 
-                                display: 'flex', 
-                                justifyContent: 'center', 
-                                alignItems: 'center', 
-                                gap: '8px', 
-                                boxShadow: '0 8px 20px rgba(79, 70, 229, 0.28)', 
-                                transition: 'all 0.2s', 
-                                width: '100%' 
-                              }}
-                              className="hover-scale"
-                            >
-                              <Play size={16} fill="white" />
-                              <span>▶️ {requiredMins} Min. Übe-Timer starten</span>
-                            </button>
-                          </div>
+                          <button 
+                            onClick={() => setActiveTab('practice_board')}
+                            style={{ 
+                              background: 'linear-gradient(135deg, #4f46e5 0%, #3730a3 100%)', 
+                              color: 'white', 
+                              border: 'none', 
+                              borderRadius: '14px', 
+                              padding: '14px 20px', 
+                              minHeight: '44px',
+                              boxSizing: 'border-box',
+                              fontWeight: 950, 
+                              fontSize: '0.88rem', 
+                              cursor: 'pointer', 
+                              display: 'flex', 
+                              justifyContent: 'center', 
+                              alignItems: 'center', 
+                              gap: '8px', 
+                              boxShadow: '0 8px 20px rgba(79, 70, 229, 0.28)', 
+                              transition: 'all 0.2s', 
+                              width: '100%' 
+                            }}
+                            className="hover-scale"
+                          >
+                            <Play size={16} fill="white" />
+                            <span>{requiredMins} Min. Übe-Timer starten</span>
+                          </button>
                         </div>
                       );
                     })()}
@@ -18876,7 +20751,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                               borderRadius: '100px',
                               border: streak === 0 ? '1px solid rgba(239, 68, 68, 0.2)' : '1px solid rgba(249, 115, 22, 0.2)'
                             }}>
-                              {streak} {streak === 1 ? 'Tag' : 'Tage'} 🔥
+                              {streak === 0 ? 'Startklar 🔥' : `${streak} ${streak === 1 ? 'Tag' : 'Tage'} 🔥`}
                             </span>
                           </div>
 
@@ -18910,7 +20785,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                 </span>
                               </div>
                               <p style={{ margin: 0, fontSize: '0.70rem', color: '#047857', lineHeight: 1.35 }}>
-                                Streak ist sicher eingefroren (kein Übezwang). Freiwilliges Üben bringt heute <strong>2× XP</strong>!
+                                Ferienpause: Streak ist gesichert. Üben bringt heute <strong>2× XP</strong>! ✨
                               </p>
                             </div>
                           ) : (
@@ -18924,11 +20799,11 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                               gap: '6px'
                             }}>
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <span style={{ fontSize: '0.70rem', fontWeight: 850, color: '#475569', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                                  <Shield size={12} color="#0284c7" />
-                                  3 Schutzschilde (KW {currentWeek}):
+                                <span style={{ fontSize: isMusicStandMode ? '0.86rem' : '0.78rem', fontWeight: 850, color: '#334155', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                  <Shield size={14} color="#0284c7" />
+                                  Wochen-Schutzschilde:
                                 </span>
-                                <span style={{ fontSize: '0.70rem', fontWeight: 900, color: availableShields > 0 ? '#0284c7' : '#b91c1c' }}>
+                                <span style={{ fontSize: isMusicStandMode ? '0.86rem' : '0.78rem', fontWeight: 900, color: availableShields > 0 ? '#0284c7' : '#b91c1c' }}>
                                   {availableShields}/3 bereit
                                 </span>
                               </div>
@@ -18946,15 +20821,15 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                       alignItems: 'center',
                                       justifyContent: 'center',
                                       gap: '4px',
-                                      padding: '4px 6px',
+                                      padding: '5px 6px',
                                       borderRadius: '6px',
                                       background: isConsumed ? '#f1f5f9' : (isShieldActive ? 'rgba(2, 132, 199, 0.08)' : 'rgba(217, 119, 6, 0.08)'),
                                       border: isConsumed ? '1px solid #cbd5e1' : (isShieldActive ? '1px solid rgba(2, 132, 199, 0.28)' : '1px dashed rgba(217, 119, 6, 0.3)'),
-                                      color: isConsumed ? '#64748b' : (isShieldActive ? '#0369a1' : '#b45309'),
-                                      fontSize: '0.65rem',
+                                      color: isConsumed ? '#475569' : (isShieldActive ? '#0369a1' : '#9a3412'),
+                                      fontSize: isMusicStandMode ? '0.78rem' : '0.72rem',
                                       fontWeight: 800
                                     }}>
-                                      <Shield size={10} color={isConsumed ? '#64748b' : (isShieldActive ? '#0284c7' : '#d97706')} fill={isConsumed ? '#94a3b8' : (isShieldActive ? '#0284c7' : 'none')} />
+                                      <Shield size={11} color={isConsumed ? '#64748b' : (isShieldActive ? '#0284c7' : '#d97706')} fill={isConsumed ? '#94a3b8' : (isShieldActive ? '#0284c7' : 'none')} />
                                       <span>{isConsumed ? `Schild ${shieldNum} (${dayLabel})` : `Schild ${shieldNum}`}</span>
                                     </div>
                                   );
@@ -18970,57 +20845,61 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                             {/* Tier 1 */}
                             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', background: '#f8fafc', padding: '10px 14px', borderRadius: '14px', border: '1px solid rgba(0,0,0,0.03)', zIndex: 2, opacity: isTier1Unlocked ? 1 : 0.6 }}>
                               <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: isTier1Unlocked ? '#eab308' : '#cbd5e1', boxShadow: isTier1Unlocked ? '0 0 8px #eab308' : 'none', zIndex: 3 }} />
-                              <div style={{ color: isTier1Unlocked ? '#eab308' : '#94a3b8', display: 'flex', alignItems: 'center' }}>
+                              <div style={{ color: isTier1Unlocked ? '#eab308' : '#64748b', display: 'flex', alignItems: 'center' }}>
                                 <Flame size={18} fill={isTier1Unlocked ? 'currentColor' : 'none'} />
                               </div>
                               <div style={{ flex: 1, minWidth: 0 }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                  <span style={{ fontSize: '0.85rem', fontWeight: 950, color: isTier1Unlocked ? '#854d0e' : '#475569', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                  <span style={{ fontSize: isMusicStandMode ? '1.05rem' : '0.92rem', fontWeight: 950, color: isTier1Unlocked ? '#854d0e' : '#334155', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                     Stufe 1: Start-Flamme
                                   </span>
-                                  <span style={{ fontSize: '0.65rem', fontWeight: 900, color: isTier1Unlocked ? '#854d0e' : '#94a3b8', flexShrink: 0 }}>
+                                  <span style={{ fontSize: isMusicStandMode ? '0.86rem' : '0.78rem', fontWeight: 900, color: isTier1Unlocked ? '#854d0e' : '#475569', flexShrink: 0 }}>
                                     1–3 Tage • {kleineMins}m
                                   </span>
                                 </div>
-                                <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '1px' }}>{streak > 0 ? '🎉 Aktiv!' : 'Bereit zum Start!'}</div>
+                                <div style={{ fontSize: isMusicStandMode ? '0.88rem' : '0.80rem', color: streak > 0 ? '#15803d' : '#475569', fontWeight: 700, marginTop: '2px' }}>{streak > 0 ? '🎉 Aktiv!' : 'Bereit zum Start!'}</div>
                               </div>
                             </div>
 
                             {/* Tier 2 */}
                             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', background: '#f8fafc', padding: '10px 14px', borderRadius: '14px', border: '1px solid rgba(0,0,0,0.03)', zIndex: 2, opacity: isTier2Unlocked ? 1 : 0.6 }}>
                               <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: isTier2Unlocked ? '#f97316' : '#cbd5e1', boxShadow: isTier2Unlocked ? '0 0 8px #f97316' : 'none', zIndex: 3 }} />
-                              <div style={{ color: isTier2Unlocked ? '#f97316' : '#94a3b8', display: 'flex', alignItems: 'center' }}>
+                              <div style={{ color: isTier2Unlocked ? '#f97316' : '#64748b', display: 'flex', alignItems: 'center' }}>
                                 <Flame size={18} fill={isTier2Unlocked ? 'currentColor' : 'none'} />
                               </div>
                               <div style={{ flex: 1, minWidth: 0 }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                  <span style={{ fontSize: '0.85rem', fontWeight: 950, color: isTier2Unlocked ? '#9a3412' : '#475569', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                  <span style={{ fontSize: isMusicStandMode ? '1.05rem' : '0.92rem', fontWeight: 950, color: isTier2Unlocked ? '#9a3412' : '#334155', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                     Stufe 2: Power-Flamme
                                   </span>
-                                  <span style={{ fontSize: '0.65rem', fontWeight: 900, color: isTier2Unlocked ? '#9a3412' : '#94a3b8', flexShrink: 0 }}>
+                                  <span style={{ fontSize: isMusicStandMode ? '0.86rem' : '0.78rem', fontWeight: 900, color: isTier2Unlocked ? '#9a3412' : '#475569', flexShrink: 0 }}>
                                     4–8 Tage • {mittlereMins}m
                                   </span>
                                 </div>
-                                <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '1px' }}>{isTier2Unlocked ? '🎉 Aktiv!' : `Noch ${Math.max(1, 4 - streak)} Tage`}</div>
+                                <div style={{ fontSize: isMusicStandMode ? '0.88rem' : '0.80rem', color: isTier2Unlocked ? '#15803d' : '#475569', fontWeight: 700, marginTop: '2px' }}>
+                                  {isTier2Unlocked ? '🎉 Aktiv!' : `Noch ${Math.max(1, 4 - streak)}${Math.max(1, 4 - streak) === 1 ? ' Tag' : ' Tage'} bis Stufe 2`}
+                                </div>
                               </div>
                             </div>
 
                             {/* Tier 3 */}
                             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', background: '#f8fafc', padding: '10px 14px', borderRadius: '14px', border: '1px solid rgba(0,0,0,0.03)', zIndex: 2, opacity: isTier3Unlocked ? 1 : 0.6 }}>
                               <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: isTier3Unlocked ? '#ef4444' : '#cbd5e1', boxShadow: isTier3Unlocked ? '0 0 8px #ef4444' : 'none', zIndex: 3 }} />
-                              <div style={{ color: isTier3Unlocked ? '#ef4444' : '#94a3b8', display: 'flex', alignItems: 'center' }}>
+                              <div style={{ color: isTier3Unlocked ? '#ef4444' : '#64748b', display: 'flex', alignItems: 'center' }}>
                                 <Flame size={18} fill={isTier3Unlocked ? 'currentColor' : 'none'} />
                               </div>
                               <div style={{ flex: 1, minWidth: 0 }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                  <span style={{ fontSize: '0.85rem', fontWeight: 950, color: isTier3Unlocked ? '#991b1b' : '#475569', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                  <span style={{ fontSize: isMusicStandMode ? '1.05rem' : '0.92rem', fontWeight: 950, color: isTier3Unlocked ? '#991b1b' : '#334155', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                     Stufe 3: Meister-Flamme
                                   </span>
-                                  <span style={{ fontSize: '0.65rem', fontWeight: 900, color: isTier3Unlocked ? '#991b1b' : '#94a3b8', flexShrink: 0 }}>
+                                  <span style={{ fontSize: isMusicStandMode ? '0.86rem' : '0.78rem', fontWeight: 900, color: isTier3Unlocked ? '#991b1b' : '#475569', flexShrink: 0 }}>
                                     9+ Tage • {heldenMins}m
                                   </span>
                                 </div>
-                                <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '1px' }}>{isTier3Unlocked ? '🔥 Meister-Flamme aktiv!' : `Noch ${Math.max(1, 9 - streak)} Tage`}</div>
+                                <div style={{ fontSize: isMusicStandMode ? '0.88rem' : '0.80rem', color: isTier3Unlocked ? '#ea580c' : '#475569', fontWeight: 700, marginTop: '2px' }}>
+                                  {isTier3Unlocked ? '🔥 Meister-Flamme aktiv!' : `Noch ${Math.max(1, 9 - streak)}${Math.max(1, 9 - streak) === 1 ? ' Tag' : ' Tage'} bis Meister-Flamme`}
+                                </div>
                               </div>
                             </div>
                           </div>
@@ -19404,20 +21283,20 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                         <div style={{
                           background: 'rgba(99, 102, 241, 0.08)',
                           color: '#4f46e5',
-                          fontSize: '0.65rem',
+                          fontSize: isMusicStandMode ? '0.80rem' : '0.72rem',
                           fontWeight: 900,
                           borderRadius: '100px',
-                          padding: '4px 12px',
+                          padding: '5px 14px',
                           textTransform: 'uppercase',
-                          letterSpacing: '0.05em'
+                          letterSpacing: '0.06em'
                         }}>
-                          Pro Level 3 🎸
+                          STUDIO MODE • PRO
                         </div>
                       </div>
 
                       <h3 style={{ 
                         margin: 0, 
-                        fontSize: '28px', 
+                        fontSize: isMusicStandMode ? '32px' : '28px', 
                         fontWeight: 950, 
                         color: '#0f172a', 
                         fontFamily: "'Plus Jakarta Sans', sans-serif", 
@@ -19429,15 +21308,15 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                       
                       <p style={{ 
                         margin: '8px 0 0 0', 
-                        fontSize: '0.88rem', 
+                        fontSize: isMusicStandMode ? '1.05rem' : '0.92rem', 
                         color: '#475569', 
-                        fontWeight: 600, 
+                        fontWeight: 650, 
                         lineHeight: 1.45, 
                         maxWidth: '95%' 
                       }}>
                         {flamesActive 
-                          ? 'Ein neuer Moment für Musik. Nimm dir heute ein paar Minuten für deine Übungsziele und sichere dir deine tägliche Serie!'
-                          : 'Ein neuer Moment für Musik. Nimm dir heute ein paar Minuten für deine Übungsziele!'}
+                          ? 'Fokus auf dein Repertoire: Kurze, regelmäßige Sessions festigen deine Songs & sichern deinen Streak. ⚡'
+                          : 'Fokus auf dein Repertoire: Kurze, regelmäßige Sessions festigen deine Songs. 🎵'}
                       </p>
 
                       {(() => {
@@ -19625,9 +21504,9 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                 {isCanceled ? (
                                   !isStudentAbsenceAllowed ? <Lock size={14} color="#dc2626" /> : <CalendarX size={14} color="#dc2626" />
                                 ) : (
-                                  <CalendarX size={14} color="#64748b" />
+                                  !isStudentAbsenceAllowed ? <Lock size={14} color="#64748b" /> : <CalendarX size={14} color="#64748b" />
                                 )}
-                                <span>{isCanceled ? (!isStudentAbsenceAllowed ? 'Absage zurücknehmen (Eltern-PIN)' : 'Absage zurücknehmen') : 'Unterricht absagen'}</span>
+                                <span>{isCanceled ? (!isStudentAbsenceAllowed ? 'Absage zurücknehmen (Eltern-PIN)' : 'Absage zurücknehmen') : (!isStudentAbsenceAllowed ? 'Unterricht absagen (Eltern-PIN)' : 'Unterricht absagen')}</span>
                               </button>
                             )}
                           </div>
@@ -19969,8 +21848,8 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                   <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 950, color: '#1e293b', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
                                     Hausaufgaben
                                   </h4>
-                                  <span style={{ fontSize: '0.65rem', fontWeight: 850, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                                    KW {currentWeekNum} · Deine Wochenziele
+                                  <span style={{ fontSize: isMusicStandMode ? '0.80rem' : '0.72rem', fontWeight: 850, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                    Diese Woche · Deine Aufgaben
                                   </span>
                                 </div>
                               </div>
@@ -20155,55 +22034,43 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                               <div style={{ background: 'rgba(251, 188, 5, 0.12)', color: '#d97706', width: '32px', height: '32px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                 <Zap size={16} fill="currentColor" />
                               </div>
-                              <span style={{ fontSize: '0.65rem', fontWeight: 900, color: '#64748b', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
-                                Dein tägliches Ritual
-                              </span>
+                              <h4 style={{ margin: 0, fontSize: isMusicStandMode ? '1.18rem' : '1.05rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                                Fokus-Session ⚡
+                              </h4>
                             </div>
                             <div>
-                              <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                                Tägliche Übezeit
-                              </h4>
-                              <p style={{ margin: '6px 0 0 0', fontSize: '0.78rem', color: '#64748b', lineHeight: 1.45 }}>
-                                Schön, dass du da bist! Lass uns gemeinsam Musik machen. Jede Minute, die du heute übst, stärkt deine Fähigkeiten am Instrument und bringt dich deinen Zielen näher. 🎸✨
+                              <p style={{ margin: 0, fontSize: isMusicStandMode ? '0.96rem' : '0.86rem', color: '#475569', lineHeight: 1.45, fontWeight: 600 }}>
+                                Kurze Intervalle, maximale Präzision: Schon {requiredMins} Minuten sichern heute deinen Fortschritt. ⚡
                               </p>
                             </div>
                           </div>
 
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                            <div style={{ background: 'rgba(251, 188, 5, 0.08)', borderRadius: '14px', padding: '10px 14px', border: '1px dashed rgba(251, 188, 5, 0.35)', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                              <div style={{ width: '9px', height: '9px', borderRadius: '50%', background: '#f59e0b', animation: 'pulse 1.5s infinite' }} />
-                              <span style={{ fontSize: '0.75rem', fontWeight: 900, color: '#854d0e' }}>
-                                Ziel für heute: Mindestens {requiredMins} Min. üben
-                              </span>
-                            </div>
-
-                            <button 
-                              onClick={() => handleTabChangeLocal('practice_board')}
-                              style={{ 
-                                background: 'linear-gradient(135deg, #4f46e5 0%, #3730a3 100%)', 
-                                color: 'white', 
-                                border: 'none', 
-                                borderRadius: '14px', 
-                                padding: '14px 20px', 
-                                minHeight: '44px',
-                                boxSizing: 'border-box',
-                                fontWeight: 950, 
-                                fontSize: '0.88rem', 
-                                cursor: 'pointer', 
-                                display: 'flex', 
-                                justifyContent: 'center', 
-                                alignItems: 'center', 
-                                gap: '8px', 
-                                boxShadow: '0 8px 20px rgba(79, 70, 229, 0.28)', 
-                                transition: 'all 0.2s', 
-                                width: '100%' 
-                              }}
-                              className="hover-scale"
-                            >
-                              <Play size={16} fill="white" />
-                              <span>🚀 Fokus-Timer starten (Übe-Pfad)</span>
-                            </button>
-                          </div>
+                          <button 
+                            onClick={() => handleTabChangeLocal('practice_board')}
+                            style={{ 
+                              background: 'linear-gradient(135deg, #4f46e5 0%, #3730a3 100%)', 
+                              color: 'white', 
+                              border: 'none', 
+                              borderRadius: '14px', 
+                              padding: '14px 20px', 
+                              minHeight: '44px', 
+                              boxSizing: 'border-box', 
+                              fontWeight: 950, 
+                              fontSize: isMusicStandMode ? '0.96rem' : '0.88rem', 
+                              cursor: 'pointer', 
+                              display: 'flex', 
+                              justifyContent: 'center', 
+                              alignItems: 'center', 
+                              gap: '8px', 
+                              boxShadow: '0 8px 20px rgba(79, 70, 229, 0.28)', 
+                              transition: 'all 0.2s', 
+                              width: '100%' 
+                            }}
+                            className="hover-scale"
+                          >
+                            <Play size={16} fill="white" />
+                            <span>▶ Übe-Session starten</span>
+                          </button>
                         </div>
                       );
                     })()}
@@ -20293,7 +22160,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                 </span>
                               </div>
                               <p style={{ margin: 0, fontSize: '0.70rem', color: '#047857', lineHeight: 1.35 }}>
-                                Streak ist sicher eingefroren (kein Übezwang). Freiwilliges Üben bringt heute <strong>2× XP</strong>!
+                                Ferienpause: Streak ist gesichert. Üben bringt heute <strong>2× XP</strong>! ✨
                               </p>
                             </div>
                           ) : (
@@ -20307,11 +22174,11 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                               gap: '6px'
                             }}>
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <span style={{ fontSize: '0.70rem', fontWeight: 850, color: '#475569', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                                  <Shield size={12} color="#0284c7" />
-                                  3 Schutzschilde (KW {currentWeek}):
+                                <span style={{ fontSize: isMusicStandMode ? '0.86rem' : '0.78rem', fontWeight: 850, color: '#334155', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                  <Shield size={14} color="#0284c7" />
+                                  Wochen-Schutzschilde:
                                 </span>
-                                <span style={{ fontSize: '0.70rem', fontWeight: 900, color: availableShields > 0 ? '#0284c7' : '#b91c1c' }}>
+                                <span style={{ fontSize: isMusicStandMode ? '0.86rem' : '0.78rem', fontWeight: 900, color: availableShields > 0 ? '#0284c7' : '#b91c1c' }}>
                                   {availableShields}/3 bereit
                                 </span>
                               </div>
@@ -20329,15 +22196,15 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                       alignItems: 'center',
                                       justifyContent: 'center',
                                       gap: '4px',
-                                      padding: '4px 6px',
+                                      padding: '5px 6px',
                                       borderRadius: '6px',
                                       background: isConsumed ? '#f1f5f9' : (isShieldActive ? 'rgba(2, 132, 199, 0.08)' : 'rgba(217, 119, 6, 0.08)'),
                                       border: isConsumed ? '1px solid #cbd5e1' : (isShieldActive ? '1px solid rgba(2, 132, 199, 0.28)' : '1px dashed rgba(217, 119, 6, 0.3)'),
-                                      color: isConsumed ? '#64748b' : (isShieldActive ? '#0369a1' : '#b45309'),
-                                      fontSize: '0.65rem',
+                                      color: isConsumed ? '#475569' : (isShieldActive ? '#0369a1' : '#9a3412'),
+                                      fontSize: isMusicStandMode ? '0.78rem' : '0.72rem',
                                       fontWeight: 800
                                     }}>
-                                      <Shield size={10} color={isConsumed ? '#64748b' : (isShieldActive ? '#0284c7' : '#d97706')} fill={isConsumed ? '#94a3b8' : (isShieldActive ? '#0284c7' : 'none')} />
+                                      <Shield size={11} color={isConsumed ? '#64748b' : (isShieldActive ? '#0284c7' : '#d97706')} fill={isConsumed ? '#94a3b8' : (isShieldActive ? '#0284c7' : 'none')} />
                                       <span>{isConsumed ? `Schild ${shieldNum} (${dayLabel})` : `Schild ${shieldNum}`}</span>
                                     </div>
                                   );
@@ -20353,60 +22220,63 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                             {/* Tier 1 */}
                             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', background: '#f8fafc', padding: '10px 14px', borderRadius: '14px', border: '1px solid rgba(0,0,0,0.03)', zIndex: 2, opacity: isTier1Unlocked ? 1 : 0.6 }}>
                               <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: isTier1Unlocked ? '#eab308' : '#cbd5e1', boxShadow: isTier1Unlocked ? '0 0 8px #eab308' : 'none', zIndex: 3 }} />
-                              <div style={{ color: isTier1Unlocked ? '#eab308' : '#94a3b8', display: 'flex', alignItems: 'center' }}>
+                              <div style={{ color: isTier1Unlocked ? '#eab308' : '#64748b', display: 'flex', alignItems: 'center' }}>
                                 <Flame size={18} fill={isTier1Unlocked ? 'currentColor' : 'none'} />
                               </div>
                               <div style={{ flex: 1, minWidth: 0 }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                  <span style={{ fontSize: '0.85rem', fontWeight: 950, color: isTier1Unlocked ? '#854d0e' : '#475569', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                    Kleine Flamme
+                                  <span style={{ fontSize: isMusicStandMode ? '1.05rem' : '0.92rem', fontWeight: 950, color: isTier1Unlocked ? '#854d0e' : '#334155', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                    Stufe 1: Basis-Fokus
                                   </span>
-                                  <span style={{ fontSize: '0.65rem', fontWeight: 900, color: isTier1Unlocked ? '#854d0e' : '#94a3b8', flexShrink: 0 }}>
-                                    1-3 Tage • {kleineMins}m
+                                  <span style={{ fontSize: isMusicStandMode ? '0.86rem' : '0.78rem', fontWeight: 900, color: isTier1Unlocked ? '#854d0e' : '#475569', flexShrink: 0 }}>
+                                    1–3 Tage • {kleineMins}m
                                   </span>
                                 </div>
-                                <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '1px' }}>{streak > 0 ? '🎉 Aktiv!' : 'Bereit zum Start!'}</div>
+                                <div style={{ fontSize: isMusicStandMode ? '0.88rem' : '0.80rem', color: streak > 0 ? '#15803d' : '#475569', fontWeight: 700, marginTop: '2px' }}>{streak > 0 ? '● Aktiv' : 'Bereit zum Start'}</div>
                               </div>
                             </div>
 
                             {/* Tier 2 */}
                             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', background: '#f8fafc', padding: '10px 14px', borderRadius: '14px', border: '1px solid rgba(0,0,0,0.03)', zIndex: 2, opacity: isTier2Unlocked ? 1 : 0.6 }}>
                               <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: isTier2Unlocked ? '#f97316' : '#cbd5e1', boxShadow: isTier2Unlocked ? '0 0 8px #f97316' : 'none', zIndex: 3 }} />
-                              <div style={{ color: isTier2Unlocked ? '#f97316' : '#94a3b8', display: 'flex', alignItems: 'center' }}>
+                              <div style={{ color: isTier2Unlocked ? '#f97316' : '#64748b', display: 'flex', alignItems: 'center' }}>
                                 <Flame size={18} fill={isTier2Unlocked ? 'currentColor' : 'none'} />
                               </div>
                               <div style={{ flex: 1, minWidth: 0 }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                  <span style={{ fontSize: '0.85rem', fontWeight: 950, color: isTier2Unlocked ? '#9a3412' : '#475569', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                    Mittlere Flamme
+                                  <span style={{ fontSize: isMusicStandMode ? '1.05rem' : '0.92rem', fontWeight: 950, color: isTier2Unlocked ? '#9a3412' : '#334155', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                    Stufe 2: Flow-Fokus
                                   </span>
-                                  <span style={{ fontSize: '0.65rem', fontWeight: 900, color: isTier2Unlocked ? '#9a3412' : '#94a3b8', flexShrink: 0 }}>
-                                    4-8 Tage • {mittlereMins}m
+                                  <span style={{ fontSize: isMusicStandMode ? '0.86rem' : '0.78rem', fontWeight: 900, color: isTier2Unlocked ? '#9a3412' : '#475569', flexShrink: 0 }}>
+                                    4–8 Tage • {mittlereMins}m
                                   </span>
                                 </div>
-                                <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '1px' }}>{isTier2Unlocked ? '🎉 Aktiv!' : `Noch ${Math.max(1, 4 - streak)} Tage`}</div>
+                                <div style={{ fontSize: isMusicStandMode ? '0.88rem' : '0.80rem', color: isTier2Unlocked ? '#15803d' : '#475569', fontWeight: 700, marginTop: '2px' }}>
+                                  {isTier2Unlocked ? '● Aktiv' : `Noch ${Math.max(1, 4 - streak)}${Math.max(1, 4 - streak) === 1 ? ' Tag' : ' Tage'} bis Stufe 2`}
+                                </div>
                               </div>
                             </div>
 
                             {/* Tier 3 */}
                             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', background: '#f8fafc', padding: '10px 14px', borderRadius: '14px', border: '1px solid rgba(0,0,0,0.03)', zIndex: 2, opacity: isTier3Unlocked ? 1 : 0.6 }}>
                               <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: isTier3Unlocked ? '#ef4444' : '#cbd5e1', boxShadow: isTier3Unlocked ? '0 0 8px #ef4444' : 'none', zIndex: 3 }} />
-                              <div style={{ color: isTier3Unlocked ? '#ef4444' : '#94a3b8', display: 'flex', alignItems: 'center' }}>
+                              <div style={{ color: isTier3Unlocked ? '#ef4444' : '#64748b', display: 'flex', alignItems: 'center' }}>
                                 <Flame size={18} fill={isTier3Unlocked ? 'currentColor' : 'none'} />
                               </div>
                               <div style={{ flex: 1, minWidth: 0 }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                  <span style={{ fontSize: '0.85rem', fontWeight: 950, color: isTier3Unlocked ? '#991b1b' : '#475569', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                    Helden-Feuer
+                                  <span style={{ fontSize: isMusicStandMode ? '1.05rem' : '0.92rem', fontWeight: 950, color: isTier3Unlocked ? '#991b1b' : '#334155', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                    Stufe 3: Meister-Fokus
                                   </span>
-                                  <span style={{ fontSize: '0.65rem', fontWeight: 900, color: isTier3Unlocked ? '#991b1b' : '#94a3b8', flexShrink: 0 }}>
+                                  <span style={{ fontSize: isMusicStandMode ? '0.86rem' : '0.78rem', fontWeight: 900, color: isTier3Unlocked ? '#991b1b' : '#475569', flexShrink: 0 }}>
                                     9+ Tage • {heldenMins}m
                                   </span>
                                 </div>
-                                <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '1px' }}>{isTier3Unlocked ? '🔥 Helden-Feuer aktiv!' : `Noch ${Math.max(1, 9 - streak)} Tage`}</div>
+                                <div style={{ fontSize: isMusicStandMode ? '0.88rem' : '0.80rem', color: isTier3Unlocked ? '#ea580c' : '#475569', fontWeight: 700, marginTop: '2px' }}>
+                                  {isTier3Unlocked ? '★ Meister-Fokus aktiv' : `Noch ${Math.max(1, 9 - streak)}${Math.max(1, 9 - streak) === 1 ? ' Tag' : ' Tage'} bis Meister-Fokus`}
+                                </div>
                               </div>
                             </div>
-
                           </div>
                         </div>
                       );
@@ -20528,8 +22398,8 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                           return (
                             <div key={occ.id} style={{ display: 'flex', gap: '16px', alignItems: 'center', borderBottom: '1px solid #f1f5f9', paddingBottom: '16px' }}>
                               <div style={{ width: '48px', borderRadius: '12px', overflow: 'hidden', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', textAlign: 'center', flexShrink: 0 }}>
-                                 <div style={{ background: '#ef4444', color: 'white', fontSize: '0.6rem', fontWeight: 800, padding: '4px 0', textTransform: 'uppercase' }}>{d.toLocaleDateString('de-DE', {month: 'short'})}</div>
-                                 <div style={{ background: 'white', color: '#1e293b', fontSize: '1.2rem', fontWeight: 900, padding: '6px 0' }}>{d.toLocaleDateString('de-DE', {day: '2-digit'})}</div>
+                                 <div style={{ background: '#ef4444', color: 'white', fontSize: isMusicStandMode ? '0.80rem' : '0.72rem', fontWeight: 900, padding: '4px 0', textTransform: 'uppercase' }}>{d.toLocaleDateString('de-DE', {month: 'short'})}</div>
+                                 <div style={{ background: 'white', color: '#1e293b', fontSize: isMusicStandMode ? '1.35rem' : '1.2rem', fontWeight: 900, padding: '6px 0' }}>{d.toLocaleDateString('de-DE', {day: '2-digit'})}</div>
                               </div>
                               
                               <div style={{ 
@@ -20543,11 +22413,11 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                 gap: '12px'
                               }}>
                                 <div style={{ flex: 1 }}>
-                                  <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  <div style={{ fontSize: isMusicStandMode ? '1.05rem' : '0.92rem', fontWeight: 850, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '8px' }}>
                                     <span>{d.toLocaleDateString('de-DE', {weekday: 'long'})}</span>
-                                    <span style={{ fontSize: '0.58rem', fontWeight: 900, background: '#000000', color: '#ffffff', padding: '2px 7px', borderRadius: '6px', textTransform: 'uppercase' }}>Ausfall</span>
+                                    <span style={{ fontSize: isMusicStandMode ? '0.76rem' : '0.68rem', fontWeight: 950, background: '#000000', color: '#ffffff', padding: '3px 8px', borderRadius: '6px', textTransform: 'uppercase' }}>Ausfall</span>
                                   </div>
-                                  <div style={{ fontSize: '0.75rem', color: 'rgba(255, 255, 255, 0.9)', fontWeight: 600, marginTop: '2px' }}>
+                                  <div style={{ fontSize: isMusicStandMode ? '0.88rem' : '0.80rem', color: 'rgba(255, 255, 255, 0.95)', fontWeight: 650, marginTop: '3px' }}>
                                     {occ.start_time?.substring(0,5)} Uhr <span style={{ color: '#fee2e2' }}>{getOccRoomName(occ)}</span>
                                   </div>
                                 </div>
@@ -20567,7 +22437,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                     });
                                     setShowAppointmentChat(true);
                                   }}
-                                  title="Shoutbox öffnen"
+                                  title="Shoutbox zum Ausfall-Termin öffnen"
                                   style={{
                                     display: 'flex',
                                     alignItems: 'center',
@@ -20597,8 +22467,8 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                           return (
                             <div key={occ.id} style={{ display: 'flex', gap: '16px', alignItems: 'center', borderBottom: '1px solid #f1f5f9', paddingBottom: '16px' }}>
                               <div style={{ width: '48px', borderRadius: '12px', overflow: 'hidden', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', textAlign: 'center', flexShrink: 0 }}>
-                                 <div style={{ background: '#eab308', color: 'white', fontSize: '0.6rem', fontWeight: 800, padding: '4px 0', textTransform: 'uppercase' }}>{d.toLocaleDateString('de-DE', {month: 'short'})}</div>
-                                 <div style={{ background: 'white', color: '#1e293b', fontSize: '1.2rem', fontWeight: 900, padding: '6px 0' }}>{d.toLocaleDateString('de-DE', {day: '2-digit'})}</div>
+                                 <div style={{ background: '#eab308', color: 'white', fontSize: isMusicStandMode ? '0.80rem' : '0.72rem', fontWeight: 900, padding: '4px 0', textTransform: 'uppercase' }}>{d.toLocaleDateString('de-DE', {month: 'short'})}</div>
+                                 <div style={{ background: 'white', color: '#1e293b', fontSize: isMusicStandMode ? '1.35rem' : '1.2rem', fontWeight: 900, padding: '6px 0' }}>{d.toLocaleDateString('de-DE', {day: '2-digit'})}</div>
                               </div>
                               
                               <div style={{ 
@@ -20612,11 +22482,11 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                 gap: '12px'
                               }}>
                                 <div style={{ flex: 1 }}>
-                                  <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#78350f', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  <div style={{ fontSize: isMusicStandMode ? '1.05rem' : '0.92rem', fontWeight: 850, color: '#78350f', display: 'flex', alignItems: 'center', gap: '8px' }}>
                                     <span>{d.toLocaleDateString('de-DE', {weekday: 'long'})}</span>
-                                    <span style={{ fontSize: '0.58rem', fontWeight: 900, background: '#000000', color: '#ffffff', padding: '2px 7px', borderRadius: '6px', textTransform: 'uppercase' }}>Verschoben</span>
+                                    <span style={{ fontSize: isMusicStandMode ? '0.76rem' : '0.68rem', fontWeight: 950, background: '#000000', color: '#ffffff', padding: '3px 8px', borderRadius: '6px', textTransform: 'uppercase' }}>Verschoben</span>
                                   </div>
-                                  <div style={{ fontSize: '0.75rem', color: 'rgba(120, 53, 15, 0.95)', fontWeight: 600, marginTop: '2px' }}>
+                                  <div style={{ fontSize: isMusicStandMode ? '0.88rem' : '0.80rem', color: 'rgba(120, 53, 15, 0.95)', fontWeight: 650, marginTop: '3px' }}>
                                     {occ.start_time?.substring(0,5)} Uhr <span style={{ color: '#b45309' }}>{getOccRoomName(occ)}</span>
                                   </div>
                                 </div>
@@ -20636,7 +22506,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                     });
                                     setShowAppointmentChat(true);
                                   }}
-                                  title="Shoutbox öffnen"
+                                  title="Shoutbox zum verschobenen Termin öffnen"
                                   style={{
                                     display: 'flex',
                                     alignItems: 'center',
@@ -20664,14 +22534,14 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                         return (
                           <div key={occ.id} style={{ display: 'flex', gap: '16px', alignItems: 'center', borderBottom: '1px solid #f1f5f9', paddingBottom: '16px' }}>
                             <div style={{ width: '48px', borderRadius: '12px', overflow: 'hidden', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', textAlign: 'center' }}>
-                              <div style={{ background: '#34a853', color: 'white', fontSize: '0.6rem', fontWeight: 800, padding: '4px 0', textTransform: 'uppercase' }}>{d.toLocaleDateString('de-DE', {month: 'short'})}</div>
-                              <div style={{ background: 'white', color: '#1e293b', fontSize: '1.2rem', fontWeight: 900, padding: '6px 0' }}>{d.toLocaleDateString('de-DE', {day: '2-digit'})}</div>
+                              <div style={{ background: '#34a853', color: 'white', fontSize: isMusicStandMode ? '0.80rem' : '0.72rem', fontWeight: 900, padding: '4px 0', textTransform: 'uppercase' }}>{d.toLocaleDateString('de-DE', {month: 'short'})}</div>
+                              <div style={{ background: 'white', color: '#1e293b', fontSize: isMusicStandMode ? '1.35rem' : '1.2rem', fontWeight: 900, padding: '6px 0' }}>{d.toLocaleDateString('de-DE', {day: '2-digit'})}</div>
                             </div>
                             <div style={{ flex: 1 }}>
-                              <div style={{ fontSize: '0.9rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <div style={{ fontSize: isMusicStandMode ? '1.05rem' : '0.92rem', fontWeight: 850, display: 'flex', alignItems: 'center', gap: '8px' }}>
                                 <span>{d.toLocaleDateString('de-DE', {weekday: 'long'})}</span>
                               </div>
-                              <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>{occ.start_time?.substring(0,5)} <span style={{ color: '#34a853' }}>{getOccRoomName(occ)}</span></div>
+                              <div style={{ fontSize: isMusicStandMode ? '0.88rem' : '0.80rem', color: '#475569', fontWeight: 650 }}>{occ.start_time?.substring(0,5)} <span style={{ color: '#15803d', fontWeight: 800 }}>{getOccRoomName(occ)}</span></div>
                             </div>
                             <button
                               onClick={() => {
@@ -21971,6 +23841,263 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
             </div>
           </div>
 
+          {/* Familien-Profile & Geschwister (Schnellwechsel) */}
+          {familyProfiles.length > 0 && (
+            <div style={{
+              background: '#ffffff',
+              border: '1px solid rgba(0,0,0,0.04)',
+              borderRadius: '32px',
+              padding: '28px 32px',
+              boxShadow: '0 8px 30px rgba(0,0,0,0.01)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '16px'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div style={{
+                    width: '42px',
+                    height: '42px',
+                    borderRadius: '14px',
+                    background: '#e0f2fe',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0
+                  }}>
+                    <Users size={20} color="#0284c7" />
+                  </div>
+                  <div>
+                    <h3 style={{ fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', margin: 0, fontFamily: "'Urbanist', sans-serif" }}>
+                      Familien-Profile &amp; Geschwister
+                    </h3>
+                    <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748b', fontWeight: 500 }}>
+                      Blitzschneller 1-Tap Wechsel zwischen Profilen auf diesem Gerät – ohne PIN.
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setIsAddSiblingModalOpen(true)}
+                  style={{
+                    background: '#f8fafc',
+                    border: '1px solid #e2e8f0',
+                    color: '#0284c7',
+                    padding: '8px 14px',
+                    borderRadius: '12px',
+                    fontSize: '0.8rem',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    transition: 'all 0.15s ease'
+                  }}
+                  className="hover-scale"
+                >
+                  <QrCode size={16} color="#0284c7" />
+                  <span>+ Weiteres Kind (QR-Scan)</span>
+                </button>
+              </div>
+
+              {/* Sibling items carousel / row */}
+              <div style={{
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '16px',
+                overflowX: 'auto',
+                padding: '8px 4px 12px 4px'
+              }} className="no-scrollbar">
+                {familyProfiles.map((member) => {
+                  const isCurrent = member.id === studentId;
+                  const memberInst = member.instrument || (isCurrent ? studentUser?.instrument : 'Gitarre') || 'Gitarre';
+                  const defaultInstAvatar = getInstrumentAvatarUrl(memberInst);
+                  
+                  let avatarSrc = defaultInstAvatar;
+                  const rawPhoto = member.photo_url;
+                  if (rawPhoto && typeof rawPhoto === 'string' && rawPhoto.trim() && rawPhoto !== '/campus_login_hero.png') {
+                    const p = rawPhoto.trim();
+                    if (p.startsWith('http://') || p.startsWith('https://') || p.startsWith('data:image/')) {
+                      avatarSrc = p;
+                    } else if (p.startsWith('/avatars/') || p.startsWith('/avatar_')) {
+                      avatarSrc = p;
+                    } else if (p.startsWith('/')) {
+                      avatarSrc = p;
+                    } else {
+                      const matched = STUDENT_AVATARS.find(a => a.id === p || a.url === p);
+                      if (matched) {
+                        avatarSrc = matched.url;
+                      } else if (p.endsWith('.png') || p.endsWith('.jpg') || p.endsWith('.jpeg')) {
+                        avatarSrc = `/avatars/${p}`;
+                      }
+                    }
+                  }
+
+                  return (
+                    <div
+                      key={member.id}
+                      style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        width: '92px',
+                        flexShrink: 0,
+                        textAlign: 'center'
+                      }}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => !isCurrent && handleSwitchFamilyStudent(member.id)}
+                        style={{
+                          position: 'relative',
+                          width: '68px',
+                          height: '68px',
+                          borderRadius: '20px',
+                          padding: 0,
+                          border: isCurrent ? '3px solid #0284c7' : '2px solid #e2e8f0',
+                          background: '#ffffff',
+                          cursor: isCurrent ? 'default' : 'pointer',
+                          boxShadow: isCurrent
+                            ? '0 8px 24px -4px rgba(2, 132, 199, 0.35)'
+                            : '0 2px 8px rgba(0,0,0,0.04)',
+                          transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                          overflow: 'hidden',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }}
+                        className={!isCurrent ? "hover-scale" : undefined}
+                        title={isCurrent ? `${member.first_name} (Aktives Profil)` : `Zu ${member.first_name} wechseln`}
+                      >
+                        <img
+                          src={avatarSrc}
+                          alt={member.first_name || 'Schüler'}
+                          onError={(e) => {
+                            const img = e.currentTarget;
+                            const fallback = getInstrumentAvatarUrl(memberInst);
+                            if (img.src !== fallback && !img.src.endsWith(fallback)) {
+                              img.src = fallback;
+                            } else {
+                              img.src = '/avatars/gitarre_avatar_new.png';
+                            }
+                          }}
+                          style={{
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'cover',
+                            background: '#f1f5f9',
+                            display: 'block'
+                          }}
+                        />
+                        {isCurrent && (
+                          <div style={{
+                            position: 'absolute',
+                            inset: 0,
+                            border: '2px solid rgba(255,255,255,0.6)',
+                            borderRadius: '17px',
+                            pointerEvents: 'none'
+                          }} />
+                        )}
+                      </button>
+
+                      <div style={{
+                        fontSize: '0.82rem',
+                        fontWeight: 850,
+                        color: isCurrent ? '#0284c7' : '#0f172a',
+                        marginTop: '8px',
+                        width: '100%',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        lineHeight: 1.2
+                      }}>
+                        {member.first_name} {member.last_name ? member.last_name.trim().charAt(0) + '.' : ''}
+                      </div>
+
+                      {isCurrent ? (
+                        <span style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '3px',
+                          fontSize: '0.64rem',
+                          fontWeight: 800,
+                          color: '#0284c7',
+                          background: '#e0f2fe',
+                          padding: '2px 6px',
+                          borderRadius: '6px',
+                          marginTop: '4px'
+                        }}>
+                          ● Aktiv
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleSwitchFamilyStudent(member.id)}
+                          style={{
+                            background: 'transparent',
+                            border: 'none',
+                            color: '#64748b',
+                            fontSize: '0.68rem',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            padding: '2px 4px',
+                            marginTop: '2px'
+                          }}
+                          className="hover-underline"
+                        >
+                          Wechseln →
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+
+                {/* Additional Quick Add Tile */}
+                <div style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  width: '92px',
+                  flexShrink: 0,
+                  textAlign: 'center'
+                }}>
+                  <button
+                    type="button"
+                    onClick={() => setIsAddSiblingModalOpen(true)}
+                    style={{
+                      width: '68px',
+                      height: '68px',
+                      borderRadius: '20px',
+                      border: '2px dashed #94a3b8',
+                      background: '#f8fafc',
+                      color: '#0284c7',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
+                      transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
+                    }}
+                    className="hover-scale"
+                    title="Weiteres Kind per QR-Ausweis hinzufügen"
+                  >
+                    <QrCode size={22} color="#0284c7" />
+                  </button>
+                  <div style={{
+                    fontSize: '0.75rem',
+                    fontWeight: 750,
+                    color: '#64748b',
+                    marginTop: '8px'
+                  }}>
+                    + Kind
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Weekly recurring schedules & Jahres-Statistik side-by-side */}
           <div style={{ display: 'flex', gap: '28px', flexWrap: 'wrap', width: '100%', alignItems: 'stretch' }}>
             {/* Wöchentlicher Unterrichtsplan */}
@@ -22178,8 +24305,8 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                       background: '#f8fafc',
                       borderRadius: '12px',
                       border: '1px solid #f1f5f9',
-                      fontSize: '0.58rem', 
-                      color: '#94a3b8', 
+                      fontSize: isMusicStandMode ? '0.78rem' : '0.70rem', 
+                      color: '#64748b', 
                       fontWeight: 700
                     }}>
                       <span style={{ textTransform: 'uppercase', letterSpacing: '0.02em' }}>Heatmap:</span>
@@ -22747,8 +24874,8 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                   </div>
                 )}
 
-                {/* 1-Click Biometric Quick-Unlock (FaceID / TouchID / Passkey) */}
-                {hasConfiguredParentPin && (
+                {/* 1-Click Biometric Quick-Unlock (FaceID / TouchID / Passkey) - Nur wenn echte Hardware verfügbar */}
+                {hasConfiguredParentPin && isWebAuthnAvailable && (
                   <button
                     type="button"
                     onClick={handleBiometricUnlock}
@@ -22970,36 +25097,6 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                         <ShieldCheck size={14} />
                         <span>Eltern-PIN vergessen? Mit Notfall-Schlüssel wiederherstellen</span>
                       </button>
-
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setParentGateError('');
-                          setParentGatePinInput('');
-                          setParentSetupPin('');
-                          setParentSetupConfirm('');
-                          setParentSetupStep('enter');
-                          if (studentUser) {
-                            (studentUser as any).has_parent_pin = false;
-                          }
-                        }}
-                        style={{
-                          background: 'none',
-                          border: 'none',
-                          color: '#64748b',
-                          fontSize: '0.78rem',
-                          fontWeight: 700,
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                          opacity: 0.85
-                        }}
-                        className="hover-opacity"
-                      >
-                        <RotateCcw size={13} />
-                        <span>PIN auf diesem vertrauten Gerät neu festlegen (1-Klick-Reset)</span>
-                      </button>
                     </div>
                   )}
                 </div>
@@ -23145,8 +25242,10 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                 {
                   id: 'security',
                   title: isAdultStudent ? 'PIN & Account-Sicherheit' : 'PIN & Sicherheit',
-                  subtitle: (studentUser?.has_personal_pin || studentUser?.is_pin_activated) ? '4-stellige PIN aktiv' : '4-stellige PIN festlegen',
-                  badge: (studentUser?.has_personal_pin || studentUser?.is_pin_activated) ? 'Geschützt' : 'Empfohlen',
+                  subtitle: isAdultStudent
+                    ? ((studentUser?.has_personal_pin || studentUser?.is_pin_activated) ? '4-stellige PIN aktiv' : '4-stellige PIN festlegen')
+                    : '6-stellige Eltern-PIN & 4-stellige Schüler-PIN',
+                  badge: (hasConfiguredParentPin || studentUser?.has_personal_pin || studentUser?.is_pin_activated) ? 'Geschützt' : 'PIN vergeben',
                   gradient: currentPlatform === 'groovelab' ? 'linear-gradient(135deg, #ca8a04 0%, #854d0e 100%)' : 'linear-gradient(135deg, #34a853 0%, #15803d 100%)',
                   shadowColor: currentPlatform === 'groovelab' ? 'rgba(202, 138, 4, 0.40)' : 'rgba(52, 168, 83, 0.40)',
                   icon: Lock
@@ -23154,8 +25253,8 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                 {
                   id: 'billing',
                   title: isAdultStudent ? 'Vertrag & Belege' : 'Belege & Bereitstellung',
-                  subtitle: '100% freie App & Belege',
-                  badge: '100% Kostenlos',
+                  subtitle: (studentUser as any)?.is_direct_billed ? 'Jahresbeitrag & Zahlungsbelege' : 'Von Musikschule übernommen (0,00 €)',
+                  badge: (studentUser as any)?.is_direct_billed ? 'Direktabrechnung' : 'Inklusive',
                   gradient: currentPlatform === 'groovelab' ? 'linear-gradient(135deg, #f59e0b 0%, #b45309 100%)' : 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)',
                   shadowColor: currentPlatform === 'groovelab' ? 'rgba(245, 158, 11, 0.35)' : 'rgba(139, 92, 246, 0.40)',
                   icon: FileText
@@ -23334,335 +25433,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
             </div>
 
             {/* PARENT GATEKEEPER MODAL (6-Digit Parent Master PIN) */}
-            {showParentGateModal && (() => {
-              const hasConfiguredParentPin = Boolean(studentUser?.has_parent_pin === true);
-
-              return (
-                <div style={{
-                  position: 'fixed',
-                  inset: 0,
-                  background: 'rgba(15, 23, 42, 0.55)',
-                  backdropFilter: 'blur(16px)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  zIndex: 12000,
-                  padding: '20px'
-                }}>
-                  <div style={{
-                    background: '#ffffff',
-                    borderRadius: '32px',
-                    padding: '32px 28px',
-                    width: '100%',
-                    maxWidth: '380px',
-                    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-                    border: '1px solid #f1f5f9',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    textAlign: 'center',
-                    position: 'relative'
-                  }}>
-                    <button
-                      onClick={() => {
-                        setShowParentGateModal(false);
-                        setPendingParentTarget(null);
-                        setParentSetupPin('');
-                        setParentSetupConfirm('');
-                        setParentSetupStep('enter');
-                        setParentGatePinInput('');
-                        setParentGateError('');
-                        setParentSetupError('');
-                      }}
-                      style={{
-                        position: 'absolute',
-                        top: '20px',
-                        right: '20px',
-                        background: '#f1f5f9',
-                        border: 'none',
-                        borderRadius: '50%',
-                        width: '36px',
-                        height: '36px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        cursor: 'pointer',
-                        color: '#64748b'
-                      }}
-                    >
-                      <X size={18} />
-                    </button>
-
-                    <div style={{
-                      width: '60px',
-                      height: '60px',
-                      borderRadius: '20px',
-                      background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: '#ffffff',
-                      marginBottom: '16px',
-                      boxShadow: '0 8px 20px -4px rgba(2, 132, 199, 0.4)'
-                    }}>
-                      <ShieldCheck size={32} />
-                    </div>
-
-                    <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#0f172a' }}>
-                      {hasConfiguredParentPin ? 'Eltern-Bereich geschützt 🛡️' : '6-stellige Eltern-Master-PIN vergeben 🛡️'}
-                    </h3>
-                    
-                    <p style={{ margin: '8px 0 16px 0', fontSize: '0.8rem', color: '#64748b', fontWeight: 600, lineHeight: '1.4' }}>
-                      {hasConfiguredParentPin
-                        ? 'Bitte gib deine 6-stellige Eltern-Master-PIN ein, um diesen geschützten Bereich zu öffnen.'
-                        : (parentSetupStep === 'enter'
-                            ? 'Erstelle eine neue 6-stellige Master-PIN für den geschützten Elternbereich.'
-                            : 'Wiederhole deine 6-stellige Master-PIN zur Bestätigung.')}
-                    </p>
-
-                    {(parentGateError || parentSetupError) && (
-                      <div style={{
-                        padding: '10px 14px',
-                        background: '#fee2e2',
-                        border: '1px solid #fca5a5',
-                        borderRadius: '12px',
-                        color: '#dc2626',
-                        fontSize: '0.78rem',
-                        fontWeight: 700,
-                        marginBottom: '14px',
-                        width: '100%',
-                        boxSizing: 'border-box'
-                      }}>
-                        {parentGateError || parentSetupError}
-                      </div>
-                    )}
-
-                    {parentGateCooldownSeconds > 0 && (
-                      <div style={{
-                        padding: '10px 14px',
-                        background: '#fef3c7',
-                        border: '1px solid #fde68a',
-                        borderRadius: '12px',
-                        color: '#92400e',
-                        fontSize: '0.8rem',
-                        fontWeight: 800,
-                        marginBottom: '14px',
-                        width: '100%',
-                        boxSizing: 'border-box',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '6px'
-                      }}>
-                        <span>⏳ Sicherheitssperre: Bitte warte noch <strong>{parentGateCooldownSeconds}s</strong></span>
-                      </div>
-                    )}
-
-                    {/* 6 Dots Display with Shake Animation */}
-                    <div style={{ 
-                      display: 'flex', 
-                      gap: '12px', 
-                      marginBottom: '16px',
-                      animation: isParentGateShaking ? 'pinShakeAnim 0.35s cubic-bezier(0.36, 0.07, 0.19, 0.97) both' : 'none'
-                    }}>
-                      {[0, 1, 2, 3, 4, 5].map((idx) => {
-                        const curLen = hasConfiguredParentPin
-                          ? parentGatePinInput.length
-                          : (parentSetupStep === 'enter' ? parentSetupPin.length : parentSetupConfirm.length);
-                        const isFilled = curLen > idx;
-                        const isError = isParentGateShaking;
-                        return (
-                          <div
-                            key={idx}
-                            style={{
-                              width: '16px',
-                              height: '16px',
-                              borderRadius: '50%',
-                              border: `2px solid ${isError ? '#dc2626' : (isFilled ? '#0284c7' : '#cbd5e1')}`,
-                              background: isError ? '#dc2626' : (isFilled ? '#0284c7' : 'transparent'),
-                              transition: 'all 0.15s ease'
-                            }}
-                          />
-                        );
-                      })}
-                    </div>
-
-                    {/* 3x4 Keypad */}
-                    <div style={{
-                      display: 'grid',
-                      gridTemplateColumns: 'repeat(3, 1fr)',
-                      gap: '10px',
-                      width: '100%'
-                    }}>
-                      {['1', '2', '3', '4', '5', '6', '7', '8', '9', 'C', '0', 'back'].map((key) => {
-                        const isSpecial = key === 'C' || key === 'back';
-                        const isDisabled = isVerifyingParentGate || parentGateCooldownSeconds > 0;
-                        return (
-                          <button
-                            key={key}
-                            type="button"
-                            disabled={isDisabled}
-                            onClick={async () => {
-                              if (parentGateCooldownSeconds > 0) return;
-                              setParentGateError('');
-                              setParentSetupError('');
-
-                              if (hasConfiguredParentPin) {
-                                if (key === 'C') {
-                                  setParentGatePinInput('');
-                                } else if (key === 'back') {
-                                  setParentGatePinInput(prev => prev.slice(0, -1));
-                                } else if (parentGatePinInput.length < 6) {
-                                  const nextVal = parentGatePinInput + key;
-                                  setParentGatePinInput(nextVal);
-                                  if (nextVal.length === 6) {
-                                    handleVerifyParentPinAttempt(nextVal, () => {
-                                      setShowParentGateModal(false);
-                                      if (pendingParentTarget) {
-                                        setSettingsSubTab(pendingParentTarget);
-                                        setActiveStudentSettingsModal(pendingParentTarget);
-                                      }
-                                    });
-                                  }
-                                }
-                              } else {
-                                // First-time PIN setup
-                                if (parentSetupStep === 'enter') {
-                                  if (key === 'C') {
-                                    setParentSetupPin('');
-                                  } else if (key === 'back') {
-                                    setParentSetupPin(prev => prev.slice(0, -1));
-                                  } else if (parentSetupPin.length < 6) {
-                                    const nextVal = parentSetupPin + key;
-                                    setParentSetupPin(nextVal);
-                                    if (nextVal.length === 6) {
-                                      if (/^(\d)\1+$/.test(nextVal) || nextVal === '123456' || nextVal === '654321') {
-                                        setParentSetupError('Bitte wähle eine sicherere PIN (nicht 123456 oder 000000).');
-                                        setParentSetupPin('');
-                                        return;
-                                      }
-                                      setParentSetupStep('confirm');
-                                    }
-                                  }
-                                } else {
-                                  if (key === 'C') {
-                                    setParentSetupConfirm('');
-                                  } else if (key === 'back') {
-                                    setParentSetupConfirm(prev => prev.slice(0, -1));
-                                  } else if (parentSetupConfirm.length < 6) {
-                                    const nextVal = parentSetupConfirm + key;
-                                    setParentSetupConfirm(nextVal);
-                                    if (nextVal.length === 6) {
-                                      if (nextVal !== parentSetupPin) {
-                                        setParentSetupError('Die PINs stimmen nicht überein.');
-                                        setParentSetupConfirm('');
-                                        setParentSetupPin('');
-                                        setParentSetupStep('enter');
-                                        return;
-                                      }
-
-                                      const recKey = generateParentRecoveryKey();
-                                      try {
-                                        const { data: rpcRes, error: rpcErr } = await supabase.rpc('set_parent_pin', {
-                                          p_student_id: studentId,
-                                          p_new_pin: nextVal
-                                        });
-
-                                        if (rpcErr || rpcRes !== true) {
-                                          throw new Error(rpcErr?.message || 'Serverfehler beim Speichern.');
-                                        }
-
-                                        try {
-                                          await supabase.from('users').update({ recovery_key: recKey }).eq('id', studentId);
-                                        } catch (err) {}
-                                        
-                                        if (studentUser) {
-                                          (studentUser as any).has_parent_pin = true;
-                                          (studentUser as any).recovery_key = recKey;
-                                        }
-
-                                        sessionStorage.setItem(`groovelab_parent_session_${studentId}`, String(Date.now() + 15 * 60 * 1000));
-                                        sessionStorage.setItem(`groovelab_parent_unlocked_${studentId}`, 'true');
-                                        sessionStorage.setItem('groovelab_parent_unlocked_global', 'true');
-                                        window.dispatchEvent(new CustomEvent('groovelab_parent_mode_changed', { detail: true }));
-
-                                        setShowParentGateModal(false);
-                                        setParentSetupPin('');
-                                        setParentSetupConfirm('');
-                                        setParentSetupStep('enter');
-                                        if (pendingParentTarget) {
-                                          setSettingsSubTab(pendingParentTarget);
-                                          setActiveStudentSettingsModal(pendingParentTarget);
-                                        }
-
-                                        // Trigger Schicht 1: One-Time Emergency Kit Modal!
-                                        setNewGeneratedRecoveryKey(recKey);
-                                        setHasCopiedRecoveryKey(false);
-                                        setShowEmergencyKitModal(true);
-                                      } catch (e: any) {
-                                        setParentSetupError('Fehler beim Speichern: ' + e.message);
-                                        setParentSetupConfirm('');
-                                      }
-                                    }
-                                  }
-                                }
-                              }
-                            }}
-                            style={{
-                              padding: '14px 0',
-                              borderRadius: '16px',
-                              border: '1px solid #e2e8f0',
-                              background: isSpecial ? '#f1f5f9' : '#ffffff',
-                              color: '#0f172a',
-                              fontSize: isSpecial ? '0.9rem' : '1.25rem',
-                              fontWeight: 800,
-                              cursor: isDisabled ? 'not-allowed' : 'pointer',
-                              opacity: isDisabled ? 0.45 : 1,
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
-                              transition: 'all 0.1s'
-                            }}
-                            className="hover-scale"
-                          >
-                            {key === 'back' ? <Delete size={20} /> : key}
-                          </button>
-                        );
-                      })}
-                    </div>
-
-                    {/* Secure Tier-1 PIN Recovery Link */}
-                    {hasConfiguredParentPin && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setRecoveryKeyInput('');
-                          setRecoveryKeyError('');
-                          setShowRecoveryKeyModal(true);
-                        }}
-                        style={{
-                          marginTop: '18px',
-                          background: 'none',
-                          border: 'none',
-                          color: '#0284c7',
-                          fontSize: '0.78rem',
-                          fontWeight: 750,
-                          cursor: 'pointer',
-                          textDecoration: 'underline',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '6px'
-                        }}
-                      >
-                        <ShieldCheck size={14} />
-                        <span>Eltern-PIN vergessen? Mit Notfall-Schlüssel wiederherstellen</span>
-                      </button>
-                    )}
-                  </div>
-                </div>
-              );
-            })()}
+            {renderParentGateModal()}
 
             {/* FOCUS MODAL */}
             {activeStudentSettingsModal && (
@@ -23778,335 +25549,598 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
 
                   {/* Modal Body */}
                   <div style={{ padding: '24px', overflowY: 'auto', flex: 1, textAlign: 'left' }}>
-                    {activeStudentSettingsModal === 'parent_controls' && (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                        {/* Campus UI Design Switcher (Junior, Teen, +16) */}
-                        <div style={{
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: '12px',
-                          padding: '18px',
-                          borderRadius: '18px',
-                          background: '#f8fafc',
-                          border: '1px solid #e2e8f0',
-                          textAlign: 'left'
-                        }}>
-                          <div>
-                            <div style={{ fontSize: '0.92rem', fontWeight: 850, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              <Compass size={18} color="#0284c7" />
-                              <span>App-Design &amp; Altersstufe (Campus)</span>
-                            </div>
-                            <div style={{ fontSize: '0.76rem', color: '#64748b', fontWeight: 500, lineHeight: 1.4, marginTop: '2px' }}>
-                              Legt fest, welche Benutzeroberfläche und Standard-Boards dein Kind in der Web-App sieht.
-                            </div>
-                          </div>
+                    {activeStudentSettingsModal === 'parent_controls' && (() => {
+                      const currentLvlKey = (draftUiLevel ?? (studentUser as any)?.campus_ui_level ?? (localStorage.getItem('campus_student_ui_level') || 'junior')) as 'junior' | 'teen' | 'pro';
+                      const standard = CAMPUS_AGE_STANDARDS[currentLvlKey] || CAMPUS_AGE_STANDARDS.junior;
 
+                      const curAbsences = currentLvlKey === 'junior' 
+                        ? false 
+                        : (draftAllowAbsences !== null ? draftAllowAbsences : ((studentUser as any)?.parent_allow_absences !== undefined && (studentUser as any)?.parent_allow_absences !== null ? Boolean((studentUser as any)?.parent_allow_absences) : (studentId && typeof window !== 'undefined' && localStorage.getItem(`groovelab_parent_allow_absences_${studentId}`) !== null ? localStorage.getItem(`groovelab_parent_allow_absences_${studentId}`) === 'true' : (currentLvlKey === 'pro'))));
+                      const curChat = draftAllowChat !== null ? draftAllowChat : ((studentUser as any)?.parent_allow_chat !== undefined && (studentUser as any)?.parent_allow_chat !== null ? Boolean((studentUser as any)?.parent_allow_chat) : (studentId && typeof window !== 'undefined' && localStorage.getItem(`groovelab_parent_allow_chat_${studentId}`) !== null ? localStorage.getItem(`groovelab_parent_allow_chat_${studentId}`) === 'true' : (currentLvlKey !== 'junior')));
+                      const curTimer = draftAllowTimer !== null ? draftAllowTimer : ((studentUser as any)?.parent_allow_timer !== undefined && (studentUser as any)?.parent_allow_timer !== null ? Boolean((studentUser as any)?.parent_allow_timer) : (studentId && typeof window !== 'undefined' && localStorage.getItem(`groovelab_parent_allow_timer_${studentId}`) !== null ? localStorage.getItem(`groovelab_parent_allow_timer_${studentId}`) === 'true' : true));
+                      const curLeaderboard = draftAllowLeaderboard !== null ? draftAllowLeaderboard : ((studentUser as any)?.parent_allow_leaderboard !== undefined && (studentUser as any)?.parent_allow_leaderboard !== null ? Boolean((studentUser as any)?.parent_allow_leaderboard) : (studentId && typeof window !== 'undefined' && localStorage.getItem(`groovelab_parent_allow_leaderboard_${studentId}`) !== null ? localStorage.getItem(`groovelab_parent_allow_leaderboard_${studentId}`) === 'true' : (currentLvlKey !== 'junior')));
+                      const curProposals = draftAllowProposals !== null ? draftAllowProposals : ((studentUser as any)?.parent_allow_proposals !== undefined && (studentUser as any)?.parent_allow_proposals !== null ? Boolean((studentUser as any)?.parent_allow_proposals) : (studentId && typeof window !== 'undefined' && localStorage.getItem(`groovelab_parent_allow_proposals_${studentId}`) !== null ? localStorage.getItem(`groovelab_parent_allow_proposals_${studentId}`) === 'true' : (draftBoardOverrides.mediathek ?? (currentLvlKey !== 'junior'))));
+                      const curAudio = draftAllowAudio !== null ? draftAllowAudio : ((studentUser as any)?.parent_allow_audio !== undefined && (studentUser as any)?.parent_allow_audio !== null ? Boolean((studentUser as any)?.parent_allow_audio) : (studentId && typeof window !== 'undefined' && localStorage.getItem(`groovelab_parent_allow_audio_${studentId}`) !== null ? localStorage.getItem(`groovelab_parent_allow_audio_${studentId}`) === 'true' : (draftBoardOverrides.recordings ?? true)));
+                      const curTts = draftAllowTts !== null ? draftAllowTts : ((studentUser as any)?.parent_allow_tts !== undefined && (studentUser as any)?.parent_allow_tts !== null ? Boolean((studentUser as any)?.parent_allow_tts) : (studentId && typeof window !== 'undefined' && localStorage.getItem(`groovelab_parent_allow_tts_${studentId}`) !== null ? localStorage.getItem(`groovelab_parent_allow_tts_${studentId}`) === 'true' : (currentLvlKey === 'junior')));
+
+                      const isDeviating = 
+                        curAbsences !== standard.allowAbsences ||
+                        curChat !== standard.allowChat ||
+                        curTimer !== standard.allowTimer ||
+                        curLeaderboard !== standard.allowLeaderboard ||
+                        curProposals !== standard.allowProposals ||
+                        curAudio !== standard.allowAudio ||
+                        curTts !== standard.allowTts;
+
+                      // 🛡️ Goldstandard: Atomarer Stufenwechsel mit direktem Standard-Load & Diff-Highlighting
+                      const handleSwitchAgeLevelWithStandard = async (targetLevelId: 'junior' | 'teen' | 'pro') => {
+                        if (targetLevelId === currentLvlKey) return;
+                        const targetStandard = CAMPUS_AGE_STANDARDS[targetLevelId] || CAMPUS_AGE_STANDARDS.junior;
+
+                        const currentValues: Record<string, boolean> = {
+                          allowAbsences: curAbsences,
+                          allowChat: curChat,
+                          allowTimer: curTimer,
+                          allowLeaderboard: curLeaderboard,
+                          allowProposals: curProposals,
+                          allowAudio: curAudio,
+                          allowTts: curTts,
+                        };
+
+                        const targetValues: Record<string, boolean> = {
+                          allowAbsences: targetStandard.allowAbsences,
+                          allowChat: targetStandard.allowChat,
+                          allowTimer: targetStandard.allowTimer,
+                          allowLeaderboard: targetStandard.allowLeaderboard,
+                          allowProposals: targetStandard.allowProposals,
+                          allowAudio: targetStandard.allowAudio,
+                          allowTts: targetStandard.allowTts,
+                        };
+
+                        const diffKeys: string[] = [];
+                        const changesRecord: Record<string, { from: boolean; to: boolean }> = {};
+
+                        Object.keys(targetValues).forEach((key) => {
+                          if (currentValues[key] !== targetValues[key]) {
+                            diffKeys.push(key);
+                            changesRecord[key] = {
+                              from: currentValues[key],
+                              to: targetValues[key],
+                            };
+                          }
+                        });
+
+                        if (diffKeys.length > 0) {
+                          setRecentlyChangedDiff({
+                            keys: diffKeys,
+                            targetLevelLabel: targetStandard.label,
+                            targetLevelId,
+                            changes: changesRecord,
+                          });
+
+                          setTimeout(() => {
+                            setRecentlyChangedDiff((prev) => (prev?.targetLevelId === targetLevelId ? null : prev));
+                          }, 4500);
+                        } else {
+                          setRecentlyChangedDiff(null);
+                        }
+
+                        // 🛡️ Atomar den empfohlenen Standard für das Ziel-Dashboard aktivieren & persistieren
+                        await applyAndSaveParentControls({
+                          uiLevel: targetLevelId,
+                          allowAbsences: targetStandard.allowAbsences,
+                          allowChat: targetStandard.allowChat,
+                          allowTimer: targetStandard.allowTimer,
+                          allowLeaderboard: targetStandard.allowLeaderboard,
+                          allowProposals: targetStandard.allowProposals,
+                          allowAudio: targetStandard.allowAudio,
+                          allowTts: targetStandard.allowTts,
+                          boardOverrides: targetStandard.boardOverrides,
+                          bedtimeEnabled: targetStandard.bedtimeEnabled,
+                          bedtimeStart: targetStandard.bedtimeStart,
+                          bedtimeEnd: targetStandard.bedtimeEnd,
+                        });
+                      };
+
+                      // Helper für reaktives Diff-Highlighting pro Zeile
+                      const getHighlightProps = (featureKey: string) => {
+                        const isHighlighted = Boolean(recentlyChangedDiff?.keys.includes(featureKey));
+                        const changeMeta = recentlyChangedDiff?.changes[featureKey];
+                        const isNewlyActivated = changeMeta?.to;
+
+                        return {
+                          isHighlighted,
+                          style: {
+                            background: isHighlighted ? (isNewlyActivated ? '#f0fdf4' : '#fef2f2') : '#f8fafc',
+                            border: isHighlighted 
+                              ? (isNewlyActivated ? '1.5px solid #86efac' : '1.5px solid #fca5a5') 
+                              : '1px solid #e2e8f0',
+                            boxShadow: isHighlighted 
+                              ? (isNewlyActivated ? '0 0 14px rgba(22, 163, 74, 0.22)' : '0 0 14px rgba(220, 38, 38, 0.22)') 
+                              : 'none',
+                            transition: 'all 0.4s ease'
+                          },
+                          badge: isHighlighted ? (
+                            <span style={{
+                              fontSize: '0.66rem',
+                              fontWeight: 800,
+                              padding: '2px 8px',
+                              borderRadius: '6px',
+                              background: isNewlyActivated ? '#dcfce7' : '#fee2e2',
+                              color: isNewlyActivated ? '#15803d' : '#b91c1c',
+                              border: isNewlyActivated ? '1px solid #86efac' : '1px solid #fca5a5',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px'
+                            }}>
+                              {isNewlyActivated ? '✨ Neu aktiviert' : '🔒 Automatisch geschützt'}
+                            </span>
+                          ) : null
+                        };
+                      };
+
+                      const hlTts = getHighlightProps('allowTts');
+                      const hlTimer = getHighlightProps('allowTimer');
+                      const hlProposals = getHighlightProps('allowProposals');
+                      const hlAudio = getHighlightProps('allowAudio');
+                      const hlAbsences = getHighlightProps('allowAbsences');
+                      const hlChat = getHighlightProps('allowChat');
+                      const hlLeaderboard = getHighlightProps('allowLeaderboard');
+
+                      return (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                          {/* 3-Tab Nav: Schutz & Freigaben | Übe-Report & Fortschritt | Absagen-Logbuch */}
                           <div style={{
-                            display: 'grid',
-                            gridTemplateColumns: 'repeat(3, 1fr)',
-                            gap: '8px',
+                            display: 'flex',
                             background: '#e2e8f0',
-                            padding: '5px',
-                            borderRadius: '14px'
+                            padding: '4px',
+                            borderRadius: '14px',
+                            gap: '4px'
                           }}>
-                            {[
-                              { id: 'junior', label: 'Junior', age: '6–10 J.' },
-                              { id: 'teen', label: 'Teen', age: '11–15 J.' },
-                              { id: 'pro', label: '+16 / Pro', age: 'Ab 16 J.' }
-                            ].map((lvl) => {
-                              const currentLevel = draftUiLevel ?? (studentUser as any)?.campus_ui_level ?? (localStorage.getItem('campus_student_ui_level') || 'junior');
-                              const active = currentLevel === lvl.id;
-                              return (
-                                <button
-                                  key={lvl.id}
-                                  type="button"
-                                  onClick={() => {
-                                    applyAndSaveParentControls({ uiLevel: lvl.id });
-                                  }}
-                                  style={{
-                                    padding: '10px 6px',
-                                    borderRadius: '11px',
-                                    border: 'none',
-                                    background: active ? '#ffffff' : 'transparent',
-                                    color: active ? '#0284c7' : '#64748b',
-                                    fontWeight: active ? 850 : 650,
-                                    fontSize: '0.82rem',
-                                    cursor: 'pointer',
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    alignItems: 'center',
-                                    gap: '2px',
-                                    boxShadow: active ? '0 2px 8px rgba(0,0,0,0.08)' : 'none',
-                                    transition: 'all 0.15s ease'
-                                  }}
-                                >
-                                  <span>{lvl.label}</span>
-                                  <span style={{ fontSize: '0.66rem', opacity: active ? 0.9 : 0.7 }}>{lvl.age}</span>
-                                </button>
-                              );
-                            })}
+                            <button
+                              type="button"
+                              onClick={() => setParentControlsTab('governance')}
+                              style={{
+                                flex: 1,
+                                border: 'none',
+                                background: parentControlsTab === 'governance' ? '#ffffff' : 'transparent',
+                                color: parentControlsTab === 'governance' ? '#0284c7' : '#64748b',
+                                fontWeight: parentControlsTab === 'governance' ? 850 : 650,
+                                fontSize: '0.80rem',
+                                padding: '9px 8px',
+                                borderRadius: '10px',
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '6px',
+                                boxShadow: parentControlsTab === 'governance' ? '0 2px 6px rgba(0,0,0,0.06)' : 'none',
+                                transition: 'all 0.15s ease'
+                              }}
+                            >
+                              <ShieldCheck size={16} />
+                              <span>Schutz &amp; Freigaben</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setParentControlsTab('insights')}
+                              style={{
+                                flex: 1,
+                                border: 'none',
+                                background: parentControlsTab === 'insights' ? '#ffffff' : 'transparent',
+                                color: parentControlsTab === 'insights' ? '#0284c7' : '#64748b',
+                                fontWeight: parentControlsTab === 'insights' ? 850 : 650,
+                                fontSize: '0.80rem',
+                                padding: '9px 8px',
+                                borderRadius: '10px',
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '6px',
+                                boxShadow: parentControlsTab === 'insights' ? '0 2px 6px rgba(0,0,0,0.06)' : 'none',
+                                transition: 'all 0.15s ease'
+                              }}
+                            >
+                              <Clock size={16} />
+                              <span>Übe-Report &amp; Fortschritt</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setParentControlsTab('cancellations')}
+                              style={{
+                                flex: 1,
+                                border: 'none',
+                                background: parentControlsTab === 'cancellations' ? '#ffffff' : 'transparent',
+                                color: parentControlsTab === 'cancellations' ? '#0284c7' : '#64748b',
+                                fontWeight: parentControlsTab === 'cancellations' ? 850 : 650,
+                                fontSize: '0.80rem',
+                                padding: '9px 8px',
+                                borderRadius: '10px',
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '6px',
+                                boxShadow: parentControlsTab === 'cancellations' ? '0 2px 6px rgba(0,0,0,0.06)' : 'none',
+                                transition: 'all 0.15s ease'
+                              }}
+                            >
+                              <FileText size={16} />
+                              <span>Absagen-Logbuch</span>
+                              {cancelledSchoolYearOccurrences.length > 0 && (
+                                <span style={{
+                                  background: '#fee2e2',
+                                  color: '#dc2626',
+                                  fontSize: '0.66rem',
+                                  fontWeight: 800,
+                                  padding: '1px 6px',
+                                  borderRadius: '8px'
+                                }}>
+                                  {cancelledSchoolYearOccurrences.length}
+                                </span>
+                              )}
+                            </button>
                           </div>
-                        </div>
 
-                        {/* Granular Board & Feature Toggles with Reset to Age Standard */}
-                        {(() => {
-                          const currentLvlKey = (draftUiLevel ?? (studentUser as any)?.campus_ui_level ?? (localStorage.getItem('campus_student_ui_level') || 'junior')) as 'junior' | 'teen' | 'pro';
-                          const standard = CAMPUS_AGE_STANDARDS[currentLvlKey] || CAMPUS_AGE_STANDARDS.junior;
+                          {parentControlsTab === 'governance' && (
+                            <>
+                              {/* Campus UI Design Switcher (Junior, Teen, +16) */}
+                          <div style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '12px',
+                            padding: '18px',
+                            borderRadius: '18px',
+                            background: '#f8fafc',
+                            border: '1px solid #e2e8f0',
+                            textAlign: 'left'
+                          }}>
+                            <div>
+                              <div style={{ fontSize: '0.92rem', fontWeight: 850, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <Compass size={18} color="#0284c7" />
+                                <span>App-Design &amp; Altersstufe (Campus)</span>
+                              </div>
+                              <div style={{ fontSize: '0.76rem', color: '#64748b', fontWeight: 500, lineHeight: 1.4, marginTop: '2px' }}>
+                                Legt fest, welche Benutzeroberfläche und Standard-Boards dein Kind in der Web-App sieht.
+                              </div>
+                            </div>
 
-                          const curAbsences = draftAllowAbsences !== null ? draftAllowAbsences : ((studentUser as any)?.parent_allow_absences !== undefined && (studentUser as any)?.parent_allow_absences !== null ? Boolean((studentUser as any)?.parent_allow_absences) : (studentId && typeof window !== 'undefined' && localStorage.getItem(`groovelab_parent_allow_absences_${studentId}`) !== null ? localStorage.getItem(`groovelab_parent_allow_absences_${studentId}`) === 'true' : (currentLvlKey === 'pro')));
-                          const curChat = draftAllowChat !== null ? draftAllowChat : ((studentUser as any)?.parent_allow_chat !== undefined && (studentUser as any)?.parent_allow_chat !== null ? Boolean((studentUser as any)?.parent_allow_chat) : (studentId && typeof window !== 'undefined' && localStorage.getItem(`groovelab_parent_allow_chat_${studentId}`) !== null ? localStorage.getItem(`groovelab_parent_allow_chat_${studentId}`) === 'true' : (currentLvlKey !== 'junior')));
-                          const curTimer = draftAllowTimer !== null ? draftAllowTimer : ((studentUser as any)?.parent_allow_timer !== undefined && (studentUser as any)?.parent_allow_timer !== null ? Boolean((studentUser as any)?.parent_allow_timer) : (studentId && typeof window !== 'undefined' && localStorage.getItem(`groovelab_parent_allow_timer_${studentId}`) !== null ? localStorage.getItem(`groovelab_parent_allow_timer_${studentId}`) === 'true' : true));
-                          const curLeaderboard = draftAllowLeaderboard !== null ? draftAllowLeaderboard : ((studentUser as any)?.parent_allow_leaderboard !== undefined && (studentUser as any)?.parent_allow_leaderboard !== null ? Boolean((studentUser as any)?.parent_allow_leaderboard) : (studentId && typeof window !== 'undefined' && localStorage.getItem(`groovelab_parent_allow_leaderboard_${studentId}`) !== null ? localStorage.getItem(`groovelab_parent_allow_leaderboard_${studentId}`) === 'true' : (currentLvlKey !== 'junior')));
-                          const curProposals = draftAllowProposals !== null ? draftAllowProposals : ((studentUser as any)?.parent_allow_proposals !== undefined && (studentUser as any)?.parent_allow_proposals !== null ? Boolean((studentUser as any)?.parent_allow_proposals) : (studentId && typeof window !== 'undefined' && localStorage.getItem(`groovelab_parent_allow_proposals_${studentId}`) !== null ? localStorage.getItem(`groovelab_parent_allow_proposals_${studentId}`) === 'true' : (draftBoardOverrides.mediathek ?? (currentLvlKey !== 'junior'))));
-                          const curAudio = draftAllowAudio !== null ? draftAllowAudio : ((studentUser as any)?.parent_allow_audio !== undefined && (studentUser as any)?.parent_allow_audio !== null ? Boolean((studentUser as any)?.parent_allow_audio) : (studentId && typeof window !== 'undefined' && localStorage.getItem(`groovelab_parent_allow_audio_${studentId}`) !== null ? localStorage.getItem(`groovelab_parent_allow_audio_${studentId}`) === 'true' : (draftBoardOverrides.recordings ?? true)));
-                          const curTts = draftAllowTts !== null ? draftAllowTts : ((studentUser as any)?.parent_allow_tts !== undefined && (studentUser as any)?.parent_allow_tts !== null ? Boolean((studentUser as any)?.parent_allow_tts) : (studentId && typeof window !== 'undefined' && localStorage.getItem(`groovelab_parent_allow_tts_${studentId}`) !== null ? localStorage.getItem(`groovelab_parent_allow_tts_${studentId}`) === 'true' : (currentLvlKey === 'junior')));
-
-                          const isDeviating = 
-                            curAbsences !== standard.allowAbsences ||
-                            curChat !== standard.allowChat ||
-                            curTimer !== standard.allowTimer ||
-                            curLeaderboard !== standard.allowLeaderboard ||
-                            curProposals !== standard.allowProposals ||
-                            curAudio !== standard.allowAudio ||
-                            curTts !== standard.allowTts;
-
-                          return (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
-                                <div style={{ fontSize: '0.82rem', fontWeight: 850, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                  <Sliders size={16} color="#0284c7" />
-                                  <span>Individuelle Board- &amp; Feature-Freigaben</span>
-                                </div>
-                                {isDeviating ? (
+                            <div style={{
+                              display: 'grid',
+                              gridTemplateColumns: 'repeat(3, 1fr)',
+                              gap: '8px',
+                              background: '#e2e8f0',
+                              padding: '5px',
+                              borderRadius: '14px'
+                            }}>
+                              {[
+                                { id: 'junior', label: 'Junior', age: '6–10 J.' },
+                                { id: 'teen', label: 'Teen', age: '11–15 J.' },
+                                { id: 'pro', label: '+16 / Pro', age: 'Ab 16 J.' }
+                              ].map((lvl) => {
+                                const currentLevel = currentLvlKey;
+                                const active = currentLevel === lvl.id;
+                                return (
                                   <button
+                                    key={lvl.id}
                                     type="button"
-                                    onClick={() => applyAndSaveParentControls(standard)}
+                                    onClick={() => {
+                                      handleSwitchAgeLevelWithStandard(lvl.id as any);
+                                    }}
                                     style={{
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      gap: '5px',
-                                      padding: '4px 10px',
-                                      borderRadius: '8px',
-                                      background: '#f1f5f9',
-                                      border: '1px solid #cbd5e1',
-                                      color: '#0369a1',
-                                      fontSize: '0.72rem',
-                                      fontWeight: 750,
+                                      padding: '10px 6px',
+                                      borderRadius: '11px',
+                                      border: 'none',
+                                      background: active ? '#ffffff' : 'transparent',
+                                      color: active ? '#0284c7' : '#64748b',
+                                      fontWeight: active ? 850 : 650,
+                                      fontSize: '0.82rem',
                                       cursor: 'pointer',
+                                      display: 'flex',
+                                      flexDirection: 'column',
+                                      alignItems: 'center',
+                                      gap: '2px',
+                                      boxShadow: active ? '0 2px 8px rgba(0,0,0,0.08)' : 'none',
                                       transition: 'all 0.15s ease'
                                     }}
-                                    className="hover-scale"
-                                    title={`Setzt alle Freigaben auf den empfohlenen Standard für ${standard.label} zurück`}
                                   >
-                                    <RotateCcw size={12} />
-                                    <span>Standard für {standard.label} wiederherstellen</span>
+                                    <span>{lvl.label}</span>
+                                    <span style={{ fontSize: '0.66rem', opacity: active ? 0.9 : 0.7 }}>{lvl.age}</span>
                                   </button>
-                                ) : (
-                                  <span style={{ fontSize: '0.70rem', color: '#16a34a', fontWeight: 750, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                                    <Check size={12} strokeWidth={3} />
-                                    <span>Standard aktiv</span>
-                                  </span>
-                                )}
-                              </div>
-
-                          {/* Toggle 1: Practice Board (Übe-Pfad & Fokus-Timer) */}
-                          <label style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            padding: '14px 16px',
-                            borderRadius: '16px',
-                            background: '#f8fafc',
-                            border: '1px solid #e2e8f0',
-                            cursor: 'pointer'
-                          }}>
-                            <div style={{ paddingRight: '12px', textAlign: 'left' }}>
-                              <div style={{ fontSize: '0.86rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <Zap size={16} color="#0284c7" style={{ flexShrink: 0 }} />
-                                <span>Übe-Pfad &amp; Fokus-Timer</span>
-                              </div>
-                              <div style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 500, lineHeight: 1.35, marginTop: '2px' }}>
-                                Interaktiver Übe-Timer, Streak-Flammen und XP-Sammeln für eigenständiges Üben zu Hause.
-                              </div>
+                                );
+                              })}
                             </div>
-                            <input
-                              type="checkbox"
-                              checked={curTimer}
-                              onChange={(e) => applyAndSaveParentControls({ allowTimer: e.target.checked, boardOverrides: { practice_board: e.target.checked } })}
-                              style={{ width: '20px', height: '20px', accentColor: '#0284c7', cursor: 'pointer' }}
-                            />
-                          </label>
+                          </div>
 
-                          {/* Toggle 2: Mediathek: Songs & Lehrwerke */}
-                          <label style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            padding: '14px 16px',
-                            borderRadius: '16px',
-                            background: '#f8fafc',
-                            border: '1px solid #e2e8f0',
-                            cursor: 'pointer'
-                          }}>
-                            <div style={{ paddingRight: '12px', textAlign: 'left' }}>
-                              <div style={{ fontSize: '0.86rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <Library size={16} color="#0284c7" style={{ flexShrink: 0 }} />
-                                <span>Mediathek: Songs &amp; Lehrwerke</span>
+                          {/* 🛡️ Feedback-Banner bei automatischem Standard-Load */}
+                          {recentlyChangedDiff && (
+                            <div style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              padding: '10px 14px',
+                              borderRadius: '12px',
+                              background: '#f0f9ff',
+                              border: '1px solid #bae6fd',
+                              color: '#0369a1',
+                              fontSize: '0.78rem',
+                              fontWeight: 700,
+                              animation: 'fadeIn 0.3s ease'
+                            }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <Sparkles size={16} color="#0284c7" />
+                                <span>
+                                  Empfohlener Standard für <strong>{recentlyChangedDiff.targetLevelLabel}</strong> geladen ({recentlyChangedDiff.keys.length} Funktion{recentlyChangedDiff.keys.length > 1 ? 'en' : ''} automatisch angepasst)
+                                </span>
                               </div>
-                              <div style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 500, lineHeight: 1.35, marginTop: '2px' }}>
-                                Schulkatalog, Song-Bibliotheken, Play-Along-Tracks und digitale Notenbücher.
-                              </div>
+                              <span style={{ fontSize: '0.70rem', color: '#0284c7', background: '#e0f2fe', padding: '2px 8px', borderRadius: '6px', fontWeight: 800 }}>
+                                Standard aktiv
+                              </span>
                             </div>
-                            <input
-                              type="checkbox"
-                              checked={curProposals}
-                              onChange={(e) => applyAndSaveParentControls({ allowProposals: e.target.checked, boardOverrides: { mediathek: e.target.checked } })}
-                              style={{ width: '20px', height: '20px', accentColor: '#0284c7', cursor: 'pointer' }}
-                            />
-                          </label>
+                          )}
 
-                          {/* Toggle 3: Mikrofon & Eigene Song-Aufnahmen */}
-                          <label style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            padding: '14px 16px',
-                            borderRadius: '16px',
-                            background: '#f8fafc',
-                            border: '1px solid #e2e8f0',
-                            cursor: 'pointer'
-                          }}>
-                            <div style={{ paddingRight: '12px', textAlign: 'left' }}>
-                              <div style={{ fontSize: '0.86rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <Mic size={16} color="#0284c7" style={{ flexShrink: 0 }} />
-                                <span>Mikrofon &amp; Eigene Song-Aufnahmen</span>
+                          {/* Granular Board & Feature Toggles with Reset to Age Standard */}
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                              <div style={{ fontSize: '0.82rem', fontWeight: 850, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <Sliders size={16} color="#0284c7" />
+                                <span>Individuelle Board- &amp; Feature-Freigaben</span>
                               </div>
-                              <div style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 500, lineHeight: 1.35, marginTop: '2px' }}>
-                                Erlaubt deinem Kind, eigene Übe-Aufnahmen und Sprachmemos mit dem Mikrofon aufzuzeichnen (Aufnahmen der Lehrkraft bleiben immer abspielbar).
-                              </div>
+                              {isDeviating ? (
+                                <button
+                                  type="button"
+                                  onClick={() => applyAndSaveParentControls(standard)}
+                                  style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '5px',
+                                    padding: '4px 10px',
+                                    borderRadius: '8px',
+                                    background: '#f1f5f9',
+                                    border: '1px solid #cbd5e1',
+                                    color: '#0369a1',
+                                    fontSize: '0.72rem',
+                                    fontWeight: 750,
+                                    cursor: 'pointer',
+                                    transition: 'all 0.15s ease'
+                                  }}
+                                  className="hover-scale"
+                                  title={`Setzt alle Freigaben auf den empfohlenen Standard für ${standard.label} zurück`}
+                                >
+                                  <RotateCcw size={12} />
+                                  <span>Standard für {standard.label} wiederherstellen</span>
+                                </button>
+                              ) : (
+                                <span style={{ fontSize: '0.70rem', color: '#16a34a', fontWeight: 750, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                  <Check size={12} strokeWidth={3} />
+                                  <span>Standard für {standard.label} aktiv</span>
+                                </span>
+                              )}
                             </div>
-                            <input
-                              type="checkbox"
-                              checked={curAudio}
-                              onChange={(e) => applyAndSaveParentControls({ allowAudio: e.target.checked, boardOverrides: { recordings: e.target.checked } })}
-                              style={{ width: '20px', height: '20px', accentColor: '#0284c7', cursor: 'pointer' }}
-                            />
-                          </label>
 
-                          {/* Toggle 4: Absences (Unterrichtsstunden selbstständig absagen) */}
-                          <label style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            padding: '14px 16px',
-                            borderRadius: '16px',
-                            background: '#f8fafc',
-                            border: '1px solid #e2e8f0',
-                            cursor: 'pointer'
-                          }}>
-                            <div style={{ paddingRight: '12px', textAlign: 'left' }}>
-                              <div style={{ fontSize: '0.86rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <Calendar size={16} color="#0284c7" style={{ flexShrink: 0 }} />
-                                <span>Unterrichtsstunden selbstständig absagen</span>
+                            {/* Toggle 1: Audio-Vorleseassistent (Sprachausgabe) */}
+                            <label style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              padding: '14px 16px',
+                              borderRadius: '16px',
+                              cursor: 'pointer',
+                              ...hlTts.style
+                            }}>
+                              <div style={{ paddingRight: '12px', textAlign: 'left' }}>
+                                <div style={{ fontSize: '0.86rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                  <Volume2 size={16} color="#0284c7" style={{ flexShrink: 0 }} />
+                                  <span>Audio-Vorleseassistent (Sprachausgabe)</span>
+                                  {currentLvlKey === 'junior' && (
+                                    <span style={{ fontSize: '0.66rem', fontWeight: 800, padding: '2px 7px', borderRadius: '6px', background: '#dcfce7', color: '#16a34a' }}>
+                                      Empfohlen für Junior
+                                    </span>
+                                  )}
+                                  {hlTts.badge}
+                                </div>
+                                <div style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 500, lineHeight: 1.35, marginTop: '2px' }}>
+                                  Liest Hausaufgaben, Notizen und Übe-Fahrpläne kindgerecht laut auf Deutsch vor. Unverzichtbar für Leseanfänger und bei LRS/Dyslexie.
+                                </div>
                               </div>
-                              <div style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 500, lineHeight: 1.35, marginTop: '2px' }}>
-                                Erlaubt deinem Kind, Termine im Kalender bei Krankheit eigenständig abzusagen.
-                              </div>
-                            </div>
-                            <input
-                              type="checkbox"
-                              checked={curAbsences}
-                              onChange={(e) => applyAndSaveParentControls({ allowAbsences: e.target.checked })}
-                              style={{ width: '20px', height: '20px', accentColor: '#0284c7', cursor: 'pointer' }}
-                            />
-                          </label>
+                              <input
+                                type="checkbox"
+                                checked={curTts}
+                                onChange={(e) => applyAndSaveParentControls({ allowTts: e.target.checked })}
+                                style={{ width: '20px', height: '20px', accentColor: '#0284c7', cursor: 'pointer' }}
+                              />
+                            </label>
 
-                          {/* Toggle 5: Chat (Direktnachrichten an Lehrkräfte schreiben) */}
-                          <label style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            padding: '14px 16px',
-                            borderRadius: '16px',
-                            background: '#f8fafc',
-                            border: '1px solid #e2e8f0',
-                            cursor: 'pointer'
-                          }}>
-                            <div style={{ paddingRight: '12px', textAlign: 'left' }}>
-                              <div style={{ fontSize: '0.86rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <Mail size={16} color="#0284c7" style={{ flexShrink: 0 }} />
-                                <span>Direktnachrichten an Lehrkräfte schreiben</span>
+                            {/* Toggle 2: Practice Board (Übe-Pfad & Fokus-Timer) */}
+                            <label style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              padding: '14px 16px',
+                              borderRadius: '16px',
+                              cursor: 'pointer',
+                              ...hlTimer.style
+                            }}>
+                              <div style={{ paddingRight: '12px', textAlign: 'left' }}>
+                                <div style={{ fontSize: '0.86rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                  <Zap size={16} color="#0284c7" style={{ flexShrink: 0 }} />
+                                  <span>Übe-Pfad &amp; Fokus-Timer</span>
+                                  {hlTimer.badge}
+                                </div>
+                                <div style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 500, lineHeight: 1.35, marginTop: '2px' }}>
+                                  {currentLvlKey === 'junior' 
+                                    ? 'Pädagogischer Übe-Timer und Fleiß-Sterne ohne Verluststress für eigenständiges Üben zu Hause.'
+                                    : 'Interaktiver Fokus-Timer, Kontinuität und Meilensteine für eigenständiges Üben zu Hause.'}
+                                </div>
                               </div>
-                              <div style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 500, lineHeight: 1.35, marginTop: '2px' }}>
-                                Erlaubt deinem Kind, im Chat Nachrichten und Fragen zu Hausaufgaben zu senden.
-                              </div>
-                            </div>
-                            <input
-                              type="checkbox"
-                              checked={curChat}
-                              onChange={(e) => applyAndSaveParentControls({ allowChat: e.target.checked, boardOverrides: { messages: e.target.checked } })}
-                              style={{ width: '20px', height: '20px', accentColor: '#0284c7', cursor: 'pointer' }}
-                            />
-                          </label>
+                              <input
+                                type="checkbox"
+                                checked={curTimer}
+                                onChange={(e) => applyAndSaveParentControls({ allowTimer: e.target.checked, boardOverrides: { practice_board: e.target.checked } })}
+                                style={{ width: '20px', height: '20px', accentColor: '#0284c7', cursor: 'pointer' }}
+                              />
+                            </label>
 
-                          {/* Toggle 6: Leaderboard (Klassen-Highlights & Team-Power) */}
-                          <label style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            padding: '14px 16px',
-                            borderRadius: '16px',
-                            background: '#f8fafc',
-                            border: '1px solid #e2e8f0',
-                            cursor: 'pointer'
-                          }}>
-                            <div style={{ paddingRight: '12px', textAlign: 'left' }}>
-                              <div style={{ fontSize: '0.86rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <Trophy size={16} color="#0284c7" style={{ flexShrink: 0 }} />
-                                <span>Klassen-Highlights &amp; Team-Power</span>
+                            {/* Toggle 3: Mediathek: Songs, Begleitspuren & Fahrpläne */}
+                            <label style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              padding: '14px 16px',
+                              borderRadius: '16px',
+                              cursor: 'pointer',
+                              ...hlProposals.style
+                            }}>
+                              <div style={{ paddingRight: '12px', textAlign: 'left' }}>
+                                <div style={{ fontSize: '0.86rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                  <Library size={16} color="#0284c7" style={{ flexShrink: 0 }} />
+                                  <span>Mediathek: Songs, Begleitspuren &amp; Fahrpläne</span>
+                                  {hlProposals.badge}
+                                </div>
+                                <div style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 500, lineHeight: 1.35, marginTop: '2px' }}>
+                                  Schulkatalog, Play-Along-Tracks und strukturierte Übe-Fahrpläne. Urheberrechtskonform ohne Notenblatt-Downloads (§ 53 Abs. 4 UrhG).
+                                </div>
                               </div>
-                              <div style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 500, lineHeight: 1.35, marginTop: '2px' }}>
-                                Gemeinsame Übe-Minuten sammeln, Meilensteine der Klasse feiern und Team-Ziele erreichen.
-                              </div>
-                            </div>
-                            <input
-                              type="checkbox"
-                              checked={curLeaderboard}
-                              onChange={(e) => applyAndSaveParentControls({ allowLeaderboard: e.target.checked, boardOverrides: { campus_cup: e.target.checked } })}
-                              style={{ width: '20px', height: '20px', accentColor: '#0284c7', cursor: 'pointer' }}
-                            />
-                          </label>
+                              <input
+                                type="checkbox"
+                                checked={curProposals}
+                                onChange={(e) => applyAndSaveParentControls({ allowProposals: e.target.checked, boardOverrides: { mediathek: e.target.checked } })}
+                                style={{ width: '20px', height: '20px', accentColor: '#0284c7', cursor: 'pointer' }}
+                              />
+                            </label>
 
-                          {/* Toggle 7: Audio-Vorleseassistent (Sprachausgabe) */}
-                          <label style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            padding: '14px 16px',
-                            borderRadius: '16px',
-                            background: '#f8fafc',
-                            border: '1px solid #e2e8f0',
-                            cursor: 'pointer'
-                          }}>
-                            <div style={{ paddingRight: '12px', textAlign: 'left' }}>
-                              <div style={{ fontSize: '0.86rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <Volume2 size={16} color="#0284c7" style={{ flexShrink: 0 }} />
-                                <span>Audio-Vorleseassistent (Sprachausgabe)</span>
+                            {/* Toggle 4: Mikrofon & Eigene Song-Aufnahmen */}
+                            <label style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              padding: '14px 16px',
+                              borderRadius: '16px',
+                              cursor: 'pointer',
+                              ...hlAudio.style
+                            }}>
+                              <div style={{ paddingRight: '12px', textAlign: 'left' }}>
+                                <div style={{ fontSize: '0.86rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                  <Mic size={16} color="#0284c7" style={{ flexShrink: 0 }} />
+                                  <span>Mikrofon &amp; Eigene Song-Aufnahmen</span>
+                                  {hlAudio.badge}
+                                </div>
+                                <div style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 500, lineHeight: 1.35, marginTop: '2px' }}>
+                                  Erlaubt deinem Kind, eigene Übe-Aufnahmen und Sprachmemos mit dem Mikrofon aufzuzeichnen (Aufnahmen der Lehrkraft bleiben immer abspielbar). Inkl. Hardware-Schutz (Stopp bei Tab-Wechsel) und 30-Tage-Löschfrist.
+                                </div>
                               </div>
-                              <div style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 500, lineHeight: 1.35, marginTop: '2px' }}>
-                                Liest Hausaufgaben, Notizen und Übe-Fahrpläne laut auf Deutsch vor. Ideal für Leseanfänger, auditive Lerntypen und bei LRS/Dyslexie.
+                              <input
+                                type="checkbox"
+                                checked={curAudio}
+                                onChange={(e) => applyAndSaveParentControls({ allowAudio: e.target.checked, boardOverrides: { recordings: e.target.checked } })}
+                                style={{ width: '20px', height: '20px', accentColor: '#0284c7', cursor: 'pointer' }}
+                              />
+                            </label>
+
+                            {/* Toggle 5: Absences (Unterrichtsstunden selbstständig absagen) */}
+                            <label style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              padding: '14px 16px',
+                              borderRadius: '16px',
+                              opacity: currentLvlKey === 'junior' ? 0.75 : 1,
+                              cursor: currentLvlKey === 'junior' ? 'not-allowed' : 'pointer',
+                              ...hlAbsences.style
+                            }}>
+                              <div style={{ paddingRight: '12px', textAlign: 'left' }}>
+                                <div style={{ fontSize: '0.86rem', fontWeight: 800, color: currentLvlKey === 'junior' ? '#64748b' : '#0f172a', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                  <Calendar size={16} color={currentLvlKey === 'junior' ? '#94a3b8' : '#0284c7'} style={{ flexShrink: 0 }} />
+                                  <span>Unterrichtsstunden selbstständig absagen</span>
+                                  {currentLvlKey === 'junior' && (
+                                    <span style={{ fontSize: '0.66rem', fontWeight: 800, padding: '2px 7px', borderRadius: '6px', background: '#fee2e2', color: '#dc2626' }}>
+                                      Im Junior-Modus gesperrt
+                                    </span>
+                                  )}
+                                  {hlAbsences.badge}
+                                </div>
+                                <div style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 500, lineHeight: 1.35, marginTop: '2px' }}>
+                                  {currentLvlKey === 'junior'
+                                    ? 'Aus rechtlichen Gründen (Vertragsschutz der Eltern) im Junior-Modus dauerhaft deaktiviert. Absagen erfolgen über den Eltern-Zugang.'
+                                    : (currentLvlKey === 'teen'
+                                        ? 'Erlaubt deinem Teenager, Termine bei Krankheit selbstständig abzusagen (Eltern erhalten sofort eine Benachrichtigung).'
+                                        : 'Erlaubt eigenständige Terminabmeldung im Krankheitsfall gemäß den Schul-Stornobedingungen.')}
+                                </div>
                               </div>
-                            </div>
-                            <input
-                              type="checkbox"
-                              checked={curTts}
-                              onChange={(e) => applyAndSaveParentControls({ allowTts: e.target.checked })}
-                              style={{ width: '20px', height: '20px', accentColor: '#0284c7', cursor: 'pointer' }}
-                            />
-                          </label>
-                        </div>
-                      );
-                    })()}
+                              <input
+                                type="checkbox"
+                                disabled={currentLvlKey === 'junior'}
+                                checked={currentLvlKey === 'junior' ? false : curAbsences}
+                                onChange={(e) => {
+                                  if (currentLvlKey !== 'junior') {
+                                    applyAndSaveParentControls({ allowAbsences: e.target.checked });
+                                  }
+                                }}
+                                style={{ width: '20px', height: '20px', accentColor: '#0284c7', cursor: currentLvlKey === 'junior' ? 'not-allowed' : 'pointer' }}
+                              />
+                            </label>
+
+                            {/* Toggle 6: Chat (Direktnachrichten an Lehrkräfte schreiben) */}
+                            <label style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              padding: '14px 16px',
+                              borderRadius: '16px',
+                              cursor: 'pointer',
+                              ...hlChat.style
+                            }}>
+                              <div style={{ paddingRight: '12px', textAlign: 'left' }}>
+                                <div style={{ fontSize: '0.86rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                  <Mail size={16} color="#0284c7" style={{ flexShrink: 0 }} />
+                                  <span>Direktnachrichten an Lehrkräfte schreiben</span>
+                                  {hlChat.badge}
+                                </div>
+                                <div style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 500, lineHeight: 1.35, marginTop: '2px' }}>
+                                  {currentLvlKey === 'junior'
+                                    ? 'Im Junior-Modus standardmäßig deaktiviert (Kinderschutz). Erlaubt bei Freigabe nur direkte Fragen zu Hausaufgaben.'
+                                    : 'Erlaubt deinem Kind, im Chat Nachrichten und Fragen zu Hausaufgaben und Songs an die Lehrkraft zu senden.'}
+                                </div>
+                              </div>
+                              <input
+                                type="checkbox"
+                                checked={curChat}
+                                onChange={(e) => applyAndSaveParentControls({ allowChat: e.target.checked, boardOverrides: { messages: e.target.checked } })}
+                                style={{ width: '20px', height: '20px', accentColor: '#0284c7', cursor: 'pointer' }}
+                              />
+                            </label>
+
+                            {/* Toggle 7: Leaderboard (Klassen-Highlights & Team-Power) */}
+                            <label style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              padding: '14px 16px',
+                              borderRadius: '16px',
+                              cursor: 'pointer',
+                              ...hlLeaderboard.style
+                            }}>
+                              <div style={{ paddingRight: '12px', textAlign: 'left' }}>
+                                <div style={{ fontSize: '0.86rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                  <Trophy size={16} color="#0284c7" style={{ flexShrink: 0 }} />
+                                  <span>Klassen-Highlights &amp; Team-Power</span>
+                                  {hlLeaderboard.badge}
+                                </div>
+                                <div style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 500, lineHeight: 1.35, marginTop: '2px' }}>
+                                  {currentLvlKey === 'junior'
+                                    ? 'Gemeinsame Klassen-Ziele ohne individuelle Ranglisten oder Leistungsdruck (DSA Art. 28 konform).'
+                                    : 'Gemeinsame Übe-Minuten sammeln, Meilensteine der Klasse feiern und Team-Ziele erreichen.'}
+                                </div>
+                              </div>
+                              <input
+                                type="checkbox"
+                                checked={curLeaderboard}
+                                onChange={(e) => applyAndSaveParentControls({ allowLeaderboard: e.target.checked, boardOverrides: { campus_cup: e.target.checked } })}
+                                style={{ width: '20px', height: '20px', accentColor: '#0284c7', cursor: 'pointer' }}
+                              />
+                            </label>
+                          </div>
 
                         {/* Must-Have 1: Ruhezeiten & Nachtruhe-Schutz */}
                         <div style={{
@@ -24123,11 +26157,32 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                               <Moon size={18} color="#0284c7" style={{ flexShrink: 0 }} />
                               <div>
-                                <div style={{ fontSize: '0.88rem', fontWeight: 850, color: '#0f172a' }}>
-                                  Nachtruhe-Schutz &amp; Ruhezeiten
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                  <div style={{ fontSize: '0.88rem', fontWeight: 850, color: '#0f172a' }}>
+                                    Nachtruhe-Schutz &amp; Ruhezeiten
+                                  </div>
+                                  {currentLvlKey === 'junior' && (
+                                    <span style={{ background: '#e0f2fe', color: '#0284c7', fontSize: '0.66rem', fontWeight: 800, padding: '2px 7px', borderRadius: '6px' }}>
+                                      Junior-Standard: 20:00 – 07:00
+                                    </span>
+                                  )}
+                                  {currentLvlKey === 'teen' && (
+                                    <span style={{ background: '#fef3c7', color: '#b45309', fontSize: '0.66rem', fontWeight: 800, padding: '2px 7px', borderRadius: '6px' }}>
+                                      Teen-Standard: 21:30 – 06:30
+                                    </span>
+                                  )}
+                                  {currentLvlKey === 'pro' && (
+                                    <span style={{ background: '#f1f5f9', color: '#64748b', fontSize: '0.66rem', fontWeight: 800, padding: '2px 7px', borderRadius: '6px' }}>
+                                      Pro-Standard: 24h Zugriff
+                                    </span>
+                                  )}
                                 </div>
                                 <div style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 500, lineHeight: 1.35, marginTop: '2px' }}>
-                                  Sperrt die Übe-App für dein Kind in der Nacht (kann per Eltern-PIN jederzeit entsperrt werden).
+                                  {currentLvlKey === 'junior' 
+                                    ? 'Schützt vor Reizüberflutung und sichert gesunden Schlaf (20:00 – 07:00 Uhr). Jederzeit per Eltern-PIN entsperrbar.'
+                                    : currentLvlKey === 'teen'
+                                    ? 'Altersgerechte Ruhezeit ab 21:30 Uhr (Schutz vor nächtlichen Push-Nachrichten & Chat-Stress).'
+                                    : '24h freier Übezugriff für Pro-Musiker & Erwachsene. Ruhezeiten können bei Bedarf manuell aktiviert werden.'}
                                 </div>
                               </div>
                             </div>
@@ -24203,81 +26258,253 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                           )}
                         </div>
 
-                        {/* 📊 Eltern-Wochenreport & Übe-Insights */}
+                        {/* Must-Have 1b: Schulzeit- & Hausaufgaben-Fokus (Tages-Sperrfenster) */}
                         <div style={{
                           display: 'flex',
                           flexDirection: 'column',
-                          gap: '14px',
-                          padding: '22px 20px',
-                          borderRadius: '22px',
-                          background: '#ffffff',
+                          gap: '12px',
+                          padding: '18px',
+                          borderRadius: '18px',
+                          background: '#f8fafc',
                           border: '1px solid #e2e8f0',
-                          boxShadow: '0 4px 16px -2px rgba(15, 23, 42, 0.04)',
                           textAlign: 'left'
                         }}>
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                              <div style={{
-                                width: '34px',
-                                height: '34px',
-                                borderRadius: '10px',
-                                background: '#e6f4ea',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                flexShrink: 0
-                              }}>
-                                <Clock size={18} color="#16a34a" />
-                              </div>
+                              <BookOpen size={18} color="#6366f1" style={{ flexShrink: 0 }} />
                               <div>
-                                <div style={{ fontSize: '0.92rem', fontWeight: 850, color: '#0f172a', letterSpacing: '-0.01em' }}>
-                                  Wöchentlicher Übe-Report &amp; Fortschritt
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                  <div style={{ fontSize: '0.88rem', fontWeight: 850, color: '#0f172a' }}>
+                                    Schulzeit- &amp; Hausaufgaben-Fokus
+                                  </div>
+                                  <span style={{ background: '#e0e7ff', color: '#4338ca', fontSize: '0.66rem', fontWeight: 800, padding: '2px 7px', borderRadius: '6px' }}>
+                                    Tages-Sperre
+                                  </span>
                                 </div>
                                 <div style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 500, lineHeight: 1.35, marginTop: '2px' }}>
-                                  100% datenschutzkonforme Zusammenfassung der Übe-Einheiten zu Hause.
+                                  Pausiert die App während der regulären Schulzeit oder Hausaufgaben, um Ablenkung zu vermeiden.
                                 </div>
                               </div>
                             </div>
-                            <span style={{
-                              background: '#f1f5f9',
-                              color: '#475569',
-                              padding: '4px 10px',
-                              borderRadius: '8px',
-                              fontSize: '0.70rem',
-                              fontWeight: 800
-                            }}>
-                              Aktuelle Woche
-                            </span>
+                            <input
+                              type="checkbox"
+                              checked={daytimeLockEnabled}
+                              onChange={(e) => handleUpdateDaytimeLock(e.target.checked)}
+                              style={{ width: '20px', height: '20px', accentColor: '#6366f1', cursor: 'pointer', flexShrink: 0 }}
+                            />
                           </div>
 
-                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '10px', marginTop: '4px' }}>
-                            <div style={{ background: '#f8fafc', border: '1px solid #f1f5f9', borderRadius: '14px', padding: '12px' }}>
-                              <div style={{ fontSize: '0.70rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Übe-Minuten</div>
-                              <div style={{ fontSize: '1.25rem', fontWeight: 900, color: '#16a34a', marginTop: '2px' }}>
-                                {totalPracticeMinutes} Min.
-                              </div>
-                              <div style={{ fontSize: '0.68rem', color: '#94a3b8', marginTop: '2px' }}>Ziel: {getTargetMinutes(avatar?.streak_flame || 0)} Min./Tag</div>
-                            </div>
+                          {daytimeLockEnabled && (
+                            <div style={{
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '10px',
+                              padding: '12px',
+                              borderRadius: '12px',
+                              background: '#ffffff',
+                              border: '1px solid #e2e8f0',
+                              marginTop: '4px'
+                            }}>
+                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                                <div>
+                                  <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b', display: 'block', marginBottom: '4px' }}>
+                                    Sperre ab:
+                                  </label>
+                                  <select
+                                    value={daytimeLockStart}
+                                    onChange={(e) => handleUpdateDaytimeLock(true, e.target.value, daytimeLockEnd, daytimeLockDays)}
+                                    style={{
+                                      width: '100%',
+                                      padding: '8px 10px',
+                                      borderRadius: '8px',
+                                      border: '1px solid #cbd5e1',
+                                      fontSize: '0.82rem',
+                                      fontWeight: 700,
+                                      color: '#0f172a',
+                                      background: '#f8fafc',
+                                      cursor: 'pointer'
+                                    }}
+                                  >
+                                    {['07:30', '08:00', '08:30', '09:00', '13:00', '13:30', '14:00', '14:30'].map(t => (
+                                      <option key={t} value={t}>{t} Uhr</option>
+                                    ))}
+                                  </select>
+                                </div>
 
-                            <div style={{ background: '#f8fafc', border: '1px solid #f1f5f9', borderRadius: '14px', padding: '12px' }}>
-                              <div style={{ fontSize: '0.70rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Aktiver Streak</div>
-                              <div style={{ fontSize: '1.25rem', fontWeight: 900, color: '#0284c7', marginTop: '2px' }}>
-                                {avatar?.streak_flame || 0} Tage
+                                <div>
+                                  <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b', display: 'block', marginBottom: '4px' }}>
+                                    Entsperren um:
+                                  </label>
+                                  <select
+                                    value={daytimeLockEnd}
+                                    onChange={(e) => handleUpdateDaytimeLock(true, daytimeLockStart, e.target.value, daytimeLockDays)}
+                                    style={{
+                                      width: '100%',
+                                      padding: '8px 10px',
+                                      borderRadius: '8px',
+                                      border: '1px solid #cbd5e1',
+                                      fontSize: '0.82rem',
+                                      fontWeight: 700,
+                                      color: '#0f172a',
+                                      background: '#f8fafc',
+                                      cursor: 'pointer'
+                                    }}
+                                  >
+                                    {['12:00', '12:30', '13:00', '13:30', '14:00', '15:00', '15:30', '16:00', '17:00'].map(t => (
+                                      <option key={t} value={t}>{t} Uhr</option>
+                                    ))}
+                                  </select>
+                                </div>
                               </div>
-                              <div style={{ fontSize: '0.68rem', color: '#94a3b8', marginTop: '2px' }}>3 Schutzschilde aktiv</div>
-                            </div>
 
-                            <div style={{ background: '#f8fafc', border: '1px solid #f1f5f9', borderRadius: '14px', padding: '12px' }}>
-                              <div style={{ fontSize: '0.70rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Campus-XP</div>
-                              <div style={{ fontSize: '1.25rem', fontWeight: 900, color: '#ca8a04', marginTop: '2px' }}>
-                                {(avatar as any)?.experience_points || (avatar as any)?.xp || 0} XP
+                              <div style={{ display: 'flex', gap: '8px', alignItems: 'center', paddingTop: '4px' }}>
+                                <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b' }}>Gültigkeit:</span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleUpdateDaytimeLock(true, daytimeLockStart, daytimeLockEnd, 'school_days')}
+                                  style={{
+                                    padding: '5px 10px',
+                                    borderRadius: '6px',
+                                    fontSize: '0.72rem',
+                                    fontWeight: 700,
+                                    border: '1px solid',
+                                    borderColor: daytimeLockDays === 'school_days' ? '#6366f1' : '#cbd5e1',
+                                    background: daytimeLockDays === 'school_days' ? '#e0e7ff' : '#f8fafc',
+                                    color: daytimeLockDays === 'school_days' ? '#4338ca' : '#64748b',
+                                    cursor: 'pointer'
+                                  }}
+                                >
+                                  Mo – Fr (Schultage)
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleUpdateDaytimeLock(true, daytimeLockStart, daytimeLockEnd, 'everyday')}
+                                  style={{
+                                    padding: '5px 10px',
+                                    borderRadius: '6px',
+                                    fontSize: '0.72rem',
+                                    fontWeight: 700,
+                                    border: '1px solid',
+                                    borderColor: daytimeLockDays === 'everyday' ? '#6366f1' : '#cbd5e1',
+                                    background: daytimeLockDays === 'everyday' ? '#e0e7ff' : '#f8fafc',
+                                    color: daytimeLockDays === 'everyday' ? '#4338ca' : '#64748b',
+                                    cursor: 'pointer'
+                                  }}
+                                >
+                                  Täglich
+                                </button>
                               </div>
-                              <div style={{ fontSize: '0.68rem', color: '#94a3b8', marginTop: '2px' }}>Level {avatar?.evolution_level || 1} erreicht</div>
                             </div>
+                          )}
+                        </div>
+
+                        {/* Must-Have 1c: 1-Tap Sofortpause ("Familienzeit / Bildschirm-Auszeit") */}
+                        <div style={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '12px',
+                          padding: '18px',
+                          borderRadius: '18px',
+                          background: isCurrentlyInInstantLock ? '#fffbeb' : '#f8fafc',
+                          border: isCurrentlyInInstantLock ? '1.5px solid #fde68a' : '1px solid #e2e8f0',
+                          textAlign: 'left'
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                              <Coffee size={18} color="#d97706" style={{ flexShrink: 0 }} />
+                              <div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                  <div style={{ fontSize: '0.88rem', fontWeight: 850, color: '#0f172a' }}>
+                                    1-Tap Sofortpause („Familienzeit“)
+                                  </div>
+                                  {isCurrentlyInInstantLock && (
+                                    <span style={{ background: '#fef3c7', color: '#b45309', fontSize: '0.66rem', fontWeight: 800, padding: '2px 7px', borderRadius: '6px' }}>
+                                      Aktiv bis {new Date(instantLockUntil!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} Uhr
+                                    </span>
+                                  )}
+                                </div>
+                                <div style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 500, lineHeight: 1.35, marginTop: '2px' }}>
+                                  Sperrt die App sofort für gemeinsame Familienzeit oder Mahlzeiten, ohne Einstellungen zu verändern.
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '4px' }}>
+                            <button
+                              type="button"
+                              onClick={() => handleSetInstantLock(30)}
+                              style={{
+                                padding: '6px 12px',
+                                borderRadius: '8px',
+                                fontSize: '0.75rem',
+                                fontWeight: 700,
+                                background: '#ffffff',
+                                border: '1px solid #cbd5e1',
+                                color: '#1e293b',
+                                cursor: 'pointer'
+                              }}
+                              className="hover-scale"
+                            >
+                              +30 Min. Pause
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleSetInstantLock(60)}
+                              style={{
+                                padding: '6px 12px',
+                                borderRadius: '8px',
+                                fontSize: '0.75rem',
+                                fontWeight: 700,
+                                background: '#ffffff',
+                                border: '1px solid #cbd5e1',
+                                color: '#1e293b',
+                                cursor: 'pointer'
+                              }}
+                              className="hover-scale"
+                            >
+                              +60 Min. (Essen/Familie)
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleSetInstantLock(-1)}
+                              style={{
+                                padding: '6px 12px',
+                                borderRadius: '8px',
+                                fontSize: '0.75rem',
+                                fontWeight: 700,
+                                background: '#ffffff',
+                                border: '1px solid #cbd5e1',
+                                color: '#1e293b',
+                                cursor: 'pointer'
+                              }}
+                              className="hover-scale"
+                            >
+                              Bis morgen früh
+                            </button>
+                            {isCurrentlyInInstantLock && (
+                              <button
+                                type="button"
+                                onClick={() => handleSetInstantLock(null)}
+                                style={{
+                                  padding: '6px 12px',
+                                  borderRadius: '8px',
+                                  fontSize: '0.75rem',
+                                  fontWeight: 800,
+                                  background: '#fee2e2',
+                                  border: '1px solid #fca5a5',
+                                  color: '#b91c1c',
+                                  cursor: 'pointer'
+                                }}
+                                className="hover-scale"
+                              >
+                                Pause jetzt beenden
+                              </button>
+                            )}
                           </div>
                         </div>
 
-                        {/* Must-Have 2: Geschwister-Schnellwechsel (Netflix Family Hub) */}
+                        {/* Must-Have 2: Verknüpfte Familien-Profile (Administrative Geräteverwaltung) */}
                         {familyProfiles.length > 0 && (
                           <div style={{
                             display: 'flex',
@@ -24505,7 +26732,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                 <button
                                   type="button"
                                   onClick={() => {
-                                    window.location.href = '/login?scan_sibling=true';
+                                    setIsAddSiblingModalOpen(true);
                                   }}
                                   style={{
                                     width: '72px',
@@ -24567,8 +26794,368 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                           <ShieldCheck size={16} color="#15803d" style={{ flexShrink: 0 }} />
                           <span>Alle Einstellungen werden in Echtzeit gespeichert und in der App übernommen.</span>
                         </div>
+                            </>
+                          )}
+
+                          {/* Tab 2: Wöchentlicher Übe-Report & Fortschritt */}
+                          {parentControlsTab === 'insights' && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                              {/* 📊 Eltern-Wochenreport & Übe-Insights */}
+                              <div style={{
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '14px',
+                                padding: '22px 20px',
+                                borderRadius: '22px',
+                                background: '#ffffff',
+                                border: '1px solid #e2e8f0',
+                                boxShadow: '0 4px 16px -2px rgba(15, 23, 42, 0.04)',
+                                textAlign: 'left'
+                              }}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                    <div style={{
+                                      width: '36px',
+                                      height: '36px',
+                                      borderRadius: '10px',
+                                      background: '#e6f4ea',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      flexShrink: 0
+                                    }}>
+                                      <Clock size={18} color="#16a34a" />
+                                    </div>
+                                    <div>
+                                      <div style={{ fontSize: '0.94rem', fontWeight: 850, color: '#0f172a', letterSpacing: '-0.01em' }}>
+                                        Wöchentlicher Übe-Report &amp; Fortschritt
+                                      </div>
+                                      <div style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 500, lineHeight: 1.35, marginTop: '2px' }}>
+                                        100% datenschutzkonforme Zusammenfassung der Übe-Einheiten zu Hause.
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <span style={{
+                                    background: '#f1f5f9',
+                                    color: '#475569',
+                                    padding: '4px 10px',
+                                    borderRadius: '8px',
+                                    fontSize: '0.70rem',
+                                    fontWeight: 800
+                                  }}>
+                                    Aktuelle Woche
+                                  </span>
+                                </div>
+
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '10px', marginTop: '4px' }}>
+                                  <div style={{ background: '#f8fafc', border: '1px solid #f1f5f9', borderRadius: '14px', padding: '14px' }}>
+                                    <div style={{ fontSize: '0.70rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Übe-Minuten</div>
+                                    <div style={{ fontSize: '1.35rem', fontWeight: 900, color: '#16a34a', marginTop: '2px' }}>
+                                      {totalPracticeMinutes} Min.
+                                    </div>
+                                    <div style={{ fontSize: '0.70rem', color: '#94a3b8', marginTop: '2px' }}>Ziel: {getTargetMinutes(avatar?.streak_flame || 0)} Min./Tag</div>
+                                  </div>
+
+                                  <div style={{ background: '#f8fafc', border: '1px solid #f1f5f9', borderRadius: '14px', padding: '12px' }}>
+                                    <div style={{ fontSize: '0.70rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Aktiver Streak</div>
+                                    <div style={{ fontSize: '1.35rem', fontWeight: 900, color: '#0284c7', marginTop: '2px' }}>
+                                      {avatar?.streak_flame || 0} Tage
+                                    </div>
+                                    <div style={{ fontSize: '0.70rem', color: '#94a3b8', marginTop: '2px' }}>3 Schutzschilde aktiv</div>
+                                  </div>
+
+                                  <div style={{ background: '#f8fafc', border: '1px solid #f1f5f9', borderRadius: '14px', padding: '12px' }}>
+                                    <div style={{ fontSize: '0.70rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Campus-XP</div>
+                                    <div style={{ fontSize: '1.35rem', fontWeight: 900, color: '#ca8a04', marginTop: '2px' }}>
+                                      {(avatar as any)?.experience_points || (avatar as any)?.xp || 0} XP
+                                    </div>
+                                    <div style={{ fontSize: '0.70rem', color: '#94a3b8', marginTop: '2px' }}>Level {avatar?.evolution_level || 1} erreicht</div>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Pädagogische Leitlinie & Entlastung */}
+                              <div style={{
+                                display: 'flex',
+                                alignItems: 'flex-start',
+                                gap: '12px',
+                                padding: '16px 18px',
+                                borderRadius: '16px',
+                                background: '#f0fdf4',
+                                border: '1px solid #bbf7d0',
+                                color: '#15803d',
+                                textAlign: 'left'
+                              }}>
+                                <Sparkles size={20} color="#16a34a" style={{ flexShrink: 0, marginTop: '2px' }} />
+                                <div style={{ fontSize: '0.78rem', lineHeight: 1.45 }}>
+                                  <strong style={{ display: 'block', marginBottom: '2px', fontSize: '0.84rem' }}>
+                                    Pädagogische Motivation ohne Leistungsdruck
+                                  </strong>
+                                  {currentLvlKey === 'junior'
+                                    ? 'Im Junior-Modus steht die Freude am Instrument im Vordergrund. 10 bis 15 Minuten spielerisches Üben an 3–4 Tagen pro Woche reichen völlig aus, um nachhaltige motorische Gewohnheiten zu verankern.'
+                                    : currentLvlKey === 'teen'
+                                    ? 'Im Teen-Modus stärkt der Fokus-Timer die Selbstorganisation. Kontinuierliche Einheiten von 20 bis 30 Minuten fördern die Repertoire-Festigung vor der nächsten Musikstunde.'
+                                    : 'Pro-Modus: Vertiefung von Phrasierung, Technik und Repertoire. Zielgerichtete Sessions ab 30 bis 45 Minuten für fortgeschrittene Musiker.'}
+                                </div>
+                              </div>
+
+                              {/* DSGVO Transparenz-Hinweis */}
+                              <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '10px',
+                                padding: '12px 16px',
+                                borderRadius: '14px',
+                                background: '#f8fafc',
+                                border: '1px solid #e2e8f0',
+                                color: '#64748b',
+                                fontSize: '0.74rem'
+                              }}>
+                                <ShieldCheck size={16} color="#64748b" style={{ flexShrink: 0 }} />
+                                <span>DSGVO-zertifiziert: Keine Verhaltens-Scorecards, keine Werbetracker. Die Übedaten verbleiben ausschließlich zwischen Familie, Schüler und Musikschule.</span>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Tab 3: Revisionssicheres Absagen-Logbuch */}
+                          {parentControlsTab === 'cancellations' && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                              {/* Absagen-Logbuch Header Card */}
+                              <div style={{
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '12px',
+                                padding: '20px',
+                                borderRadius: '20px',
+                                background: '#ffffff',
+                                border: '1px solid #e2e8f0',
+                                boxShadow: '0 4px 16px -2px rgba(15, 23, 42, 0.04)',
+                                textAlign: 'left'
+                              }}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                    <div style={{
+                                      width: '36px',
+                                      height: '36px',
+                                      borderRadius: '10px',
+                                      background: cancelledSchoolYearOccurrences.length > 0 ? '#fee2e2' : '#e6f4ea',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      flexShrink: 0
+                                    }}>
+                                      {cancelledSchoolYearOccurrences.length > 0 ? (
+                                        <AlertTriangle size={18} color="#dc2626" />
+                                      ) : (
+                                        <ShieldCheck size={18} color="#16a34a" />
+                                      )}
+                                    </div>
+                                    <div>
+                                      <div style={{ fontSize: '0.94rem', fontWeight: 850, color: '#0f172a', letterSpacing: '-0.01em' }}>
+                                        Revisionssicheres Absagen-Logbuch
+                                      </div>
+                                      <div style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 500, lineHeight: 1.35, marginTop: '2px' }}>
+                                        Schuljahr {new Date().getMonth() >= 8 ? `${new Date().getFullYear()}/${new Date().getFullYear() + 1}` : `${new Date().getFullYear() - 1}/${new Date().getFullYear()}`} – Chronologische Dokumentation aller Unterrichtsabsagen.
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <span style={{
+                                    background: cancelledSchoolYearOccurrences.length > 0 ? '#fee2e2' : '#e6f4ea',
+                                    color: cancelledSchoolYearOccurrences.length > 0 ? '#b91c1c' : '#15803d',
+                                    padding: '4px 10px',
+                                    borderRadius: '8px',
+                                    fontSize: '0.72rem',
+                                    fontWeight: 800
+                                  }}>
+                                    {cancelledSchoolYearOccurrences.length} {cancelledSchoolYearOccurrences.length === 1 ? 'Absage' : 'Absagen'}
+                                  </span>
+                                </div>
+
+                                {/* Summary KPI Badges */}
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '8px', marginTop: '4px' }}>
+                                  <div style={{ background: '#f8fafc', border: '1px solid #f1f5f9', borderRadius: '12px', padding: '10px 12px' }}>
+                                    <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Gesamt im Schuljahr</div>
+                                    <div style={{ fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', marginTop: '2px' }}>
+                                      {cancelledSchoolYearOccurrences.length}
+                                    </div>
+                                  </div>
+                                  <div style={{ background: '#f8fafc', border: '1px solid #f1f5f9', borderRadius: '12px', padding: '10px 12px' }}>
+                                    <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Durch Familie/Schüler</div>
+                                    <div style={{ fontSize: '1.2rem', fontWeight: 900, color: '#dc2626', marginTop: '2px' }}>
+                                      {cancelledSchoolYearOccurrences.filter(o => o.status === 'canceled_by_student' || o.canceled_by_role === 'student').length}
+                                    </div>
+                                  </div>
+                                  <div style={{ background: '#f8fafc', border: '1px solid #f1f5f9', borderRadius: '12px', padding: '10px 12px' }}>
+                                    <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Durch Lehrkraft/Schule</div>
+                                    <div style={{ fontSize: '1.2rem', fontWeight: 900, color: '#d97706', marginTop: '2px' }}>
+                                      {cancelledSchoolYearOccurrences.filter(o => o.status === 'teacher_sick' || o.status === 'canceled_by_teacher_sick' || (o.status === 'cancelled' && o.canceled_by_role !== 'student')).length}
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* List of cancelled occurrences */}
+                              {cancelledSchoolYearOccurrences.length === 0 ? (
+                                <div style={{
+                                  padding: '36px 20px',
+                                  borderRadius: '18px',
+                                  background: '#f0fdf4',
+                                  border: '1.5px dashed #86efac',
+                                  textAlign: 'center',
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  alignItems: 'center',
+                                  gap: '10px'
+                                }}>
+                                  <div style={{
+                                    width: '48px',
+                                    height: '48px',
+                                    borderRadius: '50%',
+                                    background: '#dcfce7',
+                                    color: '#16a34a',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center'
+                                  }}>
+                                    <CheckCircle size={26} />
+                                  </div>
+                                  <div style={{ fontSize: '0.92rem', fontWeight: 850, color: '#15803d' }}>
+                                    Keine Unterrichtsabsagen in diesem Schuljahr
+                                  </div>
+                                  <div style={{ fontSize: '0.76rem', color: '#166534', maxWidth: '380px', lineHeight: 1.4 }}>
+                                    Vorbildliche Kontinuität! Alle geplanten Unterrichtsstunden haben regulär stattgefunden bzw. sind wie geplant angesetzt.
+                                  </div>
+                                </div>
+                              ) : (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                  {cancelledSchoolYearOccurrences.map((occ: any) => {
+                                    const occDate = new Date(occ.date + 'T00:00:00');
+                                    const dateFormatted = occDate.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' });
+                                    const isStudentCancel = occ.status === 'canceled_by_student' || occ.canceled_by_role === 'student';
+                                    const isTeacherSick = occ.status === 'teacher_sick' || occ.status === 'canceled_by_teacher_sick';
+                                    const teacherName = occ.teacher ? formatTeacherFullName(occ.teacher) : (occ.teacher_name ? formatTeacherFullName(occ.teacher_name) : 'Deine Lehrkraft');
+
+                                    return (
+                                      <div
+                                        key={occ.id || `${occ.date}_${occ.start_time}`}
+                                        style={{
+                                          display: 'flex',
+                                          flexDirection: 'column',
+                                          gap: '10px',
+                                          padding: '16px',
+                                          borderRadius: '16px',
+                                          background: '#ffffff',
+                                          border: '1px solid #fee2e2',
+                                          boxShadow: '0 2px 8px rgba(220, 38, 38, 0.04)',
+                                          textAlign: 'left'
+                                        }}
+                                      >
+                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                            <div style={{
+                                              width: '32px',
+                                              height: '32px',
+                                              borderRadius: '10px',
+                                              background: isStudentCancel ? '#fee2e2' : '#fef3c7',
+                                              display: 'flex',
+                                              alignItems: 'center',
+                                              justifyContent: 'center',
+                                              flexShrink: 0
+                                            }}>
+                                              <CalendarX size={16} color={isStudentCancel ? '#dc2626' : '#d97706'} />
+                                            </div>
+                                            <div>
+                                              <div style={{ fontSize: '0.88rem', fontWeight: 850, color: '#0f172a' }}>
+                                                {dateFormatted} {occ.start_time ? `• ${occ.start_time.substring(0, 5)} Uhr` : ''}
+                                              </div>
+                                              <div style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 600 }}>
+                                                Coach: {teacherName} {occ.instrument ? `• ${occ.instrument}` : ''}
+                                              </div>
+                                            </div>
+                                          </div>
+
+                                          {/* Status Badge */}
+                                          <span style={{
+                                            padding: '4px 10px',
+                                            borderRadius: '8px',
+                                            fontSize: '0.70rem',
+                                            fontWeight: 800,
+                                            background: isStudentCancel ? '#fee2e2' : '#fef3c7',
+                                            color: isStudentCancel ? '#b91c1c' : '#b45309',
+                                            border: isStudentCancel ? '1px solid #fca5a5' : '1px solid #fde68a'
+                                          }}>
+                                            {isStudentCancel ? '❌ Durch Schüler/Eltern storniert' : isTeacherSick ? '⚠️ Durch Lehrkraft entfallen (Krankheit)' : '⚠️ Unterricht abgesagt'}
+                                          </span>
+                                        </div>
+
+                                        {/* Cancellation Reason if provided */}
+                                        {occ.cancel_reason && (
+                                          <div style={{
+                                            fontSize: '0.74rem',
+                                            color: '#475569',
+                                            background: '#f8fafc',
+                                            padding: '6px 10px',
+                                            borderRadius: '8px',
+                                            border: '1px solid #e2e8f0'
+                                          }}>
+                                            <strong>Grund:</strong> {occ.cancel_reason}
+                                          </div>
+                                        )}
+
+                                        {/* Action row: Undo cancellation */}
+                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '4px', borderTop: '1px solid #f1f5f9', flexWrap: 'wrap', gap: '6px' }}>
+                                          <span style={{ fontSize: '0.68rem', color: '#94a3b8' }}>
+                                            Protokolliert im Schulplan
+                                          </span>
+                                          <button
+                                            type="button"
+                                            onClick={() => handleUndoCancelOccurrence(occ, true)}
+                                            style={{
+                                              display: 'inline-flex',
+                                              alignItems: 'center',
+                                              gap: '5px',
+                                              padding: '5px 12px',
+                                              borderRadius: '8px',
+                                              background: '#f0fdf4',
+                                              border: '1px solid #86efac',
+                                              color: '#15803d',
+                                              fontSize: '0.74rem',
+                                              fontWeight: 800,
+                                              cursor: 'pointer'
+                                            }}
+                                            className="hover-scale"
+                                            title="Absage widerrufen und Termin im Stundenplan reaktivieren"
+                                          >
+                                            <RotateCcw size={13} />
+                                            <span>Absage zurücknehmen</span>
+                                          </button>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              )}
+
+                              {/* Legal Notice */}
+                              <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                padding: '10px 14px',
+                                borderRadius: '12px',
+                                background: '#f8fafc',
+                                border: '1px solid #e2e8f0',
+                                color: '#64748b',
+                                fontSize: '0.70rem'
+                              }}>
+                                <ShieldCheck size={14} color="#64748b" style={{ flexShrink: 0 }} />
+                                <span>Rechtssicher dokumentiert nach § 241 Abs. 2 BGB und der Musikschulordnung. Stornierungsfristen richten sich nach dem Unterrichtsvertrag.</span>
+                              </div>
+                            </div>
+                          )}
                       </div>
-                    )}
+                    );
+                  })()}
 
                     {activeStudentSettingsModal === 'notifications' && (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -25766,197 +28353,77 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
             )}
 
             {/* SECURE RECOVERY KEY MODAL */}
-            {showRecoveryKeyModal && (
-              <div
-                style={{
-                  position: 'fixed',
-                  inset: 0,
-                  zIndex: 11000,
-                  background: 'rgba(15, 23, 42, 0.75)',
-                  backdropFilter: 'blur(10px)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  padding: '20px'
-                }}
-                onClick={(e) => {
-                  if (e.target === e.currentTarget) setShowRecoveryKeyModal(false);
-                }}
-              >
-                <div
-                  style={{
-                    background: '#ffffff',
-                    borderRadius: '28px',
-                    width: '100%',
-                    maxWidth: '480px',
-                    padding: '32px 28px',
-                    boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.35)',
-                    border: '1.5px solid #e2e8f0',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    textAlign: 'center'
-                  }}
-                  className="animation-slide-up"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <div style={{
-                    width: '60px',
-                    height: '60px',
-                    borderRadius: '20px',
-                    background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: '#ffffff',
-                    marginBottom: '16px'
-                  }}>
-                    <Key size={30} />
-                  </div>
+            {renderRecoveryKeyModal()}
 
-                  <h3 style={{ margin: '0 0 6px 0', fontSize: '1.3rem', fontWeight: 1000, color: '#0f172a' }}>
-                    Elternbereich wiederherstellen 🛡️
-                  </h3>
-                  <p style={{ margin: '0 0 18px 0', fontSize: '0.82rem', color: '#64748b', fontWeight: 600, lineHeight: 1.45 }}>
-                    Gib deinen 8-stelligen Notfallschlüssel (z. B. <code>REC-7492-3810</code>) ein, um eine neue PIN festzulegen.
-                  </p>
+            {/* 🛡️ In-App Geschwisterkind hinzufügen Modal (Goldstandard: QR-Scan + PIN) */}
+            <AddSiblingModal
+              isOpen={isAddSiblingModalOpen}
+              onClose={() => setIsAddSiblingModalOpen(false)}
+              currentStudentId={studentId || (studentUser as any)?.id || ''}
+              schoolId={(studentUser as any)?.school_id}
+              existingFamilyProfiles={familyProfiles}
+              onProfileAdded={(newProfile) => {
+                setFamilyProfiles(prev => {
+                  const filtered = prev.filter(p => p.id !== newProfile.id);
+                  const updated = [...filtered, newProfile];
+                  try {
+                    localStorage.setItem('campus_family_profiles', JSON.stringify(updated));
+                    const localProfs = JSON.parse(localStorage.getItem('groovelab_local_profiles') || '[]');
+                    const updatedLocal = [...localProfs.filter((p: any) => p.id !== newProfile.id), newProfile];
+                    localStorage.setItem('groovelab_local_profiles', JSON.stringify(updatedLocal));
+                  } catch (e) {}
+                  return updated;
+                });
+              }}
+            />
 
-                  {recoveryKeyError && (
-                    <div style={{
-                      width: '100%',
-                      padding: '10px 14px',
-                      background: '#fee2e2',
-                      border: '1px solid #fca5a5',
-                      borderRadius: '12px',
-                      color: '#dc2626',
-                      fontSize: '0.78rem',
-                      fontWeight: 700,
-                      marginBottom: '16px',
-                      boxSizing: 'border-box'
-                    }}>
-                      {recoveryKeyError}
+            {/* ⏳ 10-Sekunden Inaktivitäts-Warnungs-Toast für Elternbereich */}
+            {isParentLockWarning && isParentUnlocked && (
+              <div style={{
+                position: 'fixed',
+                bottom: '24px',
+                right: '24px',
+                zIndex: 99999,
+                background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
+                border: '1.5px solid #f59e0b',
+                borderRadius: '18px',
+                padding: '14px 20px',
+                boxShadow: '0 20px 40px -10px rgba(0,0,0,0.4)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '14px',
+                color: '#ffffff',
+                animation: 'pinShakeAnim 0.5s ease'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '1.2rem' }}>⏳</span>
+                  <div>
+                    <div style={{ fontSize: '0.86rem', fontWeight: 800 }}>
+                      Eltern-Sitzung läuft in <span style={{ color: '#f59e0b', fontSize: '1rem', fontWeight: 900 }}>{parentLockRemainingSeconds}s</span> ab
                     </div>
-                  )}
-
-                  {/* Monospace Key Input */}
-                  <input
-                    type="text"
-                    placeholder="REC-XXXX-XXXX"
-                    value={recoveryKeyInput}
-                    onChange={(e) => {
-                      setRecoveryKeyError('');
-                      setRecoveryKeyInput(e.target.value.toUpperCase());
-                    }}
-                    style={{
-                      width: '100%',
-                      padding: '14px 16px',
-                      borderRadius: '16px',
-                      border: '2px solid #cbd5e1',
-                      fontSize: '1.15rem',
-                      fontWeight: 900,
-                      fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
-                      textAlign: 'center',
-                      letterSpacing: '0.08em',
-                      outline: 'none',
-                      marginBottom: '16px',
-                      boxSizing: 'border-box'
-                    }}
-                    autoFocus
-                  />
-
-                  {/* Verify Button */}
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      const cleanInput = recoveryKeyInput.trim();
-                      if (!cleanInput) {
-                        setRecoveryKeyError('Bitte gib deinen Notfallschlüssel ein.');
-                        return;
-                      }
-
-                      const targetId = studentId || (studentUser as any)?.id;
-                      if (!targetId) return;
-
-                      try {
-                        const { data: resetResult, error: resetErr } = await supabase.rpc('reset_parent_pin_via_recovery_key', {
-                          p_student_id: targetId,
-                          p_recovery_key: cleanInput
-                        });
-
-                        if (resetResult?.success) {
-                          // Valid recovery key confirmed by server!
-                          sessionStorage.removeItem(`groovelab_parent_session_${targetId}`);
-                          sessionStorage.removeItem(`groovelab_parent_unlocked_${targetId}`);
-                          sessionStorage.removeItem('groovelab_parent_unlocked_global');
-                          if (studentUser) {
-                            (studentUser as any).has_parent_pin = false;
-                          }
-
-                          setShowRecoveryKeyModal(false);
-                          setParentSetupStep('enter');
-                          setParentSetupPin('');
-                          setParentSetupConfirm('');
-                          setParentGatePinInput('');
-                          setParentGateError('');
-                          alert('Notfallschlüssel bestätigt! Bitte vergib jetzt deine neue 6-stellige Eltern-Master-PIN.');
-                        } else {
-                          setRecoveryKeyError(resetResult?.error || resetErr?.message || 'Ungültiger Notfallschlüssel. Bitte prüfe deine Eingabe oder wende dich an deine Lehrkraft.');
-                        }
-                      } catch (err: any) {
-                        setRecoveryKeyError(err.message || 'Verbindungsfehler bei der Schlüsselprüfung.');
-                      }
-                    }}
-                    style={{
-                      width: '100%',
-                      padding: '14px',
-                      borderRadius: '14px',
-                      background: '#0284c7',
-                      color: '#ffffff',
-                      border: 'none',
-                      fontSize: '0.88rem',
-                      fontWeight: 800,
-                      cursor: 'pointer',
-                      marginBottom: '16px',
-                      transition: 'all 0.15s ease'
-                    }}
-                    className="hover-scale"
-                  >
-                    Notfallschlüssel prüfen ➔
-                  </button>
-
-                  {/* Schicht 3 Note */}
-                  <div style={{
-                    background: '#f8fafc',
-                    border: '1px solid #e2e8f0',
-                    borderRadius: '14px',
-                    padding: '12px 14px',
-                    textAlign: 'left',
-                    fontSize: '0.74rem',
-                    color: '#64748b',
-                    lineHeight: 1.4,
-                    marginBottom: '16px',
-                    width: '100%',
-                    boxSizing: 'border-box'
-                  }}>
-                    <strong style={{ color: '#0f172a' }}>💡 Notfallschlüssel verloren?</strong><br />
-                    Deine Musikschul-Lehrkraft kann deine Eltern-PIN im Schul-Dashboard mit einem Klick für dich zurücksetzen.
+                    <div style={{ fontSize: '0.72rem', color: '#94a3b8' }}>
+                      Zum Schutz deiner Einstellungen wird gleich automatisch gesperrt.
+                    </div>
                   </div>
-
-                  <button
-                    type="button"
-                    onClick={() => setShowRecoveryKeyModal(false)}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      color: '#64748b',
-                      fontSize: '0.8rem',
-                      fontWeight: 700,
-                      cursor: 'pointer'
-                    }}
-                  >
-                    Abbrechen
-                  </button>
                 </div>
+                <button
+                  type="button"
+                  onClick={extendParentSession}
+                  style={{
+                    background: '#f59e0b',
+                    color: '#0f172a',
+                    border: 'none',
+                    borderRadius: '12px',
+                    padding: '8px 14px',
+                    fontSize: '0.8rem',
+                    fontWeight: 850,
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap'
+                  }}
+                  className="hover-scale"
+                >
+                  Um 3 Min. verlängern
+                </button>
               </div>
             )}
           </>
@@ -26204,7 +28671,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                     )}
                     {song.genre && (
                       <span style={{ background: '#f1f5f9', border: '1px solid #e2e8f0', color: '#334155', padding: '4px 10px', borderRadius: '8px', fontSize: '0.74rem', fontWeight: 750 }}>
-                        🎸 Genre: {song.genre}
+                        🎼 Genre: {song.genre}
                       </span>
                     )}
                     {song.instrumentation && (
@@ -26361,8 +28828,8 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                     <h2 style={{ margin: 0, fontSize: '1.18rem', fontWeight: 850, color: '#0f172a', letterSpacing: '-0.02em' }}>
                       {book.title}
                     </h2>
-                    <p style={{ margin: '2px 0 0 0', fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>
-                      {book.author ? `von ${book.author} · ` : ''}📖 {totalPages} Seiten Gesamtumfang
+                    <p style={{ margin: '2px 0 0 0', fontSize: '0.78rem', color: '#64748b', fontWeight: 600 }}>
+                      {book.author ? `von ${book.author}` : 'Lehrwerk'}
                     </p>
                   </div>
                 </div>
@@ -27684,7 +30151,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
               </div>
 
               <p style={{ margin: '0 0 20px 0', fontSize: '0.88rem', color: '#475569', lineHeight: 1.5 }}>
-                Halte deine Flamme am Brennen! Übe jeden Tag aktiv mit der App, um deine Übestreak (Serie) auszubauen und neue Flammen-Stufen freizuschalten.
+                Finde deinen eigenen Übe-Rhythmus! Regelmäßiges Üben baut deine Serie auf und schaltet neue Flammen-Stufen frei – ganz ohne Druck mit 3 Schutzschilden pro Woche.
               </p>
 
               {/* Flame Levels */}
@@ -28156,10 +30623,12 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
 
             <div>
               <h3 style={{ margin: '0 0 6px 0', fontSize: '1.2rem', fontWeight: 900, color: '#0f172a' }}>
-                Eltern Master-PIN
+                {studentUiLevel === 'junior' ? '👨‍👩‍👧 Geschützter Elternbereich' : 'Eltern Master-PIN'}
               </h3>
               <p style={{ margin: 0, fontSize: '0.8rem', color: '#64748b', lineHeight: 1.4, fontWeight: 500 }}>
-                Diese Funktion ist durch den Elternbereich geschützt. Bitte gib deine 6-stellige Eltern-Master-PIN ein.
+                {studentUiLevel === 'junior'
+                  ? 'Möchtest du eine Musikstunde absagen oder Einstellungen ändern? Gib bitte deinen Eltern Bescheid – Termine können nur Erwachsene mit der 6-stelligen Eltern-PIN verwalten.'
+                  : 'Diese Funktion ist durch den Elternbereich geschützt. Bitte gib deine 6-stellige Eltern-Master-PIN ein.'}
               </p>
             </div>
 
@@ -28638,7 +31107,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                     <span style={{ fontSize: '1.35rem', fontWeight: 900, color: '#1e293b', marginTop: '1px', lineHeight: 1 }}>
                       {celebrationDetails.streakFlame && celebrationDetails.streakFlame > 0 ? celebrationDetails.streakFlame : '1.'}
                     </span>
-                    <span style={{ fontSize: '0.54rem', fontWeight: 900, color: '#ea580c', textTransform: 'uppercase', letterSpacing: '0.06em', marginTop: '2px' }}>
+                    <span style={{ fontSize: '0.72rem', fontWeight: 900, color: '#ea580c', textTransform: 'uppercase', letterSpacing: '0.06em', marginTop: '2px' }}>
                       {celebrationDetails.streakFlame && celebrationDetails.streakFlame > 0 ? 'Tage Streak' : 'Tag im Anflug'}
                     </span>
                   </div>
@@ -28677,7 +31146,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                     <span style={{ fontSize: '0.92rem', fontWeight: 900, color: '#1e293b', lineHeight: 1.1 }}>
                       {formatSecs(exactSecs)}
                     </span>
-                    <span style={{ fontSize: '0.55rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                       Fokus-Zeit
                     </span>
                   </div>
@@ -28699,7 +31168,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                     <span style={{ fontSize: '0.88rem', fontWeight: 900, color: '#0284c7', lineHeight: 1.1 }}>
                       {exactSecs < 60 ? '1. XP ab 1m' : `+${celebrationDetails.xpGained} XP`}
                     </span>
-                    <span style={{ fontSize: '0.55rem', fontWeight: 800, color: '#0369a1', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#0369a1', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                       {exactSecs < 60 ? `Noch ${60 - exactSecs}s 🚀` : 'Erfahrung ✨'}
                     </span>
                   </div>
@@ -28721,7 +31190,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                     <span style={{ fontSize: '0.82rem', fontWeight: 900, color: isGoalReached ? '#15803d' : '#854d0e', lineHeight: 1.1 }}>
                       {isGoalReached ? 'Ziel erreicht!' : `Noch ${formatSecs(remainingSecs)}`}
                     </span>
-                    <span style={{ fontSize: '0.52rem', fontWeight: 800, color: isGoalReached ? '#166534' : '#a16207', textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap' }}>
+                    <span style={{ fontSize: '0.70rem', fontWeight: 800, color: isGoalReached ? '#166534' : '#a16207', textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap' }}>
                       Ø {personalAverageMinutes}m • {targetMins}m Ziel
                     </span>
                   </div>
@@ -28729,7 +31198,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
 
                 {celebrationDetails.usedJokerThisSession && (
                   <div style={{
-                    fontSize: '0.78rem',
+                    fontSize: '0.82rem',
                     color: '#0369a1',
                     background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)',
                     border: '1.5px solid #38bdf8',
@@ -28757,14 +31226,14 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                     </div>
                     <div style={{ textAlign: 'left' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span style={{ fontWeight: 900, color: '#0369a1', fontSize: '0.82rem' }}>
+                        <span style={{ fontWeight: 900, color: '#0369a1', fontSize: '0.86rem' }}>
                           Schutzschild aktiv! 🔥
                         </span>
-                        <span style={{ fontSize: '0.58rem', fontWeight: 900, background: '#dbeafe', color: '#1d4ed8', padding: '1px 6px', borderRadius: '100px' }}>
+                        <span style={{ fontSize: '0.72rem', fontWeight: 900, background: '#dbeafe', color: '#1d4ed8', padding: '2px 8px', borderRadius: '100px' }}>
                           Glut-Schutz
                         </span>
                       </div>
-                      <div style={{ fontSize: '0.70rem', color: '#475569', fontWeight: 650, marginTop: '2px' }}>
+                      <div style={{ fontSize: '0.78rem', color: '#475569', fontWeight: 650, marginTop: '2px' }}>
                         Dein <strong>{celebrationDetails.streak}-Tage-Streak</strong> wurde gerettet und glimmt geschützt weiter!
                       </div>
                     </div>
@@ -29152,6 +31621,10 @@ const InlineAudioPlayer: React.FC<{ url: string; label: string; onDelete?: () =>
         @keyframes spin {
           from { transform: rotate(0deg); }
           to { transform: rotate(360deg); }
+        }
+        @keyframes ttsPulseWave {
+          0% { transform: scaleY(0.4); opacity: 0.75; }
+          100% { transform: scaleY(1.3); opacity: 1; }
         }
         @media (max-width: 640px) {
           .kpi-row-container {

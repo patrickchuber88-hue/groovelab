@@ -137,28 +137,70 @@ export const getUnifiedStickerStatus = (
   if (sticker.category === 'ueben') {
     const target = sticker.id === 'fleiss-pionier' ? 20 : sticker.id === 'uebe-meister' ? 100 : sticker.id === 'uebe-legende' ? 500 : 1500;
     isMilestoneUnlocked = practiceMinutes >= target;
-    progressText = isMilestoneUnlocked ? `${target} Min. geübt` : `Noch ${Math.max(1, target - practiceMinutes)} Min. Üben`;
+    const remaining = Math.max(1, target - practiceMinutes);
+    if (isMilestoneUnlocked) {
+      progressText = `${target} Min. geübt`;
+    } else if (remaining <= 30) {
+      progressText = `Nur noch ${remaining} Min. Üben 🚀`;
+    } else if (remaining <= 90) {
+      progressText = `Noch ${remaining} Min. Üben ✨`;
+    } else if (target >= 1000) {
+      progressText = 'Geheime Meister-Legende 🏆';
+    } else if (target >= 500) {
+      progressText = 'Großes Fleiß-Ziel 🌟';
+    } else {
+      progressText = `Noch ${remaining} Min. Üben`;
+    }
     autoDetailTopic = `${target} Min. konzentriert geübt`;
   } else if (sticker.category === 'xp') {
     const target = sticker.id === 'xp-sammler' ? 100 : sticker.id === 'xp-champion' ? 500 : sticker.id === 'xp-meister' ? 1500 : 3500;
     isMilestoneUnlocked = xp >= target;
-    progressText = isMilestoneUnlocked ? `${target} XP erreicht` : `Noch ${Math.max(1, target - xp)} XP`;
+    const remaining = Math.max(1, target - xp);
+    if (isMilestoneUnlocked) {
+      progressText = `${target} XP erreicht`;
+    } else if (remaining <= 50) {
+      progressText = `Nur noch ${remaining} XP ⭐`;
+    } else if (remaining <= 200) {
+      progressText = `Noch ${remaining} XP ✨`;
+    } else if (target >= 3000) {
+      progressText = 'Geheime Legende 💎';
+    } else if (target >= 1000) {
+      progressText = 'Zauber-Meilenstein 🌌';
+    } else {
+      progressText = 'Fleißig XP sammeln ⭐';
+    }
     autoDetailTopic = `${target} XP Meilenstein erreicht`;
   } else if (sticker.category === 'streaks') {
     const target = sticker.id === 'dranbleiber' ? 3 : sticker.id === 'wochen-held' ? 7 : sticker.id === 'streak-koenig' ? 21 : 30;
     isMilestoneUnlocked = streakDays >= target;
-    progressText = isMilestoneUnlocked ? `${target} Tage Streak` : `Noch ${Math.max(1, target - streakDays)} Tage Streak`;
+    const remaining = Math.max(1, target - streakDays);
+    if (isMilestoneUnlocked) {
+      progressText = `${target} Tage Streak`;
+    } else if (target <= 7) {
+      progressText = `Noch ${remaining} ${remaining === 1 ? 'Tag' : 'Tage'} Streak 🔥`;
+    } else if (target === 21) {
+      progressText = '3 Wochen Routine ⚡';
+    } else {
+      progressText = 'Königs-Disziplin 👑';
+    }
     autoDetailTopic = `${target} Tage ununterbrochene Streak`;
   } else if (sticker.category === 'songs') {
     const target = sticker.id === 'erster-erfolg' ? 1 : sticker.id === 'song-sammler' ? 3 : sticker.id === 'repertoire-riese' ? 5 : 10;
     isMilestoneUnlocked = effectiveMasteredSongsCount >= target;
-    progressText = isMilestoneUnlocked 
-      ? `${target} ${target === 1 ? 'Song' : 'Songs'} gemeistert` 
-      : `Noch ${Math.max(1, target - effectiveMasteredSongsCount)} ${Math.max(1, target - effectiveMasteredSongsCount) === 1 ? 'Song' : 'Songs'}`;
+    const remaining = Math.max(1, target - effectiveMasteredSongsCount);
+    if (isMilestoneUnlocked) {
+      progressText = `${target} ${target === 1 ? 'Song' : 'Songs'} gemeistert`;
+    } else if (remaining === 1) {
+      progressText = 'Noch 1 Song meistern 🎵';
+    } else if (target >= 10) {
+      progressText = 'Konzertprogramm 🐉';
+    } else {
+      progressText = `Noch ${remaining} Songs meistern`;
+    }
     autoDetailTopic = `${target} ${target === 1 ? 'Song' : 'Songs'} zu 100% gemeistert`;
   } else {
     // category === 'spezial'
-    progressText = 'Von Lehrkraft vergeben';
+    progressText = 'Von Lehrkraft vergeben 🏆';
   }
 
   const isUnlocked = explicitAwardCount > 0 || isMilestoneUnlocked;

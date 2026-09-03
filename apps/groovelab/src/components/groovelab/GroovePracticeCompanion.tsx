@@ -562,6 +562,33 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
   useEffect(() => { isRecordingRef.current = isRecording; }, [isRecording]);
   useEffect(() => { isCountingInRef.current = isCountingIn; }, [isCountingIn]);
 
+  // 🛡️ Hardware & Sperrzeiten Safety: Stop audio when requested
+  useEffect(() => {
+    const handleForceStopAudio = () => {
+      setIsPlaying(false);
+      setRhythmCoachActive(false);
+      if (isRecordingRef.current) {
+        setIsRecording(false);
+      }
+      try {
+        if (typeof window !== 'undefined') {
+          (window as any).__campus_is_audio_recording = false;
+        }
+      } catch (e) {}
+    };
+    window.addEventListener('campus_force_stop_audio', handleForceStopAudio);
+    return () => window.removeEventListener('campus_force_stop_audio', handleForceStopAudio);
+  }, []);
+
+  useEffect(() => {
+    try {
+      if (typeof window !== 'undefined') {
+        const isRecOrPlaying = isPlaying || isRecording || rhythmCoachActive;
+        (window as any).__campus_is_audio_recording = isRecOrPlaying;
+      }
+    } catch (e) {}
+  }, [isPlaying, isRecording, rhythmCoachActive]);
+
   const micStreamRef = useRef<MediaStream | null>(null);
   const analyserNodeRef = useRef<AnalyserNode | null>(null);
   const scheduledBeatTimesRef = useRef<number[]>([]);

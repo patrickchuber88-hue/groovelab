@@ -421,7 +421,7 @@ export const CampusJuniorDashboard: React.FC<CampusJuniorDashboardProps> = ({
               letterSpacing: '-0.02em',
               lineHeight: 1.15
             }}>
-              Hallo {studentUser?.first_name || 'Musikschüler'}! 🎵
+              Hallo Musiker! 🎵
             </h1>
 
             <p style={{ margin: '4px 0 0 0', fontSize: '0.92rem', color: '#94a3b8', fontWeight: 650 }}>
@@ -921,18 +921,37 @@ export const CampusJuniorDashboard: React.FC<CampusJuniorDashboardProps> = ({
             <p style={{ margin: 0, color: '#475569', fontSize: '0.95rem', fontWeight: 650 }}>
               Du hast <strong style={{ color: '#34a853' }}>{selectedPresetMinutes} Minuten</strong> konzentriert musiziert und <strong style={{ color: '#ca8a04' }}>+{selectedPresetMinutes * 5} XP</strong> verdient!
             </p>
-            <button
-              type="button"
-              onClick={() => setShowCelebrationModal(false)}
-              style={{
-                width: '100%', padding: '14px', borderRadius: '16px', border: 'none',
-                background: 'linear-gradient(135deg, #34a853 0%, #2e7d32 100%)',
-                color: '#ffffff', fontWeight: 900, fontSize: '1rem', cursor: 'pointer',
-                boxShadow: '0 6px 20px rgba(52, 168, 83, 0.3)'
-              }}
-            >
-              Weiter so! 🚀
-            </button>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', width: '100%' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowCelebrationModal(false);
+                  startPresetTimer(selectedPresetMinutes);
+                }}
+                style={{
+                  width: '100%', minHeight: '48px', padding: '14px', borderRadius: '18px', border: 'none',
+                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                  color: '#ffffff', fontWeight: 950, fontSize: '1.02rem', cursor: 'pointer',
+                  boxShadow: '0 8px 20px rgba(5, 150, 105, 0.35)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
+                }}
+                className="hover-scale"
+              >
+                <span>Weiterüben (+Bonus XP) 🚀</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowCelebrationModal(false)}
+                style={{
+                  width: '100%', minHeight: '44px', padding: '12px', borderRadius: '16px', border: '1.5px solid #cbd5e1',
+                  background: '#ffffff',
+                  color: '#475569', fontWeight: 900, fontSize: '0.95rem', cursor: 'pointer'
+                }}
+                className="hover-scale"
+              >
+                Fertig! 🏁
+              </button>
+            </div>
           </div>
         </div>
       )}

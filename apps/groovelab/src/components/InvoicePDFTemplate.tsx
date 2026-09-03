@@ -15,6 +15,8 @@ interface InvoicePDFTemplateProps {
     restmonate?: number;
     studentFee?: number;
     status?: string;
+    storageAddonGb?: number;
+    storageAddonMonthlyFee?: number;
   };
   school: {
     name: string;
@@ -30,6 +32,8 @@ interface InvoicePDFTemplateProps {
     activeCampusCount?: number;
     activeGroovelabCount?: number;
     passiveStudentsCount?: number;
+    storageAddonGb?: number;
+    storageAddonMonthlyFee?: number;
     studentBillingOption: string | null;
     billingPayer: 'school' | 'student';
   };
@@ -65,6 +69,8 @@ export const InvoicePDFTemplate: React.FC<InvoicePDFTemplateProps> = ({
   const isAkt = invoice.type === 'AKT';
   const isManual = !isInf && !isAkt;
   const isPaid = invoice.status === 'Bezahlt' || invoice.status === 'paid';
+  const isPreview = invoice.status === 'Vorschau' || invoice.status === 'preview' || invoice.id.startsWith('VS-');
+  const dueDateStr = invoice.dueDateStr || 'innerhalb von 14 Tagen';
 
   const currentRates = isChf ? masterPricing.ratesCHF : masterPricing.ratesEUR;
   const billedCampus = school.hasCampus;
@@ -215,8 +221,8 @@ export const InvoicePDFTemplate: React.FC<InvoicePDFTemplateProps> = ({
             <div style={{ textAlign: 'right', fontSize: '0.78rem' }}>
               <strong style={{ display: 'block', fontSize: '0.92rem', color: invoice.status === 'Vorschau' ? '#d97706' : '#0f172a' }}>
                 {invoice.status === 'Vorschau' 
-                  ? (isInf ? 'VORSCHAU: DATENBANK- & SERVICEGEBÜHREN' : (school.billingPayer === 'student' ? 'VORSCHAU: DIREKTABRECHNUNG SCHÜLERAKTIVIERUNGEN' : 'VORSCHAU: SAMMELRECHNUNG SCHÜLERAKTIVIERUNGEN')) 
-                  : (isInf ? 'DATENBANK- & SERVICEGEBÜHREN' : (school.billingPayer === 'student' ? 'DIREKTABRECHNUNG SCHÜLERAKTIVIERUNGEN' : 'SAMMELRECHNUNG SCHÜLERAKTIVIERUNGEN'))}
+                  ? (isInf ? 'VORSCHAU: INFRASTRUKTUR- & SERVICEGEBÜHREN' : (school.billingPayer === 'student' ? 'VORSCHAU: DIREKTABRECHNUNG SCHÜLERAKTIVIERUNGEN' : 'VORSCHAU: SAMMELRECHNUNG SCHÜLERAKTIVIERUNGEN')) 
+                  : (isInf ? 'INFRASTRUKTUR- & SERVICEGEBÜHREN' : (school.billingPayer === 'student' ? 'DIREKTABRECHNUNG SCHÜLERAKTIVIERUNGEN' : 'SAMMELRECHNUNG SCHÜLERAKTIVIERUNGEN'))}
               </strong>
               <span style={{ color: '#64748b', fontWeight: 700 }}>Nr. {invoice.id}</span>
             </div>
@@ -326,6 +332,23 @@ export const InvoicePDFTemplate: React.FC<InvoicePDFTemplateProps> = ({
                     </tr>
                   )}
 
+                  {/* Position 2.6: Kombinations-Rabatt row */}
+                  {hasKombi && (
+                    <tr style={{ borderBottom: '1px solid #f1f5f9', color: '#34a853' }}>
+                      <td style={{ padding: dynamicTdPadding }}>
+                        <strong style={{ display: 'block' }}>Kombi-Vorteilsrabatt (Infrastruktur-Bündel)</strong>
+                        <span style={{ fontSize: '0.68rem', color: '#34a853' }}>Preisvorteil bei paralleler Bereitstellung von Campus + GrooveLab</span>
+                      </td>
+                      <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right' }}>
+                        1 Monat
+                      </td>
+                      <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right' }}>-{fmt(currentRates.kombiSavings)}</td>
+                      <td style={{ padding: dynamicTdPadding, textAlign: 'right', fontWeight: 700 }}>
+                        -{fmt(currentRates.kombiSavings)}
+                      </td>
+                    </tr>
+                  )}
+
                   {/* Position 3: Team-Members */}
                   {(school.totalTeachers || 0) > 0 && (
                     <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
@@ -345,58 +368,14 @@ export const InvoicePDFTemplate: React.FC<InvoicePDFTemplateProps> = ({
                     </tr>
                   )}
 
-                  {/* Position 4: Campus Student Activations */}
-                  {(school.activeCampusCount || 0) > 0 && (() => {
-                    const campusCnt = school.activeCampusCount || 0;
-                    return (
-                      <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
-                        <td style={{ padding: dynamicTdPadding }}>
-                          <strong style={{ display: 'block', color: '#0f172a' }}>Cloud- & Modul-Bereitstellung: Campus</strong>
-                          <span style={{ fontSize: '0.68rem', color: '#64748b' }}>{campusCnt} freigeschaltete Campus-Schüler ({fmt(studentRate)} / Mo. pro Profil)</span>
-                        </td>
-                        <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
-                          {campusCnt} Schüler
-                        </td>
-                        <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
-                          {fmt(studentRate)}
-                        </td>
-                        <td style={{ padding: dynamicTdPadding, textAlign: 'right', fontWeight: 600 }}>
-                          {fmt(campusCnt * studentRate)}
-                        </td>
-                      </tr>
-                    );
-                  })()}
-
-                  {/* Position 5: GrooveLab Student Activations */}
-                  {(school.activeGroovelabCount || 0) > 0 && (() => {
-                    const glCnt = school.activeGroovelabCount || 0;
-                    return (
-                      <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
-                        <td style={{ padding: dynamicTdPadding }}>
-                          <strong style={{ display: 'block', color: '#0f172a' }}>Cloud- & Modul-Bereitstellung: GrooveLab</strong>
-                          <span style={{ fontSize: '0.68rem', color: '#64748b' }}>{glCnt} freigeschaltete GrooveLab-Schüler ({fmt(studentRate)} / Mo. pro Profil)</span>
-                        </td>
-                        <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
-                          {glCnt} Schüler
-                        </td>
-                        <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
-                          {fmt(studentRate)}
-                        </td>
-                        <td style={{ padding: dynamicTdPadding, textAlign: 'right', fontWeight: 600 }}>
-                          {fmt(glCnt * studentRate)}
-                        </td>
-                      </tr>
-                    );
-                  })()}
-
-                  {/* Position 6: Passive Student Profiles */}
+                  {/* Position 4: Passive Student Profiles (Basis-Bereitstellung) */}
                   {(school.passiveStudentsCount || 0) > 0 && (() => {
                     const passCnt = school.passiveStudentsCount || 0;
                     return (
                       <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
                         <td style={{ padding: dynamicTdPadding }}>
                           <strong style={{ display: 'block', color: '#0f172a' }}>Basis-Bereitstellung</strong>
-                          <span style={{ fontSize: '0.68rem', color: '#64748b' }}>Cloud-Speicher, Termin-/Hausaufgaben-Sync & QR-Schnittstelle ({passCnt} Schüler × {fmt(passiveRate)} / Mo.)</span>
+                          <span style={{ fontSize: '0.68rem', color: '#64748b' }}>{passCnt} Schüler-Accounts ({fmt(passiveRate)} / Mo. pro Schüler). DSGVO-Datensätze, Termin-/Hausaufgaben-Sync &amp; QR-Schnittstelle</span>
                         </td>
                         <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
                           {passCnt} Schüler
@@ -411,22 +390,50 @@ export const InvoicePDFTemplate: React.FC<InvoicePDFTemplateProps> = ({
                     );
                   })()}
 
-                  {/* Kombinations-Rabatt row */}
-                  {hasKombi && (
-                    <tr style={{ borderBottom: '1px solid #f1f5f9', color: '#34a853' }}>
-                      <td style={{ padding: dynamicTdPadding }}>
-                        <strong style={{ display: 'block' }}>Kombi-Vorteilsrabatt (Infrastruktur-Bündel)</strong>
-                        <span style={{ fontSize: '0.68rem', color: '#34a853' }}>Sonderkondition für Doppel-Modulnutzung</span>
-                      </td>
-                      <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right' }}>
-                        1 Monat
-                      </td>
-                      <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right' }}>-{fmt(currentRates.kombiSavings)}</td>
-                      <td style={{ padding: dynamicTdPadding, textAlign: 'right', fontWeight: 700 }}>
-                        -{fmt(currentRates.kombiSavings)}
-                      </td>
-                    </tr>
-                  )}
+                  {/* Position 5: Audio-Tresor Storage Add-on */}
+                  {((school.storageAddonGb || invoice.storageAddonGb || 0) > 0) && (() => {
+                    const storageGb = school.storageAddonGb || invoice.storageAddonGb || 0;
+                    const storageFee = school.storageAddonMonthlyFee || invoice.storageAddonMonthlyFee || 0;
+                    return (
+                      <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
+                        <td style={{ padding: dynamicTdPadding }}>
+                          <strong style={{ display: 'block', color: '#0f172a' }}>Zusatz-Speichervolumen: Audio-Tresor (+{storageGb} GB)</strong>
+                          <span style={{ fontSize: '0.68rem', color: '#64748b' }}>Dedizierter Cloud-Speicher für hochauflösende Audio-Aufnahmen &amp; Meisterwerke</span>
+                        </td>
+                        <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
+                          1 Monat
+                        </td>
+                        <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
+                          {fmt(storageFee)}
+                        </td>
+                        <td style={{ padding: dynamicTdPadding, textAlign: 'right', fontWeight: 600 }}>
+                          {fmt(storageFee)}
+                        </td>
+                      </tr>
+                    );
+                  })()}
+
+                  {/* Position 6: GrooveLab Student Activations (Always covered by School) */}
+                  {((school.activeGroovelabCount || 0) > 0) && (() => {
+                    const glCnt = school.activeGroovelabCount || 0;
+                    return (
+                      <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
+                        <td style={{ padding: dynamicTdPadding }}>
+                          <strong style={{ display: 'block', color: '#0f172a' }}>Cloud- &amp; Modul-Bereitstellung: GrooveLab</strong>
+                          <span style={{ fontSize: '0.68rem', color: '#64748b' }}>{glCnt} freigeschaltete GrooveLab-Schüler ({fmt(studentRate)} / Mo. pro Profil). Interaktive Band-Nutzung: Songs, Band-Rooms (Kosten trägt Musikschule)</span>
+                        </td>
+                        <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
+                          {glCnt} Schüler
+                        </td>
+                        <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
+                          {fmt(studentRate)}
+                        </td>
+                        <td style={{ padding: dynamicTdPadding, textAlign: 'right', fontWeight: 600 }}>
+                          {fmt(glCnt * studentRate)}
+                        </td>
+                      </tr>
+                    );
+                  })()}
 
                   {/* Direktabrechnungs-Vorteil row */}
                   {activeStudentDiscount > 0 && (
@@ -449,28 +456,53 @@ export const InvoicePDFTemplate: React.FC<InvoicePDFTemplateProps> = ({
 
               {isAkt && (
                 <>
-                  {/* Position 1: Student Activations */}
-                  <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
-                    <td style={{ padding: dynamicTdPadding }}>
-                      <strong style={{ display: 'block', color: '#0f172a' }}>Cloud- &amp; Modul-Bereitstellung: Campus</strong>
-                      <span style={{ fontSize: '0.68rem', color: '#64748b' }}>
-                        {school.studentBillingOption === 'option2'
-                          ? `Monatliche Cloud-Bereitstellung für Schüler-Profile (${fmt(invoice.studentFee || (isChf ? 1.00 : 0.49))} / Mo. je Schüler). Keine gesonderten Lizenzkaufgebühren.`
-                          : school.studentBillingOption === 'option3_3'
+                  {school.studentBillingOption === 'option2' || !['option3_2', 'option3_3'].includes(school.studentBillingOption || '') ? (
+                    <>
+                      {/* Position 1: Campus Student Activations */}
+                      {(() => {
+                        const campusCnt = school.activeCampusCount !== undefined ? school.activeCampusCount : (invoice.activationsCount || 0);
+                        if (campusCnt <= 0) return null;
+                        return (
+                          <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
+                            <td style={{ padding: dynamicTdPadding }}>
+                              <strong style={{ display: 'block', color: '#0f172a' }}>Cloud- &amp; Modul-Bereitstellung: Campus</strong>
+                              <span style={{ fontSize: '0.68rem', color: '#64748b' }}>{campusCnt} freigeschaltete Campus-Schüler ({fmt(studentRate)} / Mo. pro Profil). Interaktive App-Nutzung: Übe-Timer, Loopstation</span>
+                            </td>
+                            <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
+                              {campusCnt} Schüler
+                            </td>
+                            <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
+                              {fmt(studentRate)}
+                            </td>
+                            <td style={{ padding: dynamicTdPadding, textAlign: 'right', fontWeight: 600 }}>
+                              {fmt(campusCnt * studentRate)}
+                            </td>
+                          </tr>
+                        );
+                      })()}
+                    </>
+                  ) : (
+                    /* Annual Package */
+                    <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
+                      <td style={{ padding: dynamicTdPadding }}>
+                        <strong style={{ display: 'block', color: '#0f172a' }}>Cloud- &amp; Modul-Bereitstellung: Campus</strong>
+                        <span style={{ fontSize: '0.68rem', color: '#64748b' }}>
+                          {school.studentBillingOption === 'option3_3'
                             ? 'Einmalige Komplett-Jahrespauschale für alle Schüler-Profile zum Schuljahresstart (inkl. 20% Rabatt). Keine gesonderten Lizenzkaufgebühren.'
                             : `Jahrespauschale für die Cloud-Bereitstellung aktiver Schüler-Profile (inkl. 10% Rabatt für ${invoice.restmonate || 12} Restmonate). Keine gesonderten Lizenzkaufgebühren.`}
-                      </span>
-                    </td>
-                    <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
-                      {invoice.activationsCount || 0} Schüler
-                    </td>
-                    <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
-                      {fmt(invoice.studentFee || (isChf ? 1.00 : 0.49))}
-                    </td>
-                    <td style={{ padding: dynamicTdPadding, textAlign: 'right', fontWeight: 600 }}>
-                      {fmt(invoice.amount)}
-                    </td>
-                  </tr>
+                        </span>
+                      </td>
+                      <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
+                        {invoice.activationsCount || 0} Schüler
+                      </td>
+                      <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
+                        {fmt(invoice.studentFee || (isChf ? 1.00 : 0.49))}
+                      </td>
+                      <td style={{ padding: dynamicTdPadding, textAlign: 'right', fontWeight: 600 }}>
+                        {fmt(invoice.amount)}
+                      </td>
+                    </tr>
+                  )}
                 </>
               )}
 
@@ -619,8 +651,22 @@ export const InvoicePDFTemplate: React.FC<InvoicePDFTemplateProps> = ({
                   textAlign: 'left'
                 }}>
                   <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    <strong style={{ color: '#0f172a', fontSize: '0.8rem' }}>Zahlungshinweis &amp; Girocode:</strong>
-                    <span>Bitte überweisen Sie den fälligen Betrag innerhalb von 14 Tagen ohne Abzug auf folgendes Bankkonto. Scannen Sie alternativ den QR-Code mit Ihrer Banking-App für eine fehlerfreie Überweisung:</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2px' }}>
+                      <strong style={{ color: '#0f172a', fontSize: '0.8rem' }}>Zahlungshinweis &amp; Girocode:</strong>
+                      <span style={{ 
+                        fontSize: '0.62rem', 
+                        fontWeight: 800, 
+                        color: isPreview ? '#0284c7' : '#b45309', 
+                        background: isPreview ? '#e0f2fe' : '#fef3c7', 
+                        border: `1px solid ${isPreview ? '#bae6fd' : '#fde68a'}`, 
+                        padding: '1px 8px', 
+                        borderRadius: '4px',
+                        letterSpacing: '0.02em'
+                      }}>
+                        {isPreview ? 'Vorschau' : 'Status: Offen (Zahlung ausstehend)'}
+                      </span>
+                    </div>
+                    <span>Bitte überweisen Sie den fälligen Betrag bis zum <strong>{dueDateStr}</strong> ohne Abzug auf folgendes Bankkonto. Scannen Sie alternativ den QR-Code mit Ihrer Banking-App für eine fehlerfreie Überweisung:</span>
                     <div style={{ display: 'grid', gridTemplateColumns: '130px 1fr', marginTop: '8px', gap: '6px' }}>
                       <strong>Zahlungsempfänger:</strong> <span>{operator.company}</span>
                       <strong>IBAN:</strong> <span>{operator.iban}</span>

@@ -85,6 +85,11 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
     ? invoice.id
     : (isGutschrift ? invoice.id.replace('INV-', 'GS-') : invoice.id.replace('INV-', 'RE-'));
 
+  const deMonthsList = [
+    'Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 
+    'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'
+  ];
+
   const getDueDate = (dateStr: string) => {
     if (!dateStr) return '';
     const months: Record<string, number> = {
@@ -98,17 +103,25 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
       const year = parseInt(parts[2]);
       const d = new Date(year, monthIndex, day);
       d.setDate(d.getDate() + 14);
-      const deMonths = [
-        'Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 
-        'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'
-      ];
-      return `${d.getDate()}. ${deMonths[d.getMonth()]} ${d.getFullYear()}`;
+      return `${d.getDate()}. ${deMonthsList[d.getMonth()]} ${d.getFullYear()}`;
     }
     return dateStr;
   };
 
-  const finalDueDateStr = invoice.dueDateStr || getDueDate(invoice.date);
-  const lpStr = invoice.date.split(' ').slice(1).join(' ');
+  const formatDisplayDate = (dStr?: string) => {
+    if (!dStr) return '';
+    if (dStr.includes('T') || (dStr.includes('-') && !dStr.includes('. '))) {
+      const d = new Date(dStr);
+      if (!isNaN(d.getTime())) {
+        return `${d.getDate()}. ${deMonthsList[d.getMonth()]} ${d.getFullYear()}`;
+      }
+    }
+    return dStr;
+  };
+
+  const formattedDate = formatDisplayDate(invoice.date);
+  const finalDueDateStr = invoice.dueDateStr || getDueDate(formattedDate || invoice.date);
+  const lpStr = (formattedDate || invoice.date).split(' ').slice(1).join(' ');
 
   const campusCost = invoice.hasCampus ? masterPricing.priceCampus : 0;
   const groovelabCost = invoice.hasGroovelab ? masterPricing.priceGroovelab : 0;
@@ -174,9 +187,20 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
           vatPercent: 0
         });
       }
-      if ((invoice.storageAddonGb ?? 0) > 0) {
+      if ((invoice.passiveStudentsCount ?? 0) > 0) {
         lineItems.push({
           id: 6,
+          name: 'Basis-Bereitstellung',
+          description: `${invoice.passiveStudentsCount} Schülerdatenbank-Datensätze & DSGVO-Hosting`,
+          quantity: invoice.passiveStudentsCount || 1,
+          unitPrice: isFree ? 0 : 0.09,
+          totalPrice: isFree ? 0 : ((invoice.passiveStudentsCount || 0) * 0.09),
+          vatPercent: 0
+        });
+      }
+      if ((invoice.storageAddonGb ?? 0) > 0) {
+        lineItems.push({
+          id: 7,
           name: `Zusatz-Speichervolumen: Audio-Tresor (+${invoice.storageAddonGb} GB)`,
           description: 'Dedizierter Cloud-Speicher für hochauflösende Audio-Aufnahmen & Masterpieces',
           quantity: 1,
@@ -185,45 +209,35 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
           vatPercent: 0
         });
       }
+      if ((invoice.activeGroovelabCount ?? 0) > 0) {
+        lineItems.push({
+          id: 8,
+          name: 'Cloud- & Modul-Bereitstellung: GrooveLab',
+          description: `${invoice.activeGroovelabCount} freigeschaltete GrooveLab-Schüler (Interaktive Band-Nutzung; Kosten trägt Musikschule)`,
+          quantity: invoice.activeGroovelabCount || 1,
+          unitPrice: isFree ? 0 : masterPricing.priceStudent,
+          totalPrice: isFree ? 0 : ((invoice.activeGroovelabCount || 0) * masterPricing.priceStudent),
+          vatPercent: 0
+        });
+      }
     } else {
-      // AKT Invoice
-      if (studentBillingOption === 'option2') {
-        if ((invoice.activeCampusCount ?? 0) > 0) {
+      // AKT Invoice (Contains strictly Campus student activations)
+      if (studentBillingOption === 'option2' || !['option3_2', 'option3_3'].includes(studentBillingOption || '')) {
+        const campusCnt = invoice.activeCampusCount !== undefined ? invoice.activeCampusCount : (invoice.activationsCount || 0);
+        if (campusCnt > 0) {
           lineItems.push({
-            id: 7,
-            name: 'Cloud- & Modul-Bereitstellung: Schüler (Campus)',
-            description: `${invoice.activeCampusCount} freigeschaltete Campus-Schüler`,
-            quantity: invoice.activeCampusCount || 1,
+            id: 1,
+            name: 'Cloud- & Modul-Bereitstellung: Campus',
+            description: `${campusCnt} freigeschaltete Campus-Schüler (Interaktive App-Nutzung: Übe-Timer, Loopstation)`,
+            quantity: campusCnt || 1,
             unitPrice: isFree ? 0 : masterPricing.priceStudent,
-            totalPrice: isFree ? 0 : ((invoice.activeCampusCount || 0) * masterPricing.priceStudent),
-            vatPercent: 0
-          });
-        }
-        if ((invoice.activeGroovelabCount ?? 0) > 0) {
-          lineItems.push({
-            id: 8,
-            name: 'Cloud- & Modul-Bereitstellung: Schüler (GrooveLab)',
-            description: `${invoice.activeGroovelabCount} freigeschaltete GrooveLab-Schüler`,
-            quantity: invoice.activeGroovelabCount || 1,
-            unitPrice: isFree ? 0 : masterPricing.priceStudent,
-            totalPrice: isFree ? 0 : ((invoice.activeGroovelabCount || 0) * masterPricing.priceStudent),
-            vatPercent: 0
-          });
-        }
-        if ((invoice.passiveStudentsCount ?? 0) > 0) {
-          lineItems.push({
-            id: 9,
-            name: 'Basis-Bereitstellung',
-            description: `${invoice.passiveStudentsCount} Schülerdatenbank-Datensätze & DSGVO-Hosting`,
-            quantity: invoice.passiveStudentsCount || 1,
-            unitPrice: isFree ? 0 : 0.09,
-            totalPrice: isFree ? 0 : ((invoice.passiveStudentsCount || 0) * 0.09),
+            totalPrice: isFree ? 0 : (campusCnt * masterPricing.priceStudent),
             vatPercent: 0
           });
         }
       } else {
         lineItems.push({
-          id: 7,
+          id: 1,
           name: 'Cloud- & Modul-Bereitstellung: Schüleraktivierungen',
           description: `${invoice.activationsCount || 1} freigeschaltete Schüler-Zugänge`,
           quantity: invoice.activationsCount || 1,
@@ -464,7 +478,7 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
           <div style={{ background: '#f8fafc', padding: '10px 14px', borderRadius: '12px', display: 'grid', gridTemplateColumns: '1.2fr 1fr 1.2fr 1fr', gap: '8px', fontSize: '0.7rem', marginBottom: '16px', border: '1px solid #f1f5f9' }}>
             <div>
               <span style={{ color: '#64748b', display: 'block' }}>Rechnungsdatum</span>
-              <strong style={{ color: '#0f172a' }}>{invoice.date.split(' ').slice(0, 3).join(' ')}</strong>
+              <strong style={{ color: '#0f172a' }}>{(formattedDate || invoice.date).split(' ').slice(0, 3).join(' ')}</strong>
             </div>
             <div>
               <span style={{ color: '#64748b', display: 'block' }}>Fälligkeit</span>
@@ -589,6 +603,27 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                         </tr>
                       )}
 
+                      {/* Position 3.5: Basis-Bereitstellung (0,09 €) */}
+                      {(invoice.passiveStudentsCount ?? 0) > 0 && (
+                        <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
+                          <td style={{ padding: '8px 0' }}>
+                            <strong style={{ display: 'block', color: '#0f172a' }}>Basis-Bereitstellung</strong>
+                            <span style={{ fontSize: '0.68rem', color: isFree ? '#ea4335' : '#64748b', fontWeight: isFree ? 700 : 500 }}>
+                              {invoice.passiveStudentsCount} Schüler-Accounts (0,09 € / Mo. pro Schüler). DSGVO-Datensätze, Stundenplan-, Raum- &amp; Termin-Sync, QR-Landingpages.{freeLabel}
+                            </span>
+                          </td>
+                          <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>
+                            {invoice.passiveStudentsCount} {invoice.passiveStudentsCount === 1 ? 'Schüler' : 'Schüler'}
+                          </td>
+                          <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>
+                            {isFree ? '0,00 €' : '0,09 €'}
+                          </td>
+                          <td style={{ padding: '8px 0', textAlign: 'right', fontWeight: 600 }}>
+                            {isFree ? '0,00 €' : `${((invoice.passiveStudentsCount || 0) * 0.09).toFixed(2).replace('.', ',')} €`}
+                          </td>
+                        </tr>
+                      )}
+
                       {/* Position 4: Audio-Tresor Cloud-Speicher Add-on */}
                       {(invoice.storageAddonGb ?? 0) > 0 && (
                         <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
@@ -607,75 +642,58 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                           </td>
                         </tr>
                       )}
+
+                      {/* Position 5: GrooveLab Student Activations (Always covered by School) */}
+                      {(invoice.activeGroovelabCount ?? 0) > 0 && (
+                        <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
+                          <td style={{ padding: '8px 0' }}>
+                            <strong style={{ display: 'block', color: '#0f172a' }}>Cloud- &amp; Modul-Bereitstellung: GrooveLab</strong>
+                            <span style={{ fontSize: '0.68rem', color: isFree ? '#ea4335' : '#64748b', fontWeight: isFree ? 700 : 500 }}>
+                              {invoice.activeGroovelabCount} freigeschaltete GrooveLab-Schüler ({masterPricing.priceStudent.toFixed(2).replace('.', ',')} € / Mo. pro Profil). Interaktive Band-Nutzung: Song-Bibliotheken, Band-Rooms, Repertoire.{freeLabel}
+                            </span>
+                          </td>
+                          <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>
+                            {invoice.activeGroovelabCount} {invoice.activeGroovelabCount === 1 ? 'Schüler' : 'Schüler'}
+                          </td>
+                          <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>
+                            {isFree ? '0,00 €' : `${masterPricing.priceStudent.toFixed(2).replace('.', ',')} €`}
+                          </td>
+                          <td style={{ padding: '8px 0', textAlign: 'right', fontWeight: 600 }}>
+                            {isFree ? '0,00 €' : `${((invoice.activeGroovelabCount || 0) * masterPricing.priceStudent).toFixed(2).replace('.', ',')} €`}
+                          </td>
+                        </tr>
+                      )}
                     </>
                   )}
 
                   {isAkt && (
                     <>
-                      {studentBillingOption === 'option2' ? (
+                      {studentBillingOption === 'option2' || !['option3_2', 'option3_3'].includes(studentBillingOption || '') ? (
                         <>
                           {/* Position 1: Campus Student Activations */}
-                          {(invoice.activeCampusCount ?? 0) > 0 && (
-                            <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
-                              <td style={{ padding: '8px 0' }}>
-                                <strong style={{ display: 'block', color: '#0f172a' }}>Cloud- &amp; Modul-Bereitstellung: Schüler (Campus)</strong>
-                                <span style={{ fontSize: '0.68rem', color: isFree ? '#ea4335' : '#64748b', fontWeight: isFree ? 700 : 500 }}>
-                                  {invoice.activeCampusCount} freigeschaltete Campus-Schüler ({masterPricing.priceStudent.toFixed(2).replace('.', ',')} € / Mo. pro Profil). Im Cloud-Paket inklusive.{freeLabel}
-                                </span>
-                              </td>
-                              <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>
-                                {invoice.activeCampusCount} {invoice.activeCampusCount === 1 ? 'Schüler' : 'Schüler'}
-                              </td>
-                              <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>
-                                {isFree ? '0,00 €' : `${masterPricing.priceStudent.toFixed(2).replace('.', ',')} €`}
-                              </td>
-                              <td style={{ padding: '8px 0', textAlign: 'right', fontWeight: 600 }}>
-                                {isFree ? '0,00 €' : `${((invoice.activeCampusCount || 0) * masterPricing.priceStudent).toFixed(2).replace('.', ',')} €`}
-                              </td>
-                            </tr>
-                          )}
-
-                          {/* Position 2: GrooveLab Student Activations */}
-                          {(invoice.activeGroovelabCount ?? 0) > 0 && (
-                            <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
-                              <td style={{ padding: '8px 0' }}>
-                                <strong style={{ display: 'block', color: '#0f172a' }}>Cloud- &amp; Modul-Bereitstellung: Schüler (GrooveLab)</strong>
-                                <span style={{ fontSize: '0.68rem', color: isFree ? '#ea4335' : '#64748b', fontWeight: isFree ? 700 : 500 }}>
-                                  {invoice.activeGroovelabCount} freigeschaltete GrooveLab-Schüler ({masterPricing.priceStudent.toFixed(2).replace('.', ',')} € / Mo. pro Profil). Im Cloud-Paket inklusive.{freeLabel}
-                                </span>
-                              </td>
-                              <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>
-                                {invoice.activeGroovelabCount} {invoice.activeGroovelabCount === 1 ? 'Schüler' : 'Schüler'}
-                              </td>
-                              <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>
-                                {isFree ? '0,00 €' : `${masterPricing.priceStudent.toFixed(2).replace('.', ',')} €`}
-                              </td>
-                              <td style={{ padding: '8px 0', textAlign: 'right', fontWeight: 600 }}>
-                                {isFree ? '0,00 €' : `${((invoice.activeGroovelabCount || 0) * masterPricing.priceStudent).toFixed(2).replace('.', ',')} €`}
-                              </td>
-                            </tr>
-                          )}
-
-                          {/* Position 3: Basis-Bereitstellung */}
-                          {(invoice.passiveStudentsCount ?? 0) > 0 && (
-                            <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
-                              <td style={{ padding: '8px 0' }}>
-                                <strong style={{ display: 'block', color: '#0f172a' }}>Basis-Bereitstellung</strong>
-                                <span style={{ fontSize: '0.68rem', color: isFree ? '#ea4335' : '#64748b', fontWeight: isFree ? 700 : 500 }}>
-                                  {invoice.passiveStudentsCount} Schüler-Accounts (0,09 € / Mo. pro Schüler). Im Cloud-Paket inklusive.{freeLabel}
-                                </span>
-                              </td>
-                              <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>
-                                {invoice.passiveStudentsCount} {invoice.passiveStudentsCount === 1 ? 'Schüler' : 'Schüler'}
-                              </td>
-                              <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>
-                                {isFree ? '0,00 €' : '0,09 €'}
-                              </td>
-                              <td style={{ padding: '8px 0', textAlign: 'right', fontWeight: 600 }}>
-                                {isFree ? '0,00 €' : `${((invoice.passiveStudentsCount || 0) * 0.09).toFixed(2).replace('.', ',')} €`}
-                              </td>
-                            </tr>
-                          )}
+                          {(() => {
+                            const campusCnt = invoice.activeCampusCount !== undefined ? invoice.activeCampusCount : (invoice.activationsCount || 0);
+                            if (campusCnt <= 0) return null;
+                            return (
+                              <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
+                                <td style={{ padding: '8px 0' }}>
+                                  <strong style={{ display: 'block', color: '#0f172a' }}>Cloud- &amp; Modul-Bereitstellung: Campus</strong>
+                                  <span style={{ fontSize: '0.68rem', color: isFree ? '#ea4335' : '#64748b', fontWeight: isFree ? 700 : 500 }}>
+                                    {campusCnt} freigeschaltete Campus-Schüler ({masterPricing.priceStudent.toFixed(2).replace('.', ',')} € / Mo. pro Profil). Interaktive App-Nutzung: Übe-Timer, Loopstation, Schüler-Protokoll.{freeLabel}
+                                  </span>
+                                </td>
+                                <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>
+                                  {campusCnt} {campusCnt === 1 ? 'Schüler' : 'Schüler'}
+                                </td>
+                                <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>
+                                  {isFree ? '0,00 €' : `${masterPricing.priceStudent.toFixed(2).replace('.', ',')} €`}
+                                </td>
+                                <td style={{ padding: '8px 0', textAlign: 'right', fontWeight: 600 }}>
+                                  {isFree ? '0,00 €' : `${(campusCnt * masterPricing.priceStudent).toFixed(2).replace('.', ',')} €`}
+                                </td>
+                              </tr>
+                            );
+                          })()}
                         </>
                       ) : (
                         /* Position for annual package */
@@ -824,8 +842,22 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                   textAlign: 'left'
                 }}>
                   <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    <strong style={{ color: '#0f172a', fontSize: '0.8rem' }}>Zahlungshinweis &amp; Girocode:</strong>
-                    <span>Bitte überweisen Sie den fälligen Betrag innerhalb von 14 Tagen ohne Abzug auf folgendes Bankkonto. Scannen Sie alternativ den QR-Code mit Ihrer Banking-App für eine fehlerfreie Überweisung:</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2px' }}>
+                      <strong style={{ color: '#0f172a', fontSize: '0.8rem' }}>Zahlungshinweis &amp; Girocode:</strong>
+                      <span style={{ 
+                        fontSize: '0.62rem', 
+                        fontWeight: 800, 
+                        color: isPreview ? '#0284c7' : '#b45309', 
+                        background: isPreview ? '#e0f2fe' : '#fef3c7', 
+                        border: `1px solid ${isPreview ? '#bae6fd' : '#fde68a'}`, 
+                        padding: '1px 8px', 
+                        borderRadius: '4px',
+                        letterSpacing: '0.02em'
+                      }}>
+                        {isPreview ? 'Vorschau' : 'Status: Offen (Zahlung ausstehend)'}
+                      </span>
+                    </div>
+                    <span>Bitte überweisen Sie den fälligen Betrag bis zum <strong>{finalDueDateStr}</strong> ohne Abzug auf folgendes Bankkonto. Scannen Sie alternativ den QR-Code mit Ihrer Banking-App für eine fehlerfreie Überweisung:</span>
                     <div style={{ display: 'grid', gridTemplateColumns: '130px 1fr', marginTop: '8px', gap: '6px' }}>
                       <strong>Zahlungsempfänger:</strong> <span>{operatorCompany}</span>
                       <strong>IBAN:</strong> <span>{operatorIban}</span>

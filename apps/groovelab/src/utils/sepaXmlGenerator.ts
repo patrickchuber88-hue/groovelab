@@ -1,7 +1,7 @@
 /**
- * ISO 20022 SEPA Direct Debit XML Generator (pain.008.001.02)
+ * ISO 20022 SEPA Direct Debit XML Generator (pain.008.001.08)
  * Standardisierter Lastschrifteinzug für B2B-Musikschulträger und Direktzahler
- * Compliance: EPC SEPA Scheme Rulebook, GoBD, ISO 20022
+ * Compliance: EPC SEPA Scheme Rulebook (Version 2023/2024+), GoBD, ISO 20022
  */
 
 export interface SepaDebtorTransaction {
@@ -29,7 +29,7 @@ export interface SepaDirectDebitBatchOptions {
 }
 
 /**
- * Erzeugt eine ISO 20022 pain.008.001.02 XML-Datei für den SEPA-Lastschrifteinzug
+ * Erzeugt eine ISO 20022 pain.008.001.08 XML-Datei für den SEPA-Lastschrifteinzug
  */
 export function generateSepaDirectDebitXml(options: SepaDirectDebitBatchOptions): string {
   const now = new Date();
@@ -50,7 +50,7 @@ export function generateSepaDirectDebitXml(options: SepaDirectDebitBatchOptions)
     .replace(/'/g, '&apos;');
 
   let xml = `<?xml version="1.0" encoding="UTF-8"?>
-<Document xmlns="urn:iso:std:iso:20022:tech:xsd:pain.008.001.02" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+<Document xmlns="urn:iso:std:iso:20022:tech:xsd:pain.008.001.08" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <CstmrDrctDbtInitn>
     <GrpHdr>
       <MsgId>${escapeXml(msgId)}</MsgId>

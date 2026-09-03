@@ -8,7 +8,7 @@ import {
 import { supabase } from '../../../lib/supabase';
 import { School, SchoolStat, PendingUser } from '../MasterAdminTypes';
 import { MasterPricingRates, isSchoolBypassActive } from '../../../domain/pricingEngine';
-import { isSchoolTrialActive } from '../../../domain/schoolMetricsAggregator';
+import { isSchoolTrialActive, resolveStorageAddonFee } from '../../../domain/schoolMetricsAggregator';
 import { calculateCampusGroovelabBilling } from '../../../domain/billingCalculator';
 import { generateSlaCertificatePDF, generateIncidentReportPDF, generateExecutiveSummaryPDF } from '../../../utils/pdfGenerator';
 
@@ -449,61 +449,91 @@ export const ExecutiveTab: React.FC<ExecutiveTabProps> = ({
     }
   };
 
-  // 1. Committed Base MRR (Fixed School Subscription Flatrates)
+  // 1. Canonical Multi-Tenant MRR Aggregation (100% synchronized with Financial Control & Billing Engine)
   let payingSchoolsCount = 0;
-  const committedBaseMrr = validSchools.reduce((acc, s) => {
-    const isBypass = isSchoolBypassActive(s);
-    const isTrial = isSchoolTrialActive(s);
-    const isPaused = s.is_paused || s.status === 'suspended';
-    if (isBypass || isTrial || isPaused) return acc;
-
-    payingSchoolsCount++;
-    const priceCampus = s.custom_price_campus ?? s.grandfathered_campus_price ?? masterPricing.priceCampus;
-    const priceGroovelab = s.custom_price_groovelab ?? s.grandfathered_groovelab_price ?? masterPricing.priceGroovelab;
-    const priceKombi = s.custom_price_kombi ?? s.grandfathered_kombi_price ?? masterPricing.priceKombi;
-
-    let baseFlat = 0;
-    if (s.has_campus_subscription && s.has_groovelab_subscription) baseFlat = priceKombi;
-    else if (s.has_campus_subscription) baseFlat = priceCampus;
-    else if (s.has_groovelab_subscription) baseFlat = priceGroovelab;
-
-    return acc + baseFlat;
-  }, 0);
-
-  // 2. Seat & Usage MRR (Teachers & Active Students: B2B + B2C)
+  let committedBaseMrr = 0;
+  let b2bSeatMrr = 0;
+  let storageAddonMrr = 0;
   let totalB2bTeachers = 0;
   let totalB2bStudents = 0;
   let totalB2cStudents = 0;
+  let activeStorageAddonCount = 0;
+  let activeStorageAddonGb = 0;
+  let trialStorageAddonCount = 0;
+  let trialStorageAddonGb = 0;
 
-  const b2bSeatMrr = validSchools.reduce((acc, s) => {
+  validSchools.forEach(s => {
     const isBypass = isSchoolBypassActive(s);
     const isTrial = isSchoolTrialActive(s);
     const isPaused = s.is_paused || s.status === 'suspended';
-    if (isBypass || isTrial || isPaused) return acc;
 
-    const priceTeacher = s.custom_price_teacher ?? s.grandfathered_teacher_price ?? masterPricing.priceTeacher;
-    const priceStudent = s.custom_price_student ?? s.grandfathered_student_price ?? masterPricing.priceStudent;
-    const pricePassive = s.custom_price_passive_student ?? s.grandfathered_passive_student_price ?? (masterPricing as any).pricePassiveStudent ?? 0.09;
-
-    const stats: any = schoolStats[s.id] || {};
+    const stats = (schoolStats[s.id] || {}) as any;
     const teachers = stats.teachers ?? stats.totalTeachers ?? s.teachers_count ?? 0;
     const campusStudents = stats.studentsCampus ?? 0;
     const groovelabStudents = stats.studentsGroovelab ?? 0;
+    const activeStudents = stats.activeStudents ?? Math.max(campusStudents, groovelabStudents);
     const totalStudents = stats.students ?? s.active_students_count ?? (campusStudents + groovelabStudents);
-    const activeStudentsMax = stats.activeStudents ?? Math.max(campusStudents, groovelabStudents);
-    const passiveStudents = stats.passiveStudents ?? Math.max(0, totalStudents - activeStudentsMax);
+    const passiveStudents = stats.passiveStudents ?? Math.max(0, totalStudents - activeStudents);
 
     totalB2bTeachers += teachers;
     totalB2bStudents += (campusStudents + groovelabStudents);
 
-    // Calculate exact seat & usage fees
-    const teacherFee = teachers * priceTeacher;
-    const campusStudentFee = s.has_campus_subscription ? campusStudents * priceStudent : 0;
-    const groovelabStudentFee = s.has_groovelab_subscription ? groovelabStudents * priceStudent : 0;
-    const passiveStudentFee = passiveStudents * pricePassive;
+    let addonGb = Number(stats.storageAddonGb ?? (s.storage_addon_gb || s.extra_storage_gb || 0));
+    if (s.storage_addon_status === 'none' || s.storage_addon_status === 'inactive') {
+      addonGb = 0;
+    } else if (addonGb === 0 && s.extra_billing_option === 'option1' && s.storage_addon_status === 'active') {
+      addonGb = 20;
+    }
 
-    return acc + teacherFee + campusStudentFee + groovelabStudentFee + passiveStudentFee;
-  }, 0);
+    if (isBypass || isTrial || isPaused) {
+      if (addonGb > 0) {
+        trialStorageAddonCount++;
+        trialStorageAddonGb += addonGb;
+      }
+      return;
+    }
+
+    payingSchoolsCount++;
+
+    const isBooked = Boolean(s.is_billing_booked) || s.status === 'active';
+    const hasCamp = (isBooked && !s.has_campus_subscription && !s.has_groovelab_subscription) ? true : !!s.has_campus_subscription;
+    const hasGroove = (isBooked && !s.has_campus_subscription && !s.has_groovelab_subscription) ? true : !!s.has_groovelab_subscription;
+
+    const rates = {
+      priceCampus: s.custom_price_campus ?? s.grandfathered_campus_price ?? masterPricing.priceCampus,
+      priceGroovelab: s.custom_price_groovelab ?? s.grandfathered_groovelab_price ?? masterPricing.priceGroovelab,
+      priceKombi: s.custom_price_kombi ?? s.grandfathered_kombi_price ?? masterPricing.priceKombi,
+      priceTeacher: s.custom_price_teacher ?? s.grandfathered_teacher_price ?? masterPricing.priceTeacher,
+      priceStudent: s.custom_price_student ?? s.grandfathered_student_price ?? masterPricing.priceStudent,
+      pricePassiveStudent: s.custom_price_passive_student ?? s.grandfathered_passive_student_price ?? (masterPricing as any).pricePassiveStudent ?? 0.09
+    };
+
+    const storageFee = (s.storage_addon_status === 'none' || s.storage_addon_status === 'inactive' || addonGb === 0)
+      ? 0
+      : resolveStorageAddonFee(addonGb, s.storage_addon_monthly_fee);
+
+    const billingCalc = calculateCampusGroovelabBilling({
+      hasCampusModule: hasCamp,
+      hasGroovelabModule: hasGroove,
+      activeTeacherCount: teachers,
+      activeStudentCount: activeStudents,
+      campusStudentCount: campusStudents,
+      groovelabStudentCount: groovelabStudents,
+      passiveStudentCount: passiveStudents,
+      storageAddonMonthlyFee: storageFee,
+      directBillingMode: s.student_billing_option === 'student_full' ? 'full' : (s.student_billing_option === 'student_partial' ? 'partial' : 'none'),
+      rates
+    });
+
+    committedBaseMrr += billingCalc.baseServerFlatRate;
+    b2bSeatMrr += (billingCalc.teacherServiceFeeTotal + billingCalc.passiveStudentFeeTotal + billingCalc.schoolContributionTotal);
+    storageAddonMrr += billingCalc.storageAddonFeeTotal;
+
+    if (addonGb > 0) {
+      activeStorageAddonCount++;
+      activeStorageAddonGb += addonGb;
+    }
+  });
 
   const b2cSeatMrr = pendingUsers.reduce((acc, u) => {
     const school = validSchools.find(s => s.id === u.school_id);
@@ -520,39 +550,6 @@ export const ExecutiveTab: React.FC<ExecutiveTabProps> = ({
   }, 0);
 
   const seatUsageMrr = b2bSeatMrr + b2cSeatMrr;
-
-  // 3. Storage Add-on MRR (Hetzner Audio-Tresor expansions)
-  let activeStorageAddonCount = 0;
-  let activeStorageAddonGb = 0;
-  let trialStorageAddonCount = 0;
-  let trialStorageAddonGb = 0;
-
-  const storageAddonMrr = validSchools.reduce((acc, s: any) => {
-    const isBypass = isSchoolBypassActive(s);
-    const isTrial = isSchoolTrialActive(s);
-    const isPaused = s.is_paused || s.status === 'suspended';
-
-    let addonGb = Number(s.storage_addon_gb || s.extra_storage_gb || 0);
-    if (addonGb === 0 && s.extra_billing_option === 'option1') addonGb = 20;
-
-    if (isBypass || isTrial || isPaused) {
-      if (addonGb > 0) {
-        trialStorageAddonCount++;
-        trialStorageAddonGb += addonGb;
-      }
-      return acc;
-    }
-
-    const addonFee = Number(s.storage_addon_monthly_fee || (addonGb === 25 ? 3.99 : addonGb === 20 ? 5.49 : addonGb === 10 ? 2.99 : addonGb === 5 ? 1.49 : addonGb === 50 ? 6.99 : addonGb === 100 ? 11.99 : addonGb === 250 ? 24.99 : 0));
-
-    if (addonGb > 0 && (s.storage_addon_status === 'active' || !s.storage_addon_status || s.storage_addon_status === 'approved')) {
-      activeStorageAddonCount++;
-      activeStorageAddonGb += addonGb;
-      return acc + addonFee;
-    }
-    return acc;
-  }, 0);
-
   const totalProvisionedStorageGb = activeStorageAddonGb + trialStorageAddonGb;
 
   const b2bMrr = committedBaseMrr + b2bSeatMrr + storageAddonMrr;

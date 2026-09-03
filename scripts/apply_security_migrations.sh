@@ -47,8 +47,10 @@ apply_migration "$MIGRATIONS_DIR/343_deprecate_and_cleanup_cooperations.sql"
 apply_migration "$MIGRATIONS_DIR/344_secure_employee_role_management_rpc.sql"
 apply_migration "$MIGRATIONS_DIR/345_restore_and_harden_set_initial_student_pin_rpc.sql"
 apply_migration "$MIGRATIONS_DIR/346_revisionssicheres_buchungsjournal_und_storage.sql"
+apply_migration "$MIGRATIONS_DIR/355_save_parent_controls_and_audit_hardening.sql"
+apply_migration "$MIGRATIONS_DIR/356_revisionssichere_elterneinstellungen_und_parent_permissions.sql"
 
 echo "🔄 Schema-Cache aktualisieren..."
 ssh "$SERVER" "docker exec -i $DB_CONTAINER psql -U postgres -d postgres -c \"NOTIFY pgrst, 'reload schema';\"" || true
 
-echo "✅ Alle Sicherheitsmigrationen (330-346) wurden erfolgreich auf dem Produktivserver angewendet!"
+echo "✅ Alle Sicherheitsmigrationen (330-356) wurden erfolgreich auf dem Produktivserver angewendet!"

@@ -1050,25 +1050,78 @@ export function TeacherDashboard({
       
       if (!dateStr) return;
 
-      if (targetSlot?.is_virtual || (slotId && String(slotId).startsWith('virt_'))) {
-        const { error } = await supabase
-          .from('schedule_occurrences')
-          .insert({
-            schedule_id: scheduleId || null,
-            student_id: studentId || null,
-            teacher_id: userId,
-            date: dateStr,
-            start_time: startTime,
-            duration: duration,
-            status: 'cancelled',
-            student_acknowledged: true
-          });
+      const isVirtual = Boolean(
+        targetSlot?.is_virtual ||
+        (slotId && (String(slotId).startsWith('virt_') || String(slotId).startsWith('virtual-')))
+      );
 
-        if (error) {
-          console.error('Error inserting cancellation:', error);
-          alert('Fehler beim Absagen des Termins: ' + error.message);
+      if (isVirtual) {
+        let existingId: string | null = null;
+        if (scheduleId && dateStr) {
+          const { data: existingOcc } = await supabase
+            .from('schedule_occurrences')
+            .select('id')
+            .eq('schedule_id', scheduleId)
+            .eq('date', dateStr)
+            .maybeSingle();
+          if (existingOcc?.id) {
+            existingId = existingOcc.id;
+          }
+        }
+
+        let opError = null;
+        if (existingId) {
+          const { error } = await supabase
+            .from('schedule_occurrences')
+            .update({
+              status: 'cancelled',
+              student_acknowledged: true,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', existingId);
+          opError = error;
+        } else {
+          const { error } = await supabase
+            .from('schedule_occurrences')
+            .insert({
+              schedule_id: scheduleId || null,
+              student_id: studentId || null,
+              teacher_id: userId,
+              date: dateStr,
+              start_time: startTime,
+              duration: duration,
+              status: 'cancelled',
+              student_acknowledged: true
+            });
+          opError = error;
+        }
+
+        if (opError) {
+          console.error('Error inserting/updating cancellation:', opError);
+          alert('Fehler beim Absagen des Termins: ' + opError.message);
         } else {
           setToastMessage('Termin erfolgreich abgesagt.');
+          try {
+            if (studentId && userId && dateStr) {
+              const [y, m, d] = String(dateStr).split('-').map(Number);
+              const occDate = (y && m && d) ? new Date(y, m - 1, d) : new Date();
+              const shortDay = occDate.toLocaleDateString('de-DE', { weekday: 'short' });
+              const shortDate = occDate.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' });
+              const timeLabel = startTime.substring(0, 5);
+              const targetOccId = existingId || (scheduleId ? `virtual-${scheduleId}-${dateStr}` : null);
+
+              await supabase.from('campus_direct_messages').insert({
+                sender_id: userId,
+                recipient_id: studentId,
+                content: `Dein Unterrichtstermin am ${shortDay} ${shortDate} um ${timeLabel} Uhr fällt aus.`,
+                occurrence_id: targetOccId,
+                is_system: true,
+                message_type: 'reschedule_notification'
+              });
+            }
+          } catch (dmErr) {
+            console.warn('Could not insert cancellation system message in TeacherDashboard:', dmErr);
+          }
           fetchData();
         }
       } else if (slotId) {
@@ -1086,28 +1139,6 @@ export function TeacherDashboard({
           alert('Fehler beim Absagen des Termins: ' + error.message);
         } else {
           setToastMessage('Termin erfolgreich abgesagt.');
-          fetchData();
-        }
-      } else {
-        const { error } = await supabase
-          .from('schedule_occurrences')
-          .insert({
-            schedule_id: scheduleId || null,
-            student_id: studentId || null,
-            teacher_id: userId,
-            date: dateStr,
-            start_time: startTime,
-            duration: duration,
-            status: 'cancelled',
-            student_acknowledged: true
-          });
-
-        if (error) {
-          console.error('Error inserting cancellation:', error);
-          alert('Fehler beim Absagen des Termins: ' + error.message);
-        } else {
-          setToastMessage('Termin erfolgreich abgesagt.');
-          // Send system cancellation message to direct messages
           try {
             if (studentId && userId && dateStr) {
               const [y, m, d] = String(dateStr).split('-').map(Number);
@@ -1115,13 +1146,12 @@ export function TeacherDashboard({
               const shortDay = occDate.toLocaleDateString('de-DE', { weekday: 'short' });
               const shortDate = occDate.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' });
               const timeLabel = startTime.substring(0, 5);
-              const targetOccId = (slotId && !String(slotId).startsWith('virt_')) ? slotId : (scheduleId ? `virtual-${scheduleId}-${dateStr}` : null);
 
               await supabase.from('campus_direct_messages').insert({
                 sender_id: userId,
                 recipient_id: studentId,
                 content: `Dein Unterrichtstermin am ${shortDay} ${shortDate} um ${timeLabel} Uhr fällt aus.`,
-                occurrence_id: targetOccId,
+                occurrence_id: slotId,
                 is_system: true,
                 message_type: 'reschedule_notification'
               });
@@ -7418,7 +7448,7 @@ useEffect(() => {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', background: '#fafafa', borderRadius: '16px', padding: '16px 18px' }}>
                   <div>
                     <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                      KW 34 (VORWOCHE)
+                      LETZTE WOCHE (VORWOCHE)
                     </span>
                     <p style={{ margin: '4px 0 0 0', fontSize: '0.78rem', color: '#64748b', fontStyle: 'italic' }}>
                       Keine Hausaufgaben erfasst.
@@ -7426,7 +7456,7 @@ useEffect(() => {
                   </div>
                   <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '10px' }}>
                     <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                      KW 35 (HEUTE / DIESE WOCHE)
+                      DIESE WOCHE (HEUTE)
                     </span>
                     <p style={{ margin: '4px 0 0 0', fontSize: '0.78rem', color: '#64748b', fontStyle: 'italic' }}>
                       Noch keine Hausaufgaben erfasst.
@@ -7877,10 +7907,15 @@ useEffect(() => {
                   </div>
                 )}
 
-                {/* KW Vorwoche */}
+                {/* Vorwoche */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <div style={{ fontSize: '0.74rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                    KW {prep.prevWeekNum || '?'} (Vorwoche)
+                  <div style={{ fontSize: '0.74rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span>Letzte Woche (Vorwoche)</span>
+                    {prep.prevWeekNum && (
+                      <span style={{ fontSize: '0.66rem', fontWeight: 600, color: '#94a3b8', textTransform: 'none' }}>
+                        · KW {prep.prevWeekNum}
+                      </span>
+                    )}
                   </div>
                   {((formattedPrevWeekItems && formattedPrevWeekItems.length > 0) || (prep.prevWeekNotes && prep.prevWeekNotes.length > 0)) ? (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -7990,10 +8025,15 @@ useEffect(() => {
                   )}
                 </div>
 
-                {/* KW Diese Woche */}
+                {/* Diese Woche */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <div style={{ fontSize: '0.74rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                    KW {prep.currentWeekNum || '?'} (Heute / Diese Woche)
+                  <div style={{ fontSize: '0.74rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span>Diese Woche (Heute)</span>
+                    {prep.currentWeekNum && (
+                      <span style={{ fontSize: '0.66rem', fontWeight: 600, color: '#94a3b8', textTransform: 'none' }}>
+                        · KW {prep.currentWeekNum}
+                      </span>
+                    )}
                   </div>
                   {((formattedCurrentWeekItems && formattedCurrentWeekItems.length > 0) || (prep.currentWeekNotes && prep.currentWeekNotes.length > 0)) ? (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>

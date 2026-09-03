@@ -27033,7 +27033,6 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                 const isExtraAnnualBilling = extraBillingOption === 'option1' || extraBillingOption === 'option3_2';
                                 const extraAnnualPrice = extraBillingOption === 'option1' ? getDynamicAnnualPrice(contractStartDate, false) : extraBillingOption === 'option3_2' ? getDynamicAnnualPrice(contractStartDate, true) : 0;
                                 const extraEinmalzahlungTotal = isExtraAnnualBilling ? bookedExtraUsers * extraAnnualPrice : 0;
-
                                 const totalB2BWithEinmalzahlung = currentTotalB2B + einmalzahlungTotal + extraEinmalzahlungTotal;
 
                                 // Helper function to get last day of month as string
@@ -27087,12 +27086,23 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                   const dueYear = dueDateObj.getFullYear();
                                   const dueDateStr = `${dueDay}. ${dueMonthName} ${dueYear}`;
 
-                                  const status = isCreated ? 'Bezahlt' : 'Vorschau';
-                                  const paid = isCreated;
+                                  const infId = `INF-${schoolNumericId}-${yearShort}${monthStr}-01`;
+                                  const aktId = `AKT-${schoolNumericId}-${yearShort}${monthStr}-01`;
+
+                                  // Payment Status Invariant: Invoices are 'Versendet' (open) until actually marked as paid via bank reconciliation!
+                                  let paidInvoicesList: string[] = [];
+                                  try {
+                                    const storedPaid = localStorage.getItem(`paid_invoices_${schoolId}`);
+                                    paidInvoicesList = storedPaid ? JSON.parse(storedPaid) : [];
+                                  } catch {}
+
+                                  const isInfPaid = paidInvoicesList.includes(infId) || paidInvoicesList.includes(`RE-${schoolNumericId}-${yearShort}${monthStr}-01`);
+                                  const isAktPaid = paidInvoicesList.includes(aktId);
+
+                                  const infStatus = isInfPaid ? 'Bezahlt' : (isCreated ? 'Versendet' : 'Vorschau');
+                                  const aktStatus = isAktPaid ? 'Bezahlt' : (isCreated ? 'Versendet' : 'Vorschau');
 
                                   // Calculate clean 2-Rechnung-Trennung (INF vs. AKT)
-                                  const infPureAmount = subscriptionBypass ? 0 : (moduleCost_global + teacherServiceFeeTotal_global + storageAddonFee_global);
-
                                   const targetMonthZeroIndexed = m - 1;
                                   const targetYear = y;
                                   const targetMonthEnd = new Date(y, m, 0, 23, 59, 59, 999);
@@ -27126,14 +27136,19 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                     ? passiveStudentsCount_global 
                                     : Math.max(0, monthTotalStudents - Math.max(monthCampusActiveCount, monthGroovelabActiveCount));
 
-                                  const monthAktPureAmount = subscriptionBypass ? 0 : (
-                                    (monthCampusActiveCount * (effectiveSchoolRates.priceStudent || 0.49)) +
-                                    (monthGroovelabActiveCount * (effectiveSchoolRates.priceStudent || 0.49)) +
-                                    (monthPassiveCount * 0.09)
-                                  );
+                                  const monthPassiveFee = parseFloat((monthPassiveCount * 0.09).toFixed(2));
+                                  const monthGroovelabStudentFee = parseFloat((monthGroovelabActiveCount * (effectiveSchoolRates.priceStudent || 0.49)).toFixed(2));
+
+                                  // 1. Infrastruktur-Rechnung enthält Software, Hosting, Lehrkräfte, Basis-Bereitstellung, Audio-Tresor UND GrooveLab-Schüleraktivierungen (da GrooveLab immer von Musikschule getragen wird)
+                                  const infPureAmount = subscriptionBypass ? 0 : parseFloat((moduleCost_global + teacherServiceFeeTotal_global + monthPassiveFee + storageAddonFee_global + monthGroovelabStudentFee).toFixed(2));
+
+                                  // 2. Sammelrechnung Schüleraktivierungen enthält ab sofort NUR noch die Campus-Schüleraktivierungen
+                                  const monthAktPureAmount = subscriptionBypass ? 0 : parseFloat((
+                                    monthCampusActiveCount * (effectiveSchoolRates.priceStudent || 0.49)
+                                  ).toFixed(2));
 
                                   const monthActivations = students.filter((s: any) => {
-                                    const isCurrentlyActive = s.isCampusActive || s.isGroovelabActive || s.is_campus_active || s.is_groovelab_active;
+                                    const isCurrentlyActive = s.isCampusActive || s.isCampusActive || s.is_campus_active;
                                     if (!isCurrentlyActive) return false;
                                     const actDate = s.activated_at ? new Date(s.activated_at) : (s.created_at ? new Date(s.created_at) : null);
                                     if (!actDate) return false;
@@ -27149,36 +27164,32 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                   let effectiveActivationsCount = monthCampusActiveCount;
                                   let invoiceStudentsList: any[] = [];
 
-                                  if (studentBillingOption === "option2") {
+                                  if (studentBillingOption === "option3_3") {
+                                    studentFee = effectiveSchoolRates.priceStudent ? effectiveSchoolRates.priceStudent * 0.8 : 0.39;
+                                    effectiveActivationsCount = monthTotalStudents;
+                                    invoiceStudentsList = isCurrent ? students : students.filter((s: any) => {
+                                      const actDate = s.activated_at ? new Date(s.activated_at) : (s.created_at ? new Date(s.created_at) : null);
+                                      if (actDate && actDate > targetMonthEnd) return false;
+                                      return true;
+                                    });
+                                  } else if (studentBillingOption === "option3_2") {
+                                    studentFee = effectiveSchoolRates.priceStudent ? effectiveSchoolRates.priceStudent * 0.9 : 0.44;
+                                    effectiveActivationsCount = isCurrent ? monthActivationsCount : studentsActiveInMonth.length;
+                                    invoiceStudentsList = isCurrent ? monthActivations : studentsActiveInMonth;
+                                  } else {
                                     studentFee = effectiveSchoolRates.priceStudent || 0.49;
                                     effectiveActivationsCount = monthCampusActiveCount;
-                                    // For running monthly billing, list all students active in this month
-                                    invoiceStudentsList = isCurrent 
-                                      ? students.filter((s: any) => s.isCampusActive || s.isGroovelabActive || s.is_campus_active || s.is_groovelab_active)
-                                      : studentsActiveInMonth;
-                                  } else if (studentBillingOption === "option3_2") {
-                                    studentFee = getDynamicAnnualPrice(contractStartDate, 10);
-                                    effectiveActivationsCount = monthActivationsCount;
-                                    invoiceStudentsList = monthActivations;
-                                  } else if (studentBillingOption === "option3_3") {
-                                    studentFee = getDynamicAnnualPrice(contractStartDate, 20);
-                                    if (m === 9) {
-                                      effectiveActivationsCount = students.length;
-                                      invoiceStudentsList = students;
-                                    } else {
-                                      effectiveActivationsCount = monthActivationsCount;
-                                      invoiceStudentsList = monthActivations;
-                                    }
+                                    invoiceStudentsList = isCurrent ? students.filter((s: any) => s.isCampusActive || s.is_campus_active) : studentsActiveInMonth.filter((s: any) => s.isCampusActive || s.is_campus_active);
                                   }
                                   
-                                  const aktAmount = (studentBillingOption === "option3_2" || studentBillingOption === "option3_3")
-                                    ? parseFloat((effectiveActivationsCount * studentFee).toFixed(2))
-                                    : parseFloat(monthAktPureAmount.toFixed(2));
+                                  let aktAmount = monthAktPureAmount;
+                                  if (studentBillingOption === "option3_3") {
+                                    aktAmount = subscriptionBypass ? 0 : parseFloat((monthTotalStudents * studentFee * 12).toFixed(2));
+                                  } else if (studentBillingOption === "option3_2") {
+                                    aktAmount = subscriptionBypass ? 0 : parseFloat((effectiveActivationsCount * studentFee * restmonate).toFixed(2));
+                                  }
 
-                                  const infId = `INF-${schoolNumericId}-${yearShort}${monthStr}-01`;
-                                  const aktId = `AKT-${schoolNumericId}-${yearShort}${monthStr}-01`;
-
-                                  // GoBD Revisionssicherheit: Snapshotting for completed months (v4)
+                                  // GoBD Revisionssicherheit: Snapshotting for completed months (v5)
                                   let infRecord: any = {
                                     id: infId,
                                     type: "INF",
@@ -27196,14 +27207,18 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                     extraEinmalzahlung: 0,
                                     b2c: 0,
                                     einmalzahlung: 0,
-                                    status: status,
-                                    paid: paid,
+                                    status: infStatus,
+                                    paid: isInfPaid,
                                     creationTime: creationTime,
                                     totalTeachersCount: billableTeachersCount,
+                                    passiveStudentsCount: monthPassiveCount,
+                                    passiveStudentsHostingFee: monthPassiveFee,
+                                    activeGroovelabCount: monthGroovelabActiveCount,
+                                    groovelabStudentsHostingFee: monthGroovelabStudentFee,
                                     storageAddonGb: Number(currentSchoolProfile?.storage_addon_gb || selectedStorageAddonGb || 0),
                                     storageAddonMonthlyFee: selectedStorageAddonFee || Number(currentSchoolProfile?.storage_addon_monthly_fee || 0),
                                     auditHash: `CG-INF-${schoolNumericId}-${yearShort}${monthStr}`,
-                                    gobd_version: 4,
+                                    gobd_version: 5,
                                     activatedStudentsList: []
                                   };
 
@@ -27224,17 +27239,17 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                     extraEinmalzahlung: 0,
                                     b2c: aktAmount,
                                     einmalzahlung: (studentBillingOption === "option3_2" || studentBillingOption === "option3_3") ? aktAmount : 0,
-                                    status: status,
-                                    paid: paid,
+                                    status: aktStatus,
+                                    paid: isAktPaid,
                                     creationTime: creationTime,
                                     activeCampusCount: monthCampusActiveCount,
-                                    activeGroovelabCount: monthGroovelabActiveCount,
-                                    passiveStudentsCount: monthPassiveCount,
+                                    activeGroovelabCount: 0,
+                                    passiveStudentsCount: 0,
                                     activationsCount: effectiveActivationsCount,
                                     restmonate: restmonate,
                                     studentFee: studentFee,
                                     auditHash: `CG-AKT-${schoolNumericId}-${yearShort}${monthStr}`,
-                                    gobd_version: 4,
+                                    gobd_version: 5,
                                     activatedStudentsList: invoiceStudentsList.map((s: any) => {
                                       const isNewlyActivated = (() => {
                                         if (!s.activated_at) return false;
@@ -27254,16 +27269,16 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                     })
                                   };
 
-                                  // GoBD Freeze: If month is closed, read from or persist to immutable snapshot (v4)
+                                  // GoBD Freeze: If month is closed, read from or persist to immutable snapshot (v5)
                                   if (typeof window !== "undefined" && !isCurrent) {
                                     try {
-                                      const snapInfKey = `campus_gobd_v4_${schoolId}_${infId}`;
-                                      const snapAktKey = `campus_gobd_v4_${schoolId}_${aktId}`;
+                                      const snapInfKey = `campus_gobd_v5_${schoolId}_${infId}`;
+                                      const snapAktKey = `campus_gobd_v5_${schoolId}_${aktId}`;
                                       const storedInf = localStorage.getItem(snapInfKey);
                                       const storedAkt = localStorage.getItem(snapAktKey);
                                       if (storedInf) {
                                         const parsed = JSON.parse(storedInf);
-                                        if (parsed && parsed.gobd_version === 4 && parsed.amount > 0) {
+                                        if (parsed && parsed.gobd_version === 5 && parsed.amount > 0) {
                                           infRecord = { ...infRecord, ...parsed, isCurrentMonth: false };
                                         } else if (infRecord.amount > 0) {
                                           localStorage.setItem(snapInfKey, JSON.stringify(infRecord));
@@ -27273,7 +27288,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                       }
                                       if (storedAkt) {
                                         const parsed = JSON.parse(storedAkt);
-                                        if (parsed && parsed.gobd_version === 4 && parsed.amount !== undefined && parsed.amount > 0) {
+                                        if (parsed && parsed.gobd_version === 5 && parsed.amount !== undefined && parsed.amount > 0) {
                                           aktRecord = { 
                                             ...aktRecord, 
                                             ...parsed, 
@@ -27289,31 +27304,57 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                       } else if (aktRecord.amount > 0 && students.length > 0) {
                                         localStorage.setItem(snapAktKey, JSON.stringify(aktRecord));
                                       }
-                                      // Synchronize GoBD snapshot to Supabase invoices table
-                                      if (supabase && schoolId && aktRecord.amount > 0) {
-                                         supabase.from('invoices').upsert({
-                                          id: aktId,
-                                          school_id: schoolId,
-                                          type: 'AKT',
-                                          amount: aktRecord.amount,
-                                          status: 'Bezahlt',
-                                          billing_date: `${y}-${monthStr}-01`,
-                                          due_date: `${y}-${monthStr}-15`,
-                                          items: {
-                                            amount: aktRecord.amount,
-                                            id: aktRecord.id,
-                                            status: (aktRecord.status === 'paid' || !aktRecord.status) ? 'Bezahlt' : aktRecord.status,
-                                            activeCampusCount: aktRecord.activeCampusCount,
-                                            activeGroovelabCount: aktRecord.activeGroovelabCount,
-                                            passiveStudentsCount: aktRecord.passiveStudentsCount,
-                                            activationsCount: aktRecord.activationsCount,
-                                            studentFee: aktRecord.studentFee,
-                                            auditHash: aktRecord.auditHash,
-                                            gobd_version: 4,
-                                            activatedStudentsList: aktRecord.activatedStudentsList
-                                          }
-                                        }, { onConflict: 'id' }).then(() => {});
-                                      }
+                                       // Synchronize GoBD snapshot to Supabase invoices table
+                                       if (supabase && schoolId) {
+                                         if (infRecord.amount > 0) {
+                                           supabase.from('invoices').upsert({
+                                             id: infId,
+                                             school_id: schoolId,
+                                             type: 'INF',
+                                             amount: infRecord.amount,
+                                             status: infRecord.status || (isInfPaid ? 'Bezahlt' : 'Versendet'),
+                                             billing_date: `${y}-${monthStr}-01`,
+                                             due_date: `${y}-${monthStr}-15`,
+                                             items: {
+                                               amount: infRecord.amount,
+                                               id: infRecord.id,
+                                               status: infRecord.status || (isInfPaid ? 'Bezahlt' : 'Versendet'),
+                                               totalTeachersCount: infRecord.totalTeachersCount,
+                                               passiveStudentsCount: infRecord.passiveStudentsCount,
+                                               activeGroovelabCount: infRecord.activeGroovelabCount,
+                                               groovelabStudentsHostingFee: infRecord.groovelabStudentsHostingFee,
+                                               storageAddonGb: infRecord.storageAddonGb,
+                                               storageAddonMonthlyFee: infRecord.storageAddonMonthlyFee,
+                                               auditHash: infRecord.auditHash,
+                                               gobd_version: 5
+                                             }
+                                           }, { onConflict: 'id' }).then(() => {});
+                                         }
+                                         if (aktRecord.amount > 0) {
+                                           supabase.from('invoices').upsert({
+                                             id: aktId,
+                                             school_id: schoolId,
+                                             type: 'AKT',
+                                             amount: aktRecord.amount,
+                                             status: aktRecord.status || (isAktPaid ? 'Bezahlt' : 'Versendet'),
+                                             billing_date: `${y}-${monthStr}-01`,
+                                             due_date: `${y}-${monthStr}-15`,
+                                             items: {
+                                               amount: aktRecord.amount,
+                                               id: aktRecord.id,
+                                               status: aktRecord.status || (isAktPaid ? 'Bezahlt' : 'Versendet'),
+                                               activeCampusCount: aktRecord.activeCampusCount,
+                                               activeGroovelabCount: 0,
+                                               passiveStudentsCount: 0,
+                                               activationsCount: aktRecord.activationsCount,
+                                               studentFee: aktRecord.studentFee,
+                                               auditHash: aktRecord.auditHash,
+                                               gobd_version: 5,
+                                               activatedStudentsList: aktRecord.activatedStudentsList
+                                             }
+                                           }, { onConflict: 'id' }).then(() => {});
+                                         }
+                                       }
                                     } catch (e) {
                                       // Non-blocking
                                     }

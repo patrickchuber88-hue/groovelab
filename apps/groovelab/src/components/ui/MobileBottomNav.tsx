@@ -403,6 +403,9 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
                     key={item.id}
                     onClick={() => {
                       setActiveTab(item.id);
+                      if (item.id === 'homework_book') {
+                        window.dispatchEvent(new CustomEvent('campus_reset_homework_board'));
+                      }
                       setDrawerOpen(false);
                     }}
                     style={{

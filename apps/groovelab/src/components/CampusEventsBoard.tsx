@@ -43,7 +43,8 @@ import {
   DoorClosed,
   Sparkles,
   AlertTriangle,
-  CheckCircle2
+  CheckCircle2,
+  FileText
 } from 'lucide-react';
 import { downloadCsvFile } from '../utils/csvHelper';
 import { formatSingleStudentAnonymized, formatGroupStudentsAnonymized, formatCombinedStudentNames, getGroupTypeLabel, formatTeacherFullName, formatDisplaySubjectOrInstrument, isInvalidInstrument } from '../utils/nameHelper';
@@ -278,7 +279,7 @@ export function CampusEventsBoard({
   });
 
   // Tabs for Column 1 (My Lessons)
-  const [lessonTab, setLessonTab] = useState<'upcoming' | 'past'>('upcoming');
+  const [lessonTab, setLessonTab] = useState<'upcoming' | 'past' | 'cancelled'>('upcoming');
 
   const [windowWidth, setWindowWidth] = useState<number>(typeof window !== 'undefined' ? window.innerWidth : 1200);
   const [orientationTick, setOrientationTick] = useState(0);
@@ -520,23 +521,55 @@ export function CampusEventsBoard({
       
       const cancelStatus = 'cancelled';
 
-      if (occ.is_virtual || (occ.id && String(occ.id).startsWith('virt_'))) {
-        const { error } = await supabase
-          .from('schedule_occurrences')
-          .insert({
-            schedule_id: occ.schedule_id || null,
-            student_id: occ.student_id || null,
-            teacher_id: occ.teacher_id || userId,
-            date: occ.date,
-            start_time: occ.start_time,
-            duration: occ.duration || 45,
-            status: cancelStatus,
-            student_acknowledged: true
-          });
+      const isVirtual = Boolean(
+        occ.is_virtual ||
+        (occ.id && (String(occ.id).startsWith('virt_') || String(occ.id).startsWith('virtual-')))
+      );
 
-        if (error) {
-          console.error('Error canceling occurrence:', error);
-          alert('Fehler beim Absagen des Termins: ' + error.message);
+      if (isVirtual) {
+        let existingId: string | null = null;
+        if (occ.schedule_id && occ.date) {
+          const { data: existingOcc } = await supabase
+            .from('schedule_occurrences')
+            .select('id')
+            .eq('schedule_id', occ.schedule_id)
+            .eq('date', occ.date)
+            .maybeSingle();
+          if (existingOcc?.id) {
+            existingId = existingOcc.id;
+          }
+        }
+
+        let opError = null;
+        if (existingId) {
+          const { error } = await supabase
+            .from('schedule_occurrences')
+            .update({
+              status: cancelStatus,
+              student_acknowledged: true,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', existingId);
+          opError = error;
+        } else {
+          const { error } = await supabase
+            .from('schedule_occurrences')
+            .insert({
+              schedule_id: occ.schedule_id || null,
+              student_id: occ.student_id || null,
+              teacher_id: occ.teacher_id || userId,
+              date: occ.date,
+              start_time: occ.start_time,
+              duration: occ.duration || 45,
+              status: cancelStatus,
+              student_acknowledged: true
+            });
+          opError = error;
+        }
+
+        if (opError) {
+          console.error('Error canceling occurrence:', opError);
+          alert('Fehler beim Absagen des Termins: ' + opError.message);
         } else {
           alert('Termin wurde erfolgreich abgesagt.');
           window.location.reload();
@@ -4435,6 +4468,12 @@ export function CampusEventsBoard({
     const todayStr = `${yyyy}-${mm}-${dd}`;
     const nowTimeStr = simStr ? '00:00:00' : d.toTimeString().substring(0, 8);
 
+    if (lessonTab === 'cancelled') {
+      return lessons.filter(occ => {
+        return ['cancelled', 'canceled_by_student', 'canceled', 'teacher_sick', 'canceled_by_teacher_sick', 'absent'].includes(String(occ.status || ''));
+      });
+    }
+
     // Show ALL regular lessons (upcoming + past) regardless of holiday periods
     return lessons.filter(occ => {
       const isPast = occ.date < todayStr || (occ.date === todayStr && occ.start_time < nowTimeStr);
@@ -5254,7 +5293,7 @@ export function CampusEventsBoard({
     const studentDateMap = new Map<string, any>();
 
     const getStudentKey = (item: any): string => {
-      const rawId = item.student_id || item.student?.id || item.board_student_id || (item.id && !String(item.id).startsWith('virt_') ? item.id : null);
+      const rawId = item.student_id || item.student?.id || item.board_student_id || (item.id && !String(item.id).startsWith('virt_') && !String(item.id).startsWith('virtual-') ? item.id : null);
       if (rawId && rawId !== 'vacant') {
         return String(rawId).trim().toLowerCase();
       }
@@ -5977,20 +6016,20 @@ export function CampusEventsBoard({
               border: 'none',
               background: lessonTab === 'upcoming' ? '#ffffff' : 'transparent',
               color: lessonTab === 'upcoming' ? brandColor : '#64748b',
-              padding: '8px 10px',
+              padding: '8px 8px',
               borderRadius: '10px',
               fontWeight: 800,
-              fontSize: '0.75rem',
+              fontSize: '0.74rem',
               cursor: 'pointer',
               transition: 'all 0.2s',
               boxShadow: lessonTab === 'upcoming' ? '0 2px 6px rgba(0,0,0,0.05)' : 'none',
               display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '6px'
+              gap: '5px'
             }}
           >
-            <Calendar size={14} /> Kommende
+            <Calendar size={13} /> Kommende
           </button>
           <button
             onClick={() => {
@@ -6005,20 +6044,48 @@ export function CampusEventsBoard({
               border: 'none',
               background: lessonTab === 'past' ? '#ffffff' : 'transparent',
               color: lessonTab === 'past' ? brandColor : '#64748b',
-              padding: '8px 10px',
+              padding: '8px 8px',
               borderRadius: '10px',
               fontWeight: 800,
-              fontSize: '0.75rem',
+              fontSize: '0.74rem',
               cursor: 'pointer',
               transition: 'all 0.2s',
               boxShadow: lessonTab === 'past' ? '0 2px 6px rgba(0,0,0,0.05)' : 'none',
               display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '6px'
+              gap: '5px'
             }}
           >
-            <History size={14} /> Vergangene
+            <History size={13} /> Vergangene
+          </button>
+          <button
+            onClick={() => {
+              if (document.startViewTransition) {
+                document.startViewTransition(() => setLessonTab('cancelled'));
+              } else {
+                setLessonTab('cancelled');
+              }
+            }}
+            style={{
+              flex: 1,
+              border: 'none',
+              background: lessonTab === 'cancelled' ? '#ffffff' : 'transparent',
+              color: lessonTab === 'cancelled' ? '#ef4444' : '#64748b',
+              padding: '8px 8px',
+              borderRadius: '10px',
+              fontWeight: 800,
+              fontSize: '0.74rem',
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+              boxShadow: lessonTab === 'cancelled' ? '0 2px 6px rgba(0,0,0,0.05)' : 'none',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '5px'
+            }}
+          >
+            <FileText size={13} /> Absagen-Log
           </button>
         </div>
 
@@ -6030,7 +6097,7 @@ export function CampusEventsBoard({
             </div>
           ) : getFilteredLessons().length === 0 ? (
             <div style={{ textAlign: 'center', padding: '40px 20px', border: '1.5px dashed #e2e8f0', borderRadius: '16px', color: '#94a3b8', fontSize: '0.8rem', fontWeight: 600 }}>
-              Keine Termine vorhanden.
+              {lessonTab === 'cancelled' ? 'Keine Unterrichtsabsagen verzeichnet.' : 'Keine Termine vorhanden.'}
             </div>
           ) : (() => {
             const grouped: Record<string, any[]> = {};
@@ -6048,7 +6115,7 @@ export function CampusEventsBoard({
             const simNow = simStr ? new Date(simStr + 'T00:00:00') : new Date();
             const currentMonthKey = `${simNow.getFullYear()}-${String(simNow.getMonth() + 1).padStart(2, '0')}`;
             monthKeys.sort((a, b) => {
-              if (lessonTab === 'past') {
+              if (lessonTab === 'past' || lessonTab === 'cancelled') {
                 return b.localeCompare(a);
               }
               return a.localeCompare(b);
@@ -6092,7 +6159,7 @@ export function CampusEventsBoard({
                   {isExpanded && (
                     role === 'student' ? (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', width: '100%', boxSizing: 'border-box', paddingLeft: '2px' }}>
-                        {renderOccurrenceItems(occs)}
+                        {renderOccurrenceItems(lessonTab === 'cancelled' ? [...occs].sort((a, b) => b.date.localeCompare(a.date)) : occs)}
                       </div>
                     ) : (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', paddingLeft: '2px' }}>

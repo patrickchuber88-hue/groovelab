@@ -69,9 +69,9 @@
   4. **`Kombi-Vorteilsrabatt (Infrastruktur-Bündel)`**: `-4,90 € / Mo.` (sofern beide Module aktiv)
   5. **`Service- & Administrationspauschale`**: `[X] Lehrkräfte & Verwaltung aktiv × 0,49 € / Mo.`
   6. **`Basis-Bereitstellung`**: `[X] Schüler × 0,09 € / Mo.` (QR-Landingpages, Stundenplan-, Termin-, Raumänderungs- und Hausaufgabenheft-Sync sowie DSGVO-Datensatz-Hosting)
-  7. **`Cloud- & Modul-Bereitstellung: Campus`**: `[X] Schüler × 0,49 € / Mo.` (Interaktive App-Nutzung: Übe-Timer, Loopstation, Meisterwerk-Protokoll)
-  8. **`Cloud- & Modul-Bereitstellung: GrooveLab`**: `[X] Schüler × 0,49 € / Mo.` (Interaktive Band-Nutzung: Song-Bibliotheken, Band-Rooms, Repertoire)
-  9. **`Zusatz-Speichervolumen: Audio-Tresor (+[X] GB)`**: `[X,XX] € / Mo.` (sofern Speicher-Add-on gebucht)
+  7. **`Zusatz-Speichervolumen: Audio-Tresor (+[X] GB)`**: `[X,XX] € / Mo.` (sofern Speicher-Add-on gebucht)
+  8. **`Cloud- & Modul-Bereitstellung: GrooveLab`**: `[X] Schüler × 0,49 € / Mo.` (Interaktive Band-Nutzung: Song-Bibliotheken, Band-Rooms, Repertoire; wird verbindlich der B2B-Infrastruktur-Rechnung der Musikschule zugeordnet, da GrooveLab-Aktivierungen immer zu 100% von der Musikschule getragen werden)
+  9. **`Cloud- & Modul-Bereitstellung: Campus`**: `[X] Schüler × 0,49 € / Mo.` (Interaktive App-Nutzung: Übe-Timer, Loopstation, Meisterwerk-Protokoll; separate Sammelrechnung Schüleraktivierungen für die Schule; wird bei Betrag 0,00 € automatisch ausgeblendet)
 - **Verbotene Begriffe & Abmahnschutz (UWG / PAngV)**: Das Wort „Lizenz“, „Lizenzen“ oder „Lizenzgebühr“ darf NIEMALS in Zusammenhang mit unserem Geschäftsmodell und unserem Angebot verwendet werden. Die Software ist ohne gesonderte Lizenzkaufgebühren im Hosting-Paket inklusive (0,00 €); vermietet und abgerechnet wird ausschließlich die Cloud-, Datenbank-, Bereitstellungs- und Hosting-Infrastruktur. Ebenfalls verboten sind irreführende Blickfang-Werbeaussagen wie „100% kostenlos ohne Bedingungen“ auf Landingpages, sowie die Begriffe „Passiv-Lizenz“, „Karteileichen-Gebühr“, „Schüler-Lizenz“ oder „Profilaktivierung“. Stattdessen gilt das Wording: „Transparentes Cloud-Hosting statt teurer Software-Lizenzen“ und „Keine Einrichtungsgebühr, keine Lizenzkaufgebühren“.
 
 ## Invoice Numbering Format (Rechnungsnummer-Logik)
