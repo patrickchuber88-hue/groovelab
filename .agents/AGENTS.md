@@ -111,6 +111,14 @@
 ## Briefing Dashboard & Terminänderungen Rules
 - **Dynamische Sichtbarkeit des Terminänderungen-Widgets**: Das `Terminänderungen`-Widget auf allen Briefing-Dashboards (sowohl `TeacherDashboard.tsx` als auch `StudentAvatarDashboard.tsx`) wird nur noch gerendert, wenn aktiv kommende Terminänderungen vorliegen. Wenn keine Terminänderungen vorhanden sind (`changes.length === 0`), wird das Widget dynamisch ausgeblendet (`return null`).
 
+## Übepfad Board & Junior UI Goldstandard (Briefing-Board Proportions-Harmonie)
+- **Briefing-Board Proportions- & Typografie-Harmonie**: Die Schriftgrößen, Abstände, Icon-Boxen und Kartenproportionen des Junior Übepfad-Boards (`studentUiLevel === 'junior'`) müssen sich ausnahmslos an den bewährten, ergonomischen und großzügigen Maßen der Helden-Karten des Briefing-Dashboards orientieren:
+  - *Karten-Radien & Paddings*: Hero- und Grid-Karten mit `borderRadius: 32px` und `padding: 28px` (bzw. `32px` im Notenständer-Modus).
+  - *Icon-Boxen*: Standard-Badgegröße `56px × 56px` mit `borderRadius: 18px` und Icon-Größe `28px` (bzw. `64px × 64px` / `size=32` im Notenständer-Modus).
+  - *Überschriften & Magazin-Typografie*: Kartentitel und Board-Headings immer `1.38rem` bis `1.55rem` (`fontWeight: 950`, `fontFamily: "'Plus Jakarta Sans', sans-serif"`, `letterSpacing: -0.02em`), Begleittexte `0.92rem` bis `1.05rem` (`fontWeight: 650`, `lineHeight: 1.4`).
+  - *Pillen & Status-Badges*: `fontSize: 0.84rem` bis `0.92rem`, `borderRadius: 100px`, `padding: 5px 12px` bzw. `6px 14px`, `fontWeight: 900`.
+  - *Buttons*: Primäre Aktionsbuttons `minHeight: 48px` bis `56px`, `borderRadius: 20px`, `fontSize: 1.02rem` bis `1.18rem`, `fontWeight: 950`.
+
 ## Schüler-Protokoll & Hausaufgabenheft Rules
 - **Universal Uniformity**: All changes in the Schüler-Protokoll (student protocol) must always be applied for all users. The Schüler-Protokoll/Hausaufgabenheft (homework book) layout, headers, first name display, and design selections must look identical across all modules and user accounts.
 - **Master Blueprint for Student Homework Representation (Verbindliche Blaupause für Hausaufgaben-Darstellung)**:

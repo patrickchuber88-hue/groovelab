@@ -10030,7 +10030,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                                   alignItems: 'center',
                                   gap: '3px'
                                 }} title={`${availableShields}/3 Schutzschilde in KW ${currentWeek} bereit`}>
-                                  <Shield size={9} fill={availableShields > 0 ? '#38bdf8' : 'none'} color="#ffffff" />
+                                  <Shield size={9} fill={availableShields > 0 ? '#c4b5fd' : 'none'} color="#ffffff" />
                                   <span>{availableShields}/3 Schilde</span>
                                 </span>
                               );
