@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Check, Award, Flame, AlertCircle, BookOpen, Music, History, Plus, ChevronLeft, ChevronRight, ChevronDown, Book, Star, Sliders, RotateCcw, Mic, Square, Play, VolumeX, Volume2, Trash2, Headphones, Minimize2, Maximize2, Calendar, FileText, Zap, Clock, Info, Activity, ArrowLeft, Edit3, Disc, Search, Lock, Unlock, Share2, Sparkles, Radio, Download, Repeat, Timer, Scissors, Moon, Wrench, Hash, Filter, Target, Printer, MessageSquare, Mail, Copy, ExternalLink } from 'lucide-react';
+import { X, Check, Award, Flame, AlertCircle, BookOpen, Music, History, Plus, ChevronLeft, ChevronRight, ChevronDown, Book, Star, Sliders, RotateCcw, Mic, Square, Play, VolumeX, Volume2, Trash2, Headphones, Minimize2, Maximize2, Calendar, FileText, Zap, Clock, Info, Activity, ArrowLeft, Edit3, Disc, Search, Lock, Unlock, Share2, Sparkles, Radio, Download, Repeat, Timer, Scissors, Moon, Wrench, Hash, Filter, Target, Printer, MessageSquare, Mail, Copy, ExternalLink, HelpCircle, Hand, Lightbulb } from 'lucide-react';
 import Confetti from 'react-confetti';
 import { supabase } from '../lib/supabase';
 // @ts-ignore
@@ -20,7 +20,7 @@ const MeisterwerkCertificateModal = React.lazy(() => import('./ui/MeisterwerkCer
 import { synthesizeNeuralSpeech, playAudioBlob, stopNeuralSpeech, buildContinuousHomeworkNarrative, cleanTextForTts, formatPageNumbersGerman } from '../services/neuralTtsService';
 import { isDevEnvironment } from '../utils/tenantUrlHelper';
 import { generateStudentHomeworkPrintoutPDF } from '../utils/pdfGenerator';
-import { formatTeacherFullName, capitalizeFirstLetter, formatSongTitleCase, copyTextToClipboard } from '../utils/nameHelper';
+import { formatTeacherFullName, capitalizeFirstLetter, formatSongTitleCase, copyTextToClipboard, maskLastName } from '../utils/nameHelper';
 import { AudioWaveformVisualizer } from './ui/AudioWaveformVisualizer';
 
 
@@ -276,6 +276,40 @@ export const formatStudentNoteDisplay = (note: string): { isStudentNote: boolean
   return { isStudentNote: false, isPrivate: false, text: note };
 };
 
+export interface ParsedStudentQuestion {
+  hasQuestion: boolean;
+  rawEntry: string | null;
+  text: string;
+  timestamp: string | null;
+}
+
+export const parseStudentQuestionFromNotes = (notesList: any[]): ParsedStudentQuestion => {
+  if (!Array.isArray(notesList)) {
+    return { hasQuestion: false, rawEntry: null, text: '', timestamp: null };
+  }
+  const qEntry = notesList.find(
+    n => typeof n === 'string' && (n.startsWith('STUDENT_QUESTION:') || n.startsWith('❓ Frage für den Unterricht:'))
+  );
+  if (!qEntry) {
+    return { hasQuestion: false, rawEntry: null, text: '', timestamp: null };
+  }
+  if (qEntry.startsWith('STUDENT_QUESTION:')) {
+    const withoutPrefix = qEntry.replace(/^STUDENT_QUESTION:/, '');
+    const pipeIdx = withoutPrefix.indexOf('|');
+    if (pipeIdx !== -1) {
+      const ts = withoutPrefix.slice(0, pipeIdx);
+      const txt = withoutPrefix.slice(pipeIdx + 1).trim();
+      return { hasQuestion: true, rawEntry: qEntry, text: txt, timestamp: ts };
+    }
+    return { hasQuestion: true, rawEntry: qEntry, text: withoutPrefix.trim(), timestamp: null };
+  }
+  if (qEntry.startsWith('❓ Frage für den Unterricht:')) {
+    const txt = qEntry.replace(/^❓\s*Frage für den Unterricht:\s*/i, '').trim();
+    return { hasQuestion: true, rawEntry: qEntry, text: txt, timestamp: null };
+  }
+  return { hasQuestion: false, rawEntry: null, text: '', timestamp: null };
+};
+
 export interface ParsedStudentAnnotation {
   targetStudentName: string | null;
   isSpecificToAnother: boolean;
@@ -353,6 +387,25 @@ export const SpeechDictationButton: React.FC<{
 }> = ({ onTranscript, title = "Diktieren", size = 'sm' }) => {
   const [isListening, setIsListening] = useState(false);
   const recognitionRef = useRef<any>(null);
+
+  // 🛡️ Hardware-Sicherheit: Automatische Hard-Termination bei Tab-Wechsel oder Unmount
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        if (recognitionRef.current) {
+          try { recognitionRef.current.abort(); } catch {}
+        }
+        setIsListening(false);
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      if (recognitionRef.current) {
+        try { recognitionRef.current.abort(); } catch {}
+      }
+    };
+  }, []);
 
   const toggleListening = () => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -707,6 +760,19 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   const [studentNotes, setStudentNotes] = useState('');
   const [isStudentNotePrivate, setIsStudentNotePrivate] = useState(false);
   const [studentNotesSavedToast, setStudentNotesSavedToast] = useState(false);
+  const [isQuestionEditorOpen, setIsQuestionEditorOpen] = useState(false);
+  const [questionDraftText, setQuestionDraftText] = useState('');
+  const [isSavingQuestion, setIsSavingQuestion] = useState(false);
+
+  const parsedStudentQuestion = useMemo(() => {
+    return parseStudentQuestionFromNotes(homeworkNotesList);
+  }, [homeworkNotesList]);
+
+  const effectiveTeacherFullName = useMemo(() => {
+    const raw = propTeacherName || (student as any)?.teacher_name || (student as any)?.teacher?.name || '';
+    return raw ? formatTeacherFullName(raw) : 'deine Lehrkraft';
+  }, [propTeacherName, student]);
+
   const [isNotesFocused, setIsNotesFocused] = useState(false);
   const isNotesExpanded = isNotesFocused || !!generalHomeworkNotes.trim();
   const homeworkTextareaRef = React.useRef<HTMLTextAreaElement>(null);
@@ -1646,51 +1712,6 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     return germanVoices[0] || null;
   };
 
-  const cleanTextForTts = (text: string): string => {
-    if (!text) return '';
-    return text
-      // Kalenderwochen & Termine
-      .replace(/KW\s*(\d+)/gi, 'Kalenderwoche $1')
-      // Takte & Seiten mit Bindestrichen
-      .replace(/Takt\s*(\d+)\s*[-–]\s*(\d+)/gi, 'Takt $1 bis $2')
-      .replace(/S\.\s*(\d+)\s*[-–]\s*(\d+)/gi, 'Seite $1 bis $2')
-      .replace(/S\.\s*(\d+)/gi, 'Seite $1')
-      .replace(/Seite\s*(\d+)\s*[-–]\s*(\d+)/gi, 'Seite $1 bis $2')
-      // Musikalische Taktarten
-      .replace(/\b4\/4\s*(?:-?\s*Takt)?/gi, 'Vier-Viertel-Takt')
-      .replace(/\b3\/4\s*(?:-?\s*Takt)?/gi, 'Drei-Viertel-Takt')
-      .replace(/\b2\/4\s*(?:-?\s*Takt)?/gi, 'Zwei-Viertel-Takt')
-      .replace(/\b6\/8\s*(?:-?\s*Takt)?/gi, 'Sechs-Achtel-Takt')
-      .replace(/\b12\/8\s*(?:-?\s*Takt)?/gi, 'Zwölf-Achtel-Takt')
-      // Dynamik & Spielanweisungen
-      .replace(/\bp\/f\b|\bp \/ f\b/gi, 'piano und forte')
-      .replace(/\bfff\b/gi, 'sehr sehr laut, fortississimo')
-      .replace(/\bff\b/gi, 'fortissimo, sehr kräftig')
-      .replace(/\bpp\b/gi, 'pianissimo, sehr leise')
-      // Metronom & Einheiten
-      .replace(/(\d+)\s*BPM/gi, '$1 Schläge pro Minute')
-      .replace(/BPM/gi, 'Schläge pro Minute')
-      .replace(/(\d+)\s*min\b/gi, '$1 Minuten')
-      .replace(/(\d+)\s*sek\b/gi, '$1 Sekunden')
-      .replace(/(\d+)\s*x\b/gi, '$1 mal')
-      // Begrifflichkeiten
-      .replace(/z\.\s*B\./gi, 'zum Beispiel')
-      .replace(/bzw\./gi, 'beziehungsweise')
-      .replace(/inkl\./gi, 'inklusive')
-      .replace(/evtl\./gi, 'eventuell')
-      .replace(/Übe-Timer/gi, 'Übe-Timer')
-      .replace(/Play-Along/gi, 'Play Along')
-      .replace(/•/g, ', ')
-      .replace(/#/g, 'Nummer ')
-      // Keine Emojis buchstabieren
-      .replace(/[\u{1F300}-\u{1F9FF}]/gu, '')
-      .replace(/[\u{2600}-\u{27BF}]/gu, '')
-      // Bindestriche zu sanften Sprechpausen machen
-      .replace(/\s*[-–—]\s*/g, ', ')
-      .replace(/\s+/g, ' ')
-      .trim();
-  };
-
   const handleStopSpeaking = () => {
     ttsSessionIdRef.current += 1;
     stopNeuralSpeech();
@@ -1721,15 +1742,14 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
     handleStopSpeaking();
 
-    // Raw phrase extraction
-    const rawPhrases = Array.isArray(textOrPhrases)
-      ? [...textOrPhrases]
-      : textOrPhrases
-          .split(/(?<=[.!?])\s+/)
-          .filter(p => p.trim().length > 0);
+    // 🧼 Bereinige Text zuerst über die zentrale kindgerechte TTS-Engine, bevor Sätze geteilt werden
+    const normalizedInput = Array.isArray(textOrPhrases)
+      ? textOrPhrases.map(p => cleanTextForTts(p)).join(' ')
+      : cleanTextForTts(textOrPhrases);
 
-    const phrases = rawPhrases
-      .map(p => cleanTextForTts(p))
+    const phrases = normalizedInput
+      .split(/(?<=[.!?])\s+/)
+      .map(p => p.trim())
       .filter(p => p.length > 0);
 
     if (phrases.length === 0) return;
@@ -1973,6 +1993,29 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       }
     };
   }, [isRecordingAudio, isRecordingMetronomeActive, recordingBpm]);
+
+  // ⏱️ Play-Along Count-In (4-Beat Vorzähler) & Metronome Popover State
+  const [isCountInEnabled, setIsCountInEnabled] = useState<boolean>(true);
+  const [playAlongCountInRemaining, setPlayAlongCountInRemaining] = useState<number | null>(null);
+  const [showPlayAlongMetronomePopup, setShowPlayAlongMetronomePopup] = useState<boolean>(false);
+  const playAlongCountInIntervalRef = useRef<any>(null);
+
+  const cancelPlayAlongCountIn = useCallback(() => {
+    if (playAlongCountInIntervalRef.current) {
+      clearInterval(playAlongCountInIntervalRef.current);
+      playAlongCountInIntervalRef.current = null;
+    }
+    setPlayAlongCountInRemaining(null);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (playAlongCountInIntervalRef.current) {
+        clearInterval(playAlongCountInIntervalRef.current);
+        playAlongCountInIntervalRef.current = null;
+      }
+    };
+  }, []);
 
   const [activeNoteTarget, setActiveNoteTarget] = useState<'student' | 'teacher'>('student');
 
@@ -2598,6 +2641,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   };
 
   const stopRecordingAudio = (activeRecorder?: MediaRecorder) => {
+    cancelPlayAlongCountIn();
     const rec = activeRecorder || mediaRecorderRef.current || mediaRecorderInstance;
     if (rec && rec.state !== 'inactive') {
       try {
@@ -2611,6 +2655,31 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     }
     setIsRecordingAudio(false);
     setActiveRecordingSongId(null);
+  };
+
+  const handleStartPlayAlongRecording = () => {
+    if (!isCountInEnabled) {
+      startRecordingAudio();
+      return;
+    }
+
+    cancelPlayAlongCountIn();
+
+    let count = 4;
+    setPlayAlongCountInRemaining(count);
+    playMetronomeTick(true);
+
+    const intervalMs = (60 / recordingBpm) * 1000;
+    playAlongCountInIntervalRef.current = setInterval(() => {
+      count -= 1;
+      if (count > 0) {
+        setPlayAlongCountInRemaining(count);
+        playMetronomeTick(false);
+      } else {
+        cancelPlayAlongCountIn();
+        startRecordingAudio();
+      }
+    }, intervalMs);
   };
 
   const awardSticker = async (stickerId: string, topicNameContext?: string) => {
@@ -5872,6 +5941,78 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     }
   };
 
+  const handleSaveStudentQuestion = async (qText: string) => {
+    const trimmed = qText.trim();
+    if (!trimmed) return;
+    setIsSavingQuestion(true);
+    try {
+      const isoNow = new Date().toISOString();
+      const tag = `STUDENT_QUESTION:${isoNow}|${trimmed}`;
+
+      // 1. Optimistic local state update
+      const filtered = (homeworkNotesList || []).filter(
+        n => typeof n === 'string' && !n.startsWith('STUDENT_QUESTION:') && !n.startsWith('❓ Frage für den Unterricht:')
+      );
+      const updatedList = [tag, ...filtered];
+      setHomeworkNotesList(updatedList);
+      try {
+        localStorage.setItem(`campus_homework_notes_${student.id}`, JSON.stringify(updatedList));
+      } catch {}
+
+      // 2. Authoritative server RPC call
+      const { error } = await supabase.rpc('save_student_homework_question', {
+        p_student_id: student.id,
+        p_question_text: trimmed
+      });
+
+      if (error) {
+        console.warn('[handleSaveStudentQuestion] RPC notice, saving via syncHomeworkNotes fallback:', error);
+        await syncHomeworkNotes(updatedList);
+      }
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('campus_student_question_updated', { detail: { studentId: student.id } }));
+      }
+      setIsQuestionEditorOpen(false);
+      setQuestionDraftText('');
+      setStudentNotesSavedToast(true);
+      setTimeout(() => setStudentNotesSavedToast(false), 2500);
+    } catch (err) {
+      console.error('Fehler beim Speichern der Schülerfrage:', err);
+    } finally {
+      setIsSavingQuestion(false);
+    }
+  };
+
+  const handleResolveStudentQuestion = async () => {
+    setIsSavingQuestion(true);
+    try {
+      const updatedList = (homeworkNotesList || []).filter(
+        n => typeof n === 'string' && !n.startsWith('STUDENT_QUESTION:') && !n.startsWith('❓ Frage für den Unterricht:')
+      );
+      setHomeworkNotesList(updatedList);
+      try {
+        localStorage.setItem(`campus_homework_notes_${student.id}`, JSON.stringify(updatedList));
+      } catch {}
+
+      const { error } = await supabase.rpc('resolve_student_homework_question', {
+        p_student_id: student.id
+      });
+      if (error) {
+        console.warn('[handleResolveStudentQuestion] RPC notice, resolving via syncHomeworkNotes fallback:', error);
+        await syncHomeworkNotes(updatedList);
+      }
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('campus_student_question_updated', { detail: { studentId: student.id } }));
+      }
+      setIsQuestionEditorOpen(false);
+      setQuestionDraftText('');
+    } catch (err) {
+      console.error('Fehler beim Erledigen der Schülerfrage:', err);
+    } finally {
+      setIsSavingQuestion(false);
+    }
+  };
+
   const autoSaveDebounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const triggerDebouncedAutoSave = (delayMs: number = 350) => {
@@ -7844,11 +7985,19 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     };
   };
 
-  const handleShareWhatsApp = () => {
-    const { shareBody } = getHomeworkFormattedSummary();
-    const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(shareBody)}`;
-    window.open(waUrl, '_blank', 'noopener,noreferrer');
-    setIsShareMenuOpen(false);
+  const handleShareMessenger = async () => {
+    const { shareSubject, shareBody } = getHomeworkFormattedSummary();
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: shareSubject,
+          text: shareBody
+        });
+        setIsShareMenuOpen(false);
+        return;
+      } catch (e) {}
+    }
+    handleCopyShareLink();
   };
 
   const handleShareEmail = () => {
@@ -14514,12 +14663,12 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                         gap: '12px',
                         boxShadow: '0 2px 8px rgba(0, 0, 0, 0.02)'
                       }}>
-                        <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#18181b' }}>
+                        <span style={{ fontSize: '0.84rem', fontWeight: 800, color: '#18181b' }}>
                           Hausaufgaben KW {weekNum}
                         </span>
 
                         {Object.keys(groupedLehrwerke).length === 0 && otherHWs.length === 0 ? (
-                          <span style={{ fontSize: '0.72rem', color: '#71717a', fontStyle: 'italic' }}>
+                          <span style={{ fontSize: '0.80rem', color: '#71717a', fontStyle: 'italic' }}>
                             Keine Hausaufgaben erfasst.
                           </span>
                         ) : (
@@ -14527,7 +14676,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                             {Object.entries(groupedLehrwerke).map(([title, info]) => (
                               <div key={title} style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                                 <div style={{ 
-                                  fontSize: '0.92rem', 
+                                  fontSize: '0.96rem', 
                                   color: '#09090b', 
                                   fontWeight: 900,
                                   display: 'flex',
@@ -14605,7 +14754,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                         }
                                         
                                         return (
-                                          <div key={`p-note-${p}`} style={{ display: 'flex', gap: '6px', alignItems: 'flex-start', fontSize: '0.74rem', color: '#475569', lineHeight: '1.4' }}>
+                                          <div key={`p-note-${p}`} style={{ display: 'flex', gap: '6px', alignItems: 'flex-start', fontSize: '0.88rem', color: '#1e293b', lineHeight: 1.5 }}>
                                             <span style={{ fontWeight: 800, color: '#b45309', flexShrink: 0 }}>S. {p}:</span>
                                             <span style={{ fontWeight: 650, color: '#1e293b' }}>{noteText}</span>
                                           </div>
@@ -14627,7 +14776,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                     color: '#475569',
                                     padding: '4px 10px',
                                     borderRadius: '999px',
-                                    fontSize: '0.76rem',
+                                    fontSize: '0.82rem',
                                     fontWeight: 900,
                                     border: '1px solid rgba(251, 191, 36, 0.3)',
                                     boxShadow: '0 3px 8px rgba(0,0,0,0.03), 0 0 12px rgba(251, 191, 36, 0.32)'
@@ -14643,12 +14792,12 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
                       {/* Homework notes */}
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                        <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1e293b' }}>
+                        <label style={{ fontSize: '0.84rem', fontWeight: 800, color: '#1e293b' }}>
                           <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}><FileText size={15} style={{ color: '#34a853', verticalAlign: 'middle', marginTop: '-2px' }} /> Hausaufgaben-Bemerkungen</span>
                         </label>
                         <div style={{
                           width: '100%', minHeight: '80px', padding: '12px 14px', borderRadius: '16px',
-                          border: '1px solid #e2e8f0', fontSize: '0.8rem', fontWeight: 600, background: '#fafafa', color: '#4b5563',
+                          border: '1px solid #e2e8f0', fontSize: '0.88rem', fontWeight: 550, lineHeight: 1.5, background: '#fafafa', color: '#0f172a',
                           whiteSpace: 'pre-wrap'
                         }}>
                           {uniqueHomeworkNotes.join('\n\n') || 'Keine Bemerkungen hinterlegt.'}
@@ -14657,19 +14806,19 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
                       {/* Internal teacher notes */}
                       {!readOnly && (
-<div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                        <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1e293b' }}>
-                          🔒 Interne Notiz (nur für Lehrer)
-                        </label>
-                        <div style={{
-                          width: '100%', minHeight: '60px', padding: '12px 14px', borderRadius: '16px',
-                          border: '1px solid #e2e8f0', fontSize: '0.8rem', fontWeight: 600, background: '#fafafa', color: '#4b5563',
-                          whiteSpace: 'pre-wrap'
-                        }}>
-                          {weekTeacherNotes || 'Keine internen Notizen.'}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          <label style={{ fontSize: '0.84rem', fontWeight: 800, color: '#1e293b' }}>
+                            🔒 Interne Notiz (nur für Lehrer)
+                          </label>
+                          <div style={{
+                            width: '100%', minHeight: '60px', padding: '12px 14px', borderRadius: '16px',
+                            border: '1px solid #e2e8f0', fontSize: '0.88rem', fontWeight: 550, lineHeight: 1.5, background: '#fafafa', color: '#0f172a',
+                            whiteSpace: 'pre-wrap'
+                          }}>
+                            {weekTeacherNotes || 'Keine internen Notizen.'}
+                          </div>
                         </div>
-                      </div>
-)}
+                      )}
                     </div>
                   </div>
                 );
@@ -14862,9 +15011,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                           padding: '12px 14px',
                           borderRadius: '16px',
                           border: '1.5px solid #cbd5e1',
-                          fontSize: '0.84rem',
+                          fontSize: '0.94rem',
                           fontWeight: 650,
-                          lineHeight: '1.45',
+                          lineHeight: '1.55',
                           outline: 'none',
                           resize: 'none',
                           background: '#fefdf8',
@@ -15016,7 +15165,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                             <div style={{ fontSize: '0.76rem', fontWeight: 900, color: '#b45309', display: 'flex', alignItems: 'center', gap: '6px' }}>
                               <span>👨‍🏫 Hausaufgabe von deiner Lehrkraft:</span>
                             </div>
-                            <div style={{ fontSize: '0.86rem', fontWeight: 650, color: '#1e293b', whiteSpace: 'pre-wrap', lineHeight: '1.5' }}>
+                            <div style={{ fontSize: '0.94rem', fontWeight: 650, color: '#1e293b', whiteSpace: 'pre-wrap', lineHeight: '1.55' }}>
                               {cleanTeacherNotes}
                             </div>
                           </div>
@@ -15033,7 +15182,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                         gap: '12px'
                       }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
-                          <label style={{ fontSize: '0.86rem', fontWeight: 900, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <label style={{ fontSize: '0.94rem', fontWeight: 900, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px' }}>
                             🧑‍🎓 Meine Übe-Notizen & Fragen an den Lehrer:
                           </label>
 
@@ -15103,9 +15252,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                             padding: '14px',
                             borderRadius: '16px',
                             border: '1.5px solid #cbd5e1',
-                            fontSize: '0.86rem',
+                            fontSize: '0.94rem',
                             fontWeight: 650,
-                            lineHeight: '1.5',
+                            lineHeight: '1.55',
                             outline: 'none',
                             resize: 'none',
                             background: '#ffffff',
@@ -15534,9 +15683,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                             padding: '16px',
                             borderRadius: '20px',
                             border: '1.5px solid #cbd5e1',
-                            fontSize: '0.88rem',
+                            fontSize: '0.94rem',
                             fontWeight: 650,
-                            lineHeight: '1.5',
+                            lineHeight: '1.55',
                             outline: 'none',
                             resize: 'none',
                             background: '#fefdf8',
@@ -15882,22 +16031,22 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             ) : (
               // GENERAL HUB VIEW (only homework Checklist + general notes textarea)
               <>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
-                  <div>
-                    <span style={{ fontSize: '0.84rem', fontWeight: 900, color: '#09090b', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <Edit3 size={16} style={{ color: '#0f172a' }} />
-                      <span>{readOnly ? 'Hausaufgaben & Wochenplan' : 'Eintrag & Hausaufgabe'}</span>
+                {!readOnly && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                    <div>
+                      <span style={{ fontSize: '0.82rem', fontWeight: 900, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <Edit3 size={15} style={{ color: '#0f172a' }} />
+                        <span>Eintrag & Hausaufgabe</span>
+                      </span>
+                    </div>
+                    <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#15803d', background: '#e6f4ea', border: '1px solid #bbf7d0', padding: '2px 8px', borderRadius: '100px' }}>
+                      Schüler-Vorschau
                     </span>
-                    {!readOnly && (
-                      <p style={{ margin: '3px 0 0 0', fontSize: '0.76rem', color: '#71717a', fontWeight: 550, lineHeight: '1.3' }}>
-                        Dokumentiere den heutigen Unterricht für den Schüler.
-                      </p>
-                    )}
                   </div>
-                </div>
+                )}
 
                 {/* The Main Input Form Card */}
-                <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, gap: '16px' }}>
+                <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, gap: readOnly ? '0px' : '16px' }}>
                   <div style={{
                     flex: 1,
                     display: 'flex',
@@ -15905,14 +16054,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                     gap: '16px'
                   }}>
                     <div style={{
-                      background: '#ffffff',
-                      border: '1px solid rgba(0, 0, 0, 0.08)',
-                      borderRadius: '24px',
-                      padding: '22px 24px',
                       display: 'flex',
                       flexDirection: 'column',
-                      gap: '18px',
-                      boxShadow: '0 10px 30px -4px rgba(0, 0, 0, 0.04), 0 2px 6px -1px rgba(0, 0, 0, 0.02)'
+                      gap: '16px'
                     }}>
                       {/* ========================================================================= */}
                       {/* HERO CARD CONTENT (100% SSOT: Single Source of Truth for Voice & UI)     */}
@@ -16225,8 +16369,21 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                         const isSilentTime = currentHour >= 20 || currentHour < 7;
 
                         return (
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                            {/* 1. Pure Header Bar */}
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                            {/* ========================================================================= */}
+                            {/* KÖRPER 1: DAS NOTENHEFT (Schüler-Bühne / Das fertige Ergebnis)            */}
+                            {/* ========================================================================= */}
+                            <div style={{
+                              background: '#ffffff',
+                              border: '1px solid rgba(0, 0, 0, 0.08)',
+                              borderRadius: '24px',
+                              padding: '20px 22px',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '14px',
+                              boxShadow: '0 8px 24px -4px rgba(0, 0, 0, 0.04), 0 2px 6px -1px rgba(0, 0, 0, 0.02)'
+                            }}>
+                              {/* 1. Pure Header Bar */}
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -16293,8 +16450,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                         border: '1px solid #e2e8f0',
                                         color: '#0f172a',
                                         borderRadius: '8px',
-                                        padding: '4px 8px',
-                                        fontSize: '0.70rem',
+                                        padding: '4px 9px',
+                                        fontSize: '0.76rem',
                                         fontWeight: 800,
                                         cursor: 'pointer',
                                         display: 'flex',
@@ -16313,6 +16470,51 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                               </div>
 
                               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                {/* ❓ Student Question Button / Teacher Live Status Pill */}
+                                {readOnly ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      if (!isQuestionEditorOpen && parsedStudentQuestion.hasQuestion) {
+                                        setQuestionDraftText(parsedStudentQuestion.text);
+                                      }
+                                      setIsQuestionEditorOpen(prev => !prev);
+                                    }}
+                                    style={{
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '5px',
+                                      padding: '5px 12px',
+                                      borderRadius: '100px',
+                                      border: parsedStudentQuestion.hasQuestion ? '1px solid #fde047' : '1px solid #bbf7d0',
+                                      background: parsedStudentQuestion.hasQuestion ? '#fef9c3' : '#f0fdf4',
+                                      color: parsedStudentQuestion.hasQuestion ? '#854d0e' : '#15803d',
+                                      fontSize: '0.80rem',
+                                      fontWeight: 800,
+                                      cursor: 'pointer',
+                                      boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
+                                      transition: 'all 0.15s ease'
+                                    }}
+                                    className="hover-scale"
+                                    title={parsedStudentQuestion.hasQuestion ? "Deine Frage ansehen oder ändern" : `Frage an ${effectiveTeacherFullName} stellen`}
+                                  >
+                                    <HelpCircle size={13} strokeWidth={2.4} />
+                                    <span>{parsedStudentQuestion.hasQuestion ? '1 Frage notiert' : 'Frage an Lehrkraft'}</span>
+                                  </button>
+                                ) : (
+                                  <span style={{
+                                    fontSize: '0.76rem',
+                                    color: '#15803d',
+                                    background: '#dcfce7',
+                                    padding: '4px 10px',
+                                    borderRadius: '100px',
+                                    fontWeight: 850,
+                                    letterSpacing: '0.02em'
+                                  }}>
+                                    Live-Schülersicht
+                                  </span>
+                                )}
+
                                 {/* 🔊 Global TTS Audio Assistant Vorlese-Button (Apple Pill) */}
                                 <button
                                   type="button"
@@ -16341,7 +16543,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                     color: (isTtsSpeaking && activeTtsKey === 'global_homework') ? '#ffffff' : '#0f172a',
                                     borderRadius: '100px',
                                     padding: '5px 12px',
-                                    fontSize: '0.74rem',
+                                    fontSize: '0.80rem',
                                     fontWeight: 750,
                                     cursor: 'pointer',
                                     display: 'flex',
@@ -16375,8 +16577,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                       border: '1px solid #e2e8f0',
                                       color: '#0f172a',
                                       borderRadius: '100px',
-                                      padding: '5px 11px',
-                                      fontSize: '0.74rem',
+                                      padding: '5px 12px',
+                                      fontSize: '0.80rem',
                                       fontWeight: 750,
                                       cursor: 'pointer',
                                       display: 'flex',
@@ -16386,7 +16588,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                       boxShadow: isShareMenuOpen ? '0 2px 8px rgba(0,0,0,0.06)' : 'none'
                                     }}
                                     className="hover-scale"
-                                    title="Hausaufgabe teilen, per WhatsApp/Mail senden oder drucken"
+                                    title="Hausaufgabe teilen, per E-Mail senden oder drucken"
                                   >
                                     <Share2 size={12} color="#475569" strokeWidth={2.2} />
                                     <span>Teilen & Drucken</span>
@@ -16453,10 +16655,10 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                         </div>
                                       </button>
 
-                                      {/* 2. WhatsApp */}
+                                      {/* 2. Messenger / Text kopieren */}
                                       <button
                                         type="button"
-                                        onClick={handleShareWhatsApp}
+                                        onClick={handleShareMessenger}
                                         style={{
                                           display: 'flex',
                                           alignItems: 'center',
@@ -16476,11 +16678,11 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                         className="hover-bg-slate"
                                       >
                                         <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: '#f0fdf4', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#16a34a', flexShrink: 0 }}>
-                                          <MessageSquare size={14} strokeWidth={2.2} />
+                                          <Share2 size={14} strokeWidth={2.2} />
                                         </div>
                                         <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                          <span>Per WhatsApp senden</span>
-                                          <span style={{ fontSize: '0.65rem', fontWeight: 500, color: '#64748b' }}>Direkt an Schüler oder Eltern</span>
+                                          <span>Mit Familie teilen / Text kopieren</span>
+                                          <span style={{ fontSize: '0.65rem', fontWeight: 500, color: '#64748b' }}>Für Messenger, SMS oder Mail</span>
                                         </div>
                                       </button>
 
@@ -16592,8 +16794,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                       border: 'none', 
                                       background: 'transparent', 
                                       color: '#94a3b8', 
-                                      fontSize: '0.72rem', 
-                                      fontWeight: 700, 
+                                      fontSize: '0.76rem', 
+                                      fontWeight: 750, 
                                       cursor: 'pointer', 
                                       padding: '4px 8px',
                                       borderRadius: '6px',
@@ -16618,12 +16820,12 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                 display: 'flex',
                                 alignItems: 'center',
                                 gap: '6px',
-                                fontSize: '0.70rem',
+                                fontSize: '0.76rem',
                                 fontWeight: 650,
                                 color: '#64748b',
-                                padding: '2px 0'
+                                padding: '3px 0'
                               }}>
-                                <Moon size={11} color="#64748b" />
+                                <Moon size={12} color="#64748b" />
                                 <span>
                                   {readOnly
                                     ? 'Nachtruhe aktiv: Keine störenden Benachrichtigungen bis 07:00 Uhr.'
@@ -16765,34 +16967,445 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                                   {/* Stage Header */}
                                   <div style={{
-                                    display: 'flex',
+                                    display: 'none',
                                     alignItems: 'center',
                                     justifyContent: 'space-between',
                                     paddingBottom: '8px',
-                                    borderBottom: '1px solid rgba(0,0,0,0.05)'
+                                    borderBottom: '1px solid rgba(0,0,0,0.05)',
+                                    gap: '8px',
+                                    flexWrap: 'wrap'
                                   }}>
                                     <span style={{
-                                      fontSize: '0.68rem',
+                                      fontSize: '0.84rem',
                                       fontWeight: 850,
-                                      color: '#94a3b8',
+                                      color: '#64748b',
                                       textTransform: 'uppercase',
-                                      letterSpacing: '0.05em',
+                                      letterSpacing: '0.04em',
                                       display: 'flex',
                                       alignItems: 'center',
-                                      gap: '5px'
+                                      gap: '6px'
                                     }}>
-                                      <BookOpen size={11} />
+                                      <BookOpen size={14} color="#64748b" />
                                       <span>Wochen-Fahrplan • {weekRange.label.toUpperCase()}</span>
-                                      <span style={{ fontSize: '0.64rem', fontWeight: 650, color: '#94a3b8', textTransform: 'none', letterSpacing: '0' }}>
+                                      <span style={{ fontSize: '0.76rem', fontWeight: 650, color: '#94a3b8', textTransform: 'none', letterSpacing: '0' }}>
                                         ({weekRange.dateSpan})
                                       </span>
                                     </span>
-                                    {!readOnly && (
-                                      <span style={{ fontSize: '0.66rem', color: '#94a3b8', fontWeight: 600 }}>
+                                    {readOnly ? (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          if (!isQuestionEditorOpen && parsedStudentQuestion.hasQuestion) {
+                                            setQuestionDraftText(parsedStudentQuestion.text);
+                                          }
+                                          setIsQuestionEditorOpen(prev => !prev);
+                                        }}
+                                        style={{
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          gap: '6px',
+                                          padding: '5px 12px',
+                                          minHeight: '32px',
+                                          borderRadius: '100px',
+                                          border: parsedStudentQuestion.hasQuestion ? '1px solid #fde047' : '1px solid #bbf7d0',
+                                          background: parsedStudentQuestion.hasQuestion ? '#fef9c3' : '#f0fdf4',
+                                          color: parsedStudentQuestion.hasQuestion ? '#854d0e' : '#15803d',
+                                          fontSize: '0.80rem',
+                                          fontWeight: 800,
+                                          cursor: 'pointer',
+                                          boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
+                                          transition: 'all 0.15s ease'
+                                        }}
+                                        className="hover-scale-mini"
+                                        title={parsedStudentQuestion.hasQuestion ? "Deine Frage ansehen oder ändern" : `Frage an ${effectiveTeacherFullName} stellen`}
+                                      >
+                                        <HelpCircle size={14} strokeWidth={2.4} />
+                                        <span>{parsedStudentQuestion.hasQuestion ? '1 Frage notiert' : 'Frage an Lehrkraft'}</span>
+                                      </button>
+                                    ) : (
+                                      <span style={{
+                                        fontSize: '0.78rem',
+                                        color: '#15803d',
+                                        background: '#dcfce7',
+                                        padding: '4px 10px',
+                                        borderRadius: '100px',
+                                        fontWeight: 850,
+                                        letterSpacing: '0.02em'
+                                      }}>
                                         Live-Schülersicht
                                       </span>
                                     )}
                                   </div>
+
+                                  {/* 💬 SCHÜLER-FRAGE FÜR DEN UNTERRICHT (KIDS GOLDSTANDARD) */}
+                                  {readOnly && isQuestionEditorOpen && (
+                                    <div style={{
+                                      background: '#ffffff',
+                                      border: '1.5px solid #eab308',
+                                      borderRadius: '18px',
+                                      padding: '14px',
+                                      boxShadow: '0 4px 16px rgba(234, 179, 8, 0.12)',
+                                      display: 'flex',
+                                      flexDirection: 'column',
+                                      gap: '12px'
+                                    }}>
+                                      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                          <div style={{
+                                            width: '32px',
+                                            height: '32px',
+                                            borderRadius: '10px',
+                                            background: '#dcfce7',
+                                            color: '#15803d',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            flexShrink: 0
+                                          }}>
+                                            <HelpCircle size={17} strokeWidth={2.4} />
+                                          </div>
+                                          <div>
+                                            <span style={{ fontSize: '0.94rem', fontWeight: 900, color: '#0f172a', display: 'block', lineHeight: 1.2 }}>
+                                              Frage an {effectiveTeacherFullName}
+                                            </span>
+                                            <p style={{ margin: '2px 0 0', fontSize: '0.76rem', color: '#64748b', fontWeight: 600 }}>
+                                              Deine Lehrkraft sieht deine Frage direkt zu Beginn der nächsten Stunde.
+                                            </p>
+                                          </div>
+                                        </div>
+                                        <button
+                                          type="button"
+                                          onClick={() => setIsQuestionEditorOpen(false)}
+                                          style={{
+                                            border: 'none',
+                                            background: 'transparent',
+                                            color: '#94a3b8',
+                                            cursor: 'pointer',
+                                            padding: '4px',
+                                            display: 'flex',
+                                            alignItems: 'center'
+                                          }}
+                                          title="Schließen"
+                                        >
+                                          <X size={16} />
+                                        </button>
+                                      </div>
+
+                                      <textarea
+                                        rows={3}
+                                        value={questionDraftText}
+                                        onChange={(e) => setQuestionDraftText(e.target.value)}
+                                        placeholder="z. B. Ich weiß bei Takt 8 nicht, wie ich zählen soll..."
+                                        style={{
+                                          width: '100%',
+                                          boxSizing: 'border-box',
+                                          borderRadius: '12px',
+                                          border: '1px solid #cbd5e1',
+                                          padding: '10px 12px',
+                                          fontSize: '16px',
+                                          lineHeight: 1.4,
+                                          fontFamily: 'inherit',
+                                          resize: 'none',
+                                          minHeight: '84px',
+                                          color: '#1e293b',
+                                          background: '#f8fafc',
+                                          outline: 'none'
+                                        }}
+                                      />
+
+                                      {/* 💡 Schnell-Tipp Ideen (vor den Action-Buttons platziert für perfekten UX-Flow) */}
+                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                          <Lightbulb size={12} color="#15803d" strokeWidth={2.4} />
+                                          <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
+                                            Schnelle Ideen für deine Frage:
+                                          </span>
+                                        </div>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                                          {[
+                                            { label: 'Welcher Fingersatz?', icon: Hand, text: 'Welchen Fingersatz soll ich hier spielen?' },
+                                            { label: 'Welches Tempo?', icon: Timer, text: 'Welches Tempo soll ich beim Üben einstellen?' },
+                                            { label: 'Takt unklar', icon: Music, text: 'Ich verstehe diesen Takt noch nicht ganz.' },
+                                            { label: 'Zählen bei Pause', icon: RotateCcw, text: 'Wie zähle ich die Pause richtig mit?' }
+                                          ].map(item => {
+                                            const IconComp = item.icon;
+                                            return (
+                                              <button
+                                                key={item.label}
+                                                type="button"
+                                                onClick={() => {
+                                                  setQuestionDraftText(prev => {
+                                                    const trimmed = prev.trim();
+                                                    if (!trimmed) return item.text;
+                                                    if (trimmed.includes(item.text)) return prev;
+                                                    return `${trimmed} ${item.text}`;
+                                                  });
+                                                }}
+                                                style={{
+                                                  background: '#ffffff',
+                                                  border: '1px solid #cbd5e1',
+                                                  borderRadius: '100px',
+                                                  padding: '5px 11px',
+                                                  minHeight: '32px',
+                                                  fontSize: '0.80rem',
+                                                  fontWeight: 750,
+                                                  color: '#334155',
+                                                  cursor: 'pointer',
+                                                  display: 'inline-flex',
+                                                  alignItems: 'center',
+                                                  gap: '5px',
+                                                  boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
+                                                  transition: 'all 0.15s ease'
+                                                }}
+                                                className="hover-scale-mini"
+                                              >
+                                                <IconComp size={13} strokeWidth={2.2} color="#15803d" />
+                                                <span>{item.label}</span>
+                                              </button>
+                                            );
+                                          })}
+                                        </div>
+                                      </div>
+
+                                      {/* Action Buttons: Diktat links, Abbrechen & Merken rechts */}
+                                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap', paddingTop: '6px', borderTop: '1px solid #f1f5f9' }}>
+                                        <SpeechDictationButton
+                                          onTranscript={(text) => {
+                                            setQuestionDraftText(prev => prev.trim() ? `${prev.trim()} ${text}` : text);
+                                          }}
+                                          title="Frage einsprechen"
+                                          size="md"
+                                        />
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                          <button
+                                            type="button"
+                                            onClick={() => setIsQuestionEditorOpen(false)}
+                                            style={{
+                                              border: 'none',
+                                              background: '#f1f5f9',
+                                              color: '#475569',
+                                              fontSize: '0.82rem',
+                                              fontWeight: 800,
+                                              padding: '7px 14px',
+                                              minHeight: '36px',
+                                              borderRadius: '10px',
+                                              cursor: 'pointer'
+                                            }}
+                                            className="hover-scale-mini"
+                                          >
+                                            Abbrechen
+                                          </button>
+                                          <button
+                                            type="button"
+                                            disabled={isSavingQuestion || !questionDraftText.trim()}
+                                            onClick={() => handleSaveStudentQuestion(questionDraftText)}
+                                            style={{
+                                              border: 'none',
+                                              background: '#34a853',
+                                              color: '#ffffff',
+                                              fontSize: '0.84rem',
+                                              fontWeight: 800,
+                                              padding: '7px 16px',
+                                              minHeight: '36px',
+                                              borderRadius: '10px',
+                                              cursor: (!isSavingQuestion && questionDraftText.trim()) ? 'pointer' : 'not-allowed',
+                                              opacity: (!isSavingQuestion && questionDraftText.trim()) ? 1 : 0.5,
+                                              display: 'inline-flex',
+                                              alignItems: 'center',
+                                              gap: '6px',
+                                              boxShadow: '0 2px 6px rgba(52, 168, 83, 0.25)'
+                                            }}
+                                            className="hover-scale-mini"
+                                          >
+                                            <Check size={14} strokeWidth={2.4} />
+                                            <span>{isSavingQuestion ? 'Speichern...' : 'Frage merken'}</span>
+                                          </button>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {readOnly && !isQuestionEditorOpen && parsedStudentQuestion.hasQuestion && (
+                                    <div style={{
+                                      background: '#fefce8',
+                                      border: '1px solid #fef08a',
+                                      borderRadius: '16px',
+                                      padding: '12px 14px',
+                                      boxShadow: '0 2px 6px rgba(234, 179, 8, 0.08)',
+                                      display: 'flex',
+                                      flexDirection: 'column',
+                                      gap: '8px'
+                                    }}>
+                                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+                                          <HelpCircle size={14} color="#ca8a04" strokeWidth={2.4} />
+                                          <span style={{ fontSize: '0.80rem', fontWeight: 850, color: '#854d0e', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
+                                            Deine Frage für den Unterricht:
+                                          </span>
+                                        </div>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                          <button
+                                            type="button"
+                                            onClick={() => handleSpeakText(parsedStudentQuestion.text, 'student_q')}
+                                            title="Frage vorlesen"
+                                            style={{
+                                              border: 'none',
+                                              background: '#fef08a',
+                                              color: '#854d0e',
+                                              borderRadius: '6px',
+                                              padding: '4px 6px',
+                                              cursor: 'pointer',
+                                              display: 'flex',
+                                              alignItems: 'center'
+                                            }}
+                                          >
+                                            <Volume2 size={13} />
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              setQuestionDraftText(parsedStudentQuestion.text);
+                                              setIsQuestionEditorOpen(true);
+                                            }}
+                                            title="Frage bearbeiten"
+                                            style={{
+                                              border: 'none',
+                                              background: '#fef08a',
+                                              color: '#854d0e',
+                                              borderRadius: '6px',
+                                              padding: '4px 6px',
+                                              cursor: 'pointer',
+                                              display: 'flex',
+                                              alignItems: 'center'
+                                            }}
+                                          >
+                                            <Edit3 size={13} />
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={handleResolveStudentQuestion}
+                                            title="Frage löschen oder als erledigt markieren"
+                                            style={{
+                                              border: 'none',
+                                              background: '#fee2e2',
+                                              color: '#dc2626',
+                                              borderRadius: '6px',
+                                              padding: '4px 6px',
+                                              cursor: 'pointer',
+                                              display: 'flex',
+                                              alignItems: 'center'
+                                            }}
+                                          >
+                                            <Trash2 size={13} />
+                                          </button>
+                                        </div>
+                                      </div>
+                                      <div style={{
+                                        fontSize: '0.92rem',
+                                        fontWeight: 700,
+                                        color: '#1e293b',
+                                        lineHeight: 1.5,
+                                        paddingLeft: '2px'
+                                      }}>
+                                        „{parsedStudentQuestion.text}“
+                                      </div>
+                                      <div style={{ fontSize: '0.74rem', fontWeight: 650, color: '#a16207', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                        <Sparkles size={11} color="#ca8a04" />
+                                        <span>{effectiveTeacherFullName} sieht diese Frage zu Beginn eurer nächsten Stunde!</span>
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {/* 🍎 LEHRKRAFT-BANNER: Prominenter Schülerfrage-Hinweis */}
+                                  {!readOnly && parsedStudentQuestion.hasQuestion && (
+                                    <div style={{
+                                      background: '#fffbeb',
+                                      border: '1.5px solid #fcd34d',
+                                      borderRadius: '16px',
+                                      padding: '12px 16px',
+                                      boxShadow: '0 3px 10px rgba(217, 119, 6, 0.08)',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'space-between',
+                                      gap: '12px',
+                                      flexWrap: 'wrap'
+                                    }}>
+                                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', minWidth: 0, flex: 1 }}>
+                                        <div style={{
+                                          width: '32px',
+                                          height: '32px',
+                                          borderRadius: '10px',
+                                          background: '#fef3c7',
+                                          color: '#d97706',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center',
+                                          flexShrink: 0
+                                        }}>
+                                          <HelpCircle size={18} strokeWidth={2.5} />
+                                        </div>
+                                        <div style={{ minWidth: 0, flex: 1 }}>
+                                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                                            <span style={{ fontSize: '0.80rem', fontWeight: 900, color: '#b45309', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                                              Schülerfrage von {student.first_name} {maskLastName(student.last_name)}
+                                            </span>
+                                            {parsedStudentQuestion.timestamp && (
+                                              <span style={{ fontSize: '0.66rem', color: '#92400e', opacity: 0.8 }}>
+                                                • {new Date(parsedStudentQuestion.timestamp).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                                              </span>
+                                            )}
+                                          </div>
+                                          <div style={{ fontSize: '0.94rem', fontWeight: 800, color: '#78350f', marginTop: '3px', lineHeight: 1.5 }}>
+                                            „{parsedStudentQuestion.text}“
+                                          </div>
+                                        </div>
+                                      </div>
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                                        <button
+                                          type="button"
+                                          onClick={() => handleSpeakText(parsedStudentQuestion.text, 'teacher_view_student_q')}
+                                          title="Frage vorlesen"
+                                          style={{
+                                            border: '1px solid #fde68a',
+                                            background: '#ffffff',
+                                            color: '#b45309',
+                                            borderRadius: '8px',
+                                            padding: '6px 9px',
+                                            minHeight: '34px',
+                                            cursor: 'pointer',
+                                            display: 'flex',
+                                            alignItems: 'center'
+                                          }}
+                                        >
+                                          <Volume2 size={14} />
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={handleResolveStudentQuestion}
+                                          style={{
+                                            background: '#16a34a',
+                                            color: '#ffffff',
+                                            border: 'none',
+                                            padding: '6px 14px',
+                                            minHeight: '34px',
+                                            borderRadius: '100px',
+                                            fontSize: '0.82rem',
+                                            fontWeight: 850,
+                                            cursor: 'pointer',
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            gap: '5px',
+                                            boxShadow: '0 2px 6px rgba(22, 163, 74, 0.25)'
+                                          }}
+                                          className="hover-scale-mini"
+                                          title="Als im Unterricht besprochen markieren"
+                                        >
+                                          <Check size={14} strokeWidth={2.5} />
+                                          <span>Im Unterricht besprochen</span>
+                                        </button>
+                                      </div>
+                                    </div>
+                                  )}
 
                                   {/* Lehrwerke Books */}
                                   {lehrwerkeList.map((item, idx) => {
@@ -16832,7 +17445,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                               <BookOpen size={13} color={bookColor.text} />
                                             </div>
                                             <span style={{
-                                              fontSize: '0.90rem',
+                                              fontSize: '0.96rem',
                                               fontWeight: 850,
                                               color: '#0f172a',
                                               overflow: 'hidden',
@@ -16850,11 +17463,11 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                                 aria-label={formatPageNumbersGerman(item.pages)}
                                                 title={formatPageNumbersGerman(item.pages)}
                                                 style={{
-                                                  fontSize: '0.74rem',
+                                                  fontSize: '0.82rem',
                                                   fontWeight: 850,
                                                   color: '#15803d',
                                                   background: '#dcfce7',
-                                                  padding: '3px 10px',
+                                                  padding: '4px 11px',
                                                   borderRadius: '99px',
                                                   display: 'inline-flex',
                                                   alignItems: 'center',
@@ -16868,8 +17481,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                               <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
                                                 {item.pages.map((p: number) => (
                                                   <span key={`p-pill-${p}`} style={{
-                                                    fontSize: '0.72rem',
-                                                    fontWeight: 800,
+                                                    fontSize: '0.80rem',
+                                                    fontWeight: 850,
                                                     color: '#15803d',
                                                     background: '#dcfce7',
                                                     padding: '3px 8px',
@@ -16890,7 +17503,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                                         background: 'none',
                                                         color: '#15803d',
                                                         cursor: 'pointer',
-                                                        fontSize: '0.66rem',
+                                                        fontSize: '0.70rem',
                                                         fontWeight: 900,
                                                         padding: '0',
                                                         lineHeight: 1
@@ -16914,7 +17527,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                                   background: 'rgba(239, 68, 68, 0.08)',
                                                   color: '#dc2626',
                                                   cursor: 'pointer',
-                                                  fontSize: '0.72rem',
+                                                  fontSize: '0.74rem',
                                                   fontWeight: 800,
                                                   padding: '4px 8px',
                                                   borderRadius: '8px',
@@ -16950,16 +17563,17 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                               alignItems: 'center',
                                               justifyContent: 'space-between',
                                               gap: '8px',
-                                              fontSize: '0.78rem',
-                                              padding: '3px 6px',
+                                              fontSize: '0.88rem',
+                                              lineHeight: 1.5,
+                                              padding: '5px 8px',
                                               marginLeft: '32px',
-                                              borderRadius: '6px',
+                                              borderRadius: '8px',
                                               background: isSpeakingThis ? '#dcfce7' : (parsedAnn.isSpecificToCurrent ? '#f0fdf4' : 'transparent'),
                                               border: parsedAnn.isSpecificToCurrent ? '1px solid #86efac' : 'none',
                                               transition: 'all 0.15s ease'
                                             }}>
                                               <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', minWidth: 0 }}>
-                                                <span style={{ fontWeight: 850, color: '#e11d48', flexShrink: 0 }}>S. {p}:</span>
+                                                <span style={{ fontWeight: 850, color: '#e11d48', flexShrink: 0, fontSize: '0.88rem' }}>S. {p}:</span>
                                                 {parsedAnn.isSpecificToCurrent && (
                                                   <span style={{
                                                     display: 'inline-flex',
@@ -16969,8 +17583,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                                     color: '#15803d',
                                                     border: '1px solid #86efac',
                                                     borderRadius: '6px',
-                                                    padding: '1px 5px',
-                                                    fontSize: '0.66rem',
+                                                    padding: '2px 6px',
+                                                    fontSize: '0.72rem',
                                                     fontWeight: 800,
                                                     flexShrink: 0
                                                   }}>
@@ -16987,8 +17601,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                                     color: '#6d28d9',
                                                     border: '1px solid #c4b5fd',
                                                     borderRadius: '6px',
-                                                    padding: '1px 5px',
-                                                    fontSize: '0.66rem',
+                                                    padding: '2px 6px',
+                                                    fontSize: '0.72rem',
                                                     fontWeight: 800,
                                                     flexShrink: 0
                                                   }}>
@@ -16996,7 +17610,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                                     <span>@{parsedAnn.targetStudentName}</span>
                                                   </span>
                                                 )}
-                                                <span style={{ fontWeight: parsedAnn.isSpecificToCurrent ? 750 : 600, color: '#334155', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                <span style={{ fontSize: '0.88rem', lineHeight: 1.5, fontWeight: parsedAnn.isSpecificToCurrent ? 650 : 550, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                                   {parsedAnn.cleanText}
                                                 </span>
                                               </div>
@@ -17022,7 +17636,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                                   onMouseLeave={(e) => { e.currentTarget.style.transform = 'none'; }}
                                                   title="Notiz vorlesen"
                                                 >
-                                                  <Volume2 size={12} strokeWidth={2.4} />
+                                                  <Volume2 size={13} strokeWidth={2.4} />
                                                 </button>
 
                                                 {!readOnly && (
@@ -17082,7 +17696,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                                   <Music size={13} strokeWidth={2.4} />
                                                 </div>
                                                 <span style={{
-                                                  fontSize: '0.90rem',
+                                                  fontSize: '0.96rem',
                                                   fontWeight: 850,
                                                   color: '#0f172a',
                                                   overflow: 'hidden',
@@ -17102,7 +17716,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                                     background: 'rgba(239, 68, 68, 0.08)',
                                                     color: '#dc2626',
                                                     cursor: 'pointer',
-                                                    fontSize: '0.72rem',
+                                                    fontSize: '0.74rem',
                                                     fontWeight: 800,
                                                     padding: '4px 8px',
                                                     borderRadius: '8px',
@@ -17127,16 +17741,17 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                                   alignItems: 'center',
                                                   justifyContent: 'space-between',
                                                   gap: '8px',
-                                                  fontSize: '0.78rem',
-                                                  padding: '3px 6px',
+                                                  fontSize: '0.88rem',
+                                                  lineHeight: 1.5,
+                                                  padding: '5px 8px',
                                                   marginLeft: '32px',
-                                                  borderRadius: '6px',
+                                                  borderRadius: '8px',
                                                   background: isSpeakingThisSong ? '#e0e7ff' : (parsedAnn.isSpecificToCurrent ? '#f0fdf4' : 'transparent'),
                                                   border: parsedAnn.isSpecificToCurrent ? '1px solid #86efac' : 'none',
                                                   transition: 'all 0.15s ease'
                                                 }}>
                                                   <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', minWidth: 0 }}>
-                                                    <span style={{ fontWeight: 850, color: '#4f46e5', flexShrink: 0 }}>📌 Fahrplan:</span>
+                                                    <span style={{ fontWeight: 850, color: '#4f46e5', flexShrink: 0, fontSize: '0.88rem' }}>📌 Fahrplan:</span>
                                                     {parsedAnn.isSpecificToCurrent && (
                                                       <span style={{
                                                         display: 'inline-flex',
@@ -17146,8 +17761,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                                         color: '#15803d',
                                                         border: '1px solid #86efac',
                                                         borderRadius: '6px',
-                                                        padding: '1px 5px',
-                                                        fontSize: '0.66rem',
+                                                        padding: '2px 6px',
+                                                        fontSize: '0.72rem',
                                                         fontWeight: 800,
                                                         flexShrink: 0
                                                       }}>
@@ -17164,8 +17779,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                                         color: '#6d28d9',
                                                         border: '1px solid #c4b5fd',
                                                         borderRadius: '6px',
-                                                        padding: '1px 5px',
-                                                        fontSize: '0.66rem',
+                                                        padding: '2px 6px',
+                                                        fontSize: '0.72rem',
                                                         fontWeight: 800,
                                                         flexShrink: 0
                                                       }}>
@@ -17173,7 +17788,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                                         <span>@{parsedAnn.targetStudentName}</span>
                                                       </span>
                                                     )}
-                                                    <span style={{ fontWeight: parsedAnn.isSpecificToCurrent ? 750 : 600, color: '#334155', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                    <span style={{ fontSize: '0.88rem', lineHeight: 1.5, fontWeight: parsedAnn.isSpecificToCurrent ? 650 : 550, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                                       {renderTextWithDidacticBadges(parsedAnn.cleanText)}
                                                     </span>
                                                   </div>
@@ -17199,7 +17814,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                                     onMouseLeave={(e) => { e.currentTarget.style.transform = 'none'; }}
                                                     title="Fahrplan vorlesen"
                                                   >
-                                                    <Volume2 size={12} strokeWidth={2.4} />
+                                                    <Volume2 size={13} strokeWidth={2.4} />
                                                   </button>
                                                 </div>
                                               );
@@ -17263,18 +17878,17 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                                 display: 'flex',
                                                 alignItems: 'center',
                                                 justifyContent: 'space-between',
-                                                gap: '8px',
-                                                padding: '7px 10px',
-                                                fontSize: '0.78rem',
-                                                borderRadius: '8px',
+                                                gap: '10px',
+                                                padding: '8px 12px',
+                                                borderRadius: '10px',
                                                 background: isSpeakingThisNote ? '#dcfce7' : (parsedAnn.isSpecificToCurrent ? '#f0fdf4' : '#ffffff'),
                                                 border: parsedAnn.isSpecificToCurrent ? '1px solid #86efac' : '1px solid #e2e8f0',
                                                 boxShadow: parsedAnn.isSpecificToCurrent ? '0 2px 6px rgba(34, 197, 94, 0.08)' : '0 1px 2px rgba(0,0,0,0.02)',
                                                 transition: 'all 0.15s ease'
                                               }}
                                             >
-                                              <div style={{ display: 'flex', alignItems: 'center', gap: '7px', minWidth: 0, flex: 1 }}>
-                                                <FileText size={13} style={{ color: '#16a34a', flexShrink: 0 }} />
+                                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
+                                                <FileText size={14} style={{ color: '#16a34a', flexShrink: 0 }} />
                                                 
                                                 {/* Personal Badge if targeted to current student */}
                                                 {parsedAnn.isSpecificToCurrent && (
@@ -17285,9 +17899,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                                     background: '#dcfce7',
                                                     color: '#15803d',
                                                     border: '1px solid #86efac',
-                                                    borderRadius: '6px',
-                                                    padding: '1px 6px',
-                                                    fontSize: '0.68rem',
+                                                    borderRadius: '8px',
+                                                    padding: '2px 7px',
+                                                    fontSize: '0.72rem',
                                                     fontWeight: 800,
                                                     flexShrink: 0
                                                   }}>
@@ -17305,9 +17919,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                                     background: '#ede9fe',
                                                     color: '#6d28d9',
                                                     border: '1px solid #c4b5fd',
-                                                    borderRadius: '6px',
-                                                    padding: '1px 6px',
-                                                    fontSize: '0.68rem',
+                                                    borderRadius: '8px',
+                                                    padding: '2px 7px',
+                                                    fontSize: '0.72rem',
                                                     fontWeight: 800,
                                                     flexShrink: 0
                                                   }}>
@@ -17325,9 +17939,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                                     background: '#f1f5f9',
                                                     color: '#475569',
                                                     border: '1px solid #cbd5e1',
-                                                    borderRadius: '6px',
-                                                    padding: '1px 6px',
-                                                    fontSize: '0.68rem',
+                                                    borderRadius: '8px',
+                                                    padding: '2px 7px',
+                                                    fontSize: '0.72rem',
                                                     fontWeight: 800,
                                                     flexShrink: 0
                                                   }}>
@@ -17337,9 +17951,10 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                                 )}
 
                                                 <span style={{
-                                                  color: '#334155',
+                                                  color: '#1e293b',
                                                   fontWeight: parsedAnn.isSpecificToCurrent ? 750 : 650,
-                                                  lineHeight: 1.4,
+                                                  fontSize: '0.88rem',
+                                                  lineHeight: 1.5,
                                                   overflow: 'hidden',
                                                   textOverflow: 'ellipsis',
                                                   whiteSpace: 'nowrap'
@@ -17348,7 +17963,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                                 </span>
                                               </div>
 
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexShrink: 0 }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
                                               {/* Contextual Inline Tag Picker / Badge */}
                                               {!readOnly ? (
                                                 <div style={{ position: 'relative' }}>
@@ -17362,9 +17977,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                                       border: currentTag ? `1px solid ${currentTag.border}` : '1px dashed #cbd5e1',
                                                       background: currentTag ? currentTag.bg : '#f8fafc',
                                                       color: currentTag ? currentTag.color : '#64748b',
-                                                      fontSize: '0.66rem',
+                                                      fontSize: '0.72rem',
                                                       fontWeight: 800,
-                                                      padding: '2px 7px',
+                                                      padding: '3px 9px',
                                                       borderRadius: '100px',
                                                       cursor: 'pointer',
                                                       display: 'inline-flex',
@@ -17584,9 +18199,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                           background: 'transparent',
                                           border: '1px dashed #cbd5e1',
                                           color: '#64748b',
-                                          fontSize: '0.70rem',
+                                          fontSize: '0.78rem',
                                           fontWeight: 750,
-                                          padding: '4px 10px',
+                                          padding: '5px 12px',
                                           borderRadius: '100px',
                                           cursor: 'pointer',
                                           display: 'flex',
@@ -17604,93 +18219,86 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                 </div>
                               )}
                             </div>
+                          </div>
+                          {/* KÖRPER 1 SCHLUSS */}
 
                             {/* ========================================================================= */}
-                            {/* ZONE 2: INTEGRATED STUDIO WORKBENCH (Apple Fluid Canvas)                 */}
+                            {/* KÖRPER 2: DAS PLAY-ALONG STUDIO (Akustik-Werkzeugbank)                    */}
                             {/* ========================================================================= */}
-                            {readOnly && (
+                            {!readOnly && (
                               <div style={{
+                                background: '#f8fafc',
+                                border: '1px solid #e2e8f0',
+                                borderRadius: '18px',
+                                padding: '14px 18px',
                                 display: 'flex',
                                 flexDirection: 'column',
-                                gap: '8px',
-                                paddingTop: '12px',
-                                borderTop: '1px solid #f1f5f9'
+                                gap: '10px',
+                                boxShadow: '0 1px 3px rgba(0, 0, 0, 0.02)'
                               }}>
-                                <div style={{
-                                  background: '#f8fafc',
-                                  border: '1px solid #e2e8f0',
-                                  borderRadius: '16px',
-                                  padding: '10px 14px',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'space-between',
-                                  gap: '12px',
-                                  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.02)'
-                                }}>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '9px', minWidth: 0 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                     <div style={{
-                                      width: '32px',
-                                      height: '32px',
-                                      borderRadius: '10px',
-                                      background: '#e0f2fe',
-                                      color: '#0284c7',
+                                      width: '24px',
+                                      height: '24px',
+                                      borderRadius: '7px',
+                                      background: '#0f172a',
+                                      color: '#ffffff',
                                       display: 'flex',
                                       alignItems: 'center',
                                       justifyContent: 'center',
                                       flexShrink: 0
                                     }}>
-                                      <MessageSquare size={16} strokeWidth={2.4} />
+                                      <Mic size={13} strokeWidth={2.4} />
                                     </div>
-                                    <span style={{ fontSize: '0.84rem', fontWeight: 800, color: '#1e293b', letterSpacing: '-0.01em' }}>
-                                      Frage an deine Lehrkraft
+                                    <span style={{ fontSize: '0.78rem', fontWeight: 850, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                                      Play-Along & Audio-Aufnahme
                                     </span>
                                   </div>
-                                  <SpeechDictationButton
-                                    onTranscript={(text) => {
-                                      const qText = `❓ Frage für den Unterricht: ${text}`;
-                                      const current = latestGeneralHomeworkNotesRef.current || generalHomeworkNotes || '';
-                                      const next = current.trim() ? `${current.trim()}\n${qText}` : qText;
-                                      latestGeneralHomeworkNotesRef.current = next;
-                                      setGeneralHomeworkNotes(next);
-                                      const specialNotes = (homeworkNotesList || []).filter(n => typeof n === 'string' && isInternalMetadataNote(n));
-                                      const noteLines = next.split('\n').map(s => s.trim()).filter(s => s.length > 0 && !isInternalMetadataNote(s));
-                                      const combined = [...specialNotes, ...noteLines];
-                                      setHomeworkNotesList(combined);
-                                      try { localStorage.setItem(`campus_homework_notes_${student.id}`, JSON.stringify(combined)); } catch {}
-                                      triggerDebouncedAutoSave(350);
-                                    }}
-                                    title="Frage einsprechen"
-                                  />
+                                  <span style={{ fontSize: '0.70rem', color: '#64748b', fontWeight: 650 }}>
+                                    {hasTresorStorage ? 'Tresor aktiv (bis 7 Min.)' : 'Direktaufnahme (bis 60s)'}
+                                  </span>
                                 </div>
-                              </div>
-                            )}
 
-                            {!readOnly && (
-                              <div style={{
-                                display: 'flex',
-                                flexDirection: 'column',
-                                gap: '12px',
-                                paddingTop: '12px',
-                                borderTop: '1px solid #f1f5f9'
-                              }}>
-                                {/* SECTION 1: 1-Touch Play-Along Audio Bar */}
-                                <div style={{
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '10px'
-                                }}>
-                                  {!isRecordingAudio ? (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                  {playAlongCountInRemaining !== null ? (
                                     <button
                                       type="button"
-                                      onClick={startRecordingAudio}
+                                      onClick={cancelPlayAlongCountIn}
+                                      style={{
+                                        background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                                        color: '#ffffff',
+                                        border: 'none',
+                                        padding: '8px 16px',
+                                        minHeight: '38px',
+                                        borderRadius: '100px',
+                                        fontSize: '0.80rem',
+                                        fontWeight: 900,
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '6px',
+                                        boxShadow: '0 0 12px rgba(245, 158, 11, 0.4)',
+                                        flexShrink: 0
+                                      }}
+                                      title="Einzähler abbrechen"
+                                    >
+                                      <Timer size={14} />
+                                      <span>Einzählen: {playAlongCountInRemaining} (Stopp)</span>
+                                    </button>
+                                  ) : !isRecordingAudio ? (
+                                    <button
+                                      type="button"
+                                      onClick={handleStartPlayAlongRecording}
                                       disabled={isUploadingAudio}
                                       style={{
                                         background: '#0f172a',
                                         color: '#ffffff',
                                         border: 'none',
-                                        padding: '7px 14px',
+                                        padding: '8px 16px',
+                                        minHeight: '38px',
                                         borderRadius: '100px',
-                                        fontSize: '0.74rem',
+                                        fontSize: '0.80rem',
                                         fontWeight: 800,
                                         cursor: 'pointer',
                                         display: 'flex',
@@ -17701,7 +18309,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                       }}
                                       className="hover-scale"
                                     >
-                                      <Mic size={13} />
+                                      <Mic size={14} />
                                       <span>Aufnahme</span>
                                     </button>
                                   ) : (
@@ -17712,9 +18320,10 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                         background: '#ef4444',
                                         color: '#ffffff',
                                         border: 'none',
-                                        padding: '7px 14px',
+                                        padding: '8px 16px',
+                                        minHeight: '38px',
                                         borderRadius: '100px',
-                                        fontSize: '0.74rem',
+                                        fontSize: '0.80rem',
                                         fontWeight: 800,
                                         cursor: 'pointer',
                                         display: 'flex',
@@ -17724,30 +18333,210 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                         flexShrink: 0
                                       }}
                                     >
-                                      <Square size={12} fill="#ffffff" />
+                                      <Square size={13} fill="#ffffff" />
                                       <span>Stopp ({hasTresorStorage ? `${formatRecordTime(audioDuration)} / 7:00` : `${audioDuration}s / 60s`})</span>
                                     </button>
                                   )}
 
-                                  {!isRecordingAudio ? (
+                                  {!isRecordingAudio && playAlongCountInRemaining === null && (
+                                    <>
+                                      {/* ⏱️ 4er Einzähler Toggle Pill */}
+                                      <button
+                                        type="button"
+                                        onClick={() => setIsCountInEnabled(!isCountInEnabled)}
+                                        style={{
+                                          background: isCountInEnabled ? '#ecfdf5' : '#ffffff',
+                                          color: isCountInEnabled ? '#15803d' : '#64748b',
+                                          border: isCountInEnabled ? '1.5px solid #86efac' : '1px solid #cbd5e1',
+                                          padding: '0 11px',
+                                          height: '38px',
+                                          borderRadius: '100px',
+                                          fontSize: '0.74rem',
+                                          fontWeight: 800,
+                                          cursor: 'pointer',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          gap: '5px',
+                                          flexShrink: 0,
+                                          transition: 'all 0.15s ease'
+                                        }}
+                                        title={isCountInEnabled ? '4-Beat Einzähler aktiv (Klick zum Deaktivieren)' : 'Einzähler inaktiv (Klick zum Aktivieren)'}
+                                      >
+                                        <Timer size={13} strokeWidth={isCountInEnabled ? 2.5 : 2} />
+                                        <span>4er Einzähler</span>
+                                      </button>
+
+                                      {/* ⏱️ Metronom & BPM Pill Button with Flyout */}
+                                      <div style={{ position: 'relative', flexShrink: 0 }}>
+                                        <button
+                                          type="button"
+                                          onClick={() => setShowPlayAlongMetronomePopup(!showPlayAlongMetronomePopup)}
+                                          style={{
+                                            background: isRecordingMetronomeActive ? '#ecfdf5' : '#ffffff',
+                                            color: isRecordingMetronomeActive ? '#15803d' : '#64748b',
+                                            border: isRecordingMetronomeActive ? '1.5px solid #86efac' : '1px solid #cbd5e1',
+                                            padding: '0 11px',
+                                            height: '38px',
+                                            borderRadius: '100px',
+                                            fontSize: '0.74rem',
+                                            fontWeight: 800,
+                                            cursor: 'pointer',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '5px',
+                                            boxShadow: isRecordingMetronomeActive ? '0 2px 6px rgba(22, 163, 74, 0.15)' : 'none',
+                                            transition: 'all 0.15s ease'
+                                          }}
+                                          title="Klick & Tempo (BPM) einstellen"
+                                        >
+                                          <MechanicalMetronomeIcon size={14} color={isRecordingMetronomeActive ? '#15803d' : '#64748b'} strokeWidth={isRecordingMetronomeActive ? 2.5 : 2} />
+                                          <span>{recordingBpm} BPM</span>
+                                          <ChevronDown size={12} strokeWidth={2.5} style={{ transform: showPlayAlongMetronomePopup ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s ease' }} />
+                                        </button>
+
+                                        {/* Popover Flyout */}
+                                        {showPlayAlongMetronomePopup && (
+                                          <div style={{
+                                            position: 'absolute',
+                                            bottom: 'calc(100% + 8px)',
+                                            left: 0,
+                                            background: '#ffffff',
+                                            borderRadius: '16px',
+                                            border: '1.5px solid #e2e8f0',
+                                            boxShadow: '0 12px 30px rgba(0, 0, 0, 0.15), 0 2px 6px rgba(0,0,0,0.05)',
+                                            padding: '12px 14px',
+                                            width: '230px',
+                                            zIndex: 100,
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            gap: '10px'
+                                          }}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                              <span style={{ fontSize: '0.80rem', fontWeight: 900, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                                <MechanicalMetronomeIcon size={15} color="#16a34a" strokeWidth={2.2} />
+                                                <span>Klick & Tempo</span>
+                                              </span>
+                                              <button
+                                                type="button"
+                                                onClick={() => setShowPlayAlongMetronomePopup(false)}
+                                                style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '2px' }}
+                                              >
+                                                <X size={14} />
+                                              </button>
+                                            </div>
+
+                                            <button
+                                              type="button"
+                                              onClick={() => {
+                                                const next = !isRecordingMetronomeActive;
+                                                setIsRecordingMetronomeActive(next);
+                                                if (next) playMetronomeTick(true);
+                                              }}
+                                              style={{
+                                                width: '100%',
+                                                background: isRecordingMetronomeActive ? '#16a34a' : '#f1f5f9',
+                                                color: isRecordingMetronomeActive ? '#ffffff' : '#475569',
+                                                border: 'none',
+                                                borderRadius: '10px',
+                                                padding: '7px 10px',
+                                                fontSize: '0.75rem',
+                                                fontWeight: 850,
+                                                cursor: 'pointer',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                gap: '6px',
+                                                boxShadow: isRecordingMetronomeActive ? '0 2px 8px rgba(22, 163, 74, 0.25)' : 'none'
+                                              }}
+                                              className="hover-scale-mini"
+                                            >
+                                              <span>{isRecordingMetronomeActive ? '✓ Klick bei Aufnahme AN' : 'Klick bei Aufnahme einschalten'}</span>
+                                            </button>
+
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.72rem', fontWeight: 800, color: '#475569' }}>
+                                                <span>Tempo</span>
+                                                <span style={{ color: '#16a34a', fontWeight: 900 }}>{recordingBpm} BPM</span>
+                                              </div>
+                                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                <button
+                                                  type="button"
+                                                  onClick={() => setRecordingBpm(b => Math.max(40, b - 5))}
+                                                  style={{ background: '#f1f5f9', border: 'none', borderRadius: '6px', width: '24px', height: '24px', fontWeight: 900, cursor: 'pointer' }}
+                                                >-</button>
+                                                <input
+                                                  type="range"
+                                                  min="40"
+                                                  max="240"
+                                                  value={recordingBpm}
+                                                  onChange={(e) => setRecordingBpm(parseInt(e.target.value, 10))}
+                                                  style={{ flex: 1, accentColor: '#16a34a', cursor: 'pointer' }}
+                                                />
+                                                <button
+                                                  type="button"
+                                                  onClick={() => setRecordingBpm(b => Math.min(240, b + 5))}
+                                                  style={{ background: '#f1f5f9', border: 'none', borderRadius: '6px', width: '24px', height: '24px', fontWeight: 900, cursor: 'pointer' }}
+                                                >+</button>
+                                              </div>
+                                            </div>
+
+                                            <button
+                                              type="button"
+                                              onClick={() => playMetronomeTick(true)}
+                                              style={{
+                                                background: '#f8fafc',
+                                                border: '1px solid #e2e8f0',
+                                                borderRadius: '8px',
+                                                padding: '5px 8px',
+                                                fontSize: '0.70rem',
+                                                fontWeight: 750,
+                                                color: '#64748b',
+                                                cursor: 'pointer'
+                                              }}
+                                            >
+                                              🔊 Klick kurz testen
+                                            </button>
+                                          </div>
+                                        )}
+                                      </div>
+                                    </>
+                                  )}
+
+                                  {playAlongCountInRemaining !== null ? (
+                                    <div style={{
+                                      flex: 1,
+                                      fontSize: '0.78rem',
+                                      color: '#d97706',
+                                      fontWeight: 750,
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '8px',
+                                      paddingLeft: '4px'
+                                    }}>
+                                      <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#f59e0b', animation: 'pulse 0.5s infinite' }} />
+                                      <span>Einzähler läuft ({recordingBpm} BPM)... Aufnahme startet bei 1.</span>
+                                    </div>
+                                  ) : !isRecordingAudio ? (
                                     <input
                                       type="text"
-                                      placeholder="Name der Aufnahme (optional)..."
+                                      placeholder="Titel der Begleitspur (optional, z. B. Play-Along Tempo 70)..."
                                       value={audioLabel}
                                       onChange={(e) => setAudioLabel(e.target.value)}
                                       onKeyDown={(e) => {
                                         if (e.key === 'Enter') {
                                           e.preventDefault();
-                                          startRecordingAudio();
+                                          handleStartPlayAlongRecording();
                                         }
                                       }}
                                       style={{
                                         flex: 1,
-                                        fontSize: '0.78rem',
-                                        padding: '7px 12px',
+                                        minWidth: '130px',
+                                        fontSize: '0.82rem',
+                                        padding: '8px 12px',
+                                        minHeight: '38px',
                                         borderRadius: '10px',
                                         border: '1px solid #e2e8f0',
-                                        background: '#f8fafc',
+                                        background: '#ffffff',
                                         color: '#0f172a',
                                         outline: 'none',
                                         boxSizing: 'border-box'
@@ -17756,470 +18545,505 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                   ) : (
                                     <div style={{
                                       flex: 1,
-                                      fontSize: '0.74rem',
+                                      fontSize: '0.78rem',
                                       color: '#dc2626',
                                       fontWeight: 750,
                                       display: 'flex',
                                       alignItems: 'center',
-                                      gap: '6px'
+                                      gap: '8px',
+                                      paddingLeft: '4px'
                                     }}>
-                                      <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#ef4444', animation: 'pulse 1s infinite' }} />
-                                      <span>Aufnahme läuft...</span>
+                                      <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#ef4444', animation: 'pulse 1s infinite' }} />
+                                      <span>Audioaufnahme läuft... {isRecordingMetronomeActive ? `(Klick: ${recordingBpm} BPM)` : 'Sprich oder spiele dein Instrument.'}</span>
                                     </div>
                                   )}
                                 </div>
-                                  {(() => {
-                                    const toolboxViewingWeekIso = (() => {
-                                      if (viewingWeekOffset === 0) return getISOWeek();
-                                      const d = new Date();
-                                      d.setDate(d.getDate() + (viewingWeekOffset * 7));
-                                      return getISOWeek(d);
-                                    })();
-                                    const toolboxViewingWeekNum = toolboxViewingWeekIso.split('-W')[1] || '';
+                              </div>
+                            )}
 
-                                    const getViewingNotesForCurrentOffset = (): string => {
-                                      if (viewingWeekOffset === 0) {
-                                        return generalHomeworkNotes;
-                                      }
-                                      const histWeekItem = (progressItems || []).find((item: any) => {
-                                        return item.topic_name === `Hausaufgabe KW ${toolboxViewingWeekNum}` ||
-                                               (item.created_at && getISOWeek(item.created_at) === toolboxViewingWeekIso) ||
-                                               (item.updated_at && getISOWeek(item.updated_at) === toolboxViewingWeekIso && item.topic_name.startsWith('Hausaufgabe KW '));
-                                      });
+                            {/* ========================================================================= */}
+                            {/* KÖRPER 3: DIE HAUSAUFGABEN-REDAKTION (Text- & Redaktions-Werkbank)        */}
+                            {/* ========================================================================= */}
+                            {!readOnly && (() => {
+                              const toolboxViewingWeekIso = (() => {
+                                if (viewingWeekOffset === 0) return getISOWeek();
+                                const d = new Date();
+                                d.setDate(d.getDate() + (viewingWeekOffset * 7));
+                                return getISOWeek(d);
+                              })();
+                              const toolboxViewingWeekNum = toolboxViewingWeekIso.split('-W')[1] || '';
 
-                                      if (!histWeekItem || !histWeekItem.homework_notes) return '';
-                                      try {
-                                        const parsed = typeof histWeekItem.homework_notes === 'string'
-                                          ? JSON.parse(histWeekItem.homework_notes)
-                                          : histWeekItem.homework_notes;
-                                        if (Array.isArray(parsed)) {
-                                          return parsed
-                                            .filter((n: string) => typeof n === 'string' && !isInternalMetadataNote(n))
-                                            .join('\n')
-                                            .trim();
-                                        } else if (typeof parsed === 'string') {
-                                          return parsed.split('\n').filter((s: string) => !isInternalMetadataNote(s)).join('\n').trim();
+                              const getViewingNotesForCurrentOffset = (): string => {
+                                if (viewingWeekOffset === 0) {
+                                  return generalHomeworkNotes;
+                                }
+                                const histWeekItem = (progressItems || []).find((item: any) => {
+                                  return item.topic_name === `Hausaufgabe KW ${toolboxViewingWeekNum}` ||
+                                         (item.created_at && getISOWeek(item.created_at) === toolboxViewingWeekIso) ||
+                                         (item.updated_at && getISOWeek(item.updated_at) === toolboxViewingWeekIso && item.topic_name.startsWith('Hausaufgabe KW '));
+                                });
+
+                                if (!histWeekItem || !histWeekItem.homework_notes) return '';
+                                try {
+                                  const parsed = typeof histWeekItem.homework_notes === 'string'
+                                    ? JSON.parse(histWeekItem.homework_notes)
+                                    : histWeekItem.homework_notes;
+                                  if (Array.isArray(parsed)) {
+                                    return parsed
+                                      .filter((n: string) => typeof n === 'string' && !isInternalMetadataNote(n))
+                                      .join('\n')
+                                      .trim();
+                                  } else if (typeof parsed === 'string') {
+                                    return parsed.split('\n').filter((s: string) => !isInternalMetadataNote(s)).join('\n').trim();
+                                  }
+                                } catch (e) {
+                                  return cleanNotesText(histWeekItem.homework_notes);
+                                }
+                                return '';
+                              };
+
+                              const activeViewingStudentNotes = getViewingNotesForCurrentOffset();
+
+                              return (
+                                <div style={{
+                                  background: activeNoteTarget === 'student' ? '#ffffff' : '#fffbeb',
+                                  border: activeNoteTarget === 'student' ? '1px solid #e2e8f0' : '1.5px solid #fcd34d',
+                                  borderRadius: '20px',
+                                  boxShadow: '0 4px 20px -2px rgba(0, 0, 0, 0.04)',
+                                  overflow: 'hidden',
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  transition: 'all 0.2s ease'
+                                }}>
+                                  {/* 1. Redaktions-Kopf: Switcher & Diktieren */}
+                                  <div style={{
+                                    padding: '12px 16px',
+                                    background: activeNoteTarget === 'student' ? '#fafafa' : '#fef3c7',
+                                    borderBottom: '1px solid rgba(0,0,0,0.06)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    gap: '8px',
+                                    flexWrap: 'wrap'
+                                  }}>
+                                    {/* Apple Segmented Switcher */}
+                                    <div style={{
+                                      display: 'flex',
+                                      background: '#f1f5f9',
+                                      border: '1px solid #e2e8f0',
+                                      padding: '3px',
+                                      borderRadius: '10px',
+                                      gap: '3px'
+                                    }}>
+                                      <button
+                                        type="button"
+                                        onClick={() => setActiveNoteTarget('student')}
+                                        style={{
+                                          border: 'none',
+                                          background: activeNoteTarget === 'student' ? '#ffffff' : 'transparent',
+                                          color: activeNoteTarget === 'student' ? '#15803d' : '#64748b',
+                                          fontWeight: activeNoteTarget === 'student' ? 850 : 650,
+                                          fontSize: '0.80rem',
+                                          padding: '5px 12px',
+                                          borderRadius: '8px',
+                                          cursor: 'pointer',
+                                          boxShadow: activeNoteTarget === 'student' ? '0 1px 3px rgba(0,0,0,0.06)' : 'none',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          gap: '6px',
+                                          transition: 'all 0.15s ease'
+                                        }}
+                                      >
+                                        <BookOpen size={13} />
+                                        <span>Hausaufgaben-Bemerkung</span>
+                                        {activeViewingStudentNotes.trim() && (
+                                          <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#34a853' }} />
+                                        )}
+                                      </button>
+
+                                      <button
+                                        type="button"
+                                        onClick={() => setActiveNoteTarget('teacher')}
+                                        style={{
+                                          border: 'none',
+                                          background: activeNoteTarget === 'teacher' ? '#ffffff' : 'transparent',
+                                          color: activeNoteTarget === 'teacher' ? '#92400e' : '#64748b',
+                                          fontWeight: activeNoteTarget === 'teacher' ? 850 : 650,
+                                          fontSize: '0.80rem',
+                                          padding: '5px 12px',
+                                          borderRadius: '8px',
+                                          cursor: 'pointer',
+                                          boxShadow: activeNoteTarget === 'teacher' ? '0 1px 3px rgba(0,0,0,0.06)' : 'none',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          gap: '6px',
+                                          transition: 'all 0.15s ease'
+                                        }}
+                                      >
+                                        <Lock size={12} />
+                                        <span>Interne Notiz (Nur Lehrer)</span>
+                                        {teacherNotes.trim() && (
+                                          <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#b45309' }} />
+                                        )}
+                                      </button>
+                                    </div>
+
+                                    {/* Diktier-Button */}
+                                    <SpeechDictationButton
+                                      onTranscript={(text) => {
+                                        if (activeNoteTarget === 'student') {
+                                          const current = latestGeneralHomeworkNotesRef.current !== undefined
+                                            ? latestGeneralHomeworkNotesRef.current
+                                            : generalHomeworkNotes;
+                                          const trimmed = current.trim();
+                                          const next = trimmed ? `${trimmed}\n${text}` : text;
+                                          latestGeneralHomeworkNotesRef.current = next;
+                                          setGeneralHomeworkNotes(next);
+                                          try { localStorage.setItem(`campus_homework_notes_${student.id}`, next); } catch {}
+                                        } else {
+                                          const current = latestTeacherNotesRef.current !== undefined
+                                            ? latestTeacherNotesRef.current
+                                            : teacherNotes;
+                                          const trimmed = current.trim();
+                                          const next = trimmed ? `${trimmed}\n${text}` : text;
+                                          latestTeacherNotesRef.current = next;
+                                          setTeacherNotes(next);
+                                          try { localStorage.setItem(`campus_teacher_notes_${student.id}`, next); } catch {}
                                         }
-                                      } catch (e) {
-                                        return cleanNotesText(histWeekItem.homework_notes);
-                                      }
-                                      return '';
-                                    };
+                                        triggerDebouncedAutoSave(350);
+                                      }}
+                                      title="Diktieren"
+                                    />
+                                  </div>
 
-                                    const activeViewingStudentNotes = getViewingNotesForCurrentOffset();
-
-                                    return (
-                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                                          {/* Apple Segmented Switcher */}
-                                          <div style={{
-                                            display: 'flex',
-                                            background: '#f8fafc',
-                                            border: '1px solid #f1f5f9',
-                                            padding: '2px',
-                                            borderRadius: '10px',
-                                            gap: '2px'
-                                          }}>
-                                            <button
-                                              type="button"
-                                              onClick={() => setActiveNoteTarget('student')}
-                                              style={{
-                                                border: 'none',
-                                                background: activeNoteTarget === 'student' ? '#ffffff' : 'transparent',
-                                                color: activeNoteTarget === 'student' ? '#0f172a' : '#64748b',
-                                                fontWeight: activeNoteTarget === 'student' ? 800 : 600,
-                                                fontSize: '0.72rem',
-                                                padding: '4px 10px',
-                                                borderRadius: '8px',
-                                                cursor: 'pointer',
-                                                boxShadow: activeNoteTarget === 'student' ? '0 1px 3px rgba(0,0,0,0.06)' : 'none',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                gap: '5px'
-                                              }}
-                                            >
-                                              <BookOpen size={12} />
-                                              <span>Hausaufgaben-Bemerkung</span>
-                                              {activeViewingStudentNotes.trim() && (
-                                                <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#34a853' }} />
-                                              )}
-                                            </button>
-
-                                            <button
-                                              type="button"
-                                              onClick={() => setActiveNoteTarget('teacher')}
-                                              style={{
-                                                border: 'none',
-                                                background: activeNoteTarget === 'teacher' ? '#ffffff' : 'transparent',
-                                                color: activeNoteTarget === 'teacher' ? '#0f172a' : '#64748b',
-                                                fontWeight: activeNoteTarget === 'teacher' ? 800 : 600,
-                                                fontSize: '0.72rem',
-                                                padding: '4px 10px',
-                                                borderRadius: '8px',
-                                                cursor: 'pointer',
-                                                boxShadow: activeNoteTarget === 'teacher' ? '0 1px 3px rgba(0,0,0,0.06)' : 'none',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                gap: '5px'
-                                              }}
-                                            >
-                                              <Lock size={11} />
-                                              <span>Interne Notiz (Nur Lehrer)</span>
-                                              {teacherNotes.trim() && (
-                                                <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#64748b' }} />
-                                              )}
-                                            </button>
-                                          </div>
-
-                                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                            <SpeechDictationButton
-                                              onTranscript={(text) => {
-                                                if (activeNoteTarget === 'student') {
-                                                  const current = latestGeneralHomeworkNotesRef.current !== undefined
-                                                    ? latestGeneralHomeworkNotesRef.current
-                                                    : generalHomeworkNotes;
-                                                  const trimmed = current.trim();
-                                                  const next = trimmed ? `${trimmed}\n${text}` : text;
-                                                  latestGeneralHomeworkNotesRef.current = next;
-                                                  setGeneralHomeworkNotes(next);
-                                                  try { localStorage.setItem(`campus_homework_notes_${student.id}`, next); } catch {}
-                                                } else {
-                                                  const current = latestTeacherNotesRef.current !== undefined
-                                                    ? latestTeacherNotesRef.current
-                                                    : teacherNotes;
-                                                  const trimmed = current.trim();
-                                                  const next = trimmed ? `${trimmed}\n${text}` : text;
-                                                  latestTeacherNotesRef.current = next;
-                                                  setTeacherNotes(next);
-                                                  try { localStorage.setItem(`campus_teacher_notes_${student.id}`, next); } catch {}
-                                                }
-                                                triggerDebouncedAutoSave(350);
-                                              }}
-                                              title="Diktieren"
-                                            />
-                                          </div>
-                                        </div>
-
-
-                                        {/* Notice Pill when in historical or future week */}
-                                        {viewingWeekOffset !== 0 && activeNoteTarget === 'student' && (
-                                          <div style={{
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'space-between',
-                                            background: viewingWeekOffset < 0 ? '#f8fafc' : '#f0fdf4',
-                                            border: `1px solid ${viewingWeekOffset < 0 ? '#e2e8f0' : '#bbf7d0'}`,
-                                            borderRadius: '10px',
-                                            padding: '6px 12px',
-                                            fontSize: '0.72rem',
-                                            fontWeight: 650,
-                                            color: viewingWeekOffset < 0 ? '#475569' : '#166534'
-                                          }}>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                              <span>{viewingWeekOffset < 0 ? '📅' : '🚀'}</span>
-                                              <span>
-                                                {viewingWeekOffset < 0
-                                                  ? `Archivierte Woche (KW ${toolboxViewingWeekNum})`
-                                                  : `Planungs-Vorschau (KW ${toolboxViewingWeekNum})`}
-                                              </span>
-                                            </div>
-                                            <button
-                                              type="button"
-                                              onClick={() => setViewingWeekOffset(0)}
-                                              style={{
-                                                background: 'none',
-                                                border: 'none',
-                                                color: viewingWeekOffset < 0 ? '#2563eb' : '#16a34a',
-                                                fontWeight: 800,
-                                                fontSize: '0.70rem',
-                                                cursor: 'pointer',
-                                                padding: 0
-                                              }}
-                                            >
-                                              ➔ Zur aktuellen Woche (KW {getISOWeek().split('-W')[1]})
-                                            </button>
-                                          </div>
-                                        )}
-
-                                        {/* Single Dynamic Textarea (Auto-Expanding with Content & Precision Cursor Tracking) */}
-                                        {activeNoteTarget === 'student' ? (
-                                          <>
-                                            {!readOnly && viewingWeekOffset === 0 && (
-                                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px', flexWrap: 'wrap' }}>
-                                                <span style={{ fontSize: '0.70rem', fontWeight: 800, color: '#64748b' }}>
-                                                  {effectiveGroupStudents.length > 1 ? 'Duo/Gruppen-Zuweisung:' : 'Schnell-Zuweisung:'}
-                                                </span>
-                                                {effectiveGroupStudents.map((grpStud, gIdx) => {
-                                                  const gName = (grpStud?.first_name || (grpStud as any)?.name?.split(' ')[0] || '').trim();
-                                                  if (!gName) return null;
-                                                  const isCurrentStudent = gName.toLowerCase() === studentFirstName.toLowerCase();
-                                                  return (
-                                                    <button
-                                                      key={`group-tag-btn-${gIdx}-${gName}`}
-                                                      type="button"
-                                                      onClick={() => {
-                                                        const tagToInsert = `@${gName}: `;
-                                                        const currentText = generalHomeworkNotes || '';
-                                                        const cursor = studentNotesSelectionRef.current?.start ?? currentText.length;
-                                                        const nextText = currentText.slice(0, cursor) + (currentText.length > 0 && !currentText.endsWith('\n') ? '\n' : '') + tagToInsert + currentText.slice(cursor);
-                                                        latestGeneralHomeworkNotesRef.current = nextText;
-                                                        setGeneralHomeworkNotes(nextText);
-                                                        const noteLines = nextText.split('\n').map(s => s.trim()).filter(s => s.length > 0 && !isInternalMetadataNote(s));
-                                                        setHomeworkNotesList(noteLines);
-                                                        try { localStorage.setItem(`campus_homework_notes_${student.id}`, JSON.stringify(noteLines)); } catch {}
-                                                        triggerDebouncedAutoSave(350);
-                                                        setTimeout(() => {
-                                                          if (studentNotesTextareaRef.current) {
-                                                            studentNotesTextareaRef.current.focus();
-                                                            const pos = cursor + tagToInsert.length + 1;
-                                                            studentNotesTextareaRef.current.setSelectionRange(pos, pos);
-                                                          }
-                                                        }, 20);
-                                                      }}
-                                                      style={{
-                                                        background: isCurrentStudent ? '#e6f4ea' : '#ede9fe',
-                                                        border: isCurrentStudent ? '1px solid rgba(52, 168, 83, 0.4)' : '1px solid rgba(139, 92, 246, 0.4)',
-                                                        borderRadius: '6px',
-                                                        padding: '2px 8px',
-                                                        fontSize: '0.70rem',
-                                                        fontWeight: 800,
-                                                        color: isCurrentStudent ? '#15803d' : '#6d28d9',
-                                                        cursor: 'pointer',
-                                                        display: 'inline-flex',
-                                                        alignItems: 'center',
-                                                        gap: '4px',
-                                                        transition: 'all 0.15s'
-                                                      }}
-                                                      className="hover-scale-mini"
-                                                      title={`@${gName} zur Hausaufgabe zuweisen`}
-                                                    >
-                                                      + @{gName}
-                                                    </button>
-                                                  );
-                                                })}
-                                                <button
-                                                  type="button"
-                                                  onClick={() => {
-                                                    const tagToInsert = '@Alle: ';
-                                                    const currentText = generalHomeworkNotes || '';
-                                                    const cursor = studentNotesSelectionRef.current?.start ?? currentText.length;
-                                                    const nextText = currentText.slice(0, cursor) + (currentText.length > 0 && !currentText.endsWith('\n') ? '\n' : '') + tagToInsert + currentText.slice(cursor);
-                                                    latestGeneralHomeworkNotesRef.current = nextText;
-                                                    setGeneralHomeworkNotes(nextText);
-                                                    const noteLines = nextText.split('\n').map(s => s.trim()).filter(s => s.length > 0 && !isInternalMetadataNote(s));
-                                                    setHomeworkNotesList(noteLines);
-                                                    try { localStorage.setItem(`campus_homework_notes_${student.id}`, JSON.stringify(noteLines)); } catch {}
-                                                    triggerDebouncedAutoSave(350);
-                                                    setTimeout(() => {
-                                                      if (studentNotesTextareaRef.current) {
-                                                        studentNotesTextareaRef.current.focus();
-                                                        const pos = cursor + tagToInsert.length + 1;
-                                                        studentNotesTextareaRef.current.setSelectionRange(pos, pos);
-                                                      }
-                                                    }, 20);
-                                                  }}
-                                                  style={{
-                                                    background: '#f1f5f9',
-                                                    border: '1px solid #cbd5e1',
-                                                    borderRadius: '6px',
-                                                    padding: '2px 8px',
-                                                    fontSize: '0.70rem',
-                                                    fontWeight: 800,
-                                                    color: '#475569',
-                                                    cursor: 'pointer',
-                                                    display: 'inline-flex',
-                                                    alignItems: 'center',
-                                                    gap: '4px',
-                                                    transition: 'all 0.15s'
-                                                  }}
-                                                >
-                                                  + @Alle
-                                                </button>
-                                              </div>
-                                            )}
-                                            <textarea
-                                            ref={studentNotesTextareaRef}
-                                            placeholder={viewingWeekOffset === 0
-                                              ? "Trage hier zusätzliche Bemerkungen zur Hausaufgabe ein..."
-                                              : (viewingWeekOffset < 0
-                                                ? `Keine zusätzlichen Hausaufgaben-Notizen in KW ${toolboxViewingWeekNum} archiviert.`
-                                                : `Noch keine Notizen für KW ${toolboxViewingWeekNum} geplant.`)}
-                                            value={activeViewingStudentNotes}
-                                            onInput={(e) => {
-                                              adjustTextareaHeight(e.currentTarget);
-                                              studentNotesSelectionRef.current = {
-                                                start: e.currentTarget.selectionStart ?? e.currentTarget.value.length,
-                                                end: e.currentTarget.selectionEnd ?? e.currentTarget.value.length
-                                              };
-                                            }}
-                                            onSelect={(e) => {
-                                              const target = e.currentTarget;
-                                              studentNotesSelectionRef.current = {
-                                                start: target.selectionStart ?? target.value.length,
-                                                end: target.selectionEnd ?? target.value.length
-                                              };
-                                            }}
-                                            onClick={(e) => {
-                                              const target = e.currentTarget;
-                                              studentNotesSelectionRef.current = {
-                                                start: target.selectionStart ?? target.value.length,
-                                                end: target.selectionEnd ?? target.value.length
-                                              };
-                                            }}
-                                            onKeyUp={(e) => {
-                                              const target = e.currentTarget;
-                                              studentNotesSelectionRef.current = {
-                                                start: target.selectionStart ?? target.value.length,
-                                                end: target.selectionEnd ?? target.value.length
-                                              };
-                                            }}
-                                            onChange={(e) => {
-                                              const val = e.target.value;
-                                              const target = e.currentTarget;
-                                              adjustTextareaHeight(target);
-                                              studentNotesSelectionRef.current = {
-                                                start: target.selectionStart ?? val.length,
-                                                end: target.selectionEnd ?? val.length
-                                              };
-                                              if (viewingWeekOffset === 0) {
-                                                latestGeneralHomeworkNotesRef.current = val;
-                                                setGeneralHomeworkNotes(val);
-                                                const specialNotes = (homeworkNotesList || []).filter(n => typeof n === 'string' && isInternalMetadataNote(n));
-                                                const noteLines = val.split('\n').map(s => s.trim()).filter(s => s.length > 0 && !isInternalMetadataNote(s));
-                                                const combined = [...specialNotes, ...noteLines];
-                                                setHomeworkNotesList(combined);
-                                                try { localStorage.setItem(`campus_homework_notes_${student.id}`, JSON.stringify(combined)); } catch {}
-                                                triggerDebouncedAutoSave(350);
-                                              }
-                                            }}
-                                            onFocus={(e) => {
-                                              setIsNotesFocused(true);
-                                              adjustTextareaHeight(e.currentTarget);
-                                              const target = e.currentTarget;
-                                              studentNotesSelectionRef.current = {
-                                                start: target.selectionStart ?? target.value.length,
-                                                end: target.selectionEnd ?? target.value.length
-                                              };
-                                            }}
-                                            onBlur={(e) => {
-                                              const target = e.currentTarget;
-                                              studentNotesSelectionRef.current = {
-                                                start: target.selectionStart ?? target.value.length,
-                                                end: target.selectionEnd ?? target.value.length
-                                              };
-                                              triggerImmediateAutoSave();
-                                              if (!activeViewingStudentNotes.trim()) setIsNotesFocused(false);
-                                            }}
-                                            style={{
-                                              width: '100%',
-                                              minHeight: '64px',
-                                              height: 'auto',
-                                              padding: '10px 14px',
-                                              borderRadius: '12px',
-                                              border: '1px solid #e2e8f0',
-                                              fontSize: '0.84rem',
-                                              fontWeight: 550,
-                                              lineHeight: 1.5,
-                                              outline: 'none',
-                                              resize: 'none',
-                                              overflow: 'hidden',
-                                              background: '#f8fafc',
-                                              color: '#0f172a',
-                                              boxSizing: 'border-box',
-                                              display: 'block'
-                                            }}
-                                          />
-                                        </>
-                                        ) : (
-                                          <textarea
-                                            ref={teacherNotesTextareaRef}
-                                            placeholder="Vertrauliche Notizen zum Schüler (nur für dich sichtbar)..."
-                                            value={teacherNotes}
-                                            onInput={(e) => {
-                                              adjustTextareaHeight(e.currentTarget);
-                                            }}
-                                            onChange={(e) => {
-                                              const val = e.target.value;
-                                              adjustTextareaHeight(e.currentTarget);
-                                              latestTeacherNotesRef.current = val;
-                                              setTeacherNotes(val);
-                                              try { localStorage.setItem(`campus_teacher_notes_${student.id}`, val); } catch {}
-                                              triggerDebouncedAutoSave(350);
-                                            }}
-                                            onBlur={() => triggerImmediateAutoSave()}
-                                            style={{
-                                              width: '100%',
-                                              minHeight: '64px',
-                                              height: 'auto',
-                                              padding: '10px 14px',
-                                              borderRadius: '12px',
-                                              border: '1px solid #e2e8f0',
-                                              fontSize: '0.84rem',
-                                              fontWeight: 550,
-                                              lineHeight: 1.5,
-                                              outline: 'none',
-                                              resize: 'none',
-                                              overflow: 'hidden',
-                                              background: '#f8fafc',
-                                              color: '#334155',
-                                              boxSizing: 'border-box',
-                                              display: 'block'
-                                            }}
-                                          />
-                                        )}
-
-                                        {/* SECTION 3: Apple QuickType Soft-Pills for 1-Tap iPad Speed */}
-                                        {activeNoteTarget === 'student' && (
-                                          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                            {/* Apple QuickType Soft-Pills for 1-Tap iPad Speed */}
-                                            <div style={{ display: 'flex', gap: '5px', overflowX: 'auto', padding: '2px 0', alignItems: 'center' }} className="hide-scrollbar">
-                                              <span style={{ fontSize: '0.66rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '3px' }}>
-                                                <Sparkles size={10} color="#94a3b8" />
-                                                <span>Vorlagen:</span>
-                                              </span>
-                                              {PRESET_CHIPS.map((chip, cIdx) => {
-                                                const isActive = chip.isBpm 
-                                                  ? activeViewingStudentNotes.toLowerCase().includes('bpm')
-                                                  : activeViewingStudentNotes.includes(chip.text);
-
-                                                return (
-                                                  <button
-                                                    key={`chip-${cIdx}`}
-                                                    type="button"
-                                                    onMouseDown={(e) => e.preventDefault()}
-                                                    onClick={(e) => handleTogglePresetChip(chip, e)}
-                                                    style={{
-                                                      flexShrink: 0,
-                                                      background: isActive ? '#f0fdf4' : '#ffffff',
-                                                      color: isActive ? '#166534' : '#475569',
-                                                      border: `1px solid ${isActive ? '#86efac' : '#e2e8f0'}`,
-                                                      padding: '3px 9px',
-                                                      borderRadius: '100px',
-                                                      fontSize: '0.68rem',
-                                                      fontWeight: isActive ? 800 : 650,
-                                                      cursor: 'pointer',
-                                                      boxShadow: isActive ? '0 1px 3px rgba(22, 101, 52, 0.12)' : '0 1px 2px rgba(0,0,0,0.03)',
-                                                      transition: 'all 0.15s ease',
-                                                      display: 'inline-flex',
-                                                      alignItems: 'center',
-                                                      gap: '4px'
-                                                    }}
-                                                    className="hover-scale-mini"
-                                                    title={chip.text}
-                                                  >
-                                                    {isActive && <Check size={10} color="#166534" strokeWidth={3} />}
-                                                    <span>{chip.label}</span>
-                                                  </button>
-                                                );
-                                              })}
-                                            </div>
-                                          </div>
-                                        )}
+                                  {/* Notice Pill when in historical or future week */}
+                                  {viewingWeekOffset !== 0 && activeNoteTarget === 'student' && (
+                                    <div style={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'space-between',
+                                      background: viewingWeekOffset < 0 ? '#f8fafc' : '#f0fdf4',
+                                      borderBottom: `1px solid ${viewingWeekOffset < 0 ? '#e2e8f0' : '#bbf7d0'}`,
+                                      padding: '6px 16px',
+                                      fontSize: '0.74rem',
+                                      fontWeight: 650,
+                                      color: viewingWeekOffset < 0 ? '#475569' : '#166534'
+                                    }}>
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                        <span>{viewingWeekOffset < 0 ? '📅' : '🚀'}</span>
+                                        <span>
+                                          {viewingWeekOffset < 0
+                                            ? `Archivierte Woche (KW ${toolboxViewingWeekNum})`
+                                            : `Planungs-Vorschau (KW ${toolboxViewingWeekNum})`}
+                                        </span>
                                       </div>
-                                    );
-                                  })()}
+                                      <button
+                                        type="button"
+                                        onClick={() => setViewingWeekOffset(0)}
+                                        style={{
+                                          background: 'none',
+                                          border: 'none',
+                                          color: viewingWeekOffset < 0 ? '#2563eb' : '#16a34a',
+                                          fontWeight: 800,
+                                          fontSize: '0.72rem',
+                                          cursor: 'pointer',
+                                          padding: 0
+                                        }}
+                                      >
+                                        ➔ Zur aktuellen Woche
+                                      </button>
+                                    </div>
+                                  )}
+
+                                  {/* Duo/Gruppen-Zuweisung: NUR wenn effectiveGroupStudents.length > 1 */}
+                                  {activeNoteTarget === 'student' && viewingWeekOffset === 0 && effectiveGroupStudents.length > 1 && (
+                                    <div style={{
+                                      padding: '10px 16px 2px 16px',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '6px',
+                                      flexWrap: 'wrap'
+                                    }}>
+                                      <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#64748b' }}>
+                                        Duo/Gruppen-Zuweisung:
+                                      </span>
+                                      {effectiveGroupStudents.map((grpStud, gIdx) => {
+                                        const gName = (grpStud?.first_name || (grpStud as any)?.name?.split(' ')[0] || '').trim();
+                                        if (!gName) return null;
+                                        const isCurrentStudent = gName.toLowerCase() === studentFirstName.toLowerCase();
+                                        return (
+                                          <button
+                                            key={`group-tag-btn-${gIdx}-${gName}`}
+                                            type="button"
+                                            onClick={() => {
+                                              const tagToInsert = `@${gName}: `;
+                                              const currentText = generalHomeworkNotes || '';
+                                              const cursor = studentNotesSelectionRef.current?.start ?? currentText.length;
+                                              const nextText = currentText.slice(0, cursor) + (currentText.length > 0 && !currentText.endsWith('\n') ? '\n' : '') + tagToInsert + currentText.slice(cursor);
+                                              latestGeneralHomeworkNotesRef.current = nextText;
+                                              setGeneralHomeworkNotes(nextText);
+                                              const noteLines = nextText.split('\n').map(s => s.trim()).filter(s => s.length > 0 && !isInternalMetadataNote(s));
+                                              setHomeworkNotesList(noteLines);
+                                              try { localStorage.setItem(`campus_homework_notes_${student.id}`, JSON.stringify(noteLines)); } catch {}
+                                              triggerDebouncedAutoSave(350);
+                                              setTimeout(() => {
+                                                if (studentNotesTextareaRef.current) {
+                                                  studentNotesTextareaRef.current.focus();
+                                                  const pos = cursor + tagToInsert.length + 1;
+                                                  studentNotesTextareaRef.current.setSelectionRange(pos, pos);
+                                                }
+                                              }, 20);
+                                            }}
+                                            style={{
+                                              background: isCurrentStudent ? '#e6f4ea' : '#ede9fe',
+                                              border: isCurrentStudent ? '1px solid rgba(52, 168, 83, 0.4)' : '1px solid rgba(139, 92, 246, 0.4)',
+                                              borderRadius: '6px',
+                                              padding: '3px 8px',
+                                              fontSize: '0.72rem',
+                                              fontWeight: 800,
+                                              color: isCurrentStudent ? '#15803d' : '#6d28d9',
+                                              cursor: 'pointer',
+                                              display: 'inline-flex',
+                                              alignItems: 'center',
+                                              gap: '4px',
+                                              transition: 'all 0.15s'
+                                            }}
+                                            className="hover-scale-mini"
+                                            title={`@${gName} zur Hausaufgabe zuweisen`}
+                                          >
+                                            + @{gName}
+                                          </button>
+                                        );
+                                      })}
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const tagToInsert = '@Alle: ';
+                                          const currentText = generalHomeworkNotes || '';
+                                          const cursor = studentNotesSelectionRef.current?.start ?? currentText.length;
+                                          const nextText = currentText.slice(0, cursor) + (currentText.length > 0 && !currentText.endsWith('\n') ? '\n' : '') + tagToInsert + currentText.slice(cursor);
+                                          latestGeneralHomeworkNotesRef.current = nextText;
+                                          setGeneralHomeworkNotes(nextText);
+                                          const noteLines = nextText.split('\n').map(s => s.trim()).filter(s => s.length > 0 && !isInternalMetadataNote(s));
+                                          setHomeworkNotesList(noteLines);
+                                          try { localStorage.setItem(`campus_homework_notes_${student.id}`, JSON.stringify(noteLines)); } catch {}
+                                          triggerDebouncedAutoSave(350);
+                                          setTimeout(() => {
+                                            if (studentNotesTextareaRef.current) {
+                                              studentNotesTextareaRef.current.focus();
+                                              const pos = cursor + tagToInsert.length + 1;
+                                              studentNotesTextareaRef.current.setSelectionRange(pos, pos);
+                                            }
+                                          }, 20);
+                                        }}
+                                        style={{
+                                          background: '#f1f5f9',
+                                          border: '1px solid #cbd5e1',
+                                          borderRadius: '6px',
+                                          padding: '3px 8px',
+                                          fontSize: '0.72rem',
+                                          fontWeight: 800,
+                                          color: '#475569',
+                                          cursor: 'pointer',
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          gap: '4px',
+                                          transition: 'all 0.15s'
+                                        }}
+                                        className="hover-scale-mini"
+                                      >
+                                        + @Alle
+                                      </button>
+                                    </div>
+                                  )}
+
+                                  {/* 2. Textarea Bereich */}
+                                  <div style={{ padding: '12px 16px' }}>
+                                    {activeNoteTarget === 'student' ? (
+                                      <textarea
+                                        ref={studentNotesTextareaRef}
+                                        placeholder={viewingWeekOffset === 0
+                                          ? "Trage hier Notizen, Hausaufgaben oder den Wochen-Fahrplan ein..."
+                                          : (viewingWeekOffset < 0
+                                            ? `Keine Notizen in KW ${toolboxViewingWeekNum} archiviert.`
+                                            : `Noch keine Notizen für KW ${toolboxViewingWeekNum} geplant.`)}
+                                        value={activeViewingStudentNotes}
+                                        onInput={(e) => {
+                                          adjustTextareaHeight(e.currentTarget);
+                                          studentNotesSelectionRef.current = {
+                                            start: e.currentTarget.selectionStart ?? e.currentTarget.value.length,
+                                            end: e.currentTarget.selectionEnd ?? e.currentTarget.value.length
+                                          };
+                                        }}
+                                        onSelect={(e) => {
+                                          const target = e.currentTarget;
+                                          studentNotesSelectionRef.current = {
+                                            start: target.selectionStart ?? target.value.length,
+                                            end: target.selectionEnd ?? target.value.length
+                                          };
+                                        }}
+                                        onClick={(e) => {
+                                          const target = e.currentTarget;
+                                          studentNotesSelectionRef.current = {
+                                            start: target.selectionStart ?? target.value.length,
+                                            end: target.selectionEnd ?? target.value.length
+                                          };
+                                        }}
+                                        onKeyUp={(e) => {
+                                          const target = e.currentTarget;
+                                          studentNotesSelectionRef.current = {
+                                            start: target.selectionStart ?? target.value.length,
+                                            end: target.selectionEnd ?? target.value.length
+                                          };
+                                        }}
+                                        onChange={(e) => {
+                                          const val = e.target.value;
+                                          const target = e.currentTarget;
+                                          adjustTextareaHeight(target);
+                                          studentNotesSelectionRef.current = {
+                                            start: target.selectionStart ?? val.length,
+                                            end: target.selectionEnd ?? val.length
+                                          };
+                                          if (viewingWeekOffset === 0) {
+                                            latestGeneralHomeworkNotesRef.current = val;
+                                            setGeneralHomeworkNotes(val);
+                                            const specialNotes = (homeworkNotesList || []).filter(n => typeof n === 'string' && isInternalMetadataNote(n));
+                                            const noteLines = val.split('\n').map(s => s.trim()).filter(s => s.length > 0 && !isInternalMetadataNote(s));
+                                            const combined = [...specialNotes, ...noteLines];
+                                            setHomeworkNotesList(combined);
+                                            try { localStorage.setItem(`campus_homework_notes_${student.id}`, JSON.stringify(combined)); } catch {}
+                                            triggerDebouncedAutoSave(350);
+                                          }
+                                        }}
+                                        onFocus={(e) => {
+                                          setIsNotesFocused(true);
+                                          adjustTextareaHeight(e.currentTarget);
+                                          const target = e.currentTarget;
+                                          studentNotesSelectionRef.current = {
+                                            start: target.selectionStart ?? target.value.length,
+                                            end: target.selectionEnd ?? target.value.length
+                                          };
+                                        }}
+                                        onBlur={(e) => {
+                                          const target = e.currentTarget;
+                                          studentNotesSelectionRef.current = {
+                                            start: target.selectionStart ?? target.value.length,
+                                            end: target.selectionEnd ?? target.value.length
+                                          };
+                                          triggerImmediateAutoSave();
+                                          if (!activeViewingStudentNotes.trim()) setIsNotesFocused(false);
+                                        }}
+                                        style={{
+                                          width: '100%',
+                                          minHeight: '84px',
+                                          height: 'auto',
+                                          padding: '0',
+                                          border: 'none',
+                                          fontSize: '0.94rem',
+                                          fontWeight: 550,
+                                          lineHeight: 1.55,
+                                          outline: 'none',
+                                          resize: 'none',
+                                          overflow: 'hidden',
+                                          background: 'transparent',
+                                          color: '#0f172a',
+                                          boxSizing: 'border-box',
+                                          display: 'block'
+                                        }}
+                                      />
+                                    ) : (
+                                      <textarea
+                                        ref={teacherNotesTextareaRef}
+                                        placeholder="Vertrauliche Notizen zum Schüler (nur für dich sichtbar)..."
+                                        value={teacherNotes}
+                                        onInput={(e) => {
+                                          adjustTextareaHeight(e.currentTarget);
+                                        }}
+                                        onChange={(e) => {
+                                          const val = e.target.value;
+                                          adjustTextareaHeight(e.currentTarget);
+                                          latestTeacherNotesRef.current = val;
+                                          setTeacherNotes(val);
+                                          try { localStorage.setItem(`campus_teacher_notes_${student.id}`, val); } catch {}
+                                          triggerDebouncedAutoSave(350);
+                                        }}
+                                        onBlur={() => triggerImmediateAutoSave()}
+                                        style={{
+                                          width: '100%',
+                                          minHeight: '84px',
+                                          height: 'auto',
+                                          padding: '0',
+                                          border: 'none',
+                                          fontSize: '0.94rem',
+                                          fontWeight: 550,
+                                          lineHeight: 1.55,
+                                          outline: 'none',
+                                          resize: 'none',
+                                          overflow: 'hidden',
+                                          background: 'transparent',
+                                          color: '#78350f',
+                                          boxSizing: 'border-box',
+                                          display: 'block'
+                                        }}
+                                      />
+                                    )}
+                                  </div>
+
+                                  {/* 3. Vorlagen-Dock: Nahtlos im Fuß der Redaktionskarte verankert */}
+                                  {activeNoteTarget === 'student' && (
+                                    <div style={{
+                                      padding: '10px 16px',
+                                      background: '#f8fafc',
+                                      borderTop: '1px solid #f1f5f9',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '6px',
+                                      overflowX: 'auto'
+                                    }} className="hide-scrollbar">
+                                      <span style={{ fontSize: '0.70rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.04em', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                        <Sparkles size={11} color="#94a3b8" />
+                                        <span>Vorlagen:</span>
+                                      </span>
+                                      {PRESET_CHIPS.map((chip, cIdx) => {
+                                        const isActive = chip.isBpm 
+                                          ? activeViewingStudentNotes.toLowerCase().includes('bpm')
+                                          : activeViewingStudentNotes.includes(chip.text);
+
+                                        return (
+                                          <button
+                                            key={`chip-${cIdx}`}
+                                            type="button"
+                                            onMouseDown={(e) => e.preventDefault()}
+                                            onClick={(e) => handleTogglePresetChip(chip, e)}
+                                            style={{
+                                              flexShrink: 0,
+                                              background: isActive ? '#f0fdf4' : '#ffffff',
+                                              color: isActive ? '#166534' : '#475569',
+                                              border: `1px solid ${isActive ? '#86efac' : '#e2e8f0'}`,
+                                              padding: '4px 11px',
+                                              borderRadius: '100px',
+                                              fontSize: '0.74rem',
+                                              fontWeight: isActive ? 800 : 650,
+                                              cursor: 'pointer',
+                                              boxShadow: isActive ? '0 1px 3px rgba(22, 101, 52, 0.12)' : '0 1px 2px rgba(0,0,0,0.03)',
+                                              transition: 'all 0.15s ease',
+                                              display: 'inline-flex',
+                                              alignItems: 'center',
+                                              gap: '4px'
+                                            }}
+                                            className="hover-scale-mini"
+                                            title={chip.text}
+                                          >
+                                            {isActive && <Check size={11} color="#166534" strokeWidth={3} />}
+                                            <span>{chip.label}</span>
+                                          </button>
+                                        );
+                                      })}
+                                    </div>
+                                  )}
                                 </div>
-                              )}
+                              );
+                            })()}
                             </div>
                           );
                         })()}
@@ -19903,7 +20727,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                     </div>
 
                     <div style={{ display: 'flex', gap: '10px', fontSize: '0.72rem', background: 'rgba(255,255,255,0.15)', padding: '8px 14px', borderRadius: '12px', backdropFilter: 'blur(4px)' }}>
-                      <span>🔒 <strong>100 % DSGVO-konform:</strong> Lückenlose Speicherung deiner musikalischen Meilensteine – ohne private Kamerafotos!</span>
+                      <span>🔒 <strong>DSGVO-konform:</strong> Lückenlose Speicherung deiner musikalischen Meilensteine – ohne private Kamerafotos!</span>
                     </div>
                   </div>
                 </div>
@@ -21609,7 +22433,7 @@ const InlineAudioPlayer: React.FC<{
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
-                const rates = [1, 0.85, 0.75, 0.5, 1.2];
+                const rates = [1, 0.85, 0.75, 0.5];
                 const nextRate = rates[(rates.indexOf(playbackRate) + 1) % rates.length];
                 setPlaybackRate(nextRate);
               }}
@@ -21626,9 +22450,17 @@ const InlineAudioPlayer: React.FC<{
                 boxSizing: 'border-box'
               }}
               className="hover-scale-mini"
-              title="Tempo anpassen"
+              title={
+                playbackRate === 1
+                  ? 'Originaltempo (100%)'
+                  : playbackRate === 0.85
+                  ? 'Übetempo (85%)'
+                  : playbackRate === 0.75
+                  ? 'Übetempo (75%)'
+                  : 'Halbes Tempo (50%)'
+              }
             >
-              {playbackRate}×
+              {Math.round(playbackRate * 100)}%
             </button>
           </>
         ) : (
@@ -21697,7 +22529,7 @@ const InlineAudioPlayer: React.FC<{
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
-                const rates = [1, 0.85, 0.75, 0.5, 1.2];
+                const rates = [1, 0.85, 0.75, 0.5];
                 const nextRate = rates[(rates.indexOf(playbackRate) + 1) % rates.length];
                 setPlaybackRate(nextRate);
               }}
@@ -21714,9 +22546,17 @@ const InlineAudioPlayer: React.FC<{
                 boxSizing: 'border-box'
               }}
               className="hover-scale-mini"
-              title="Tempo anpassen"
+              title={
+                playbackRate === 1
+                  ? 'Originaltempo (100%)'
+                  : playbackRate === 0.85
+                  ? 'Übetempo (85%)'
+                  : playbackRate === 0.75
+                  ? 'Übetempo (75%)'
+                  : 'Halbes Tempo (50%)'
+              }
             >
-              Tempo {playbackRate}×
+              Tempo {Math.round(playbackRate * 100)}%
             </button>
 
             {/* ✂️ Studio Editor Button */}

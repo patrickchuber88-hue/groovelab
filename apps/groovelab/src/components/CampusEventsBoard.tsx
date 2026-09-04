@@ -44,10 +44,15 @@ import {
   Sparkles,
   AlertTriangle,
   CheckCircle2,
-  FileText
+  FileText,
+  Smartphone,
+  Rocket,
+  RefreshCw,
+  Hourglass,
+  Copy
 } from 'lucide-react';
 import { downloadCsvFile } from '../utils/csvHelper';
-import { formatSingleStudentAnonymized, formatGroupStudentsAnonymized, formatCombinedStudentNames, getGroupTypeLabel, formatTeacherFullName, formatDisplaySubjectOrInstrument, isInvalidInstrument } from '../utils/nameHelper';
+import { formatSingleStudentAnonymized, formatGroupStudentsAnonymized, formatCombinedStudentNames, getGroupTypeLabel, formatTeacherFullName, formatDisplaySubjectOrInstrument, isInvalidInstrument, maskLastName } from '../utils/nameHelper';
 
 interface CampusEventsBoardProps {
   userId: string;
@@ -602,8 +607,10 @@ export function CampusEventsBoard({
   // iCal Subscription States
   const [showIcalModal, setShowIcalModal] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [userQrToken, setUserQrToken] = useState<string>('');
+  const [familyCopied, setFamilyCopied] = useState(false);
+  const [calendarToken, setCalendarToken] = useState<string>('');
   const [generatingToken, setGeneratingToken] = useState<boolean>(false);
+  const tokenFetchAttemptedRef = useRef(false);
 
   // Column 3: Infos der Verwaltung (campus_announcements)
   const [schoolAnnouncements, setSchoolAnnouncements] = useState<any[]>([]);
@@ -2061,40 +2068,50 @@ export function CampusEventsBoard({
     }
   };
 
-  // Fetch or generate QR token for secure iCal URL
-  useEffect(() => {
-    const fetchOrCreateToken = async () => {
-      try {
-        const { data, error } = await supabase
+  // Fetch or generate dedicated calendar_token via secure RPC (OWASP ASVS / DSGVO compliant)
+  const fetchOrCreateCalendarToken = async (forceRotate = false) => {
+    if (!userId) return;
+    try {
+      setGeneratingToken(true);
+      const { data, error } = await supabase.rpc('get_or_rotate_calendar_token', {
+        p_user_id: userId,
+        p_force_rotate: forceRotate
+      });
+      if (error) {
+        console.warn('RPC get_or_rotate_calendar_token error, checking user record:', error);
+        const { data: userData } = await supabase
           .from('users')
-          .select('qr_token')
+          .select('calendar_token')
           .eq('id', userId)
-          .single();
-        if (error) throw error;
-        if (data && data.qr_token) {
-          setUserQrToken(data.qr_token);
-        } else {
-          setGeneratingToken(true);
-          const newToken = Array.from(crypto.getRandomValues(new Uint8Array(16)))
-            .map(b => b.toString(16).padStart(2, '0'))
-            .join('');
-          const { error: updateErr } = await supabase
-            .from('users')
-            .update({ qr_token: newToken })
-            .eq('id', userId);
-          if (updateErr) throw updateErr;
-          setUserQrToken(newToken);
+          .maybeSingle();
+        if (userData?.calendar_token) {
+          setCalendarToken(userData.calendar_token);
         }
-      } catch (err) {
-        console.warn('Error fetching or creating user QR token for iCal:', err);
-      } finally {
-        setGeneratingToken(false);
+      } else if (data) {
+        setCalendarToken(data);
       }
-    };
+    } catch (err) {
+      console.warn('Error fetching or rotating calendar token:', err);
+    } finally {
+      setGeneratingToken(false);
+    }
+  };
+
+  useEffect(() => {
     if (userId) {
-      fetchOrCreateToken();
+      fetchOrCreateCalendarToken(false);
     }
   }, [userId]);
+
+  useEffect(() => {
+    if (showIcalModal && !calendarToken && userId && !tokenFetchAttemptedRef.current) {
+      tokenFetchAttemptedRef.current = true;
+      fetchOrCreateCalendarToken(false);
+    }
+    if (!showIcalModal) {
+      tokenFetchAttemptedRef.current = false;
+    }
+  }, [showIcalModal, calendarToken, userId]);
 
   // Fetch all initial data and keep in 100% real-time sync with Stundenplan
   useEffect(() => {
@@ -4203,7 +4220,40 @@ export function CampusEventsBoard({
     try {
       if (!occ.id) return;
 
-      if (occ.id.toString().startsWith("virtual-")) {
+      const isTeacherActor = role === 'teacher';
+      const isStudentActor = role === 'student';
+      const isVirtual = Boolean(
+        occ.is_virtual || 
+        (occ.id && (String(occ.id).startsWith('virt_') || String(occ.id).startsWith('virtual-')))
+      );
+
+      // Collect all student IDs involved (handles single student and group lessons)
+      const gatheredStudentIds: string[] = [];
+      if (Array.isArray(occ.students) && occ.students.length > 0) {
+        occ.students.forEach((s: any) => {
+          const sId = s?.id || s?.user_id || s?.student_id;
+          if (sId && typeof sId === 'string' && sId.length > 5 && !sId.startsWith('virtual-student-') && !sId.startsWith('break-')) {
+            gatheredStudentIds.push(sId);
+          }
+        });
+      }
+      if (Array.isArray(occ.group_occurrences) && occ.group_occurrences.length > 0) {
+        occ.group_occurrences.forEach((g: any) => {
+          const gId = g?.student_id || g?.student?.id || g?.user_id;
+          if (gId && typeof gId === 'string' && gId.length > 5 && !gId.startsWith('virtual-student-') && !gId.startsWith('break-')) {
+            gatheredStudentIds.push(gId);
+          }
+        });
+      }
+      const singleStudentId = occ.student_id || (occ.student as any)?.id || occ.board_student_id;
+      if (singleStudentId && typeof singleStudentId === 'string' && singleStudentId.length > 5 && !singleStudentId.startsWith('virtual-student-') && !singleStudentId.startsWith('break-')) {
+        gatheredStudentIds.push(singleStudentId);
+      }
+      const uniqueStudentIds = Array.from(new Set(gatheredStudentIds));
+
+      const teacherId = occ.teacher_id || (occ.teacher as any)?.id || (isTeacherActor ? userId : null);
+
+      if (isVirtual) {
         if (occ.status === "teacher_sick" || occ.status === "canceled_by_teacher_sick") {
           const { error: updErr } = await supabase
             .from("schedules")
@@ -4211,56 +4261,214 @@ export function CampusEventsBoard({
             .eq("id", occ.schedule_id)
             .eq("status", "canceled_by_teacher_sick");
           if (updErr) throw updErr;
-          await fetchLessons();
         }
-        return;
-      }
 
-      if (occ.schedule_id) {
-        // Recurring template-derived slot: delete the cancellation override row to restore template default
-        const { error: delErr } = await supabase
+        // Check if an occurrence row exists in schedule_occurrences for this schedule & date
+        const { data: existingOcc } = await supabase
           .from("schedule_occurrences")
-          .delete()
-          .eq("id", occ.id);
-        if (delErr) throw delErr;
+          .select("id")
+          .eq("schedule_id", occ.schedule_id)
+          .eq("date", occ.date)
+          .maybeSingle();
+
+        if (existingOcc?.id) {
+          const { error: updOccErr } = await supabase
+            .from("schedule_occurrences")
+            .update({
+              status: "scheduled",
+              original_date: occ.date,
+              student_acknowledged: isStudentActor,
+              teacher_acknowledged: isTeacherActor,
+              updated_at: new Date().toISOString()
+            })
+            .eq("id", existingOcc.id);
+          if (updOccErr) throw updOccErr;
+        } else {
+          // Insert explicit occurrence so acknowledgment tracking works on briefing boards
+          const targets = uniqueStudentIds.length > 0 ? uniqueStudentIds : [occ.student_id].filter(Boolean);
+          for (const sId of targets) {
+            await supabase
+              .from("schedule_occurrences")
+              .insert({
+                schedule_id: occ.schedule_id,
+                student_id: sId,
+                teacher_id: teacherId,
+                date: occ.date,
+                original_date: occ.date,
+                start_time: occ.start_time || "14:00",
+                duration: occ.duration || 45,
+                status: "scheduled",
+                student_acknowledged: isStudentActor,
+                teacher_acknowledged: isTeacherActor
+              });
+          }
+        }
       } else {
-        // One-off slot: update status back to "scheduled"
+        // One-off or template override: update status back to "scheduled" with original_date and acknowledgment flags
         const { error: updErr } = await supabase
           .from("schedule_occurrences")
-          .update({ status: "scheduled" })
+          .update({
+            status: "scheduled",
+            original_date: occ.date,
+            student_acknowledged: isStudentActor,
+            teacher_acknowledged: isTeacherActor,
+            updated_at: new Date().toISOString()
+          })
           .eq("id", occ.id);
         if (updErr) throw updErr;
+
+        // Also update any sibling group occurrences
+        const siblingOccIds = (occ.group_occurrences || [])
+          .map((g: any) => g.id)
+          .filter((id: any) => id && id !== occ.id && !String(id).startsWith("virtual-") && !String(id).startsWith("virt_"));
+        if (siblingOccIds.length > 0) {
+          await supabase
+            .from("schedule_occurrences")
+            .update({
+              status: "scheduled",
+              original_date: occ.date,
+              student_acknowledged: isStudentActor,
+              teacher_acknowledged: isTeacherActor,
+              updated_at: new Date().toISOString()
+            })
+            .in("id", siblingOccIds);
+        }
       }
 
-      // Dispatch system notification that appointment is restored to regular status
+      // 2. Dispatch system notifications to BOTH students and teacher
       try {
-        const studentId = occ.student_id || (occ.student as any)?.id || occ.board_student_id;
-        const recipientId = role === "student" ? (occ.teacher_id || (occ.teacher as any)?.id) : studentId;
         const targetOccId = occ.schedule_id ? `virtual-${occ.schedule_id}-${occ.date}` : occ.id;
-        
-        if (userId && recipientId && occ.date) {
-          const [y, m, d] = String(occ.date).split("-").map(Number);
-          const occDate = (y && m && d) ? new Date(y, m - 1, d) : new Date();
-          const shortDay = occDate.toLocaleDateString("de-DE", { weekday: "short" });
-          const shortDate = occDate.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "2-digit" });
-          const timeLabel = (occ.start_time || "16:30").slice(0, 5);
-          const notificationMessage = `Der Ausfall für diesen Termin wurde zurückgenommen. Der Termin findet regulär statt:\n${shortDay} ${shortDate} um ${timeLabel} Uhr.`;
+        const [y, m, d] = String(occ.date).split("-").map(Number);
+        const occDate = (y && m && d) ? new Date(y, m - 1, d) : new Date();
+        const shortDay = occDate.toLocaleDateString("de-DE", { weekday: "short" });
+        const shortDate = occDate.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "2-digit" });
+        const timeLabel = (occ.start_time || "16:30").slice(0, 5);
+        const notificationMessage = `Der Ausfall für diesen Termin wurde zurückgenommen. Der Termin findet regulär statt:\n${shortDay} ${shortDate} um ${timeLabel} Uhr. (${occ.date})`;
 
+        // Determine actor display name
+        let actorName = isTeacherActor ? 'Deine Lehrkraft' : (isStudentActor ? 'Ein Schüler' : 'Die Schulleitung');
+        if (userId) {
+          try {
+            const { data: userData } = await supabase
+              .from('users')
+              .select('first_name, last_name, role')
+              .eq('id', userId)
+              .maybeSingle();
+            if (userData) {
+              if (userData.role === 'teacher') {
+                actorName = `${userData.first_name} ${userData.last_name}`;
+              } else if (userData.role === 'student') {
+                actorName = `${userData.first_name} ${maskLastName(userData.last_name, true)}`;
+              } else {
+                actorName = `${userData.first_name} ${userData.last_name} (Verwaltung)`;
+              }
+            }
+          } catch (e) {}
+        }
+
+        // Inform ALL students involved in the lesson
+        for (const sId of uniqueStudentIds) {
+          if (!sId) continue;
           await supabase.from("campus_direct_messages").insert({
             sender_id: userId,
-            recipient_id: recipientId,
+            recipient_id: sId,
             content: notificationMessage,
             occurrence_id: targetOccId,
             is_system: true,
             message_type: "cancellation_reset"
           });
+
+          // In-App Notification & Web Push
+          try {
+            const { data: studentProfile } = await supabase
+              .from('users')
+              .select('is_campus_active')
+              .eq('id', sId)
+              .maybeSingle();
+
+            if (studentProfile && studentProfile.is_campus_active) {
+              await supabase.from('notifications').insert({
+                user_id: sId,
+                title: 'Termin reaktiviert 🔄',
+                message: notificationMessage,
+                metadata: { occurrence_id: targetOccId, type: 'cancellation_reset' }
+              });
+
+              await supabase.functions.invoke('send-push', {
+                body: {
+                  userId: sId,
+                  title: 'Termin reaktiviert 🔄',
+                  body: notificationMessage
+                }
+              });
+            }
+          } catch (pushErr) {
+            console.warn('Could not send push notification to student:', pushErr);
+          }
+        }
+
+        // Inform teacher if action was performed by student or administration (or if teacherId is distinct)
+        if (teacherId && teacherId !== userId) {
+          await supabase.from("campus_direct_messages").insert({
+            sender_id: userId,
+            recipient_id: teacherId,
+            content: notificationMessage,
+            occurrence_id: targetOccId,
+            is_system: true,
+            message_type: "cancellation_reset"
+          });
+
+          try {
+            await supabase.from('notifications').insert({
+              user_id: teacherId,
+              title: 'Termin reaktiviert 🔄',
+              message: `✅ Reaktiviert: ${actorName} hat den Termin am ${shortDay} ${shortDate} um ${timeLabel} Uhr wieder reaktiviert.`,
+              metadata: { occurrence_id: targetOccId, type: 'cancellation_reset' }
+            });
+
+            await supabase.functions.invoke('send-push', {
+              body: {
+                userId: teacherId,
+                title: 'Termin reaktiviert 🔄',
+                body: `✅ Reaktiviert: ${actorName} hat den Termin am ${shortDay} ${shortDate} um ${timeLabel} Uhr wieder reaktiviert.`
+              }
+            });
+          } catch (pushErr) {
+            console.warn('Could not send push notification to teacher:', pushErr);
+          }
+        }
+
+        // Revisionssicheres Audit & System Alert for teacher & administration
+        if (teacherId) {
+          try {
+            await supabase.from("system_alerts").insert({
+              school_id: schoolId || occ.schedule?.school_id || occ.school_id || null,
+              teacher_id: teacherId,
+              type: "Termin wiederhergestellt",
+              message: `✅ Reaktiviert: ${actorName} hat den Termin am ${shortDay} ${shortDate} um ${timeLabel} Uhr wieder reaktiviert. Der Termin findet regulär statt.`
+            });
+          } catch (alertErr) {
+            console.warn('Could not create system alert on undo cancel:', alertErr);
+          }
         }
       } catch (notifErr) {
         console.error("Error creating restore notification message:", notifErr);
       }
 
+      // 3. Trigger Real-Time Cross-Tab / Cross-Device Synchronization
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('campus_schedule_sync', Date.now().toString());
+        localStorage.setItem('groovelab_schedule_changed', Date.now().toString());
+        localStorage.setItem('campus_bookings_sync', Date.now().toString());
+        localStorage.setItem('refresh-bookings', Date.now().toString());
+        window.dispatchEvent(new CustomEvent('campus_schedule_sync'));
+        window.dispatchEvent(new CustomEvent('groovelab_schedule_changed'));
+        window.dispatchEvent(new CustomEvent('refresh-bookings'));
+      }
+
       // Refresh local schedule state
       await fetchLessons();
+      alert("Der Termin wurde erfolgreich reaktiviert. Sowohl Schüler als auch Lehrkraft wurden über die Reaktivierung informiert. ✅");
     } catch (err: any) {
       console.error("Error undoing cancellation:", err);
       alert("Fehler beim Rückgängigmachen der Absage: " + err.message);
@@ -5675,25 +5883,25 @@ export function CampusEventsBoard({
           }}
           className="hover-scale-subtle"
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
-            {/* Date Block */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
+            {/* Ergonomic Date Block (44x44px for glanceability on music stands and tablets) */}
             <div style={{
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
               justifyContent: 'center',
               background: dateBlockBg,
-              borderRadius: '6px',
-              padding: '2px',
-              width: '34px',
-              height: '34px',
+              borderRadius: '10px',
+              padding: '3px',
+              width: '44px',
+              height: '44px',
               border: dateBlockBorder,
               flexShrink: 0
             }}>
-              <span style={{ fontSize: '7px', fontWeight: 900, textTransform: 'uppercase', color: subColor }}>
+              <span style={{ fontSize: '9.5px', fontWeight: 900, textTransform: 'uppercase', color: subColor, letterSpacing: '0.04em' }}>
                 {formatWeekday(occ.date)}
               </span>
-              <span style={{ fontSize: '12px', fontWeight: 900, color: textColor, marginTop: '-2px' }}>
+              <span style={{ fontSize: '15px', fontWeight: 900, color: textColor, marginTop: '-1px', lineHeight: 1 }}>
                 {occ.date.substring(8, 10)}
               </span>
             </div>
@@ -5702,7 +5910,7 @@ export function CampusEventsBoard({
             <div style={{ minWidth: 0, flex: 1 }}>
               <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
                 <span style={{ 
-                  fontSize: '12px', 
+                  fontSize: '13.5px', 
                   fontWeight: 800, 
                   color: textColor, 
                   textDecoration: 'none',
@@ -5715,18 +5923,19 @@ export function CampusEventsBoard({
 
                 {isGroupOcc && (
                   <span style={{
-                    fontSize: '9.5px',
+                    fontSize: '11px',
                     fontWeight: 800,
                     background: '#eff6ff',
                     color: '#1d4ed8',
                     border: '1px solid #bfdbfe',
-                    padding: '1px 6px',
-                    borderRadius: '6px',
+                    padding: '2px 8px',
+                    borderRadius: '8px',
                     display: 'inline-flex',
                     alignItems: 'center',
-                    gap: '3px'
+                    gap: '4px'
                   }}>
-                    👥 {groupBadgeLabel}
+                    <Users size={12} color="#1d4ed8" style={{ flexShrink: 0 }} />
+                    <span>{groupBadgeLabel}</span>
                   </span>
                 )}
 
@@ -5737,19 +5946,19 @@ export function CampusEventsBoard({
                   if (isRoomChanged) {
                     return (
                       <span style={{
-                        fontSize: '11px',
+                        fontSize: '12px',
                         fontWeight: 700,
                         color: '#7c3aed',
                         display: 'inline-flex',
                         alignItems: 'center',
                         gap: '4px'
                       }} title={`Raum geändert zu ${rName}`}>
-                        <DoorClosed size={12} color="#7c3aed" style={{ flexShrink: 0 }} />
+                        <DoorClosed size={13} color="#7c3aed" style={{ flexShrink: 0 }} />
                         {rName}
                         <span 
                           style={{
-                            width: '5px',
-                            height: '5px',
+                            width: '6px',
+                            height: '6px',
                             borderRadius: '50%',
                             background: '#7c3aed',
                             display: 'inline-block',
@@ -5765,14 +5974,14 @@ export function CampusEventsBoard({
 
                   return (
                     <span style={{
-                      fontSize: '11px',
+                      fontSize: '12px',
                       fontWeight: 600,
                       color: '#64748b',
                       display: 'inline-flex',
                       alignItems: 'center',
                       gap: '4px'
                     }}>
-                      <DoorClosed size={12} color="#94a3b8" style={{ flexShrink: 0 }} />
+                      <DoorClosed size={13} color="#94a3b8" style={{ flexShrink: 0 }} />
                       {rName}
                     </span>
                   );
@@ -5780,30 +5989,31 @@ export function CampusEventsBoard({
 
                 {isPendingReview && (
                   <span style={{
-                    fontSize: '7px',
+                    fontSize: '9px',
                     fontWeight: 800,
                     background: '#fffbeb',
                     color: '#b45309',
                     border: '1px solid #fef3c7',
-                    padding: '1px 4px',
-                    borderRadius: '4px',
+                    padding: '2px 6px',
+                    borderRadius: '6px',
                     textTransform: 'uppercase',
                     display: 'inline-flex',
                     alignItems: 'center',
-                    gap: '2px'
+                    gap: '4px'
                   }} title="Stundenplan befindet sich in der Zuteilung durch das Sekretariat.">
-                    ⏳ In Prüfung
+                    <Hourglass size={10} color="#b45309" style={{ flexShrink: 0 }} />
+                    <span>In Prüfung</span>
                   </span>
                 )}
                 {isRescheduled && (
                   <span style={{
-                    fontSize: '7.5px',
+                    fontSize: '9px',
                     fontWeight: 800,
                     background: isGroupOcc ? '#e0f2fe' : '#fef3c7',
                     color: isGroupOcc ? '#0369a1' : '#b45309',
                     border: isGroupOcc ? '1.5px dashed #0284c7' : '1.5px dashed #eab308',
-                    padding: '1px 5px',
-                    borderRadius: '5px',
+                    padding: '2px 6px',
+                    borderRadius: '6px',
                     textTransform: 'uppercase'
                   }}>
                     Verschoben
@@ -5811,13 +6021,13 @@ export function CampusEventsBoard({
                 )}
                 {isCanceled && (
                   <span style={{
-                    fontSize: '7.5px',
+                    fontSize: '9px',
                     fontWeight: 800,
                     background: '#fee2e2',
                     color: '#dc2626',
                     border: '1.5px dashed #ef4444',
-                    padding: '1px 5px',
-                    borderRadius: '5px',
+                    padding: '2px 6px',
+                    borderRadius: '6px',
                     textTransform: 'uppercase'
                   }}>
                     Abgesagt
@@ -5825,13 +6035,13 @@ export function CampusEventsBoard({
                 )}
               </div>
               
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.68rem', color: subColor, fontWeight: 700, marginTop: '2px', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.80rem', color: subColor, fontWeight: 700, marginTop: '3px', flexWrap: 'wrap' }}>
                 <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
-                  <Calendar size={10} /> {formatDateGerman(occ.date)}
+                  <Calendar size={13} /> {formatDateGerman(occ.date)}
                 </span>
                 <span>•</span>
                 <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
-                  <Clock size={10} /> {occ.start_time.substring(0, 5)} Uhr
+                  <Clock size={13} /> {occ.start_time.substring(0, 5)} Uhr
                 </span>
                 <span>•</span>
                 <span>{occ.duration} Min</span>
@@ -5851,8 +6061,8 @@ export function CampusEventsBoard({
             </div>
           </div>
 
-          {/* Right Status */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+          {/* Right Status / Actions with 38x38px Touch Targets */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
             {/* 1:1 Shoutbox Icon */}
             <button
               type="button"
@@ -5862,25 +6072,27 @@ export function CampusEventsBoard({
               }}
               title={hasMessages ? "1:1 Shoutbox (Nachrichten vorhanden)" : "1:1 Shoutbox öffnen"}
               style={{
-                border: hasMessages ? '1px solid #fde047' : 'none',
-                background: hasMessages ? '#fefce8' : 'none',
-                padding: '6px',
+                border: hasMessages ? '1px solid #fde047' : '1px solid #f1f5f9',
+                background: hasMessages ? '#fefce8' : '#f8fafc',
+                width: '38px',
+                height: '38px',
+                padding: '0',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: hasMessages ? '#ca8a04' : '#94a3b8',
+                color: hasMessages ? '#ca8a04' : '#64748b',
                 transition: 'all 0.2s',
-                borderRadius: '50%',
+                borderRadius: '12px',
                 flexShrink: 0,
                 boxShadow: hasMessages ? '0 1px 4px rgba(202, 138, 4, 0.15)' : 'none'
               }}
-              onMouseEnter={(e) => e.currentTarget.style.background = hasMessages ? '#fef08a' : 'rgba(0,0,0,0.06)'}
-              onMouseLeave={(e) => e.currentTarget.style.background = hasMessages ? '#fefce8' : 'none'}
+              onMouseEnter={(e) => e.currentTarget.style.background = hasMessages ? '#fef08a' : '#f1f5f9'}
+              onMouseLeave={(e) => e.currentTarget.style.background = hasMessages ? '#fefce8' : '#f8fafc'}
             >
               <MessageSquare 
-                size={16} 
-                color={hasMessages ? '#ca8a04' : '#94a3b8'}
+                size={17} 
+                color={hasMessages ? '#ca8a04' : '#64748b'}
                 fill={hasMessages ? '#eab308' : 'none'} 
                 style={{
                   animation: hasMessages ? 'pulse 2s infinite' : 'none'
@@ -5892,25 +6104,27 @@ export function CampusEventsBoard({
             <button
               type="button"
               onClick={(e) => handleCancelClick(occ, e)}
-              title={isCanceled ? "Termin ist abgesagt (Klicken zum Reaktivieren)" : "Termin absagen (Krankmeldung)"}
+              title={isCanceled ? "Termin ist abgesagt (Klicken zum Reaktivieren)" : "Termin absagen"}
               style={{
-                border: 'none',
-                background: 'none',
-                padding: '6px',
+                border: isCanceled ? '1px solid #e2e8f0' : '1px solid #fee2e2',
+                background: isCanceled ? '#f1f5f9' : '#fef2f2',
+                width: '38px',
+                height: '38px',
+                padding: '0',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 color: isCanceled ? '#94a3b8' : '#ef4444',
                 transition: 'all 0.2s',
-                borderRadius: '50%',
+                borderRadius: '12px',
                 flexShrink: 0
               }}
-              onMouseEnter={(e) => e.currentTarget.style.background = isCanceled ? 'rgba(0,0,0,0.06)' : 'rgba(239, 68, 68, 0.1)'}
-              onMouseLeave={(e) => e.currentTarget.style.background = 'none'}
+              onMouseEnter={(e) => e.currentTarget.style.background = isCanceled ? '#e2e8f0' : '#fee2e2'}
+              onMouseLeave={(e) => e.currentTarget.style.background = isCanceled ? '#f1f5f9' : '#fef2f2'}
             >
               <CalendarX 
-                size={16} 
+                size={17} 
                 color={isCanceled ? '#94a3b8' : '#ef4444'} 
               />
             </button>
@@ -5963,31 +6177,56 @@ export function CampusEventsBoard({
           {/* iCal Subscription Button (Adaptive compact label on multi-column layout) */}
           {icalActive && (
             <button
-              onClick={() => setShowIcalModal(true)}
+              onClick={() => {
+                const isJuniorStudent = role === 'student' && ((studentUser as any)?.campus_ui_level === 'junior');
+                const isAlreadyParentUnlocked = typeof window !== 'undefined' && (
+                  sessionStorage.getItem('groovelab_parent_unlocked_global') === 'true' ||
+                  sessionStorage.getItem(`groovelab_parent_unlocked_${userId}`) === 'true'
+                );
+
+                if (isJuniorStudent && !isAlreadyParentUnlocked) {
+                  setPinGatePendingAction(() => () => {
+                    setShowIcalModal(true);
+                    if (!calendarToken && !generatingToken) {
+                      fetchOrCreateCalendarToken(false);
+                    }
+                  });
+                  setPinGateInput('');
+                  setPinGateError('');
+                  setShowPinGateModal(true);
+                  return;
+                }
+
+                setShowIcalModal(true);
+                if (!calendarToken && !generatingToken) {
+                  fetchOrCreateCalendarToken(false);
+                }
+              }}
               className="hover-scale"
               title="Unterrichtstermine abonnieren (iCal)"
               style={{
                 border: 'none',
                 background: brandColor,
                 color: '#ffffff',
-                padding: '6px 12px',
+                padding: '8px 14px',
                 borderRadius: '14px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: '5px',
+                gap: '6px',
                 cursor: 'pointer',
                 transition: 'all 0.2s',
                 boxShadow: '0 4px 12px rgba(52, 168, 83, 0.25)',
-                fontSize: '0.74rem',
+                fontSize: '0.82rem',
                 fontWeight: 800,
+                minHeight: '36px',
                 width: isMobilePortrait ? '100%' : 'auto',
                 flexShrink: 0,
                 whiteSpace: 'nowrap',
                 boxSizing: 'border-box'
               }}
             >
-              <CalendarPlus size={14} style={{ flexShrink: 0 }} />
+              <CalendarPlus size={15} style={{ flexShrink: 0 }} />
               <span>{isMobilePortrait ? 'Unterrichtstermine abonnieren' : 'Abonnieren'}</span>
             </button>
           )}
@@ -5997,7 +6236,7 @@ export function CampusEventsBoard({
         <div style={{
           display: 'flex',
           background: '#f1f5f9',
-          padding: '3px',
+          padding: '4px',
           borderRadius: '14px',
           gap: '4px',
           width: '100%',
@@ -6016,20 +6255,20 @@ export function CampusEventsBoard({
               border: 'none',
               background: lessonTab === 'upcoming' ? '#ffffff' : 'transparent',
               color: lessonTab === 'upcoming' ? brandColor : '#64748b',
-              padding: '8px 8px',
+              padding: '9px 10px',
               borderRadius: '10px',
               fontWeight: 800,
-              fontSize: '0.74rem',
+              fontSize: '0.80rem',
               cursor: 'pointer',
               transition: 'all 0.2s',
               boxShadow: lessonTab === 'upcoming' ? '0 2px 6px rgba(0,0,0,0.05)' : 'none',
               display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '5px'
+              gap: '6px'
             }}
           >
-            <Calendar size={13} /> Kommende
+            <Calendar size={14} /> Kommende
           </button>
           <button
             onClick={() => {
@@ -6044,20 +6283,20 @@ export function CampusEventsBoard({
               border: 'none',
               background: lessonTab === 'past' ? '#ffffff' : 'transparent',
               color: lessonTab === 'past' ? brandColor : '#64748b',
-              padding: '8px 8px',
+              padding: '9px 10px',
               borderRadius: '10px',
               fontWeight: 800,
-              fontSize: '0.74rem',
+              fontSize: '0.80rem',
               cursor: 'pointer',
               transition: 'all 0.2s',
               boxShadow: lessonTab === 'past' ? '0 2px 6px rgba(0,0,0,0.05)' : 'none',
               display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '5px'
+              gap: '6px'
             }}
           >
-            <History size={13} /> Vergangene
+            <History size={14} /> Vergangene
           </button>
           <button
             onClick={() => {
@@ -6072,20 +6311,20 @@ export function CampusEventsBoard({
               border: 'none',
               background: lessonTab === 'cancelled' ? '#ffffff' : 'transparent',
               color: lessonTab === 'cancelled' ? '#ef4444' : '#64748b',
-              padding: '8px 8px',
+              padding: '9px 10px',
               borderRadius: '10px',
               fontWeight: 800,
-              fontSize: '0.74rem',
+              fontSize: '0.80rem',
               cursor: 'pointer',
               transition: 'all 0.2s',
               boxShadow: lessonTab === 'cancelled' ? '0 2px 6px rgba(0,0,0,0.05)' : 'none',
               display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '5px'
+              gap: '6px'
             }}
           >
-            <FileText size={13} /> Absagen-Log
+            <FileText size={14} /> Absagen-Log
           </button>
         </div>
 
@@ -6294,8 +6533,84 @@ export function CampusEventsBoard({
               Termine werden geladen...
             </div>
           ) : getMergedTimelineEvents().length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '40px 20px', border: '1.5px dashed #e2e8f0', borderRadius: '16px', color: '#94a3b8', fontSize: '0.8rem', fontWeight: 600 }}>
-              Keine Termine eingetragen.
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '14px',
+              padding: '20px',
+              background: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              borderRadius: '20px'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div style={{
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '10px',
+                  background: '#ffffff',
+                  border: '1px solid #e2e8f0',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '0 2px 6px rgba(0,0,0,0.02)'
+                }}>
+                  <Palmtree size={18} color={brandColor || '#34a853'} />
+                </div>
+                <div>
+                  <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 800, color: '#0f172a' }}>
+                    Unterrichtsfreie Zeiten &amp; Ferien
+                  </h4>
+                  <p style={{ margin: '2px 0 0 0', fontSize: '0.72rem', color: '#64748b', fontWeight: 550 }}>
+                    Schuljahres-Orientierung
+                  </p>
+                </div>
+              </div>
+
+              <div style={{
+                background: '#ffffff',
+                border: '1px solid #f1f5f9',
+                borderRadius: '14px',
+                padding: '12px 14px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '8px',
+                fontSize: '0.74rem',
+                color: '#475569'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f8fafc', paddingBottom: '6px' }}>
+                  <span style={{ fontWeight: 650, color: '#1e293b' }}>Herbstferien</span>
+                  <span style={{ color: '#64748b', fontSize: '0.7rem' }}>Ende Oktober / Nov.</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f8fafc', paddingBottom: '6px' }}>
+                  <span style={{ fontWeight: 650, color: '#1e293b' }}>Weihnachtsferien</span>
+                  <span style={{ color: '#64748b', fontSize: '0.7rem' }}>Dezember / Januar</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f8fafc', paddingBottom: '6px' }}>
+                  <span style={{ fontWeight: 650, color: '#1e293b' }}>Osterferien</span>
+                  <span style={{ color: '#64748b', fontSize: '0.7rem' }}>März / April</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontWeight: 650, color: '#1e293b' }}>Pfingst- &amp; Sommerferien</span>
+                  <span style={{ color: '#64748b', fontSize: '0.7rem' }}>Juni / Juli / August</span>
+                </div>
+              </div>
+
+              <p style={{ margin: 0, fontSize: '0.72rem', color: '#64748b', lineHeight: 1.45 }}>
+                An gesetzlichen Feiertagen und während der offiziellen Schulferien findet in der Regel kein regulärer Musikschulunterricht statt.
+              </p>
+
+              {(role === 'admin' || role === 'secretary') && (
+                <div style={{
+                  padding: '10px 12px',
+                  background: '#ffffff',
+                  border: `1px dashed ${brandColor || '#34a853'}60`,
+                  borderRadius: '12px',
+                  fontSize: '0.72rem',
+                  color: '#475569'
+                }}>
+                  💡 <strong>Tipp für Verwaltung:</strong> Neue Konzerte oder Klassenvorspiele kannst du oben rechts über <em>„Termin erstellen“</em> anlegen.
+                </div>
+              )}
             </div>
           ) : (
             getMergedTimelineEvents().map((ev: any) => {
@@ -6527,8 +6842,8 @@ export function CampusEventsBoard({
             ))}
           </div>
 
-          <div style={{ fontSize: '0.68rem', color: '#94a3b8', fontWeight: 600, marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-            🚀 <CampusGroovelabText /> Roadmap
+          <div style={{ fontSize: '0.68rem', color: '#94a3b8', fontWeight: 600, marginTop: '4px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+            <Rocket size={13} color="#94a3b8" /> <CampusGroovelabText /> Roadmap
           </div>
         </div>
       </div>
@@ -13257,12 +13572,45 @@ export function CampusEventsBoard({
       {/* Student Event Detail Modal */}
       {selectedStudentEvent && renderStudentEventDetailModal()}
 
-      {/* iCal Subscription Modal */}
+      {/* iCal Subscription Modal – Gehärteter Goldstandard */}
 
       {showIcalModal && (() => {
-        const supabaseUrlStr = import.meta.env.VITE_SUPABASE_URL || supabase?.supabaseUrl || 'https://supabase.178.105.10.2.sslip.io';
+        const supabaseUrlStr = import.meta.env.VITE_SUPABASE_URL || supabase?.supabaseUrl || 'https://supabase.campus-groovelab.de';
         const cleanSupabaseUrl = supabaseUrlStr.replace('https://', '');
-        const token = userQrToken || userId;
+        // FAIL-CLOSED: Ausschließlich der dedizierte, hoch-entropische calendarToken darf verwendet werden!
+        const token = calendarToken;
+        const webcalUrl = `webcal://${cleanSupabaseUrl}/functions/v1/ical-feed?token=${token}`;
+        const httpsUrl = `${supabaseUrlStr}/functions/v1/ical-feed?token=${token}`;
+
+        const handleShareWithFamily = async () => {
+          const studentFirstName = studentUser?.first_name || 'deines Kindes';
+          const shareData = {
+            title: `Musikschul-Termine von ${studentFirstName}`,
+            text: `Hier ist der Live-Stundenplan von ${studentFirstName} an der Musikschule zum Abonnieren:`,
+            url: httpsUrl,
+          };
+
+          if (navigator.share && navigator.canShare && navigator.canShare(shareData)) {
+            try {
+              await navigator.share(shareData);
+              return;
+            } catch (err: any) {
+              if (err?.name !== 'AbortError') {
+                console.warn('Share API failed, fallback to clipboard', err);
+              } else {
+                return;
+              }
+            }
+          }
+
+          try {
+            await navigator.clipboard.writeText(httpsUrl);
+            setFamilyCopied(true);
+            setTimeout(() => setFamilyCopied(false), 2500);
+          } catch (clipErr) {
+            console.error('Clipboard copy error:', clipErr);
+          }
+        };
 
         return (
           <div
@@ -13271,34 +13619,33 @@ export function CampusEventsBoard({
               position: 'fixed',
               inset: 0,
               zIndex: 1100,
-              background: 'rgba(0, 0, 0, 0.4)',
-              backdropFilter: 'blur(20px)',
-              WebkitBackdropFilter: 'blur(20px)',
+              background: 'rgba(15, 23, 42, 0.45)',
+              backdropFilter: 'blur(16px)',
+              WebkitBackdropFilter: 'blur(16px)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              padding: '20px',
-              animation: 'fadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
+              padding: '16px',
+              animation: 'fadeIn 0.15s ease'
             }}
           >
             <div
               onClick={e => e.stopPropagation()}
               style={{
                 background: '#ffffff',
-                borderRadius: '24px',
+                borderRadius: '28px',
                 width: '100%',
-                maxWidth: '460px',
-                boxShadow: '0 20px 40px rgba(0, 0, 0, 0.12), 0 1px 3px rgba(0, 0, 0, 0.05)',
-                overflow: 'hidden',
-                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
-                position: 'relative',
-                padding: '32px 24px',
+                maxWidth: '400px',
+                boxShadow: '0 24px 48px -12px rgba(0, 0, 0, 0.18)',
+                padding: '24px 22px 20px 22px',
                 display: 'flex',
                 flexDirection: 'column',
-                alignItems: 'stretch'
+                alignItems: 'center',
+                position: 'relative',
+                boxSizing: 'border-box'
               }}
             >
-              {/* iOS close button */}
+              {/* Schließen-Button */}
               <button
                 onClick={() => setShowIcalModal(false)}
                 style={{
@@ -13306,281 +13653,270 @@ export function CampusEventsBoard({
                   top: '16px',
                   right: '16px',
                   border: 'none',
-                  background: 'rgba(0, 0, 0, 0.05)',
+                  background: '#f1f5f9',
                   borderRadius: '50%',
-                  width: '30px',
-                  height: '30px',
+                  width: '28px',
+                  height: '28px',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   cursor: 'pointer',
-                  color: '#86868b',
-                  transition: 'background 0.2s, color 0.2s',
-                  zIndex: 10
+                  color: '#64748b',
+                  transition: 'background 0.2s, color 0.2s'
                 }}
-                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(0, 0, 0, 0.08)'; e.currentTarget.style.color = '#1d1d1f'; }}
-                onMouseLeave={e => { e.currentTarget.style.background = 'rgba(0, 0, 0, 0.05)'; e.currentTarget.style.color = '#86868b'; }}
+                onMouseEnter={e => { e.currentTarget.style.background = '#e2e8f0'; e.currentTarget.style.color = '#0f172a'; }}
+                onMouseLeave={e => { e.currentTarget.style.background = '#f1f5f9'; e.currentTarget.style.color = '#64748b'; }}
               >
                 <X size={14} strokeWidth={2.5} />
               </button>
 
-              {/* Dynamic Apple Calendar App Icon */}
+              {/* Kindgerechtes Hero-Badge */}
               <div style={{
-                width: '68px',
-                height: '68px',
-                borderRadius: '16px',
-                background: '#ffffff',
-                boxShadow: '0 8px 24px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(0, 0, 0, 0.04)',
+                width: '54px',
+                height: '54px',
+                borderRadius: '18px',
+                background: '#e6f4ea',
+                color: brandColor || '#34a853',
                 display: 'flex',
-                flexDirection: 'column',
-                overflow: 'hidden',
-                margin: '8px auto 20px auto',
-                userSelect: 'none'
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginBottom: '12px',
+                boxShadow: '0 4px 12px rgba(52, 168, 83, 0.15)'
               }}>
-                <div style={{
-                  background: '#ff3b30',
-                  height: '20px',
-                  color: '#ffffff',
-                  fontSize: '9.5px',
-                  fontWeight: 800,
-                  letterSpacing: '0.06em',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  textTransform: 'uppercase'
-                }}>
-                  {new Date().toLocaleDateString('de-DE', { weekday: 'short' }).replace('.', '')}
-                </div>
-                <div style={{
-                  flex: 1,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '26px',
-                  fontWeight: 700,
-                  color: '#1d1d1f',
-                  lineHeight: 1
-                }}>
-                  {new Date().getDate()}
-                </div>
+                <CalendarDays size={28} />
               </div>
 
-              {/* Header Text */}
-              <div style={{ textAlign: 'center', marginBottom: '28px' }}>
-                <h3 style={{
-                  margin: 0,
-                  fontSize: '22px',
-                  fontWeight: 700,
-                  color: '#1d1d1f',
-                  letterSpacing: '-0.02em'
-                }}>
-                  Kalender abonnieren
-                </h3>
-                <p style={{
-                  margin: '8px 0 0 0',
-                  color: '#86868b',
-                  fontSize: '13.5px',
-                  lineHeight: 1.45,
-                  fontWeight: 450,
-                  padding: '0 10px'
-                }}>
-                  Synchronisiere deine Unterrichtstermine live. Neue Termine aktualisieren sich vollautomatisch auf deinem Smartphone.
-                </p>
-              </div>
+              {/* Titel & kindgerechte Subline */}
+              <h3 style={{ margin: 0, fontSize: '1.22rem', fontWeight: 900, color: '#0f172a', textAlign: 'center', letterSpacing: '-0.02em' }}>
+                Stundenplan im Kalender
+              </h3>
+              <p style={{ margin: '4px 0 18px 0', fontSize: '0.82rem', color: '#64748b', textAlign: 'center', lineHeight: 1.4, fontWeight: 550, padding: '0 8px' }}>
+                Verpasse keine Musikstunde. Neue Termine aktualisieren sich ganz automatisch.
+              </p>
 
-              {/* Content / Buttons */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                
-                {/* QR-Code section */}
-                {(() => {
-                  const feedUrl = `https://${cleanSupabaseUrl}/functions/v1/ical-feed?token=${token}`;
-                  return (
+              {/* Fail-Closed Guard: Lade- & Fehler-Status */}
+              {generatingToken && !token ? (
+                <div style={{ textAlign: 'center', padding: '36px 16px', color: '#64748b', fontSize: '0.86rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+                  <RefreshCw size={24} color={brandColor || '#34a853'} style={{ animation: 'spin 1s linear infinite' }} />
+                  <span style={{ fontWeight: 600 }}>Sicherer Kalender-Schlüssel wird vorbereitet...</span>
+                </div>
+              ) : !token ? (
+                <div style={{ textAlign: 'center', padding: '28px 16px', color: '#64748b', fontSize: '0.86rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+                  <span style={{ color: '#ef4444', fontWeight: 650 }}>Schlüssel konnte nicht geladen werden.</span>
+                  <button
+                    onClick={() => fetchOrCreateCalendarToken(true)}
+                    style={{
+                      border: 'none',
+                      background: brandColor || '#34a853',
+                      color: '#ffffff',
+                      padding: '9px 20px',
+                      borderRadius: '12px',
+                      fontWeight: 750,
+                      fontSize: '0.84rem',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Erneut versuchen
+                  </button>
+                </div>
+              ) : (
+                <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  
+                  {/* Desktop Hero: Direkt sichtbarer, gestochen scharfer QR-Code für Smartphones & Familie */}
+                  {!isMobilePortrait && (
                     <div style={{
+                      background: '#f8fafc',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '20px',
+                      padding: '14px',
                       display: 'flex',
                       flexDirection: 'column',
                       alignItems: 'center',
-                      gap: '8px',
-                      background: '#f8fafc',
-                      border: '1px solid #e2e8f0',
-                      borderRadius: '16px',
-                      padding: '16px',
-                      margin: '0 auto',
-                      width: '100%',
-                      boxSizing: 'border-box'
+                      gap: '8px'
                     }}>
-                      <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#475569' }}>
-                        📱 Einfach mit dem Smartphone scannen:
-                      </span>
                       <div style={{
                         background: '#ffffff',
                         padding: '10px',
-                        borderRadius: '12px',
-                        boxShadow: '0 4px 12px rgba(0,0,0,0.06)',
-                        border: '1px solid #e2e8f0',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center'
+                        borderRadius: '14px',
+                        boxShadow: '0 4px 14px rgba(0,0,0,0.05)',
+                        border: '1px solid #e2e8f0'
                       }}>
-                        <QRCode
-                          value={feedUrl}
-                          size={120}
-                          style={{ height: "auto", maxWidth: "100%", width: "100%" }}
-                          viewBox={`0 0 120 120`}
-                          level="M"
-                        />
+                        <QRCode value={httpsUrl} size={110} viewBox="0 0 110 110" level="M" />
                       </div>
-                      <span style={{ fontSize: '0.62rem', color: '#64748b', textAlign: 'center', lineHeight: 1.3 }}>
-                        Unterstützt Apple Kalender, Google Kalender und alle gängigen Kalender-Apps.
-                      </span>
+                      <div style={{ textAlign: 'center' }}>
+                        <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#0f172a' }}>
+                          Mit Smartphone scannen
+                        </div>
+                        <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '1px', fontWeight: 500 }}>
+                          Kamera auf iPhone oder Android halten (auch für Oma & Opa)
+                        </div>
+                      </div>
                     </div>
-                  );
-                })()}
+                  )}
 
-                {/* Option 1: Direct Subscription */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {/* 1. Primäre Aktion: Direktes Abonnieren */}
                   <a
-                    href={`webcal://${cleanSupabaseUrl}/functions/v1/ical-feed?token=${token}`}
+                    href={webcalUrl}
                     style={{
                       textDecoration: 'none',
-                      background: '#007aff',
+                      background: brandColor || '#34a853',
                       color: '#ffffff',
-                      padding: '14px 20px',
-                      borderRadius: '12px',
-                      fontWeight: 600,
-                      fontSize: '15px',
+                      padding: '12px 18px',
+                      borderRadius: '16px',
+                      fontWeight: 800,
+                      fontSize: '0.90rem',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
                       gap: '8px',
-                      transition: 'background 0.2s',
-                      textAlign: 'center',
-                      boxShadow: '0 4px 12px rgba(0, 122, 255, 0.15)'
+                      boxShadow: '0 4px 14px rgba(52, 168, 83, 0.28)',
+                      transition: 'all 0.15s ease',
+                      textAlign: 'center'
                     }}
-                    onMouseEnter={e => { e.currentTarget.style.background = '#0066cc'; }}
-                    onMouseLeave={e => { e.currentTarget.style.background = '#007aff'; }}
+                    onMouseEnter={e => { e.currentTarget.style.background = '#2d9247'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = brandColor || '#34a853'; e.currentTarget.style.transform = 'none'; }}
                   >
-                    <CalendarPlus size={16} /> Auf diesem Gerät abonnieren
+                    <CalendarPlus size={17} />
+                    {isMobilePortrait ? 'Auf diesem Smartphone eintragen' : 'Auf diesem Computer abonnieren'}
                   </a>
-                  <p style={{
-                    margin: '4px 0 0 0',
-                    color: '#86868b',
-                    fontSize: '11px',
-                    lineHeight: 1.4,
-                    fontWeight: 500,
-                    textAlign: 'center',
-                    padding: '0 8px'
-                  }}>
-                    <strong>Entwickler-Tipp:</strong> Wir empfehlen, das automatische Aktualisierungsintervall in den Einstellungen deines Kalenders auf <strong>1 Std.</strong> einzustellen, um Änderungen zeitnah zu synchronisieren.
-                  </p>
-                </div>
 
-                {/* Divider */}
-                <div style={{ display: 'flex', alignItems: 'center', margin: '4px 0' }}>
-                  <div style={{ flex: 1, height: '1px', background: 'rgba(0, 0, 0, 0.06)' }}></div>
-                  <span style={{ fontSize: '12px', color: '#86868b', padding: '0 12px', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 550 }}>oder</span>
-                  <div style={{ flex: 1, height: '1px', background: 'rgba(0, 0, 0, 0.06)' }}></div>
-                </div>
-
-                {/* Option 2: Copy link / Google Calendar */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  
-                  {/* Google Calendar Direct Import */}
-                  <a
-                    href={`https://calendar.google.com/calendar/render?cid=${encodeURIComponent(`webcal://${cleanSupabaseUrl}/functions/v1/ical-feed?token=${token}`)}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                  {/* 2. Familien-Aktion: Sauberer 1-Klick Clipboard Copy ohne störendes macOS-Popup */}
+                  <button
+                    onClick={async () => {
+                      try {
+                        await navigator.clipboard.writeText(httpsUrl);
+                        setFamilyCopied(true);
+                        setTimeout(() => setFamilyCopied(false), 2500);
+                      } catch (err) {
+                        console.error('Clipboard copy failed:', err);
+                      }
+                    }}
                     style={{
-                      textDecoration: 'none',
-                      background: '#f5f5f7',
-                      color: '#007aff',
-                      padding: '14px 20px',
-                      borderRadius: '12px',
-                      fontWeight: 600,
-                      fontSize: '15px',
+                      border: familyCopied ? '1px solid #86efac' : '1px solid #e2e8f0',
+                      background: familyCopied ? '#f0fdf4' : '#ffffff',
+                      color: familyCopied ? '#16a34a' : '#1e293b',
+                      padding: '11px 18px',
+                      borderRadius: '16px',
+                      fontWeight: 750,
+                      fontSize: '0.86rem',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
                       gap: '8px',
-                      transition: 'background 0.2s'
+                      cursor: 'pointer',
+                      transition: 'all 0.15s',
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
                     }}
-                    onMouseEnter={e => { e.currentTarget.style.background = '#e8e8ed'; }}
-                    onMouseLeave={e => { e.currentTarget.style.background = '#f5f5f7'; }}
+                    onMouseEnter={e => { if (!familyCopied) e.currentTarget.style.background = '#f8fafc'; }}
+                    onMouseLeave={e => { if (!familyCopied) e.currentTarget.style.background = '#ffffff'; }}
                   >
-                    <Globe size={16} color="#007aff" /> In Google Kalender importieren
-                  </a>
+                    {familyCopied ? <Check size={16} strokeWidth={2.5} color="#16a34a" /> : <Copy size={16} color="#475569" />}
+                    {familyCopied ? 'Link kopiert! Bereit zum Teilen mit der Familie ✓' : 'Kalender-Link für Familie kopieren (Eltern, Oma & Opa)'}
+                  </button>
 
-                  {/* Copy Link Input Bar */}
-                  <div style={{ display: 'flex', background: '#f1f5f9', borderRadius: '12px', padding: '4px', alignItems: 'center', marginTop: '4px', border: '1px solid #e2e8f0' }}>
-                    <input
-                      type="text"
-                      readOnly
-                      value={`${supabaseUrlStr}/functions/v1/ical-feed?token=${token}`}
+                  {/* Mobile-Only: QR-Code zum Abscannen für andere */}
+                  {isMobilePortrait && (
+                    <details style={{ textAlign: 'center', marginTop: '2px' }}>
+                      <summary style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 600, cursor: 'pointer', userSelect: 'none' }}>
+                        QR-Code zum Abscannen für andere anzeigen
+                      </summary>
+                      <div style={{ marginTop: '10px', display: 'flex', justifyContent: 'center' }}>
+                        <div style={{ background: '#ffffff', padding: '10px', borderRadius: '14px', border: '1px solid #e2e8f0', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+                          <QRCode value={httpsUrl} size={100} viewBox="0 0 100 100" level="M" />
+                        </div>
+                      </div>
+                    </details>
+                  )}
+
+                  {/* Kindgerechtes Datenschutz- & Vertrauenssiegel */}
+                  <div style={{
+                    background: '#f8fafc',
+                    borderRadius: '14px',
+                    padding: '8px 12px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    border: '1px solid #edf2f7'
+                  }}>
+                    <ShieldCheck size={16} color={brandColor || '#34a853'} style={{ flexShrink: 0 }} />
+                    <span style={{ fontSize: '0.72rem', color: '#64748b', lineHeight: 1.35, fontWeight: 550 }}>
+                      <strong style={{ color: '#334155' }}>DSGVO-Garantie:</strong> Überträgt nur den Vornamen, Termine, Raum und Lehrkraft. Keine Nachnamen, Noten, Chats oder Kontaktdaten.
+                    </span>
+                  </div>
+
+                  {/* Latenz-, Synchronisations- & Verbindlichkeits-Hinweis (Kindersicherheit & Aufsichtspflicht) */}
+                  <div style={{
+                    background: '#f1f5f9',
+                    borderRadius: '12px',
+                    padding: '8px 12px',
+                    fontSize: '0.71rem',
+                    color: '#475569',
+                    lineHeight: 1.4,
+                    textAlign: 'left',
+                    border: '1px solid #e2e8f0',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '4px'
+                  }}>
+                    <div>
+                      <strong style={{ color: '#1e293b' }}>💡 Kalender-Tipp für Eltern:</strong> Bei Apple Kalender in den Einstellungen das Aktualisierungsintervall auf <em>„Alle 15 Minuten“</em> stellen. Google Kalender aktualisiert Web-Abos nur alle 12–24 Std.
+                    </div>
+                    <div style={{ fontSize: '0.67rem', color: '#64748b' }}>
+                      Rechtlich verbindlich bei kurzfristigen Ausfällen oder Raumwechseln ist stets die Live-Anzeige in der Campus-Groovelab App.
+                    </div>
+                  </div>
+
+                  {/* Diskreter 1-Klick-Widerruf (Sicherheit) */}
+                  <div style={{ textAlign: 'center', marginTop: '2px' }}>
+                    <button
+                      onClick={async () => {
+                        const isJuniorStudent = role === 'student' && ((studentUser as any)?.campus_ui_level === 'junior');
+                        const isAlreadyParentUnlocked = typeof window !== 'undefined' && (
+                          sessionStorage.getItem('groovelab_parent_unlocked_global') === 'true' ||
+                          sessionStorage.getItem(`groovelab_parent_unlocked_${userId}`) === 'true'
+                        );
+
+                        const executeRevoke = async () => {
+                          if (window.confirm('Möchtest du den Kalender-Schlüssel wirklich erneuern? Alle bisherigen Kalender-Abonnements (auch bei Familie/Oma/Opa) werden dadurch beendet und müssen mit dem neuen Link aktualisiert werden.')) {
+                            await fetchOrCreateCalendarToken(true);
+                          }
+                        };
+
+                        if (isJuniorStudent && !isAlreadyParentUnlocked) {
+                          setPinGatePendingAction(() => executeRevoke);
+                          setPinGateInput('');
+                          setPinGateError('');
+                          setShowPinGateModal(true);
+                          return;
+                        }
+
+                        await executeRevoke();
+                      }}
+                      disabled={generatingToken}
                       style={{
-                        flex: 1,
                         background: 'transparent',
                         border: 'none',
-                        padding: '10px 12px',
-                        fontSize: '11.5px',
-                        color: '#0f172a',
-                        fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
-                        fontVariantNumeric: 'tabular-nums',
-                        outline: 'none',
-                        textOverflow: 'ellipsis',
-                        cursor: 'text'
-                      }}
-                      onClick={e => (e.target as HTMLInputElement).select()}
-                      title="Klicken zum vollständigen Markieren"
-                    />
-                    <button
-                      onClick={() => {
-                        navigator.clipboard.writeText(`${supabaseUrlStr}/functions/v1/ical-feed?token=${token}`);
-                        setCopied(true);
-                        setTimeout(() => setCopied(false), 2000);
-                      }}
-                      style={{
-                        border: 'none',
-                        background: copied ? '#16a34a' : '#007aff',
-                        color: '#ffffff',
-                        padding: '10px 16px',
-                        borderRadius: '10px',
-                        fontWeight: 700,
-                        fontSize: '13px',
+                        color: '#94a3b8',
+                        fontSize: '0.70rem',
+                        fontWeight: 600,
                         cursor: 'pointer',
-                        transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
-                        display: 'flex',
+                        display: 'inline-flex',
                         alignItems: 'center',
-                        gap: '6px',
-                        boxShadow: copied ? '0 2px 8px rgba(22, 163, 74, 0.3)' : '0 2px 8px rgba(0, 122, 255, 0.25)'
+                        gap: '4px',
+                        padding: '3px 6px',
+                        borderRadius: '6px',
+                        transition: 'color 0.15s'
                       }}
+                      onMouseEnter={e => (e.currentTarget.style.color = '#ef4444')}
+                      onMouseLeave={e => (e.currentTarget.style.color = '#94a3b8')}
                     >
-                      {copied ? <Check size={14} strokeWidth={2.5} /> : null}
-                      {copied ? 'Kopiert! ✓' : 'Kopieren'}
+                      <RefreshCw size={10} style={{ animation: generatingToken ? 'spin 1s linear infinite' : 'none' }} />
+                      {generatingToken ? 'Erneuere Schlüssel...' : 'Abonnement widerrufen / Schlüssel neu erstellen'}
                     </button>
                   </div>
-                </div>
 
-                {/* Instructions */}
-                <div style={{
-                  background: '#f5f5f7',
-                  borderRadius: '16px',
-                  padding: '16px',
-                  fontSize: '12.5px',
-                  color: '#515154',
-                  lineHeight: 1.5,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '8px',
-                  marginTop: '8px'
-                }}>
-                  <span style={{ fontWeight: 650, color: '#1d1d1f' }}>Kurzanleitung:</span>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    <span>• <b>iOS / macOS</b>: Auf "Auf diesem Gerät abonnieren" tippen.</span>
-                    <span>• <b>Google / Android</b>: Auf "In Google Kalender importieren" tippen.</span>
-                    <span>• <b>Andere Apps</b>: Link kopieren und als Netzwerk-/Web-Kalender hinzufügen.</span>
-                  </div>
                 </div>
-
-              </div>
+              )}
             </div>
           </div>
         );
@@ -13598,6 +13934,8 @@ export function CampusEventsBoard({
           const lessonDateTime = new Date(`${activeChatOcc.date}T${timePart}`);
           isFrozen = Date.now() > lessonDateTime.getTime() + 48 * 60 * 60 * 1000;
         } catch (e) {}
+
+        const isCanceled = activeChatOcc.status === 'canceled_by_student' || activeChatOcc.status === 'cancelled' || activeChatOcc.status === 'teacher_sick' || activeChatOcc.status === 'canceled_by_teacher_sick';
 
         return (
           <div
@@ -13619,53 +13957,87 @@ export function CampusEventsBoard({
               onClick={e => e.stopPropagation()}
               style={{
                 background: '#ffffff',
-                borderRadius: '24px',
+                borderRadius: '28px',
                 width: '100%',
-                maxWidth: '480px',
+                maxWidth: '500px',
                 boxShadow: '0 32px 80px rgba(0,0,0,0.25)',
                 overflow: 'hidden',
                 display: 'flex',
                 flexDirection: 'column',
                 position: 'relative',
-                maxHeight: '85vh'
+                maxHeight: '85vh',
+                fontFamily: "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
               }}
             >
               {/* Header */}
               <div style={{
                 background: `linear-gradient(135deg, ${brandColor || '#34a853'} 0%, #34a853 100%)`,
-                padding: '20px 24px',
+                padding: '22px 24px',
                 color: '#ffffff',
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'space-between'
+                justifyContent: 'space-between',
+                transition: 'all 0.2s ease'
               }}>
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                    <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <MessageSquare size={18} color="#ffffff" />
+                    <h3 style={{ 
+                      margin: 0, 
+                      fontSize: '1.38rem', 
+                      fontWeight: 950, 
+                      letterSpacing: '-0.02em',
+                      color: '#ffffff', 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: '8px' 
+                    }}>
+                      <MessageSquare size={22} color="#ffffff" />
                       <span>{titleText}</span>
                     </h3>
                   </div>
-                  <p style={{ margin: '4px 0 6px 0', color: 'rgba(255, 255, 255, 0.85)', fontSize: '0.75rem', fontWeight: 600 }}>
+                  <p style={{ 
+                    margin: '6px 0 10px 0', 
+                    color: 'rgba(255, 255, 255, 0.95)', 
+                    fontSize: '0.94rem', 
+                    fontWeight: 650,
+                    lineHeight: 1.4
+                  }}>
                     Termin am {new Date(activeChatOcc.date).toLocaleDateString('de-DE')} um {activeChatOcc.start_time.substring(0, 5)} Uhr
                   </p>
                   
                   {/* Badges */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                     <span style={{
-                      padding: '4px 10px',
-                      borderRadius: '8px',
-                      background: 'rgba(255, 255, 255, 0.2)',
-                      color: '#ffffff',
-                      fontSize: '0.68rem',
-                      fontWeight: 800,
-                      backdropFilter: 'blur(4px)',
+                      padding: '6px 14px',
+                      borderRadius: '100px',
+                      background: isCanceled ? '#fee2e2' : 'rgba(255, 255, 255, 0.22)',
+                      color: isCanceled ? '#dc2626' : '#ffffff',
+                      fontSize: '0.85rem',
+                      fontWeight: 900,
+                      backdropFilter: 'blur(6px)',
                       display: 'inline-flex',
                       alignItems: 'center',
-                      gap: '5px'
+                      gap: '6px',
+                      border: isCanceled ? '1px solid #fca5a5' : '1px solid rgba(255, 255, 255, 0.3)'
                     }}>
-                      <ShieldCheck size={13} color="#ffffff" />
-                      <span>100% DSGVO-konform • TLS 1.3 &amp; AES-256 verschlüsselt</span>
+                      <span>{isCanceled ? '✕ Termin abgesagt' : '✓ Regulärer Termin'}</span>
+                    </span>
+
+                    <span style={{
+                      padding: '6px 14px',
+                      borderRadius: '100px',
+                      background: 'rgba(255, 255, 255, 0.22)',
+                      color: '#ffffff',
+                      fontSize: '0.84rem',
+                      fontWeight: 850,
+                      backdropFilter: 'blur(6px)',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      border: '1px solid rgba(255, 255, 255, 0.3)'
+                    }}>
+                      <ShieldCheck size={15} color="#ffffff" />
+                      <span>DSGVO-konform • TLS 1.3 &amp; AES-256</span>
                     </span>
                   </div>
                 </div>
@@ -13675,10 +14047,10 @@ export function CampusEventsBoard({
                   onClick={() => setActiveChatOcc(null)}
                   style={{
                     border: 'none',
-                    background: 'rgba(255, 255, 255, 0.2)',
+                    background: 'rgba(255, 255, 255, 0.22)',
                     borderRadius: '50%',
-                    width: '32px',
-                    height: '32px',
+                    width: '36px',
+                    height: '36px',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -13687,12 +14059,74 @@ export function CampusEventsBoard({
                     transition: 'all 0.2s',
                     alignSelf: 'flex-start'
                   }}
-                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)'}
-                  onMouseLeave={e => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)'}
+                  onMouseEnter={e => e.currentTarget.style.opacity = '0.8'}
+                  onMouseLeave={e => e.currentTarget.style.opacity = '1'}
                 >
-                  <X size={16} />
+                  <X size={20} />
                 </button>
               </div>
+
+              {/* Cancelled Alert Banner with In-Chat Reactivation */}
+              {isCanceled && (
+                <div style={{
+                  margin: '12px 20px 0 20px',
+                  padding: '10px 16px',
+                  borderRadius: '14px',
+                  background: '#fef2f2',
+                  border: '1.5px dashed #fca5a5',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '10px'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '1.1rem' }}>⚠️</span>
+                    <div>
+                      <div style={{ fontSize: '0.86rem', fontWeight: 900, color: '#991b1b' }}>Termin ist abgesagt</div>
+                      <div style={{ fontSize: '0.74rem', color: '#b91c1c', fontWeight: 650 }}>Absage kann hier direkt rückgängig gemacht werden.</div>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const executeReactivation = async (unlocked: boolean) => {
+                        await handleUndoCancel(activeChatOcc, unlocked);
+                        if (activeChatOcc) {
+                          setActiveChatOcc(prev => prev ? { ...prev, status: 'scheduled' } : null);
+                          const otherUserId = role === 'student' ? (activeChatOcc.teacher_id || (activeChatOcc.teacher as any)?.id) : activeChatOcc.student_id;
+                          const sId = activeChatOcc.schedule_id || activeChatOcc.schedule?.id;
+                          setTimeout(() => {
+                            if (otherUserId) fetchChat(otherUserId, activeChatOcc.id, activeChatOcc.date, sId);
+                          }, 300);
+                        }
+                      };
+
+                      if (role === 'student' && !isAbsenceAllowed) {
+                        setPinGatePendingAction(() => () => executeReactivation(true));
+                        setPinGateInput('');
+                        setPinGateError('');
+                        setShowPinGateModal(true);
+                        return;
+                      }
+                      executeReactivation(false);
+                    }}
+                    style={{
+                      background: '#15803d',
+                      color: '#ffffff',
+                      border: 'none',
+                      borderRadius: '100px',
+                      padding: '6px 14px',
+                      fontSize: '0.80rem',
+                      fontWeight: 900,
+                      cursor: 'pointer',
+                      whiteSpace: 'nowrap',
+                      boxShadow: '0 2px 6px rgba(21,128,61,0.2)'
+                    }}
+                  >
+                    Reaktivieren
+                  </button>
+                </div>
+              )}
 
               {/* Messages Viewport */}
               <div style={{
@@ -13720,7 +14154,7 @@ export function CampusEventsBoard({
                       Termingekoppelter Schulchat
                     </h5>
                     <p style={{ margin: 0, fontSize: '0.74rem', color: '#64748b', lineHeight: 1.4, maxWidth: '240px' }}>
-                      Geschützte Direktnachrichten für diesen Unterrichtstermin – 100% DSGVO- & datenschutzkonform.
+                      Geschützte Direktnachrichten für diesen Unterrichtstermin – DSGVO- &amp; datenschutzkonform.
                     </p>
                   </div>
                 ) : (
@@ -13754,6 +14188,75 @@ export function CampusEventsBoard({
 
                     const isStudentSender = senderName && senderName !== formatTeacherFullName(activeChatOcc.teacher || currentTeacherProfile);
 
+                    const isCancellation = msg.message_type === 'reschedule_notification' || 
+                                           (msg.content && (msg.content.includes('❌') || msg.content.includes('fällt aus') || msg.content.includes('Termin abgesagt') || msg.content.includes('wurde abgesagt')));
+                    const isReactivation = msg.message_type === 'cancellation_reset' || 
+                                           (msg.content && (msg.content.includes('🔄') || msg.content.includes('reaktiviert') || msg.content.includes('zurückgenommen') || msg.content.includes('regulär statt')));
+
+                    if (isReactivation) {
+                      return (
+                        <div key={msg.id || idx} style={{ alignSelf: 'center', width: '100%', maxWidth: '94%', margin: '6px 0' }}>
+                          <div style={{
+                            background: '#f0fdf4',
+                            border: '1.5px solid #86efac',
+                            borderRadius: '18px',
+                            padding: '12px 18px',
+                            boxShadow: '0 2px 8px rgba(34, 197, 94, 0.08)',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '6px'
+                          }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: '#dcfce7', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                <span style={{ fontSize: '0.95rem' }}>🔄</span>
+                              </div>
+                              <span style={{ fontSize: '0.86rem', fontWeight: 900, color: '#15803d', letterSpacing: '-0.01em' }}>
+                                Termin reaktiviert
+                              </span>
+                              <span style={{ marginLeft: 'auto', fontSize: '0.72rem', color: '#16a34a', fontWeight: 700 }}>
+                                {new Date(msg.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                            </div>
+                            <div style={{ fontSize: '0.92rem', color: '#166534', fontWeight: 650, lineHeight: 1.45, wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>
+                              {cleanContent}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    if (isCancellation) {
+                      return (
+                        <div key={msg.id || idx} style={{ alignSelf: 'center', width: '100%', maxWidth: '94%', margin: '6px 0' }}>
+                          <div style={{
+                            background: '#fef2f2',
+                            border: '1.5px dashed #fca5a5',
+                            borderRadius: '18px',
+                            padding: '12px 18px',
+                            boxShadow: '0 2px 8px rgba(239, 68, 68, 0.06)',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '6px'
+                          }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: '#fee2e2', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                <span style={{ fontSize: '0.95rem' }}>❌</span>
+                              </div>
+                              <span style={{ fontSize: '0.86rem', fontWeight: 900, color: '#991b1b', letterSpacing: '-0.01em' }}>
+                                Termin abgesagt
+                              </span>
+                              <span style={{ marginLeft: 'auto', fontSize: '0.72rem', color: '#b91c1c', fontWeight: 700 }}>
+                                {new Date(msg.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                            </div>
+                            <div style={{ fontSize: '0.92rem', color: '#991b1b', fontWeight: 650, lineHeight: 1.45, wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>
+                              {cleanContent}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    }
+
                     return (
                       <div key={msg.id || idx} style={{
                         display: 'flex',
@@ -13765,10 +14268,10 @@ export function CampusEventsBoard({
                       }}>
                         {!isMe && senderName && (
                           <span style={{ 
-                            fontSize: '0.68rem', 
+                            fontSize: '0.82rem', 
                             fontWeight: 800, 
                             color: isStudentSender ? '#2563eb' : '#34a853', 
-                            marginBottom: '1px', 
+                            marginBottom: '2px', 
                             marginLeft: '6px' 
                           }}>
                             {senderName}
@@ -13777,17 +14280,17 @@ export function CampusEventsBoard({
                         <div style={{
                           background: isMe ? '#e6f4ea' : '#ffffff',
                           color: '#0f172a',
-                          padding: '10px 14px',
-                          borderRadius: isMe ? '16px 16px 2px 16px' : '16px 16px 16px 2px',
-                          fontSize: '0.85rem',
-                          lineHeight: 1.4,
+                          padding: '12px 16px',
+                          borderRadius: isMe ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
+                          fontSize: '0.98rem',
+                          lineHeight: 1.45,
                           wordBreak: 'break-word',
                           border: isMe ? '1px solid #bbf7d0' : '1px solid #e2e8f0',
-                          boxShadow: '0 1px 4px rgba(0,0,0,0.04)'
+                          boxShadow: '0 2px 6px rgba(0,0,0,0.04)'
                         }}>
                           {cleanContent}
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '3px', marginTop: '4px' }}>
-                            <span style={{ fontSize: '0.62rem', color: isMe ? '#15803d' : '#64748b', fontWeight: 600 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '3px', marginTop: '6px' }}>
+                            <span style={{ fontSize: '0.76rem', color: isMe ? '#15803d' : '#64748b', fontWeight: 650 }}>
                               {new Date(msg.created_at).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })}, {new Date(msg.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}
                             </span>
                             {isMe && <CheckCheck size={14} color="#15803d" style={{ marginLeft: '2px' }} />}
@@ -13805,13 +14308,63 @@ export function CampusEventsBoard({
                 <div style={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '6px',
+                  gap: '8px',
                   overflowX: 'auto',
-                  padding: '10px 20px 4px 20px',
+                  padding: '12px 20px 6px 20px',
                   background: '#fafbfc',
+                  borderTop: '1px solid #f1f5f9',
                   scrollbarWidth: 'none',
                   msOverflowStyle: 'none'
                 }}>
+                  {/* Reaktivieren Quick Action Chip when Cancelled */}
+                  {isCanceled && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const executeReactivation = async (unlocked: boolean) => {
+                          await handleUndoCancel(activeChatOcc, unlocked);
+                          if (activeChatOcc) {
+                            setActiveChatOcc(prev => prev ? { ...prev, status: 'scheduled' } : null);
+                            const otherUserId = role === 'student' ? (activeChatOcc.teacher_id || (activeChatOcc.teacher as any)?.id) : activeChatOcc.student_id;
+                            const sId = activeChatOcc.schedule_id || activeChatOcc.schedule?.id;
+                            setTimeout(() => {
+                              if (otherUserId) fetchChat(otherUserId, activeChatOcc.id, activeChatOcc.date, sId);
+                            }, 300);
+                          }
+                        };
+
+                        if (role === 'student' && !isAbsenceAllowed) {
+                          setPinGatePendingAction(() => () => executeReactivation(true));
+                          setPinGateInput('');
+                          setPinGateError('');
+                          setShowPinGateModal(true);
+                          return;
+                        }
+                        executeReactivation(false);
+                      }}
+                      style={{
+                        padding: '6px 14px',
+                        borderRadius: '100px',
+                        background: '#f0fdf4',
+                        border: '1.5px solid #86efac',
+                        color: '#15803d',
+                        fontSize: '0.88rem',
+                        fontWeight: 850,
+                        whiteSpace: 'nowrap',
+                        cursor: 'pointer',
+                        boxShadow: '0 1px 3px rgba(34, 197, 94, 0.12)',
+                        flexShrink: 0,
+                        minHeight: '38px',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}
+                      className="hover-scale"
+                    >
+                      🔄 Termin reaktivieren
+                    </button>
+                  )}
+
                   {/* 1-Click Direct Emoji Reaction Buttons */}
                   <div style={{ display: 'flex', gap: '4px', paddingRight: '6px', borderRight: '1px solid #e2e8f0' }}>
                     {['👍', '🎵', '👏', '🙏'].map((emoji, idx) => (
@@ -13829,14 +14382,18 @@ export function CampusEventsBoard({
                           sendDirectChatMessage(emoji);
                         }}
                         style={{
-                          padding: '4px 9px',
+                          padding: '6px 12px',
                           borderRadius: '100px',
                           background: '#ffffff',
                           border: '1px solid #e2e8f0',
-                          fontSize: '0.88rem',
+                          fontSize: '0.98rem',
                           cursor: 'pointer',
                           boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-                          flexShrink: 0
+                          flexShrink: 0,
+                          minHeight: '38px',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center'
                         }}
                         className="hover-scale"
                         title={`Schnell-Reaktion ${emoji} senden`}
@@ -13874,17 +14431,20 @@ export function CampusEventsBoard({
                         setChatTypedMessage(phrase.text);
                       }}
                       style={{
-                        padding: '5px 12px',
+                        padding: '6px 14px',
                         borderRadius: '100px',
                         background: '#ffffff',
                         border: '1px solid #bbf7d0',
                         color: '#15803d',
-                        fontSize: '0.75rem',
-                        fontWeight: 700,
+                        fontSize: '0.88rem',
+                        fontWeight: 800,
                         whiteSpace: 'nowrap',
                         cursor: 'pointer',
                         boxShadow: '0 1px 3px rgba(52, 168, 83, 0.08)',
-                        flexShrink: 0
+                        flexShrink: 0,
+                        minHeight: '38px',
+                        display: 'inline-flex',
+                        alignItems: 'center'
                       }}
                       className="hover-scale"
                     >
@@ -13900,17 +14460,17 @@ export function CampusEventsBoard({
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
-                  padding: '8px 14px',
-                  margin: '6px 20px 0 20px',
-                  borderRadius: '12px',
+                  padding: '10px 16px',
+                  margin: '8px 20px 0 20px',
+                  borderRadius: '14px',
                   background: '#eff6ff',
                   border: '1px solid #bfdbfe',
                   color: '#1e40af',
-                  fontSize: '0.78rem',
+                  fontSize: '0.88rem',
                   fontWeight: 700
                 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Lock size={14} color="#2563eb" />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Lock size={16} color="#2563eb" />
                     <span>Antworten durch Eltern geschützt (Lesen frei)</span>
                   </div>
                   <button
@@ -13925,10 +14485,10 @@ export function CampusEventsBoard({
                       background: '#2563eb',
                       color: '#ffffff',
                       border: 'none',
-                      borderRadius: '8px',
-                      padding: '4px 10px',
-                      fontSize: '0.72rem',
-                      fontWeight: 800,
+                      borderRadius: '100px',
+                      padding: '6px 14px',
+                      fontSize: '0.82rem',
+                      fontWeight: 850,
                       cursor: 'pointer'
                     }}
                     className="hover-scale"
@@ -13995,10 +14555,11 @@ export function CampusEventsBoard({
                        style={{
                          flex: 1,
                          padding: '12px 20px',
+                         minHeight: '48px',
                          borderRadius: '100px',
                          border: isChatLocked ? '1.5px dashed #93c5fd' : '1.5px solid #cbd5e1',
                          background: isDisabled ? '#f1f5f9' : isChatLocked ? '#f8fafc' : '#ffffff',
-                         fontSize: '0.88rem',
+                         fontSize: '0.98rem',
                          outline: 'none',
                          color: '#1e293b',
                          boxShadow: 'none',
@@ -14010,27 +14571,36 @@ export function CampusEventsBoard({
                         <button
                           type="button"
                           onClick={() => {
+                            const executeReactivation = async (unlocked: boolean) => {
+                              await handleUndoCancel(activeChatOcc, unlocked);
+                              if (activeChatOcc) {
+                                setActiveChatOcc(prev => prev ? { ...prev, status: 'scheduled' } : null);
+                                const otherUserId = role === 'student' ? (activeChatOcc.teacher_id || (activeChatOcc.teacher as any)?.id) : activeChatOcc.student_id;
+                                const sId = activeChatOcc.schedule_id || activeChatOcc.schedule?.id;
+                                setTimeout(() => {
+                                  if (otherUserId) fetchChat(otherUserId, activeChatOcc.id, activeChatOcc.date, sId);
+                                }, 300);
+                              }
+                            };
+
                             if (role === "student" && !isAbsenceAllowed) {
-                              setPinGatePendingAction(() => () => {
-                                handleUndoCancel(activeChatOcc, true);
-                                setActiveChatOcc(null);
-                              });
+                              setPinGatePendingAction(() => () => executeReactivation(true));
                               setPinGateInput("");
                               setPinGateError("");
                               setShowPinGateModal(true);
                               return;
                             }
-                            handleUndoCancel(activeChatOcc, false);
-                            setActiveChatOcc(null);
+                            executeReactivation(false);
                           }}
                           style={{
-                            background: "#f1f5f9",
-                            color: "#475569",
-                            border: "1px solid #cbd5e1",
+                            background: "#f0fdf4",
+                            color: "#15803d",
+                            border: "1.5px solid #86efac",
                             borderRadius: "100px",
-                            padding: "10px 16px",
-                            fontSize: "0.82rem",
-                            fontWeight: 800,
+                            padding: "10px 18px",
+                            minHeight: "46px",
+                            fontSize: "0.88rem",
+                            fontWeight: 850,
                             cursor: "pointer",
                             display: "flex",
                             alignItems: "center",
@@ -14039,7 +14609,7 @@ export function CampusEventsBoard({
                             flexShrink: 0
                           }}
                         >
-                          Reaktivieren
+                          🔄 Reaktivieren
                         </button>
                       ) : (
                         <button
@@ -14063,9 +14633,10 @@ export function CampusEventsBoard({
                            color: '#ffffff',
                            border: 'none',
                            borderRadius: '100px',
-                           padding: '10px 16px',
-                           fontSize: '0.82rem',
-                           fontWeight: 800,
+                           padding: '10px 18px',
+                           minHeight: '46px',
+                           fontSize: '0.88rem',
+                           fontWeight: 850,
                            cursor: 'pointer',
                            display: 'flex',
                            alignItems: 'center',
@@ -14087,8 +14658,8 @@ export function CampusEventsBoard({
                          color: '#ffffff',
                          border: 'none',
                          borderRadius: '50%',
-                         width: '42px',
-                         height: '42px',
+                         width: '46px',
+                         height: '46px',
                          display: 'flex',
                          alignItems: 'center',
                          justifyContent: 'center',

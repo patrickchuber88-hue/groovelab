@@ -3730,11 +3730,19 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
     copyToClipboard(fullShareText);
   };
 
-  const handleShareWhatsApp = () => {
+  const handleShareFamily = async () => {
     savePinToStorage(sharePin);
     completeFamilyMilestone();
-    const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(fullShareText)}`;
-    window.open(waUrl, '_blank');
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'Musik-Audiobiografie',
+          text: fullShareText
+        });
+        return;
+      } catch (err) {}
+    }
+    copyToClipboard(fullShareText);
   };
 
   const isLight = theme === 'light';
@@ -11021,16 +11029,16 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
 
             {/* Große, taktile Haupt-Aktionen */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {/* 1. Haupt-Button: WhatsApp */}
+              {/* 1. Haupt-Button: Mit Familie teilen */}
               <button
                 type="button"
-                onClick={handleShareWhatsApp}
+                onClick={handleShareFamily}
                 style={{
                   width: '100%',
                   padding: '14px 18px',
                   borderRadius: '16px',
                   border: 'none',
-                  background: '#25D366',
+                  background: '#10b981',
                   color: '#ffffff',
                   fontWeight: 900,
                   fontSize: '0.94rem',
@@ -11039,13 +11047,13 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: '8px',
-                  boxShadow: '0 4px 14px rgba(37, 211, 102, 0.4)',
+                  boxShadow: '0 4px 14px rgba(16, 185, 129, 0.35)',
                   transition: 'all 0.15s ease'
                 }}
                 className="hover-scale"
               >
-                <MessageCircle size={20} strokeWidth={2.4} />
-                <span>Per WhatsApp an Familie senden</span>
+                <Share2 size={20} strokeWidth={2.4} />
+                <span>Mit Familie teilen</span>
               </button>
 
               {/* 2. Sekundär-Button: Link kopieren */}
@@ -12224,23 +12232,29 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                         </div>
 
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-                          {/* WhatsApp Share Button */}
+                          {/* Family Share Button */}
                           {isGift && (
                             <button
                               type="button"
-                              onClick={() => {
+                              onClick={async () => {
                                 const sName = student?.first_name || 'Junger Musiker';
                                 const origin = typeof window !== 'undefined' ? window.location.origin : 'https://campus-groovelab.de';
                                 const shareUrl = `${origin}/share/audio-bio?student_id=${studentId}`;
-                                const msg = `*Ein Musik-Geschenk von ${sName}!* 🎶🎁\n\nIch habe ein persönliches Stück für dich eingespielt:\n${shareUrl}`;
-                                window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`, '_blank');
+                                const msg = `Ein Musik-Geschenk von ${sName}! 🎶🎁\n\nIch habe ein persönliches Stück für dich eingespielt:\n${shareUrl}`;
+                                if (navigator.share) {
+                                  try {
+                                    await navigator.share({ title: `Musik-Geschenk von ${sName}`, text: msg, url: shareUrl });
+                                    return;
+                                  } catch (e) {}
+                                }
+                                copyToClipboard(msg);
                               }}
-                              title="Per WhatsApp an Familie senden"
+                              title="Mit Familie teilen"
                               style={{
                                 padding: '7px 12px',
                                 borderRadius: '100px',
                                 border: 'none',
-                                background: '#25D366',
+                                background: '#10b981',
                                 color: 'white',
                                 fontSize: '0.74rem',
                                 fontWeight: 900,
@@ -12248,12 +12262,12 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                                 display: 'inline-flex',
                                 alignItems: 'center',
                                 gap: '4px',
-                                boxShadow: '0 2px 8px rgba(37, 211, 102, 0.35)'
+                                boxShadow: '0 2px 8px rgba(16, 185, 129, 0.35)'
                               }}
                               className="hover-scale"
                             >
                               <Share2 size={13} />
-                              <span>WhatsApp</span>
+                              <span>Teilen</span>
                             </button>
                           )}
 

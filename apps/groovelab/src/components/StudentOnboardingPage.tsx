@@ -868,7 +868,7 @@ Deine Vorteile auf einen Blick:
           />
         </div>
 
-        {/* 6. WhatsApp/E-Mail Teilen */}
+        {/* 6. Einladung kopieren & teilen */}
         <button 
           onClick={handleCopyLink} 
           style={{ 
@@ -888,7 +888,7 @@ Deine Vorteile auf einen Blick:
           }}
         >
           {copied ? <Check size={14} color="#22c55e" /> : <Copy size={14} />}
-          {copied ? 'WhatsApp/E-Mail Einladung kopiert!' : 'Zugangs-Link kopieren'}
+          {copied ? 'Zugangs-Einladung kopiert!' : 'Zugangs-Link kopieren'}
         </button>
 
         {/* 7. Login Button */}

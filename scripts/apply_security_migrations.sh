@@ -49,8 +49,12 @@ apply_migration "$MIGRATIONS_DIR/345_restore_and_harden_set_initial_student_pin_
 apply_migration "$MIGRATIONS_DIR/346_revisionssicheres_buchungsjournal_und_storage.sql"
 apply_migration "$MIGRATIONS_DIR/355_save_parent_controls_and_audit_hardening.sql"
 apply_migration "$MIGRATIONS_DIR/356_revisionssichere_elterneinstellungen_und_parent_permissions.sql"
+apply_migration "$MIGRATIONS_DIR/357_dedicated_calendar_token_and_revocation_rpc.sql"
+apply_migration "$MIGRATIONS_DIR/358_student_homework_question_rpc.sql"
+apply_migration "$MIGRATIONS_DIR/359_student_schedule_absence_rpc_and_schema_alignment.sql"
 
 echo "🔄 Schema-Cache aktualisieren..."
 ssh "$SERVER" "docker exec -i $DB_CONTAINER psql -U postgres -d postgres -c \"NOTIFY pgrst, 'reload schema';\"" || true
 
-echo "✅ Alle Sicherheitsmigrationen (330-356) wurden erfolgreich auf dem Produktivserver angewendet!"
+echo "✅ Alle Sicherheitsmigrationen (330-359) wurden erfolgreich auf dem Produktivserver angewendet!"
+

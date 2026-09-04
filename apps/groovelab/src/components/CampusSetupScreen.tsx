@@ -283,7 +283,7 @@ export function CampusSetupScreen({
             id: 'datenschutz',
             title: 'Datenschutz & AVV',
             subtitle: '21/21 DSGVO Standards',
-            badge: '100% DSGVO',
+            badge: 'DSGVO-Audit',
             gradient: 'linear-gradient(135deg, #34a853 0%, #15803d 100%)',
             shadowColor: 'rgba(52, 168, 83, 0.40)',
             icon: ShieldCheck

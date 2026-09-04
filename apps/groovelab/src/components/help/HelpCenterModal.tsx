@@ -272,7 +272,7 @@ export const HelpCenterModal: React.FC<HelpCenterModalProps> = ({
       category: 'features',
       roles: ['admin', 'secretary', 'teacher', 'student'],
       badge: 'Elternbrief',
-      summary: 'Druckfertiger 1-Seiter mit Schullogo, QR-Code & 100% DSGVO-Datenschutzgarantie.',
+      summary: 'Druckfertiger 1-Seiter mit Schullogo, QR-Code & zertifizierter DSGVO-Datenschutzgarantie.',
       tags: ['eltern', 'elternbrief', 'infoblatt', 'pdf', 'druck', 'schullogo', 'qr', 'onboarding'],
       details: (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', fontSize: '0.86rem', color: '#334155', lineHeight: 1.6 }}>

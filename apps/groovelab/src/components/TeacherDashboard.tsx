@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback, useRef, lazy, Suspens
 import { MUSIC_QUOTES, getQuotesForAudience, getDailyQuote } from '@groovelab/shared';
 import { usePremiumOnboardingTour, TourStartButton, TourStep } from './PremiumOnboardingTour';
 import { supabase, deleteUserStorageAssets } from '../lib/supabase';
-import { Monitor, Music, Award, Box, Plus, AlertCircle, AlertTriangle, User, Users, Star, TrendingUp, Shield, Zap, Play, Info, CheckCircle, Check, Search, Trash2, Bell, X, Clock, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, LayoutDashboard, LogOut, Flame, GraduationCap, UserPlus, Edit3, Calendar, Activity, CheckSquare, Mail, Copy, Sparkles, BookOpen, MessageSquare, Lock, Palmtree, Heart, Settings, Key, Sun, ThumbsUp, Building2, Hourglass, Eye, EyeOff, ShieldCheck, CheckCheck, CalendarX, Send, Lightbulb, Download, Sliders, Mic, Disc, Radio, Timer, ArrowRight, Headphones, FileText, DoorOpen } from 'lucide-react';
+import { Monitor, Music, Award, Box, Plus, AlertCircle, AlertTriangle, User, Users, Star, TrendingUp, Shield, Zap, Play, Info, CheckCircle, Check, Search, Trash2, Bell, X, Clock, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, LayoutDashboard, LogOut, Flame, GraduationCap, UserPlus, Edit3, Calendar, Activity, CheckSquare, Mail, Copy, Sparkles, BookOpen, MessageSquare, Lock, Palmtree, Heart, Settings, Key, Sun, ThumbsUp, Building2, Hourglass, Eye, EyeOff, ShieldCheck, CheckCheck, CalendarX, Send, Lightbulb, Download, Sliders, Mic, Disc, Radio, Timer, ArrowRight, Headphones, FileText, DoorOpen, HelpCircle } from 'lucide-react';
 import { notesService, UserNote } from '../services/notesService';
 import { formatCleanNoteContent } from './notes/notesConstants';
 import { checkIsAudioTresorActive } from '../domain/stickersAndTresor';
@@ -1169,6 +1169,64 @@ export function TeacherDashboard({
     }
   };
 
+  const handleTeacherReactivateOccurrence = async (occ: any) => {
+    if (!confirm('Möchtest du diesen Unterrichtstermin wieder reaktivieren? Der Termin findet dann wieder regulär statt.')) return;
+    try {
+      const occId = occ.id;
+      const scheduleId = occ.schedule_id || occ.scheduleId;
+      const studentId = occ.student_id || occ.student?.id;
+      const dateStr = occ.date || (briefingData?.timeline?.[0]?.date);
+      const startTime = occ.start_time || occ.timeSlot || '14:00';
+
+      if (occId && !String(occId).startsWith('virtual-') && !String(occId).startsWith('virt_')) {
+        if (scheduleId) {
+          await supabase.from('schedule_occurrences').delete().eq('id', occId);
+        } else {
+          await supabase.from('schedule_occurrences').update({
+            status: 'scheduled',
+            teacher_acknowledged: true,
+            student_acknowledged: false,
+            updated_at: new Date().toISOString()
+          }).eq('id', occId);
+        }
+      } else {
+        if (scheduleId && dateStr) {
+          await supabase.from('schedule_occurrences').delete().eq('schedule_id', scheduleId).eq('date', dateStr);
+        }
+      }
+
+      // Insert reactivation message in chat
+      const [y, m, d] = String(dateStr).split('-').map(Number);
+      const occDate = (y && m && d) ? new Date(y, m - 1, d) : new Date();
+      const shortDay = occDate.toLocaleDateString('de-DE', { weekday: 'short' });
+      const shortDate = occDate.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' });
+      const timeLabel = startTime.substring(0, 5);
+
+      const reactivationText = `🔄 Termin reaktiviert: Dein Unterrichtstermin am ${shortDay} ${shortDate} (${dateStr}) um ${timeLabel} Uhr findet wieder regulär statt.`;
+
+      if (studentId && userId) {
+        await supabase.from('campus_direct_messages').insert({
+          sender_id: userId,
+          recipient_id: studentId,
+          content: reactivationText,
+          occurrence_id: occId || (scheduleId ? `virtual-${scheduleId}-${dateStr}` : null),
+          is_system: true,
+          message_type: 'cancellation_reset'
+        });
+      }
+
+      setToastMessage('Termin erfolgreich reaktiviert.');
+      setActiveChatOcc((prev: any) => prev ? { ...prev, status: 'scheduled' } : null);
+      if (occId) {
+        await fetchChatMessages(occId, dateStr, studentId);
+      }
+      fetchData();
+    } catch (err: any) {
+      console.error('Error in handleTeacherReactivateOccurrence:', err);
+      alert('Fehler beim Reaktivieren des Termins: ' + err.message);
+    }
+  };
+
   // Fetch active conversations (occurrence_ids that have messages)
   const fetchActiveChatOccs = async () => {
     try {
@@ -1185,14 +1243,23 @@ export function TeacherDashboard({
     }
   };
 
-  const fetchChatMessages = async (occurrenceId: string) => {
+  const fetchChatMessages = async (occurrenceId: string, occDate?: string, studentId?: string) => {
     if (!userId || !occurrenceId) return;
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('campus_direct_messages')
-        .select('*')
-        .eq('occurrence_id', occurrenceId)
-        .order('created_at', { ascending: true });
+        .select('*');
+
+      if (occDate && studentId) {
+        const [y, m, d] = occDate.split('-');
+        const deDate = (d && m && y) ? `${d}.${m}.${y}` : occDate;
+        const shortDate = (d && m && y) ? `${d}.${m}.${y.slice(2)}` : occDate;
+        query = query.or(`occurrence_id.eq.${occurrenceId},and(sender_id.in.(${userId},${studentId}),recipient_id.in.(${userId},${studentId}),or(content.ilike.%${occDate}%,content.ilike.%${deDate}%,content.ilike.%${shortDate}%))`);
+      } else {
+        query = query.eq('occurrence_id', occurrenceId);
+      }
+
+      const { data, error } = await query.order('created_at', { ascending: true });
       if (error) throw error;
       if (data) {
         setChatMessages(data);
@@ -1231,7 +1298,7 @@ export function TeacherDashboard({
       return;
     }
 
-    fetchChatMessages(activeChatOcc.id);
+    fetchChatMessages(activeChatOcc.id, activeChatOcc.date, activeChatOcc.student_id);
 
     const channel = supabase
       .channel(`chat_occ_dashboard_${activeChatOcc.id}`)
@@ -1241,7 +1308,7 @@ export function TeacherDashboard({
         table: 'campus_direct_messages', 
         filter: `occurrence_id=eq.${activeChatOcc.id}` 
       }, () => {
-        fetchChatMessages(activeChatOcc.id);
+        fetchChatMessages(activeChatOcc.id, activeChatOcc.date, activeChatOcc.student_id);
       })
       .subscribe();
 
@@ -1270,7 +1337,7 @@ export function TeacherDashboard({
 
       if (error) throw error;
       setChatTypedMessage('');
-      fetchChatMessages(activeChatOcc.id);
+      fetchChatMessages(activeChatOcc.id, activeChatOcc.date, activeChatOcc.student_id);
       fetchActiveChatOccs();
     } catch (err) {
       console.error('Error sending chat message:', err);
@@ -2105,7 +2172,7 @@ export function TeacherDashboard({
   };
 
   const handleReportIllness = async () => {
-    if (!confirm('Möchtest du dich wirklich für heute krankmelden? Alle heutigen Stunden werden storniert und die Verwaltung benachrichtigt.')) return;
+    if (!confirm('Möchtest du dich wirklich für heute abmelden? Alle heutigen Unterrichtstermine werden storniert und die Disposition benachrichtigt.')) return;
 
     try {
       const todayStr = new Date().toLocaleDateString('sv-SE');
@@ -2116,7 +2183,7 @@ export function TeacherDashboard({
       });
 
       if (resp.ok) {
-        alert('Krankheitsmeldung erfolgreich registriert. Das Sekretariat und die betroffenen Schüler wurden benachrichtigt.');
+        alert('Terminabsage erfolgreich registriert. Das Ausfall-Cockpit und die betroffenen Schüler wurden benachrichtigt.');
         setTicker(t => t + 1);
         return;
       }
@@ -2165,20 +2232,20 @@ export function TeacherDashboard({
         await supabase.from('crisis_notifications').insert(notifs);
       }
 
-      const alertMessage = `🚨 LEHRER-KRANKHEIT: Lehrkraft ${formatTeacherFullName(teacherProfile)} hat sich für heute krankgemeldet.`;
+      const alertMessage = `🚨 TERMINABSAGE: Lehrkraft ${formatTeacherFullName(teacherProfile)} hat sich für heute abgemeldet.`;
       await supabase.from('system_alerts').insert({
         school_id: teacherProfile.school_id,
         teacher_id: userId,
-        type: 'Teacher Illness Alert',
+        type: 'Teacher Absence Alert',
         message: alertMessage,
         resolved: false
       });
 
-      alert('Krankheit erfolgreich gemeldet. Alle Stunden wurden abgesagt.');
+      alert('Abwesenheit erfolgreich gemeldet. Alle heutigen Termine wurden abgesagt.');
       setTicker(t => t + 1);
     } catch (err) {
       console.error(err);
-      alert('Fehler beim Melden der Krankheit.');
+      alert('Fehler beim Melden der Abwesenheit.');
     }
   };
 
@@ -2203,12 +2270,12 @@ export function TeacherDashboard({
     const diffDays = Math.round((untilD.getTime() - startD.getTime()) / (24 * 3600 * 1000)) + 1;
     if (diffDays > MAX_SELF_REPORT_DAYS) {
       alert(
-        `⚠️ Krankmeldungen von mehr als 4 Wochen (${diffDays} Tage) können nicht selbst eingetragen werden.\n\nBitte wende dich an die Verwaltung, damit diese die Krankmeldung für dich hinterlegt. Es gilt keine 30-Tage-Sperre für Verwaltungseinträge.`
+        `⚠️ Abwesenheiten / Ausfälle von mehr als 4 Wochen (${diffDays} Tage) können nicht selbst eingetragen werden.\n\nBitte wende dich an die Verwaltung, damit diese die Abwesenheit für dich hinterlegt. Es gilt keine 30-Tage-Sperre für Verwaltungseinträge.`
       );
       return;
     }
 
-    const confirmMsg = `Möchtest du dich wirklich vom ${new Date(sickStartDate).toLocaleDateString('de-DE')} bis zum ${new Date(sickUntilDate).toLocaleDateString('de-DE')} krankmelden?`;
+    const confirmMsg = `Möchtest du die Unterrichtstermine vom ${new Date(sickStartDate + 'T00:00:00').toLocaleDateString('de-DE')} bis zum ${new Date(sickUntilDate + 'T00:00:00').toLocaleDateString('de-DE')} wirklich absagen?`;
 
     if (!confirm(confirmMsg)) return;
 
@@ -2416,15 +2483,15 @@ export function TeacherDashboard({
 
       // Add Secretary alarm ticket
       const alertMessage = prevSickUntilStr
-        ? `🚨 KRANKHEITS-ANPASSUNG: Lehrkraft ${formatTeacherFullName(profile)} hat den Krankmeldungszeitraum auf den ${new Date(sickUntilDate).toLocaleDateString('de-DE')} geändert.`
-        : `🚨 NEUE KRANKMELDUNG: Lehrkraft ${formatTeacherFullName(profile)} hat sich bis zum ${new Date(sickUntilDate).toLocaleDateString('de-DE')} krankgemeldet.`;
+        ? `🚨 TERMIN-ANPASSUNG: Lehrkraft ${formatTeacherFullName(profile)} hat den Abwesenheitszeitraum auf den ${new Date(sickUntilDate + 'T00:00:00').toLocaleDateString('de-DE')} geändert.`
+        : `🚨 TERMINABSAGE: Lehrkraft ${formatTeacherFullName(profile)} hat Termine bis zum ${new Date(sickUntilDate + 'T00:00:00').toLocaleDateString('de-DE')} abgesagt.`;
 
       await supabase
         .from('system_alerts')
         .insert({
           school_id: profile.school_id,
           teacher_id: userId,
-          type: 'Teacher Illness Alert',
+          type: 'Teacher Absence Alert',
           message: alertMessage,
           resolved: false
         });
@@ -2451,14 +2518,14 @@ export function TeacherDashboard({
       }, 2500);
     } catch (err) {
       console.error(err);
-      alert('Fehler bei der Krankheitsmeldung.');
+      alert('Fehler bei der Terminabsage.');
     } finally {
       setReportingSick(false);
     }
   };
 
   const handleEndSick = async () => {
-    if (!confirm('Möchtest du dich wirklich wieder gesundmelden? Alle zukünftigen Krankheitsausfälle werden wieder aktiviert.')) return;
+    if (!confirm('Möchtest du die Abwesenheit wirklich beenden? Alle zukünftigen Termine werden wieder als aktiv geführt.')) return;
 
     try {
       setReportingSick(true);
@@ -2581,20 +2648,19 @@ export function TeacherDashboard({
           .in('slot_start_datetime', datesToDeleteNotifs);
       }
 
-      // Add healthy notice to system alerts with logged duration
-      const durationStr = daysDiff > 0 ? ` (Krankheitsdauer: vom ${formattedStartDate} bis zum ${formattedEndDate}, ${daysDiff} ${daysDiff === 1 ? 'Tag' : 'Tage'})` : '';
-      const alertMessage = `🍏 LEHRKRAFT GESUND: Lehrkraft ${formatTeacherFullName(profile)} hat sich wieder gesund gemeldet.${durationStr}`;
+      // Add available notice to system alerts
+      const alertMessage = `🟢 WIEDER IM DIENST: Lehrkraft ${formatTeacherFullName(profile)} hat die Abwesenheit beendet und steht wieder regulär zur Verfügung.`;
       await supabase
         .from('system_alerts')
         .insert({
           school_id: profile.school_id,
           teacher_id: userId,
-          type: 'Teacher Healthy Alert',
+          type: 'Teacher Available Alert',
           message: alertMessage,
           resolved: false
         });
 
-      alert('Erfolgreich gesundgemeldet! Zukünftige Stundenplandaten wurden wieder aktiviert.');
+      alert('Abwesenheit beendet! Zukünftige Stundenplandaten wurden wieder aktiviert.');
       setSickUntilDate('');
       const today = new Date();
       setSickStartDate(today.toISOString().substring(0, 10));
@@ -3378,9 +3444,8 @@ export function TeacherDashboard({
       localStorage.removeItem('selected_sick_date');
       return saved;
     }
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    return tomorrow.toLocaleDateString('sv-SE');
+    const today = new Date();
+    return today.toLocaleDateString('sv-SE');
   });
   const [showCustomStart, setShowCustomStart] = useState(false);
   const [showSickModal, setShowSickModal] = useState(false);
@@ -3666,6 +3731,8 @@ export function TeacherDashboard({
             studentName: studentDisplayName,
             student_acknowledged: occ.student_acknowledged,
             studentAcknowledged: occ.studentAcknowledged,
+            teacher_acknowledged: occ.teacher_acknowledged,
+            teacherAcknowledged: occ.teacherAcknowledged,
             is_rescheduled: occ.is_rescheduled || occ.isRescheduled,
             is_moved: occ.is_moved || occ.isMoved,
             is_room_booking: Boolean(occ.is_room_booking || occ.isRoomBooking || occ.room_override_id || occ.roomOverrideId || occ.is_room_changed || occ.isRoomChanged),
@@ -3707,8 +3774,9 @@ export function TeacherDashboard({
           const isTimeMoved = Boolean(b.original_start_time && b.startTime && b.original_start_time.substring(0, 5) !== b.startTime.substring(0, 5));
           const isChangedStatus = Boolean(b.status && ['pending_reschedule', 'rescheduled_confirmed', 'rescheduled', 'cancelled', 'canceled_by_student', 'teacher_sick', 'canceled_by_teacher_sick', 'open_reschedule', 'changed'].includes(b.status));
           const isExplicitChange = Boolean(b.is_rescheduled || b.isRescheduled || b.is_changed || b.isChanged || b.is_moved || b.isMoved);
+          const isReactivatedUnacknowledged = Boolean(b.status === 'scheduled' && b.original_date && (b.teacher_acknowledged === false || b.teacherAcknowledged === false));
 
-          const isRealReschedule = isDateMoved || isTimeMoved || isChangedStatus || isExplicitChange;
+          const isRealReschedule = isDateMoved || isTimeMoved || isChangedStatus || isExplicitChange || isReactivatedUnacknowledged;
           if (!isRealReschedule) return false;
 
           let normDate = b.date || '';
@@ -4201,6 +4269,71 @@ export function TeacherDashboard({
     const todayStr = getSimulatedNow().toISOString().slice(0, 10);
     return raw.includes('AUDIO:') && raw.includes(todayStr);
   }, []);
+
+  // ❓ Schülerfragen-Status für den Tagesplan (Apple HIG Goldstandard)
+  const [studentsWithQuestions, setStudentsWithQuestions] = useState<Record<string, boolean>>({});
+
+  const checkHasStudentQuestion = useCallback((studentId: string) => {
+    if (!studentId) return false;
+    if (studentsWithQuestions[studentId]) return true;
+    if (typeof window !== 'undefined') {
+      try {
+        const raw = localStorage.getItem(`campus_homework_notes_${studentId}`);
+        if (raw && (raw.includes('STUDENT_QUESTION:') || raw.includes('❓ Frage für den Unterricht:'))) {
+          return true;
+        }
+      } catch {}
+    }
+    return false;
+  }, [studentsWithQuestions]);
+
+  useEffect(() => {
+    const studentIds = (todayTagesplanStudents || []).map((s: any) => s.id).filter(Boolean);
+    if (studentIds.length === 0) return;
+
+    let isMounted = true;
+    const fetchQuestions = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('progress_matrix')
+          .select('student_id, homework_notes')
+          .in('student_id', studentIds)
+          .or('homework_notes.ilike.%STUDENT_QUESTION:%,homework_notes.ilike.%Frage für den Unterricht:%');
+
+        if (!error && data && isMounted) {
+          const map: Record<string, boolean> = {};
+          data.forEach((row: any) => {
+            if (row.homework_notes && (row.homework_notes.includes('STUDENT_QUESTION:') || row.homework_notes.includes('Frage für den Unterricht:'))) {
+              map[row.student_id] = true;
+            }
+          });
+          setStudentsWithQuestions(prev => ({ ...prev, ...map }));
+        }
+      } catch (err) {
+        console.warn('[TeacherDashboard] Could not fetch student questions:', err);
+      }
+    };
+
+    fetchQuestions();
+
+    const handleQuestionUpdated = (e: any) => {
+      const sId = e?.detail?.studentId;
+      if (sId) {
+        try {
+          const raw = localStorage.getItem(`campus_homework_notes_${sId}`);
+          const hasQ = Boolean(raw && (raw.includes('STUDENT_QUESTION:') || raw.includes('❓ Frage für den Unterricht:')));
+          setStudentsWithQuestions(prev => ({ ...prev, [sId]: hasQ }));
+        } catch {}
+      }
+      fetchQuestions();
+    };
+
+    window.addEventListener('campus_student_question_updated', handleQuestionUpdated);
+    return () => {
+      isMounted = false;
+      window.removeEventListener('campus_student_question_updated', handleQuestionUpdated);
+    };
+  }, [todayTagesplanStudents]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -7216,6 +7349,10 @@ useEffect(() => {
         className="sick-card-container hover-scale"
         onClick={() => {
           if (!isSick) {
+            const today = new Date().toLocaleDateString('sv-SE');
+            setSickStartDate(today);
+            setSickUntilDate(today);
+            setQuickSickPreset('today');
             setShowSickModal(true);
           }
         }}
@@ -7262,7 +7399,7 @@ useEffect(() => {
                 letterSpacing: '-0.01em',
                 whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
               }}>
-                {isSick ? 'Krankgemeldet' : 'Krankmelden'}
+                {isSick ? 'Abwesenheit aktiv' : 'Ausfall / Abwesenheit melden'}
               </h3>
               {isSick && (
                 <span style={{ 
@@ -7286,8 +7423,8 @@ useEffect(() => {
               whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
             }}>
               {isSick 
-                ? `Bis ${sickUntilFormatted} (${cancellationsCount} Ausfälle heute)` 
-                : 'Stunden stornieren & Verwaltung informieren'}
+                ? `Abwesend bis ${sickUntilFormatted} (${cancellationsCount} Termine abgesagt)` 
+                : 'Termine absagen & Verwaltung informieren'}
             </p>
           </div>
         </div>
@@ -7340,13 +7477,17 @@ useEffect(() => {
                 }}
               >
                 <Check size={13} strokeWidth={3} />
-                <span>Gesundmelden</span>
+                <span>Wieder verfügbar</span>
               </button>
             </>
           ) : (
             <button
               onClick={(e) => {
                 e.stopPropagation();
+                const today = new Date().toLocaleDateString('sv-SE');
+                setSickStartDate(today);
+                setSickUntilDate(today);
+                setQuickSickPreset('today');
                 setShowSickModal(true);
               }}
               style={{
@@ -7364,7 +7505,7 @@ useEffect(() => {
                 boxShadow: '0 3px 12px rgba(239, 68, 68, 0.28)'
               }}
             >
-              <span>Jetzt melden</span>
+              <span>Ausfall melden</span>
               <ArrowRight size={13} strokeWidth={2.5} />
             </button>
           )}
@@ -8935,14 +9076,12 @@ useEffect(() => {
           boxShadow: 'inset 0 2px 4px rgba(255,255,255,0.6), 0 2px 12px rgba(0,0,0,0.02)',
           boxSizing: 'border-box'
         }}>
-           <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#9f1239', fontFamily: "'Plus Jakarta Sans', sans-serif", display: 'flex', alignItems: 'center', gap: '6px' }}>
-             Gute Besserung &amp; gute Erholung! 
-             <svg width="16" height="16" viewBox="0 0 24 24" fill="#9f1239" stroke="none" style={{ display: 'inline-block', verticalAlign: 'middle' }}>
-               <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>
-             </svg>
+           <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#991b1b', fontFamily: "'Plus Jakarta Sans', sans-serif", display: 'flex', alignItems: 'center', gap: '8px' }}>
+             <CalendarX size={20} color="#dc2626" />
+             Abwesenheits-Modus aktiv
            </h4>
-           <p style={{ margin: 0, fontSize: '0.8rem', color: '#be123c', fontWeight: 600, maxWidth: '420px', lineHeight: 1.4 }}>
-             Ruh dich aus – keine Sorge, wir übernehmen heute für dich!
+           <p style={{ margin: 0, fontSize: '0.82rem', color: '#b91c1c', fontWeight: 600, maxWidth: '440px', lineHeight: 1.4 }}>
+             Deine Termine für diesen Zeitraum wurden storniert und betroffene Schüler und Eltern benachrichtigt.
            </p>
         </div>
       ) : (
@@ -9565,6 +9704,36 @@ useEffect(() => {
                                      <span style={{ fontWeight: 700, color: '#78350f', fontSize: '0.82rem' }}>☕️ Pause ({slot.duration || 30} Min.)</span>
                                    )}
 
+                                    {/* ❓ Schülerfrage Badge (Mobile/Shared) */}
+                                    {(slot.student || slot.isGroup) && !isCanceled && !isRescheduledAway && (() => {
+                                      const targetStudentId = slot.isGroup ? slot.students?.[0]?.id : slot.student?.id;
+                                      const hasQuestion = targetStudentId ? checkHasStudentQuestion(targetStudentId) : false;
+                                      if (!hasQuestion) return null;
+                                      return (
+                                        <span
+                                          title="Schüler hat eine Frage für den Unterricht notiert"
+                                          style={{
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            gap: '3px',
+                                            padding: '2px 7px',
+                                            borderRadius: '100px',
+                                            background: '#fef3c7',
+                                            border: '1px solid #fde68a',
+                                            color: '#b45309',
+                                            fontSize: '0.68rem',
+                                            fontWeight: 850,
+                                            fontFamily: "'Plus Jakarta Sans', sans-serif",
+                                            flexShrink: 0,
+                                            marginLeft: '6px'
+                                          }}
+                                        >
+                                          <HelpCircle size={10} strokeWidth={2.8} />
+                                          <span>1 Frage</span>
+                                        </span>
+                                      );
+                                    })()}
+
                                    {(slot.student || slot.isGroup) && (isRescheduledAway || isCanceled) && (
                                      <div style={{
                                        position: 'absolute',
@@ -9623,27 +9792,27 @@ useEffect(() => {
                                          justifyContent: 'center',
                                          background: hasAudioToday ? '#e6f4ea' : '#ffffff',
                                          color: hasAudioToday ? '#15803d' : '#64748b',
-                                         width: '26px',
-                                         height: '26px',
-                                         borderRadius: '50%',
+                                         width: '36px',
+                                         height: '36px',
+                                         borderRadius: '10px',
                                          border: hasAudioToday ? '1px solid rgba(52, 168, 83, 0.3)' : '1px solid rgba(0,0,0,0.06)',
                                          cursor: 'pointer',
                                          transition: 'all 0.2s',
                                          flexShrink: 0,
                                          boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
-                                         marginLeft: slot.isGroup ? '2px' : 'auto',
+                                         marginLeft: slot.isGroup ? '4px' : 'auto',
                                          marginRight: '2px',
                                          position: 'relative'
                                        }}
                                      >
-                                       <Mic size={13} color={hasAudioToday ? '#15803d' : '#64748b'} />
+                                       <Mic size={16} color={hasAudioToday ? '#15803d' : '#64748b'} />
                                        {hasAudioToday && (
                                          <span style={{
                                            position: 'absolute',
-                                           top: '2px',
-                                           right: '2px',
-                                           width: '5px',
-                                           height: '5px',
+                                           top: '3px',
+                                           right: '3px',
+                                           width: '6px',
+                                           height: '6px',
                                            borderRadius: '50%',
                                            background: '#34a853'
                                          }} />
@@ -9679,18 +9848,18 @@ useEffect(() => {
                                        justifyContent: 'center',
                                        background: '#ffffff',
                                        color: '#34a853',
-                                       width: '26px',
-                                       height: '26px',
-                                       borderRadius: '50%',
+                                       width: '36px',
+                                       height: '36px',
+                                       borderRadius: '10px',
                                        border: '1px solid rgba(0,0,0,0.06)',
                                        cursor: 'pointer',
                                        transition: 'all 0.2s',
                                        flexShrink: 0,
                                        boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
-                                       marginLeft: '2px'
+                                       marginLeft: '4px'
                                      }}
                                    >
-                                     <MessageSquare size={12} />
+                                     <MessageSquare size={16} />
                                    </button>
                                  )}
                                </div>
@@ -9702,9 +9871,9 @@ useEffect(() => {
                                  gap: '6px',
                                  width: '100%', 
                                  minWidth: 0, 
-                                 fontSize: '0.74rem', 
+                                 fontSize: '0.80rem', 
                                  color: '#64748b', 
-                                 fontWeight: 600,
+                                 fontWeight: 700,
                                  flexWrap: 'wrap',
                                  paddingLeft: '0'
                                }}>
@@ -9862,18 +10031,19 @@ useEffect(() => {
           {(showAllChangedAppointments ? visibleChangedAppointments : visibleChangedAppointments.slice(0, 3)).map((b: any) => {
               const dateObj = new Date(b.date);
               const isCancelled = ['cancelled', 'canceled_by_student', 'teacher_sick', 'canceled_by_teacher_sick'].includes(b.status);
+              const isReactivated = Boolean(b.status === 'scheduled' && b.original_date && b.original_date === b.date);
               const isRescheduled = ['pending_reschedule', 'rescheduled_confirmed', 'rescheduled', 'open_reschedule', 'changed', 'pending', 'draft'].includes(b.status) || 
                 Boolean(b.original_date && b.original_date !== b.date) ||
                 Boolean(b.original_start_time && b.startTime && b.original_start_time !== b.startTime);
               const isConfirmed = b.status === 'rescheduled_confirmed' || b.student_acknowledged === true || b.studentAcknowledged === true;
-              const isPending = b.status === 'pending' && !isRescheduled;
+              const isPending = b.status === 'pending' && !isRescheduled && !isReactivated;
 
               const isGroup = Boolean(b.isGroup || (b.studentName && b.studentName.includes('&')));
 
               let cardBg = '#f8fafc';
               let cardBorder = '1px solid #e2e8f0';
               let dateHeaderBg = '#34a853';
-              let iconSymbol = '✓';
+              let iconComponent: React.ReactNode = <Check size={11} strokeWidth={2.5} />;
               let iconBg = '#dcfce7';
               let iconColor = '#166534';
               let iconBorder = '1px solid #86efac';
@@ -9900,7 +10070,7 @@ useEffect(() => {
 
               if (isCancelled) {
                 dateHeaderBg = '#ef4444';
-                iconSymbol = '✕';
+                iconComponent = <X size={11} strokeWidth={2.5} />;
                 iconBg = '#fee2e2';
                 iconColor = '#991b1b';
                 iconBorder = '1px solid #fca5a5';
@@ -9926,18 +10096,30 @@ useEffect(() => {
                 if (isConfirmed) {
                   cardBg = '#faf5ff';
                   cardBorder = '1.5px solid #7c3aed';
-                  iconSymbol = '✓';
+                  iconComponent = <Check size={11} strokeWidth={2.5} />;
                   iconBg = '#f3e8ff';
                   iconColor = '#6b21a8';
                   iconBorder = '1px solid #ddd6fe';
                 } else {
                   cardBg = 'repeating-linear-gradient(-45deg, #faf5ff 0px, #faf5ff 8px, #ffffff 8px, #ffffff 16px)';
                   cardBorder = '1.5px dashed #7c3aed';
-                  iconSymbol = '⏳';
+                  iconComponent = <Hourglass size={10} />;
                   iconBg = '#f3e8ff';
                   iconColor = '#7c3aed';
                   iconBorder = '1px solid #ddd6fe';
                 }
+              } else if (isReactivated) {
+                dateHeaderBg = '#34a853';
+                iconComponent = <Check size={11} strokeWidth={2.5} />;
+                iconBg = '#dcfce7';
+                iconColor = '#166534';
+                iconBorder = '1px solid #86efac';
+                textColor = '#166534';
+                subTextColor = '#15803d';
+                commentButtonBg = '#ffffff';
+                commentButtonColor = '#34a853';
+                cardBg = '#f0fdf4';
+                cardBorder = '1.5px solid #86efac';
               } else if (isRescheduled) {
                 if (isGroup) {
                   dateHeaderBg = '#0284c7';
@@ -9949,14 +10131,14 @@ useEffect(() => {
                   if (isConfirmed) {
                     cardBg = '#f0f9ff';
                     cardBorder = '1.5px solid #0284c7';
-                    iconSymbol = '✓';
+                    iconComponent = <Check size={11} strokeWidth={2.5} />;
                     iconBg = '#dcfce7';
                     iconColor = '#15803d';
                     iconBorder = '1px solid #86efac';
                   } else {
                     cardBg = 'repeating-linear-gradient(-45deg, #f0f9ff 0px, #f0f9ff 8px, #ffffff 8px, #ffffff 16px)';
                     cardBorder = '1.5px dashed #0284c7';
-                    iconSymbol = '⏳';
+                    iconComponent = <Hourglass size={10} />;
                     iconBg = '#e0f2fe';
                     iconColor = '#0284c7';
                     iconBorder = '1px solid #bae6fd';
@@ -9971,14 +10153,14 @@ useEffect(() => {
                   if (isConfirmed) {
                     cardBg = '#fffbeb';
                     cardBorder = '1.5px solid #eab308';
-                    iconSymbol = '✓';
+                    iconComponent = <Check size={11} strokeWidth={2.5} />;
                     iconBg = '#dcfce7';
                     iconColor = '#15803d';
                     iconBorder = '1px solid #86efac';
                   } else {
                     cardBg = 'repeating-linear-gradient(-45deg, #fefce8 0px, #fefce8 8px, #ffffff 8px, #ffffff 16px)';
                     cardBorder = '1.5px dashed #eab308';
-                    iconSymbol = '⏳';
+                    iconComponent = <Hourglass size={10} />;
                     iconBg = '#fef3c7';
                     iconColor = '#b45309';
                     iconBorder = '1px solid #fde68a';
@@ -9988,7 +10170,7 @@ useEffect(() => {
                 cardBg = '#f5f3ff';
                 cardBorder = '1px solid #ddd6fe';
                 dateHeaderBg = '#8b5cf6';
-                iconSymbol = '⏳';
+                iconComponent = <Hourglass size={10} />;
                 iconBg = '#ede9fe';
                 iconColor = '#6d28d9';
                 iconBorder = '1px solid #c4b5fd';
@@ -10027,58 +10209,62 @@ useEffect(() => {
                   className="hover-scale"
                 >
                   <div style={{ 
-                    width: '38px', 
-                    borderRadius: '8px', 
+                    width: '44px', 
+                    height: '44px',
+                    borderRadius: '10px', 
                     overflow: 'hidden', 
                     border: '1px solid rgba(0,0,0,0.08)', 
                     display: 'flex', 
                     flexDirection: 'column', 
                     textAlign: 'center', 
+                    justifyContent: 'center',
                     flexShrink: 0,
-                    background: 'white'
+                    background: 'white',
+                    boxSizing: 'border-box'
                   }}>
-                    <div style={{ background: dateHeaderBg, color: '#ffffff', fontSize: '0.55rem', fontWeight: 800, padding: '2px 0', textTransform: 'uppercase' }}>
+                    <div style={{ background: dateHeaderBg, color: '#ffffff', fontSize: '9.5px', fontWeight: 900, padding: '2px 0', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                       {dateObj.toLocaleDateString('de-DE', { month: 'short' })}
                     </div>
-                    <div style={{ color: '#1e293b', fontSize: '0.95rem', fontWeight: 900, padding: '2px 0', lineHeight: 1 }}>
+                    <div style={{ color: '#1e293b', fontSize: '15px', fontWeight: 900, padding: '2px 0 3px 0', lineHeight: 1 }}>
                       {dateObj.toLocaleDateString('de-DE', { day: '2-digit' })}
                     </div>
                   </div>
 
                   <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '2px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px', width: '100%' }}>
-                      <div style={{ fontSize: '0.78rem', fontWeight: 800, color: textColor, whiteSpace: 'nowrap', flexShrink: 0 }}>
+                      <div style={{ fontSize: '13.5px', fontWeight: 800, color: textColor, whiteSpace: 'nowrap', flexShrink: 0 }}>
                         {dateObj.toLocaleDateString('de-DE', { weekday: 'short' })} {b.startTime} Uhr
                       </div>
 
                       <span 
-                        title={isCancelled ? 'Ausfall' : (isConfirmed ? 'Bestätigt' : 'Unbestätigt')}
+                        title={isCancelled ? 'Ausfall' : (isReactivated ? 'Reaktiviert' : (isConfirmed ? 'Bestätigt' : 'Unbestätigt'))}
                         style={{ 
-                          fontSize: '0.72rem', 
-                          fontWeight: 900, 
+                          fontSize: '9px', 
+                          fontWeight: 800, 
                           background: iconBg, 
                           color: iconColor, 
                           border: iconBorder,
-                          padding: '1px 5px', 
-                          borderRadius: '4px', 
+                          padding: '2px 6px', 
+                          borderRadius: '6px', 
                           lineHeight: 1,
                           display: 'inline-flex',
                           alignItems: 'center',
                           justifyContent: 'center',
+                          gap: '3px',
                           flexShrink: 0
                         }}
                       >
-                        {iconSymbol}
+                        {iconComponent}
                       </span>
                     </div>
 
-                    <div style={{ fontSize: '0.72rem', color: subTextColor, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <div style={{ fontSize: '0.80rem', color: subTextColor, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '4px' }}>
                       {isGroup && <Users size={12} style={{ color: subTextColor, flexShrink: 0 }} />}
                       <span>{displayStudentName ? displayStudentName : ''}</span>
                     </div>
                   </div>
 
-                  {isCancelled && !b.teacher_acknowledged && b.teacherAcknowledged !== true && (
+                  {(isCancelled || isReactivated) && !b.teacher_acknowledged && b.teacherAcknowledged !== true && (
                     <button
                       type="button"
                       onClick={async (e) => {
@@ -10096,24 +10282,25 @@ useEffect(() => {
                           console.error(err);
                         }
                       }}
-                      title="Absage / Krankmeldung quittieren"
+                      title={isReactivated ? "Reaktivierung quittieren" : "Terminabsage quittieren"}
                       style={{
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '3px',
-                        padding: '4px 8px',
-                        borderRadius: '8px',
-                        background: '#fee2e2',
-                        color: '#dc2626',
-                        border: '1px solid #fca5a5',
-                        fontSize: '0.68rem',
+                        gap: '4px',
+                        padding: '6px 12px',
+                        minHeight: '36px',
+                        borderRadius: '10px',
+                        background: isReactivated ? '#dcfce7' : '#fee2e2',
+                        color: isReactivated ? '#166534' : '#dc2626',
+                        border: isReactivated ? '1px solid #86efac' : '1px solid #fca5a5',
+                        fontSize: '0.80rem',
                         fontWeight: 800,
                         cursor: 'pointer',
+                        whiteSpace: 'nowrap',
                         flexShrink: 0
                       }}
-                      className="hover-scale"
                     >
-                      <Check size={11} strokeWidth={3} />
+                      <Check size={12} strokeWidth={3} />
                       <span>Quittieren</span>
                     </button>
                   )}
@@ -10140,9 +10327,9 @@ useEffect(() => {
                         justifyContent: 'center',
                         background: commentButtonBg,
                         color: commentButtonColor,
-                        width: '28px',
-                        height: '28px',
-                        borderRadius: '50%',
+                        width: '36px',
+                        height: '36px',
+                        borderRadius: '10px',
                         border: '1px solid rgba(0,0,0,0.06)',
                         cursor: 'pointer',
                         transition: 'all 0.2s',
@@ -10150,7 +10337,7 @@ useEffect(() => {
                         boxShadow: '0 1px 2px rgba(0,0,0,0.04)'
                       }}
                     >
-                      <MessageSquare size={13} />
+                      <MessageSquare size={16} />
                     </button>
                   )}
                 </div>
@@ -11862,7 +12049,7 @@ useEffect(() => {
                             justifyContent: 'center',
                             flexShrink: 0
                           }}>
-                            <span style={{ fontSize: '1.1rem' }}>🤒</span>
+                            <CalendarX size={18} color="#dc2626" />
                           </div>
                           <div style={{ flex: 1 }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '4px' }}>
@@ -11875,13 +12062,13 @@ useEffect(() => {
                                 borderRadius: '5px',
                                 textTransform: 'uppercase',
                                 letterSpacing: '0.05em'
-                              }}>Krankmeldung aktiv</span>
+                              }}>Abwesenheit aktiv</span>
                           <h4 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.01em' }}>
                                 Kein Unterricht diese Woche
                               </h4>
                             </div>
                             <p style={{ margin: 0, fontSize: '0.78rem', color: '#7f1d1d', fontWeight: 600, lineHeight: 1.4 }}>
-                              Du bist bis einschließlich <strong>{endStr}</strong> krankgemeldet. Alle betroffenen Schüler wurden benachrichtigt.
+                              Du hast Termine bis einschließlich <strong>{endStr}</strong> abgesagt. Alle betroffenen Schüler wurden benachrichtigt.
                             </p>
                           </div>
                         </div>
@@ -11907,8 +12094,8 @@ useEffect(() => {
                       boxShadow: '0 4px 12px rgba(239, 68, 68, 0.05)'
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#b91c1c', fontSize: '0.85rem', fontWeight: 700 }}>
-                        <span style={{ fontSize: '1.1rem' }}>🩹</span>
-                        <span>Du befindest dich im Krank-Modus (Bypass aktiv). Deine Schüler sehen den Krank-Status.</span>
+                        <CalendarX size={16} color="#b91c1c" />
+                        <span>Du befindest dich im Abwesenheits-Modus (Bypass aktiv). Deine Schüler sehen den Ausfall-Status.</span>
                       </div>
                       <button 
                         onClick={() => setBypassSickView(false)}
@@ -11927,7 +12114,7 @@ useEffect(() => {
                         onMouseOver={e => e.currentTarget.style.background = '#e03126'}
                         onMouseOut={e => e.currentTarget.style.background = '#ff3b30'}
                       >
-                        Zurück zur Krank-Ansicht
+                        Zurück zur Abwesenheits-Ansicht
                       </button>
                     </div>
                   )}
@@ -11947,37 +12134,37 @@ useEffect(() => {
                     }}>
                       {/* Hero Section */}
                       <div style={{
-                        background: 'linear-gradient(135deg, #fff1f2 0%, #ffe4e6 50%, #fecdd3 100%)',
-                        border: '1px solid rgba(251, 113, 133, 0.2)',
+                        background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 50%, #e2e8f0 100%)',
+                        border: '1px solid rgba(203, 213, 225, 0.8)',
                         borderRadius: '20px',
                         padding: '32px',
                         textAlign: 'center',
                         position: 'relative',
                         overflow: 'hidden',
-                        boxShadow: '0 10px 30px -5px rgba(251, 113, 133, 0.15)'
+                        boxShadow: '0 10px 30px -5px rgba(0, 0, 0, 0.05)'
                       }}>
-                        <Heart size={48} color="#be123c" fill="#be123c" style={{ margin: '0 auto 12px auto' }} />
+                        <CalendarX size={44} color="#dc2626" style={{ margin: '0 auto 12px auto' }} />
                         <h2 style={{
                           margin: '0 0 8px 0',
                           fontSize: '1.8rem',
                           fontWeight: 900,
-                          color: '#9f1239',
+                          color: '#0f172a',
                           fontFamily: "'Plus Jakarta Sans', sans-serif",
                           letterSpacing: '-0.02em'
                         }}>
-                          Gute Besserung, {teacher?.first_name || 'Patrick'}!
+                          Abwesenheits-Modus aktiv
                         </h2>
                         <p style={{
                           margin: 0,
                           fontSize: '0.95rem',
-                          color: '#be123c',
+                          color: '#475569',
                           fontWeight: 600,
                           lineHeight: 1.6,
                           maxWidth: '540px',
                           marginLeft: 'auto',
                           marginRight: 'auto'
                         }}>
-                          Deine Gesundheit steht an erster Stelle. Ruh dich aus – wir haben den Krankheits-Modus für dich aktiviert. Alle deine betroffenen Schüler wurden automatisch informiert.
+                          Deine Unterrichtsausfälle sind im System registriert. Alle betroffenen Schüler sowie das Ausfall-Cockpit der Disposition wurden automatisch informiert.
                         </p>
                       </div>
 
@@ -12608,14 +12795,12 @@ useEffect(() => {
                         boxShadow: 'inset 0 2px 4px rgba(255,255,255,0.6), 0 2px 12px rgba(0,0,0,0.02)',
                         boxSizing: 'border-box'
                       }}>
-                         <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#9f1239', fontFamily: "'Plus Jakarta Sans', sans-serif", display: 'flex', alignItems: 'center', gap: '6px' }}>
-                           Gute Besserung &amp; gute Erholung! 
-                           <svg width="16" height="16" viewBox="0 0 24 24" fill="#9f1239" stroke="none" style={{ display: 'inline-block', verticalAlign: 'middle' }}>
-                             <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>
-                           </svg>
+                         <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#991b1b', fontFamily: "'Plus Jakarta Sans', sans-serif", display: 'flex', alignItems: 'center', gap: '8px' }}>
+                           <CalendarX size={20} color="#dc2626" />
+                           Abwesenheits-Modus aktiv
                          </h4>
-                         <p style={{ margin: 0, fontSize: '0.8rem', color: '#be123c', fontWeight: 600, maxWidth: '420px', lineHeight: 1.4 }}>
-                           Ruh dich aus – keine Sorge, wir übernehmen heute für dich!
+                         <p style={{ margin: 0, fontSize: '0.82rem', color: '#b91c1c', fontWeight: 600, maxWidth: '440px', lineHeight: 1.4 }}>
+                           Deine Termine für diesen Zeitraum wurden storniert und betroffene Schüler und Eltern benachrichtigt.
                          </p>
                       </div>
                     ) : (
@@ -13175,34 +13360,63 @@ useEffect(() => {
                                           })()}
                                         </span>
                                       ) : slot.student ? (
-                                        <span style={{ 
-                                          fontWeight: 900, 
-                                          color: (isCanceled || isRescheduledAway) ? '#8e8e93' : (isFinished ? '#34a853' : '#0f172a'), 
-                                          fontSize: '0.9rem', 
-                                          flexShrink: 0, 
-                                          whiteSpace: 'nowrap'
-                                        }}>
-                                          {isBirthday ? '🎂 ' : ''}{(() => {
-                                            const found = allStudents.find(s => s.id === slot.student?.id);
-                                            const fn = slot.student?.first_name || found?.first_name || (slot.student?.name ? slot.student.name.split(' ')[0] : '');
-                                            const ln = slot.student?.last_name || found?.last_name || (slot.student?.name ? slot.student.name.split(' ').slice(1).join(' ') : '');
-                                            if (fn || ln) {
-                                              return `${fn} ${maskLastName(ln, showRealNames)}`.trim();
-                                            }
-                                            return slot.student?.name || 'Schüler';
-                                          })()}
-                                        </span>
-                                      ) : isBreak ? (
-                                        <span style={{ fontWeight: 700, color: '#b45309', fontSize: '0.85rem', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                                          <span>☕</span>
-                                          <span>Freies Zeitfenster</span>
-                                          <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#d97706' }}>({slot.duration || 30} Min.)</span>
-                                        </span>
-                                      ) : (
-                                        <span style={{ fontWeight: 700, color: '#78350f', fontSize: '0.85rem' }}>☕️ Pause ({slot.duration || 30} Min.)</span>
-                                      )}
+                                         <span style={{ 
+                                           fontWeight: 900, 
+                                           color: (isCanceled || isRescheduledAway) ? '#8e8e93' : (isFinished ? '#34a853' : '#0f172a'), 
+                                           fontSize: '0.9rem', 
+                                           flexShrink: 0, 
+                                           whiteSpace: 'nowrap'
+                                         }}>
+                                           {isBirthday ? '🎂 ' : ''}{(() => {
+                                             const found = allStudents.find(s => s.id === slot.student?.id);
+                                             const fn = slot.student?.first_name || found?.first_name || (slot.student?.name ? slot.student.name.split(' ')[0] : '');
+                                             const ln = slot.student?.last_name || found?.last_name || (slot.student?.name ? slot.student.name.split(' ').slice(1).join(' ') : '');
+                                             if (fn || ln) {
+                                               return `${fn} ${maskLastName(ln, showRealNames)}`.trim();
+                                             }
+                                             return slot.student?.name || 'Schüler';
+                                           })()}
+                                         </span>
+                                       ) : isBreak ? (
+                                         <span style={{ fontWeight: 700, color: '#b45309', fontSize: '0.85rem', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                           <span>☕</span>
+                                           <span>Freies Zeitfenster</span>
+                                           <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#d97706' }}>({slot.duration || 30} Min.)</span>
+                                         </span>
+                                       ) : (
+                                         <span style={{ fontWeight: 700, color: '#78350f', fontSize: '0.85rem' }}>☕️ Pause ({slot.duration || 30} Min.)</span>
+                                       )}
 
-                                      {/* Single continuous absolute strike-through line */}
+                                      {/* ❓ Schülerfrage Badge (Desktop) */}
+                                      {(slot.student || slot.isGroup) && !isCanceled && !isRescheduledAway && (() => {
+                                        const targetStudentId = slot.isGroup ? slot.students?.[0]?.id : slot.student?.id;
+                                        const hasQuestion = targetStudentId ? checkHasStudentQuestion(targetStudentId) : false;
+                                        if (!hasQuestion) return null;
+                                        return (
+                                          <span
+                                            title="Schüler hat eine Frage für den Unterricht notiert"
+                                            style={{
+                                              display: 'inline-flex',
+                                              alignItems: 'center',
+                                              gap: '3px',
+                                              padding: '2px 7px',
+                                              borderRadius: '100px',
+                                              background: '#fef3c7',
+                                              border: '1px solid #fde68a',
+                                              color: '#b45309',
+                                              fontSize: '0.68rem',
+                                              fontWeight: 850,
+                                              fontFamily: "'Plus Jakarta Sans', sans-serif",
+                                              flexShrink: 0,
+                                              marginLeft: '6px'
+                                            }}
+                                          >
+                                            <HelpCircle size={10} strokeWidth={2.8} />
+                                            <span>1 Frage</span>
+                                          </span>
+                                        );
+                                      })()}
+
                                       {(slot.student || slot.isGroup) && (isRescheduledAway || isCanceled) && (
                                         <div style={{
                                           position: 'absolute',
@@ -13745,11 +13959,12 @@ useEffect(() => {
                   {(showAllChangedAppointments ? visibleChangedAppointments : visibleChangedAppointments.slice(0, 3)).map((b: any) => {
                       const dateObj = new Date(b.date);
                       const isCancelled = ['cancelled', 'canceled_by_student', 'teacher_sick', 'canceled_by_teacher_sick'].includes(b.status);
+                      const isReactivated = Boolean(b.status === 'scheduled' && b.original_date && b.original_date === b.date);
                       const isRescheduled = ['pending_reschedule', 'rescheduled_confirmed', 'rescheduled', 'open_reschedule', 'changed', 'pending', 'draft'].includes(b.status) || 
                         Boolean(b.original_date && b.original_date !== b.date) ||
                         Boolean(b.original_start_time && b.startTime && b.original_start_time !== b.startTime);
                       const isConfirmed = b.status === 'rescheduled_confirmed' || b.student_acknowledged === true || b.studentAcknowledged === true;
-                      const isPending = b.status === 'pending' && !isRescheduled;
+                      const isPending = b.status === 'pending' && !isRescheduled && !isReactivated;
 
                       const isGroup = Boolean(b.isGroup || (b.studentName && b.studentName.includes('&')));
 
@@ -13757,7 +13972,7 @@ useEffect(() => {
                       let cardBg = '#f8fafc';
                       let cardBorder = '1px solid #e2e8f0';
                       let dateHeaderBg = '#34a853';
-                      let iconSymbol = '✓';
+                      let iconComponent: React.ReactNode = <Check size={11} strokeWidth={2.5} />;
                       let iconBg = '#dcfce7';
                       let iconColor = '#166534';
                       let iconBorder = '1px solid #86efac';
@@ -13784,7 +13999,7 @@ useEffect(() => {
 
                       if (isCancelled) {
                         dateHeaderBg = '#ef4444';
-                        iconSymbol = '✕';
+                        iconComponent = <X size={11} strokeWidth={2.5} />;
                         iconBg = '#fee2e2';
                         iconColor = '#991b1b';
                         iconBorder = '1px solid #fca5a5';
@@ -13811,18 +14026,30 @@ useEffect(() => {
                         if (isConfirmed) {
                           cardBg = '#faf5ff';
                           cardBorder = '1.5px solid #7c3aed';
-                          iconSymbol = '✓';
+                          iconComponent = <Check size={11} strokeWidth={2.5} />;
                           iconBg = '#f3e8ff';
                           iconColor = '#6b21a8';
                           iconBorder = '1px solid #ddd6fe';
                         } else {
                           cardBg = 'repeating-linear-gradient(-45deg, #faf5ff 0px, #faf5ff 8px, #ffffff 8px, #ffffff 16px)';
                           cardBorder = '1.5px dashed #7c3aed';
-                          iconSymbol = '⏳';
+                          iconComponent = <Hourglass size={10} />;
                           iconBg = '#f3e8ff';
                           iconColor = '#7c3aed';
                           iconBorder = '1px solid #ddd6fe';
                         }
+                      } else if (isReactivated) {
+                        dateHeaderBg = '#34a853';
+                        iconComponent = <Check size={11} strokeWidth={2.5} />;
+                        iconBg = '#dcfce7';
+                        iconColor = '#166534';
+                        iconBorder = '1px solid #86efac';
+                        textColor = '#166534';
+                        subTextColor = '#15803d';
+                        commentButtonBg = '#ffffff';
+                        commentButtonColor = '#34a853';
+                        cardBg = '#f0fdf4';
+                        cardBorder = '1.5px solid #86efac';
                       } else if (isRescheduled) {
                         if (isGroup) {
                           // Gruppentermine: Signature Blue Palette
@@ -13836,7 +14063,7 @@ useEffect(() => {
                             // Bestätigte Gruppen-Verschiebung: Vollton Blau
                             cardBg = '#f0f9ff';
                             cardBorder = '1.5px solid #0284c7';
-                            iconSymbol = '✓';
+                            iconComponent = <Check size={11} strokeWidth={2.5} />;
                             iconBg = '#dcfce7';
                             iconColor = '#15803d';
                             iconBorder = '1px solid #86efac';
@@ -13844,7 +14071,7 @@ useEffect(() => {
                             // Unbestätigte Gruppen-Verschiebung: Blau gestreift / gestrichelt
                             cardBg = 'repeating-linear-gradient(-45deg, #f0f9ff 0px, #f0f9ff 8px, #ffffff 8px, #ffffff 16px)';
                             cardBorder = '1.5px dashed #0284c7';
-                            iconSymbol = '⏳';
+                            iconComponent = <Hourglass size={10} />;
                             iconBg = '#e0f2fe';
                             iconColor = '#0284c7';
                             iconBorder = '1px solid #bae6fd';
@@ -13861,7 +14088,7 @@ useEffect(() => {
                             // Bestätigte Einzeltermin-Verschiebung: Vollton Gelb
                             cardBg = '#fffbeb';
                             cardBorder = '1.5px solid #eab308';
-                            iconSymbol = '✓';
+                            iconComponent = <Check size={11} strokeWidth={2.5} />;
                             iconBg = '#dcfce7';
                             iconColor = '#15803d';
                             iconBorder = '1px solid #86efac';
@@ -13869,7 +14096,7 @@ useEffect(() => {
                             // Unbestätigte Einzeltermin-Verschiebung: Gelb gestreift / gestrichelt
                             cardBg = 'repeating-linear-gradient(-45deg, #fefce8 0px, #fefce8 8px, #ffffff 8px, #ffffff 16px)';
                             cardBorder = '1.5px dashed #eab308';
-                            iconSymbol = '⏳';
+                            iconComponent = <Hourglass size={10} />;
                             iconBg = '#fef3c7';
                             iconColor = '#b45309';
                             iconBorder = '1px solid #fde68a';
@@ -13879,7 +14106,7 @@ useEffect(() => {
                         cardBg = '#f5f3ff';
                         cardBorder = '1px solid #ddd6fe';
                         dateHeaderBg = '#8b5cf6';
-                        iconSymbol = '⏳';
+                        iconComponent = <Hourglass size={10} />;
                         iconBg = '#ede9fe';
                         iconColor = '#6d28d9';
                         iconBorder = '1px solid #c4b5fd';
@@ -13919,20 +14146,23 @@ useEffect(() => {
                         >
                           {/* Compact Date Badge */}
                           <div style={{ 
-                            width: '38px', 
-                            borderRadius: '8px', 
+                            width: '44px', 
+                            height: '44px',
+                            borderRadius: '10px', 
                             overflow: 'hidden', 
                             border: '1px solid rgba(0,0,0,0.08)', 
                             display: 'flex', 
                             flexDirection: 'column', 
                             textAlign: 'center', 
+                            justifyContent: 'center',
                             flexShrink: 0,
-                            background: 'white'
+                            background: 'white',
+                            boxSizing: 'border-box'
                           }}>
-                            <div style={{ background: dateHeaderBg, color: '#ffffff', fontSize: '0.55rem', fontWeight: 800, padding: '2px 0', textTransform: 'uppercase' }}>
+                            <div style={{ background: dateHeaderBg, color: '#ffffff', fontSize: '9.5px', fontWeight: 900, padding: '2px 0', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                               {dateObj.toLocaleDateString('de-DE', { month: 'short' })}
                             </div>
-                            <div style={{ color: '#1e293b', fontSize: '0.95rem', fontWeight: 900, padding: '2px 0', lineHeight: 1 }}>
+                            <div style={{ color: '#1e293b', fontSize: '15px', fontWeight: 900, padding: '2px 0 3px 0', lineHeight: 1 }}>
                               {dateObj.toLocaleDateString('de-DE', { day: '2-digit' })}
                             </div>
                           </div>
@@ -13940,45 +14170,46 @@ useEffect(() => {
                           {/* Content Block */}
                           <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '2px' }}>
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px', width: '100%' }}>
-                              <div style={{ fontSize: '0.78rem', fontWeight: 800, color: textColor, whiteSpace: 'nowrap', flexShrink: 0 }}>
+                              <div style={{ fontSize: '13.5px', fontWeight: 800, color: textColor, whiteSpace: 'nowrap', flexShrink: 0 }}>
                                 {dateObj.toLocaleDateString('de-DE', { weekday: 'short' })} {b.startTime} Uhr
                               </div>
 
                               <span 
-                                title={isCancelled ? 'Ausfall' : (isConfirmed ? 'Bestätigt' : 'Unbestätigt')}
+                                title={isCancelled ? 'Ausfall' : (isReactivated ? 'Reaktiviert' : (isConfirmed ? 'Bestätigt' : 'Unbestätigt'))}
                                 style={{ 
-                                  fontSize: '0.72rem', 
-                                  fontWeight: 900, 
+                                  fontSize: '9px', 
+                                  fontWeight: 800, 
                                   background: iconBg, 
                                   color: iconColor, 
                                   border: iconBorder,
-                                  padding: '1px 5px', 
-                                  borderRadius: '4px', 
+                                  padding: '2px 6px', 
+                                  borderRadius: '6px', 
                                   lineHeight: 1,
                                   display: 'inline-flex',
                                   alignItems: 'center',
                                   justifyContent: 'center',
+                                  gap: '3px',
                                   flexShrink: 0
                                 }}
                               >
-                                {iconSymbol}
+                                {iconComponent}
                               </span>
                             </div>
 
-                            <div style={{ fontSize: '0.72rem', color: subTextColor, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <div style={{ fontSize: '0.80rem', color: subTextColor, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '4px' }}>
                               {isGroup && <Users size={12} style={{ color: subTextColor, flexShrink: 0 }} />}
                               <span>{displayStudentName ? displayStudentName : ''}</span>
                               {rName && (() => {
                                 if (isRoomChanged) {
                                   return (
                                     <span style={{
-                                      fontSize: '0.66rem',
+                                      fontSize: '0.72rem',
                                       fontWeight: 800,
                                       background: '#f3e8ff',
                                       color: '#7c3aed',
                                       border: '1px solid #ddd6fe',
-                                      padding: '0.5px 5px',
-                                      borderRadius: '5px',
+                                      padding: '1px 6px',
+                                      borderRadius: '6px',
                                       display: 'inline-flex',
                                       alignItems: 'center',
                                       gap: '3px'
@@ -13999,7 +14230,7 @@ useEffect(() => {
                                   );
                                 }
                                 return (
-                                  <span style={{ fontSize: '0.72rem', fontWeight: 600, color: '#64748b', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                  <span style={{ fontSize: '0.76rem', fontWeight: 600, color: '#64748b', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
                                     • {rName}
                                     <span 
                                       title="Raumbuchung vorgenommen" 
@@ -14020,7 +14251,7 @@ useEffect(() => {
                           </div>
 
                           {/* Cancellation Acknowledge & Shoutbox Chat Button */}
-                          {isCancelled && !b.teacher_acknowledged && b.teacherAcknowledged !== true && (
+                          {(isCancelled || isReactivated) && !b.teacher_acknowledged && b.teacherAcknowledged !== true && (
                             <button
                               type="button"
                               onClick={async (e) => {
@@ -14038,24 +14269,26 @@ useEffect(() => {
                                   console.error(err);
                                 }
                               }}
-                              title="Absage / Krankmeldung quittieren"
+                              title={isReactivated ? "Reaktivierung quittieren" : "Terminabsage quittieren"}
                               style={{
                                 display: 'flex',
                                 alignItems: 'center',
-                                gap: '3px',
-                                padding: '4px 8px',
-                                borderRadius: '8px',
-                                background: '#fee2e2',
-                                color: '#dc2626',
-                                border: '1px solid #fecaca',
-                                fontSize: '0.68rem',
+                                gap: '4px',
+                                padding: '6px 12px',
+                                minHeight: '36px',
+                                borderRadius: '10px',
+                                background: isReactivated ? '#dcfce7' : '#fee2e2',
+                                color: isReactivated ? '#166534' : '#dc2626',
+                                border: isReactivated ? '1px solid #86efac' : '1px solid #fecaca',
+                                fontSize: '0.80rem',
                                 fontWeight: 800,
                                 cursor: 'pointer',
-                                flexShrink: 0
+                                flexShrink: 0,
+                                boxSizing: 'border-box'
                               }}
                               className="hover-scale"
                             >
-                              <Check size={11} strokeWidth={3} />
+                              <Check size={13} strokeWidth={2.5} />
                               <span>Quittieren</span>
                             </button>
                           )}
@@ -14082,9 +14315,9 @@ useEffect(() => {
                                 justifyContent: 'center',
                                 background: commentButtonBg,
                                 color: commentButtonColor,
-                                width: '28px',
-                                height: '28px',
-                                borderRadius: '50%',
+                                width: '36px',
+                                height: '36px',
+                                borderRadius: '10px',
                                 border: '1px solid rgba(0,0,0,0.06)',
                                 cursor: 'pointer',
                                 transition: 'all 0.2s',
@@ -14092,7 +14325,7 @@ useEffect(() => {
                                 boxShadow: '0 1px 2px rgba(0,0,0,0.04)'
                               }}
                             >
-                              <MessageSquare size={13} />
+                              <MessageSquare size={16} />
                             </button>
                           )}
                         </div>
@@ -19898,7 +20131,7 @@ useEffect(() => {
         </div>
       )}
 
-      {/* ── TIER-1 APPLE BOTTOM SHEET KRANKMELDUNG MODAL ── */}
+      {/* ── TIER-1 APPLE BOTTOM SHEET TERMINABSAGE / ABWESENHEIT MODAL ── */}
       {showSickModal && (
         <div
           style={{
@@ -19961,10 +20194,10 @@ useEffect(() => {
                 </div>
                 <div>
                   <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                    {teacher?.sick_until ? 'Krankmeldung anpassen' : 'Krankmeldung einreichen'}
+                    {teacher?.sick_until ? 'Abwesenheit anpassen' : 'Abwesenheit / Ausfall melden'}
                   </h2>
                   <p style={{ margin: '2px 0 0 0', fontSize: '0.78rem', color: '#64748b', fontWeight: 500 }}>
-                    Storniert Stunden & alarmiert das Sekretariat
+                    Sagt Termine ab & alarmiert das Sekretariat zur Schülerbetreuung
                   </p>
                 </div>
               </div>
@@ -20002,7 +20235,7 @@ useEffect(() => {
               }}>
                 <span style={{ fontSize: '1.2rem', lineHeight: 1 }}>ℹ️</span>
                 <span style={{ fontSize: '0.78rem', color: '#991b1b', lineHeight: 1.45, fontWeight: 550 }}>
-                  Alle betroffenen Stundenplandaten im Zeitraum werden automatisch storniert. Das Sekretariat erhält ein Notfall-Ticket und betreut die Schüler.
+                  Alle betroffenen Stundenplandaten im Zeitraum werden storniert. Das Sekretariat erhält ein Ticket zur Betreuung der Schüler.
                 </span>
               </div>
 
@@ -20154,8 +20387,8 @@ useEffect(() => {
                   <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#ef4444', background: '#fee2e2', padding: '2px 8px', borderRadius: '100px' }}>
                     {(() => {
                       if (!sickStartDate || !sickUntilDate) return '1 Tag';
-                      const s = new Date(sickStartDate);
-                      const u = new Date(sickUntilDate);
+                      const s = new Date(sickStartDate + 'T00:00:00');
+                      const u = new Date(sickUntilDate + 'T00:00:00');
                       s.setHours(0,0,0,0);
                       u.setHours(0,0,0,0);
                       const diff = Math.round((u.getTime() - s.getTime()) / (24*3600*1000)) + 1;
@@ -20168,14 +20401,14 @@ useEffect(() => {
                   <div style={{ display: 'flex', flexDirection: 'column' }}>
                     <span style={{ fontSize: '0.68rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase' }}>Von</span>
                     <strong style={{ fontSize: '0.92rem', color: '#0f172a', fontWeight: 800 }}>
-                      {sickStartDate ? new Date(sickStartDate).toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' }) : 'Sofort'}
+                      {sickStartDate ? new Date(sickStartDate + 'T00:00:00').toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' }) : 'Sofort'}
                     </strong>
                   </div>
                   <div style={{ color: '#cbd5e1' }}>➔</div>
                   <div style={{ display: 'flex', flexDirection: 'column', textAlign: 'right' }}>
                     <span style={{ fontSize: '0.68rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase' }}>Bis einschließlich</span>
                     <strong style={{ fontSize: '0.92rem', color: '#b91c1c', fontWeight: 800 }}>
-                      {sickUntilDate ? new Date(sickUntilDate).toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' }) : 'Nicht gewählt'}
+                      {sickUntilDate ? new Date(sickUntilDate + 'T00:00:00').toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' }) : 'Nicht gewählt'}
                     </strong>
                   </div>
                 </div>
@@ -20285,8 +20518,8 @@ useEffect(() => {
                 }}
                 className="hover-scale"
               >
-                <span>🌡️</span>
-                <span>{reportingSick ? 'Wird übermittelt...' : (teacher?.sick_until ? 'Krankmeldung anpassen' : 'Krankmeldung jetzt absenden')}</span>
+                <CalendarX size={18} />
+                <span>{reportingSick ? 'Wird übermittelt...' : (teacher?.sick_until ? 'Abwesenheit anpassen' : 'Terminabsage jetzt einreichen')}</span>
               </button>
 
               {teacher?.sick_until && (
@@ -20314,7 +20547,7 @@ useEffect(() => {
                   className="hover-scale"
                 >
                   <Check size={16} strokeWidth={3} />
-                  <span>☀️ Wieder gesund melden</span>
+                  <span>Wieder verfügbar melden</span>
                 </button>
               )}
 
@@ -20338,7 +20571,7 @@ useEffect(() => {
         </div>
       )}
 
-      {/* ── KRANKMELDUNGS-BESTÄTIGUNG MODAL ── */}
+      {/* ── TERMINABSAGE-BESTÄTIGUNG MODAL ── */}
       {sickNotifModal && (
         <div
           style={{
@@ -20370,12 +20603,12 @@ useEffect(() => {
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                  Krankmeldung registriert
+                  Abwesenheit registriert
                 </h2>
                 <p style={{ margin: '4px 0 0', fontSize: '0.8rem', color: '#64748b' }}>
-                  Gemeldet bis einschließlich{' '}
+                  Abwesend gemeldet bis einschließlich{' '}
                   <strong style={{ color: '#ef4444' }}>
-                    {new Date(sickNotifModal.sickUntilDateStr).toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}
+                    {new Date(sickNotifModal.sickUntilDateStr + 'T00:00:00').toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}
                   </strong>
                 </p>
               </div>
@@ -20409,7 +20642,7 @@ useEffect(() => {
                 </strong>
                 <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
                   {sickNotifModal.notifs.length > 0
-                    ? 'Die Verwaltung sieht alle Fälle im Krisen-Dashboard und informiert die Schüler.'
+                    ? 'Die Verwaltung sieht alle Fälle im Ausfall-Cockpit und informiert die Schüler.'
                     : 'Für diesen Zeitraum gibt es keine geplanten Stunden.'}
                 </span>
               </div>
@@ -20489,7 +20722,7 @@ useEffect(() => {
                 borderRadius: '12px', padding: '10px 14px',
                 fontSize: '0.72rem', color: '#3b82f6', lineHeight: 1.5,
               }}>
-                ℹ️ Die <strong>Verwaltung</strong> wurde automatisch alarmiert. Im Krisen-Dashboard können alle Fälle eingesehen und als <em>"Informiert"</em> markiert werden.
+                ℹ️ Die <strong>Verwaltung</strong> wurde automatisch alarmiert. Im Ausfall-Cockpit können alle Fälle eingesehen und als <em>"Informiert"</em> markiert werden.
               </div>
               <button
                 onClick={() => setSickNotifModal(null)}
@@ -20616,23 +20849,23 @@ useEffect(() => {
               onClick={e => e.stopPropagation()}
               style={{
                 background: '#ffffff',
-                borderRadius: '24px',
+                borderRadius: '28px',
                 width: '100%',
-                maxWidth: '480px',
+                maxWidth: '500px',
                 boxShadow: '0 32px 80px rgba(0,0,0,0.25)',
                 overflow: 'hidden',
                 display: 'flex',
                 flexDirection: 'column',
                 position: 'relative',
                 maxHeight: '85vh',
-                fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
+                fontFamily: "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
               }}
             >
               {/* Header */}
               <div style={{
                 background: headerBackground,
                 borderBottom: headerBorder,
-                padding: '20px 24px',
+                padding: '22px 24px',
                 color: headerTextColor,
                 display: 'flex',
                 alignItems: 'center',
@@ -20641,47 +20874,63 @@ useEffect(() => {
               }}>
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                    <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: headerTextColor, display: 'flex', alignItems: 'center', gap: '6px', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                      <MessageSquare size={18} color={headerTextColor} />
+                    <h3 style={{ 
+                      margin: 0, 
+                      fontSize: '1.38rem', 
+                      fontWeight: 950, 
+                      letterSpacing: '-0.02em',
+                      color: headerTextColor, 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: '8px' 
+                    }}>
+                      <MessageSquare size={22} color={headerTextColor} />
                       <span>{titleText}</span>
                     </h3>
                   </div>
-                  <p style={{ margin: '4px 0 6px 0', color: headerSubColor, fontSize: '0.75rem', fontWeight: 600 }}>
+                  <p style={{ 
+                    margin: '6px 0 10px 0', 
+                    color: headerSubColor, 
+                    fontSize: '0.94rem', 
+                    fontWeight: 650,
+                    lineHeight: 1.4
+                  }}>
                     Termin am {new Date(activeChatOcc.date).toLocaleDateString('de-DE')} um {activeChatOcc.start_time ? activeChatOcc.start_time.substring(0, 5) : '00:00'} Uhr
                   </p>
                   
                   {/* Badges */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                     <span style={{
-                      padding: '4px 10px',
-                      borderRadius: '8px',
+                      padding: '6px 14px',
+                      borderRadius: '100px',
                       background: headerBadgeBg,
                       color: headerBadgeColor,
-                      fontSize: '0.68rem',
-                      fontWeight: 800,
-                      backdropFilter: 'blur(4px)',
+                      fontSize: '0.85rem',
+                      fontWeight: 900,
+                      backdropFilter: 'blur(6px)',
                       display: 'inline-flex',
                       alignItems: 'center',
-                      gap: '5px',
+                      gap: '6px',
                       border: headerBadgeBorder
                     }}>
                       <span>{statusBadgeText}</span>
                     </span>
+
                     <span style={{
-                      padding: '4px 10px',
-                      borderRadius: '8px',
+                      padding: '6px 14px',
+                      borderRadius: '100px',
                       background: headerBadgeBg,
                       color: headerBadgeColor,
-                      fontSize: '0.68rem',
-                      fontWeight: 800,
-                      backdropFilter: 'blur(4px)',
+                      fontSize: '0.84rem',
+                      fontWeight: 850,
+                      backdropFilter: 'blur(6px)',
                       display: 'inline-flex',
                       alignItems: 'center',
-                      gap: '5px',
+                      gap: '6px',
                       border: headerBadgeBorder
                     }}>
-                      <ShieldCheck size={13} color={headerBadgeColor} />
-                      <span>100% DSGVO-konform • TLS 1.3 &amp; AES-256 verschlüsselt</span>
+                      <ShieldCheck size={15} color={headerBadgeColor} />
+                      <span>DSGVO-konform • TLS 1.3 &amp; AES-256</span>
                     </span>
                   </div>
                 </div>
@@ -20694,8 +20943,8 @@ useEffect(() => {
                     background: headerBadgeBg,
                     color: headerBadgeColor,
                     borderRadius: '50%',
-                    width: '32px',
-                    height: '32px',
+                    width: '36px',
+                    height: '36px',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -20703,8 +20952,10 @@ useEffect(() => {
                     transition: 'all 0.2s',
                     alignSelf: 'flex-start'
                   }}
+                  onMouseEnter={e => e.currentTarget.style.opacity = '0.8'}
+                  onMouseLeave={e => e.currentTarget.style.opacity = '1'}
                 >
-                  <X size={18} color={headerBadgeColor} />
+                  <X size={20} color={headerBadgeColor} />
                 </button>
               </div>
 
@@ -20716,30 +20967,173 @@ useEffect(() => {
                 background: '#fafbfc',
                 display: 'flex',
                 flexDirection: 'column',
-                gap: '12px',
-                minHeight: '280px',
-                maxHeight: '400px'
+                gap: '14px',
+                minHeight: '290px',
+                maxHeight: '420px'
               }} className="custom-scrollbar">
                 {isFrozen && (
-                  <div style={{ background: '#fef2f2', border: '1px solid #fee2f2', color: '#991b1b', padding: '8px 12px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'center', textAlign: 'center' }}>
-                    🔒 Shoutbox eingefroren (Schreibschutz nach 48h aktiv)
+                  <div style={{ background: '#fef2f2', border: '1px solid #fee2f2', color: '#991b1b', padding: '10px 16px', borderRadius: '100px', fontSize: '0.82rem', fontWeight: 750, display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'center', textAlign: 'center' }}>
+                    <Lock size={16} color="#991b1b" />
+                    <span>Shoutbox nach 48h eingefroren (Schreibschutz aktiv)</span>
                   </div>
                 )}
-                {chatMessages.length === 0 ? (
-                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#64748b', fontSize: '0.82rem', textAlign: 'center', padding: '24px 16px', gap: '8px', background: 'rgba(255,255,255,0.7)', border: '1.5px dashed #cbd5e1', borderRadius: '16px', margin: 'auto 0' }}>
-                    <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: '#e6f4ea', color: '#34a853', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '4px' }}>
-                      <Calendar size={20} />
+
+                {/* Event Banner when appointment is cancelled */}
+                {isCancelledOcc && (
+                  <div style={{
+                    background: '#fef2f2',
+                    border: '1.5px dashed #f87171',
+                    color: '#991b1b',
+                    padding: '12px 16px',
+                    borderRadius: '18px',
+                    fontSize: '0.88rem',
+                    fontWeight: 700,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '10px'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontSize: '1.1rem' }}>❌</span>
+                      <span>Dieser Unterrichtstermin wurde abgesagt.</span>
                     </div>
-                    <h5 style={{ margin: 0, fontSize: '0.88rem', fontWeight: 800, color: '#0f172a' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      {!activeChatOcc.teacher_acknowledged && activeChatOcc.teacherAcknowledged !== true && (
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            try {
+                              await supabase
+                                .from('schedule_occurrences')
+                                .update({ teacher_acknowledged: true })
+                                .eq('id', activeChatOcc.id);
+                              setMyChangedAppointments(prev => prev.map(a => (a.id === activeChatOcc.id) ? { ...a, teacher_acknowledged: true, teacherAcknowledged: true } : a));
+                            } catch (e) {
+                              console.error(e);
+                            }
+                          }}
+                          style={{
+                            background: '#dc2626',
+                            color: '#ffffff',
+                            border: 'none',
+                            borderRadius: '100px',
+                            padding: '6px 14px',
+                            fontSize: '0.80rem',
+                            fontWeight: 900,
+                            cursor: 'pointer',
+                            whiteSpace: 'nowrap',
+                            boxShadow: '0 2px 6px rgba(220,38,38,0.2)'
+                          }}
+                        >
+                          Quittieren
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => handleTeacherReactivateOccurrence(activeChatOcc)}
+                        style={{
+                          background: '#15803d',
+                          color: '#ffffff',
+                          border: 'none',
+                          borderRadius: '100px',
+                          padding: '6px 14px',
+                          fontSize: '0.80rem',
+                          fontWeight: 900,
+                          cursor: 'pointer',
+                          whiteSpace: 'nowrap',
+                          boxShadow: '0 2px 6px rgba(21,128,61,0.2)'
+                        }}
+                      >
+                        Reaktivieren
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {chatMessages.length === 0 ? (
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#64748b', fontSize: '0.88rem', textAlign: 'center', padding: '24px 16px', gap: '8px', background: 'rgba(255,255,255,0.7)', border: '1.5px dashed #cbd5e1', borderRadius: '18px', margin: 'auto 0' }}>
+                    <div style={{ width: '48px', height: '48px', borderRadius: '14px', background: '#e6f4ea', color: '#34a853', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '4px' }}>
+                      <Calendar size={24} />
+                    </div>
+                    <h5 style={{ margin: 0, fontSize: '0.98rem', fontWeight: 800, color: '#0f172a' }}>
                       Termingekoppelter Schulchat
                     </h5>
-                    <p style={{ margin: 0, fontSize: '0.74rem', color: '#64748b', lineHeight: 1.4, maxWidth: '240px' }}>
-                      Geschützte Direktnachrichten für diesen Unterrichtstermin – 100% DSGVO- & datenschutzkonform.
+                    <p style={{ margin: 0, fontSize: '0.82rem', color: '#64748b', lineHeight: 1.45, maxWidth: '280px' }}>
+                      Geschützte Direktnachrichten für diesen Unterrichtstermin – DSGVO- &amp; datenschutzkonform.
                     </p>
                   </div>
                 ) : (
                   chatMessages.map((msg, idx) => {
                     const isMe = msg.sender_id === userId;
+                    const isCancellation = msg.message_type === 'reschedule_notification' || 
+                                           (msg.content && (msg.content.includes('❌') || msg.content.includes('fällt aus') || msg.content.includes('Termin abgesagt')));
+                    const isReactivation = msg.message_type === 'cancellation_reset' || 
+                                           (msg.content && (msg.content.includes('🔄') || msg.content.includes('reaktiviert') || msg.content.includes('zurückgenommen') || msg.content.includes('regulär statt')));
+
+                    if (isReactivation) {
+                      return (
+                        <div key={msg.id || idx} style={{ alignSelf: 'center', width: '100%', maxWidth: '94%', margin: '6px 0' }}>
+                          <div style={{
+                            background: '#f0fdf4',
+                            border: '1.5px solid #86efac',
+                            borderRadius: '18px',
+                            padding: '12px 18px',
+                            boxShadow: '0 2px 8px rgba(34, 197, 94, 0.08)',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '6px'
+                          }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: '#dcfce7', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                <span style={{ fontSize: '0.95rem' }}>🔄</span>
+                              </div>
+                              <span style={{ fontSize: '0.86rem', fontWeight: 900, color: '#15803d', letterSpacing: '-0.01em' }}>
+                                Termin reaktiviert
+                              </span>
+                              <span style={{ marginLeft: 'auto', fontSize: '0.72rem', color: '#16a34a', fontWeight: 700 }}>
+                                {new Date(msg.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                            </div>
+                            <div style={{ fontSize: '0.92rem', color: '#166534', fontWeight: 650, lineHeight: 1.45, wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>
+                              {msg.content}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    if (isCancellation) {
+                      return (
+                        <div key={msg.id || idx} style={{ alignSelf: 'center', width: '100%', maxWidth: '94%', margin: '6px 0' }}>
+                          <div style={{
+                            background: '#fef2f2',
+                            border: '1.5px dashed #fca5a5',
+                            borderRadius: '18px',
+                            padding: '12px 18px',
+                            boxShadow: '0 2px 8px rgba(239, 68, 68, 0.06)',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '6px'
+                          }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: '#fee2e2', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                <span style={{ fontSize: '0.95rem' }}>❌</span>
+                              </div>
+                              <span style={{ fontSize: '0.86rem', fontWeight: 900, color: '#991b1b', letterSpacing: '-0.01em' }}>
+                                Termin abgesagt
+                              </span>
+                              <span style={{ marginLeft: 'auto', fontSize: '0.72rem', color: '#b91c1c', fontWeight: 700 }}>
+                                {new Date(msg.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                            </div>
+                            <div style={{ fontSize: '0.92rem', color: '#991b1b', fontWeight: 650, lineHeight: 1.45, wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>
+                              {msg.content}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    }
+
                     return (
                       <div key={msg.id || idx} style={{
                         display: 'flex',
@@ -20747,25 +21141,26 @@ useEffect(() => {
                         alignSelf: isMe ? 'flex-end' : 'flex-start',
                         maxWidth: '82%',
                         alignItems: isMe ? 'flex-end' : 'flex-start',
-                        gap: '2px'
+                        gap: '3px'
                       }}>
                         <div style={{
                           background: isMe ? '#e6f4ea' : '#ffffff',
                           color: '#0f172a',
-                          padding: '10px 14px',
-                          borderRadius: isMe ? '16px 16px 2px 16px' : '16px 16px 16px 2px',
-                          fontSize: '0.85rem',
-                          lineHeight: 1.4,
+                          padding: '12px 16px',
+                          borderRadius: isMe ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
+                          fontSize: '0.98rem',
+                          lineHeight: 1.45,
+                          fontWeight: 600,
                           wordBreak: 'break-word',
                           border: isMe ? '1px solid #bbf7d0' : '1px solid #e2e8f0',
-                          boxShadow: '0 1px 4px rgba(0,0,0,0.04)'
+                          boxShadow: '0 2px 6px rgba(0,0,0,0.03)'
                         }}>
                           {msg.content}
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '3px', marginTop: '4px' }}>
-                            <span style={{ fontSize: '0.62rem', color: isMe ? '#15803d' : '#64748b', fontWeight: 600 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '4px', marginTop: '6px' }}>
+                            <span style={{ fontSize: '0.76rem', color: isMe ? '#15803d' : '#64748b', fontWeight: 650 }}>
                               {new Date(msg.created_at).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })}, {new Date(msg.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}
                             </span>
-                            {isMe && <CheckCheck size={14} color="#15803d" style={{ marginLeft: '2px' }} />}
+                            {isMe && <CheckCheck size={15} color="#15803d" style={{ marginLeft: '2px' }} />}
                           </div>
                         </div>
                       </div>
@@ -20777,30 +21172,54 @@ useEffect(() => {
 
               {/* Music Pedagogical Quick Reply Chips */}
               {!isFrozen && (
-                <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', padding: '10px 20px 4px 20px', background: '#fafbfc' }}>
-                  {[
-                    '👍 Ja, geht klar!',
-                    '❌ Nein, geht leider nicht',
-                    '⏳ Bin 5 Min. später',
-                    '🎼 Bitte Notenheft mitbringen',
-                    '📝 Hausaufgabe im Aufgabenheft',
-                    '✅ Termin ist bestätigt'
-                  ].map((text, i) => (
+                <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', padding: '12px 20px 6px 20px', background: '#fafbfc' }}>
+                  {(isCancelledOcc
+                    ? [
+                        '🔄 Termin reaktivieren',
+                        '✓ Absage zur Kenntnis genommen',
+                        '🔄 Ersatztermin anbieten',
+                        '💬 Kurze Rückfrage'
+                      ]
+                    : [
+                        '👍 Ja, geht klar!',
+                        '❌ Nein, geht leider nicht',
+                        '⏳ Bin 5 Min. später',
+                        '🎼 Bitte Notenheft mitbringen',
+                        '📝 Hausaufgabe im Aufgabenheft',
+                        '✅ Termin ist bestätigt'
+                      ]
+                  ).map((text, i) => (
                     <button
                       key={i}
                       type="button"
-                      onClick={() => setChatTypedMessage(text)}
+                      onClick={() => {
+                        if (text === '🔄 Termin reaktivieren') {
+                          handleTeacherReactivateOccurrence(activeChatOcc);
+                          return;
+                        }
+                        setChatTypedMessage(text);
+                      }}
                       style={{
-                        padding: '5px 10px',
-                        borderRadius: '16px',
+                        padding: '8px 14px',
+                        minHeight: '38px',
+                        borderRadius: '100px',
                         background: '#ffffff',
-                        border: '1px solid #cbd5e1',
+                        border: '1.5px solid #cbd5e1',
                         color: '#334155',
-                        fontSize: '0.72rem',
-                        fontWeight: 700,
+                        fontSize: '0.88rem',
+                        fontWeight: 800,
                         cursor: 'pointer',
                         whiteSpace: 'nowrap',
-                        boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                        transition: 'all 0.15s ease'
+                      }}
+                      onMouseEnter={e => {
+                        e.currentTarget.style.background = '#f1f5f9';
+                        e.currentTarget.style.color = '#0f172a';
+                      }}
+                      onMouseLeave={e => {
+                        e.currentTarget.style.background = '#ffffff';
+                        e.currentTarget.style.color = '#334155';
                       }}
                     >
                       {text}
@@ -20809,14 +21228,14 @@ useEffect(() => {
                 </div>
               )}
 
-              {/* Message Input Form (Styled according to Screenshot 2) */}
+              {/* Message Input Form */}
               <form onSubmit={handleSendChatMessage} style={{
                 padding: '16px 20px',
                 borderTop: '1px solid #f1f5f9',
                 background: '#fafbfc',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '10px'
+                gap: '12px'
               }}>
                 <input
                   type="text"
@@ -20827,10 +21246,12 @@ useEffect(() => {
                   style={{
                     flex: 1,
                     padding: '12px 20px',
+                    minHeight: '48px',
                     borderRadius: '100px',
                     border: '1.5px solid #cbd5e1',
                     background: isFrozen ? '#f1f5f9' : '#ffffff',
-                    fontSize: '0.88rem',
+                    fontSize: '0.98rem',
+                    fontWeight: 600,
                     outline: 'none',
                     color: '#1e293b',
                     boxShadow: 'none',
@@ -20845,8 +21266,8 @@ useEffect(() => {
                     color: '#ffffff',
                     border: 'none',
                     borderRadius: '50%',
-                    width: '42px',
-                    height: '42px',
+                    width: '46px',
+                    height: '46px',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -20858,7 +21279,7 @@ useEffect(() => {
                   className={!isFrozen && chatTypedMessage.trim() ? 'hover-scale' : ''}
                   title="Nachricht senden"
                 >
-                  <Send size={18} color="#ffffff" style={{ marginLeft: '-2px' }} />
+                  <Send size={19} color="#ffffff" style={{ marginLeft: '-2px' }} />
                 </button>
               </form>
             </div>

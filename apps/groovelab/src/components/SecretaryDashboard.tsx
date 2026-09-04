@@ -1172,7 +1172,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
       {
         selector: 'tour-secretary-kpis',
         title: 'Tägliche KPIs',
-        description: 'Auf einen Blick siehst du die aktuelle Raumauslastung, wie viele Schüler ihre Accounts aktiviert haben, ob es Terminkonflikte gibt und wie viele Lehrkräfte sich krankgemeldet haben.'
+        description: 'Auf einen Blick siehst du die aktuelle Raumauslastung, wie viele Schüler ihre Accounts aktiviert haben, ob es Terminkonflikte gibt und wie viele Lehrkräfte abwesend gemeldet sind.'
       },
       {
         selector: 'tour-secretary-bookings',
@@ -6102,7 +6102,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
 
   const handleEndSickOnBehalf = async (teacherId: string, teacherName: string) => {
     try {
-      const confirmOk = window.confirm(`Möchten Sie ${teacherName} wirklich gesund melden? Alle betroffenen zukünftigen Stunden werden reaktiviert.`);
+      const confirmOk = window.confirm(`Möchten Sie ${teacherName} wirklich als wieder im Dienst verfügbar melden? Alle betroffenen zukünftigen Stunden werden reaktiviert.`);
       if (!confirmOk) return;
 
       const { data: profile, error: profileErr } = await supabase
@@ -6209,22 +6209,22 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
       }
 
       // Add healthy alert
-      const alertMessage = `🍏 LEHRKRAFT GESUND (Verwaltung): Lehrkraft ${teacherName} wurde durch die Verwaltung wieder gesund gemeldet.`;
+      const alertMessage = `🟢 WIEDER IM DIENST: Lehrkraft ${teacherName} wurde durch die Disposition wieder als verfügbar gemeldet.`;
       await supabase
         .from('system_alerts')
         .insert({
           school_id: profile.school_id,
           teacher_id: teacherId,
-          type: 'Teacher Healthy Alert',
+          type: 'Teacher Return Alert',
           message: alertMessage,
           resolved: false
         });
 
-      alert('Erfolgreich gesundgemeldet! Zukünftige Stundenplandaten wurden wieder aktiviert.');
+      alert('Erfolgreich als verfügbar gemeldet! Zukünftige Stundenplandaten wurden wieder aktiviert.');
       fetchDashboardData();
     } catch (err: any) {
       console.error(err);
-      alert('Fehler bei der Gesundmeldung: ' + err.message);
+      alert('Fehler bei der Statusaktualisierung: ' + err.message);
     }
   };
 
@@ -8946,7 +8946,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                       </div>
                     </div>
                     <span style={{ fontSize: '0.68rem', color: '#15803d', fontWeight: 800, background: '#ecfdf5', padding: '3px 8px', borderRadius: '100px', border: '1px solid #a7f3d0' }}>
-                      100% DSGVO-Anonymisiert
+                      DSGVO-Anonymisiert
                     </span>
                   </div>
 
@@ -12582,7 +12582,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
       case 'secretary':
         switch (secretarySubTab) {
           case 'briefing': return '📊 Tägliches Briefing & Status';
-          case 'crisis': return '🚨 Operations-Cockpit: Krisen-Dashboard';
+          case 'crisis': return '🛡️ Operations-Cockpit: Ausfall-Management';
           case 'equipment': return '🎸 Instrumente & Ausstattung';
           case 'employees': return '👥 Mitarbeiterverwaltung';
           case 'licenses': return '💳 Abrechnung & Infrastruktur';
@@ -13493,7 +13493,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
             { id: 'briefing', label: 'Briefing', icon: LayoutDashboard },
             hasCampusSub && { 
               id: 'crisis', 
-              label: 'Krisen-Dashboard', 
+              label: 'Ausfall-Cockpit', 
               icon: ShieldAlert, 
               count: (() => {
                 const todayStart = new Date();
@@ -14186,7 +14186,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
             const totalSlotsCount = rooms.length * 8; // standard 8 slots per room per day
             const roomOccupancyRate = totalSlotsCount > 0 ? Math.round((todayAllocations.length / totalSlotsCount) * 100) : 0;
 
-            // 2. Heutige Krankmeldungen
+            // 2. Heutige Abwesenheiten
             const activeSickTeachers = [...campusTeachers, ...bypassTeachers, ...coaches].filter(t => {
               if (!t.sick_until) return false;
               return t.sick_until.substring(0, 10) >= todayDateStr;
@@ -19612,7 +19612,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px' }}>
                                 <div>
                                   <div style={{ fontWeight: 800, fontSize: '0.92rem', color: '#0f172a' }}>Digitale Abwesenheitsmeldung</div>
-                                  <div style={{ fontSize: '0.76rem', color: '#64748b', marginTop: '2px' }}>Erlaubt Eltern, Krankmeldungen und Unterrichtsausfälle direkt per Klick zu melden.</div>
+                                  <div style={{ fontSize: '0.76rem', color: '#64748b', marginTop: '2px' }}>Erlaubt Eltern, Abwesenheiten und Unterrichtsausfälle direkt per Klick zu melden.</div>
                                 </div>
                                 <button
                                   onClick={() => handleSaveSettingValue('gl_campus_parent_absence_notify', !campusParentAbsenceNotify, setCampusParentAbsenceNotify)}
@@ -20339,7 +20339,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                         gap: '5px'
                       }}>
                         <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981', display: 'inline-block', boxShadow: '0 0 6px #10b981' }}></span>
-                        100% DSGVO-KONFORM
+                        DSGVO-KONFORM (ART. 32)
                       </span>
                     </div>
 
@@ -23858,7 +23858,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
               <p style={{ margin: '0 0 20px 0', fontSize: '0.82rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                 <span>Verwalte deine aktiven Module und buche zusätzliche Schülerzugänge.</span>
                 <span style={{ fontSize: '0.74rem', color: '#34a853', background: '#e6f4ea', padding: '4px 10px', borderRadius: '100px', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                  🔒 100% DSGVO-konform auf deutschen Servern
+                  🔒 DSGVO-konform auf deutschen Servern
                 </span>
               </p>
 
@@ -24068,7 +24068,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                     </div>
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '0.68rem', color: '#64748b', marginTop: '6px' }}>
                                        <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><span style={{ color: '#34a853' }}>•</span> Stundenpläne &amp; Raumbelegungspläne</span>
-                                       <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><span style={{ color: '#34a853' }}>•</span> Hausaufgabenheft &amp; Krankheits-Cockpit</span>
+                                       <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><span style={{ color: '#34a853' }}>•</span> Hausaufgabenheft &amp; Ausfall-Cockpit</span>
                                        <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><span style={{ color: '#34a853' }}>•</span> Messenger &amp; Campus Live-Feed</span>
                                        <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><span style={{ color: '#34a853' }}>•</span> Übestreaks sowie Performance &amp; Highlights</span>
                                      </div>
@@ -31252,7 +31252,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                               <div>
                                 <strong style={{ fontSize: '0.82rem', display: 'block', color: expiredStudents.length === 0 ? '#166534' : '#991b1b' }}>
                                   {expiredStudents.length === 0
-                                    ? 'Datenbank ist 100% DSGVO-bereinigt'
+                                    ? 'Datenbank ist DSGVO-bereinigt'
                                     : `${expiredStudents.length} abgelaufene Schülerkonten gefunden`}
                                 </strong>
                                 <span style={{ fontSize: '0.72rem', color: expiredStudents.length === 0 ? '#15803d' : '#7f1d1d' }}>
@@ -35659,7 +35659,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                 { id: 'briefing', label: 'Briefing', icon: LayoutDashboard },
                 hasCampusSub && { 
                   id: 'crisis', 
-                  label: 'Krisen-Dashboard', 
+                  label: 'Ausfall-Cockpit', 
                   icon: ShieldAlert, 
                   count: (() => {
                     const todayStart = new Date();

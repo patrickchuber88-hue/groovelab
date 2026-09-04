@@ -278,7 +278,7 @@ export const SecretaryCrisisView: React.FC<SecretaryCrisisViewProps> = ({
 
       {/* ── TOP: KPI HEADER BAR ── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }} className="animation-slide-up">
-        {/* KPI 1: Kranke Lehrkräfte - Red */}
+        {/* KPI 1: Abwesende Lehrkräfte - Red */}
         <div style={{
           background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.95) 0%, rgba(220, 38, 38, 0.95) 100%)',
           color: 'white', borderRadius: '24px', padding: '22px',
@@ -289,7 +289,7 @@ export const SecretaryCrisisView: React.FC<SecretaryCrisisViewProps> = ({
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <span style={{ fontSize: '0.68rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', opacity: 0.85 }}>
-              Kranke Lehrkräfte
+              Abwesende Lehrkräfte
             </span>
             <div style={{ background: 'rgba(255,255,255,0.2)', padding: '6px', borderRadius: '10px' }}>
               <UserX size={15} color="white" />
@@ -362,7 +362,7 @@ export const SecretaryCrisisView: React.FC<SecretaryCrisisViewProps> = ({
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <span style={{ fontSize: '0.68rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', opacity: 0.85 }}>
-              Archivierte Fälle
+              Erledigte Tagesfälle
             </span>
             <div style={{ background: 'rgba(255,255,255,0.2)', padding: '6px', borderRadius: '10px' }}>
               <Clock size={15} color="white" />
@@ -371,7 +371,7 @@ export const SecretaryCrisisView: React.FC<SecretaryCrisisViewProps> = ({
           <div style={{ fontSize: '2.2rem', fontWeight: 950, letterSpacing: '-0.02em', lineHeight: 1, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
             {archivedCount}
           </div>
-          <span style={{ fontSize: '0.72rem', opacity: 0.85, fontWeight: 600 }}>Protokollierte Historie</span>
+          <span style={{ fontSize: '0.72rem', opacity: 0.85, fontWeight: 600 }}>Tagesdisposition abgeschlossen</span>
         </div>
       </div>
 
@@ -411,7 +411,7 @@ export const SecretaryCrisisView: React.FC<SecretaryCrisisViewProps> = ({
                   {selectedCrisisTeacherId && <span style={{ color: '#ef4444', fontSize: '0.78rem', marginLeft: '10px', background: '#fee2e2', padding: '2px 10px', borderRadius: '100px', fontWeight: 800 }}>Gefiltert</span>}
                 </h3>
                 <p style={{ margin: '3px 0 0', fontSize: '0.78rem', color: '#64748b', fontWeight: 600 }}>
-                  Lehrerausfall-Kaskade &bull; Live-Abgleich mit Schülerbenachrichtigungen
+                  Unterrichtsausfall-Kaskade &bull; Live-Abgleich mit Schülerbenachrichtigungen
                 </p>
               </div>
             </div>
@@ -479,7 +479,7 @@ export const SecretaryCrisisView: React.FC<SecretaryCrisisViewProps> = ({
                     <CheckCircle size={56} color="#34a853" strokeWidth={1.5} />
                   </div>
                   <strong style={{ display: 'block', fontSize: '1.25rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif", marginBottom: '8px' }}>
-                    Keine akuten Krankmeldungen
+                    Keine akuten Ausfälle
                   </strong>
                   <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b', fontWeight: 600, maxWidth: '460px', marginInline: 'auto', lineHeight: 1.4 }}>
                     Derzeit sind alle Lehrkräfte aktiv im Dienst. Es liegen keine akuten Ausfälle vor.
@@ -705,7 +705,7 @@ export const SecretaryCrisisView: React.FC<SecretaryCrisisViewProps> = ({
                               {group.date} &bull; {teacherName}
                             </strong>
                             <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>
-                              Krankmeldung: {sickDurStr(group.teacher?.sick_until)}
+                              Abwesenheit: {sickDurStr(group.teacher?.sick_until)}
                             </span>
                           </div>
                         </div>
@@ -843,7 +843,7 @@ export const SecretaryCrisisView: React.FC<SecretaryCrisisViewProps> = ({
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <strong style={{ fontSize: '0.9rem', fontWeight: 950, color: sickTeachers.length === 0 ? '#1e293b' : '#7f1d1d', display: 'block', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                  Krankmeldungen
+                  Abwesenheiten
                 </strong>
                 <span style={{ fontSize: '0.72rem', color: sickTeachers.length === 0 ? '#64748b' : '#b91c1c', fontWeight: 600 }}>
                   {sickTeachers.length === 0 ? 'Alle im Dienst' : 'Wählen zum Filtern'}
@@ -900,13 +900,13 @@ export const SecretaryCrisisView: React.FC<SecretaryCrisisViewProps> = ({
                           <span style={{ fontSize: '0.72rem', color: '#b91c1c', fontWeight: 600 }}>{sickDurStr(teacher.sick_until)}</span>
                         </div>
                       </div>
-                      {/* Re-activate / Gesundmelden button */}
+                      {/* Re-activate button */}
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
                           handleEndSickOnBehalf(teacher.id, formatTeacherFullName(teacher));
                         }}
-                        title="Lehrkraft als gesund melden (Stunden reaktivieren)"
+                        title="Abwesenheit beenden (Stunden reaktivieren)"
                         style={{
                           background: '#ef4444', border: 'none',
                           borderRadius: '10px', width: '28px', height: '28px',

@@ -1,6 +1,6 @@
 /**
  * 🎙️ Campus-Groovelab Neural In-Browser Text-to-Speech Engine
- * 100% Kostenlos, 100% DSGVO-konform, 100% Client-Side WebAssembly (Piper VITS Neural TTS)
+ * 100% Kostenlos, DSGVO-konform, 100% Client-Side WebAssembly (Piper VITS Neural TTS)
  * 
  * ✨ High-End Enterprise+ & Didaktik-Features:
  * - Begrüßung mit sympathischem „Hallo!“
@@ -234,14 +234,52 @@ export function transliterateEnglishMusicTerms(text: string): string {
 }
 
 /**
+ * 🔢 Deutsche Zahlwörter für sichere Phrasierung von Satzenden (verhindert 'drittens')
+ */
+const NUMBER_WORDS_DE: Record<number, string> = {
+  1: 'eins',
+  2: 'zwei',
+  3: 'drei',
+  4: 'vier',
+  5: 'fünf',
+  6: 'sechs',
+  7: 'sieben',
+  8: 'acht',
+  9: 'neun',
+  10: 'zehn',
+  11: 'elf',
+  12: 'zwölf',
+  13: 'dreizehn',
+  14: 'vierzehn',
+  15: 'fünfzehn',
+  16: 'sechzehn',
+  17: 'siebzehn',
+  18: 'achtzehn',
+  19: 'neunzehn',
+  20: 'zwanzig'
+};
+
+/**
  * 📖 Deutsche Seitenzahlen-Grammatik-Engine (Linguistischer Page-Normalizer)
  * Formuliert Seitenzahlen vollkommen flüssig in natürlicher deutscher Sprache
  */
-export function formatPageNumbersGerman(pageNums?: number[], formattedPages?: string): string {
-  // Wenn bereits formatierter String vorliegt
-  if (formattedPages && formattedPages.trim()) {
-    const raw = formattedPages.replace(/S\.\s*/gi, '').trim();
-    // Bereich wie "14–16" oder "14-16"
+export function formatPageNumbersGerman(pageNums?: number[] | string, formattedPages?: string): string {
+  let pagesStr = formattedPages;
+  let pagesArr = Array.isArray(pageNums) ? pageNums : undefined;
+  if (typeof pageNums === 'string' && !pagesStr) {
+    pagesStr = pageNums;
+  }
+
+  // Wenn bereits formatierter String vorliegt (z. B. "S. 1–3", "1-3.", "14–16")
+  if (pagesStr && pagesStr.trim()) {
+    let raw = pagesStr
+      .replace(/S\.\s*/gi, '')
+      .replace(/Seiten?\s*/gi, '')
+      .trim();
+    // Trailing dot entfernen (verhindert 'seite 1-drittens')
+    raw = raw.replace(/\.+$/, '').trim();
+
+    // Bereich wie "14–16", "14-16" oder "1-3"
     if (/^\d+\s*[-–—]\s*\d+$/.test(raw)) {
       const parts = raw.split(/\s*[-–—]\s*/);
       return `auf den Seiten ${parts[0]} bis ${parts[1]}`;
@@ -250,7 +288,7 @@ export function formatPageNumbersGerman(pageNums?: number[], formattedPages?: st
     if (raw.includes('&')) {
       const parts = raw.split(/\s*&\s*/);
       const cleanParts = parts.map(p => {
-        const trimmed = p.trim();
+        const trimmed = p.replace(/\.+$/, '').trim();
         if (/^\d+\s*[-–—]\s*\d+$/.test(trimmed)) {
           const [s, e] = trimmed.split(/\s*[-–—]\s*/);
           return `${s} bis ${e}`;
@@ -261,7 +299,7 @@ export function formatPageNumbersGerman(pageNums?: number[], formattedPages?: st
     }
     // Komma-Liste wie "14, 15"
     if (raw.includes(',')) {
-      const nums = raw.split(',').map(s => s.trim()).filter(Boolean);
+      const nums = raw.split(',').map(s => s.replace(/\.+$/, '').trim()).filter(Boolean);
       if (nums.length === 2) {
         return `auf den Seiten ${nums[0]} und ${nums[1]}`;
       } else if (nums.length > 2) {
@@ -275,16 +313,12 @@ export function formatPageNumbersGerman(pageNums?: number[], formattedPages?: st
   }
 
   // Fallback über PageNums Array
-  if (pageNums && pageNums.length > 0) {
-    const sorted = [...pageNums].sort((a, b) => a - b);
+  if (pagesArr && pagesArr.length > 0) {
+    const sorted = [...pagesArr].sort((a, b) => a - b);
     if (sorted.length === 1) {
       return `auf Seite ${sorted[0]}`;
     }
     if (sorted.length === 2) {
-      // Prüfen ob fortlaufender Bereich
-      if (sorted[1] === sorted[0] + 1) {
-        return `auf den Seiten ${sorted[0]} und ${sorted[1]}`;
-      }
       return `auf den Seiten ${sorted[0]} und ${sorted[1]}`;
     }
     // Prüfen ob fortlaufender Bereich z. B. 14, 15, 16
@@ -355,17 +389,22 @@ export function formatBookTitleForSpeech(rawTitle: string): string {
 }
 
 /**
- * 🧼 Bereinigt formale Lehrer-Kürzel in geschmeidige, natürliche Sprache
+ * 🧼 Bereinigt formale Lehrer-Kürzel in geschmeidige, kindgerechte Sprache
  */
 export function cleanTeacherNoteForSpeech(note: string): string {
   if (!note) return '';
   return note
     // Formale Präfixe entfernen
     .replace(/^(?:Aufgabe|Fahrplan|Hinweis|Notiz|Übe-Tipp|Tipp)\s*:\s*/gi, '')
-    // Takte umwandeln
-    .replace(/\bTakt\s*(\d+)\s*[-–]\s*(\d+)/gi, 'die Takte $1 bis $2')
-    .replace(/\bTakt\s*(\d+)\s*bis\s*(\d+)/gi, 'die Takte $1 bis $2')
-    .replace(/\bTakt\s*(\d+)\b/gi, 'Takt $1')
+    // Takte umwandeln (inkl. Punkt am Ende)
+    .replace(/\b(?:die\s+)?(?:Takte?|T\.)\s*(\d+)\s*[-–—]\s*(\d+)\.?/gi, 'die Takte $1 bis $2')
+    .replace(/\b(?:Takte?|T\.)\s*(\d+)\s*bis\s*(\d+)\.?/gi, 'die Takte $1 bis $2')
+    .replace(/\b(?:Takt|T\.)\s*(\d+)\.?/gi, 'Takt $1')
+    // Seiten in Notizen umwandeln
+    .replace(/\b(?:auf\s+den\s+)?(?:Seiten?|S\.)\s*(\d+)\s*[-–—]\s*(\d+)\.?/gi, 'auf den Seiten $1 bis $2')
+    .replace(/\b(?:auf\s+)?(?:Seite|S\.)\s*(\d+)\.?/gi, 'auf Seite $1')
+    // Freistehende Zahlenbereiche wie "1-3."
+    .replace(/\b(\d+)\s*[-–—]\s*(\d+)\.?/g, '$1 bis $2')
     // Wiederholungen & Tempo
     .replace(/\bWdh\.?\s*(\d+)x?\b/gi, '$1 Mal wiederholen')
     .replace(/\b(\d+)\s*x\b/gi, '$1 Mal')
@@ -373,11 +412,15 @@ export function cleanTeacherNoteForSpeech(note: string): string {
     .replace(/\bHände\s*zus\.?\b/gi, 'beide Hände zusammen')
     .replace(/\bLH\b/gi, 'linke Hand')
     .replace(/\bRH\b/gi, 'rechte Hand')
+    .replace(/\bm\.g\.\b/gi, 'linke Hand')
+    .replace(/\bm\.d\.\b/gi, 'rechte Hand')
+    .replace(/\bPed\.?\b/gi, 'Pedal')
     .trim();
 }
 
 /**
  * 🧼 Bereinigt, harmonisiert und glättet Text für fließende Aussprache (Legato Flow)
+ * Kindgerechter Goldstandard: Keine unverständlichen Fachbegriffe, keine Ordinal-Pannen ("drittens")
  */
 export function cleanTextForTts(text: string): string {
   if (!text) return '';
@@ -388,27 +431,49 @@ export function cleanTextForTts(text: string): string {
     .replace(/\bauf das Tempo\b/gi, 'aufs Tempo')
     .replace(/\ban dem Instrument\b/gi, 'am Instrument')
     .replace(/\bzu dem Stück\b/gi, 'zum Stück')
-    // Kalenderwochen & Termine
-    .replace(/KW\s*(\d+)/gi, 'Kalenderwoche $1')
-    // Lehrwerk-Seitenbereiche & Einzelseiten (z. B. S. 1–3 -> auf den Seiten 1 bis 3)
-    .replace(/\bS\.\s*(\d+)\s*[-–—]\s*(\d+)\b/gi, 'auf den Seiten $1 bis $2')
-    .replace(/\bS\.\s*(\d+)\b/gi, 'auf Seite $1')
+    // Kalenderwochen & Termine: kindgerecht
+    .replace(/\bKW\s*(\d+)\b/gi, 'für Woche $1')
+    .replace(/\bKalenderwoche\s*(\d+)\b/gi, 'Woche $1')
+    // Lehrwerk-Seitenbereiche & Einzelseiten (z. B. S. 1–3. -> auf den Seiten 1 bis 3)
+    .replace(/\b(?:auf\s+den\s+)?(?:Seiten?|S\.)\s*(\d+)\s*[-–—]\s*(\d+)\.?/gi, 'auf den Seiten $1 bis $2')
+    .replace(/\b(?:auf\s+)?(?:Seite|S\.)\s*(\d+)\.?/gi, 'auf Seite $1')
+    // Taktbereiche & Einzeltakte
+    .replace(/\b(?:die\s+)?(?:Takte?|T\.)\s*(\d+)\s*[-–—]\s*(\d+)\.?/gi, 'die Takte $1 bis $2')
+    .replace(/\b(?:Takt|T\.)\s*(\d+)\.?/gi, 'Takt $1')
+    // Freistehende Zahlenbereiche wie "1-3." oder "1-3" (verhindert 'seite 1-drittens' und '1, 3.')
+    .replace(/\b(\d+)\s*[-–—]\s*(\d+)\.?/g, '$1 bis $2')
     // Musikalische Taktarten
     .replace(/\b4\/4\s*(?:-?\s*Takt)?/gi, 'Vier-Viertel-Takt')
     .replace(/\b3\/4\s*(?:-?\s*Takt)?/gi, 'Drei-Viertel-Takt')
     .replace(/\b2\/4\s*(?:-?\s*Takt)?/gi, 'Zwei-Viertel-Takt')
     .replace(/\b6\/8\s*(?:-?\s*Takt)?/gi, 'Sechs-Achtel-Takt')
     .replace(/\b12\/8\s*(?:-?\s*Takt)?/gi, 'Zwölf-Achtel-Takt')
-    // Dynamik & Spielanweisungen
-    .replace(/\bp\/f\b|\bp \/ f\b/gi, 'piano und forte')
-    .replace(/\bfff\b/gi, 'sehr laut')
-    .replace(/\bff\b/gi, 'sehr kräftig')
-    .replace(/\bpp\b/gi, 'sehr leise')
+    // Kindgerechte Dynamik & Spielanweisungen (kein lateinisches/italienisches Kauderwelsch)
+    .replace(/\bp\/f\b|\bp \/ f\b/gi, 'leise und laut')
+    .replace(/\bfff\b/gi, 'ganz ganz laut')
+    .replace(/\bff\b/gi, 'ganz kräftig')
+    .replace(/\bf\b(?!\w)/g, 'laut')
+    .replace(/\bmf\b/gi, 'mittellaut')
+    .replace(/\bmp\b/gi, 'mittelleise')
+    .replace(/\bpp\b/gi, 'ganz leise')
+    .replace(/\bp\b(?!\w)/g, 'leise')
+    // Artikulation & Tempo für Kinder verständlich
+    .replace(/\b(?:cresc\.|crescendo)\b/gi, 'schrittweise lauter werden')
+    .replace(/\b(?:decresc\.|dim\.|diminuendo)\b/gi, 'schrittweise leiser werden')
+    .replace(/\b(?:rit\.|ritardando)\b/gi, 'langsamer werden')
+    .replace(/\b(?:accel\.|accelerando)\b/gi, 'schneller werden')
+    .replace(/\ba\s*tempo\b/gi, 'wieder im normalen Tempo')
+    .replace(/\b(?:stacc\.|staccato)\b/gi, 'kurz und abgesetzt')
+    .replace(/\blegato\b/gi, 'gebunden und fließend')
+    .replace(/\btenuto\b/gi, 'breit gehalten')
+    .replace(/\bfermate\b/gi, 'Haltezeichen')
     // Metronom & Einheiten
     .replace(/(\d+)\s*BPM/gi, '$1 Schläge pro Minute')
-    .replace(/BPM/gi, 'Schläge pro Minute')
+    .replace(/\bBPM\b/gi, 'Schläge pro Minute')
     .replace(/(\d+)\s*min\b/gi, '$1 Minuten')
     .replace(/(\d+)\s*sek\b/gi, '$1 Sekunden')
+    .replace(/(\d+)\s*x\b/gi, '$1 Mal')
+    .replace(/\bPlay-Along\b/gi, 'Play Along')
     // Begrifflichkeiten
     .replace(/z\.\s*B\./gi, 'zum Beispiel')
     .replace(/bzw\./gi, 'beziehungsweise')
@@ -419,7 +484,7 @@ export function cleanTextForTts(text: string): string {
     // Keine Emojis vorlesen
     .replace(/[\u{1F300}-\u{1F9FF}]/gu, '')
     .replace(/[\u{2600}-\u{27BF}]/gu, '')
-    // Doppelpunkte durch natürliche Satzverbinder oder Kommas ersetzen
+    // Doppelpunkte durch sanfte Atempausen ersetzen
     .replace(/\s*:\s*/g, ', ')
     // Bindestriche zu sanften Atempausen (Komma) machen
     .replace(/\s*[-–—]\s*/g, ', ')
@@ -429,6 +494,17 @@ export function cleanTextForTts(text: string): string {
     .replace(/,\s*\./g, '.')
     .replace(/\s+/g, ' ')
     .trim();
+
+  // 🛡️ Ordinal-Trap-Schutz für Satzenden:
+  // Verhindert, dass z.B. "bis 3." oder "Seite 3." als "drittens" vorgelesen wird
+  cleaned = cleaned.replace(/\b(bis|und|Seite|Seiten|Takt|Takte)\s+(\d+)\./gi, (match, word, numStr) => {
+    const num = parseInt(numStr, 10);
+    const wordNum = NUMBER_WORDS_DE[num];
+    if (wordNum) {
+      return `${word} ${wordNum}.`;
+    }
+    return `${word} ${numStr}`;
+  });
 
   // Englische Lautschrift-Transliteration anwenden
   cleaned = transliterateEnglishMusicTerms(cleaned);

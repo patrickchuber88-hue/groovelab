@@ -647,7 +647,7 @@ export const GuidanceCenterModal: React.FC<GuidanceCenterModalProps> = ({
                     fontFamily: 'Urbanist'
                   }}
                 >
-                  💬 WhatsApp / Signal Kurztext
+                  💬 Messenger / SMS Kurztext
                 </button>
 
                 <button

@@ -6747,7 +6747,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                       </span>
                       <span style={{ fontSize: '0.72rem', color: '#166534', lineHeight: 1.35 }}>
                         • <strong>B2B Schulrechnungen:</strong> Format <code>RE-[SCHUL_ID]-[YYMM]-01</code><br />
-                        • <strong>B2C Eltern-Direktabrechnung:</strong> Format <code>CG-[STUDENT_HASH_8]-[YYMM]</code> (100 % DSGVO-konform ohne Klartext-Namen auf Kontoauszügen).
+                        • <strong>B2C Eltern-Direktabrechnung:</strong> Format <code>CG-[STUDENT_HASH_8]-[YYMM]</code> (DSGVO-konforme Datenminimierung ohne Klartext-Namen auf Kontoauszügen).
                       </span>
                     </div>
 
@@ -7178,7 +7178,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                       <Fingerprint size={22} color="#0f172a" /> FIDO2 Hardware-Passkey &amp; DSGVO Zero-Trust Suite
                     </h3>
                     <p style={{ margin: '4px 0 0 0', fontSize: '0.82rem', color: '#64748b' }}>
-                      Phishing-resistente TouchID / YubiKey Authentifizierung &amp; revisionssicherer Audit-Trail (100% DSGVO &amp; BSI IT-Grundschutz konform).
+                      Phishing-resistente TouchID / YubiKey Authentifizierung &amp; revisionssicherer Audit-Trail (DSGVO &amp; BSI IT-Grundschutz konform).
                     </p>
                   </div>
 
@@ -8640,7 +8640,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                   <div style={{ background: '#f0fdf4', padding: '16px 20px', borderRadius: '16px', border: '1px solid #bbf7d0', display: 'flex', alignItems: 'center', gap: '12px' }}>
                     <CheckCircle size={24} color="#0f172a" />
                     <div style={{ fontSize: '0.82rem', color: '#166534' }}>
-                      <strong>Betreiber-Compliance Bestätigung:</strong> Dieser Bericht wurde automatisch aus den geprüften Supabase RLS-Datenbankeinträgen generiert. 100% DSGVO/COPPA-konform, 0 ungeprüfte Fremd-Zugriffe.
+                      <strong>Betreiber-Compliance Bestätigung:</strong> Dieser Bericht wurde automatisch aus den geprüften Supabase RLS-Datenbankeinträgen generiert. DSGVO/COPPA-konform, 0 ungeprüfte Fremd-Zugriffe.
                     </div>
                   </div>
 

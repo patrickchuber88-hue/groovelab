@@ -242,6 +242,9 @@ export const isInternalMetadataNote = (text: any): boolean => {
     clean.startsWith('system:') ||
     clean.startsWith('feedback:') ||
     clean.startsWith('student_note_') ||
+    clean.startsWith('student_question:') ||
+    clean.startsWith('❓ frage für den unterricht:') ||
+    clean.startsWith('frage für den unterricht:') ||
     clean.startsWith('hausaufgabe kw ') ||
     clean.startsWith('rhythm_score:') ||
     clean === 'inhalte in der premium-version freischalten' ||

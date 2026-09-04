@@ -276,7 +276,7 @@ export const ParentInfoSheetModal: React.FC<ParentInfoSheetModalProps> = ({
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.74rem', color: '#059669', fontWeight: 800, background: '#ecfdf5', padding: '3px 8px', borderRadius: '8px' }}>
               <ShieldCheck size={13} />
-              <span>100% DSGVO</span>
+              <span>DSGVO-Zertifiziert</span>
             </div>
           </div>
 

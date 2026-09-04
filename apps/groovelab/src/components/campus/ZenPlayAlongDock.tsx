@@ -9,6 +9,7 @@ export interface ZenPlayAlongDockProps {
   isMusicStandMode?: boolean;
   teacherName?: string;
   teacherAvatarUrl?: string;
+  theme?: 'dark' | 'light' | 'amber';
 }
 
 const formatTrackTime = (seconds: number) => {
@@ -99,9 +100,9 @@ export const getTrackPedagogicalType = (label?: string, index: number = 0) => {
     l.includes('erklaerung') ||
     l.includes('kommentar')
   ) {
-    return { icon: '💬', tag: 'Tipp', type: 'tip', color: '#ec4899', border: '#f472b6' };
+    return { icon: '💡', tag: 'Tipp', type: 'tipp', color: '#facc15', border: '#fde047' };
   }
-  return { icon: '🎧', tag: `Spur ${index + 1}`, type: 'default', color: '#6366f1', border: '#a5b4fc' };
+  return { icon: '🎧', tag: `Spur ${index + 1}`, type: 'audio', color: '#6366f1', border: '#a5b4fc' };
 };
 
 export const ZenPlayAlongDock: React.FC<ZenPlayAlongDockProps> = ({
@@ -109,8 +110,11 @@ export const ZenPlayAlongDock: React.FC<ZenPlayAlongDockProps> = ({
   initialIndex = 0,
   isMusicStandMode = false,
   teacherName = 'Deine Lehrkraft',
-  teacherAvatarUrl = '/campus_login_hero.png'
+  teacherAvatarUrl = '/campus_login_hero.png',
+  theme = 'dark'
 }) => {
+  const isLight = theme === 'light';
+  const isAmber = theme === 'amber';
   const [activeIndex, setActiveIndex] = useState(
     initialIndex >= 0 && initialIndex < tracks.length ? initialIndex : 0
   );
@@ -299,13 +303,21 @@ export const ZenPlayAlongDock: React.FC<ZenPlayAlongDockProps> = ({
         width: '100%',
         maxWidth: isMusicStandMode ? '640px' : '580px',
         margin: '0 auto',
-        background: 'rgba(15, 23, 42, 0.92)',
-        backdropFilter: 'blur(24px) saturate(1.8)',
-        WebkitBackdropFilter: 'blur(24px) saturate(1.8)',
-        border: '1.5px solid rgba(165, 180, 252, 0.35)',
+        background: isLight ? 'rgba(255, 255, 255, 0.88)' : 'rgba(15, 23, 42, 0.92)',
+        backdropFilter: isLight ? 'blur(24px)' : 'blur(24px) saturate(1.8)',
+        WebkitBackdropFilter: isLight ? 'blur(24px)' : 'blur(24px) saturate(1.8)',
+        border: isLight
+          ? '1.5px solid rgba(0, 113, 227, 0.16)'
+          : isAmber
+          ? '1.5px solid rgba(245, 158, 11, 0.35)'
+          : '1.5px solid rgba(165, 180, 252, 0.35)',
         borderRadius: '32px',
         padding: isMusicStandMode ? '16px 24px' : '14px 20px',
-        boxShadow: '0 24px 50px rgba(0, 0, 0, 0.75), 0 0 24px rgba(99, 102, 241, 0.22)',
+        boxShadow: isLight
+          ? '0 20px 45px rgba(0, 113, 227, 0.08), 0 4px 15px rgba(0, 0, 0, 0.04)'
+          : isAmber
+          ? '0 24px 50px rgba(0, 0, 0, 0.75), 0 0 24px rgba(245, 158, 11, 0.20)'
+          : '0 24px 50px rgba(0, 0, 0, 0.75), 0 0 24px rgba(99, 102, 241, 0.22)',
         display: 'flex',
         flexDirection: 'column',
         gap: '12px',
@@ -390,40 +402,86 @@ export const ZenPlayAlongDock: React.FC<ZenPlayAlongDockProps> = ({
                   flex: '1 1 0',
                   minWidth: '44px',
                   maxWidth: '68px',
-                  height: '46px',
-                  background: isSel
-                    ? 'linear-gradient(180deg, #4f46e5 0%, #3730a3 100%)'
-                    : hasListened
-                    ? 'rgba(22, 101, 52, 0.35)'
-                    : 'rgba(255, 255, 255, 0.08)',
-                  border: isSel
-                    ? '2px solid #a5b4fc'
-                    : hasListened
-                    ? '1.5px solid rgba(74, 222, 128, 0.55)'
-                    : '1.5px solid rgba(255, 255, 255, 0.14)',
-                  borderRadius: '16px',
+                  height: '44px',
+                  background: isLight
+                    ? isSel
+                      ? 'linear-gradient(135deg, #0071e3 0%, #0284c7 100%)'
+                      : hasListened
+                      ? '#dcfce7'
+                      : '#f1f5f9'
+                    : isAmber
+                    ? isSel
+                      ? 'linear-gradient(135deg, rgba(245, 158, 11, 0.75) 0%, rgba(217, 119, 6, 0.9) 100%)'
+                      : hasListened
+                      ? 'rgba(34, 197, 94, 0.18)'
+                      : 'rgba(255, 255, 255, 0.08)'
+                    : isSel
+                      ? 'linear-gradient(135deg, rgba(99, 102, 241, 0.45) 0%, rgba(79, 70, 229, 0.65) 100%)'
+                      : hasListened
+                      ? 'rgba(34, 197, 94, 0.16)'
+                      : 'rgba(255, 255, 255, 0.08)',
+                  border: isLight
+                    ? isSel
+                      ? '1.5px solid #93c5fd'
+                      : hasListened
+                      ? '1px solid #86efac'
+                      : '1px solid #e2e8f0'
+                    : isAmber
+                    ? isSel
+                      ? '1.5px solid #fde047'
+                      : hasListened
+                      ? '1px solid rgba(74, 222, 128, 0.5)'
+                      : '1px solid rgba(255, 255, 255, 0.14)'
+                    : isSel
+                      ? '1.5px solid rgba(165, 180, 252, 0.85)'
+                      : hasListened
+                      ? '1px solid rgba(74, 222, 128, 0.45)'
+                      : '1px solid rgba(255, 255, 255, 0.14)',
+                  borderRadius: '100px',
+                  backdropFilter: 'blur(16px)',
+                  WebkitBackdropFilter: 'blur(16px)',
                   padding: '2px',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  gap: '4px',
+                  gap: '5px',
                   cursor: 'pointer',
-                  boxShadow: isSel
-                    ? '0 3px 0 #1e1b4b, 0 6px 16px rgba(99, 102, 241, 0.45)'
-                    : '0 2px 0 rgba(0, 0, 0, 0.45)',
-                  transition: 'all 0.15s ease',
+                  boxShadow: isLight
+                    ? isSel
+                      ? '0 4px 14px rgba(0, 113, 227, 0.35)'
+                      : '0 2px 6px rgba(0, 0, 0, 0.04)'
+                    : isAmber
+                    ? isSel
+                      ? '0 0 16px rgba(245, 158, 11, 0.5), 0 4px 12px rgba(0, 0, 0, 0.3)'
+                      : '0 2px 8px rgba(0, 0, 0, 0.2)'
+                    : isSel
+                      ? '0 0 16px rgba(99, 102, 241, 0.45), 0 4px 12px rgba(0, 0, 0, 0.3)'
+                      : '0 2px 8px rgba(0, 0, 0, 0.2)',
+                  transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
                   position: 'relative'
                 }}
                 className="hover-scale"
                 title={`Spur ${idx + 1}: ${track.label || ped.tag}`}
                 aria-label={`Spur ${idx + 1} wählen: ${ped.tag}`}
               >
-                <span style={{ fontSize: '1.15rem', lineHeight: 1 }}>{ped.icon}</span>
+                {ped.icon === '🎧' ? (
+                  <Headphones
+                    size={13}
+                    color={isSel ? '#ffffff' : isLight ? '#64748b' : isAmber ? '#fbbf24' : '#a5b4fc'}
+                    style={{ flexShrink: 0 }}
+                  />
+                ) : (
+                  <span style={{ fontSize: '1.15rem', lineHeight: 1 }}>{ped.icon}</span>
+                )}
                 <span
                   style={{
                     fontSize: '0.86rem',
                     fontWeight: 950,
-                    color: isSel ? '#ffffff' : hasListened ? '#86efac' : '#cbd5e1',
+                    color: isLight
+                      ? isSel ? '#ffffff' : hasListened ? '#15803d' : '#475569'
+                      : isAmber
+                      ? isSel ? '#ffffff' : hasListened ? '#86efac' : '#f1f5f9'
+                      : isSel ? '#ffffff' : hasListened ? '#86efac' : '#cbd5e1',
                     fontVariantNumeric: 'tabular-nums'
                   }}
                 >
@@ -445,8 +503,8 @@ export const ZenPlayAlongDock: React.FC<ZenPlayAlongDockProps> = ({
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      boxShadow: '0 2px 5px rgba(0,0,0,0.5)',
-                      border: '1.5px solid #0f172a'
+                      boxShadow: '0 2px 5px rgba(0,0,0,0.3)',
+                      border: isLight ? '1.5px solid #ffffff' : '1.5px solid #0f172a'
                     }}
                     title="Diese Spur hast du bereits geübt!"
                   >
@@ -463,11 +521,11 @@ export const ZenPlayAlongDock: React.FC<ZenPlayAlongDockProps> = ({
       <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '6px', paddingTop: '4px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
-            <Headphones size={14} color={isPlaying ? '#4ade80' : '#a5b4fc'} style={{ flexShrink: 0 }} />
+            <Headphones size={14} color={isPlaying ? (isLight ? '#0071e3' : '#4ade80') : (isLight ? '#64748b' : isAmber ? '#fbbf24' : '#a5b4fc')} style={{ flexShrink: 0 }} />
             <span style={{
               fontSize: '0.88rem',
               fontWeight: 850,
-              color: '#ffffff',
+              color: isLight ? '#0f172a' : '#ffffff',
               overflow: 'hidden',
               textOverflow: 'ellipsis',
               whiteSpace: 'nowrap'
@@ -480,7 +538,7 @@ export const ZenPlayAlongDock: React.FC<ZenPlayAlongDockProps> = ({
           <span style={{
             fontSize: '0.78rem',
             fontWeight: 800,
-            color: '#cbd5e1',
+            color: isLight ? '#64748b' : '#cbd5e1',
             fontVariantNumeric: 'tabular-nums',
             flexShrink: 0
           }}>
@@ -502,7 +560,7 @@ export const ZenPlayAlongDock: React.FC<ZenPlayAlongDockProps> = ({
             width: '100%',
             height: '8px',
             borderRadius: '100px',
-            background: 'rgba(255, 255, 255, 0.16)',
+            background: isLight ? '#e2e8f0' : 'rgba(255, 255, 255, 0.16)',
             cursor: 'pointer',
             position: 'relative',
             overflow: 'hidden',
@@ -514,7 +572,11 @@ export const ZenPlayAlongDock: React.FC<ZenPlayAlongDockProps> = ({
             style={{
               width: `${Math.min(100, Math.max(0, trackProgress * 100))}%`,
               height: '100%',
-              background: isPlaying ? 'linear-gradient(90deg, #6366f1 0%, #22c55e 100%)' : '#818cf8',
+              background: isLight
+                ? isPlaying ? 'linear-gradient(90deg, #0071e3 0%, #10b981 100%)' : '#0071e3'
+                : isAmber
+                ? isPlaying ? 'linear-gradient(90deg, #f59e0b 0%, #22c55e 100%)' : '#f59e0b'
+                : isPlaying ? 'linear-gradient(90deg, #6366f1 0%, #22c55e 100%)' : '#818cf8',
               borderRadius: '100px',
               transition: 'width 0.1s linear'
             }}
@@ -522,7 +584,7 @@ export const ZenPlayAlongDock: React.FC<ZenPlayAlongDockProps> = ({
         </div>
       </div>
 
-      {/* 3. SYMMETRISCHE KONTROLL-LEISTE (4-BEAT LINKS | 56px APPLE PLAY MITTE | LOOP RECHTS) */}
+      {/* 3. SYMMETRISCHE KONTROLL-LEISTE (4-BEAT LINKS | APPLE PLAY MITTE | LOOP RECHTS) */}
       <div style={{
         display: 'flex',
         alignItems: 'center',
@@ -531,7 +593,7 @@ export const ZenPlayAlongDock: React.FC<ZenPlayAlongDockProps> = ({
         gap: '12px',
         paddingTop: '4px'
       }}>
-        {/* Links: ⏱️ 4-Beat Einzähler */}
+        {/* Links: ⏱️ 4-Beat Einzähler (Apple Music Capsule) */}
         <button
           type="button"
           onClick={e => {
@@ -541,24 +603,36 @@ export const ZenPlayAlongDock: React.FC<ZenPlayAlongDockProps> = ({
           style={{
             flex: '1 1 0',
             height: '44px',
-            background: isCountInActive
-              ? 'linear-gradient(180deg, #f59e0b 0%, #d97706 100%)'
-              : 'linear-gradient(180deg, #334155 0%, #1e293b 100%)',
-            border: isCountInActive ? '1.5px solid #fde047' : '1.5px solid #475569',
-            borderRadius: '14px',
-            padding: '6px 12px',
+            background: isLight
+              ? isCountInActive
+                ? 'rgba(245, 158, 11, 0.14)'
+                : '#f8fafc'
+              : isCountInActive
+                ? 'rgba(245, 158, 11, 0.22)'
+                : 'rgba(255, 255, 255, 0.09)',
+            border: isLight
+              ? isCountInActive ? '1.5px solid #f59e0b' : '1.5px solid #e2e8f0'
+              : isCountInActive ? '1.5px solid rgba(253, 224, 71, 0.75)' : '1px solid rgba(255, 255, 255, 0.16)',
+            borderRadius: '100px',
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
+            padding: '0 14px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            gap: '6px',
-            color: '#ffffff',
-            fontSize: '0.84rem',
-            fontWeight: 850,
+            gap: '7px',
+            color: isLight
+              ? isCountInActive ? '#b45309' : '#334155'
+              : isCountInActive ? '#fef08a' : '#f1f5f9',
+            fontSize: '0.86rem',
+            fontWeight: 900,
             cursor: 'pointer',
-            boxShadow: isCountInActive
-              ? '0 2px 0 #b45309, 0 4px 12px rgba(245, 158, 11, 0.4)'
-              : '0 2px 0 #0f172a',
-            transition: 'all 0.15s ease'
+            boxShadow: isLight
+              ? isCountInActive ? '0 0 16px rgba(245, 158, 11, 0.25)' : '0 2px 6px rgba(0, 0, 0, 0.04)'
+              : isCountInActive
+                ? '0 0 16px rgba(245, 158, 11, 0.4), 0 4px 12px rgba(0, 0, 0, 0.25)'
+                : '0 4px 12px rgba(0, 0, 0, 0.25)',
+            transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
           }}
           className="hover-scale"
           title={isCountInActive ? '4-Beat Einzähler aktiv' : '4-Beat Einzähler aktivieren (3s Vorbereitung)'}
@@ -567,38 +641,71 @@ export const ZenPlayAlongDock: React.FC<ZenPlayAlongDockProps> = ({
           <span>4-Beat</span>
         </button>
 
-        {/* Mitte: Großer 56px Apple Play/Pause-Button */}
+        {/* Mitte: Apple Music Studio Master Play/Pause-Button */}
         <button
           type="button"
           onClick={togglePlay}
           style={{
-            background:
-              countInStep !== null
-                ? 'linear-gradient(180deg, #f59e0b 0%, #d97706 100%)'
+            background: isLight
+              ? countInStep !== null
+                ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)'
                 : isPlaying
-                ? 'linear-gradient(180deg, #4ade80 0%, #22c55e 100%)'
-                : 'linear-gradient(180deg, #818cf8 0%, #6366f1 100%)',
+                ? 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)'
+                : 'linear-gradient(135deg, #0071e3 0%, #0284c7 100%)'
+              : isAmber
+              ? countInStep !== null
+                ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)'
+                : isPlaying
+                ? 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)'
+                : 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)'
+              : countInStep !== null
+                ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)'
+                : isPlaying
+                ? 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)'
+                : 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
             color: '#ffffff',
-            border:
-              countInStep !== null
-                ? '2.5px solid #fde047'
+            border: isLight
+              ? countInStep !== null
+                ? '2px solid #fde047'
                 : isPlaying
                 ? '2px solid #86efac'
-                : '2px solid #a5b4fc',
+                : '2px solid #bfdbfe'
+              : isAmber
+              ? countInStep !== null
+                ? '2px solid rgba(253, 224, 71, 0.95)'
+                : isPlaying
+                ? '2px solid rgba(134, 239, 172, 0.95)'
+                : '2px solid rgba(253, 224, 71, 0.95)'
+              : countInStep !== null
+                ? '2px solid rgba(253, 224, 71, 0.85)'
+                : isPlaying
+                ? '2px solid rgba(134, 239, 172, 0.85)'
+                : '2px solid rgba(165, 180, 252, 0.85)',
             borderRadius: '50%',
-            width: isMusicStandMode ? '62px' : '56px',
-            height: isMusicStandMode ? '62px' : '56px',
+            width: isMusicStandMode ? '64px' : '58px',
+            height: isMusicStandMode ? '64px' : '58px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             cursor: 'pointer',
             flexShrink: 0,
-            boxShadow:
-              countInStep !== null
-                ? '0 4px 0 #b45309, 0 8px 24px rgba(245, 158, 11, 0.65)'
+            boxShadow: isLight
+              ? countInStep !== null
+                ? '0 0 24px rgba(245, 158, 11, 0.4)'
                 : isPlaying
-                ? '0 4px 0 #15803d, 0 8px 24px rgba(34, 197, 94, 0.65)'
-                : '0 4px 0 #4338ca, 0 8px 22px rgba(99, 102, 241, 0.55)',
+                ? '0 0 24px rgba(22, 163, 74, 0.35)'
+                : '0 0 24px rgba(0, 113, 227, 0.35)'
+              : isAmber
+              ? countInStep !== null
+                ? '0 0 24px rgba(245, 158, 11, 0.65), 0 6px 18px rgba(0, 0, 0, 0.4)'
+                : isPlaying
+                ? '0 0 24px rgba(34, 197, 94, 0.55), 0 6px 18px rgba(0, 0, 0, 0.4)'
+                : '0 0 24px rgba(245, 158, 11, 0.5), 0 6px 18px rgba(0, 0, 0, 0.4)'
+              : countInStep !== null
+                ? '0 0 24px rgba(245, 158, 11, 0.65), 0 6px 18px rgba(0, 0, 0, 0.4)'
+                : isPlaying
+                ? '0 0 24px rgba(34, 197, 94, 0.55), 0 6px 18px rgba(0, 0, 0, 0.4)'
+                : '0 0 24px rgba(99, 102, 241, 0.5), 0 6px 18px rgba(0, 0, 0, 0.4)',
             transition: 'transform 0.15s ease, background 0.25s ease'
           }}
           className="hover-scale"
@@ -624,7 +731,7 @@ export const ZenPlayAlongDock: React.FC<ZenPlayAlongDockProps> = ({
           )}
         </button>
 
-        {/* Rechts: 🔁 Loop */}
+        {/* Rechts: 🔁 Loop (Apple Music Capsule) */}
         <button
           type="button"
           onClick={e => {
@@ -634,24 +741,36 @@ export const ZenPlayAlongDock: React.FC<ZenPlayAlongDockProps> = ({
           style={{
             flex: '1 1 0',
             height: '44px',
-            background: isLooping
-              ? 'linear-gradient(180deg, #22c55e 0%, #16a34a 100%)'
-              : 'linear-gradient(180deg, #334155 0%, #1e293b 100%)',
-            border: isLooping ? '1.5px solid #86efac' : '1.5px solid #475569',
-            borderRadius: '14px',
-            padding: '6px 12px',
+            background: isLight
+              ? isLooping
+                ? 'rgba(34, 197, 94, 0.14)'
+                : '#f8fafc'
+              : isLooping
+                ? 'rgba(34, 197, 94, 0.22)'
+                : 'rgba(255, 255, 255, 0.09)',
+            border: isLight
+              ? isLooping ? '1.5px solid #22c55e' : '1.5px solid #e2e8f0'
+              : isLooping ? '1.5px solid rgba(134, 239, 172, 0.75)' : '1px solid rgba(255, 255, 255, 0.16)',
+            borderRadius: '100px',
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
+            padding: '0 14px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            gap: '6px',
-            color: '#ffffff',
-            fontSize: '0.84rem',
-            fontWeight: 850,
+            gap: '7px',
+            color: isLight
+              ? isLooping ? '#15803d' : '#334155'
+              : isLooping ? '#bbf7d0' : '#f1f5f9',
+            fontSize: '0.86rem',
+            fontWeight: 900,
             cursor: 'pointer',
-            boxShadow: isLooping
-              ? '0 2px 0 #15803d, 0 4px 12px rgba(34, 197, 94, 0.4)'
-              : '0 2px 0 #0f172a',
-            transition: 'all 0.15s ease'
+            boxShadow: isLight
+              ? isLooping ? '0 0 16px rgba(34, 197, 94, 0.25)' : '0 2px 6px rgba(0, 0, 0, 0.04)'
+              : isLooping
+                ? '0 0 16px rgba(34, 197, 94, 0.4), 0 4px 12px rgba(0, 0, 0, 0.25)'
+                : '0 4px 12px rgba(0, 0, 0, 0.25)',
+            transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
           }}
           className="hover-scale"
           title={isLooping ? 'Loop aktiv: Endlose Wiederholung' : 'Loop aktivieren'}

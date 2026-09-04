@@ -7,7 +7,7 @@ import {
   ChevronLeft, ChevronRight, Coffee, Clock, Timer, Flame, BookOpen, Share2, Play, 
   Pause, Square, RotateCcw, Volume2, VolumeX, Moon, QrCode, X, Eye, EyeOff, Zap, Music, Library, School, Calendar, CalendarX, Check, CheckCircle, Target, MessageSquare, Send,
   Pencil, Edit3, User, Mail, Phone, MapPin, Activity, Camera, TrendingUp, Users, Shield, Search, Palmtree, Settings, Bell, FileText, ThumbsUp, Heart, AlertTriangle, Anchor, ShieldCheck, CheckCheck, Building,
-  Mic, Disc, Trash2, Download, Key, Delete, Headphones, ArrowRight, Sliders, Compass, Palette, Lightbulb, Copy, ShieldAlert, Fingerprint
+  Mic, Disc, Trash2, Download, Key, Delete, Headphones, ArrowRight, Sliders, Compass, Palette, Lightbulb, Copy, ShieldAlert, Fingerprint, GraduationCap
 } from 'lucide-react';
 import QRCode from 'react-qr-code';
 import { ResponsiveContainer, PieChart as RechartsPieChart, Pie, Cell, Tooltip } from 'recharts';
@@ -967,6 +967,12 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
 
   // Parent Control Center Draft States & Step-Up Save Modal (Deterministic SSOT)
   const [parentControlsTab, setParentControlsTab] = useState<'governance' | 'insights' | 'cancellations'>('governance');
+  const [parentBriefingDismissed, setParentBriefingDismissed] = useState<boolean>(() => {
+    if (typeof window === 'undefined' || !studentId) return false;
+    const dismissedAt = localStorage.getItem(`groovelab_parent_dismissed_briefing_${studentId}`);
+    if (!dismissedAt) return false;
+    return (Date.now() - Number(dismissedAt)) < (12 * 60 * 60 * 1000);
+  });
   const [draftUiLevel, setDraftUiLevel] = useState<string>(() => {
     const dbLevel = (initialUser as any)?.campus_ui_level;
     if (dbLevel === 'junior' || dbLevel === 'teen' || dbLevel === 'pro') return dbLevel;
@@ -986,6 +992,16 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     }
     if (initialUser?.parent_allow_absences !== undefined && initialUser?.parent_allow_absences !== null) {
       return Boolean(initialUser.parent_allow_absences);
+    }
+    return null;
+  });
+  const [draftAllowReschedule, setDraftAllowReschedule] = useState<boolean | null>(() => {
+    if (typeof window !== 'undefined' && studentId) {
+      const saved = localStorage.getItem(`groovelab_parent_allow_reschedule_${studentId}`);
+      if (saved !== null) return saved === 'true';
+    }
+    if ((initialUser as any)?.parent_allow_reschedule_confirm !== undefined && (initialUser as any)?.parent_allow_reschedule_confirm !== null) {
+      return Boolean((initialUser as any).parent_allow_reschedule_confirm);
     }
     return null;
   });
@@ -1369,6 +1385,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     label: string;
     uiLevel: string;
     allowAbsences: boolean;
+    allowRescheduleConfirm: boolean;
     allowChat: boolean;
     allowTimer: boolean;
     allowLeaderboard: boolean;
@@ -1384,6 +1401,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       label: 'Junior (6–10 J.)',
       uiLevel: 'junior',
       allowAbsences: false,
+      allowRescheduleConfirm: false,
       allowChat: false,
       allowTimer: true,
       allowLeaderboard: false,
@@ -1406,6 +1424,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       label: 'Teen (11–15 J.)',
       uiLevel: 'teen',
       allowAbsences: true,
+      allowRescheduleConfirm: true,
       allowChat: true,
       allowTimer: true,
       allowLeaderboard: true,
@@ -1428,6 +1447,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       label: '+16 / Pro (Ab 16 J.)',
       uiLevel: 'pro',
       allowAbsences: true,
+      allowRescheduleConfirm: true,
       allowChat: true,
       allowTimer: true,
       allowLeaderboard: true,
@@ -1451,6 +1471,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
   const applyAndSaveParentControls = async (updates: {
     uiLevel?: 'junior' | 'teen' | 'pro' | string;
     allowAbsences?: boolean;
+    allowRescheduleConfirm?: boolean;
     allowChat?: boolean;
     allowTimer?: boolean;
     allowLeaderboard?: boolean;
@@ -1476,6 +1497,11 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       : (updates.allowAbsences !== undefined 
           ? updates.allowAbsences 
           : (draftAllowAbsences !== null ? draftAllowAbsences : ((studentUser as any)?.parent_allow_absences !== undefined && (studentUser as any)?.parent_allow_absences !== null ? Boolean((studentUser as any)?.parent_allow_absences) : false)));
+    const nextAllowReschedule = isJuniorLevel
+      ? false
+      : (updates.allowRescheduleConfirm !== undefined 
+          ? updates.allowRescheduleConfirm 
+          : (draftAllowReschedule !== null ? draftAllowReschedule : ((studentUser as any)?.parent_allow_reschedule_confirm !== undefined && (studentUser as any)?.parent_allow_reschedule_confirm !== null ? Boolean((studentUser as any)?.parent_allow_reschedule_confirm) : true)));
     const nextAllowChat = updates.allowChat !== undefined 
       ? updates.allowChat 
       : (draftAllowChat !== null ? draftAllowChat : ((studentUser as any)?.parent_allow_chat !== undefined && (studentUser as any)?.parent_allow_chat !== null ? Boolean((studentUser as any)?.parent_allow_chat) : false));
@@ -1514,6 +1540,12 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       setDraftAllowAbsences(finalAbsences);
       localStorage.setItem('campus_allow_absences', String(finalAbsences));
       if (studentId) localStorage.setItem(`groovelab_parent_allow_absences_${studentId}`, String(finalAbsences));
+    }
+    if (updates.allowRescheduleConfirm !== undefined || isJuniorLevel) {
+      const finalReschedule = isJuniorLevel ? false : (updates.allowRescheduleConfirm ?? nextAllowReschedule);
+      setDraftAllowReschedule(finalReschedule);
+      localStorage.setItem('campus_allow_reschedule_confirm', String(finalReschedule));
+      if (studentId) localStorage.setItem(`groovelab_parent_allow_reschedule_${studentId}`, String(finalReschedule));
     }
     if (updates.allowChat !== undefined) {
       setDraftAllowChat(updates.allowChat);
@@ -1638,6 +1670,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     const payload: any = {
       campus_ui_level: nextUiLevel,
       parent_allow_absences: nextAllowAbsences,
+      parent_allow_reschedule_confirm: nextAllowReschedule,
       parent_allow_chat: nextAllowChat,
       parent_allow_timer: nextAllowTimer,
       parent_allow_leaderboard: nextAllowLeaderboard,
@@ -2288,6 +2321,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
   const [rawBriefingData, setRawBriefingData] = useState<any>(null);
   const [occurrencesWithMessages, setOccurrencesWithMessages] = useState<string[]>([]);
   const [occurrencesWithUnreadCount, setOccurrencesWithUnreadCount] = useState<Record<string, number>>({});
+  const [totalUnreadDirectMessages, setTotalUnreadDirectMessages] = useState<number>(0);
   const [briefingLoading, setBriefingLoading] = useState(true);
   const [rawScheduleOccurrences, setRawScheduleOccurrences] = useState<any[]>([]);
   const [roomBookings, setRoomBookings] = useState<any[]>([]);
@@ -2379,7 +2413,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
   // Direct Chat states inside appointment popup (Shoutbox)
   const [showAppointmentChat, setShowAppointmentChat] = useState(false);
   const [showStudentToolbox, setShowStudentToolbox] = useState(false);
-  const [appointmentChatData, setAppointmentChatData] = useState<{ teacherId: string; date: string; start_time: string; label: string; occurrenceId?: string } | null>(null);
+  const [appointmentChatData, setAppointmentChatData] = useState<{ teacherId: string; date: string; start_time: string; label: string; occurrenceId?: string; status?: string; isCancelled?: boolean } | null>(null);
   const [chatMessages, setChatMessages] = useState<any[]>([]);
   const [chatTypedMessage, setChatTypedMessage] = useState('');
   const [campusFeedAnnouncements, setCampusFeedAnnouncements] = useState<any[]>([]);
@@ -2528,7 +2562,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     }
   };
 
-  const fetchChat = async (teacherId: string, occurrenceId?: string) => {
+  const fetchChat = async (teacherId: string, occurrenceId?: string, targetDate?: string) => {
     if (!studentId || !teacherId) return;
     
     let query = supabase
@@ -2536,7 +2570,14 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       .select('*');
       
     if (occurrenceId) {
-      query = query.eq('occurrence_id', occurrenceId);
+      if (targetDate) {
+        const [y, m, d] = targetDate.split('-');
+        const deDate = (d && m && y) ? `${d}.${m}.${y}` : targetDate;
+        const shortDate = (d && m && y) ? `${d}.${m}.${y.slice(2)}` : targetDate;
+        query = query.or(`occurrence_id.eq.${occurrenceId},and(sender_id.in.(${studentId},${teacherId}),recipient_id.in.(${studentId},${teacherId}),or(content.ilike.%${targetDate}%,content.ilike.%${deDate}%,content.ilike.%${shortDate}%))`);
+      } else {
+        query = query.eq('occurrence_id', occurrenceId);
+      }
     } else {
       query = query.or(`and(sender_id.eq.${studentId},recipient_id.eq.${teacherId}),and(sender_id.eq.${teacherId},recipient_id.eq.${studentId})`);
     }
@@ -2567,6 +2608,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
               .eq('recipient_id', studentId)
               .eq('is_read', false);
           }
+          setTotalUnreadDirectMessages(prev => Math.max(0, prev - unreadIncoming.length));
         } catch (e) {
           console.warn('Error marking messages as read:', e);
         }
@@ -2580,12 +2622,12 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       return;
     }
 
-    fetchChat(appointmentChatData.teacherId, appointmentChatData.occurrenceId);
+    fetchChat(appointmentChatData.teacherId, appointmentChatData.occurrenceId, appointmentChatData.date);
 
     const channel = supabase
-      .channel(`chat_student_occ_${appointmentChatData.teacherId}`)
+      .channel(`chat_student_occ_${appointmentChatData.teacherId}_${appointmentChatData.date || 'all'}`)
       .on('postgres_changes', { schema: 'public', event: '*', table: 'campus_direct_messages' }, () => {
-        fetchChat(appointmentChatData.teacherId, appointmentChatData.occurrenceId);
+        fetchChat(appointmentChatData.teacherId, appointmentChatData.occurrenceId, appointmentChatData.date);
       })
       .subscribe();
 
@@ -2641,7 +2683,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
         setOccurrencesWithMessages(prev => prev.includes(occId) ? prev : [...prev, occId]);
       }
       
-      await fetchChat(appointmentChatData.teacherId, appointmentChatData.occurrenceId);
+      await fetchChat(appointmentChatData.teacherId, appointmentChatData.occurrenceId, appointmentChatData.date);
     } catch (err) {
       console.error('Error sending quick chat message:', err);
     }
@@ -2819,8 +2861,10 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
           }
         });
 
+        const unreadDirect = data.filter((m: any) => m.recipient_id === studentId && !m.is_read).length;
         setOccurrencesWithMessages(Array.from(ids));
         setOccurrencesWithUnreadCount(unreadMap);
+        setTotalUnreadDirectMessages(unreadDirect);
       }
     } catch (err) {
       console.error('Error fetching occurrences with messages:', err);
@@ -3267,6 +3311,15 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     return true;
   }, [studentUser, draftAllowAbsences, draftUiLevel]);
 
+  const isStudentRescheduleAllowed = useMemo(() => {
+    if (draftAllowReschedule !== null) return draftAllowReschedule;
+    const userReschedule = (studentUser as any)?.parent_allow_reschedule_confirm;
+    if (userReschedule !== undefined && userReschedule !== null) return Boolean(userReschedule);
+    const currentLvl = draftUiLevel || (studentUser as any)?.campus_ui_level || (typeof window !== 'undefined' ? localStorage.getItem('campus_student_ui_level') : 'junior') || 'junior';
+    if (currentLvl === 'junior') return false;
+    return true;
+  }, [studentUser, draftAllowReschedule, draftUiLevel]);
+
   const isStudentChatAllowed = useMemo(() => {
     if (draftAllowChat !== null) return draftAllowChat;
     const userChat = (studentUser as any)?.parent_allow_chat;
@@ -3332,6 +3385,17 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     }
   };
 
+  const handleTriggerConfirmReschedule = (occId: string) => {
+    if (!isStudentRescheduleAllowed) {
+      setGlobalPinPendingAction(() => () => handleConfirmReschedule(occId));
+      setGlobalPinInput('');
+      setGlobalPinError('');
+      setShowGlobalParentPinModal(true);
+      return;
+    }
+    handleConfirmReschedule(occId);
+  };
+
   const handleTriggerCancelOccurrence = (occ: any) => {
     if (!isStudentAbsenceAllowed) {
       setGlobalPinPendingAction(() => () => handleCancelOccurrence(occ, true));
@@ -3369,53 +3433,108 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     if (!confirm(undoConfirmMsg)) return;
 
     try {
-      const isVirtual = Boolean(
-        occ.is_virtual || 
-        (occ.id && (String(occ.id).startsWith('virt_') || String(occ.id).startsWith('virtual-')))
-      );
+      const targetStudentId = studentId || studentUser?.id || occ.student_id;
+      const targetTeacherId = occ.teacher_id || occ.teacher?.id || studentUser?.teacher_id || null;
+      const targetScheduleId = occ.schedule_id || occ.schedule?.id || null;
+      const targetOccIdStr = occ.id ? String(occ.id) : null;
 
-      if (occ.id && !isVirtual) {
-        const { error: updErr } = await supabase
-          .from('schedule_occurrences')
-          .update({ 
-            status: 'scheduled', 
-            student_acknowledged: true,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', occ.id);
-        if (updErr) throw updErr;
-      } else {
-        // Look up inserted occurrence in database for this student and date
-        const { data: existingOcc } = await supabase
-          .from('schedule_occurrences')
-          .select('id')
-          .eq('student_id', studentId)
-          .eq('date', occ.date)
-          .maybeSingle();
+      // 1. Authoritative RPC call (Fail-Closed, zero-leak)
+      let rpcSucceeded = false;
+      try {
+        const { data: rpcRes, error: rpcErr } = await supabase.rpc('undo_cancel_student_schedule_occurrence', {
+          p_student_id: targetStudentId,
+          p_occurrence_id: targetOccIdStr,
+          p_date: occ.date,
+          p_start_time: occ.start_time || '15:00',
+          p_duration: occ.duration || 45,
+          p_teacher_id: targetTeacherId,
+          p_schedule_id: targetScheduleId
+        });
 
-        if (existingOcc?.id) {
+        if (!rpcErr && rpcRes?.success) {
+          rpcSucceeded = true;
+        } else if (rpcErr) {
+          console.warn('undo_cancel_student_schedule_occurrence RPC returned error, using fallback:', rpcErr);
+        }
+      } catch (rpcCallErr) {
+        console.warn('Could not call undo_cancel_student_schedule_occurrence RPC:', rpcCallErr);
+      }
+
+      // 2. Resilient Direct Fallback
+      if (!rpcSucceeded) {
+        const isVirtual = Boolean(
+          occ.is_virtual || 
+          (occ.id && (String(occ.id).startsWith('virt_') || String(occ.id).startsWith('virtual-')))
+        );
+
+        if (occ.id && !isVirtual) {
           const { error: updErr } = await supabase
             .from('schedule_occurrences')
             .update({ 
               status: 'scheduled', 
+              original_date: occ.date,
               student_acknowledged: true,
+              teacher_acknowledged: false,
+              canceled_by_role: null,
+              notes: null,
               updated_at: new Date().toISOString()
             })
-            .eq('id', existingOcc.id);
+            .eq('id', occ.id);
           if (updErr) throw updErr;
+        } else {
+          // Look up inserted occurrence in database for this student and date
+          const { data: existingOcc } = await supabase
+            .from('schedule_occurrences')
+            .select('id')
+            .eq('student_id', targetStudentId)
+            .eq('date', occ.date)
+            .maybeSingle();
+
+          if (existingOcc?.id) {
+            const { error: updErr } = await supabase
+              .from('schedule_occurrences')
+              .update({ 
+                status: 'scheduled', 
+                original_date: occ.date,
+                student_acknowledged: true,
+                teacher_acknowledged: false,
+                canceled_by_role: null,
+                notes: null,
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', existingOcc.id);
+            if (updErr) throw updErr;
+          } else {
+            const occPayload: any = {
+              schedule_id: targetScheduleId,
+              student_id: targetStudentId,
+              teacher_id: targetTeacherId,
+              date: occ.date,
+              original_date: occ.date,
+              start_time: occ.start_time || '14:00',
+              duration: occ.duration || 45,
+              status: 'scheduled',
+              student_acknowledged: true,
+              teacher_acknowledged: false
+            };
+            const schoolId = occ.schedule?.school_id || occ.school_id || studentUser?.school_id;
+            if (schoolId) occPayload.school_id = schoolId;
+
+            await supabase.from('schedule_occurrences').insert(occPayload);
+          }
         }
       }
 
       // Optimistic state update
       setRawScheduleOccurrences((prev: any[]) => prev.map((o: any) => {
         if (o.id === occ.id || (o.date === occ.date && (o.student_id === studentId || !o.student_id))) {
-          return { ...o, status: 'scheduled', student_acknowledged: true };
+          return { ...o, status: 'scheduled', original_date: occ.date, student_acknowledged: true, teacher_acknowledged: false };
         }
         return o;
       }));
       setRawSchoolYearOccurrences((prev: any[]) => prev.map((o: any) => {
         if (o.id === occ.id || (o.date === occ.date && (o.student_id === studentId || !o.student_id))) {
-          return { ...o, status: 'scheduled', student_acknowledged: true };
+          return { ...o, status: 'scheduled', original_date: occ.date, student_acknowledged: true, teacher_acknowledged: false };
         }
         return o;
       }));
@@ -3424,7 +3543,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       try {
         const studentUserId = studentId || studentUser?.id || occ.student_id;
         const teacherUserId = occ.teacher_id || occ.teacher?.id;
-        const targetOccId = occ.schedule_id ? `virtual-${occ.schedule_id}-${occ.date}` : occ.id;
+        const targetOccId = occ.id || (occ.schedule_id ? `virtual-${occ.schedule_id}-${occ.date}` : null);
 
         const [y, m, d] = String(occ.date).split('-').map(Number);
         const occDate = (y && m && d) ? new Date(y, m - 1, d) : new Date();
@@ -3432,7 +3551,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
         const shortDate = occDate.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' });
         const timeLabel = (occ.start_time || '16:30').slice(0, 5);
 
-        const notificationMessage = `Der Ausfall für diesen Termin wurde zurückgenommen. Der Termin findet regulär statt:\n${shortDay} ${shortDate} um ${timeLabel} Uhr.`;
+        const notificationMessage = `Der Ausfall für diesen Termin wurde zurückgenommen. Der Termin findet regulär statt:\n${shortDay} ${shortDate} (${occ.date}) um ${timeLabel} Uhr.`;
 
         if (studentUserId && teacherUserId) {
           await supabase.from('campus_direct_messages').insert({
@@ -3453,14 +3572,46 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
           .single();
         const userName = userData ? `${userData.first_name} ${maskLastName(userData.last_name)}` : 'Ein Schüler';
 
-        await supabase.from('system_alerts').insert({
-          school_id: occ.schedule?.school_id || occ.school_id || studentUser?.school_id || null,
-          teacher_id: teacherUserId,
-          type: 'Termin wiederhergestellt',
-          message: `✅ Reaktiviert: ${userName} hat den Termin am ${shortDay} ${shortDate} um ${timeLabel} Uhr wieder reaktiviert.`
-        });
+        if (teacherUserId) {
+          await supabase.from('system_alerts').insert({
+            school_id: occ.schedule?.school_id || occ.school_id || studentUser?.school_id || null,
+            teacher_id: teacherUserId,
+            type: 'Termin wiederhergestellt',
+            message: `✅ Reaktiviert: ${userName} hat den Termin am ${shortDay} ${shortDate} um ${timeLabel} Uhr wieder reaktiviert.`
+          });
+
+          try {
+            await supabase.from('notifications').insert({
+              user_id: teacherUserId,
+              title: 'Termin reaktiviert 🔄',
+              message: `✅ Reaktiviert: ${userName} hat den Termin am ${shortDay} ${shortDate} um ${timeLabel} Uhr wieder reaktiviert.`,
+              metadata: { occurrence_id: targetOccId, type: 'cancellation_reset' }
+            });
+
+            await supabase.functions.invoke('send-push', {
+              body: {
+                userId: teacherUserId,
+                title: 'Termin reaktiviert 🔄',
+                body: `✅ Reaktiviert: ${userName} hat den Termin am ${shortDay} ${shortDate} um ${timeLabel} Uhr wieder reaktiviert.`
+              }
+            });
+          } catch (pushErr) {
+            console.warn('Could not send push notification to teacher on undo cancel:', pushErr);
+          }
+        }
       } catch (notifErr) {
         console.warn('Could not create system notification on undo cancel:', notifErr);
+      }
+
+      // Trigger Real-Time Cross-Tab Synchronization
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('campus_schedule_sync', Date.now().toString());
+        localStorage.setItem('groovelab_schedule_changed', Date.now().toString());
+        localStorage.setItem('campus_bookings_sync', Date.now().toString());
+        localStorage.setItem('refresh-bookings', Date.now().toString());
+        window.dispatchEvent(new CustomEvent('campus_schedule_sync'));
+        window.dispatchEvent(new CustomEvent('groovelab_schedule_changed'));
+        window.dispatchEvent(new CustomEvent('refresh-bookings'));
       }
 
       fetchSchedule();
@@ -3497,144 +3648,175 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     const teacherPhrase = fullTeacherName ? `deiner Lehrkraft ${fullTeacherName}` : 'deiner Lehrkraft';
 
     // Altersgerechtes Wording für Junior, Teen und Pro
+    const pedagogicalNotice = '💡 Hinweis: Da deine Musikstunde fest für dich reserviert ist, werden deine Eltern und deine Lehrkraft automatisch über diese Absage informiert.';
     let confirmMsg = '';
     if (skipPinCheck) {
-      confirmMsg = `Möchtest du den Unterrichtstermin am ${formattedDate} bei ${teacherPhrase} verbindlich absagen?`;
+      confirmMsg = `Möchtest du den Unterrichtstermin am ${formattedDate} bei ${teacherPhrase} verbindlich absagen?\n\n${pedagogicalNotice}`;
     } else if (studentUiLevel === 'junior') {
-      confirmMsg = `Möchtest du ${teacherPhrase} Bescheid geben, dass du am ${formattedDate} fehlst?\n\n(Deine Eltern haben dir erlaubt, dich für diesen Termin selbst abzumelden.)`;
+      confirmMsg = `Möchtest du ${teacherPhrase} Bescheid geben, dass du am ${formattedDate} fehlst?\n\n${pedagogicalNotice}\n\n(Deine Eltern haben dir erlaubt, dich für diesen Termin selbst abzumelden.)`;
     } else if (studentUiLevel === 'teen') {
-      confirmMsg = `Möchtest du deinen Unterrichtstermin am ${formattedDate} bei ${teacherPhrase} absagen?`;
+      confirmMsg = `Möchtest du deinen Unterrichtstermin am ${formattedDate} bei ${teacherPhrase} absagen?\n\n${pedagogicalNotice}`;
     } else {
-      confirmMsg = `Möchtest du deinen Unterrichtstermin am ${formattedDate} bei ${teacherPhrase} verbindlich absagen?`;
+      confirmMsg = `Möchtest du deinen Unterrichtstermin am ${formattedDate} bei ${teacherPhrase} verbindlich absagen?\n\n${pedagogicalNotice}`;
     }
 
     if (!confirm(confirmMsg)) return;
 
     try {
-      const isVirtual = Boolean(
-        occ.is_virtual || 
-        (occ.id && (String(occ.id).startsWith('virtual-') || String(occ.id).startsWith('virt_')))
-      );
+      const targetStudentId = studentId || studentUser?.id || occ.student_id;
+      const targetTeacherId = occ.teacher_id || occ.teacher?.id || studentUser?.teacher_id || null;
+      const targetScheduleId = occ.schedule_id || occ.schedule?.id || null;
+      const targetOccIdStr = occ.id ? String(occ.id) : null;
 
-      if (isVirtual) {
-        // Prüfen, ob für dieses Datum bereits ein Eintrag existiert
-        const { data: existingOcc } = await supabase
-          .from('schedule_occurrences')
-          .select('id')
-          .eq('student_id', studentId)
-          .eq('date', occ.date)
-          .maybeSingle();
+      // 1. Authoritative RPC call (Fail-Closed, zero-leak)
+      let rpcSucceeded = false;
+      try {
+        const { data: rpcRes, error: rpcErr } = await supabase.rpc('cancel_student_schedule_occurrence', {
+          p_student_id: targetStudentId,
+          p_occurrence_id: targetOccIdStr,
+          p_date: occ.date,
+          p_start_time: occ.start_time || '15:00',
+          p_duration: occ.duration || 45,
+          p_teacher_id: targetTeacherId,
+          p_schedule_id: targetScheduleId,
+          p_notes: 'canceled_by_student'
+        });
 
-        if (existingOcc?.id) {
+        if (!rpcErr && rpcRes?.success) {
+          rpcSucceeded = true;
+        } else if (rpcErr) {
+          console.warn('cancel_student_schedule_occurrence RPC returned error, using fallback:', rpcErr);
+        }
+      } catch (rpcCallErr) {
+        console.warn('Could not call cancel_student_schedule_occurrence RPC:', rpcCallErr);
+      }
+
+      // 2. Resilient Direct Fallback
+      if (!rpcSucceeded) {
+        const isVirtual = Boolean(
+          occ.is_virtual || 
+          (occ.id && (String(occ.id).startsWith('virtual-') || String(occ.id).startsWith('virt_')))
+        );
+
+        if (isVirtual) {
+          // Prüfen, ob für dieses Datum bereits ein Eintrag existiert
+          const { data: existingOcc } = await supabase
+            .from('schedule_occurrences')
+            .select('id')
+            .eq('student_id', targetStudentId)
+            .eq('date', occ.date)
+            .maybeSingle();
+
+          if (existingOcc?.id) {
+            const { error: updateErr } = await supabase
+              .from('schedule_occurrences')
+              .update({ 
+                status: 'canceled_by_student',
+                canceled_by_role: 'student',
+                student_acknowledged: true,
+                notes: 'canceled_by_student',
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', existingOcc.id);
+            if (updateErr) throw updateErr;
+          } else {
+            const occPayload: any = {
+              schedule_id: targetScheduleId,
+              student_id: targetStudentId,
+              teacher_id: targetTeacherId,
+              date: occ.date,
+              start_time: occ.start_time || '15:00',
+              duration: occ.duration || 45,
+              status: 'canceled_by_student',
+              canceled_by_role: 'student',
+              student_acknowledged: true,
+              notes: 'canceled_by_student'
+            };
+            const schoolId = occ.schedule?.school_id || occ.school_id || studentUser?.school_id;
+            if (schoolId) occPayload.school_id = schoolId;
+
+            const { error: insertErr } = await supabase
+              .from('schedule_occurrences')
+              .insert(occPayload);
+            if (insertErr) throw insertErr;
+          }
+        } else {
           const { error: updateErr } = await supabase
             .from('schedule_occurrences')
             .update({ 
-              status: 'cancelled', 
+              status: 'canceled_by_student',
+              canceled_by_role: 'student',
               student_acknowledged: true,
+              notes: 'canceled_by_student',
               updated_at: new Date().toISOString()
             })
-            .eq('id', existingOcc.id);
+            .eq('id', occ.id);
           if (updateErr) throw updateErr;
-        } else {
-          const occPayload: any = {
-            schedule_id: occ.schedule_id || occ.schedule?.id || null,
-            student_id: studentId,
-            teacher_id: occ.teacher_id || occ.teacher?.id,
-            date: occ.date,
-            start_time: occ.start_time || '15:00',
-            duration: occ.duration || 45,
-            status: 'cancelled',
-            student_acknowledged: true
-          };
-          const schoolId = occ.schedule?.school_id || occ.school_id || studentUser?.school_id;
-          if (schoolId) occPayload.school_id = schoolId;
-
-          const { error: insertErr } = await supabase
-            .from('schedule_occurrences')
-            .insert(occPayload);
-          if (insertErr) throw insertErr;
         }
-      } else {
-        const { error: updateErr } = await supabase
-          .from('schedule_occurrences')
-          .update({ 
-            status: 'cancelled', 
-            student_acknowledged: true,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', occ.id);
-        if (updateErr) throw updateErr;
+
+        // Resilient System Alerts & Direct Messages fallback
+        try {
+          const { data: userData } = await supabase
+            .from('users')
+            .select('first_name, last_name')
+            .eq('id', targetStudentId)
+            .single();
+          const studentName = userData ? `${userData.first_name} ${maskLastName(userData.last_name)}` : 'Ein Schüler';
+          const actorDesc = skipPinCheck ? 'mit Eltern-PIN' : 'mit elterlicher Erlaubnis';
+          const timeLabel = (occ.start_time || '16:30').substring(0, 5);
+
+          if (targetTeacherId) {
+            await supabase.from('system_alerts').insert({
+              school_id: occ.schedule?.school_id || occ.school_id || studentUser?.school_id || null,
+              teacher_id: targetTeacherId,
+              type: 'Termin abgesagt',
+              message: `❌ Absage durch Schüler: ${studentName} hat den Termin am ${formattedDate} um ${timeLabel} Uhr ${actorDesc} abgesagt. Eltern wurden benachrichtigt.`
+            });
+
+            const [y, m, d] = String(occ.date).split('-').map(Number);
+            const occDate = (y && m && d) ? new Date(y, m - 1, d) : new Date();
+            const shortDay = occDate.toLocaleDateString('de-DE', { weekday: 'short' });
+            const shortDate = occDate.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' });
+            const targetOccId = occ.schedule_id ? `virtual-${occ.schedule_id}-${occ.date}` : occ.id;
+
+            await supabase.from('campus_direct_messages').insert({
+              sender_id: targetStudentId,
+              recipient_id: targetTeacherId,
+              content: `Dein Unterrichtstermin am ${shortDay} ${shortDate} um ${timeLabel} Uhr fällt aus.`,
+              occurrence_id: targetOccId,
+              is_system: true,
+              message_type: 'reschedule_notification'
+            });
+          }
+        } catch (alertErr) {
+          console.warn('Could not insert cancellation system alert in fallback:', alertErr);
+        }
       }
 
       // Optimistic state update
       setRawScheduleOccurrences((prev: any[]) => prev.map((o: any) => {
-        if (o.id === occ.id || (o.date === occ.date && (o.student_id === studentId || !o.student_id))) {
-          return { ...o, status: 'cancelled', student_acknowledged: true };
+        if (o.id === occ.id || (o.date === occ.date && (o.student_id === targetStudentId || !o.student_id))) {
+          return { ...o, status: 'canceled_by_student', canceled_by_role: 'student', student_acknowledged: true };
         }
         return o;
       }));
       setRawSchoolYearOccurrences((prev: any[]) => prev.map((o: any) => {
-        if (o.id === occ.id || (o.date === occ.date && (o.student_id === studentId || !o.student_id))) {
-          return { ...o, status: 'cancelled', student_acknowledged: true };
+        if (o.id === occ.id || (o.date === occ.date && (o.student_id === targetStudentId || !o.student_id))) {
+          return { ...o, status: 'canceled_by_student', canceled_by_role: 'student', student_acknowledged: true };
         }
         return o;
       }));
-
-      // Resilient System Alerts & Direct Messages
-      try {
-        const { data: userData } = await supabase
-          .from('users')
-          .select('first_name, last_name')
-          .eq('id', studentId)
-          .single();
-        const studentName = userData ? `${userData.first_name} ${maskLastName(userData.last_name)}` : 'Ein Schüler';
-        const actorDesc = skipPinCheck ? 'mit Eltern-PIN' : 'mit elterlicher Erlaubnis';
-        const timeLabel = (occ.start_time || '16:30').substring(0, 5);
-
-        await supabase.from('system_alerts').insert({
-          school_id: occ.schedule?.school_id || occ.school_id || studentUser?.school_id || null,
-          teacher_id: occ.teacher_id || occ.teacher?.id,
-          type: 'Termin abgesagt',
-          message: `❌ Absage: ${studentName} hat den Termin am ${formattedDate} um ${timeLabel} Uhr ${actorDesc} abgesagt.`
-        });
-      } catch (alertErr) {
-        console.warn('Could not insert cancellation system alert:', alertErr);
-      }
-
-      // Send a system message to Direct Messages
-      try {
-        const [y, m, d] = String(occ.date).split('-').map(Number);
-        const occDate = (y && m && d) ? new Date(y, m - 1, d) : new Date();
-        const shortDay = occDate.toLocaleDateString('de-DE', { weekday: 'short' });
-        const shortDate = occDate.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' });
-        const timeLabel = (occ.start_time || '16:30').slice(0, 5);
-        const targetOccId = occ.schedule_id ? `virtual-${occ.schedule_id}-${occ.date}` : occ.id;
-        const teacherUserId = occ.teacher_id || occ.teacher?.id;
-
-        if (studentId && teacherUserId) {
-          await supabase.from('campus_direct_messages').insert({
-            sender_id: studentId,
-            recipient_id: teacherUserId,
-            content: `Dein Unterrichtstermin am ${shortDay} ${shortDate} um ${timeLabel} Uhr fällt aus.`,
-            occurrence_id: targetOccId,
-            is_system: true,
-            message_type: 'reschedule_notification'
-          });
-        }
-      } catch (dmErr) {
-        console.warn('Could not insert cancellation system message into campus_direct_messages:', dmErr);
-      }
 
       fetchSchedule();
       fetchSchoolYearSchedule();
 
       const successCancelMsg = studentUiLevel === 'junior'
-        ? 'Deine Musikstunde wurde abgemeldet. Deine Lehrkraft wurde benachrichtigt! 🎵'
-        : 'Der Termin wurde erfolgreich abgesagt.';
+        ? 'Deine Musikstunde wurde abgemeldet. Deine Eltern und deine Lehrkraft wurden benachrichtigt! 🎵'
+        : 'Der Termin wurde erfolgreich abgesagt. Deine Eltern und deine Lehrkraft wurden benachrichtigt.';
       alert(successCancelMsg);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error canceling occurrence:', err);
-      alert('Fehler beim Absagen des Termins.');
+      alert('Fehler beim Absagen des Termins: ' + (err?.message || 'Bitte versuche es erneut.'));
     }
   };
 
@@ -3643,39 +3825,64 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       const originalDate = occ.original_date || occ.date;
       const originalStartTime = occ.original_start_time || occ.start_time;
 
-      // Optimistic update
+      // Optimistic update: Status bleibt scheduled mit Originalzeit, Verschiebung abgewiesen
       setRawScheduleOccurrences(prev => 
-        prev.map(o => o.id == occ.id ? { ...o, date: originalDate, start_time: originalStartTime, status: 'cancelled', student_acknowledged: false } : o)
+        prev.map(o => o.id == occ.id ? { ...o, date: originalDate, start_time: originalStartTime, status: 'scheduled', student_acknowledged: true, reschedule_declined: true } : o)
       );
 
-      // 1. Reset occurrence back to original date/time and set status to cancelled
+      // 1. Reset occurrence back to original date/time, behalte scheduled (keine Fehl-Stornierung!)
       const { error: updateErr } = await supabase
         .from('schedule_occurrences')
         .update({
           date: originalDate,
           start_time: originalStartTime,
-          status: 'cancelled',
-          student_acknowledged: false // Student will see it as cancelled in their dashboard
+          status: 'scheduled',
+          student_acknowledged: true,
+          notes: 'Vorgeschlagener Ausweichtermin abgelehnt – Neuabstimmung erforderlich',
+          updated_at: new Date().toISOString()
         })
         .eq('id', occ.id);
 
       if (updateErr) throw updateErr;
 
-      // 2. Alert the teacher
+      // 2. Alert the teacher zur Abstimmung eines Alternativtermins
       const { data: userData } = await supabase
         .from('users')
         .select('first_name, last_name')
         .eq('id', studentId)
         .single();
       const studentName = userData ? `${userData.first_name} ${maskLastName(userData.last_name)}` : 'Ein Schüler';
-      const formattedDate = new Date(occ.date).toLocaleDateString('de-DE');
+      const formattedDeclinedDate = new Date(occ.date).toLocaleDateString('de-DE');
 
       await supabase.from('system_alerts').insert({
         school_id: occ.schedule?.school_id || studentUser?.school_id || null,
         teacher_id: occ.teacher_id,
-        type: 'Verschiebung abgelehnt',
-        message: `❌ ${studentName} hat den Verschiebungstermin am ${formattedDate} abgelehnt. Der Termin wurde auf den Originaltermin zurückgesetzt und für diese Woche abgesagt.`
+        type: 'Ausweichtermin abgelehnt',
+        message: `❌ ${studentName} kann den vorgeschlagenen Ausweichtermin am ${formattedDeclinedDate} nicht wahrnehmen. Der Termin wurde NICHT storniert – bitte stimme einen alternativen Termin ab.`
       });
+
+      // 3. System message im Chat an die Lehrkraft
+      try {
+        const studentUserId = studentId || studentUser?.id || occ.student_id;
+        const teacherUserId = occ.teacher_id || occ.teacher?.id;
+        const targetOccId = occ.schedule_id ? `virtual-${occ.schedule_id}-${occ.date}` : occ.id;
+
+        if (studentUserId && teacherUserId) {
+          await supabase.from('campus_direct_messages').insert({
+            sender_id: studentUserId,
+            recipient_id: teacherUserId,
+            content: `Der vorgeschlagene Ausweichtermin am ${formattedDeclinedDate} passt leider nicht. Bitte schlage einen anderen Termin vor oder schreibe uns kurz per Chat.`,
+            occurrence_id: targetOccId,
+            is_system: true,
+            message_type: 'reschedule_notification'
+          });
+        }
+      } catch (dmErr) {
+        console.warn('Could not insert rejection direct message:', dmErr);
+      }
+
+      fetchSchedule();
+      alert('Der Ausweichtermin wurde abgelehnt. Deine Lehrkraft wurde benachrichtigt, um einen passenden neuen Termin mit dir abzustimmen.');
     } catch (err: any) {
       console.error('Error rejecting reschedule:', err);
       fetchSchedule();
@@ -4240,51 +4447,6 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     return germanVoices[0] || null;
   }, [ttsAvailableVoices]);
 
-  const cleanTextForTts = (text: string): string => {
-    if (!text) return '';
-    return text
-      // Kalenderwochen & Termine
-      .replace(/KW\s*(\d+)/gi, 'Kalenderwoche $1')
-      // Takte & Seiten mit Bindestrichen
-      .replace(/Takt\s*(\d+)\s*[-–]\s*(\d+)/gi, 'Takt $1 bis $2')
-      .replace(/S\.\s*(\d+)\s*[-–]\s*(\d+)/gi, 'Seite $1 bis $2')
-      .replace(/S\.\s*(\d+)/gi, 'Seite $1')
-      .replace(/Seite\s*(\d+)\s*[-–]\s*(\d+)/gi, 'Seite $1 bis $2')
-      // Musikalische Taktarten
-      .replace(/\b4\/4\s*(?:-?\s*Takt)?/gi, 'Vier-Viertel-Takt')
-      .replace(/\b3\/4\s*(?:-?\s*Takt)?/gi, 'Drei-Viertel-Takt')
-      .replace(/\b2\/4\s*(?:-?\s*Takt)?/gi, 'Zwei-Viertel-Takt')
-      .replace(/\b6\/8\s*(?:-?\s*Takt)?/gi, 'Sechs-Achtel-Takt')
-      .replace(/\b12\/8\s*(?:-?\s*Takt)?/gi, 'Zwölf-Achtel-Takt')
-      // Dynamik & Spielanweisungen
-      .replace(/\bp\/f\b|\bp \/ f\b/gi, 'piano und forte')
-      .replace(/\bfff\b/gi, 'sehr sehr laut, fortississimo')
-      .replace(/\bff\b/gi, 'fortissimo, sehr kräftig')
-      .replace(/\bpp\b/gi, 'pianissimo, sehr leise')
-      // Metronom & Einheiten
-      .replace(/(\d+)\s*BPM/gi, '$1 Schläge pro Minute')
-      .replace(/BPM/gi, 'Schläge pro Minute')
-      .replace(/(\d+)\s*min\b/gi, '$1 Minuten')
-      .replace(/(\d+)\s*sek\b/gi, '$1 Sekunden')
-      .replace(/(\d+)\s*x\b/gi, '$1 mal')
-      // Begrifflichkeiten
-      .replace(/z\.\s*B\./gi, 'zum Beispiel')
-      .replace(/bzw\./gi, 'beziehungsweise')
-      .replace(/inkl\./gi, 'inklusive')
-      .replace(/evtl\./gi, 'eventuell')
-      .replace(/Übe-Timer/gi, 'Übe-Timer')
-      .replace(/Play-Along/gi, 'Play Along')
-      .replace(/•/g, ', ')
-      .replace(/#/g, 'Nummer ')
-      // Keine Emojis vorlesen
-      .replace(/[\u{1F300}-\u{1F9FF}]/gu, '')
-      .replace(/[\u{2600}-\u{27BF}]/gu, '')
-      // Bindestriche zu sanften Sprechpausen machen
-      .replace(/\s*[-–—]\s*/g, ', ')
-      .replace(/\s+/g, ' ')
-      .trim();
-  };
-
   const handleStopSpeaking = useCallback(() => {
     ttsSessionIdRef.current += 1;
     stopNeuralSpeech();
@@ -4322,14 +4484,14 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       setJuniorPreviewPlaying(false);
     }
 
-    const rawPhrases = Array.isArray(textOrPhrases)
-      ? [...textOrPhrases]
-      : textOrPhrases
-          .split(/(?<=[.!?])\s+/)
-          .filter(p => p.trim().length > 0);
+    // 🧼 Bereinige Text zuerst über die zentrale kindgerechte TTS-Engine, bevor Sätze geteilt werden
+    const normalizedInput = Array.isArray(textOrPhrases)
+      ? textOrPhrases.map(p => cleanTextForTts(p)).join(' ')
+      : cleanTextForTts(textOrPhrases);
 
-    const phrases = rawPhrases
-      .map(p => cleanTextForTts(p))
+    const phrases = normalizedInput
+      .split(/(?<=[.!?])\s+/)
+      .map(p => p.trim())
       .filter(p => p.length > 0);
 
     if (phrases.length === 0) return;
@@ -8515,7 +8677,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
         try {
           const p = JSON.parse(clean);
           if (Array.isArray(p)) {
-            clean = p.filter((x: any) => typeof x === 'string' && !x.startsWith('AUDIO:') && !x.startsWith('STICKER:') && !x.startsWith('LATENCY:') && !x.startsWith('STUDENT_NOTE_PUBLIC:') && !x.startsWith('STUDENT_NOTE_PRIVATE:')).join(' ');
+            clean = p.filter((x: any) => typeof x === 'string' && !x.startsWith('AUDIO:') && !x.startsWith('STICKER:') && !x.startsWith('LATENCY:') && !x.startsWith('STUDENT_NOTE_PUBLIC:') && !x.startsWith('STUDENT_NOTE_PRIVATE:') && !x.startsWith('STUDENT_QUESTION:')).join(' ');
           } else if (typeof p === 'string') {
             clean = p;
           }
@@ -8524,18 +8686,38 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       return clean
         .replace(/\["AUDIO:[^"]*"\]/g, '')
         .replace(/AUDIO:[^\s,|]+/g, '')
-        .replace(/.*(STUDENT_NOTE_PUBLIC|STUDENT_NOTE_PRIVATE):[^|]*\|/, '')
+        .replace(/.*(STUDENT_NOTE_PUBLIC|STUDENT_NOTE_PRIVATE|STUDENT_QUESTION):[^|]*\|/, '')
+        .replace(/^STUDENT_QUESTION:[^|]*\|?/i, '')
         .replace(/^❓\s*Frage für den Unterricht:\s*/i, '')
         .trim();
     };
 
-    const generalNoteRaw = currentWeekNotes.find(n => !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('LATENCY:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:'));
+    const generalNoteRaw = currentWeekNotes.find(n => !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('LATENCY:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:') && !n.startsWith('STUDENT_QUESTION:'));
     const generalNote = generalNoteRaw ? cleanGeneralNote(generalNoteRaw) : '';
 
-    let specificTeacherNote = generalNote;
+    const studentQuestionEntry = currentWeekNotes.find(n => typeof n === 'string' && (n.startsWith('STUDENT_QUESTION:') || n.startsWith('❓ Frage für den Unterricht:')));
+    let studentQuestionText = '';
+    if (studentQuestionEntry) {
+      if (studentQuestionEntry.startsWith('STUDENT_QUESTION:')) {
+        const withoutPrefix = studentQuestionEntry.replace(/^STUDENT_QUESTION:/, '');
+        const pipeIdx = withoutPrefix.indexOf('|');
+        studentQuestionText = pipeIdx !== -1 ? withoutPrefix.slice(pipeIdx + 1).trim() : withoutPrefix.trim();
+      } else {
+        studentQuestionText = studentQuestionEntry.replace(/^❓\s*Frage für den Unterricht:\s*/i, '').trim();
+      }
+    }
+
+    const isPlaceholderNote = (t: string) => {
+      if (!t) return true;
+      const lower = t.trim().toLowerCase();
+      return lower === 'zusätzliche bemerkung' || lower === 'zusätzliche bemerkungen' || lower === 'keine' || lower === 'keine hausaufgabe' || lower === 'keine hausaufgaben';
+    };
+    const validGeneralNote = isPlaceholderNote(generalNote) ? '' : generalNote;
+
+    let specificTeacherNote = validGeneralNote;
     if (!specificTeacherNote) {
       for (const b of formattedJuniorBooks) {
-        if (b.notesList && b.notesList.length > 0 && b.notesList[0].text) {
+        if (b.notesList && b.notesList.length > 0 && b.notesList[0].text && !isPlaceholderNote(b.notesList[0].text)) {
           specificTeacherNote = b.notesList[0].text;
           break;
         }
@@ -8543,21 +8725,22 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     }
     if (!specificTeacherNote) {
       for (const s of otherActiveSongs) {
-        if (s.homework_notes) {
+        if (s.homework_notes && !isPlaceholderNote(s.homework_notes)) {
           specificTeacherNote = s.homework_notes;
           break;
         }
       }
     }
 
-    const hasAnyHomework = formattedJuniorBooks.length > 0 || otherActiveSongs.length > 0 || audioTracks.length > 0 || Boolean(generalNote);
+    const hasAnyHomework = formattedJuniorBooks.length > 0 || otherActiveSongs.length > 0 || audioTracks.length > 0 || Boolean(validGeneralNote) || Boolean(studentQuestionText);
 
     return {
       formattedJuniorBooks,
       otherActiveSongs,
       audioTracks,
-      generalNote,
+      generalNote: validGeneralNote,
       specificTeacherNote,
+      studentQuestionText,
       hasAnyHomework
     };
   }, [localProgress, lehrwerke, progressItems, activeSongSkills, studentId, studentUser]);
@@ -8747,16 +8930,22 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     } catch (e) {}
   }, []);
 
+  // Canonical Ground-Truth Practice Minutes (Synchronizes DB aggregate & raw event logs 1:1)
+  const effectivePracticeMinutes = useMemo(() => {
+    const logsMins = Math.floor((fokusLogs || []).reduce((sum, log) => sum + (log.duration_seconds || ((log.duration_minutes || 0) * 60)), 0) / 60);
+    return Math.max(totalFocusMinutes || 0, logsMins);
+  }, [totalFocusMinutes, fokusLogs]);
+
   // Unified Sticker Map calculated 1:1 across Junior, Teen, and Pro levels
   const unifiedStickersMap = useMemo(() => {
     return getUnifiedStickersMap({
-      practiceMinutes: totalFocusMinutes || 0,
+      practiceMinutes: effectivePracticeMinutes,
       xp: avatar?.xp || 0,
       streakDays: avatar?.streak_flame || 0,
       masteredSongsCount: songStats?.masteredCount || 0,
       progressItems: progressItems || []
     });
-  }, [totalFocusMinutes, avatar?.xp, avatar?.streak_flame, songStats?.masteredCount, progressItems]);
+  }, [effectivePracticeMinutes, avatar?.xp, avatar?.streak_flame, songStats?.masteredCount, progressItems]);
 
   // Check and trigger sticker award celebration in Level 1 (Junior) Briefing Board
   useEffect(() => {
@@ -8765,6 +8954,15 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     try {
       const storageKey = `groovelab_junior_celebrated_stickers_${studentId}`;
       const stored = localStorage.getItem(storageKey);
+
+      // If first visit on a new device/cleared cache, seed existing unlocked stickers
+      // so they are not annoyingly re-celebrated retroactively
+      if (stored === null) {
+        const initialUnlocked = (ALL_STICKERS || []).filter(st => unifiedStickersMap[st.id]?.isUnlocked).map(st => st.id);
+        localStorage.setItem(storageKey, JSON.stringify(initialUnlocked));
+        return;
+      }
+
       const celebratedIds: string[] = stored ? JSON.parse(stored) : [];
       const celebratedSet = new Set<string>(celebratedIds);
 
@@ -9387,6 +9585,9 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
         }
         if (user.parent_allow_absences !== undefined && user.parent_allow_absences !== null) {
           setDraftAllowAbsences(Boolean(user.parent_allow_absences));
+        }
+        if (user.parent_allow_reschedule_confirm !== undefined && user.parent_allow_reschedule_confirm !== null) {
+          setDraftAllowReschedule(Boolean(user.parent_allow_reschedule_confirm));
         }
         if (user.parent_allow_chat !== undefined && user.parent_allow_chat !== null) {
           setDraftAllowChat(Boolean(user.parent_allow_chat));
@@ -11601,9 +11802,8 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                 if (localPractice.xp) xpVal = Math.max(xpVal, localPractice.xp);
               } catch (e) {}
 
-              // Next Sticker Calculation
-              const logsMins = Math.floor((fokusLogs || []).reduce((sum, log) => sum + (log.duration_seconds || ((log.duration_minutes || 0) * 60)), 0) / 60);
-              const effMins = Math.max(totalFocusMinutes || 0, logsMins);
+              // Next Sticker Calculation (Harmonized 1:1 with effectivePracticeMinutes)
+              const effMins = effectivePracticeMinutes;
               let nextStickerName = 'Fleiß-Pionier';
               let targetMin = 20;
               let prevMin = 0;
@@ -12290,7 +12490,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
 
                         <button
                           type="button"
-                          onClick={() => handleOpenHomeworkBookWithView('stickeralbum', 'document')}
+                          onClick={() => setShowJuniorStickerModal(true)}
                           style={{
                             background: '#ffffff',
                             border: '1.5px solid #c7d2fe',
@@ -12313,16 +12513,21 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                       </div>
 
                       {/* 3D Holographic Sticker Preview Block */}
-                      <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '16px',
-                        background: '#ffffff',
-                        borderRadius: '20px',
-                        padding: '16px 18px',
-                        border: '1.5px solid #e2e8f0',
-                        boxShadow: '0 2px 8px rgba(0,0,0,0.03)'
-                      }}>
+                      <div 
+                        onClick={() => setShowJuniorStickerModal(true)}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '16px',
+                          background: '#ffffff',
+                          borderRadius: '20px',
+                          padding: '16px 18px',
+                          border: '1.5px solid #e2e8f0',
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
+                          cursor: 'pointer'
+                        }}
+                        className="hover-scale"
+                      >
                         <div style={{
                           width: isMusicStandMode ? '64px' : '56px',
                           height: isMusicStandMode ? '64px' : '56px',
@@ -12373,7 +12578,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                           </div>
 
                           <span style={{ fontSize: isMusicStandMode ? '0.88rem' : '0.80rem', color: '#64748b', fontWeight: 650 }}>
-                            {isMax ? 'Großmeister-Status erreicht! 🏆' : `Noch ${minsToNext} Min. am Stück spielen zum Freischalten!`}
+                            {isMax ? 'Großmeister-Status erreicht! 🏆' : `Noch ${minsToNext} Min. konzentriert üben zum Freischalten!`}
                           </span>
                         </div>
                       </div>
@@ -12890,35 +13095,38 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                 <span>Fokus-Zeit</span>
                               </div>
 
-                              {/* Right: Haptische Apple-Glass-Buttons */}
+                              {/* Right: Apple Music Pro-Kids Liquid Glass Capsules */}
                               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                 {isGoalReached ? (
                                   <button
                                     type="button"
                                     onClick={handleFinishJuniorMission}
                                     style={{
-                                      background: 'linear-gradient(180deg, #fbbf24 0%, #f59e0b 100%)',
-                                      border: '1.5px solid #fde047',
-                                      borderRadius: '14px',
-                                      height: '38px',
-                                      padding: '0 16px',
-                                      color: '#78350f',
+                                      background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.25) 0%, rgba(217, 119, 6, 0.35) 100%)',
+                                      border: '1.5px solid rgba(253, 224, 71, 0.7)',
+                                      backdropFilter: 'blur(20px)',
+                                      WebkitBackdropFilter: 'blur(20px)',
+                                      borderRadius: '100px',
+                                      height: '40px',
+                                      padding: '0 18px',
+                                      color: '#fef08a',
                                       fontSize: '0.90rem',
                                       fontWeight: 950,
                                       cursor: 'pointer',
                                       display: 'inline-flex',
                                       alignItems: 'center',
-                                      gap: '6px',
-                                      boxShadow: '0 3px 0 #b45309, 0 6px 16px rgba(245, 158, 11, 0.45)'
+                                      gap: '7px',
+                                      boxShadow: '0 0 16px rgba(245, 158, 11, 0.4), 0 4px 12px rgba(0, 0, 0, 0.3)',
+                                      transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
                                     }}
                                     className="hover-scale"
                                   >
                                     <span>Abschließen</span>
-                                    <Star size={15} fill="#78350f" color="#78350f" />
+                                    <Star size={15} fill="#fef08a" color="#fef08a" />
                                   </button>
                                 ) : (
                                   <>
-                                    {/* ⏸️ Pause */}
+                                    {/* ⏸️ Pause (Apple Music Frosted Glass Capsule) */}
                                     <button
                                       type="button"
                                       onClick={() => {
@@ -12926,49 +13134,55 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                         isJuniorMissionPausedRef.current = true;
                                       }}
                                       style={{
-                                        background: 'linear-gradient(180deg, #334155 0%, #1e293b 100%)',
-                                        border: '1.5px solid rgba(255, 255, 255, 0.16)',
-                                        borderRadius: '14px',
-                                        height: '38px',
-                                        padding: '0 14px',
-                                        color: '#ffffff',
+                                        background: 'rgba(255, 255, 255, 0.10)',
+                                        border: '1px solid rgba(255, 255, 255, 0.18)',
+                                        backdropFilter: 'blur(20px)',
+                                        WebkitBackdropFilter: 'blur(20px)',
+                                        borderRadius: '100px',
+                                        height: '40px',
+                                        padding: '0 16px',
+                                        color: '#f8fafc',
                                         fontSize: '0.86rem',
                                         fontWeight: 900,
                                         cursor: 'pointer',
                                         display: 'inline-flex',
                                         alignItems: 'center',
-                                        gap: '6px',
-                                        boxShadow: '0 2px 0 #0f172a'
+                                        gap: '7px',
+                                        boxShadow: '0 4px 14px rgba(0, 0, 0, 0.25)',
+                                        transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
                                       }}
                                       className="hover-scale"
                                     >
-                                      <Pause size={14} fill="#ffffff" color="#ffffff" />
+                                      <Pause size={14} fill="#f8fafc" color="#f8fafc" />
                                       <span>Pause</span>
                                     </button>
 
-                                    {/* ⏹️ Beenden */}
+                                    {/* ⏹️ Beenden (Apple Music Coral-Glass Capsule - Beruhigt & Stressfrei) */}
                                     <button
                                       type="button"
                                       onClick={handleFinishJuniorMission}
                                       style={{
-                                        background: 'linear-gradient(180deg, #f87171 0%, #ef4444 100%)',
-                                        border: '1.5px solid #fca5a5',
-                                        borderRadius: '14px',
-                                        height: '38px',
-                                        padding: '0 14px',
-                                        color: '#ffffff',
+                                        background: 'rgba(239, 68, 68, 0.16)',
+                                        border: '1px solid rgba(248, 113, 113, 0.38)',
+                                        backdropFilter: 'blur(20px)',
+                                        WebkitBackdropFilter: 'blur(20px)',
+                                        borderRadius: '100px',
+                                        height: '40px',
+                                        padding: '0 16px',
+                                        color: '#fca5a5',
                                         fontSize: '0.86rem',
                                         fontWeight: 900,
                                         cursor: 'pointer',
                                         display: 'inline-flex',
                                         alignItems: 'center',
-                                        gap: '6px',
-                                        boxShadow: '0 2px 0 #b91c1c, 0 4px 12px rgba(239, 68, 68, 0.3)'
+                                        gap: '7px',
+                                        boxShadow: '0 4px 14px rgba(239, 68, 68, 0.2)',
+                                        transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
                                       }}
                                       className="hover-scale"
                                       title="Übung beenden und deine Übe-Zeit als XP sichern"
                                     >
-                                      <Square size={13} fill="#ffffff" color="#ffffff" />
+                                      <Square size={13} fill="#fca5a5" color="#fca5a5" />
                                       <span>Beenden</span>
                                     </button>
                                   </>
@@ -13976,2940 +14190,1910 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
               );
             })()}
 
-            {/* KPI Cards Grid (Row 1 - Top - Teen & Pro only) */}
-            {studentUiLevel !== 'junior' && (
-              <div style={{ display: 'flex', flexDirection: 'row', gap: '10px', width: '100%' }} className="kpi-row-container">
-              
-              {/* Card 1: XP */}
-              {xpActive && (
-                <div style={{ 
-                  flex: '1 1 0px',
-                  minWidth: 0,
-                  background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', 
-                  borderRadius: '18px', 
-                  color: 'white', 
-                  padding: '13px 16px', 
-                  boxShadow: '0 4px 15px rgba(99, 102, 241, 0.15)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '6px'
-                }} className="kpi-card">
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: isMusicStandMode ? '0.84rem' : '0.74rem', fontWeight: 800, opacity: 0.95, textTransform: 'uppercase', letterSpacing: '0.05em' }} className="kpi-card-title">Gesammelte XP</span>
-                    <Star size={15} fill="currentColor" />
-                  </div>
-                  <span style={{ fontSize: '1.3rem', fontWeight: 900, fontFamily: "'Urbanist', sans-serif" }} className="kpi-card-value">{(() => {
-                    let xpVal = avatar?.xp || 0;
-                    try {
-                      const localStats = JSON.parse(localStorage.getItem(`cg_offline_stats_${studentId}`) || '{}');
-                      if (localStats.current_xp) xpVal = Math.max(xpVal, localStats.current_xp);
-                      const localPractice = JSON.parse(localStorage.getItem(`cg_offline_practice_${studentId}`) || '{}');
-                      if (localPractice.xp) xpVal = Math.max(xpVal, localPractice.xp);
-                    } catch (e) {}
-                    
-                    const logsXp = (fokusLogs || []).reduce((sum, log) => {
-                      if (log.xp_earned) return sum + log.xp_earned;
-                      const isMastered = !log.is_extra && (log.duration_seconds >= 180 || (log.duration_minutes || 0) >= 3);
-                      const extraMins = log.is_extra ? Math.floor((log.duration_seconds || ((log.duration_minutes || 0) * 60)) / 60) : 0;
-                      return sum + (isMastered ? 3 : 0) + extraMins;
-                    }, 0);
+            
+            
+            {/* ========================================================================= */}
+            {/* ⚡ TEEN FLOW: THE ACOUSTIC LOUNGE (11–15 JAHRE) - 1:1 JUNIOR PARITÄT     */}
+            {/* ========================================================================= */}
+            {studentUiLevel === 'teen' && (() => {
+              const streak = avatar?.streak_flame || 0;
+              const targetMins = getTargetMinutes(streak);
+              const targetSeconds = targetMins * 60;
+              const weekMetrics = getDeterministicWeekMetrics();
+              const { weekDays, weekPracticedCount } = weekMetrics;
+              const elapsedSecs = secondsElapsedRef.current || secondsElapsed;
+              const isGoalReached = elapsedSecs >= targetSeconds;
+              const currentMins = Math.floor(elapsedSecs / 60);
+              const currentSecs = elapsedSecs % 60;
+              const effMins = effectivePracticeMinutes;
 
-                    // Mastered Songs (+50 XP each)
-                    const masteredSongsSet = new Set<string>();
-                    (activeSongSkills || []).forEach((skill: any) => {
-                      if (skill.is_stage_ready || skill.progress_percent === 100 || skill.status === 'MASTERED') {
-                        const title = skill.songs?.title || skill.title || skill.song_title;
-                        if (title) masteredSongsSet.add(title.toLowerCase().trim());
-                      }
-                    });
-                    (progressItems || []).forEach((item: any) => {
-                      const rawTopic = (item.topic_name || item.title || '').trim();
-                      if (!rawTopic || rawTopic.includes(' - Seite ') || rawTopic.startsWith('Hausaufgabe KW ') || rawTopic.toLowerCase().startsWith('test')) return;
-                      if (item.status === 'MASTERED' || (item.progress_percent || 0) === 100) {
-                        const cleanT = rawTopic.replace(/\s*\([^)]*\)\s*$/, '').trim();
-                        if (cleanT) masteredSongsSet.add(cleanT.toLowerCase());
-                      }
-                    });
+              let xpVal = avatar?.xp || 0;
+              try {
+                const localStats = JSON.parse(localStorage.getItem(`cg_offline_stats_${studentId}`) || '{}');
+                if (localStats.current_xp) xpVal = Math.max(xpVal, localStats.current_xp);
+                const localPractice = JSON.parse(localStorage.getItem(`cg_offline_practice_${studentId}`) || '{}');
+                if (localPractice.xp) xpVal = Math.max(xpVal, localPractice.xp);
+              } catch (e) {}
+              let nextStickerName = 'Fleiß-Pionier';
+              let targetMin = 20;
+              let prevMin = 0;
+              let stickerIcon = '🐝';
+              let stickerId = 'fleiss-pionier';
+              if (effMins >= 500) {
+                nextStickerName = 'Übe-Großmeister';
+                targetMin = 1500;
+                prevMin = 500;
+                stickerIcon = '🏆';
+                stickerId = 'uebe-grossmeister';
+              } else if (effMins >= 100) {
+                nextStickerName = 'Übe-Legende';
+                targetMin = 500;
+                prevMin = 100;
+                stickerIcon = '👑';
+                stickerId = 'uebe-legende';
+              } else if (effMins >= 20) {
+                nextStickerName = 'Übe-Meister';
+                targetMin = 100;
+                prevMin = 20;
+                stickerIcon = '🦉';
+                stickerId = 'uebe-meister';
+              }
+              const isMax = effMins >= 1500;
+              const progressPct = isMax ? 100 : Math.min(100, Math.max(0, ((effMins - prevMin) / (targetMin - prevMin)) * 100));
+              const minsToNext = Math.max(1, targetMin - effMins);
 
-                    // Mastered Lehrwerk Pages (+10 XP each)
-                    const masteredPagesSet = new Set<string>();
-                    (progressItems || []).forEach((item: any) => {
-                      const rawTopic = (item.topic_name || item.title || '').trim();
-                      if (rawTopic.includes(' - Seite ') && (item.status === 'MASTERED' || (item.progress_percent || 0) === 100)) {
-                        masteredPagesSet.add(rawTopic.toLowerCase());
-                      }
-                    });
+              const missionInfo = getJuniorMissionDetails();
+              const rawInst = (studentUser?.instrument || '').trim();
+              const isFeminineInst = rawInst ? ['gitarre', 'e-gitarre', 'flöte', 'querflöte', 'blockflöte', 'trompete', 'geige', 'violine', 'posaune', 'klarinette', 'harfe', 'bratsche', 'tuba', 'mundharmonika', 'ukulele'].some(w => rawInst.toLowerCase().includes(w)) : false;
+              const instrumentLabel = rawInst ? (isFeminineInst ? `Deine ${rawInst}` : `Dein ${rawInst}`) : 'Dein Instrument';
 
-                    const songsXp = masteredSongsSet.size * 50;
-                    const pagesXp = masteredPagesSet.size * 10;
-                    const groundTruthXp = logsXp + songsXp + pagesXp;
-
-                    xpVal = Math.max(xpVal, groundTruthXp);
-                    
-                    return `${xpVal} XP`;
-                  })()}</span>
-                </div>
-              )}
-
-              {/* Card 2: Lifetime Practice Minutes (Gesamtzeit) */}
-              {flamesActive && (
-                <div style={{ 
-                  flex: '1 1 0px',
-                  minWidth: 0,
-                  background: 'linear-gradient(135deg, #34a853 0%, #34a853 100%)', 
-                  borderRadius: '18px', 
-                  color: 'white', 
-                  padding: '13px 16px', 
-                  boxShadow: '0 4px 15px rgba(52, 168, 83, 0.15)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '6px'
-                }} className="kpi-card">
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: isMusicStandMode ? '0.84rem' : '0.74rem', fontWeight: 800, opacity: 0.95, textTransform: 'uppercase', letterSpacing: '0.05em' }} className="kpi-card-title">Gesamtzeit</span>
-                    <Clock size={15} />
-                  </div>
-                  <span style={{ fontSize: '1.3rem', fontWeight: 900, fontFamily: "'Urbanist', sans-serif" }} className="kpi-card-value">{(() => {
-                    const dbSecs = (fokusLogs || []).reduce((sum, log) => sum + (log.duration_seconds || ((log.duration_minutes || 0) * 60)), 0);
-                    const liveSecs = sessionActive ? secondsElapsed : 0;
-                    let localSecs = 0;
-                    try {
-                      const localStats = JSON.parse(localStorage.getItem(`cg_offline_stats_${studentId}`) || '{}');
-                      if (localStats.total_focus_minutes) localSecs = Math.max(localSecs, localStats.total_focus_minutes * 60);
-                    } catch (e) {}
-                    const totalSecs = Math.max(dbSecs + liveSecs, (totalFocusMinutes || 0) * 60, localSecs);
-                    if (totalSecs > 0 && totalSecs < 60) {
-                      return `${Math.round(totalSecs)} Sek.`;
-                    }
-                    const mins = Math.floor(totalSecs / 60);
-                    return `${mins} Min.`;
-                  })()}</span>
-                </div>
-              )}
-
-              {/* Card 3: Focus Time Today */}
-              <div style={{ 
-                flex: '1 1 0px',
-                minWidth: 0,
-                background: 'linear-gradient(135deg, #facc15 0%, #eab308 100%)', 
-                borderRadius: '18px', 
-                color: '#0f172a', 
-                padding: '13px 16px', 
-                boxShadow: '0 4px 15px rgba(234, 179, 8, 0.2)',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '6px'
-              }} className="kpi-card">
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: isMusicStandMode ? '0.84rem' : '0.74rem', fontWeight: 900, color: '#713f12', textTransform: 'uppercase', letterSpacing: '0.05em' }} className="kpi-card-title">Fokus Heute</span>
-                  <Activity size={15} color="#713f12" />
-                </div>
-                <span style={{ fontSize: '1.2rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Urbanist', sans-serif", display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: '5px' }} className="kpi-card-value">{(() => {
-                  const todayStr = toLocalYYYYMMDD(getSimulatedNow());
-                  const todayLogs = (fokusLogs || []).filter(log => log.created_at && toLocalYYYYMMDD(new Date(log.created_at)) === todayStr);
-                  
-                  const targetSecs = getTargetMinutes(avatar?.streak_flame || 0) * 60;
-                  const targetMins = getTargetMinutes(avatar?.streak_flame || 0);
-
-                  // 🎯 Single Source of Truth: Total DB Seconds recorded today
-                  const dbTotalSecs = todayLogs.reduce((sum, log) => sum + (log.duration_seconds || ((log.duration_minutes || 0) * 60)), 0);
-                  const liveSecs = sessionActive ? secondsElapsed : 0;
-                  const totalDaySecs = dbTotalSecs + liveSecs;
-                  
-                  if (totalDaySecs === 0) {
-                    return `0 Min.`;
-                  }
-                  if (totalDaySecs > 0 && totalDaySecs < 60) {
-                    return `${Math.round(totalDaySecs)} Sek.`;
-                  }
-
-                  // 🎯 Strictly clamp Daily Focus Seconds to targetSecs (e.g. max 180s = 3 Min.)
-                  // Any surplus beyond the daily goal strictly flows into Extra / Freie Zeit!
-                  const totalFocusSecs = Math.min(totalDaySecs, targetSecs);
-                  const totalExtraSecs = Math.max(0, totalDaySecs - targetSecs);
-
-                  const focusMin = Math.floor(totalFocusSecs / 60);
-                  const focusRemainderSec = Math.round(totalFocusSecs % 60);
-
-                  if (totalExtraSecs > 0) {
-                    const extraMin = Math.floor(totalExtraSecs / 60);
-                    const extraSec = Math.round(totalExtraSecs % 60);
-                    const extraFormatted = extraMin === 0 
-                      ? `${extraSec}s Extra` 
-                      : (extraSec === 0 ? `${extraMin}m Extra` : `${extraMin}m ${extraSec}s Extra`);
-
-                    return (
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap' }}>
-                        <span>{focusMin} Min. Fokus</span>
-                        <span style={{ fontSize: '0.74rem', opacity: 0.95, fontWeight: 900, background: 'rgba(0, 0, 0, 0.08)', color: '#713f12', padding: '1px 6px', borderRadius: '6px' }}>
-                          + {extraFormatted}
-                        </span>
-                      </span>
-                    );
-                  }
-
-                  if (focusRemainderSec > 0 && focusMin > 0) {
-                    return `${focusMin} Min. ${focusRemainderSec} Sek.`;
-                  }
-                  return `${focusMin} Min.`;
-                })()}</span>
-              </div>
-
-              {/* Card 4: Streak-Pfad & Joker */}
-              {flamesActive && (
-                <div style={{ 
-                  flex: '1 1 0px',
-                  minWidth: 0,
-                  background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)', 
-                  borderRadius: '18px', 
-                  color: 'white', 
-                  padding: '13px 16px', 
-                  boxShadow: '0 4px 15px rgba(239, 68, 68, 0.15)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  justifyContent: 'space-between',
-                  minHeight: '76px'
-                }} className="kpi-card">
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: isMusicStandMode ? '0.84rem' : '0.74rem', fontWeight: 800, opacity: 0.95, textTransform: 'uppercase', letterSpacing: '0.05em' }} className="kpi-card-title">Streak-Pfad</span>
-                    <Flame size={15} fill="currentColor" />
-                  </div>
-                  
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '5px', marginTop: '6px' }} className="kpi-streak-footer">
-                    <div style={{ display: 'flex', flexDirection: 'column', minWidth: 'fit-content' }}>
-                      <span style={{ fontSize: '1.3rem', fontWeight: 900, fontFamily: "'Urbanist', sans-serif", lineHeight: 1.1 }} className="kpi-card-value">
-                        {(() => {
-                          const weekMetrics = getDeterministicWeekMetrics();
-                          let streakVal = Math.max(avatar?.streak_flame || 0, weekMetrics.calculatedStreak);
-                          try {
-                            const localStats = JSON.parse(localStorage.getItem(`cg_offline_stats_${studentId}`) || '{}');
-                            if (localStats.streak_flame) streakVal = Math.max(streakVal, localStats.streak_flame);
-                          } catch (e) {}
-                          return `${streakVal} ${streakVal === 1 ? 'Tag' : 'Tage'}`;
-                        })()}
-                      </span>
-                    </div>
-                    
-                    {(() => {
-                      const weekMetrics = getDeterministicWeekMetrics();
-                      const availableShields = weekMetrics.availableShields;
-                      const currentWeek = getISOWeek(getSimulatedNow());
-                      
-                      if (isTodayHoliday) {
-                        return (
-                          <span style={{ 
-                            fontSize: isMusicStandMode ? '0.85rem' : '0.75rem', 
-                            fontWeight: 800, 
-                            background: 'rgba(255, 255, 255, 0.2)', 
-                            backdropFilter: 'blur(8px)',
-                            WebkitBackdropFilter: 'blur(8px)',
-                            border: '1px solid rgba(255, 255, 255, 0.4)', 
-                            color: '#ffffff',
-                            padding: '6px 10px', 
-                            borderRadius: '10px',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            lineHeight: '1.15',
-                            gap: '2px'
-                          }}>
-                            <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                              <Palmtree size={13} color="#ffffff" />
-                              <span>Ferienpause</span>
-                            </span>
-                            <span style={{ fontSize: isMusicStandMode ? '0.78rem' : '0.68rem', opacity: 0.95, fontWeight: 700 }}>Streak sicher</span>
-                          </span>
-                        );
-                      }
-                      
-                      return (
-                        <span style={{ 
-                          fontSize: isMusicStandMode ? '0.82rem' : '0.74rem', 
-                          fontWeight: 800, 
-                          background: availableShields > 0 
-                            ? 'rgba(255, 255, 255, 0.18)' 
-                            : 'rgba(0, 0, 0, 0.25)',
-                          backdropFilter: 'blur(8px)',
-                          WebkitBackdropFilter: 'blur(8px)',
-                          border: availableShields > 0 
-                            ? '1px solid rgba(255, 255, 255, 0.45)' 
-                            : '1px solid rgba(255, 255, 255, 0.1)',
-                          color: availableShields > 0 ? '#ffffff' : 'rgba(255, 255, 255, 0.55)',
-                          padding: '6px 10px', 
-                          borderRadius: '10px',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          lineHeight: '1.15',
-                          textAlign: 'center',
-                          letterSpacing: '0.03em',
-                          flexShrink: 0
-                        }} title={`${availableShields}/3 Schutzschilde diese Woche bereit (Glut-Schutz bei verpassten Tagen)`}>
-                          <div style={{ display: 'flex', gap: '3px', marginBottom: '3px' }}>
-                            {[1, 2, 3].map(sNum => (
-                              <Shield 
-                                key={`kpi-s-${sNum}`} 
-                                size={10} 
-                                fill={sNum <= availableShields ? '#ffffff' : 'none'} 
-                                color={sNum <= availableShields ? '#ffffff' : 'rgba(255,255,255,0.4)'} 
-                              />
-                            ))}
-                          </div>
-                          <span style={{ fontWeight: 900, fontSize: isMusicStandMode ? '0.82rem' : '0.74rem' }}>{availableShields}/3 Schilde</span>
-                        </span>
-                      );
-                    })()}
-                  </div>
-                </div>
-              )}
-
-            </div>
-            )}
-
-            {/* Interactive Level Roadmap Banner (Row 2 - Below KPIs - Teen & Pro only) */}
-            {studentUiLevel !== 'junior' && (
-            <div style={{
-              width: '100%',
-              background: 'linear-gradient(135deg, rgba(22, 101, 52, 0.95) 0%, rgba(21, 128, 61, 0.90) 50%, rgba(4, 120, 87, 0.95) 100%)',
-              backdropFilter: 'blur(16px)',
-              WebkitBackdropFilter: 'blur(16px)',
-              borderRadius: '20px',
-              padding: '12px 18px',
-              color: '#ffffff',
-              border: '1px solid rgba(255, 255, 255, 0.25)',
-              boxShadow: '0 8px 24px -6px rgba(19, 115, 51, 0.25)',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '10px',
-              position: 'relative',
-              overflow: 'hidden',
-              boxSizing: 'border-box'
-            }}>
-              {/* Ambient Golden Background Glow */}
-              <div style={{
-                position: 'absolute',
-                top: '-30px',
-                right: '-30px',
-                width: '140px',
-                height: '140px',
-                background: 'radial-gradient(circle, rgba(253, 224, 71, 0.22) 0%, rgba(0,0,0,0) 70%)',
-                borderRadius: '50%',
-                pointerEvents: 'none'
-              }} />
-
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', zIndex: 1 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <div style={{
-                    width: '32px',
-                    height: '32px',
-                    borderRadius: '10px',
-                    background: 'rgba(255, 255, 255, 0.2)',
-                    backdropFilter: 'blur(8px)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    border: '1px solid rgba(255, 255, 255, 0.3)',
-                    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)',
-                    flexShrink: 0
-                  }}>
-                    <Award size={17} color="#fde047" />
-                  </div>
-                  <div>
-                    <div style={{ fontSize: isMusicStandMode ? '0.86rem' : '0.78rem', fontWeight: 800, color: '#a7f3d0', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                      Dein Sticker-Pfad & Übe-Level
-                    </div>
-                    <h3 style={{ margin: 0, fontSize: isMusicStandMode ? '1.30rem' : '1.18rem', fontWeight: 900, color: '#ffffff' }}>
-                      {(() => {
-                        const logsMins = Math.floor((fokusLogs || []).reduce((sum, log) => sum + (log.duration_seconds || ((log.duration_minutes || 0) * 60)), 0) / 60);
-                        const effMins = Math.max(totalFocusMinutes || 0, logsMins);
-                        if (effMins >= 1500) return 'Stufe 4: Übe-Großmeister';
-                        if (effMins >= 500) return 'Stufe 3: Übe-Legende';
-                        if (effMins >= 100) return 'Stufe 2: Übe-Meister';
-                        if (effMins >= 20) return 'Stufe 1: Fleiß-Pionier';
-                        return 'Stufe 0: Übe-Starter';
-                      })()}
-                    </h3>
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  {(() => {
-                    const logsMins = Math.floor((fokusLogs || []).reduce((sum, log) => sum + (log.duration_seconds || ((log.duration_minutes || 0) * 60)), 0) / 60);
-                    const effMins = Math.max(totalFocusMinutes || 0, logsMins);
-                    let nextStickerName = 'Fleiß-Pionier';
-                    let targetMin = 20;
-                    let prevMin = 0;
-                    if (effMins >= 500) {
-                      nextStickerName = 'Übe-Großmeister';
-                      targetMin = 1500;
-                      prevMin = 500;
-                    } else if (effMins >= 100) {
-                      nextStickerName = 'Übe-Legende';
-                      targetMin = 500;
-                      prevMin = 100;
-                    } else if (effMins >= 20) {
-                      nextStickerName = 'Übe-Meister';
-                      targetMin = 100;
-                      prevMin = 20;
-                    }
-
-                    const isMax = effMins >= 1500;
-                    const progressPct = isMax ? 100 : Math.min(100, Math.max(0, ((effMins - prevMin) / (targetMin - prevMin)) * 100));
-
-                    return (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(0, 0, 0, 0.18)', padding: isMusicStandMode ? '6px 14px' : '4px 10px', borderRadius: '999px', border: '1px solid rgba(255, 255, 255, 0.2)' }}>
-                        <span style={{ fontSize: isMusicStandMode ? '0.90rem' : '0.82rem', fontWeight: 800, color: '#ffffff' }}>
-                          {isMax ? 'Großmeister-Status erreicht' : `${effMins}/${targetMin} Min. zu ${nextStickerName}`}
-                        </span>
-                        <div style={{ width: isMusicStandMode ? '60px' : '48px', height: '6px', background: 'rgba(255, 255, 255, 0.2)', borderRadius: '999px', overflow: 'hidden' }}>
-                          <div style={{ width: `${progressPct}%`, height: '100%', background: 'linear-gradient(90deg, #facc15 0%, #fde047 100%)', borderRadius: '999px', transition: 'width 0.5s ease' }} />
-                        </div>
-                      </div>
-                    );
-                  })()}
-
-                  <button
-                    onClick={() => {
-                      handleOpenHomeworkBookWithView('stickeralbum', 'document');
-                    }}
+              // =========================================================================
+              // 🎧 WENN SESSION AKTIV IST -> IMMERSIVE TEEN FOCUS STAGE
+              // =========================================================================
+              if (sessionActive) {
+                return createPortal(
+                  <div
+                    id="teen-flow-mission-portal"
                     style={{
-                      background: 'rgba(255, 255, 255, 0.2)',
-                      border: '1px solid rgba(255, 255, 255, 0.35)',
-                      color: '#ffffff',
-                      borderRadius: '999px',
-                      padding: isMusicStandMode ? '6px 14px' : '4px 10px',
-                      fontWeight: 800,
-                      fontSize: isMusicStandMode ? '0.88rem' : '0.80rem',
-                      cursor: 'pointer',
+                      position: 'fixed',
+                      inset: 0,
+                      zIndex: 100002,
+                      background: 'linear-gradient(160deg, #090d16 0%, #0f172a 40%, #1e293b 80%, #090d16 100%)',
                       display: 'flex',
+                      flexDirection: 'column',
                       alignItems: 'center',
-                      gap: '5px',
-                      backdropFilter: 'blur(8px)',
-                      transition: 'all 0.2s ease'
+                      justifyContent: 'center',
+                      overflow: 'hidden',
+                      boxSizing: 'border-box',
+                      userSelect: 'none',
+                      WebkitUserSelect: 'none',
+                      fontFamily: '"Plus Jakarta Sans", sans-serif'
                     }}
-                    className="hover-scale"
-                    title="Zum virtuellen Sticker-Album"
                   >
-                    <BookOpen size={isMusicStandMode ? 14 : 12} />
-                    <span>Sticker-Album</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Visual Level Stage Path Nodes */}
-              <div style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                position: 'relative',
-                marginTop: '2px',
-                padding: '2px 4px',
-                zIndex: 1,
-                overflowX: 'auto',
-                gap: '8px'
-              }}>
-                {/* Line connection behind nodes */}
-                <div style={{
-                  position: 'absolute',
-                  top: '23px',
-                  left: '24px',
-                  right: '24px',
-                  height: '2.5px',
-                  background: 'rgba(255, 255, 255, 0.2)',
-                  zIndex: 0
-                }}>
-                  {(() => {
-                    const logsMins = Math.floor((fokusLogs || []).reduce((sum, log) => sum + (log.duration_seconds || ((log.duration_minutes || 0) * 60)), 0) / 60);
-                    const effMins = Math.max(totalFocusMinutes || 0, logsMins);
-                    return (
+                    {/* Countdown Overlay (3-2-1) */}
+                    {preStartCountdown !== null && preStartCountdown > 0 ? (
                       <div style={{
-                        width: `${Math.min(100, Math.max(0, (effMins / 1500) * 100))}%`,
-                        height: '100%',
-                        background: 'linear-gradient(90deg, #facc15 0%, #fde047 100%)',
-                        transition: 'width 0.5s ease'
-                      }} />
-                    );
-                  })()}
-                </div>
-
-                {(() => {
-                  const logsMins = Math.floor((fokusLogs || []).reduce((sum, log) => sum + (log.duration_seconds || ((log.duration_minutes || 0) * 60)), 0) / 60);
-                  const effMins = Math.max(totalFocusMinutes || 0, logsMins);
-                  return [
-                    { stage: 1, id: 'fleiss-pionier', title: 'Fleiß-Pionier', desc: '20 Min', icon: '🐝', done: (effMins >= 20), current: (effMins < 20) },
-                    { stage: 2, id: 'uebe-meister', title: 'Übe-Meister', desc: '100 Min', icon: '🦉', done: (effMins >= 100), current: (effMins >= 20 && effMins < 100) },
-                    { stage: 3, id: 'uebe-legende', title: 'Übe-Legende', desc: '500 Min', icon: '👑', done: (effMins >= 500), current: (effMins >= 100 && effMins < 500) },
-                    { stage: 4, id: 'uebe-grossmeister', title: 'Übe-Großmeister', desc: '1500 Min', icon: '🏆', done: (effMins >= 1500), current: (effMins >= 500 && effMins < 1500) }
-                  ].map((node) => (
-                    <div
-                      key={node.stage}
-                      style={{
+                        position: 'relative',
+                        zIndex: 10,
                         display: 'flex',
                         flexDirection: 'column',
                         alignItems: 'center',
-                        gap: '4px',
-                        zIndex: 1,
-                        minWidth: isMusicStandMode ? '76px' : '68px'
-                      }}
-                    title={`${node.title}: ${node.desc}`}
-                  >
-                    <div style={{
-                      width: isMusicStandMode ? '54px' : '46px',
-                      height: isMusicStandMode ? '54px' : '46px',
-                      borderRadius: '16px',
-                      background: node.done ? '#ffffff' : (node.current ? 'rgba(253, 224, 71, 0.25)' : 'rgba(255, 255, 255, 0.12)'),
-                      border: node.done ? '2px solid #facc15' : (node.current ? '1.5px dashed #fde047' : '1px dashed rgba(255, 255, 255, 0.3)'),
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      boxShadow: node.done ? '0 4px 14px rgba(250, 204, 21, 0.4)' : (node.current ? '0 3px 8px rgba(253, 224, 71, 0.2)' : 'none'),
-                      transform: node.done ? 'scale(1.05)' : (node.current ? 'scale(1.02)' : 'scale(1)'),
-                      transition: 'all 0.3s ease',
-                      overflow: 'hidden',
-                      padding: '3px'
-                    }}>
-                      <img
-                        src={`/stickers/${node.id}.png?v=1`}
-                        alt={node.title}
-                        style={{
-                          width: '100%',
-                          height: '100%',
-                          objectFit: 'contain',
-                          filter: node.done ? 'drop-shadow(0 2px 4px rgba(0,0,0,0.15))' : 'grayscale(100%) opacity(0.4)'
-                        }}
-                        onError={(e) => {
-                          e.currentTarget.style.display = 'none';
-                          const parent = e.currentTarget.parentElement;
-                          if (parent) {
-                            const span = document.createElement('span');
-                            span.style.fontSize = isMusicStandMode ? '1.35rem' : '1.15rem';
-                            span.style.filter = node.done ? 'none' : 'grayscale(100%) opacity(0.4)';
-                            span.innerText = node.icon;
-                            parent.appendChild(span);
-                          }
-                        }}
-                      />
-                    </div>
-                    <span style={{
-                      fontSize: isMusicStandMode ? '0.82rem' : '0.74rem',
-                      fontWeight: node.current ? 900 : 750,
-                      color: node.done ? '#ffffff' : (node.current ? '#fde047' : 'rgba(255, 255, 255, 0.75)'),
-                      textAlign: 'center',
-                      whiteSpace: 'nowrap'
-                    }}>
-                      {node.title}
-                    </span>
-                  </div>
-                ));
-              })()}
-              </div>
-            </div>
-            )}
-
-            {/* Row 3 - 2 Balanced Widgets: Fokus-Timer (Left) & Log-Buch (Right - Equal Size) */}
-            <div style={studentUiLevel === 'junior' ? { display: 'none' } : {
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
-              gap: '16px',
-              width: '100%',
-              alignItems: 'stretch'
-            }} className="practice-widgets-row">
-
-              {/* Left Widget - Fokus-Timer Zen Studio */}
-              <div style={sessionActive ? {
-                position: 'fixed',
-                inset: 0,
-                zIndex: 9998,
-                background: isExtraTime ? 'linear-gradient(135deg, #34a853 0%, #022c22 100%)' : '#000000',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#ffffff',
-                boxSizing: 'border-box',
-                padding: '24px'
-              } : {
-                width: '100%',
-                background: 'rgba(255, 255, 255, 0.92)',
-                backdropFilter: 'blur(24px)',
-                WebkitBackdropFilter: 'blur(24px)',
-                border: '1px solid rgba(226, 232, 240, 0.8)',
-                borderRadius: '24px',
-                padding: '24px',
-                boxShadow: '0 20px 40px -12px rgba(0, 0, 0, 0.04), 0 0 0 1px rgba(255, 255, 255, 0.6) inset',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '14px',
-                boxSizing: 'border-box',
-                height: '100%',
-                position: 'relative'
-              }}>
-                <div style={sessionActive ? {
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '8px',
-                  width: '100%',
-                  maxWidth: '440px',
-                  margin: '0 auto',
-                  textAlign: 'center',
-                  paddingBottom: '10px'
-                } : { 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  gap: '12px', 
-                  width: '100%', 
-                  borderBottom: '1px solid rgba(241, 245, 249, 0.8)', 
-                  paddingBottom: '12px' 
-                }}>
-                  <div style={{ 
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    background: sessionActive ? 'rgba(255, 255, 255, 0.12)' : '#e6f4ea', 
-                    color: sessionActive ? '#ffffff' : '#34a853', 
-                    padding: sessionActive ? '6px 16px' : '9px', 
-                    borderRadius: sessionActive ? '999px' : '12px',
-                    boxShadow: sessionActive ? 'none' : '0 2px 8px rgba(52, 168, 83, 0.08)'
-                  }}>
-                    <Clock size={sessionActive ? 15 : 18} color={sessionActive ? '#ffffff' : '#34a853'} />
-                    {sessionActive && (
-                      <span style={{ fontSize: '0.84rem', fontWeight: 850, color: '#ffffff', letterSpacing: '0.02em' }}>
-                        {isExtraTime ? '🌟 Extra-Zeit läuft!' : (studentUiLevel === 'junior' ? '🚀 Deine Übe-Rakete' : '🎧 Fokus-Session')}
-                      </span>
-                    )}
-                  </div>
-                  <div>
-                    {!sessionActive && (
-                      <h4 style={{ 
-                        fontWeight: 850, 
-                        fontSize: isMusicStandMode ? '22px' : '19px', 
-                        color: '#0f172a', 
-                        margin: 0, 
-                        letterSpacing: '-0.02em',
-                        fontFamily: "'Plus Jakarta Sans', sans-serif"
+                        justifyContent: 'center',
+                        gap: '24px',
+                        textAlign: 'center'
                       }}>
-                        {studentUiLevel === 'junior' ? 'Deine Übe-Rakete' : (studentUiLevel === 'teen' ? 'Flow-Timer' : 'Fokus-Timer')}
-                      </h4>
-                    )}
-                    <p style={{ 
-                      fontSize: isMusicStandMode ? '0.96rem' : '0.86rem', 
-                      color: sessionActive ? 'rgba(255, 255, 255, 0.7)' : '#64748b', 
-                      margin: '2px 0 0 0', 
-                      fontWeight: 550, 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      justifyContent: sessionActive ? 'center' : 'flex-start',
-                      gap: '5px' 
-                    }}>
-                      {isExtraTime ? (
-                        <>
-                          <Award size={13} style={{ color: '#ffffff', flexShrink: 0 }} />
-                          <span style={{ color: '#ffffff', fontWeight: 600 }}>Du bist in der Extra-Zeit! Jede Minute bringt Extra-XP.</span>
-                        </>
-                      ) : (
-                        <>
-                          <Smartphone size={13} style={{ color: sessionActive ? '#ffffff' : '#34a853', flexShrink: 0 }} />
-                          <span>
-                            {sessionActive 
-                              ? `Ziel: ${getTargetMinutes(avatar?.streak_flame || 0)} Min. am Stück für deinen Tages-Streak 🔥`
-                              : (studentUiLevel === 'junior' 
-                                  ? `Handy flach hinlegen & ${getTargetMinutes(avatar?.streak_flame || 0)} Min. am Stück üben` 
-                                  : `Handy flach hinlegen – ${getTargetMinutes(avatar?.streak_flame || 0)} Min. am Stück für die Flamme 🔥`)}
-                          </span>
-                        </>
-                      )}
-                    </p>
-                  </div>
-
-                  {/* Level progression inside the header on the right */}
-                  {!sessionActive && (() => {
-                    const { practicedDays, targetDays, nextLevel, progressPercentage, isMaxLevel } = getTrimesterProgressDetails();
-                    return (
-                      <div style={{ marginLeft: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px' }}>
-                        <span style={{ fontSize: isMusicStandMode ? '0.80rem' : '0.72rem', fontWeight: 800, color: '#34a853', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                          {isMaxLevel ? 'Stufe Max' : `Weg zu Level ${nextLevel}`}
-                        </span>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                          <span style={{ fontSize: isMusicStandMode ? '0.94rem' : '0.85rem', fontWeight: 800, color: '#125026', fontFamily: "'Urbanist', sans-serif" }}>
-                            {practicedDays} / {targetDays} Tage
-                          </span>
-                          <div style={{ width: isMusicStandMode ? '60px' : '50px', height: '5px', background: '#e6f4ea', borderRadius: '100px', overflow: 'hidden' }}>
-                            <div style={{ width: `${progressPercentage}%`, height: '100%', background: '#34a853', borderRadius: '100px' }} />
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })()}
-                </div>
-
-                {!sessionActive ? (
-                  /* Timer setup before starting - Centered */
-                  <div style={{ 
-                    display: 'flex', 
-                    flexDirection: 'column', 
-                    gap: '14px', 
-                    maxWidth: '400px', 
-                    width: '100%', 
-                    margin: '0 auto', 
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}>
-                    
-                    {practiceAnchor ? (
-                      <>
-
-                        {/* Pulsating Neon-Emerald Studio Ring Center */}
-                        <div style={{ 
-                          position: 'relative', 
-                          width: '175px', 
-                          height: '175px', 
-                          margin: '4px 0',
+                        <div style={{
+                          width: '170px',
+                          height: '170px',
+                          borderRadius: '50%',
+                          background: 'radial-gradient(circle, rgba(245, 158, 11, 0.25) 0%, rgba(245, 158, 11, 0.05) 70%)',
+                          border: '3px solid #fbbf24',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          borderRadius: '50%',
-                          background: 'radial-gradient(circle, rgba(52, 168, 83, 0.06) 0%, rgba(255,255,255,0) 70%)',
-                          boxShadow: '0 10px 30px -8px rgba(52, 168, 83, 0.2)'
+                          boxShadow: '0 0 50px rgba(245, 158, 11, 0.45)',
+                          animation: 'countInPulse 0.5s ease-out'
                         }}>
-                          {/* Audio wave pulse background effect */}
-                          <div style={{
-                            position: 'absolute',
-                            inset: '-6px',
-                            borderRadius: '50%',
-                            border: '1.5px dashed rgba(52, 168, 83, 0.25)',
-                            animation: 'spinSlow 20s linear infinite'
-                          }} />
-
-                          <svg width="175" height="175" viewBox="0 0 175 175" style={{ transform: 'rotate(-90deg)', overflow: 'visible' }}>
-                            <circle cx="87.5" cy="87.5" r="77" fill="none" stroke="#e6f4ea" strokeWidth="5.5" />
-                            <circle 
-                              cx="87.5" 
-                              cy="87.5" 
-                              r="77" 
-                              fill="none" 
-                              stroke="url(#emeraldStudioGradient)" 
-                              strokeWidth="5.5" 
-                              strokeDasharray={2 * Math.PI * 77}
-                              strokeDashoffset={0}
-                              strokeLinecap="round"
-                              style={{ filter: 'drop-shadow(0 0 6px rgba(52, 168, 83, 0.35))' }}
-                            />
-                            <defs>
-                              <linearGradient id="emeraldStudioGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                                <stop offset="0%" stopColor="#34a853" />
-                                <stop offset="50%" stopColor="#10b981" />
-                                <stop offset="100%" stopColor="#059669" />
-                              </linearGradient>
-                            </defs>
-                          </svg>
-
-                          <div style={{
-                            position: 'absolute',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            textAlign: 'center'
-                          }}>
-                            <span style={{
-                              fontSize: '2.4rem',
-                              fontWeight: 900,
-                              color: '#0f172a',
-                              letterSpacing: '-0.04em',
-                              lineHeight: 1,
-                              fontFamily: "'Urbanist', sans-serif"
-                            }}>
-                              {String(getTargetMinutes(avatar?.streak_flame || 0)).padStart(2, '0')}:00
-                            </span>
-                            <span style={{
-                              fontSize: '0.62rem',
-                              fontWeight: 800,
-                              color: '#34a853',
-                              textTransform: 'uppercase',
-                              letterSpacing: '0.09em',
-                              marginTop: '5px',
-                              background: '#e6f4ea',
-                              padding: '2px 9px',
-                              borderRadius: '999px'
-                            }}>
-                              {studentUiLevel === 'junior' ? 'Zielzeit' : (studentUiLevel === 'teen' ? 'Daily Goal' : 'Ziel-Fokuszeit')}
-                            </span>
-                          </div>
+                          <span style={{ fontSize: '5.5rem', fontWeight: 950, color: '#fbbf24', lineHeight: 1 }}>
+                            {preStartCountdown}
+                          </span>
                         </div>
-
-                        {/* Integrated Studio Bottom Capsule (Übe-Anker & Zielzeit) - 100% Monochrome Icons */}
-                        <div style={{ 
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          background: '#f8fafc', 
-                          padding: '10px 14px', 
-                          borderRadius: '16px', 
-                          width: '100%', 
-                          border: '1px solid rgba(226, 232, 240, 0.9)',
-                          boxSizing: 'border-box',
-                          gap: '10px',
-                          flexWrap: 'wrap'
-                        }}>
-                          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '6px', flex: 1, minWidth: '180px' }}>
-                            <Anchor size={14} style={{ color: '#34a853', flexShrink: 0, marginTop: '2px' }} />
-                            <span style={{ fontSize: '0.74rem', fontWeight: 650, color: '#334155', lineHeight: 1.35, wordBreak: 'break-word' }}>
-                              <span style={{ color: '#64748b', fontWeight: 800 }}>Anker:</span> „{practiceAnchor.replace(/^Direct nach/, 'Direkt nach')}“
-                            </span>
-                            <button
-                              onClick={() => setPracticeAnchor(null)}
-                              style={{ 
-                                background: 'transparent', 
-                                border: 'none', 
-                                color: '#64748b', 
-                                cursor: 'pointer', 
-                                minWidth: '28px', 
-                                minHeight: '28px', 
-                                padding: '4px', 
-                                display: 'inline-flex', 
-                                alignItems: 'center', 
-                                justifyContent: 'center', 
-                                flexShrink: 0,
-                                borderRadius: '6px'
-                              }}
-                              title="Anker bearbeiten"
-                              className="hover-scale"
-                            >
-                              <Pencil size={12} />
-                            </button>
-                          </div>
-                          
-                          <div style={{ fontSize: '0.74rem', fontWeight: 850, color: '#34a853', whiteSpace: 'nowrap', flexShrink: 0, display: 'flex', alignItems: 'center', gap: '4px', marginLeft: 'auto' }}>
-                            <Target size={14} style={{ color: '#34a853', flexShrink: 0 }} />
-                            <span>Ziel: {getTargetMinutes(avatar?.streak_flame || 0)} Min.</span>
-                          </div>
-                        </div>
-
-                        {/* Level-based Milestone Sound Preview - Minimal Monochrome Pill Strip */}
                         <div style={{
-                          background: 'transparent',
+                          background: 'rgba(255, 255, 255, 0.1)',
+                          border: '1.5px solid rgba(245, 158, 11, 0.4)',
+                          borderRadius: '100px',
+                          padding: '8px 24px',
+                          color: '#ffffff',
+                          fontSize: '1.05rem',
+                          fontWeight: 850
+                        }}>
+                          Kopfhörer auf, {instrumentLabel} bereit machen... 🎧
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{
+                        position: 'relative',
+                        zIndex: 1,
+                        width: '100%',
+                        maxWidth: '440px',
+                        margin: '0 auto',
+                        height: '100%',
+                        maxHeight: '100dvh',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: isMusicStandMode ? '20px 18px 24px' : '16px 16px 20px',
+                        boxSizing: 'border-box',
+                        overflow: 'hidden'
+                      }}>
+                        {/* ZONE A: HUD Top Bar mit Status & Taktilen Buttons */}
+                        <div style={{
                           width: '100%',
                           display: 'flex',
                           flexDirection: 'column',
                           gap: '8px',
+                          background: 'rgba(30, 41, 59, 0.85)',
+                          border: '1.5px solid rgba(245, 158, 11, 0.3)',
+                          borderRadius: '20px',
+                          padding: '10px 14px',
                           boxSizing: 'border-box'
                         }}>
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                            <span style={{ fontSize: '0.68rem', fontWeight: 850, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                              <Bell size={12} color="#64748b" />
-                              <span>Zaubertöne dieser Session:</span>
-                            </span>
-                            <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#166534', background: '#dcfce7', padding: '1px 6px', borderRadius: '6px' }}>
-                              Akustische Meilensteine
-                            </span>
-                          </div>
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            width: '100%',
+                            gap: '10px'
+                          }}>
+                            {/* Left Status Pill */}
+                            <div style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '8px',
+                              background: 'rgba(245, 158, 11, 0.15)',
+                              border: '1px solid rgba(245, 158, 11, 0.4)',
+                              borderRadius: '100px',
+                              padding: '5px 12px',
+                              fontSize: '0.82rem',
+                              fontWeight: 850,
+                              color: '#fbbf24'
+                            }}>
+                              <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#f59e0b', boxShadow: '0 0 8px #f59e0b' }} />
+                              <Headphones size={13} color="#f59e0b" style={{ flexShrink: 0 }} />
+                              <span>Übe-Studio</span>
+                            </div>
 
-                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
-                            {(() => {
-                              const targetMins = getTargetMinutes(avatar?.streak_flame || 0);
-                              const tone2Mins = Math.max(targetMins + 1, customTone2Min || (targetMins + 5));
-                              const tone3Mins = Math.max(tone2Mins + 1, customTone3Min || (tone2Mins + 5));
-
-                              const cycleTone2 = () => {
-                                const options = [targetMins + 2, targetMins + 5, targetMins + 7, 10, 15, 20].filter(m => m > targetMins);
-                                const uniqueOptions = Array.from(new Set(options)).sort((a, b) => a - b);
-                                const currIdx = uniqueOptions.indexOf(tone2Mins);
-                                const nextVal = uniqueOptions[(currIdx + 1) % uniqueOptions.length] || (targetMins + 5);
-                                setCustomTone2Min(nextVal);
-                                try { localStorage.setItem(`cg_magictone2_${studentId}`, String(nextVal)); } catch {}
-                                playMilestoneSound(2);
-                              };
-
-                              const cycleTone3 = () => {
-                                const options = [tone2Mins + 3, tone2Mins + 5, tone2Mins + 10, 15, 20, 25, 30, 45].filter(m => m > tone2Mins);
-                                const uniqueOptions = Array.from(new Set(options)).sort((a, b) => a - b);
-                                const currIdx = uniqueOptions.indexOf(tone3Mins);
-                                const nextVal = uniqueOptions[(currIdx + 1) % uniqueOptions.length] || (tone2Mins + 5);
-                                setCustomTone3Min(nextVal);
-                                try { localStorage.setItem(`cg_magictone3_${studentId}`, String(nextVal)); } catch {}
-                                playMilestoneSound(3);
-                              };
-
-                              return (
+                            {/* Right Buttons */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              {isGoalReached ? (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setIsJuniorMissionPaused(false);
+                                    isJuniorMissionPausedRef.current = false;
+                                    finishPracticeSession();
+                                  }}
+                                  style={{
+                                    background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                                    border: '1.5px solid #fde047',
+                                    borderRadius: '100px',
+                                    height: '40px',
+                                    padding: '0 18px',
+                                    color: '#ffffff',
+                                    fontSize: '0.90rem',
+                                    fontWeight: 950,
+                                    cursor: 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '7px',
+                                    boxShadow: '0 0 16px rgba(245, 158, 11, 0.45)'
+                                  }}
+                                >
+                                  <span>Abschließen</span>
+                                  <Star size={15} fill="#ffffff" color="#ffffff" />
+                                </button>
+                              ) : (
                                 <>
-                                  {/* Ton 1: Immer synchron mit dem Zielwert */}
-                                  <div
-                                    style={{
-                                      background: '#e6f4ea',
-                                      border: '1.5px solid #86efac',
-                                      borderRadius: '12px',
-                                      padding: '8px 4px',
-                                      minHeight: '48px',
-                                      textAlign: 'center',
-                                      display: 'flex',
-                                      flexDirection: 'column',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                      gap: '2px',
-                                      boxShadow: '0 1px 3px rgba(34, 197, 94, 0.08)',
-                                      cursor: 'default'
-                                    }}
-                                    title="Zauberton 1 ist fest an dein Tages-Fokus-Ziel gekoppelt"
-                                  >
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
-                                      <span style={{ fontSize: '0.80rem', fontWeight: 950, color: '#15803d' }}>{targetMins} Min</span>
-                                    </div>
-                                    <span style={{ fontSize: '0.62rem', fontWeight: 900, color: '#166534' }}>🎯 Glocke</span>
-                                  </div>
-
-                                  {/* Ton 2: Interaktiv wählbar */}
                                   <button
                                     type="button"
-                                    onClick={cycleTone2}
-                                    style={{
-                                      background: '#f8fafc',
-                                      border: '1.5px solid #e2e8f0',
-                                      borderRadius: '12px',
-                                      padding: '8px 4px',
-                                      minHeight: '48px',
-                                      textAlign: 'center',
-                                      display: 'flex',
-                                      flexDirection: 'column',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                      gap: '2px',
-                                      boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
-                                      cursor: 'pointer',
-                                      transition: 'all 0.15s ease'
+                                    onClick={() => {
+                                      const next = !isJuniorMissionPaused;
+                                      setIsJuniorMissionPaused(next);
+                                      isJuniorMissionPausedRef.current = next;
                                     }}
-                                    className="hover-scale"
-                                    title="Klicken, um Meilenstein 2 für freies Weiterspielen zu ändern (spielt Ton-Vorschau)"
+                                    style={{
+                                      background: 'rgba(255, 255, 255, 0.10)',
+                                      border: '1px solid rgba(255, 255, 255, 0.2)',
+                                      borderRadius: '100px',
+                                      height: '40px',
+                                      padding: '0 16px',
+                                      color: '#f8fafc',
+                                      fontSize: '0.86rem',
+                                      fontWeight: 900,
+                                      cursor: 'pointer',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '7px'
+                                    }}
                                   >
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
-                                      <span style={{ fontSize: '0.80rem', fontWeight: 900, color: '#1e293b' }}>{tone2Mins} Min</span>
-                                      <span style={{ fontSize: '0.60rem', color: '#94a3b8' }}>✎</span>
-                                    </div>
-                                    <span style={{ fontSize: '0.62rem', fontWeight: 850, color: '#4338ca' }}>🎵 Harfe</span>
+                                    <Pause size={14} fill="#f8fafc" color="#f8fafc" />
+                                    <span>{isJuniorMissionPaused ? 'Weiter' : 'Pause'}</span>
                                   </button>
 
-                                  {/* Ton 3: Interaktiv wählbar */}
                                   <button
                                     type="button"
-                                    onClick={cycleTone3}
-                                    style={{
-                                      background: '#f8fafc',
-                                      border: '1.5px solid #e2e8f0',
-                                      borderRadius: '12px',
-                                      padding: '8px 4px',
-                                      minHeight: '48px',
-                                      textAlign: 'center',
-                                      display: 'flex',
-                                      flexDirection: 'column',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                      gap: '2px',
-                                      boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
-                                      cursor: 'pointer',
-                                      transition: 'all 0.15s ease'
+                                    onClick={() => {
+                                      setIsJuniorMissionPaused(false);
+                                      isJuniorMissionPausedRef.current = false;
+                                      finishPracticeSession();
                                     }}
-                                    className="hover-scale"
-                                    title="Klicken, um Meilenstein 3 für freies Weiterspielen zu ändern (spielt Ton-Vorschau)"
+                                    style={{
+                                      background: 'rgba(239, 68, 68, 0.20)',
+                                      border: '1px solid rgba(248, 113, 113, 0.4)',
+                                      borderRadius: '100px',
+                                      height: '40px',
+                                      padding: '0 16px',
+                                      color: '#fca5a5',
+                                      fontSize: '0.86rem',
+                                      fontWeight: 900,
+                                      cursor: 'pointer',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '7px'
+                                    }}
                                   >
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
-                                      <span style={{ fontSize: '0.80rem', fontWeight: 900, color: '#1e293b' }}>{tone3Mins} Min</span>
-                                      <span style={{ fontSize: '0.60rem', color: '#94a3b8' }}>✎</span>
-                                    </div>
-                                    <span style={{ fontSize: '0.62rem', fontWeight: 850, color: '#9333ea' }}>🎹 Akkord</span>
+                                    <Square size={13} fill="#fca5a5" color="#fca5a5" />
+                                    <span>Beenden</span>
                                   </button>
                                 </>
-                              );
-                            })()}
+                              )}
+                            </div>
                           </div>
 
-                          {/* Notenständer-Modus & Audio Readiness Status Badge (HM2) */}
-                          <div style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '6px',
-                            padding: '6px 10px',
-                            borderRadius: '10px',
-                            background: 'rgba(52, 168, 83, 0.08)',
-                            border: '1px solid rgba(52, 168, 83, 0.2)',
-                            color: '#15803d',
-                            fontSize: '0.68rem',
-                            fontWeight: 800,
-                            marginTop: '2px'
-                          }}>
-                            <span>💡 Notenständer-Modus bereit (Display bleibt an)</span>
-                          </div>
-                        </div>
-
-                      <button
-                        onClick={handleStartPracticeSession}
-                        style={{
-                          width: '100%',
-                          background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
-                          color: 'white',
-                          border: 'none',
-                          padding: '14px 20px',
-                          borderRadius: '16px',
-                          fontWeight: 950,
-                          fontSize: '0.96rem',
-                          cursor: 'pointer',
-                          boxShadow: '0 8px 22px rgba(34, 197, 94, 0.28), 0 2px 4px rgba(0,0,0,0.05)',
-                          textTransform: 'none',
-                          letterSpacing: '0.01em',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '8px',
-                          transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
-                        }}
-                        className="hover-scale"
-                      >
-                        <Play size={17} fill="white" color="white" />
-                        <span>
-                          {studentUiLevel === 'junior' 
-                            ? 'Rakete zünden & Üben starten' 
-                            : (studentUiLevel === 'teen' 
-                                ? 'Flow-Session starten & XP sammeln' 
-                                : 'Fokus-Session starten')}
-                        </span>
-                      </button>
-                    </>
-                  ) : (
-                    /* Inline Setup Anchor Gating Sentence Builder - Apple Style */
-                    <div style={{
-                      width: '100%',
-                      background: 'linear-gradient(135deg, rgba(52, 168, 83, 0.05) 0%, rgba(52, 168, 83, 0.01) 100%)',
-                      border: '1.5px dashed rgba(52, 168, 83, 0.35)',
-                      borderRadius: '24px',
-                      padding: '24px 20px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '16px',
-                      boxSizing: 'border-box',
-                      alignItems: 'center',
-                      textAlign: 'center'
-                    }}>
-                      <div style={{
-                        width: '46px',
-                        height: '46px',
-                        borderRadius: '16px',
-                        background: 'linear-gradient(135deg, #e6f4ea 0%, #d1fae5 100%)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        boxShadow: '0 4px 12px rgba(52, 168, 83, 0.18)'
-                      }}>
-                        <Anchor size={24} style={{ color: '#15803d' }} />
-                      </div>
-                      
-                      <div>
-                        <h5 style={{ margin: 0, fontWeight: 950, fontSize: '1.15rem', color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                          Setze deinen Übe-Anker
-                        </h5>
-                        <p style={{ margin: '4px 0 0 0', fontSize: '0.82rem', color: '#64748b', fontWeight: 650, lineHeight: 1.4 }}>
-                          Wann übst du am liebsten? Wähle deine tägliche Routine:
-                        </p>
-                      </div>
-
-                      {/* Visual Choice Chips (Kindgerecht & 1-Klick) */}
-                      <div style={{
-                        display: 'grid',
-                        gridTemplateColumns: 'repeat(2, 1fr)',
-                        gap: '8px',
-                        width: '100%'
-                      }}>
-                        {[
-                          { id: 'den Hausaufgaben', icon: '📚', label: 'Hausaufgaben' },
-                          { id: 'dem Zähneputzen', icon: '🪥', label: 'Zähneputzen' },
-                          { id: 'dem Mittagessen', icon: '🍽️', label: 'Mittagessen' },
-                          { id: 'der Schule', icon: '🎒', label: 'Nach der Schule' },
-                          { id: 'dem Aufstehen', icon: '☀️', label: 'Morgens' },
-                          { id: 'custom', icon: '✏️', label: 'Eigener Moment' }
-                        ].map((chip) => {
-                          const isSelected = anchorTrigger === chip.id;
-                          return (
-                            <button
-                              key={chip.id}
-                              type="button"
-                              onClick={() => {
-                                setAnchorTrigger(chip.id);
-                                if (chip.id !== 'custom') {
-                                  setCustomTriggerText('');
-                                }
-                              }}
-                              style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '8px',
-                                padding: '10px 12px',
-                                borderRadius: '14px',
-                                border: isSelected ? '2px solid #16a34a' : '1.5px solid #e2e8f0',
-                                background: isSelected ? '#f0fdf4' : '#ffffff',
-                                color: isSelected ? '#15803d' : '#334155',
-                                fontWeight: isSelected ? 900 : 700,
-                                fontSize: '0.82rem',
-                                cursor: 'pointer',
-                                transition: 'all 0.15s ease',
-                                boxShadow: isSelected ? '0 4px 12px rgba(34, 197, 94, 0.15)' : '0 2px 4px rgba(0,0,0,0.02)',
-                                textAlign: 'left'
-                              }}
-                              className="hover-scale"
-                            >
-                              <span style={{ fontSize: '1.15rem' }}>{chip.icon}</span>
-                              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{chip.label}</span>
-                            </button>
-                          );
-                        })}
-                      </div>
-
-                      {/* Custom Input if selected */}
-                      {anchorTrigger === 'custom' && (
-                        <input
-                          type="text"
-                          placeholder="z.B. dem Abendessen, dem Sport..."
-                          value={customTriggerText}
-                          onChange={e => setCustomTriggerText(e.target.value)}
-                          style={{
-                            background: '#ffffff',
-                            border: '1.5px solid #16a34a',
-                            borderRadius: '12px',
-                            padding: '10px 14px',
-                            fontSize: '0.85rem',
-                            fontWeight: 700,
-                            color: '#0f172a',
-                            outline: 'none',
-                            width: '100%',
-                            boxSizing: 'border-box',
-                            boxShadow: '0 2px 8px rgba(34, 197, 94, 0.1)'
-                          }}
-                          autoFocus
-                        />
-                      )}
-                      
-                      {/* Live Sentence Badge */}
-                      <div style={{
-                        width: '100%',
-                        background: '#ffffff',
-                        border: '1.5px solid #e2e8f0',
-                        borderRadius: '16px',
-                        padding: '12px 14px',
-                        boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '6px',
-                        fontSize: '0.88rem',
-                        fontWeight: 750,
-                        color: '#334155',
-                        flexWrap: 'wrap'
-                      }}>
-                        <span style={{ color: '#64748b' }}>Direkt nach</span>
-                        <strong style={{ color: '#15803d', fontWeight: 950 }}>
-                          {anchorTrigger === 'custom' ? (customTriggerText.trim() || '...') : anchorTrigger}
-                        </strong>
-                        <span style={{ color: '#64748b' }}>übe ich</span>
-                        <span style={{
-                          background: '#e6f4ea',
-                          color: '#15803d',
-                          padding: '2px 8px',
-                          borderRadius: '8px',
-                          fontWeight: 950,
-                          fontSize: '0.82rem'
-                        }}>
-                          {studentInstrumentName}
-                        </span>
-                      </div>
-
-                      <button
-                        onClick={() => {
-                          const trigger = anchorTrigger === 'custom' ? customTriggerText.trim() : anchorTrigger;
-                          if (!trigger) {
-                            alert('Bitte gib einen Text für deinen Übe-Anker ein!');
-                            return;
-                          }
-                          handleSavePracticeAnchor(`Direkt nach ${trigger} übe ich ${studentInstrumentName}.`);
-                        }}
-                        style={{
-                          width: '100%',
-                          background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
-                          color: 'white',
-                          border: 'none',
-                          padding: '14px 20px',
-                          borderRadius: '18px',
-                          fontWeight: 950,
-                          fontSize: '0.95rem',
-                          cursor: 'pointer',
-                          boxShadow: '0 8px 24px rgba(34, 197, 94, 0.28)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '8px',
-                          transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
-                        }}
-                        className="hover-scale"
-                      >
-                        <Sparkles size={17} />
-                        <span>Anker speichern & Timer freischalten</span>
-                      </button>
-                    </div>
-                  )}
-
-                  {/* 1-Klick Übezeit Presets für "Von Eltern geführt" */}
-                  {(studentUser?.campus_usage_mode === 'eltern_geführt' || studentUser?.app_usage_mode === 'eltern_geführt') && (
-                    <div style={{
-                      width: '100%',
-                      marginTop: '16px',
-                      background: '#ffffff',
-                      border: '1.5px solid #bbf7d0',
-                      borderRadius: '24px',
-                      padding: '20px',
-                      boxSizing: 'border-box',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '14px',
-                      boxShadow: '0 4px 15px rgba(52, 168, 83, 0.08)'
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <span style={{ fontSize: '0.85rem', fontWeight: 900, color: '#15803d', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          👨‍👩‍👧 1-Klick Übezeit eintragen (Level {((avatar?.streak_flame || 0) >= 3) ? 3 : (((avatar?.streak_flame || 0) === 2) ? 2 : 1)})
-                        </span>
-                        <span style={{ fontSize: '0.68rem', background: '#f0fdf4', color: '#166534', border: '1px solid #86efac', padding: '2px 8px', borderRadius: '10px', fontWeight: 800 }}>
-                          Eltern-Modus
-                        </span>
-                      </div>
-
-                      <p style={{ fontSize: '0.74rem', color: '#475569', margin: 0, lineHeight: 1.35 }}>
-                        Trage die geübte Zeit nach dem Spielen am Instrument mit einem Klick ein. Die Streak &amp; XP werden sofort aktualisiert!
-                      </p>
-
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
-                        {(((avatar?.streak_flame || 0) >= 3) ? [10, 15, 20] : (((avatar?.streak_flame || 0) === 2) ? [5, 10, 15] : [3, 5, 10])).map(mins => (
-                          <button
-                            key={mins}
-                            onClick={() => logParentGuidedPractice(mins)}
-                            style={{
-                              background: 'linear-gradient(135deg, #15803d 0%, #22c55e 100%)',
-                              color: '#ffffff',
-                              border: 'none',
-                              borderRadius: '14px',
-                              padding: '12px 6px',
-                              fontSize: '0.82rem',
-                              fontWeight: 900,
-                              cursor: 'pointer',
-                              textAlign: 'center',
-                              boxShadow: '0 3px 10px rgba(34, 197, 94, 0.25)'
-                            }}
-                            className="hover-scale"
-                          >
-                            {mins} Min
-                          </button>
-                        ))}
-
-                        <button
-                          onClick={() => setShowCustomParentInput(prev => !prev)}
-                          style={{
-                            background: '#f1f5f9',
-                            color: '#1e293b',
-                            border: '1.5px solid #cbd5e1',
-                            borderRadius: '14px',
-                            padding: '12px 6px',
-                            fontSize: '0.74rem',
-                            fontWeight: 800,
-                            cursor: 'pointer',
-                            textAlign: 'center'
-                          }}
-                          className="hover-scale"
-                        >
-                          ✏️ Freie
-                        </button>
-                      </div>
-
-                      {showCustomParentInput && (
-                        <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
-                          <input
-                            type="number"
-                            placeholder="Minuten eingeben..."
-                            value={customParentMinutes}
-                            onChange={e => setCustomParentMinutes(e.target.value)}
-                            style={{
-                              flex: 1,
-                              padding: '10px 14px',
-                              borderRadius: '12px',
-                              border: '1px solid #cbd5e1',
-                              fontSize: '0.85rem',
-                              fontWeight: 700,
-                              outline: 'none'
-                            }}
-                          />
-                          <button
-                            onClick={() => {
-                              const mins = parseInt(customParentMinutes, 10);
-                              if (mins > 0) logParentGuidedPractice(mins);
-                            }}
-                            style={{
-                              background: '#15803d',
-                              color: '#ffffff',
-                              border: 'none',
-                              borderRadius: '12px',
-                              padding: '10px 16px',
-                              fontSize: '0.8rem',
-                              fontWeight: 800,
-                              cursor: 'pointer'
-                            }}
-                          >
-                            Verbuchen
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                </div>
-              ) : (
-                /* Timer running / Gyro orientation dashboard */
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '28px', width: '100%', alignItems: 'center' }}>
-                  
-                  {preStartCountdown !== null ? (
-                    /* Pre-start Instructions & Countdown Screen */
-                    <div style={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '20px',
-                      textAlign: 'center',
-                      padding: '30px 20px',
-                      minHeight: '300px',
-                      boxSizing: 'border-box'
-                    }}>
-                      <div style={{
-                        fontSize: '4.5rem',
-                        fontWeight: 900,
-                        color: '#34a853',
-                        fontFamily: 'monospace, sans-serif',
-                        lineHeight: 1,
-                        animation: 'pulseSoft 1.5s infinite ease-in-out'
-                      }}>
-                        {preStartCountdown}
-                      </div>
-
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'center' }}>
-                        <h3 style={{ fontSize: '1.3rem', fontWeight: 900, color: '#ffffff', margin: 0, letterSpacing: '-0.02em' }}>
-                          Fokus-Modus startet...
-                        </h3>
-                        <p style={{ fontSize: '0.8rem', color: '#a1a1aa', margin: 0, fontWeight: 600 }}>
-                          Mach dich bereit zum Spielen am Instrument!
-                        </p>
-                      </div>
-
-                      <div style={{
-                        background: 'rgba(255, 255, 255, 0.05)',
-                        border: '1px solid rgba(255, 255, 255, 0.1)',
-                        borderRadius: '20px',
-                        padding: '16px 20px',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '10px',
-                        maxWidth: '320px',
-                        textAlign: 'left'
-                      }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.8rem', color: '#e4e4e7', fontWeight: 700 }}>
-                          <span style={{ fontSize: '1rem' }}>📱</span>
-                          <span><strong>1. Handy flach hinlegen</strong> (Tisch oder Notenständer)</span>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.8rem', color: '#e4e4e7', fontWeight: 700 }}>
-                          <span style={{ fontSize: '1rem' }}>🌙</span>
-                          <span><strong>2. Bildschirm wird dunkel</strong> (100% reizfrei &amp; akkusparend)</span>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.8rem', color: '#e4e4e7', fontWeight: 700 }}>
-                          <span style={{ fontSize: '1rem' }}>🔔</span>
-                          <span><strong>3. Lausche auf die Klang-Signale</strong> für deine Meilensteine</span>
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    /* Normal active timer layout */
-                    <>
-                      {wakeLockFailed && (
-                        <div style={{
-                          width: '100%',
-                          maxWidth: '300px',
-                          padding: '10px 14px',
-                          borderRadius: '12px',
-                          background: 'rgba(245, 158, 11, 0.2)',
-                          border: '1px solid rgba(245, 158, 11, 0.4)',
-                          color: '#fef3c7',
-                          fontSize: '0.72rem',
-                          fontWeight: 700,
-                          textAlign: 'center',
-                          lineHeight: 1.3,
-                          marginBottom: '8px',
-                          boxSizing: 'border-box'
-                        }}>
-                          ⚠️ Energiesparmodus aktiv oder Wake-Lock blockiert. Bitte lasse den Bildschirm an!
-                        </div>
-                      )}
-                      {/* Circular animated SVG progress ring */}
-                      <div style={{ 
-                        position: 'relative', 
-                        width: '210px', 
-                        height: '210px', 
-                        filter: isExtraTime ? 'drop-shadow(0 0 12px rgba(52, 168, 83, 0.25))' : (isPhoneFlat ? 'drop-shadow(0 0 12px rgba(52, 168, 83, 0.2))' : 'drop-shadow(0 0 12px rgba(239, 68, 68, 0.25))'),
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center'
-                      }}>
-                        <svg width="210" height="210" viewBox="0 0 210 210" style={{ transform: 'rotate(-90deg)' }}>
-                          <circle cx="105" cy="105" r="95" fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="4" />
-                          <circle 
-                            cx="105" 
-                            cy="105" 
-                            r="95" 
-                            fill="none" 
-                            stroke={isExtraTime ? '#ffffff' : (isPhoneFlat ? 'url(#greenGradient)' : 'url(#redGradient)')} 
-                            strokeWidth="4" 
-                            strokeDasharray={2 * Math.PI * 95}
-                            strokeDashoffset={
-                              isExtraTime 
-                                ? 0 // Full circle in extra time
-                                : 2 * Math.PI * 95 - (2 * Math.PI * 95 * Math.min(1, secondsElapsed / (getTargetMinutes(avatar?.streak_flame || 0) * 60)))
-                            }
-                            strokeLinecap="round"
-                            style={{ transition: isPhoneFlat ? 'stroke-dashoffset 1s linear, stroke 0.3s' : 'stroke 0.3s' }}
-                          />
-                          <defs>
-                            <linearGradient id="greenGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                              <stop offset="0%" stopColor="#34a853" />
-                              <stop offset="100%" stopColor="#34a853" />
-                            </linearGradient>
-                            <linearGradient id="redGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                              <stop offset="0%" stopColor="#f87171" />
-                              <stop offset="100%" stopColor="#dc2626" />
-                            </linearGradient>
-                          </defs>
-                        </svg>
-                        <div style={{
-                          position: 'absolute',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          alignItems: 'center',
-                          justifyContent: 'center'
-                        }}>
-                          <span style={{ fontSize: '3rem', fontWeight: 800, color: '#ffffff', fontFamily: 'system-ui, -apple-system, sans-serif', letterSpacing: '-0.02em', lineHeight: 1 }}>
-                            {String(Math.floor(secondsElapsed / 60)).padStart(2, '0')}:
-                            {String(secondsElapsed % 60).padStart(2, '0')}
-                          </span>
-                          <span style={{ 
-                            fontSize: '0.62rem', 
-                            fontWeight: 700, 
-                            color: 'rgba(255,255,255,0.7)', 
-                            textTransform: 'uppercase', 
-                            letterSpacing: '0.08em', 
-                            marginTop: '6px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '4px'
-                          }}>
-                            {isExtraTime ? (
-                              <>
-                                <Zap size={11} fill="currentColor" style={{ animation: 'pulse 1.5s infinite' }} />
-                                <span>Extra-Zeit aktiv</span>
-                              </>
-                            ) : (
-                              isPhoneFlat ? 'Üben Aktiv' : 'Unterbrochen'
-                            )}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Gyro Sensor feedback - ONLY show when interrupted (not flat) to stay clean */}
-                      {!isPhoneFlat && (
-                        <div style={{
-                          width: '100%',
-                          maxWidth: '450px',
-                          padding: '16px 20px',
-                          borderRadius: '20px',
-                          background: isExtraTime 
-                            ? 'rgba(255, 255, 255, 0.15)' 
-                            : 'rgba(239, 68, 68, 0.15)',
-                          border: isExtraTime
-                            ? '1px solid rgba(255, 255, 255, 0.3)'
-                            : '1px solid rgba(239, 68, 68, 0.3)',
-                          color: '#ffffff',
-                          fontSize: '0.85rem',
-                          fontWeight: 600,
-                          textAlign: 'center',
-                          lineHeight: 1.4,
-                          boxShadow: '0 2px 8px rgba(0,0,0,0.01)'
-                        }}>
-                          <div className={isExtraTime ? '' : 'animate-pulse'}>
-                            <strong style={{ fontSize: '0.9rem', fontWeight: 800, display: 'block', marginBottom: '2px' }}>
-                              {isExtraTime ? 'Fokus pausiert' : 'Fokus unterbrochen!'}
-                            </strong>
-                            <span style={{ fontSize: '0.78rem', opacity: 0.9 }}>
-                              {isExtraTime 
-                                ? (isDesktopFallback ? 'Wechsle zurück auf dieses Fenster, um weiter Extra-Zeit zu sammeln.' : 'Lege das Handy mit dem Display nach unten hin, um weiter Extra-Minuten zu sammeln.')
-                                : (isDesktopFallback ? 'Wechsle sofort zurück auf dieses Fenster! Sonst fällt dein Timer sofort auf 0 zurück.' : 'Lege das Handy mit dem Display nach unten hin! Sonst fällt dein Timer sofort auf 0 zurück.')}
-                            </span>
-                          </div>
-                        </div>
-                      )}
-                    </>
-                  )}
-
-                  {/* Style definitions for modern breathing and glowing animations */}
-                  <style dangerouslySetInnerHTML={{__html: `
-                    @keyframes breathGlow {
-                      0% { opacity: 0.15; transform: scale(0.95) translate(-50%, -50%); filter: blur(45px); }
-                      50% { opacity: 0.3; transform: scale(1.05) translate(-50%, -50%); filter: blur(65px); }
-                      100% { opacity: 0.15; transform: scale(0.95) translate(-50%, -50%); filter: blur(45px); }
-                    }
-                    @keyframes breathRing {
-                      0% { transform: scale(0.98); }
-                      50% { transform: scale(1.02); }
-                      100% { transform: scale(0.98); }
-                    }
-                    @keyframes pulseSoft {
-                      0%, 100% { opacity: 0.5; }
-                      50% { opacity: 1; }
-                    }
-                  `}} />
-
-                  {/* Fullscreen Active Timer Overlays */}
-                  {sessionActive && (
-                    <>
-                      {/* 1. Flat on Table Mode */}
-                      {false && isPhoneFlat && !isDesktopFallback && createPortal(
-                        <div 
-                          className="fokus-overlay-container"
-                          style={{
-                            position: 'fixed',
-                            inset: 0,
-                            zIndex: 9999,
-                            background: '#000000', // AMOLED Black base
-                            display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            color: '#ffffff',
-                            userSelect: 'none',
-                            fontFamily: '"Plus Jakarta Sans", -apple-system, system-ui, sans-serif',
-                            overflow: 'hidden'
-                          }}
-                        >
-                          {/* CSS for hover buttons and breathing effect */}
-                          <style dangerouslySetInnerHTML={{__html: `
-                            @keyframes timerBreathe {
-                              0%, 100% { opacity: 0.8; text-shadow: 0 0 10px rgba(255,255,255,0.05); }
-                              50% { opacity: 1; text-shadow: 0 0 20px rgba(255,255,255,0.2); }
-                            }
-                            .fokus-digits {
-                              animation: timerBreathe 4s ease-in-out infinite;
-                            }
-                            .fokus-controls {
-                              opacity: 0;
-                              transform: translateY(10px);
-                              transition: opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1), transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-                            }
-                            .fokus-overlay-container:hover .fokus-controls {
-                              opacity: 1;
-                              transform: translateY(0);
-                            }
-                          `}} />
-
-                          {/* Large Timer digits only */}
-                          <div className="fokus-digits" style={{
-                            fontSize: 'clamp(5.5rem, 18vw, 10rem)',
-                            fontWeight: 100,
-                            fontFamily: 'system-ui, -apple-system, monospace',
-                            letterSpacing: '-0.03em',
-                            lineHeight: 1,
-                            color: '#ffffff',
-                            textAlign: 'center',
-                            zIndex: 10
-                          }}>
-                            {String(Math.floor(secondsElapsed / 60)).padStart(2, '0')}:
-                            {String(secondsElapsed % 60).padStart(2, '0')}
-                          </div>
-                        </div>,
-                        document.body
-                      )}
-
-                      {/* 2. Grace Period Warning Overlay (when picked up / tab hidden) */}
-                      {isGraceActive && !isPhoneFlat && !isDesktopFallback && createPortal(
-                        <div 
-                          style={{
-                            position: 'fixed',
-                            inset: 0,
-                            zIndex: 10001, // Layered above the flat overlay
-                            background: 'rgba(9, 9, 11, 0.72)',
-                            backdropFilter: 'blur(24px)',
-                            WebkitBackdropFilter: 'blur(24px)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            padding: '24px',
-                            color: '#ffffff',
-                            userSelect: 'none',
-                            fontFamily: '"Plus Jakarta Sans", -apple-system, system-ui, sans-serif'
-                          }}
-                        >
-                          <div style={{
-                            width: '100%',
-                            maxWidth: '340px',
-                            background: 'rgba(24, 24, 27, 0.85)',
-                            border: '1px solid rgba(255, 255, 255, 0.08)',
-                            borderRadius: '32px',
-                            padding: '40px 30px',
-                            textAlign: 'center',
-                            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: 'center',
-                            gap: '24px'
-                          }}>
-                            {/* Warning Sign */}
+                          {/* Hausaufgaben-Bereich am Instrument (Alle Bücher mit Seiten, alle Songs, qualifizierte Lehrkraft-Notiz) */}
+                          {(Boolean(missionInfo.books?.length) || Boolean(missionInfo.songs?.length) || Boolean(missionInfo.teacherNote && missionInfo.hasSpecificNote)) && (
                             <div style={{
-                              width: '72px',
-                              height: '72px',
-                              borderRadius: '22px',
-                              background: 'rgba(245, 158, 11, 0.12)',
-                              border: '1px solid rgba(245, 158, 11, 0.25)',
+                              borderTop: '1px solid rgba(255, 255, 255, 0.10)',
+                              paddingTop: '8px',
                               display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              color: '#fbbf24',
-                              animation: 'pulseSoft 1.5s infinite'
+                              flexDirection: 'column',
+                              gap: '6px',
+                              width: '100%'
                             }}>
-                              <Smartphone size={32} style={{ animation: 'bounce 2s infinite' }} />
-                            </div>
-
-                            <div>
-                              <h3 style={{ fontSize: '1.45rem', fontWeight: 850, color: '#f59e0b', margin: '0 0 8px 0', letterSpacing: '-0.02em' }}>
-                                Fokus unterbrochen!
-                              </h3>
-                              <p style={{ fontSize: '0.82rem', color: '#a1a1aa', fontWeight: 550, lineHeight: 1.5, margin: 0 }}>
-                                {isDesktopFallback 
-                                  ? 'Wechsle sofort zurück auf diese Seite, um den Fokus fortzusetzen.'
-                                  : 'Lege das Handy wieder flach auf den Tisch, um den Fokus fortzusetzen.'}
-                              </p>
-                            </div>
-
-                            {/* Big countdown number */}
-                            <div style={{
-                              fontSize: '4.8rem',
-                              fontWeight: 800,
-                              color: '#fbbf24',
-                              fontFamily: 'monospace, sans-serif',
-                              lineHeight: 1,
-                              margin: '4px 0'
-                            }}>
-                              {graceSecondsLeft}
-                            </div>
-
-                            {/* Animated shrinking progress bar */}
-                            <div style={{
-                              width: '100%',
-                              height: '6px',
-                              background: 'rgba(255, 255, 255, 0.08)',
-                              borderRadius: '3px',
-                              overflow: 'hidden'
-                            }}>
-                              <div style={{
-                                height: '100%',
-                                background: 'linear-gradient(90deg, #f59e0b 0%, #ef4444 100%)',
-                                width: `${graceSecondsLeft * 10}%`,
-                                transition: 'width 1s linear',
-                                borderRadius: '3px'
-                              }} />
-                            </div>
-
-                            {/* Quick Action Buttons */}
-                            <button
-                              onClick={finishPracticeSession}
-                              style={{
-                                width: '100%',
-                                background: 'rgba(255, 255, 255, 0.08)',
-                                border: '1px solid rgba(255, 255, 255, 0.05)',
-                                color: '#ffffff',
-                                padding: '14px 20px',
-                                borderRadius: '16px',
-                                fontWeight: 700,
-                                fontSize: '0.88rem',
-                                cursor: 'pointer',
-                                transition: 'all 0.2s',
-                                boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
-                              }}
-                              onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.12)'}
-                              onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'}
-                            >
-                              Fokus beenden & Sichern
-                            </button>
-                          </div>
-                        </div>,
-                        document.body
-                      )}
-
-                      {/* 3. Anti-Cheat Checkpoint Overlay */}
-                      {showCheckpoint && createPortal(
-                        <div 
-                          style={{
-                            position: 'fixed',
-                            inset: 0,
-                            zIndex: 10002, // Topmost layer
-                            background: 'rgba(9, 9, 11, 0.95)',
-                            backdropFilter: 'blur(20px)',
-                            WebkitBackdropFilter: 'blur(20px)',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            padding: '24px',
-                            color: '#ffffff',
-                            userSelect: 'none',
-                            fontFamily: '"Plus Jakarta Sans", -apple-system, system-ui, sans-serif',
-                            textAlign: 'center'
-                          }}
-                        >
-                          <div style={{
-                            display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: 'center',
-                            gap: '24px',
-                            maxWidth: '320px',
-                            width: '100%'
-                          }}>
-                            <div style={{
-                              width: '72px',
-                              height: '72px',
-                              borderRadius: '50%',
-                              background: 'linear-gradient(135deg, #34a853 0%, #34a853 100%)',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              boxShadow: '0 0 24px rgba(52, 168, 83, 0.4)',
-                              cursor: 'pointer',
-                              animation: 'pulse 1.5s infinite'
-                            }}
-                            onClick={() => setShowCheckpoint(false)}
-                            >
-                              <span style={{ fontSize: '2.5rem' }}>🔥</span>
-                            </div>
-                            
-                            <div>
-                              <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#ffffff' }}>
-                                Bist du noch fokussiert?
-                              </h3>
-                              <p style={{ margin: '10px 0 0 0', fontSize: '0.875rem', color: '#a1a1aa', lineHeight: 1.5 }}>
-                                Tippe schnell auf das Flammen-Symbol, um deine Session fortzusetzen!
-                              </p>
-                            </div>
-
-                            <div style={{
-                              fontSize: '1.75rem',
-                              fontWeight: 900,
-                              color: '#34a853',
-                              fontVariantNumeric: 'tabular-nums'
-                            }}>
-                              {checkpointSecondsLeft}s
-                            </div>
-                          </div>
-                        </div>
-                      , document.body)}
-                    </>
-                  )}
-
-                  {/* 🎼 BLENDFREIE NOTENSTÄNDER-KARTE IM AKTIVEN FOKUS-TIMER (OLED-DARK) */}
-                  {(() => {
-                    const latestItem = (progressItems || []).find(item => item.is_current_homework || item.topic_name?.startsWith('Hausaufgabe KW '));
-                    const currentWeekStr = latestItem ? getItemWeek(latestItem) : getISOWeekRaw(new Date(), 1);
-                    const cleanTitle = (t: string) => (t || '').replace(/\s*\((gitarre|guitar|e-gitarre|bass|e-bass|drums|schlagzeug|klavier|piano|keys|keyboard|vocals|gesang|stimme|allgemein)\)/i, '');
-
-                    const studentFirstName = (studentUser?.first_name || (studentUser?.name ? studentUser.name.split(' ')[0] : '')).trim().toLowerCase();
-
-                    const cleanNoteText = (raw: any) => {
-                      if (!raw) return '';
-                      let text = typeof raw === 'string' ? raw : JSON.stringify(raw);
-                      if (text.startsWith('[') || text.startsWith('{')) {
-                        try {
-                          const parsed = JSON.parse(text);
-                          if (Array.isArray(parsed)) {
-                            text = parsed.filter((x: any) => typeof x === 'string' && !x.startsWith('AUDIO:') && !x.startsWith('STICKER:') && !x.startsWith('LATENCY:') && !x.startsWith('STUDENT_NOTE_PUBLIC:') && !x.startsWith('STUDENT_NOTE_PRIVATE:')).join('\n');
-                          } else if (typeof parsed === 'string') {
-                            text = parsed;
-                          }
-                        } catch {}
-                      }
-                      const rawLines = String(text)
-                        .replace(/\["AUDIO:[^"]*"\]/g, '')
-                        .replace(/AUDIO:[^\s,|]+/g, '')
-                        .replace(/.*(STUDENT_NOTE_PUBLIC|STUDENT_NOTE_PRIVATE):[^|]*\|/, '')
-                        .replace(/^❓\s*Frage für den Unterricht:\s*/i, '')
-                        .split('\n');
-
-                      const filteredLines = rawLines.filter(line => {
-                        const trimmed = line.trim();
-                        if (!trimmed.startsWith('@')) return true;
-                        const colonIdx = trimmed.indexOf(':');
-                        if (colonIdx === -1) return true;
-                        const targetName = trimmed.substring(1, colonIdx).trim().toLowerCase();
-                        if (targetName === 'alle' || targetName === 'all' || targetName === 'gruppe') return true;
-                        if (!studentFirstName) return true;
-                        return targetName === studentFirstName;
-                      });
-
-                      return filteredLines.join('\n').trim();
-                    };
-
-                    // 1. Books with granular pages & specific page notes
-                    const activeBooksMap: Record<string, { pages: number[]; pageNotes: { num: number; text: string }[] }> = {};
-
-                    (localProgress || []).forEach((assignment: any) => {
-                      if (String(assignment.studentId) !== String(studentId) || !assignment.pageStates) return;
-                      const book = lehrwerke.find(g => String(g.id) === String(assignment.lehrwerkId));
-                      if (!book) return;
-                      if (!activeBooksMap[book.title]) {
-                        activeBooksMap[book.title] = { pages: [], pageNotes: [] };
-                      }
-
-                      Object.entries(assignment.pageStates).forEach(([pNumStr, pState]: [string, any]) => {
-                        if (pState?.status === 'homework' || pState?.isCurrentHomework) {
-                          const pNum = parseInt(pNumStr, 10);
-                          if (!isNaN(pNum)) {
-                            if (!activeBooksMap[book.title].pages.includes(pNum)) {
-                              activeBooksMap[book.title].pages.push(pNum);
-                            }
-                            const rawNote = pState.homeworkNotes || pState.homework_notes;
-                            const cleaned = cleanNoteText(rawNote);
-                            if (cleaned && !activeBooksMap[book.title].pageNotes.some(n => n.num === pNum)) {
-                              activeBooksMap[book.title].pageNotes.push({ num: pNum, text: cleaned });
-                            }
-                          }
-                        }
-                      });
-                    });
-
-                    (progressItems || []).forEach(item => {
-                      if (item.topic_name && item.topic_name.includes(' - Seite ')) {
-                        const parts = item.topic_name.split(' - Seite ');
-                        const bookTitle = parts[0].trim();
-                        const pageNum = parseInt(parts[1], 10);
-                        const isHw = Boolean(item.is_current_homework) || item.status === 'homework';
-                        if (isHw && !isNaN(pageNum)) {
-                          if (!activeBooksMap[bookTitle]) {
-                            activeBooksMap[bookTitle] = { pages: [], pageNotes: [] };
-                          }
-                          if (!activeBooksMap[bookTitle].pages.includes(pageNum)) {
-                            activeBooksMap[bookTitle].pages.push(pageNum);
-                          }
-                          const cleaned = cleanNoteText(item.homework_notes);
-                          if (cleaned && !activeBooksMap[bookTitle].pageNotes.some(n => n.num === pageNum)) {
-                            activeBooksMap[bookTitle].pageNotes.push({ num: pageNum, text: cleaned });
-                          }
-                        }
-                      }
-                    });
-
-                    const activeBooks = Object.entries(activeBooksMap).map(([title, info]) => {
-                      info.pages.sort((a, b) => a - b);
-                      info.pageNotes.sort((a, b) => a.num - b.num);
-                      return {
-                        title,
-                        pages: info.pages,
-                        pageNotes: info.pageNotes
-                      };
-                    });
-
-                    // 2. Active Songs & Roadmaps
-                    const activeSongs: { id?: string; title: string; artist?: string; roadmap?: string; bpm?: string }[] = [];
-
-                    (progressItems || []).forEach(item => {
-                      if (item.topic_name?.startsWith('Hausaufgabe KW ') || item.topic_name?.includes(' - Seite ')) return;
-                      const localHw = localStorage.getItem(`song_hw_${studentId}_${item.id}`) ??
-                                      (item.song_id ? localStorage.getItem(`song_hw_${studentId}_${item.song_id}`) : null);
-                      if (localHw === 'false') return;
-                      const isSongHw = (localHw === 'true') || Boolean(item.is_current_homework);
-                      if (isSongHw) {
-                        const rawTitle = (item.topic_name || item.title || '').replace(/\s*\([^)]*\)\s*$/, '');
-                        const cleanT = cleanTitle(rawTitle);
-                        if (cleanT && !activeSongs.some(existing => cleanTitle(existing.title) === cleanT)) {
-                          const cachedNote = localStorage.getItem(`song_note_${studentId}_${item.id}`) ||
-                                             (item.song_id ? localStorage.getItem(`song_note_${studentId}_${item.song_id}`) : null) ||
-                                             item.homework_notes || '';
-                          const bpmMatch = rawTitle.match(/(\d+)\s*(?:bpm|tempo|\/min)/i);
-                          const bpmVal = item.bpm || (bpmMatch ? bpmMatch[1] : undefined);
-                          activeSongs.push({
-                            id: item.id,
-                            title: cleanT,
-                            artist: item.artist,
-                            roadmap: cleanNoteText(cachedNote),
-                            bpm: bpmVal
-                          });
-                        }
-                      }
-                    });
-
-                    (activeSongSkills || []).forEach((skill: any) => {
-                      const localHw = localStorage.getItem(`song_hw_${studentId}_${skill.id}`) ??
-                                      (skill.song_id ? localStorage.getItem(`song_hw_${studentId}_${skill.song_id}`) : null) ??
-                                      (skill.songs?.id ? localStorage.getItem(`song_hw_${studentId}_${skill.songs.id}`) : null);
-                      const isHw = (localHw === 'true') || (localHw !== 'false' && Boolean(skill.is_current_homework));
-                      if (isHw) {
-                        const songArtist = skill.songs?.artist || skill.artist || '';
-                        const songTitle = skill.songs?.title || skill.title || skill.song_title || 'Song';
-                        const fullTitle = songArtist ? `${songArtist} - ${songTitle}` : songTitle;
-                        const cleanT = cleanTitle(fullTitle);
-                        if (cleanT && !activeSongs.some(existing => cleanTitle(existing.title) === cleanT)) {
-                          const cachedNote = localStorage.getItem(`song_note_${studentId}_${skill.id}`) ||
-                                             (skill.song_id ? localStorage.getItem(`song_note_${studentId}_${skill.song_id}`) : null) ||
-                                             (skill.songs?.id ? localStorage.getItem(`song_note_${studentId}_${skill.songs.id}`) : null) ||
-                                             skill.homework_notes || '';
-                          activeSongs.push({
-                            id: skill.id,
-                            title: cleanT,
-                            artist: songArtist,
-                            roadmap: cleanNoteText(cachedNote)
-                          });
-                        }
-                      }
-                    });
-
-                    // 3. Audio & Notes
-                    const currentWeekNotes: string[] = [];
-                    (progressItems || []).forEach(item => {
-                      const itemW = getItemWeek(item);
-                      const isActive = item.is_current_homework || item.topic_name?.startsWith('Hausaufgabe KW ') || itemW === currentWeekStr;
-                      if (isActive && item.homework_notes && item.homework_notes.trim()) {
-                        try {
-                          const parsed = JSON.parse(item.homework_notes);
-                          if (Array.isArray(parsed)) {
-                            parsed.forEach((n: any) => {
-                              if (typeof n === 'string' && n.trim() && !currentWeekNotes.includes(n.trim())) currentWeekNotes.push(n.trim());
-                            });
-                          } else if (typeof parsed === 'string' && parsed.trim() && !currentWeekNotes.includes(parsed.trim())) {
-                            currentWeekNotes.push(parsed.trim());
-                          }
-                        } catch {
-                          if (!currentWeekNotes.includes(item.homework_notes.trim())) currentWeekNotes.push(item.homework_notes.trim());
-                        }
-                      }
-                    });
-
-                    try {
-                      const localGenNotes = localStorage.getItem(`campus_homework_notes_${studentId}`);
-                      if (localGenNotes && localGenNotes.trim()) {
-                        try {
-                          const parsed = JSON.parse(localGenNotes);
-                          if (Array.isArray(parsed)) {
-                            parsed.forEach((n: any) => {
-                              if (typeof n === 'string' && n.trim() && !currentWeekNotes.includes(n.trim())) currentWeekNotes.push(n.trim());
-                            });
-                          } else if (typeof parsed === 'string' && parsed.trim() && !currentWeekNotes.includes(parsed.trim())) {
-                            currentWeekNotes.push(parsed.trim());
-                          }
-                        } catch {
-                          if (!currentWeekNotes.includes(localGenNotes.trim())) currentWeekNotes.push(localGenNotes.trim());
-                        }
-                      }
-                    } catch {}
-
-                    const audioTracks: { url: string; label: string; duration?: number }[] = [];
-                    currentWeekNotes.forEach((n) => {
-                      if (typeof n === 'string' && n.startsWith('AUDIO:')) {
-                        const parts = n.substring(6).split('|');
-                        let label = (parts[3] || '').trim();
-                        if (!label || label.toLowerCase() === 'aufnahme' || label.toLowerCase() === 'test' || label.toLowerCase() === 'audio') {
-                          label = `Demo-Aufnahme #${audioTracks.length + 1}`;
-                        }
-                        audioTracks.push({
-                          url: parts[0],
-                          duration: parseFloat(parts[1]) || 0,
-                          label
-                        });
-                      }
-                    });
-
-                    const generalNote = currentWeekNotes
-                      .filter(n => !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('LATENCY:') && !n.startsWith('STUDENT_NOTE_'))
-                      .map(n => cleanNoteText(n))
-                      .filter(Boolean)
-                      .join(' • ');
-
-                    const hasHomework = activeBooks.length > 0 || activeSongs.length > 0 || audioTracks.length > 0 || Boolean(generalNote);
-
-                    return (
-                      <div style={{
-                        width: '100%',
-                        maxWidth: '480px',
-                        background: 'rgba(255, 255, 255, 0.08)',
-                        backdropFilter: 'blur(20px)',
-                        WebkitBackdropFilter: 'blur(20px)',
-                        border: '1px solid rgba(255, 255, 255, 0.15)',
-                        borderRadius: '24px',
-                        padding: '16px 20px',
-                        boxSizing: 'border-box',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '12px',
-                        color: '#ffffff',
-                        textAlign: 'left',
-                        boxShadow: '0 12px 40px rgba(0, 0, 0, 0.4)'
-                      }}>
-                        {/* Notenständer Header */}
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(255, 255, 255, 0.12)', paddingBottom: '10px' }}>
-                          <span style={{ fontSize: '0.74rem', fontWeight: 900, color: '#4ade80', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <span>🎼</span>
-                            <span>Notenständer-Begleiter ({currentWeekStr})</span>
-                          </span>
-                          <span style={{ fontSize: '0.66rem', color: 'rgba(255, 255, 255, 0.65)', fontWeight: 700 }}>
-                            {hasHomework ? 'Aktuelle Aufgaben' : 'Freies Üben'}
-                          </span>
-                        </div>
-
-                        {hasHomework ? (
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                            {/* Lehrwerke Books with Granular Page Badges & Page Notes */}
-                            {activeBooks.length > 0 && (
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                {activeBooks.map((b, bIdx) => (
-                                  <div key={bIdx} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' }}>
-                                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
-                                        <BookOpen size={14} color="#4ade80" />
-                                        <span style={{ fontSize: '0.86rem', fontWeight: 850, color: '#ffffff' }}>{b.title}</span>
-                                      </div>
-                                      <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
-                                        {b.pages.map((p) => (
-                                          <span key={`p-${p}`} style={{ background: 'rgba(34, 197, 94, 0.25)', border: '1px solid rgba(74, 222, 128, 0.4)', color: '#86efac', padding: '2px 7px', borderRadius: '6px', fontSize: '0.72rem', fontWeight: 900 }}>
-                                            S. {p}
+                              {/* Bücher mit allen Seitenzahlen */}
+                              {missionInfo.books?.map((b: any, bIdx: number) => {
+                                const pageNums = b.pageNums || [];
+                                return (
+                                  <div key={`teen-b-${bIdx}`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
+                                      <BookOpen size={14} color="#fbbf24" style={{ flexShrink: 0 }} />
+                                      <span style={{ fontSize: '0.90rem', fontWeight: 800, color: '#f8fafc', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                                        {b.title}
+                                      </span>
+                                    </div>
+                                    {pageNums.length > 0 && (
+                                      <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
+                                        {pageNums.map((pNum: any) => (
+                                          <span key={`teen-p-${pNum}`} style={{
+                                            background: 'rgba(245, 158, 11, 0.20)',
+                                            color: '#fef08a',
+                                            border: '1px solid rgba(245, 158, 11, 0.4)',
+                                            fontSize: '0.80rem',
+                                            fontWeight: 850,
+                                            padding: '2px 8px',
+                                            borderRadius: '6px'
+                                          }}>
+                                            S. {pNum}
                                           </span>
                                         ))}
                                       </div>
-                                    </div>
-                                    {b.pageNotes.map((pn, pnIdx) => (
-                                      <div key={pnIdx} style={{ fontSize: '0.78rem', color: '#e2e8f0', marginLeft: '22px', fontWeight: 600, display: 'flex', alignItems: 'baseline', gap: '5px' }}>
-                                        <span style={{ color: '#f87171', fontWeight: 850 }}>S. {pn.num}:</span>
-                                        <span>{pn.text}</span>
-                                      </div>
-                                    ))}
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-
-                            {/* Songs & Roadmaps */}
-                            {activeSongs.length > 0 && (
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', borderTop: activeBooks.length > 0 ? '1px solid rgba(255, 255, 255, 0.08)' : 'none', paddingTop: activeBooks.length > 0 ? '8px' : '0' }}>
-                                {activeSongs.map((s, sIdx) => (
-                                  <div key={sIdx} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                                      <Music size={14} color="#facc15" />
-                                      <span style={{ fontSize: '0.86rem', fontWeight: 850, color: '#ffffff' }}>{s.title}</span>
-                                      {s.bpm && (
-                                        <span style={{ background: 'rgba(250, 204, 21, 0.2)', border: '1px solid rgba(250, 204, 21, 0.4)', color: '#fef08a', padding: '1px 6px', borderRadius: '6px', fontSize: '0.68rem', fontWeight: 850 }}>
-                                          ⏱️ {s.bpm} BPM
-                                        </span>
-                                      )}
-                                    </div>
-                                    {s.roadmap && (
-                                      <div style={{ fontSize: '0.78rem', color: '#e2e8f0', marginLeft: '22px', fontWeight: 600, display: 'flex', alignItems: 'baseline', gap: '5px' }}>
-                                        <span style={{ color: '#818cf8', fontWeight: 850 }}>📌 Fahrplan:</span>
-                                        <span>{s.roadmap}</span>
-                                      </div>
                                     )}
                                   </div>
-                                ))}
-                              </div>
-                            )}
+                                );
+                              })}
 
-                            {/* Audio notes in Notenständer */}
-                            {audioTracks.length > 0 && (
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', borderTop: '1px solid rgba(255, 255, 255, 0.08)', paddingTop: '8px' }}>
-                                <span style={{ fontSize: '0.68rem', fontWeight: 850, color: 'rgba(255, 255, 255, 0.7)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                                  🎙️ Unterrichtsaufnahmen ({audioTracks.length})
-                                </span>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                  {audioTracks.map((tr, aIdx) => (
-                                    <div key={aIdx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', background: 'rgba(255, 255, 255, 0.06)', border: '1px solid rgba(255, 255, 255, 0.12)', padding: '6px 10px', borderRadius: '12px' }}>
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
-                                        <Volume2 size={15} color="#4ade80" style={{ flexShrink: 0 }} />
-                                        <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#ffffff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                          {tr.label}
-                                        </span>
-                                      </div>
-                                      {tr.url && (
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
-                                          <button
-                                            type="button"
-                                            onClick={(e) => {
-                                              const audioEl = (e.currentTarget.parentElement?.querySelector('audio') as HTMLAudioElement);
-                                              if (audioEl) {
-                                                const rates = [1, 0.9, 0.75, 0.5];
-                                                const currentR = Number(audioEl.playbackRate) || 1;
-                                                const nextRate = rates[(rates.indexOf(currentR) + 1) % rates.length];
-                                                audioEl.playbackRate = nextRate;
-                                                e.currentTarget.textContent = `${nextRate}×`;
-                                              }
-                                            }}
-                                            style={{
-                                              background: 'rgba(255, 255, 255, 0.15)',
-                                              border: '1px solid rgba(255, 255, 255, 0.3)',
-                                              borderRadius: '6px',
-                                              padding: '3px 7px',
-                                              fontSize: '0.70rem',
-                                              fontWeight: 850,
-                                              color: '#ffffff',
-                                              cursor: 'pointer'
-                                            }}
-                                            title="Geschwindigkeit anpassen: 1.0x, 0.9x, 0.75x, 0.5x"
-                                          >
-                                            1.0×
-                                          </button>
-                                          <audio
-                                            controls
-                                            src={tr.url}
-                                            style={{ height: '32px', maxWidth: '170px' }}
-                                            onPlay={(e) => {
-                                              const allAudios = document.querySelectorAll('audio');
-                                              allAudios.forEach((a) => {
-                                                if (a !== e.currentTarget && !a.paused) {
-                                                  a.pause();
-                                                }
-                                              });
-                                            }}
-                                          />
-                                        </div>
-                                      )}
+                              {/* Songs */}
+                              {missionInfo.songs?.map((s: any, sIdx: number) => {
+                                const songTitle = (s.topic_name || s.title || '').replace(/\s*\([^)]*\)\s*$/, '');
+                                return (
+                                  <div key={`teen-s-${sIdx}`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
+                                      <Music size={14} color="#fbbf24" style={{ flexShrink: 0 }} />
+                                      <span style={{ fontSize: '0.90rem', fontWeight: 800, color: '#f8fafc', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                                        {songTitle}
+                                      </span>
                                     </div>
-                                  ))}
+                                    {s.homework_notes && s.homework_notes.trim() && s.homework_notes.trim().toLowerCase() !== 'zusätzliche bemerkung' && (
+                                      <span style={{ fontSize: '0.82rem', color: '#94a3b8', fontWeight: 650, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden', maxWidth: '150px' }}>
+                                        {s.homework_notes}
+                                      </span>
+                                    )}
+                                  </div>
+                                );
+                              })}
+
+                              {/* Spezifische Lehrkraft-Notiz (falls kein Platzhalter) */}
+                              {missionInfo.hasSpecificNote && missionInfo.teacherNote && missionInfo.teacherNote.trim().toLowerCase() !== 'zusätzliche bemerkung' && (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', paddingTop: '2px', borderTop: (missionInfo.books?.length || missionInfo.songs?.length) ? '1px solid rgba(255, 255, 255, 0.06)' : 'none' }}>
+                                  <Lightbulb size={13} color="#fcd34d" style={{ flexShrink: 0 }} />
+                                  <span style={{ fontSize: '0.84rem', color: '#cbd5e1', fontWeight: 650, fontStyle: 'italic', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                                    „{missionInfo.teacherNote}“
+                                  </span>
                                 </div>
-                              </div>
-                            )}
+                              )}
+                            </div>
+                          )}
+                        </div>
 
-                            {/* General Note */}
-                            {generalNote && (
-                              <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', borderTop: '1px dashed rgba(255, 255, 255, 0.15)', paddingTop: '8px', fontSize: '0.78rem', color: '#e2e8f0', fontWeight: 600 }}>
-                                <FileText size={13} color="#4ade80" style={{ flexShrink: 0 }} />
-                                <span style={{ color: '#4ade80', fontWeight: 850 }}>Hinweis:</span>
-                                <span>{generalNote}</span>
-                              </div>
-                            )}
-                          </div>
-                        ) : (
-                          <p style={{ margin: 0, fontSize: '0.76rem', color: 'rgba(255, 255, 255, 0.7)', fontStyle: 'italic' }}>
-                            Keine festen Hausaufgaben hinterlegt. Viel Spaß bei deiner freien Übe-Session! 🎶
-                          </p>
-                        )}
-                      </div>
-                    );
-                  })()}
+                        {/* ZONE B: Monumentaler Vinyl Orbit-Reaktor (Zentrum) */}
+                        <div style={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '12px',
+                          textAlign: 'center',
+                          margin: 'auto 0'
+                        }}>
+                          <div style={{
+                            position: 'relative',
+                            width: isMusicStandMode ? '260px' : '230px',
+                            height: isMusicStandMode ? '260px' : '230px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            borderRadius: '50%',
+                            background: 'radial-gradient(circle, #0f172a 0%, #090d16 100%)',
+                            border: '3px solid rgba(245, 158, 11, 0.35)',
+                            boxShadow: '0 0 60px rgba(245, 158, 11, 0.28), 0 0 100px rgba(245, 158, 11, 0.12), inset 0 0 35px rgba(0,0,0,0.8)'
+                          }}>
+                            {/* SVG Vinyl Grooves & Progress Arc */}
+                            <svg
+                              width={isMusicStandMode ? '260' : '230'}
+                              height={isMusicStandMode ? '260' : '230'}
+                              viewBox="0 0 280 280"
+                              style={{ transform: 'rotate(-90deg)', overflow: 'visible', position: 'absolute', inset: 0 }}
+                            >
+                              <defs>
+                                <linearGradient id="teenProgressGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                                  <stop offset="0%" stopColor="#f59e0b" />
+                                  <stop offset="100%" stopColor="#d97706" />
+                                </linearGradient>
+                                <linearGradient id="teenProgressGradReached" x1="0%" y1="0%" x2="100%" y2="100%">
+                                  <stop offset="0%" stopColor="#f59e0b" />
+                                  <stop offset="100%" stopColor="#10b981" />
+                                </linearGradient>
+                              </defs>
+                              <circle cx="140" cy="140" r="124" fill="none" stroke="rgba(255, 255, 255, 0.08)" strokeWidth="10" />
+                              <circle
+                                cx="140"
+                                cy="140"
+                                r="124"
+                                fill="none"
+                                stroke={isGoalReached ? 'url(#teenProgressGradReached)' : 'url(#teenProgressGrad)'}
+                                strokeWidth={isGoalReached ? '12' : '10'}
+                                strokeDasharray={2 * Math.PI * 124}
+                                strokeDashoffset={2 * Math.PI * 124 * (1 - Math.min(1, elapsedSecs / targetSeconds))}
+                                strokeLinecap="round"
+                                style={{
+                                  transition: 'stroke-dashoffset 0.8s cubic-bezier(0.4, 0, 0.2, 1)',
+                                  filter: 'drop-shadow(0 0 10px rgba(245, 158, 11, 0.6))'
+                                }}
+                              />
+                            </svg>
 
-                  <div style={{ display: 'flex', gap: '14px', width: '100%', maxWidth: '350px' }}>
-                    <button
-                      onClick={finishPracticeSession}
-                      style={{
-                        flex: 1,
-                        background: isExtraTime 
-                          ? 'linear-gradient(135deg, #ffffff 0%, #f4f4f5 100%)' 
-                          : 'linear-gradient(135deg, #34a853 0%, #34a853 100%)',
-                        color: isExtraTime ? '#34a853' : 'white',
-                        border: 'none',
-                        padding: '16px',
-                        borderRadius: '20px',
-                        fontWeight: 800,
-                        cursor: 'pointer',
-                        fontSize: '0.9rem',
-                        boxShadow: isExtraTime 
-                          ? '0 8px 25px rgba(255, 255, 255, 0.15)' 
-                          : '0 8px 25px rgba(52, 168, 83, 0.2), 0 2px 4px rgba(0,0,0,0.05)',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.05em',
-                        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
-                      }}
-                      className="hover-scale"
-                    >
-                      🏁 Beenden
-                    </button>
-                    <button
-                      onClick={() => {
-                        if (confirm('Möchtest du diese Session wirklich abbrechen? Der Fortschritt geht verloren.')) {
-                          setSecondsElapsed(0);
-                          setSessionActive(false);
-                          setIsExtraTime(false);
-                        }
-                      }}
-                      style={{
-                        padding: '16px 20px',
-                        borderRadius: '20px',
-                        border: isExtraTime 
-                          ? '1px solid rgba(255, 255, 255, 0.4)' 
-                          : (sessionActive ? '1px solid rgba(255, 255, 255, 0.3)' : '1px solid rgba(252, 165, 165, 0.8)'),
-                        background: isExtraTime 
-                          ? 'transparent' 
-                          : (sessionActive ? 'transparent' : 'rgba(254, 242, 242, 0.5)'),
-                        backdropFilter: 'blur(4px)',
-                        color: isExtraTime || sessionActive ? '#ffffff' : '#ef4444',
-                        fontWeight: 700,
-                        cursor: 'pointer',
-                        fontSize: '0.9rem',
-                        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
-                      }}
-                      className="hover-scale"
-                    >
-                      Abbrechen
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Right Widget - Flammen Log-Buch & Jahres-Statistik (Gleich groß wie das Widget links daneben!) */}
-            <div style={{ 
-              width: '100%',
-              background: 'rgba(255, 255, 255, 0.9)',
-              backdropFilter: 'blur(24px)',
-              WebkitBackdropFilter: 'blur(24px)',
-              border: '1px solid rgba(226, 232, 240, 0.8)',
-              borderRadius: '24px', 
-              padding: '20px 22px', 
-              boxShadow: '0 20px 40px -12px rgba(0, 0, 0, 0.04), 0 0 0 1px rgba(255, 255, 255, 0.6) inset',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '12px',
-              boxSizing: 'border-box',
-              height: '100%'
-            }}>
-              {/* Sidebar View Switcher Header */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f1f5f9', paddingBottom: '10px', gap: '10px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <div style={{ 
-                  background: sidebarTab === 'logbook' ? '#fff7ed' : '#e6f4ea', 
-                  color: sidebarTab === 'logbook' ? '#ea580c' : '#34a853', 
-                  padding: '8px', 
-                  borderRadius: '12px',
-                  transition: 'all 0.3s ease'
-                }}>
-                  {sidebarTab === 'logbook' ? <Flame size={18} fill="#ea580c" color="#ea580c" /> : <Calendar size={18} />}
-                </div>
-                <div>
-                  <h4 style={{ fontWeight: 850, fontSize: '18px', color: '#1e293b', margin: 0 }}>
-                    {sidebarTab === 'logbook' ? 'Log-Buch' : 'Jahres-Statistik'}
-                  </h4>
-                  <p style={{ fontSize: '0.7rem', color: '#94a3b8', margin: '2px 0 0 0', fontWeight: 600 }}>
-                    {sidebarTab === 'logbook' ? 'Tägliche Übe-Einträge' : 'Übeminuten (Sep - Aug)'}
-                  </p>
-                </div>
-              </div>
-              
-              {/* Toggle Button */}
-              <button
-                onClick={() => setSidebarTab(sidebarTab === 'logbook' ? 'stats' : 'logbook')}
-                style={{
-                  background: '#f1f5f9',
-                  border: 'none',
-                  borderRadius: '10px',
-                  padding: '6px 12px',
-                  color: '#475569',
-                  fontSize: '0.68rem',
-                  fontWeight: 800,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                  boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-                  transition: 'all 0.2s',
-                  outline: 'none'
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.background = '#e2e8f0'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = '#f1f5f9'; }}
-              >
-                {sidebarTab === 'logbook' ? (
-                  <>
-                    <Calendar size={12} />
-                    <span>Statistik</span>
-                  </>
-                ) : (
-                  <>
-                    <Flame size={12} fill="#ea580c" color="#ea580c" />
-                    <span>Log-Buch</span>
-                  </>
-                )}
-              </button>
-            </div>
-
-            {/* Tab Panel Switcher */}
-            {sidebarTab === 'stats' ? (
-              /* Jahres-Statistik Grid */
-              (() => {
-                const now = new Date();
-                const currentMonth = now.getMonth();
-                const startYear = currentMonth >= 8 ? now.getFullYear() : now.getFullYear() - 1;
-                const monthsList = [
-                  { month: 8, label: 'Sep', year: startYear },
-                  { month: 9, label: 'Okt', year: startYear },
-                  { month: 10, label: 'Nov', year: startYear },
-                  { month: 11, label: 'Dez', year: startYear },
-                  { month: 0, label: 'Jan', year: startYear + 1 },
-                  { month: 1, label: 'Feb', year: startYear + 1 },
-                  { month: 2, label: 'Mrz', year: startYear + 1 },
-                  { month: 3, label: 'Apr', year: startYear + 1 },
-                  { month: 4, label: 'Mai', year: startYear + 1 },
-                  { month: 5, label: 'Jun', year: startYear + 1 },
-                  { month: 6, label: 'Jul', year: startYear + 1 },
-                  { month: 7, label: 'Aug', year: startYear + 1 }
-                ];
-
-                return (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }} className="animation-fade-in">
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
-                      {monthsList.map(item => {
-                        const logsForMonth = fokusLogs.filter(log => {
-                          if (!log.created_at) return false;
-                          const logDate = new Date(log.created_at);
-                          return logDate.getMonth() === item.month && logDate.getFullYear() === item.year;
-                        });
-                        let totalSecs = logsForMonth.reduce((sum, log) => {
-                          return sum + (log.duration_seconds || ((log.duration_minutes || 0) * 60));
-                        }, 0);
-                        
-                        if (sessionActive && secondsElapsed > 0 && item.month === now.getMonth() && item.year === now.getFullYear()) {
-                          totalSecs += secondsElapsed;
-                        }
-
-                        const minutes = Math.round(totalSecs / 60);
-                        
-                        // Heatmap Style Calculation
-                        let bg = '#f8fafc';
-                        let border = '1px solid #e2e8f0';
-                        let labelColor = '#94a3b8';
-                        let textColor = '#64748b';
-                        let numColor = '#1e293b';
-                        let shadow = 'none';
-
-                        if (minutes > 0) {
-                          if (minutes <= 15) {
-                            bg = 'linear-gradient(135deg, #e6f4ea 0%, #e6fbf0 100%)';
-                            border = '1px solid #e6f4ea';
-                            labelColor = '#34a853';
-                            textColor = '#34a853';
-                            numColor = '#34a853';
-                            shadow = '0 2px 6px rgba(52, 168, 83, 0.04)';
-                          } else if (minutes <= 60) {
-                            bg = 'linear-gradient(135deg, #e6f4ea 0%, #e6f4ea 100%)';
-                            border = '1px solid #e6f4ea';
-                            labelColor = '#34a853';
-                            textColor = '#34a853';
-                            numColor = '#34a853';
-                            shadow = '0 3px 8px rgba(52, 168, 83, 0.07)';
-                          } else if (minutes <= 180) {
-                            bg = 'linear-gradient(135deg, #e6f4ea 0%, #e6f4ea 100%)';
-                            border = '1px solid #e6f4ea';
-                            labelColor = '#34a853';
-                            textColor = '#34a853';
-                            numColor = '#34a853';
-                            shadow = '0 4px 12px rgba(52, 168, 83, 0.12)';
-                          } else {
-                            bg = 'linear-gradient(135deg, #34a853 0%, #34a853 100%)';
-                            border = '1px solid #34a853';
-                            labelColor = 'rgba(255, 255, 255, 0.8)';
-                            textColor = 'rgba(255, 255, 255, 0.9)';
-                            numColor = '#ffffff';
-                            shadow = '0 6px 15px rgba(52, 168, 83, 0.25)';
-                          }
-                        }
-
-                        return (
-                          <div 
-                            key={`${item.month}-${item.year}`}
-                            style={{
-                              background: bg,
-                              border: border,
-                              borderRadius: '14px',
-                              padding: '8px 4px',
+                            {/* Digits & Status Pill */}
+                            <div style={{
+                              position: 'absolute',
+                              inset: 0,
                               display: 'flex',
                               flexDirection: 'column',
                               alignItems: 'center',
                               justifyContent: 'center',
-                              gap: '3px',
-                              minHeight: '66px',
-                              textAlign: 'center',
-                              boxShadow: shadow,
-                              transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-                              cursor: 'default'
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.transform = 'translateY(-2px)';
-                              if (minutes > 0) {
-                                e.currentTarget.style.boxShadow = shadow.replace(/0\.\d+/, '0.3');
-                              } else {
-                                e.currentTarget.style.boxShadow = '0 4px 10px rgba(0,0,0,0.04)';
-                                e.currentTarget.style.borderColor = '#cbd5e1';
-                              }
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.transform = 'translateY(0px)';
-                              e.currentTarget.style.boxShadow = shadow;
-                              e.currentTarget.style.borderColor = border.split(' ')[2];
-                            }}
-                          >
-                            <span style={{ 
-                              fontSize: '0.62rem', 
-                              fontWeight: 800, 
-                              color: labelColor,
-                              textTransform: 'uppercase',
-                              letterSpacing: '0.05em'
+                              gap: '6px'
                             }}>
-                              {item.label}
-                            </span>
-                            <span style={{ 
-                              fontSize: '0.9rem', 
-                              fontWeight: 900, 
-                              color: numColor,
-                              fontFamily: "'Urbanist', sans-serif"
-                            }}>
-                              {minutes}
-                              <span style={{ fontSize: '0.6rem', fontWeight: 700, marginLeft: '1px', color: textColor }}>m</span>
-                            </span>
-                          </div>
-                        );
-                      })}
-                    </div>
-
-                    {/* Heatmap Legend */}
-                    <div style={{ 
-                      display: 'flex', 
-                      justifyContent: 'space-between', 
-                      alignItems: 'center', 
-                      marginTop: '4px', 
-                      padding: '8px 10px',
-                      background: '#f8fafc',
-                      borderRadius: '12px',
-                      border: '1px solid #f1f5f9',
-                      fontSize: isMusicStandMode ? '0.78rem' : '0.70rem', 
-                      color: '#64748b', 
-                      fontWeight: 700
-                    }}>
-                      <span style={{ textTransform: 'uppercase', letterSpacing: '0.02em' }}>Heatmap:</span>
-                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                        <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
-                          <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#f8fafc', border: '1px solid #e2e8f0' }} /> 0m
-                        </span>
-                        <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
-                          <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#e6fbf0', border: '1px solid #e6f4ea' }} /> &lt;15m
-                        </span>
-                        <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
-                          <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#e6f4ea', border: '1px solid #e6f4ea' }} /> &lt;1h
-                        </span>
-                        <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
-                          <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#e6f4ea', border: '1px solid #e6f4ea' }} /> &lt;3h
-                        </span>
-                        <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
-                          <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#34a853' }} /> 3h+
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })()
-            ) : (
-              /* 2-TIER HYBRID SOUND JOURNAL (MASTERPIECE DUO EDITION) */
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', maxHeight: '520px', overflowY: 'auto', paddingRight: '4px' }} className="animation-fade-in">
-                {(() => {
-                  const weekMetrics = getDeterministicWeekMetrics();
-                  const { 
-                    now, 
-                    weekDays, 
-                    weekPracticedCount, 
-                    weekShieldedCount, 
-                    weekTotalMins, 
-                    availableShields, 
-                    consumedShieldsCount 
-                  } = weekMetrics;
-
-                  const dayNamesFull = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
-                  const monthNamesShort = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
-                  const monthNamesFull = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"];
-
-                  // Read shield usage dates
-                  let shieldDatesArr: string[] = [];
-                  try {
-                    shieldDatesArr = JSON.parse(localStorage.getItem(`cg_shield_usage_dates_${studentId}`) || '[]');
-                    if (!Array.isArray(shieldDatesArr)) shieldDatesArr = [];
-                  } catch (e) {
-                    shieldDatesArr = [];
-                  }
-                  if (studentUser?.joker_used_at) {
-                    shieldDatesArr.push(toLocalYYYYMMDD(new Date(studentUser.joker_used_at)));
-                  }
-                  weekDays.forEach(d => {
-                    if (d.isJoker) shieldDatesArr.push(d.dateStr);
-                  });
-                  const shieldDatesSet = new Set(shieldDatesArr);
-
-                  // 2. Format Friendly Date Helper
-                  const formatFriendlyDate = (dateStr: string) => {
-                    const parts = dateStr.split('.');
-                    if (parts.length < 3) return dateStr;
-                    const day = parseInt(parts[0], 10);
-                    const monthIndex = parseInt(parts[1], 10) - 1;
-                    const year = 2000 + parseInt(parts[2], 10);
-                    const d = new Date(year, monthIndex, day);
-
-                    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-                    const targetStart = new Date(year, monthIndex, day);
-                    const diffDays = Math.round((todayStart.getTime() - targetStart.getTime()) / (1000 * 60 * 60 * 24));
-
-                    if (diffDays === 0) return `Heute (${dayNamesFull[d.getDay()]})`;
-                    if (diffDays === 1) return `Gestern (${dayNamesFull[d.getDay()]})`;
-                    if (diffDays === 2) return `Vorgestern (${dayNamesFull[d.getDay()]})`;
-                    return `${dayNamesFull[d.getDay()]}, ${day}. ${monthNamesShort[monthIndex]}`;
-                  };
-
-                  // 3. Process Grouped Logs for Success Stream
-                  const rawGrouped = getGroupedLogs();
-                  
-                  // Filter to genuine practice sessions (> 0s) or Joker days, excluding today (handled by Hero Card)
-                  const todayDd = String(now.getDate()).padStart(2, '0');
-                  const todayMm = String(now.getMonth() + 1).padStart(2, '0');
-                  const todayYy = String(now.getFullYear()).substring(2);
-                  const todayDateStr = `${todayDd}.${todayMm}.${todayYy}`;
-
-                  const todayGroup = rawGrouped.find(g => g.date === todayDateStr);
-                  const dayLogsToday = (fokusLogs || []).filter(log => log.created_at && toLocalYYYYMMDD(new Date(log.created_at)) === toLocalYYYYMMDD(now));
-                  const dayLogsSecs = dayLogsToday.reduce((sum, log) => sum + (log.duration_seconds || ((log.duration_minutes || 0) * 60)), 0);
-                  const todayTotalSecs = Math.max(
-                    (todayGroup?.focusSeconds || 0) + (todayGroup?.extraSeconds || 0),
-                    dayLogsSecs
-                  ) + (sessionActive ? secondsElapsed : 0);
-                  const todayHasMastered = Boolean(
-                    todayGroup?.hasMasteredSession || 
-                    dayLogsToday.some(l => !l.is_extra && (l.duration_seconds >= 180 || (l.duration_minutes || 0) >= 3)) || 
-                    todayTotalSecs >= 180
-                  );
-
-                  // Group past genuine practice sessions by Month
-                  const pastPracticedLogs = rawGrouped.filter(g => {
-                    const totalSecs = (g.focusSeconds || 0) + (g.extraSeconds || 0);
-                    const isJoker = Boolean(shieldDatesSet.has((() => {
-                      const parts = g.date.split('.');
-                      if (parts.length < 3) return '';
-                      return `20${parts[2]}-${parts[1]}-${parts[0]}`;
-                    })()));
-                    return g.date !== todayDateStr && (totalSecs > 0 || isJoker);
-                  });
-
-                  const monthsMap: Record<string, { label: string, key: string, entries: typeof pastPracticedLogs, totalMins: number, practiceDays: number }> = {};
-
-                  // Ensure current month is always present in list
-                  const currentMonthKey = `${now.getMonth()}-${now.getFullYear()}`;
-                  monthsMap[currentMonthKey] = {
-                    label: `${monthNamesFull[now.getMonth()]} ${now.getFullYear()}`,
-                    key: currentMonthKey,
-                    entries: [],
-                    totalMins: todayHasMastered || todayTotalSecs > 0 ? Math.floor(todayTotalSecs / 60) : 0,
-                    practiceDays: todayHasMastered || todayTotalSecs > 0 ? 1 : 0
-                  };
-
-                  pastPracticedLogs.forEach(entry => {
-                    const parts = entry.date.split('.');
-                    if (parts.length < 3) return;
-                    const monthIndex = parseInt(parts[1], 10) - 1;
-                    const yearFull = 2000 + parseInt(parts[2], 10);
-                    const key = `${monthIndex}-${yearFull}`;
-
-                    if (!monthsMap[key]) {
-                      monthsMap[key] = {
-                        label: `${monthNamesFull[monthIndex]} ${yearFull}`,
-                        key,
-                        entries: [],
-                        totalMins: 0,
-                        practiceDays: 0
-                      };
-                    }
-                    monthsMap[key].entries.push(entry);
-                    const totalSecs = (entry.focusSeconds || 0) + (entry.extraSeconds || 0);
-                    monthsMap[key].totalMins += Math.floor(totalSecs / 60);
-                    monthsMap[key].practiceDays += 1;
-                  });
-
-                  const sortedMonths = Object.values(monthsMap).sort((a, b) => {
-                    const [aMonth, aYear] = a.key.split('-').map(Number);
-                    const [bMonth, bYear] = b.key.split('-').map(Number);
-                    if (aYear !== bYear) return bYear - aYear;
-                    return bMonth - aMonth;
-                  });
-
-                  return (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                      
-                      {/* 🌟 TIER 1: 7-TAGE-WOCHEN-TRACKER (SMARAGDGRÜNER MASTER-TRACKER) */}
-                      <div style={{
-                        background: '#ffffff',
-                        border: '1px solid #e2e8f0',
-                        borderRadius: '22px',
-                        padding: '16px 18px',
-                        boxShadow: '0 4px 20px rgba(0, 0, 0, 0.04)',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '12px'
-                      }}>
-                        {/* Header with 7-Segment Progress */}
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ fontSize: '0.76rem', fontWeight: 900, color: '#1e293b', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <Flame size={15} color="#ea580c" fill="#ea580c" />
-                            Diese Woche
-                          </span>
-                          <span style={{ 
-                            fontSize: '0.68rem', 
-                            fontWeight: 800, 
-                            color: weekPracticedCount > 0 ? '#166534' : '#ea580c', 
-                            background: weekPracticedCount > 0 ? '#e6f4ea' : '#fff7ed', 
-                            border: weekPracticedCount > 0 ? '1px solid #bbf7d0' : '1px solid #fed7aa', 
-                            padding: '2px 10px', 
-                            borderRadius: '100px' 
-                          }}>
-                            {weekPracticedCount} von 7 Tagen gemeistert{weekShieldedCount > 0 ? ` (${weekShieldedCount} geschützt)` : ''}
-                          </span>
-                        </div>
-
-                        {/* Holiday Freeze Banner if School Holiday */}
-                        {isTodayHoliday && (
-                          <div style={{
-                            background: 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)',
-                            border: '1.5px solid #a7f3d0',
-                            borderRadius: '12px',
-                            padding: '8px 12px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            marginBottom: '4px'
-                          }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                              <Palmtree size={14} color="#059669" />
-                              <span style={{ fontSize: '0.72rem', fontWeight: 900, color: '#065f46' }}>
-                                Ferienpause aktiv (Streak sicher eingefroren)
-                              </span>
-                            </div>
-                            <span style={{ fontSize: '0.62rem', fontWeight: 900, background: '#059669', color: '#ffffff', padding: '2px 8px', borderRadius: '100px' }}>
-                              ✨ 2× XP
-                            </span>
-                          </div>
-                        )}
-
-                        {/* 7-Segment Visual Progress Bar in Smaragdgrün */}
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px', height: '4px' }}>
-                          {weekDays.map((d, dIdx) => (
-                            <div 
-                              key={dIdx} 
-                              style={{ 
-                                height: '100%', 
-                                borderRadius: '100px', 
-                                background: d.hasMastered 
-                                  ? 'linear-gradient(90deg, #34a853, #22c55e)' 
-                                  : (d.isJoker ? '#38bdf8' : (d.totalDaySecs >= 180 ? '#86efac' : '#e2e8f0')),
-                                transition: 'all 0.3s ease'
-                              }} 
-                            />
-                          ))}
-                        </div>
-
-                        {/* 7 Day Trophy Coins Grid */}
-                        <div style={{
-                          display: 'grid',
-                          gridTemplateColumns: 'repeat(7, 1fr)',
-                          gap: '6px'
-                        }}>
-                          {weekDays.map((day, idx) => {
-                            let bg = '#f8fafc';
-                            let border = '1px solid #e2e8f0';
-                            let textColor = '#475569';
-                            let iconElement = <span style={{ fontSize: '0.65rem', color: '#94a3b8', fontWeight: 900 }}>·</span>;
-                            let subLabel = day.isFuture ? '·' : (day.totalMins > 0 ? `${day.totalMins}m` : 'Pause');
-
-                            if (day.isToday) {
-                              if (day.hasMastered) {
-                                bg = 'linear-gradient(135deg, #e6f4ea 0%, #d1fae5 100%)';
-                                border = '1.5px solid #34a853';
-                                textColor = '#166534';
-                                iconElement = <Flame size={15} color="#34a853" fill="#34a853" />;
-                                subLabel = day.totalMins > 0 ? `${day.totalMins}m` : '3m';
-                              } else {
-                                bg = 'linear-gradient(135deg, #fffbeb 0%, #fefce8 100%)';
-                                border = '1.5px solid #ca8a04';
-                                textColor = '#854d0e';
-                                iconElement = <span style={{ fontSize: '0.75rem', lineHeight: 1 }}>✨</span>;
-                                subLabel = 'Heute';
-                              }
-                            } else if (day.isJoker) {
-                              bg = 'linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%)';
-                              border = '1.5px solid #a78bfa';
-                              textColor = '#5b21b6';
-                              iconElement = <Shield size={14} color="#7c3aed" fill="#7c3aed" />;
-                              subLabel = `Schild ${day.shieldNumber || ''}`.trim();
-                            } else if (day.hasMastered) {
-                              bg = 'linear-gradient(135deg, #e6f4ea 0%, #d1fae5 100%)';
-                              border = '1px solid #34a853';
-                              textColor = '#166534';
-                              iconElement = <Flame size={14} color="#34a853" fill="#34a853" />;
-                              subLabel = `${Math.max(1, day.totalMins)}m`;
-                            } else if (day.totalMins > 0) {
-                              bg = '#f8fafc';
-                              border = '1px solid #cbd5e1';
-                              textColor = '#475569';
-                              iconElement = <Clock size={13} color="#64748b" />;
-                              subLabel = `${day.totalMins}m`;
-                            } else if (!day.isFuture) {
-                              bg = '#f8fafc';
-                              border = '1px solid #e2e8f0';
-                              textColor = '#475569';
-                              iconElement = <span style={{ fontSize: '0.62rem', color: '#64748b' }}>☕</span>;
-                              subLabel = 'Pause';
-                            }
-
-                            return (
-                              <div
-                                key={idx}
-                                style={{
-                                  background: bg,
-                                  border: border,
-                                  borderRadius: '16px',
-                                  padding: '10px 2px',
-                                  display: 'flex',
-                                  flexDirection: 'column',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  gap: '3px',
-                                  minHeight: '66px',
-                                  minWidth: '32px',
-                                  transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                                  boxShadow: day.isToday && day.hasMastered 
-                                    ? '0 4px 12px rgba(52, 168, 83, 0.15)' 
-                                    : (day.isToday ? '0 4px 12px rgba(202, 138, 4, 0.12)' : 'none')
-                                }}
-                              >
-                                <span style={{ fontSize: '0.66rem', fontWeight: 800, color: textColor, textTransform: 'uppercase', letterSpacing: '0.02em' }}>
-                                  {day.dayName}
-                                </span>
-                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '20px' }}>
-                                  {iconElement}
-                                </div>
-                                <span style={{ fontSize: '0.6rem', fontWeight: 800, color: textColor }}>
-                                  {subLabel}
-                                </span>
-                              </div>
-                            );
-                          })}
-                        </div>
-
-                        {/* Informative Footer Bar with 3 Schutzschilde Status & Offline Sync */}
-                        {(() => {
-                          const currentWeek = getISOWeek(now);
-
-                          return (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', borderTop: '1px solid #f1f5f9', paddingTop: '10px' }}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: isMusicStandMode ? '0.80rem' : '0.72rem', color: '#64748b', fontWeight: 700, flexWrap: 'wrap', gap: '6px' }}>
-                                <span>Wochenzeit: <strong style={{ color: '#1e293b' }}>{weekTotalMins} Min.</strong></span>
-                                
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                                  <span style={{ fontSize: isMusicStandMode ? '0.78rem' : '0.68rem', fontWeight: 800, color: '#475569', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                    <Shield size={12} color="#7c3aed" />
-                                    Wochen-Schutzschilde:
-                                  </span>
-                                  <div style={{ display: 'flex', gap: '3px' }}>
-                                    {[1, 2, 3].map((shieldNum) => {
-                                      const isConsumed = shieldNum <= weekShieldedCount;
-                                      const isShieldActive = shieldNum > weekShieldedCount;
-                                      const shieldedDay = weekDays.find(d => d.shieldNumber === shieldNum);
-                                      const dayLabel = shieldedDay ? shieldedDay.dayName : '';
-
-                                      return (
-                                        <div
-                                          key={`logbook-shield-${shieldNum}`}
-                                          style={{
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: '3px',
-                                            padding: '2px 7px',
-                                            borderRadius: '6px',
-                                            background: isConsumed ? '#f1f5f9' : 'rgba(124, 58, 237, 0.08)',
-                                            border: isConsumed ? '1px solid #cbd5e1' : '1px solid rgba(124, 58, 237, 0.28)',
-                                            color: isConsumed ? '#64748b' : '#6d28d9',
-                                            fontSize: '0.62rem',
-                                            fontWeight: 850
-                                          }}
-                                          title={isConsumed ? `Schutzschild ${shieldNum} wurde am ${dayLabel} als Glut-Schutz eingesetzt` : `Schutzschild ${shieldNum} bereit (Glut-Schutz bei verpasstem Tag)`}
-                                        >
-                                          <Shield size={9} color={isConsumed ? '#64748b' : '#7c3aed'} fill={isConsumed ? '#94a3b8' : '#7c3aed'} />
-                                          <span>{isConsumed ? `Schild ${shieldNum} (${dayLabel})` : `Schild ${shieldNum}`}</span>
-                                        </div>
-                                      );
-                                    })}
-                                  </div>
-                                </div>
-
-                                <span>Tagesziel: <strong style={{ color: '#34a853' }}>3 Min. am Stück</strong></span>
-                              </div>
-
-                              {/* Offline-Puffer & Sync Indikator (HM3) */}
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: isMusicStandMode ? '0.76rem' : '0.68rem', color: '#64748b', fontWeight: 650, paddingTop: '4px', borderTop: '1px dashed #f1f5f9' }}>
-                                <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#166534', fontWeight: 700 }}>
-                                  <ShieldCheck size={12} color="#16a34a" />
-                                  <span>Automatisch gesichert</span>
-                                </span>
-                                <span 
-                                  title="DSGVO-konforme Ende-zu-Ende-Verschlüsselung"
-                                  style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#64748b' }}
-                                >
-                                  <Lock size={11} color="#64748b" />
-                                  <span>Verschlüsselt</span>
-                                </span>
-                              </div>
-                            </div>
-                          );
-                        })()}
-                      </div>
-
-                      {/* 🌟 TIER 2: ERFOLGS-STREAM (PURE PRAXIS-ERFOLGE) */}
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                        
-                        {/* 🏆 HEUTE-HERO-KARTE IN SMARAGDGRÜN (GEMEISTERTE TAGES-FLAMME) */}
-                        {todayHasMastered ? (
-                          <div style={{
-                            background: 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)',
-                            border: '1.5px solid #34a853',
-                            borderRadius: '20px',
-                            padding: '14px 16px',
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center',
-                            boxShadow: '0 4px 14px rgba(52, 168, 83, 0.12)'
-                          }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                               <div style={{
-                                width: '38px',
-                                height: '38px',
-                                borderRadius: '12px',
-                                background: 'linear-gradient(135deg, #34a853 0%, #16a34a 100%)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                boxShadow: '0 2px 8px rgba(52, 168, 83, 0.35)'
+                                fontSize: isMusicStandMode ? '4.6rem' : '3.9rem',
+                                fontWeight: 950,
+                                color: isGoalReached ? '#34d399' : '#fef08a',
+                                letterSpacing: '-0.04em',
+                                lineHeight: 1,
+                                fontFamily: "'Urbanist', 'Plus Jakarta Sans', sans-serif",
+                                fontVariantNumeric: 'tabular-nums',
+                                fontFeatureSettings: '"tnum"',
+                                textShadow: isGoalReached ? '0 0 35px rgba(52, 211, 153, 0.6)' : '0 0 25px rgba(245, 158, 11, 0.45)'
                               }}>
-                                <Flame size={20} color="#ffffff" fill="#ffffff" />
+                                {String(currentMins).padStart(2, '0')}:{String(currentSecs).padStart(2, '0')}
                               </div>
-                              <div>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                  <span style={{ fontSize: '0.84rem', fontWeight: 900, color: '#166534' }}>
-                                    Heute ({dayNamesFull[now.getDay()]})
-                                  </span>
-                                  <span style={{ fontSize: isMusicStandMode ? '0.78rem' : '0.68rem', fontWeight: 900, background: '#34a853', color: '#ffffff', padding: '2px 8px', borderRadius: '100px', textTransform: 'uppercase' }}>
-                                    Gemeistert
-                                  </span>
-                                </div>
-                                <p style={{ margin: '2px 0 0 0', fontSize: isMusicStandMode ? '0.84rem' : '0.76rem', fontWeight: 700, color: '#15803d' }}>
-                                  {(() => {
-                                    const focusSecs = Math.min(180, todayGroup?.focusSeconds ?? (todayHasMastered ? 180 : 0));
-                                    const extraSecs = (todayGroup?.extraSeconds !== undefined)
-                                      ? todayGroup.extraSeconds
-                                      : Math.max(0, todayTotalSecs - focusSecs);
-                                    const fMins = Math.floor(focusSecs / 60);
-                                    if (extraSecs > 0) {
-                                      const extraStr = extraSecs < 60 ? `${extraSecs} Sek.` : `${Math.floor(extraSecs / 60)} Min. ${extraSecs % 60 > 0 ? (extraSecs % 60) + ' Sek.' : ''}`.trim();
-                                      return `Tages-Flamme entfacht! 🔥 • ${fMins} Min. Fokus + ${extraStr} Frei`;
-                                    }
-                                    return `Tages-Flamme entfacht! 🔥 • ${fMins} Min. geübt`;
-                                  })()}
-                                </p>
+
+                              <div style={{
+                                fontSize: isMusicStandMode ? '0.94rem' : '0.84rem',
+                                fontWeight: 900,
+                                color: isGoalReached ? '#34d399' : '#fbbf24',
+                                background: isGoalReached ? 'rgba(52, 211, 153, 0.15)' : 'rgba(245, 158, 11, 0.25)',
+                                border: isGoalReached ? '1.5px solid rgba(52, 211, 153, 0.5)' : '1.5px solid rgba(245, 158, 11, 0.5)',
+                                padding: isMusicStandMode ? '6px 16px' : '4px 14px',
+                                borderRadius: '100px',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '6px'
+                              }}>
+                                {!isGoalReached ? (
+                                  <>
+                                    <Target size={13} color="#fbbf24" style={{ flexShrink: 0 }} />
+                                    <span>Ziel: {String(targetMins).padStart(2, '0')}:00 Min.</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Zap size={13} color="#34d399" style={{ flexShrink: 0 }} />
+                                    <span>Flow-Ziel erreicht!</span>
+                                  </>
+                                )}
                               </div>
                             </div>
-                            <span style={{ fontSize: '0.76rem', fontWeight: 900, color: '#166534', background: '#ffffff', border: '1px solid #bbf7d0', padding: '4px 10px', borderRadius: '12px', boxShadow: '0 2px 6px rgba(52, 168, 83, 0.1)' }}>
-                              +{(() => {
-                                const focusSecs = Math.min(180, todayGroup?.focusSeconds ?? (todayHasMastered ? 180 : 0));
-                                const extraSecs = (todayGroup?.extraSeconds !== undefined)
-                                  ? todayGroup.extraSeconds
-                                  : Math.max(0, todayTotalSecs - focusSecs);
-                                const extraXp = Math.floor(extraSecs / 60);
-                                return 3 + extraXp;
-                              })()} XP ⚡
-                            </span>
+                          </div>
+
+                          <div style={{ maxWidth: '420px', padding: '0 8px', marginTop: '2px' }}>
+                            <p style={{ margin: 0, fontSize: isMusicStandMode ? '1.02rem' : '0.90rem', color: '#cbd5e1', fontWeight: 750, lineHeight: 1.35, letterSpacing: '-0.01em' }}>
+                              „{instrumentLabel} ist am Start! Finde deinen Groove“
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* ZONE C: Audio Play-Along Dock */}
+                        {missionInfo.audioTracks && missionInfo.audioTracks.length > 0 ? (
+                          <div style={{ width: '100%', maxWidth: '440px', zIndex: 12 }}>
+                            <ZenPlayAlongDock
+                              tracks={missionInfo.audioTracks}
+                              isMusicStandMode={isMusicStandMode}
+                              teacherName={studentUser?.teacher_name ? formatTeacherFullName(studentUser.teacher_name) : 'Deine Lehrkraft'}
+                              theme="amber"
+                            />
                           </div>
                         ) : (
                           <div style={{
-                            background: 'linear-gradient(135deg, #fefce8 0%, #ffffff 100%)',
-                            border: '1.5px solid #facc15',
-                            borderRadius: '20px',
-                            padding: '14px 16px',
-                            display: 'flex',
-                                justifyContent: 'space-between',
+                            display: 'inline-flex',
                             alignItems: 'center',
-                            boxShadow: '0 4px 14px rgba(234, 179, 8, 0.08)'
+                            gap: '8px',
+                            color: 'rgba(255, 255, 255, 0.75)',
+                            fontSize: '0.86rem',
+                            fontWeight: 700,
+                            background: 'rgba(245, 158, 11, 0.12)',
+                            padding: '8px 18px',
+                            borderRadius: '100px',
+                            border: '1.5px solid rgba(245, 158, 11, 0.25)'
                           }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                              <div style={{
-                                width: '38px',
-                                height: '38px',
-                                borderRadius: '12px',
-                                background: 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)',
+                            <Zap size={15} color="#fbbf24" />
+                            <span>Jede gespielte Minute stärkt dein Muskelgedächtnis</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>,
+                  document.body
+                );
+              }
+
+              // =========================================================================
+              // 🎸 WENN SESSION IDLE IST -> DAS ERGONOMISCHE DASHBOARD (1:1 JUNIOR PARITÄT)
+              // =========================================================================
+              return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', width: '100%' }} className="animation-fade-in practice-board-teen">
+                  
+                  {/* 1. Header Bar: Einzeilige Überschrift ohne Subtext */}
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '14px',
+                    background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
+                    borderRadius: '24px',
+                    padding: isMusicStandMode ? '20px 28px' : '16px 24px',
+                    border: '1.5px solid rgba(245, 158, 11, 0.25)',
+                    boxShadow: '0 12px 30px rgba(0, 0, 0, 0.25)',
+                    flexWrap: 'wrap'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                      <div style={{
+                        width: isMusicStandMode ? '64px' : '56px',
+                        height: isMusicStandMode ? '64px' : '56px',
+                        borderRadius: '18px',
+                        background: 'rgba(245, 158, 11, 0.15)',
+                        border: '1.5px solid rgba(245, 158, 11, 0.35)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: '#fbbf24',
+                        boxShadow: '0 6px 16px rgba(245, 158, 11, 0.2)',
+                        flexShrink: 0
+                      }}>
+                        <Headphones size={isMusicStandMode ? 32 : 28} color="#fbbf24" />
+                      </div>
+                      <div>
+                        <h3 style={{ margin: 0, fontSize: isMusicStandMode ? '1.65rem' : '1.45rem', fontWeight: 950, color: '#ffffff', fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em', whiteSpace: 'nowrap' }}>
+                          Übe-Pfad 🎧
+                        </h3>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                      {/* Flow Flamme */}
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        background: 'rgba(15, 23, 42, 0.7)',
+                        border: '1.5px solid rgba(245, 158, 11, 0.35)',
+                        color: '#fbbf24',
+                        padding: isMusicStandMode ? '8px 16px' : '6px 14px',
+                        borderRadius: '100px',
+                        fontWeight: 900,
+                        fontSize: isMusicStandMode ? '0.92rem' : '0.86rem'
+                      }}>
+                        <Flame size={18} fill="#f59e0b" color="#f59e0b" />
+                        <span>{streak} {streak === 1 ? 'Tag' : 'Tage'} Flow</span>
+                      </div>
+
+                      {/* XP Pill */}
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        background: 'rgba(15, 23, 42, 0.7)',
+                        border: '1.5px solid rgba(255, 255, 255, 0.1)',
+                        color: '#ffffff',
+                        padding: isMusicStandMode ? '8px 16px' : '6px 14px',
+                        borderRadius: '100px',
+                        fontWeight: 900,
+                        fontSize: isMusicStandMode ? '0.92rem' : '0.86rem'
+                      }}>
+                        <Star size={16} fill="#fbbf24" color="#fbbf24" />
+                        <span>{xpVal} XP</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 2. Karte A: Center Stage Hero (Der Flow-Timer - OHNE Dropdown!) */}
+                  <div style={{
+                    width: '100%',
+                    background: 'linear-gradient(160deg, #0f172a 0%, #1e293b 50%, #0f172a 100%)',
+                    borderRadius: '32px',
+                    border: '2px solid rgba(245, 158, 11, 0.28)',
+                    padding: isMusicStandMode ? '44px 32px' : '40px 28px',
+                    boxShadow: '0 20px 50px -10px rgba(0, 0, 0, 0.5), 0 0 35px rgba(245, 158, 11, 0.08) inset',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    textAlign: 'center',
+                    position: 'relative',
+                    overflow: 'hidden',
+                    boxSizing: 'border-box'
+                  }}>
+                    {/* Ambient Glow */}
+                    <div style={{
+                      position: 'absolute',
+                      top: '-50px',
+                      right: '-30px',
+                      width: '280px',
+                      height: '280px',
+                      background: 'radial-gradient(circle, rgba(245, 158, 11, 0.12) 0%, rgba(0,0,0,0) 70%)',
+                      borderRadius: '50%',
+                      pointerEvents: 'none'
+                    }} />
+
+                    {/* Target Pill */}
+                    <div style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      background: 'rgba(245, 158, 11, 0.15)',
+                      border: '1px solid rgba(245, 158, 11, 0.4)',
+                      color: '#fbbf24',
+                      padding: isMusicStandMode ? '7px 22px' : '6px 18px',
+                      borderRadius: '100px',
+                      fontSize: isMusicStandMode ? '0.92rem' : '0.86rem',
+                      fontWeight: 900,
+                      letterSpacing: '0.04em',
+                      textTransform: 'uppercase',
+                      marginBottom: '20px',
+                      boxShadow: '0 0 15px rgba(245, 158, 11, 0.15)',
+                      zIndex: 1
+                    }}>
+                      <Target size={16} color="#fbbf24" />
+                      <span>Tagesziel: {targetMins} Min. am Stück</span>
+                    </div>
+
+                    {/* Vinyl Groove Dial Ring (195px) */}
+                    <div style={{
+                      position: 'relative',
+                      width: '195px',
+                      height: '195px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      borderRadius: '50%',
+                      background: 'radial-gradient(circle, rgba(245, 158, 11, 0.12) 0%, rgba(15, 23, 42, 0.9) 70%)',
+                      border: '3px solid rgba(245, 158, 11, 0.35)',
+                      boxShadow: '0 0 35px rgba(245, 158, 11, 0.12), inset 0 0 20px rgba(0,0,0,0.6)',
+                      marginBottom: '24px',
+                      zIndex: 1
+                    }}>
+                      <div style={{
+                        position: 'absolute',
+                        inset: '-6px',
+                        borderRadius: '50%',
+                        border: '1.5px dashed rgba(245, 158, 11, 0.4)',
+                        pointerEvents: 'none'
+                      }} />
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                        <span style={{
+                          fontSize: isMusicStandMode ? '3.6rem' : '3.2rem',
+                          fontWeight: 950,
+                          color: '#fef3c7',
+                          fontFamily: "'Plus Jakarta Sans', monospace",
+                          letterSpacing: '-0.03em',
+                          lineHeight: 1
+                        }}>
+                          {String(targetMins).padStart(2, '0')}:00
+                        </span>
+                        <span style={{ fontSize: '0.76rem', color: '#cbd5e1', fontWeight: 700, marginTop: '6px' }}>
+                          Fokuszeit
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Primary Action Button */}
+                    <div style={{ width: '100%', maxWidth: '380px', zIndex: 1 }}>
+                      <button
+                        type="button"
+                        onClick={handleStartPracticeSession}
+                        style={{
+                          width: '100%',
+                          minHeight: isMusicStandMode ? '56px' : '50px',
+                          borderRadius: '20px',
+                          background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                          border: '2px solid #fde047',
+                          color: '#ffffff',
+                          fontSize: isMusicStandMode ? '1.18rem' : '1.08rem',
+                          fontWeight: 950,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '10px',
+                          boxShadow: '0 12px 28px rgba(245, 158, 11, 0.4), inset 0 1px 0 rgba(255,255,255,0.4)',
+                          letterSpacing: '-0.01em',
+                          transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
+                        }}
+                        className="hover-scale"
+                      >
+                        <Play size={20} fill="#ffffff" color="#ffffff" />
+                        <span>Übe-Session starten</span>
+                      </button>
+                    </div>
+
+                    <span style={{ fontSize: '0.80rem', color: '#94a3b8', fontWeight: 650, marginTop: '14px', zIndex: 1 }}>
+                      🎧 Kopfhörer aufsetzen &amp; konzentriert üben
+                    </span>
+                  </div>
+
+                  {/* 3. Bottom Dual Grid: Karte C (Wochen-Konsistenz) + Karte B (Sticker-Meilenstein) */}
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+                    gap: '24px',
+                    width: '100%'
+                  }}>
+                    {/* Karte C: Weekly Beats & Flow-Serie (Exakt 2 Schilde pro Woche) */}
+                    <div style={{
+                      background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
+                      borderRadius: '32px',
+                      border: '2px solid rgba(245, 158, 11, 0.25)',
+                      padding: isMusicStandMode ? '32px' : '28px',
+                      boxShadow: '0 12px 30px rgba(0, 0, 0, 0.25)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'space-between',
+                      gap: '18px',
+                      boxSizing: 'border-box'
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <div style={{ width: isMusicStandMode ? '64px' : '56px', height: isMusicStandMode ? '64px' : '56px', borderRadius: '18px', background: 'rgba(245, 158, 11, 0.15)', border: '1.5px solid rgba(245, 158, 11, 0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fbbf24' }}>
+                            <Flame size={isMusicStandMode ? 32 : 28} fill="#f59e0b" color="#f59e0b" />
+                          </div>
+                          <div>
+                            <h4 style={{ margin: 0, fontSize: isMusicStandMode ? '1.55rem' : '1.38rem', fontWeight: 950, color: '#ffffff', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                              Deine Übe-Woche
+                            </h4>
+                            <span style={{ fontSize: isMusicStandMode ? '1.05rem' : '0.92rem', color: '#cbd5e1', fontWeight: 650 }}>
+                              Wochen-Rhythmus &amp; Schilde
+                            </span>
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{
+                            fontSize: '0.78rem',
+                            fontWeight: 850,
+                            background: 'rgba(245, 158, 11, 0.15)',
+                            color: '#fbbf24',
+                            border: '1px solid rgba(245, 158, 11, 0.35)',
+                            padding: '4px 10px',
+                            borderRadius: '100px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '5px'
+                          }}>
+                            <Shield size={13} fill="#fbbf24" color="#fbbf24" />
+                            <span>2 Schilde aktiv</span>
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* 7-Tage-Grid */}
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '8px' }}>
+                        {weekDays.map((d, idx) => {
+                          const isDone = d.hasMastered;
+                          const isToday = d.isToday;
+                          return (
+                            <div
+                              key={idx}
+                              style={{
+                                background: isDone ? 'rgba(16, 185, 129, 0.15)' : (isToday ? 'rgba(245, 158, 11, 0.15)' : 'rgba(15, 23, 42, 0.6)'),
+                                border: isDone ? '1.5px solid #10b981' : (isToday ? '1.5px solid #f59e0b' : '1px solid rgba(255, 255, 255, 0.08)'),
+                                borderRadius: '16px',
+                                padding: '10px 4px',
                                 display: 'flex',
+                                flexDirection: 'column',
                                 alignItems: 'center',
                                 justifyContent: 'center',
-                                boxShadow: '0 2px 8px rgba(202, 138, 4, 0.25)'
-                              }}>
-                                <Timer size={20} color="#ffffff" />
-                              </div>
-                              <div>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                  <span style={{ fontSize: '0.84rem', fontWeight: 900, color: '#854d0e' }}>
-                                    Heute ({dayNamesFull[now.getDay()]})
+                                gap: '6px',
+                                minHeight: '74px'
+                              }}
+                            >
+                              <span style={{ fontSize: '0.72rem', fontWeight: 900, color: isDone ? '#34d399' : (isToday ? '#fbbf24' : '#94a3b8'), textTransform: 'uppercase' }}>
+                                {d.dayName}
+                              </span>
+                              {isDone ? (
+                                <Zap size={18} color="#34d399" />
+                              ) : isToday ? (
+                                <Flame size={18} fill="#f59e0b" color="#f59e0b" />
+                              ) : (
+                                <span style={{ fontSize: '0.85rem', color: '#64748b' }}>·</span>
+                              )}
+                              <span style={{ fontSize: '0.66rem', fontWeight: 850, color: isDone ? '#34d399' : (isToday ? '#fbbf24' : '#94a3b8') }}>
+                                {isDone ? `${d.totalMins || 3}m` : (isToday ? 'Heute' : 'Pause')}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Karte B: Nächster Meilenstein mit echtem Sticker */}
+                    <div style={{
+                      background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
+                      borderRadius: '32px',
+                      border: '2px solid rgba(245, 158, 11, 0.25)',
+                      padding: isMusicStandMode ? '32px' : '28px',
+                      boxShadow: '0 12px 30px rgba(0, 0, 0, 0.25)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'space-between',
+                      gap: '18px',
+                      boxSizing: 'border-box'
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <div style={{ width: isMusicStandMode ? '64px' : '56px', height: isMusicStandMode ? '64px' : '56px', borderRadius: '18px', background: 'rgba(245, 158, 11, 0.15)', border: '1.5px solid rgba(245, 158, 11, 0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fbbf24' }}>
+                            <Award size={isMusicStandMode ? 32 : 28} />
+                          </div>
+                          <div>
+                            <h4 style={{ margin: 0, fontSize: isMusicStandMode ? '1.55rem' : '1.38rem', fontWeight: 950, color: '#ffffff', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                              Nächster Meilenstein
+                            </h4>
+                            <span style={{ fontSize: isMusicStandMode ? '1.05rem' : '0.92rem', color: '#cbd5e1', fontWeight: 650 }}>
+                              Sticker-Pfad Belohnung
+                            </span>
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => setShowJuniorStickerModal(true)}
+                          style={{
+                            background: 'rgba(245, 158, 11, 0.15)',
+                            border: '1.5px solid rgba(245, 158, 11, 0.35)',
+                            borderRadius: '100px',
+                            padding: isMusicStandMode ? '6px 14px' : '5px 12px',
+                            color: '#fbbf24',
+                            fontSize: isMusicStandMode ? '0.92rem' : '0.84rem',
+                            fontWeight: 900,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px'
+                          }}
+                          className="hover-scale"
+                        >
+                          <BookOpen size={14} />
+                          <span>Sticker-Album</span>
+                        </button>
+                      </div>
+
+                      {/* Echte Sticker Vorschau */}
+                      <div
+                        onClick={() => setShowJuniorStickerModal(true)}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '16px',
+                          background: 'rgba(15, 23, 42, 0.7)',
+                          borderRadius: '20px',
+                          padding: '16px 18px',
+                          border: '1.5px solid rgba(255, 255, 255, 0.08)',
+                          cursor: 'pointer'
+                        }}
+                        className="hover-scale"
+                      >
+                        <div style={{
+                          width: isMusicStandMode ? '64px' : '56px',
+                          height: isMusicStandMode ? '64px' : '56px',
+                          borderRadius: '18px',
+                          background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.25) 0%, rgba(15, 23, 42, 0.8) 100%)',
+                          border: '2px solid rgba(245, 158, 11, 0.45)',
+                          boxShadow: '0 6px 16px rgba(245, 158, 11, 0.25)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flexShrink: 0,
+                          padding: '4px',
+                          overflow: 'hidden'
+                        }}>
+                          <img
+                            src={`/stickers/${stickerId}.png?v=1`}
+                            alt={nextStickerName}
+                            style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                            onError={(e) => {
+                              e.currentTarget.style.display = 'none';
+                              const parent = e.currentTarget.parentElement;
+                              if (parent) {
+                                const span = document.createElement('span');
+                                span.style.fontSize = '1.6rem';
+                                span.innerText = stickerIcon;
+                                parent.appendChild(span);
+                              }
+                            }}
+                          />
+                        </div>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', flex: 1, minWidth: 0 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ fontWeight: 950, fontSize: isMusicStandMode ? '1.20rem' : '1.08rem', color: '#ffffff' }}>{nextStickerName}</span>
+                            <span style={{ fontSize: isMusicStandMode ? '0.92rem' : '0.86rem', fontWeight: 900, color: '#fbbf24' }}>{effMins} / {targetMin} Min</span>
+                          </div>
+                          <div style={{ width: '100%', height: '8px', background: 'rgba(255, 255, 255, 0.1)', borderRadius: '10px', overflow: 'hidden' }}>
+                            <div style={{ width: `${progressPct}%`, height: '100%', background: 'linear-gradient(90deg, #f59e0b, #10b981)', borderRadius: '10px' }} />
+                          </div>
+                          <span style={{ fontSize: isMusicStandMode ? '0.88rem' : '0.80rem', color: '#94a3b8', fontWeight: 650 }}>
+                            {isMax ? 'Maximaler Status erreicht! ⭐' : `Noch ${minsToNext} Min. bis zum nächsten Sticker!`}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* ========================================================================= */}
+            {/* 🎓 PRO STUDIO: HELLES APPLE HIG DESIGN (16+ J.) - 1:1 JUNIOR PARITÄT      */}
+            {/* ========================================================================= */}
+            {studentUiLevel === 'pro' && (() => {
+              const streak = avatar?.streak_flame || 0;
+              const targetMins = getTargetMinutes(streak);
+              const targetSeconds = targetMins * 60;
+              const weekMetrics = getDeterministicWeekMetrics();
+              const { weekDays, weekPracticedCount } = weekMetrics;
+              const elapsedSecs = secondsElapsedRef.current || secondsElapsed;
+              const isGoalReached = elapsedSecs >= targetSeconds;
+              const currentMins = Math.floor(elapsedSecs / 60);
+              const currentSecs = elapsedSecs % 60;
+
+              let xpVal = avatar?.xp || 0;
+              try {
+                const localStats = JSON.parse(localStorage.getItem(`cg_offline_stats_${studentId}`) || '{}');
+                if (localStats.current_xp) xpVal = Math.max(xpVal, localStats.current_xp);
+                const localPractice = JSON.parse(localStorage.getItem(`cg_offline_practice_${studentId}`) || '{}');
+                if (localPractice.xp) xpVal = Math.max(xpVal, localPractice.xp);
+              } catch (e) {}
+
+              const missionInfo = getJuniorMissionDetails();
+              const rawInst = (studentUser?.instrument || '').trim();
+              const isFeminineInst = rawInst ? ['gitarre', 'e-gitarre', 'flöte', 'querflöte', 'blockflöte', 'trompete', 'geige', 'violine', 'posaune', 'klarinette', 'harfe', 'bratsche', 'tuba', 'mundharmonika', 'ukulele'].some(w => rawInst.toLowerCase().includes(w)) : false;
+              const instrumentLabel = rawInst ? (isFeminineInst ? `Deine ${rawInst}` : `Dein ${rawInst}`) : 'Dein Instrument';
+
+              // Active incomplete songs for Meisterwerk (100% gemeisterte Stücke gehören ins Protokoll-Archiv)
+              const activeSongsList: any[] = [];
+              (activeSongSkills || []).forEach((skill: any) => {
+                const title = skill.songs?.title || skill.title || skill.song_title;
+                const progress = skill.progress_percent ?? (skill.status === 'MASTERED' ? 100 : 75);
+                if (title && progress < 100 && skill.status !== 'MASTERED') {
+                  if (!activeSongsList.some(s => s.title.toLowerCase() === title.toLowerCase())) {
+                    activeSongsList.push({
+                      title,
+                      subtitle: skill.songs?.composer || skill.songs?.artist || 'Song-Repertoire',
+                      progress,
+                      isCurrentHomework: Boolean(skill.is_current_homework),
+                      updatedAt: skill.updated_at || skill.created_at || null
+                    });
+                  }
+                }
+              });
+              (progressItems || []).forEach((item: any) => {
+                const rawTopic = (item.topic_name || item.title || '').trim();
+                if (!rawTopic || rawTopic.includes(' - Seite ') || rawTopic.startsWith('Hausaufgabe KW ') || rawTopic.toLowerCase().startsWith('test')) return;
+                const cleanT = rawTopic.replace(/\s*\([^)]*\)\s*$/, '').trim();
+                const progress = item.progress_percent ?? (item.status === 'MASTERED' ? 100 : 60);
+                if (cleanT && progress < 100 && item.status !== 'MASTERED') {
+                  if (!activeSongsList.some(s => s.title.toLowerCase() === cleanT.toLowerCase())) {
+                    activeSongsList.push({
+                      title: cleanT,
+                      subtitle: item.instrument || 'Konzertstück',
+                      progress,
+                      isCurrentHomework: Boolean(item.is_current_homework),
+                      updatedAt: item.updated_at || item.created_at || null
+                    });
+                  }
+                }
+              });
+
+              // Smarte 3-Stufen Priorisierung (Goldstandard):
+              // 1. Hausaufgabe zuerst (aktueller Wochenfokus)
+              // 2. Goal-Gradient (höchster Fortschritt zuerst, z.B. 85% vor 40%)
+              // 3. Aktualität (zuletzt geübt)
+              activeSongsList.sort((a, b) => {
+                if (a.isCurrentHomework && !b.isCurrentHomework) return -1;
+                if (!a.isCurrentHomework && b.isCurrentHomework) return 1;
+                if (b.progress !== a.progress) return b.progress - a.progress;
+                return 0;
+              });
+
+              // =========================================================================
+              // 🎓 WENN SESSION AKTIV IST -> HELLE APPLE HIG CUERTINO FOCUS STAGE
+              // =========================================================================
+              if (sessionActive) {
+                return createPortal(
+                  <div
+                    id="pro-studio-mission-portal"
+                    style={{
+                      position: 'fixed',
+                      inset: 0,
+                      zIndex: 100002,
+                      background: 'linear-gradient(160deg, #f8fafc 0%, #ffffff 50%, #f1f5f9 100%)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      overflow: 'hidden',
+                      boxSizing: 'border-box',
+                      userSelect: 'none',
+                      WebkitUserSelect: 'none',
+                      fontFamily: '"Plus Jakarta Sans", -apple-system, system-ui, sans-serif'
+                    }}
+                  >
+                    {/* Countdown Overlay (3-2-1) */}
+                    {preStartCountdown !== null && preStartCountdown > 0 ? (
+                      <div style={{
+                        position: 'relative',
+                        zIndex: 10,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '24px',
+                        textAlign: 'center'
+                      }}>
+                        <div style={{
+                          width: '170px',
+                          height: '170px',
+                          borderRadius: '50%',
+                          background: 'radial-gradient(circle, rgba(0, 113, 227, 0.12) 0%, rgba(0, 113, 227, 0.02) 70%)',
+                          border: '3px solid #0071e3',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          boxShadow: '0 0 45px rgba(0, 113, 227, 0.25)',
+                          animation: 'countInPulse 0.5s ease-out'
+                        }}>
+                          <span style={{ fontSize: '5.5rem', fontWeight: 950, color: '#0071e3', lineHeight: 1 }}>
+                            {preStartCountdown}
+                          </span>
+                        </div>
+                        <div style={{
+                          background: '#ffffff',
+                          border: '1.5px solid #bfdbfe',
+                          borderRadius: '100px',
+                          padding: '8px 24px',
+                          color: '#0f172a',
+                          fontSize: '1.05rem',
+                          fontWeight: 850,
+                          boxShadow: '0 4px 15px rgba(0, 0, 0, 0.05)'
+                        }}>
+                          Fokus einnehmen, {instrumentLabel} bereit machen... 🎓
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{
+                        position: 'relative',
+                        zIndex: 1,
+                        width: '100%',
+                        maxWidth: '440px',
+                        margin: '0 auto',
+                        height: '100%',
+                        maxHeight: '100dvh',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: isMusicStandMode ? '20px 18px 24px' : '16px 16px 20px',
+                        boxSizing: 'border-box',
+                        overflow: 'hidden'
+                      }}>
+                        {/* ZONE A: HUD Top Bar mit Status & Apple HIG Buttons */}
+                        <div style={{
+                          width: '100%',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '8px',
+                          background: '#ffffff',
+                          border: '1.5px solid #e2e8f0',
+                          borderRadius: '20px',
+                          padding: '10px 14px',
+                          boxSizing: 'border-box',
+                          boxShadow: '0 8px 24px rgba(0, 0, 0, 0.04)'
+                        }}>
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            width: '100%',
+                            gap: '10px'
+                          }}>
+                            {/* Left Status Pill */}
+                            <div style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '8px',
+                              background: 'rgba(0, 113, 227, 0.08)',
+                              border: '1px solid #bfdbfe',
+                              borderRadius: '100px',
+                              padding: '5px 12px',
+                              fontSize: '0.82rem',
+                              fontWeight: 850,
+                              color: '#0071e3'
+                            }}>
+                              <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#0071e3', boxShadow: '0 0 6px #0071e3' }} />
+                              <span>Studio-Fokus</span>
+                              <GraduationCap size={13} color="#0071e3" />
+                            </div>
+
+                            {/* Right Buttons */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              {isGoalReached ? (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setIsJuniorMissionPaused(false);
+                                    isJuniorMissionPausedRef.current = false;
+                                    finishPracticeSession();
+                                  }}
+                                  style={{
+                                    background: 'linear-gradient(135deg, #0071e3 0%, #0077ed 100%)',
+                                    border: 'none',
+                                    borderRadius: '100px',
+                                    height: '40px',
+                                    padding: '0 18px',
+                                    color: '#ffffff',
+                                    fontSize: '0.90rem',
+                                    fontWeight: 950,
+                                    cursor: 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '7px',
+                                    boxShadow: '0 4px 14px rgba(0, 113, 227, 0.35)'
+                                  }}
+                                >
+                                  <span>Abschließen</span>
+                                  <CheckCircle size={15} color="#ffffff" />
+                                </button>
+                              ) : (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const next = !isJuniorMissionPaused;
+                                      setIsJuniorMissionPaused(next);
+                                      isJuniorMissionPausedRef.current = next;
+                                    }}
+                                    style={{
+                                      background: '#f8fafc',
+                                      border: '1px solid #cbd5e1',
+                                      borderRadius: '100px',
+                                      height: '40px',
+                                      padding: '0 16px',
+                                      color: '#334155',
+                                      fontSize: '0.86rem',
+                                      fontWeight: 900,
+                                      cursor: 'pointer',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '7px'
+                                    }}
+                                  >
+                                    <Pause size={14} color="#334155" />
+                                    <span>{isJuniorMissionPaused ? 'Weiter' : 'Pause'}</span>
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setIsJuniorMissionPaused(false);
+                                      isJuniorMissionPausedRef.current = false;
+                                      finishPracticeSession();
+                                    }}
+                                    style={{
+                                      background: 'rgba(239, 68, 68, 0.08)',
+                                      border: '1px solid rgba(239, 68, 68, 0.3)',
+                                      borderRadius: '100px',
+                                      height: '40px',
+                                      padding: '0 16px',
+                                      color: '#dc2626',
+                                      fontSize: '0.86rem',
+                                      fontWeight: 900,
+                                      cursor: 'pointer',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '7px'
+                                    }}
+                                  >
+                                    <Square size={13} fill="#dc2626" color="#dc2626" />
+                                    <span>Beenden</span>
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Hausaufgaben-Bereich am Instrument (Alle Bücher mit Seiten, alle Songs, qualifizierte Lehrkraft-Notiz) */}
+                          {(Boolean(missionInfo.books?.length) || Boolean(missionInfo.songs?.length) || Boolean(missionInfo.teacherNote && missionInfo.hasSpecificNote)) && (
+                            <div style={{
+                              borderTop: '1px solid #f1f5f9',
+                              paddingTop: '8px',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '6px',
+                              width: '100%'
+                            }}>
+                              {/* Bücher */}
+                              {missionInfo.books?.map((b: any, bIdx: number) => {
+                                const pageNums = b.pageNums || [];
+                                return (
+                                  <div key={`pro-b-${bIdx}`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
+                                      <BookOpen size={14} color="#0071e3" style={{ flexShrink: 0 }} />
+                                      <span style={{ fontSize: '0.90rem', fontWeight: 800, color: '#0f172a', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                                        {b.title}
+                                      </span>
+                                    </div>
+                                    {pageNums.length > 0 && (
+                                      <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
+                                        {pageNums.map((pNum: any) => (
+                                          <span key={`pro-p-${pNum}`} style={{
+                                            background: '#eff6ff',
+                                            color: '#0071e3',
+                                            border: '1px solid #bfdbfe',
+                                            fontSize: '0.80rem',
+                                            fontWeight: 850,
+                                            padding: '2px 8px',
+                                            borderRadius: '6px'
+                                          }}>
+                                            S. {pNum}
+                                          </span>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+
+                              {/* Songs */}
+                              {missionInfo.songs?.map((s: any, sIdx: number) => {
+                                const songTitle = (s.topic_name || s.title || '').replace(/\s*\([^)]*\)\s*$/, '');
+                                return (
+                                  <div key={`pro-s-${sIdx}`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
+                                      <Music size={14} color="#0071e3" style={{ flexShrink: 0 }} />
+                                      <span style={{ fontSize: '0.90rem', fontWeight: 800, color: '#0f172a', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                                        {songTitle}
+                                      </span>
+                                    </div>
+                                    {s.homework_notes && s.homework_notes.trim() && s.homework_notes.trim().toLowerCase() !== 'zusätzliche bemerkung' && (
+                                      <span style={{ fontSize: '0.82rem', color: '#64748b', fontWeight: 650, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden', maxWidth: '150px' }}>
+                                        {s.homework_notes}
+                                      </span>
+                                    )}
+                                  </div>
+                                );
+                              })}
+
+                              {/* Spezifische Lehrkraft-Notiz */}
+                              {missionInfo.hasSpecificNote && missionInfo.teacherNote && missionInfo.teacherNote.trim().toLowerCase() !== 'zusätzliche bemerkung' && (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', paddingTop: '2px', borderTop: (missionInfo.books?.length || missionInfo.songs?.length) ? '1px solid #f1f5f9' : 'none' }}>
+                                  <Lightbulb size={13} color="#0071e3" style={{ flexShrink: 0 }} />
+                                  <span style={{ fontSize: '0.84rem', color: '#475569', fontWeight: 650, fontStyle: 'italic', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                                    „{missionInfo.teacherNote}“
                                   </span>
-                                  {isTodayHoliday ? (
-                                    <span style={{ fontSize: '0.6rem', fontWeight: 850, background: '#d1fae5', color: '#065f46', border: '1px solid #a7f3d0', padding: '1px 8px', borderRadius: '100px', display: 'flex', alignItems: 'center', gap: '3px' }}>
-                                      <Palmtree size={10} color="#059669" />
-                                      Ferienpause
-                                    </span>
-                                  ) : weekMetrics.availableShields > 0 ? (
-                                    <span style={{ fontSize: '0.6rem', fontWeight: 850, background: '#f5f3ff', color: '#6d28d9', border: '1px solid #ddd6fe', padding: '1px 8px', borderRadius: '100px', display: 'flex', alignItems: 'center', gap: '3px' }}>
-                                      <Shield size={10} color="#7c3aed" fill="#7c3aed" />
-                                      {weekMetrics.availableShields === 1 ? '1 Schild bereit' : `${weekMetrics.availableShields} Schilde bereit`}
-                                    </span>
-                                  ) : (
-                                    <span style={{ fontSize: '0.6rem', fontWeight: 850, background: '#fee2e2', color: '#991b1b', border: '1px solid #fecaca', padding: '1px 8px', borderRadius: '100px', display: 'flex', alignItems: 'center', gap: '3px' }}>
-                                      <Shield size={10} color="#dc2626" />
-                                      Keine Schilde mehr
-                                    </span>
-                                  )}
                                 </div>
-                                <p style={{ margin: '2px 0 0 0', fontSize: '0.72rem', fontWeight: 700, color: '#a16207' }}>
-                                  {todayTotalSecs > 0 
-                                    ? `Bereits ${Math.floor(todayTotalSecs / 60)} Min. geübt • Noch ${Math.max(1, Math.ceil((180 - todayTotalSecs) / 60))} Min. am Stück zur Flamme!`
-                                    : 'Entfache heute deine Tages-Flamme! (3 Min. am Stück) 🎶'}
-                                </p>
+                              )}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* ZONE B: Monumentaler Apple Precision Dial (Zentrum) */}
+                        <div style={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '12px',
+                          textAlign: 'center',
+                          margin: 'auto 0'
+                        }}>
+                          <div style={{
+                            position: 'relative',
+                            width: isMusicStandMode ? '260px' : '230px',
+                            height: isMusicStandMode ? '260px' : '230px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            borderRadius: '50%',
+                            background: '#ffffff',
+                            boxShadow: '0 12px 35px rgba(0, 113, 227, 0.08), 0 2px 10px rgba(0,0,0,0.03)'
+                          }}>
+                            <svg
+                              width={isMusicStandMode ? '260' : '230'}
+                              height={isMusicStandMode ? '260' : '230'}
+                              viewBox="0 0 280 280"
+                              style={{ transform: 'rotate(-90deg)', overflow: 'visible', position: 'absolute', inset: 0 }}
+                            >
+                              <defs>
+                                <linearGradient id="proProgressGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                                  <stop offset="0%" stopColor="#0071e3" />
+                                  <stop offset="100%" stopColor="#38bdf8" />
+                                </linearGradient>
+                                <linearGradient id="proProgressGradReached" x1="0%" y1="0%" x2="100%" y2="100%">
+                                  <stop offset="0%" stopColor="#0071e3" />
+                                  <stop offset="100%" stopColor="#22c55e" />
+                                </linearGradient>
+                              </defs>
+                              <circle cx="140" cy="140" r="124" fill="none" stroke="#f1f5f9" strokeWidth="10" />
+                              <circle
+                                cx="140"
+                                cy="140"
+                                r="124"
+                                fill="none"
+                                stroke={isGoalReached ? 'url(#proProgressGradReached)' : 'url(#proProgressGrad)'}
+                                strokeWidth={isGoalReached ? '12' : '10'}
+                                strokeDasharray={2 * Math.PI * 124}
+                                strokeDashoffset={2 * Math.PI * 124 * (1 - Math.min(1, elapsedSecs / targetSeconds))}
+                                strokeLinecap="round"
+                                style={{
+                                  transition: 'stroke-dashoffset 0.8s cubic-bezier(0.4, 0, 0.2, 1)',
+                                  filter: 'drop-shadow(0 2px 8px rgba(0, 113, 227, 0.35))'
+                                }}
+                              />
+                            </svg>
+
+                            {/* Digits & Status Pill */}
+                            <div style={{
+                              position: 'absolute',
+                              inset: 0,
+                              display: 'flex',
+                              flexDirection: 'column',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '6px'
+                            }}>
+                              <div style={{
+                                fontSize: isMusicStandMode ? '4.6rem' : '3.9rem',
+                                fontWeight: 950,
+                                color: isGoalReached ? '#15803d' : '#0f172a',
+                                letterSpacing: '-0.04em',
+                                lineHeight: 1,
+                                fontVariantNumeric: 'tabular-nums',
+                                fontFamily: "'Urbanist', 'Plus Jakarta Sans', sans-serif"
+                              }}>
+                                {String(currentMins).padStart(2, '0')}:{String(currentSecs).padStart(2, '0')}
+                              </div>
+
+                              <div style={{
+                                fontSize: isMusicStandMode ? '0.94rem' : '0.84rem',
+                                fontWeight: 900,
+                                color: isGoalReached ? '#15803d' : '#0071e3',
+                                background: isGoalReached ? '#dcfce7' : '#eff6ff',
+                                border: isGoalReached ? '1.5px solid #86efac' : '1.5px solid #bfdbfe',
+                                padding: isMusicStandMode ? '6px 16px' : '4px 14px',
+                                borderRadius: '100px',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '6px'
+                              }}>
+                                {!isGoalReached ? (
+                                  <>
+                                    <Target size={13} color="#0071e3" />
+                                    <span>Ziel: {String(targetMins).padStart(2, '0')}:00 Min.</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <CheckCircle size={13} color="#15803d" />
+                                    <span>Tagesziel erreicht</span>
+                                  </>
+                                )}
                               </div>
                             </div>
-                            <span style={{ fontSize: '0.74rem', fontWeight: 900, color: '#854d0e', background: '#ffffff', border: '1.5px solid #facc15', padding: '4px 10px', borderRadius: '12px', boxShadow: '0 2px 6px rgba(234, 179, 8, 0.08)' }}>
-                              +3 XP warten auf dich ⚡
+                          </div>
+
+                          <div style={{ maxWidth: '380px', padding: '0 8px' }}>
+                            <p style={{ margin: 0, fontSize: isMusicStandMode ? '1.02rem' : '0.90rem', color: '#475569', fontWeight: 700, lineHeight: 1.35 }}>
+                              „{instrumentLabel} im Studio-Fokus. Präzision formt meisterhaften Klang.“
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* ZONE C: Audio Play-Along Dock (Helles Cupertino Frosted Glass) */}
+                        {missionInfo.audioTracks && missionInfo.audioTracks.length > 0 ? (
+                          <div style={{ width: '100%', maxWidth: '440px', zIndex: 12 }}>
+                            <ZenPlayAlongDock
+                              tracks={missionInfo.audioTracks}
+                              isMusicStandMode={isMusicStandMode}
+                              teacherName={studentUser?.teacher_name ? formatTeacherFullName(studentUser.teacher_name) : 'Deine Lehrkraft'}
+                              theme="light"
+                            />
+                          </div>
+                        ) : (
+                          <div style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            color: '#64748b',
+                            fontSize: '0.86rem',
+                            fontWeight: 700,
+                            background: '#ffffff',
+                            padding: '8px 18px',
+                            borderRadius: '100px',
+                            border: '1.5px solid #e2e8f0',
+                            boxShadow: '0 2px 6px rgba(0,0,0,0.03)'
+                          }}>
+                            <Sparkles size={15} color="#0071e3" />
+                            <span>Konzentrierte Wiederholung formt musikalische Virtuosität</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>,
+                  document.body
+                );
+              }
+
+              // =========================================================================
+              // 🎓 WENN SESSION IDLE IST -> DAS ERGONOMISCHE DASHBOARD (1:1 JUNIOR PARITÄT)
+              // =========================================================================
+              return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', width: '100%' }} className="animation-fade-in practice-board-pro">
+                  
+                  {/* 1. Header Bar: Einzeilige Überschrift ohne Subtext */}
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '14px',
+                    background: '#ffffff',
+                    borderRadius: '24px',
+                    padding: isMusicStandMode ? '20px 28px' : '16px 24px',
+                    border: '1.5px solid #e2e8f0',
+                    boxShadow: '0 8px 24px rgba(0, 0, 0, 0.04)',
+                    flexWrap: 'wrap'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                      <div style={{
+                        width: isMusicStandMode ? '64px' : '56px',
+                        height: isMusicStandMode ? '64px' : '56px',
+                        borderRadius: '18px',
+                        background: '#eff6ff',
+                        border: '1.5px solid #bfdbfe',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: '#0071e3',
+                        boxShadow: '0 4px 12px rgba(0, 113, 227, 0.12)',
+                        flexShrink: 0
+                      }}>
+                        <Music size={isMusicStandMode ? 32 : 28} color="#0071e3" />
+                      </div>
+                      <div>
+                        <h3 style={{ margin: 0, fontSize: isMusicStandMode ? '1.65rem' : '1.45rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em', whiteSpace: 'nowrap' }}>
+                          Übe-Pfad 🎓
+                        </h3>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                      {/* Streak Pill */}
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        background: '#fffbeb',
+                        border: '1.5px solid #fde68a',
+                        color: '#b45309',
+                        padding: isMusicStandMode ? '8px 16px' : '6px 14px',
+                        borderRadius: '100px',
+                        fontWeight: 900,
+                        fontSize: isMusicStandMode ? '0.92rem' : '0.86rem'
+                      }}>
+                        <Flame size={18} fill="#f59e0b" color="#f59e0b" />
+                        <span>{streak} {streak === 1 ? 'Tag' : 'Tage'} Streak</span>
+                      </div>
+
+                      {/* XP Pill */}
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        background: '#eff6ff',
+                        border: '1.5px solid #bfdbfe',
+                        color: '#0071e3',
+                        padding: isMusicStandMode ? '8px 16px' : '6px 14px',
+                        borderRadius: '100px',
+                        fontWeight: 900,
+                        fontSize: isMusicStandMode ? '0.92rem' : '0.86rem'
+                      }}>
+                        <Star size={16} fill="#0071e3" color="#0071e3" />
+                        <span>{xpVal} XP</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 2. Karte A: Center Stage Hero (Der Apple Precision Timer - OHNE Dropdown!) */}
+                  <div style={{
+                    width: '100%',
+                    background: '#ffffff',
+                    borderRadius: '32px',
+                    border: '2px solid #e2e8f0',
+                    padding: isMusicStandMode ? '44px 32px' : '40px 28px',
+                    boxShadow: '0 20px 50px -10px rgba(0, 0, 0, 0.06), 0 0 35px rgba(0, 113, 227, 0.03) inset',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    textAlign: 'center',
+                    position: 'relative',
+                    overflow: 'hidden',
+                    boxSizing: 'border-box'
+                  }}>
+                    {/* Target Pill */}
+                    <div style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      background: '#eff6ff',
+                      border: '1.5px solid #bfdbfe',
+                      color: '#0071e3',
+                      padding: isMusicStandMode ? '7px 22px' : '6px 18px',
+                      borderRadius: '100px',
+                      fontSize: isMusicStandMode ? '0.92rem' : '0.86rem',
+                      fontWeight: 900,
+                      letterSpacing: '0.04em',
+                      textTransform: 'uppercase',
+                      marginBottom: '20px',
+                      boxShadow: '0 2px 8px rgba(0, 113, 227, 0.08)',
+                      zIndex: 1
+                    }}>
+                      <Target size={16} color="#0071e3" />
+                      <span>Tages-Fokus: {targetMins} Min. am Stück</span>
+                    </div>
+
+                    {/* Apple HIG Precision Dial Ring (195px) */}
+                    <div style={{
+                      position: 'relative',
+                      width: '195px',
+                      height: '195px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      borderRadius: '50%',
+                      background: '#ffffff',
+                      border: '4px solid #0071e3',
+                      boxShadow: '0 12px 35px rgba(0, 113, 227, 0.15), inset 0 2px 8px rgba(0, 0, 0, 0.03)',
+                      marginBottom: '24px',
+                      zIndex: 1
+                    }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                        <span style={{
+                          fontSize: isMusicStandMode ? '3.6rem' : '3.2rem',
+                          fontWeight: 950,
+                          color: '#0f172a',
+                          fontFamily: "'Plus Jakarta Sans', monospace",
+                          letterSpacing: '-0.03em',
+                          lineHeight: 1
+                        }}>
+                          {String(targetMins).padStart(2, '0')}:00
+                        </span>
+                        <span style={{ fontSize: '0.76rem', color: '#64748b', fontWeight: 700, marginTop: '6px' }}>
+                          Fokuszeit
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Primary Action Button */}
+                    <div style={{ width: '100%', maxWidth: '380px', zIndex: 1 }}>
+                      <button
+                        type="button"
+                        onClick={handleStartPracticeSession}
+                        style={{
+                          width: '100%',
+                          background: 'linear-gradient(135deg, #0071e3 0%, #0077ed 100%)',
+                          color: '#ffffff',
+                          border: 'none',
+                          borderRadius: '20px',
+                          minHeight: '52px',
+                          padding: '14px 24px',
+                          fontSize: isMusicStandMode ? '1.18rem' : '1.05rem',
+                          fontWeight: 950,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '10px',
+                          boxShadow: '0 8px 25px rgba(0, 113, 227, 0.35)',
+                          transition: 'all 0.15s ease'
+                        }}
+                        className="hover-scale"
+                      >
+                        <Play size={20} fill="#ffffff" />
+                        <span>Fokus-Session starten</span>
+                      </button>
+                    </div>
+
+                    {/* Microcopy underneath */}
+                    <p style={{
+                      fontSize: isMusicStandMode ? '0.98rem' : '0.90rem',
+                      color: '#64748b',
+                      fontWeight: 650,
+                      margin: '16px 0 0 0',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px',
+                      flexWrap: 'wrap',
+                      justifyContent: 'center',
+                      zIndex: 1
+                    }}>
+                      <span>🎧 Fokus setzen</span>
+                      <span>·</span>
+                      <span>🎯 Konzentration bündeln</span>
+                      <span>·</span>
+                      <span>🎓 Präzision formen</span>
+                    </p>
+                  </div>
+
+                  {/* 3. Bottom Dual Grid: 2 Ruhige, Ausbalancierte Karten (1:1 Parität mit Junior) */}
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+                    gap: '24px',
+                    width: '100%'
+                  }}>
+                    {/* Karte C: Wochen-Konsistenz & Fokus (7-Tage-Grid mit 2 Ruhetagen) */}
+                    <div style={{
+                      background: '#ffffff',
+                      borderRadius: '32px',
+                      border: '2px solid #e2e8f0',
+                      padding: isMusicStandMode ? '32px' : '28px',
+                      boxShadow: '0 12px 30px rgba(15, 23, 42, 0.04)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '18px',
+                      boxSizing: 'border-box'
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <div style={{ width: isMusicStandMode ? '64px' : '56px', height: isMusicStandMode ? '64px' : '56px', borderRadius: '18px', background: '#eff6ff', border: '1.5px solid #bfdbfe', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0071e3' }}>
+                            <Activity size={isMusicStandMode ? 32 : 28} color="#0071e3" />
+                          </div>
+                          <div>
+                            <h4 style={{ margin: 0, fontSize: isMusicStandMode ? '1.55rem' : '1.38rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                              Wochen-Konsistenz &amp; Fokus
+                            </h4>
+                            <span style={{ fontSize: isMusicStandMode ? '1.05rem' : '0.92rem', color: '#64748b', fontWeight: 650 }}>
+                              {weekPracticedCount} von 7 Tagen • 2 Ruhetage geschützt
                             </span>
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{
+                            fontSize: '0.78rem',
+                            fontWeight: 850,
+                            background: '#eff6ff',
+                            color: '#0071e3',
+                            border: '1px solid #bfdbfe',
+                            padding: '4px 10px',
+                            borderRadius: '100px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '5px'
+                          }}>
+                            <ShieldCheck size={13} color="#0071e3" />
+                            <span>2 Ruhetage aktiv</span>
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* 7-Tage-Grid */}
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '8px' }}>
+                        {weekDays.map((d, idx) => {
+                          const isDone = d.hasMastered;
+                          const isToday = d.isToday;
+                          return (
+                            <div
+                              key={idx}
+                              style={{
+                                background: isDone ? '#f0fdf4' : (isToday ? '#eff6ff' : '#f8fafc'),
+                                border: isDone ? '1.5px solid #86efac' : (isToday ? '1.5px solid #bfdbfe' : '1px solid #e2e8f0'),
+                                borderRadius: '16px',
+                                padding: '10px 4px',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '6px',
+                                minHeight: '74px'
+                              }}
+                            >
+                              <span style={{ fontSize: '0.72rem', fontWeight: 900, color: isDone ? '#166534' : (isToday ? '#0071e3' : '#64748b'), textTransform: 'uppercase' }}>
+                                {d.dayName}
+                              </span>
+                              {isDone ? (
+                                <CheckCircle size={18} color="#166534" />
+                              ) : isToday ? (
+                                <Sparkles size={16} color="#0071e3" />
+                              ) : (
+                                <span style={{ fontSize: '0.85rem', color: '#94a3b8' }}>·</span>
+                              )}
+                              <span style={{ fontSize: '0.66rem', fontWeight: 850, color: isDone ? '#166534' : (isToday ? '#0071e3' : '#64748b') }}>
+                                {isDone ? `${d.totalMins || 3}m` : (isToday ? 'Heute' : 'Pause')}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Karte B: Meisterwerk & Repertoire-Widget (Offene Konzertstücke & Bühnenreife) */}
+                    <div style={{
+                      background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+                      borderRadius: '32px',
+                      border: '2px solid #e2e8f0',
+                      padding: isMusicStandMode ? '32px' : '28px',
+                      boxShadow: '0 12px 30px rgba(15, 23, 42, 0.04)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'space-between',
+                      gap: '18px',
+                      boxSizing: 'border-box'
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <div style={{ width: isMusicStandMode ? '64px' : '56px', height: isMusicStandMode ? '64px' : '56px', borderRadius: '18px', background: '#eff6ff', border: '1.5px solid #bfdbfe', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0071e3' }}>
+                            <Trophy size={isMusicStandMode ? 32 : 28} />
+                          </div>
+                          <div>
+                            <h4 style={{ margin: 0, fontSize: isMusicStandMode ? '1.55rem' : '1.38rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                              Meisterwerk &amp; Repertoire
+                            </h4>
+                            <span style={{ fontSize: isMusicStandMode ? '1.05rem' : '0.92rem', color: '#64748b', fontWeight: 650 }}>
+                              Bühnenreife &amp; Konzertstücke
+                            </span>
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => handleOpenHomeworkBookWithView('audiobiography', 'document')}
+                          style={{
+                            background: '#ffffff',
+                            border: '1.5px solid #bfdbfe',
+                            borderRadius: '100px',
+                            padding: isMusicStandMode ? '6px 14px' : '5px 12px',
+                            color: '#0071e3',
+                            fontSize: isMusicStandMode ? '0.92rem' : '0.84rem',
+                            fontWeight: 900,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            boxShadow: '0 2px 6px rgba(0, 113, 227, 0.08)'
+                          }}
+                          className="hover-scale"
+                        >
+                          <FileText size={14} />
+                          <span>Protokoll öffnen</span>
+                        </button>
+                      </div>
+
+                      {/* Repertoire Stücke Preview (Maximal 2 unvollständige Stücke im Arbeits-Fokus) */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                        {activeSongsList.length > 0 ? (
+                          <>
+                            {activeSongsList.slice(0, 2).map((song, sIdx) => (
+                              <div
+                                key={`pro-song-${sIdx}`}
+                                onClick={() => handleOpenHomeworkBookWithView('audiobiography', 'document')}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '14px',
+                                  background: '#ffffff',
+                                  borderRadius: '20px',
+                                  padding: '12px 16px',
+                                  border: song.isCurrentHomework ? '1.5px solid #bfdbfe' : '1.5px solid #e2e8f0',
+                                  boxShadow: song.isCurrentHomework ? '0 4px 14px rgba(0, 113, 227, 0.08)' : '0 2px 8px rgba(0,0,0,0.03)',
+                                  cursor: 'pointer'
+                                }}
+                                className="hover-scale"
+                              >
+                                <div style={{
+                                  width: '42px',
+                                  height: '42px',
+                                  borderRadius: '14px',
+                                  background: song.isCurrentHomework ? '#eff6ff' : '#f8fafc',
+                                  border: song.isCurrentHomework ? '1.5px solid #bfdbfe' : '1.5px solid #e2e8f0',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  color: '#0071e3',
+                                  flexShrink: 0
+                                }}>
+                                  <Disc size={22} />
+                                </div>
+
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', flex: 1, minWidth: 0 }}>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
+                                      <span style={{ fontWeight: 950, fontSize: isMusicStandMode ? '1.05rem' : '0.96rem', color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                        {song.title}
+                                      </span>
+                                      {song.isCurrentHomework && (
+                                        <span style={{
+                                          background: '#eff6ff',
+                                          color: '#0071e3',
+                                          border: '1px solid #bfdbfe',
+                                          fontSize: '0.70rem',
+                                          fontWeight: 850,
+                                          padding: '1px 6px',
+                                          borderRadius: '6px',
+                                          flexShrink: 0
+                                        }}>
+                                          Hausaufgabe
+                                        </span>
+                                      )}
+                                    </div>
+                                    <span style={{ fontSize: '0.80rem', fontWeight: 900, color: '#0071e3', flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>
+                                      {song.progress}% Bühnenreif
+                                    </span>
+                                  </div>
+                                  <div style={{ width: '100%', height: '7px', background: '#e2e8f0', borderRadius: '10px', overflow: 'hidden' }}>
+                                    <div style={{ width: `${Math.min(99, Math.max(5, song.progress))}%`, height: '100%', background: 'linear-gradient(90deg, #0071e3, #10b981)', borderRadius: '10px' }} />
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+
+                            {/* Dezente Fußzeile bei mehr als 2 offenen Stücken */}
+                            {activeSongsList.length > 2 && (
+                              <div style={{ textAlign: 'center', paddingTop: '2px' }}>
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenHomeworkBookWithView('audiobiography', 'document')}
+                                  style={{
+                                    background: 'none',
+                                    border: 'none',
+                                    color: '#0071e3',
+                                    fontSize: '0.80rem',
+                                    fontWeight: 850,
+                                    cursor: 'pointer',
+                                    padding: '2px 8px'
+                                  }}
+                                  className="hover-scale"
+                                >
+                                  + {activeSongsList.length - 2} weitere {activeSongsList.length - 2 === 1 ? 'Stück' : 'Stücke'} in Arbeit • Alle im Protokoll öffnen →
+                                </button>
+                              </div>
+                            )}
+                          </>
+                        ) : (
+                          <div style={{
+                            background: '#ffffff',
+                            borderRadius: '20px',
+                            padding: '18px 16px',
+                            textAlign: 'center',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            gap: '8px',
+                            border: '1.5px dashed #bfdbfe'
+                          }}>
+                            <div style={{
+                              width: '40px',
+                              height: '40px',
+                              borderRadius: '50%',
+                              background: '#eff6ff',
+                              border: '1.5px solid #bfdbfe',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              color: '#0071e3'
+                            }}>
+                              <Trophy size={20} />
+                            </div>
+                            <span style={{ fontWeight: 950, fontSize: '0.94rem', color: '#0f172a' }}>
+                              Alle Konzertstücke meisterhaft abgeschlossen
+                            </span>
+                            <span style={{ fontSize: '0.80rem', color: '#64748b', maxWidth: '320px', lineHeight: 1.35 }}>
+                              Hervorragende Leistung! Wähle im Meisterwerk-Protokoll ein neues Stück oder sprich deine Lehrkraft an.
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleOpenHomeworkBookWithView('audiobiography', 'document')}
+                              style={{
+                                marginTop: '4px',
+                                background: '#eff6ff',
+                                border: '1.5px solid #bfdbfe',
+                                borderRadius: '100px',
+                                padding: '5px 14px',
+                                color: '#0071e3',
+                                fontSize: '0.80rem',
+                                fontWeight: 900,
+                                cursor: 'pointer',
+                                boxShadow: '0 2px 6px rgba(0, 113, 227, 0.08)'
+                              }}
+                              className="hover-scale"
+                            >
+                              Neues Stück im Protokoll wählen →
+                            </button>
                           </div>
                         )}
                       </div>
 
+                      <span style={{ fontSize: '0.68rem', color: '#94a3b8', textAlign: 'center', display: 'block' }}>
+                        § 53 Abs. 4 UrhG • Zero-PDF • Reines Audio- &amp; Metadatenprotokoll
+                      </span>
                     </div>
-                  );
-                })()}
-              </div>
-            )}
-          </div>
-        </div>
-
+                  </div>
+                </div>
+              );
+            })()}
 
 
           {/* ========================================================================= */}
           {/* 📅 ROW 5: ÜBE-CHRONIK & ARCHIV (VERGANGENE MONATE & SESSIONS - Teen & Pro) */}
           {/* ========================================================================= */}
           {studentUiLevel !== 'junior' && (() => {
+            const isTeen = studentUiLevel === 'teen';
             const now = getSimulatedNow();
             const todayDd = String(now.getDate()).padStart(2, '0');
             const todayMm = String(now.getMonth() + 1).padStart(2, '0');
@@ -16949,7 +16133,10 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
               shieldDatesArr = [];
             }
             if (studentUser?.joker_used_at) {
-              shieldDatesArr.push(toLocalYYYYMMDD(new Date(studentUser.joker_used_at)));
+              const jokerIso = toLocalYYYYMMDD(new Date(studentUser.joker_used_at));
+              if (!shieldDatesArr.includes(jokerIso)) {
+                shieldDatesArr.push(jokerIso);
+              }
             }
 
             const shieldedDaysMap = new Map<string, number>();
@@ -16968,26 +16155,84 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
             });
             const shieldDatesSet = new Set(shieldDatesArr);
 
+            // 1. Alle Tage aus getGroupedLogs() erfassen
             const rawGrouped = getGroupedLogs();
-            const pastPracticedLogs = rawGrouped.filter(g => {
+            const groupedByDate: Record<string, {
+              date: string;
+              focusSeconds: number;
+              extraSeconds: number;
+              hasMasteredSession: boolean;
+              flameLevel: string;
+              isPlaceholder?: boolean;
+              isToday?: boolean;
+            }> = {};
+
+            rawGrouped.forEach(g => {
+              groupedByDate[g.date] = { ...g };
+            });
+
+            // 2. Garantiere lückenlose Ruhetag-Historie: Jeder jemals eingesetzte Schild / Ruhetag wird im Archiv abgebildet
+            shieldDatesArr.forEach(isoStr => {
+              const isoParts = isoStr.split('-');
+              if (isoParts.length === 3) {
+                const ddMmYy = `${isoParts[2]}.${isoParts[1]}.${isoParts[0].substring(2)}`;
+                if (!groupedByDate[ddMmYy]) {
+                  groupedByDate[ddMmYy] = {
+                    date: ddMmYy,
+                    focusSeconds: 0,
+                    extraSeconds: 0,
+                    hasMasteredSession: false,
+                    flameLevel: 'Keine Flamme',
+                    isPlaceholder: false,
+                    isToday: ddMmYy === todayDateStr
+                  };
+                }
+              }
+            });
+
+            // 3. Relevante Tage: Geübt (> 0) ODER geschützt (Schild/Ruhetag)
+            // Auch der heutige Tag wird in Echtzeit erfasst, sobald geübt oder geschützt wurde
+            const allMeaningfulLogs = Object.values(groupedByDate).filter(g => {
               const totalSecs = (g.focusSeconds || 0) + (g.extraSeconds || 0);
               const parts = g.date.split('.');
               const isoDateStr = parts.length === 3 ? `20${parts[2]}-${parts[1]}-${parts[0]}` : '';
               const isJoker = Boolean(shieldedDaysMap.has(isoDateStr) || shieldDatesSet.has(isoDateStr));
-              return g.date !== todayDateStr && (totalSecs > 0 || isJoker);
+              return totalSecs > 0 || isJoker;
             });
 
-            const monthsMap: Record<string, { label: string, key: string, entries: typeof pastPracticedLogs, totalMins: number, practiceDays: number }> = {};
+            allMeaningfulLogs.sort((a, b) => {
+              const parseDateStr = (s: string) => {
+                const parts = s.split('.');
+                const day = parseInt(parts[0], 10);
+                const month = parseInt(parts[1], 10) - 1;
+                const year = 2000 + parseInt(parts[2], 10);
+                return new Date(year, month, day).getTime();
+              };
+              return parseDateStr(b.date) - parseDateStr(a.date);
+            });
+
+            // 4. Mathematisch saubere Monats-Akkumulation
+            interface MonthArchive {
+              label: string;
+              key: string;
+              entries: typeof allMeaningfulLogs;
+              totalMins: number;
+              activePracticeDays: number;
+              shieldedDays: number;
+            }
+
+            const monthsMap: Record<string, MonthArchive> = {};
             const currentMonthKey = `${now.getMonth()}-${now.getFullYear()}`;
             monthsMap[currentMonthKey] = {
               label: `${monthNamesFull[now.getMonth()]} ${now.getFullYear()}`,
               key: currentMonthKey,
               entries: [],
               totalMins: 0,
-              practiceDays: 0
+              activePracticeDays: 0,
+              shieldedDays: 0
             };
 
-            pastPracticedLogs.forEach(entry => {
+            allMeaningfulLogs.forEach(entry => {
               const parts = entry.date.split('.');
               if (parts.length < 3) return;
               const monthIndex = parseInt(parts[1], 10) - 1;
@@ -17000,13 +16245,23 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                   key,
                   entries: [],
                   totalMins: 0,
-                  practiceDays: 0
+                  activePracticeDays: 0,
+                  shieldedDays: 0
                 };
               }
               monthsMap[key].entries.push(entry);
+
               const totalSecs = (entry.focusSeconds || 0) + (entry.extraSeconds || 0);
-              monthsMap[key].totalMins += Math.floor(totalSecs / 60);
-              monthsMap[key].practiceDays += 1;
+              const isoDateStr = parts.length === 3 ? `20${parts[2]}-${parts[1]}-${parts[0]}` : '';
+              const isShielded = Boolean(shieldedDaysMap.has(isoDateStr) || shieldDatesSet.has(isoDateStr));
+
+              if (totalSecs > 0) {
+                monthsMap[key].totalMins += Math.floor(totalSecs / 60);
+                monthsMap[key].activePracticeDays += 1;
+              }
+              if (isShielded) {
+                monthsMap[key].shieldedDays += 1;
+              }
             });
 
             const sortedMonths = Object.values(monthsMap).sort((a, b) => {
@@ -17016,37 +16271,58 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
               return bMonth - aMonth;
             });
 
+            // Globale Kennzahlen für den Header
+            const totalActivePracticeDays = allMeaningfulLogs.filter(e => ((e.focusSeconds || 0) + (e.extraSeconds || 0)) > 0).length;
+            const totalShieldedDaysCount = allMeaningfulLogs.filter(e => {
+              const parts = e.date.split('.');
+              const isoDateStr = parts.length === 3 ? `20${parts[2]}-${parts[1]}-${parts[0]}` : '';
+              return Boolean(shieldedDaysMap.has(isoDateStr) || shieldDatesSet.has(isoDateStr));
+            }).length;
+
+            // Level-spezifische Design-Tokens
+            const containerBg = isTeen ? 'linear-gradient(145deg, #1e293b 0%, #0f172a 100%)' : '#ffffff';
+            const containerBorder = isTeen ? '1.5px solid rgba(245, 158, 11, 0.25)' : '1.5px solid #e2e8f0';
+            const containerShadow = isTeen ? '0 20px 40px rgba(0, 0, 0, 0.3)' : '0 8px 24px rgba(0, 0, 0, 0.04)';
+            const headerBorderBottom = isTeen ? '1px solid rgba(255, 255, 255, 0.08)' : '1px solid #f1f5f9';
+            const iconBadgeBg = isTeen ? 'rgba(245, 158, 11, 0.15)' : '#eff6ff';
+            const iconBadgeBorder = isTeen ? '1px solid rgba(245, 158, 11, 0.35)' : '1px solid #bfdbfe';
+            const iconColor = isTeen ? '#fbbf24' : '#0071e3';
+            const titleColor = isTeen ? '#ffffff' : '#0f172a';
+            const subtitleColor = isTeen ? '#94a3b8' : '#64748b';
+            const countPillBg = isTeen ? 'rgba(15, 23, 42, 0.7)' : '#f8fafc';
+            const countPillColor = isTeen ? '#e2e8f0' : '#475569';
+            const countPillBorder = isTeen ? '1px solid rgba(255, 255, 255, 0.12)' : '1px solid #e2e8f0';
+
             return (
               <div style={{
                 width: '100%',
-                background: 'rgba(255, 255, 255, 0.92)',
-                backdropFilter: 'blur(24px)',
-                WebkitBackdropFilter: 'blur(24px)',
-                border: '1px solid rgba(226, 232, 240, 0.8)',
+                background: containerBg,
                 borderRadius: '24px',
+                border: containerBorder,
                 padding: '22px 26px',
-                boxShadow: '0 20px 40px -12px rgba(0, 0, 0, 0.04), 0 0 0 1px rgba(255, 255, 255, 0.6) inset',
+                boxShadow: containerShadow,
                 display: 'flex',
                 flexDirection: 'column',
                 gap: '14px',
                 boxSizing: 'border-box'
               }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f1f5f9', paddingBottom: '12px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: headerBorderBottom, paddingBottom: '12px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <div style={{ background: '#e6f4ea', color: '#34a853', padding: '8px', borderRadius: '12px' }}>
-                      <Calendar size={18} color="#34a853" />
+                    <div style={{ background: iconBadgeBg, border: iconBadgeBorder, padding: '8px', borderRadius: '12px' }}>
+                      <Calendar size={18} color={iconColor} />
                     </div>
                     <div>
-                      <h4 style={{ fontWeight: 850, fontSize: '18px', color: '#1e293b', margin: 0 }}>
+                      <h4 style={{ fontWeight: 850, fontSize: '18px', color: titleColor, margin: 0 }}>
                         Übe-Chronik &amp; Archiv
                       </h4>
-                      <p style={{ fontSize: '0.72rem', color: '#94a3b8', margin: '2px 0 0 0', fontWeight: 600 }}>
-                        Alle vergangenen Übe-Tage &amp; gesammelten XP im Monatsverlauf
+                      <p style={{ fontSize: '0.74rem', color: subtitleColor, margin: '2px 0 0 0', fontWeight: 600 }}>
+                        {isTeen ? 'Alle vergangenen Übe-Tage & gesammelten XP im Monatsverlauf' : 'Übe-Verlauf & dokumentierte Einheiten im Monatsüberblick'}
                       </p>
                     </div>
                   </div>
-                  <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 750, background: '#f8fafc', border: '1px solid #e2e8f0', padding: '4px 12px', borderRadius: '100px' }}>
-                    {pastPracticedLogs.length} archivierte {pastPracticedLogs.length === 1 ? 'Session' : 'Sessions'}
+                  <span style={{ fontSize: '0.74rem', color: countPillColor, fontWeight: 750, background: countPillBg, border: countPillBorder, padding: '4px 12px', borderRadius: '100px' }}>
+                    {totalActivePracticeDays} dokumentierte {totalActivePracticeDays === 1 ? 'Übetag' : 'Übetage'}
+                    {totalShieldedDaysCount > 0 ? (isTeen ? ` • ${totalShieldedDaysCount} geschützt` : ` • ${totalShieldedDaysCount} ${totalShieldedDaysCount === 1 ? 'Ruhetag' : 'Ruhetage'}`) : ''}
                   </span>
                 </div>
 
@@ -17063,12 +16339,6 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                       }));
                     };
 
-                    const shieldedCount = month.entries.filter(e => {
-                      const p = e.date.split('.');
-                      const iso = p.length === 3 ? `20${p[2]}-${p[1]}-${p[0]}` : '';
-                      return shieldedDaysMap.has(iso) || shieldDatesSet.has(iso);
-                    }).length;
-
                     return (
                       <div key={month.key} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                         {/* Month Header Accordion */}
@@ -17078,42 +16348,44 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                             display: 'flex',
                             justifyContent: 'space-between',
                             alignItems: 'center',
-                            background: '#f8fafc',
-                            border: '1px solid #e2e8f0',
+                            background: isTeen ? 'rgba(30, 41, 59, 0.7)' : '#f8fafc',
+                            border: isTeen ? '1px solid rgba(255, 255, 255, 0.08)' : '1px solid #e2e8f0',
                             borderRadius: '16px',
                             padding: '12px 16px',
                             cursor: 'pointer',
                             userSelect: 'none',
                             transition: 'all 0.2s'
                           }}
-                          onMouseEnter={(e) => { e.currentTarget.style.background = '#f1f5f9'; }}
-                          onMouseLeave={(e) => { e.currentTarget.style.background = '#f8fafc'; }}
                         >
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <ChevronRight 
                               size={15} 
                               style={{ 
-                                color: '#64748b', 
+                                color: isTeen ? '#fbbf24' : '#64748b', 
                                 transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)', 
                                 transition: 'transform 0.2s ease-in-out' 
                               }} 
                             />
-                            <span style={{ fontWeight: 850, fontSize: '0.86rem', color: '#1e293b' }}>
+                            <span style={{ fontWeight: 850, fontSize: '0.86rem', color: isTeen ? '#f8fafc' : '#0f172a' }}>
                               {month.label}
                             </span>
                           </div>
 
                           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                             <span style={{
-                              fontSize: '0.7rem',
+                              fontSize: '0.70rem',
                               fontWeight: 800,
-                              color: month.practiceDays > 0 ? '#166534' : '#64748b',
-                              background: month.practiceDays > 0 ? '#e6f4ea' : '#f1f5f9',
-                              border: month.practiceDays > 0 ? '1px solid #bbf7d0' : '1px solid #e2e8f0',
+                              color: isTeen ? '#fbbf24' : '#0071e3',
+                              background: isTeen ? 'rgba(245, 158, 11, 0.15)' : '#eff6ff',
+                              border: isTeen ? '1px solid rgba(245, 158, 11, 0.35)' : '1px solid #bfdbfe',
                               padding: '3px 10px',
                               borderRadius: '100px'
                             }}>
-                              {month.practiceDays} {month.practiceDays === 1 ? 'Übetag' : 'Übetage'}{shieldedCount > 0 ? ` (${shieldedCount} geschützt)` : ''} • {month.totalMins}m
+                              {month.activePracticeDays} {month.activePracticeDays === 1 ? 'Übetag' : 'Übetage'}
+                              {month.shieldedDays > 0 ? (
+                                isTeen ? ` • ${month.shieldedDays} geschützt` : ` • ${month.shieldedDays} ${month.shieldedDays === 1 ? 'Ruhetag' : 'Ruhetage'}`
+                              ) : ''}
+                              {` • ${month.totalMins} Min.`}
                             </span>
                           </div>
                         </div>
@@ -17122,8 +16394,17 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                         {isExpanded && (
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingLeft: '6px' }}>
                             {month.entries.length === 0 ? (
-                              <div style={{ textAlign: 'center', color: '#94a3b8', fontSize: '0.76rem', fontStyle: 'italic', padding: '16px 10px', background: '#fafafa', borderRadius: '14px', border: '1px dashed #e2e8f0' }}>
-                                Noch keine vergangenen Sessions in diesem Monat archiviert. 🚀
+                              <div style={{
+                                textAlign: 'center',
+                                color: isTeen ? '#94a3b8' : '#64748b',
+                                fontSize: '0.78rem',
+                                fontStyle: 'italic',
+                                padding: '16px 10px',
+                                background: isTeen ? 'rgba(15, 23, 42, 0.5)' : '#fafafa',
+                                borderRadius: '14px',
+                                border: isTeen ? '1px dashed rgba(255,255,255,0.1)' : '1px dashed #e2e8f0'
+                              }}>
+                                Noch keine vergangenen Sessions in diesem Monat archiviert.
                               </div>
                             ) : (
                               month.entries.map((entry, eIdx) => {
@@ -17136,22 +16417,22 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                 const eSecs = entry.extraSeconds || 0;
                                 const totalSecs = fSecs + eSecs;
                                 const totalMins = Math.floor(totalSecs / 60);
-                                const xp = totalMins;
+                                const xp = Math.max(1, totalMins);
 
                                 if (isShielded) {
                                   return (
                                     <div
                                       key={eIdx}
                                       style={{
-                                        background: '#ffffff',
-                                        border: '1px solid #e9d5ff',
+                                        background: isTeen ? 'rgba(30, 41, 59, 0.55)' : '#ffffff',
+                                        border: isTeen ? '1px solid rgba(245, 158, 11, 0.3)' : '1px solid #e2e8f0',
                                         borderRadius: '16px',
                                         padding: '12px 16px',
                                         display: 'flex',
                                         justifyContent: 'space-between',
                                         alignItems: 'center',
-                                        boxShadow: '0 2px 6px rgba(124, 58, 237, 0.04)',
-                                        borderLeft: '4px solid #7c3aed'
+                                        boxShadow: isTeen ? 'none' : '0 2px 6px rgba(0, 0, 0, 0.02)',
+                                        borderLeft: isTeen ? '4px solid #f59e0b' : '4px solid #0071e3'
                                       }}
                                     >
                                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -17159,29 +16440,37 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                           width: '34px',
                                           height: '34px',
                                           borderRadius: '10px',
-                                          background: 'linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%)',
-                                          border: '1px solid #c4b5fd',
+                                          background: isTeen ? 'rgba(245, 158, 11, 0.15)' : '#eff6ff',
+                                          border: isTeen ? '1px solid rgba(245, 158, 11, 0.35)' : '1px solid #bfdbfe',
                                           display: 'flex',
                                           alignItems: 'center',
-                                          justifyContent: 'center',
-                                          boxShadow: '0 2px 6px rgba(124, 58, 237, 0.12)'
+                                          justifyContent: 'center'
                                         }}>
-                                          <Shield size={17} color="#7c3aed" fill="#7c3aed" />
+                                          {isTeen ? (
+                                            <Shield size={17} color="#fbbf24" fill="#fbbf24" />
+                                          ) : (
+                                            <ShieldCheck size={17} color="#0071e3" />
+                                          )}
                                         </div>
                                         <div>
-                                          <span style={{ fontSize: '0.8rem', fontWeight: 850, color: '#1e293b' }}>
+                                          <span style={{ fontSize: '0.82rem', fontWeight: 850, color: isTeen ? '#ffffff' : '#0f172a' }}>
                                             {formatFriendlyDate(entry.date)}
                                           </span>
                                           <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginTop: '2px' }}>
-                                            <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#6d28d9', display: 'flex', alignItems: 'center', gap: '3px' }}>
-                                              <Shield size={10} color="#7c3aed" fill="#7c3aed" />
-                                              Schild {shieldNumber} eingesetzt (Glut-Schutz)
+                                            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: isTeen ? '#fbbf24' : '#0071e3', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                              {isTeen ? (
+                                                <Shield size={10} color="#fbbf24" fill="#fbbf24" />
+                                              ) : (
+                                                <ShieldCheck size={11} color="#0071e3" />
+                                              )}
+                                              {isTeen ? `Schild ${shieldNumber} eingesetzt (Woche geschützt)` : `Ruhetag ${shieldNumber} eingelegt (Fokus-Schutz)`}
                                             </span>
                                             {totalSecs > 0 && (
                                               <>
                                                 <span style={{ fontSize: '0.65rem', color: '#94a3b8' }}>•</span>
-                                                <span style={{ fontSize: '0.7rem', fontWeight: 650, color: '#64748b' }}>
-                                                  ⏱️ {totalSecs < 60 ? `${totalSecs} Sek.` : `${Math.floor(totalSecs / 60)}:${String(totalSecs % 60).padStart(2, '0')} Min.`} Fokus
+                                                <span style={{ fontSize: '0.70rem', fontWeight: 650, color: isTeen ? '#cbd5e1' : '#64748b', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                                  {isTeen ? '⏱️' : <Clock size={11} color="#0071e3" style={{ flexShrink: 0 }} />}
+                                                  {totalSecs < 60 ? `${totalSecs} Sek.` : `${Math.floor(totalSecs / 60)}:${String(totalSecs % 60).padStart(2, '0')} Min.`} Fokus
                                                 </span>
                                               </>
                                             )}
@@ -17190,19 +16479,23 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                       </div>
 
                                       <span style={{
-                                        fontSize: '0.68rem',
+                                        fontSize: '0.70rem',
                                         fontWeight: 800,
-                                        color: '#6d28d9',
-                                        background: '#f5f3ff',
+                                        color: isTeen ? '#fbbf24' : '#0071e3',
+                                        background: isTeen ? 'rgba(245, 158, 11, 0.15)' : '#eff6ff',
                                         padding: '3px 10px',
                                         borderRadius: '8px',
-                                        border: '1px solid #c4b5fd',
+                                        border: isTeen ? '1px solid rgba(245, 158, 11, 0.35)' : '1px solid #bfdbfe',
                                         display: 'flex',
                                         alignItems: 'center',
                                         gap: '4px'
                                       }}>
-                                        <Shield size={10} color="#7c3aed" fill="#7c3aed" />
-                                        Schild {shieldNumber} geschützt
+                                        {isTeen ? (
+                                          <Shield size={10} color="#fbbf24" fill="#fbbf24" />
+                                        ) : (
+                                          <ShieldCheck size={11} color="#0071e3" />
+                                        )}
+                                        {isTeen ? `Schild ${shieldNumber} geschützt` : `Ruhetag ${shieldNumber} aktiv`}
                                       </span>
                                     </div>
                                   );
@@ -17212,15 +16505,17 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                   <div
                                     key={eIdx}
                                     style={{
-                                      background: '#ffffff',
-                                      border: entry.hasMasteredSession ? '1px solid #bbf7d0' : '1px solid #e2e8f0',
+                                      background: isTeen ? 'rgba(30, 41, 59, 0.55)' : '#ffffff',
+                                      border: isTeen ? '1px solid rgba(255, 255, 255, 0.08)' : (entry.hasMasteredSession ? '1px solid #bbf7d0' : '1px solid #e2e8f0'),
                                       borderRadius: '16px',
                                       padding: '12px 16px',
                                       display: 'flex',
                                       justifyContent: 'space-between',
                                       alignItems: 'center',
-                                      boxShadow: '0 2px 6px rgba(0, 0, 0, 0.02)',
-                                      borderLeft: entry.hasMasteredSession ? '4px solid #34a853' : '4px solid #eab308'
+                                      boxShadow: isTeen ? 'none' : '0 2px 6px rgba(0, 0, 0, 0.02)',
+                                      borderLeft: isTeen 
+                                        ? (entry.hasMasteredSession ? '4px solid #10b981' : '4px solid #f59e0b') 
+                                        : (entry.hasMasteredSession ? '4px solid #10b981' : '4px solid #0071e3')
                                     }}
                                   >
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -17228,39 +16523,64 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                         width: '34px',
                                         height: '34px',
                                         borderRadius: '10px',
-                                        background: entry.hasMasteredSession ? '#e6f4ea' : '#fefce8',
+                                        background: isTeen 
+                                          ? (entry.hasMasteredSession ? 'rgba(16, 185, 129, 0.15)' : 'rgba(245, 158, 11, 0.15)') 
+                                          : (entry.hasMasteredSession ? '#f0fdf4' : '#eff6ff'),
                                         display: 'flex',
                                         alignItems: 'center',
                                         justifyContent: 'center'
                                       }}>
-                                        <Flame size={17} color={entry.hasMasteredSession ? '#34a853' : '#ca8a04'} fill={entry.hasMasteredSession ? '#34a853' : 'none'} />
+                                        <Flame 
+                                          size={17} 
+                                          color={isTeen 
+                                            ? (entry.hasMasteredSession ? '#34d399' : '#fbbf24') 
+                                            : (entry.hasMasteredSession ? '#166534' : '#0071e3')
+                                          } 
+                                          fill={entry.hasMasteredSession ? (isTeen ? '#34d399' : '#166534') : 'none'} 
+                                        />
                                       </div>
                                       <div>
-                                        <span style={{ fontSize: '0.8rem', fontWeight: 850, color: '#1e293b' }}>
+                                        <span style={{ fontSize: '0.82rem', fontWeight: 850, color: isTeen ? '#ffffff' : '#0f172a' }}>
                                           {formatFriendlyDate(entry.date)}
                                         </span>
                                         <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginTop: '2px' }}>
-                                          <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#15803d' }}>
-                                            ⏱️ {totalSecs < 60 ? `${totalSecs} Sek.` : `${Math.floor(totalSecs / 60)}:${String(totalSecs % 60).padStart(2, '0')} Min.`} Fokus
+                                          <span style={{ fontSize: '0.72rem', fontWeight: 700, color: isTeen ? '#34d399' : '#166534', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                            {isTeen ? '⏱️' : <Clock size={11} color="#0071e3" style={{ flexShrink: 0 }} />}
+                                            {totalSecs < 60 ? `${totalSecs} Sek.` : `${Math.floor(totalSecs / 60)}:${String(totalSecs % 60).padStart(2, '0')} Min.`} Fokus
                                           </span>
                                           <span style={{ fontSize: '0.65rem', color: '#94a3b8' }}>•</span>
-                                          <span style={{ fontSize: '0.7rem', fontWeight: 850, color: '#0284c7' }}>
-                                            +{xp} XP ⚡
+                                          <span style={{ fontSize: '0.72rem', fontWeight: 850, color: isTeen ? '#38bdf8' : '#0071e3', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                            {isTeen ? (
+                                              `+${xp} XP ⚡`
+                                            ) : (
+                                              <>
+                                                <Zap size={11} color="#0071e3" style={{ flexShrink: 0 }} />
+                                                <span>+{xp} XP</span>
+                                              </>
+                                            )}
                                           </span>
                                         </div>
                                       </div>
                                     </div>
 
                                     <span style={{
-                                      fontSize: '0.68rem',
+                                      fontSize: '0.70rem',
                                       fontWeight: 800,
-                                      color: entry.hasMasteredSession ? '#166534' : '#854d0e',
-                                      background: entry.hasMasteredSession ? '#e6f4ea' : '#fef9c3',
+                                      color: isTeen 
+                                        ? (entry.hasMasteredSession ? '#34d399' : '#fbbf24') 
+                                        : (entry.hasMasteredSession ? '#166534' : '#0071e3'),
+                                      background: isTeen 
+                                        ? (entry.hasMasteredSession ? 'rgba(16, 185, 129, 0.15)' : 'rgba(245, 158, 11, 0.15)') 
+                                        : (entry.hasMasteredSession ? '#f0fdf4' : '#eff6ff'),
                                       padding: '3px 10px',
                                       borderRadius: '8px',
-                                      border: entry.hasMasteredSession ? '1px solid #bbf7d0' : '1px solid #fef08a'
+                                      border: isTeen 
+                                        ? (entry.hasMasteredSession ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid rgba(245, 158, 11, 0.3)') 
+                                        : (entry.hasMasteredSession ? '1px solid #bbf7d0' : '1px solid #bfdbfe')
                                     }}>
-                                      {entry.flameLevel && entry.flameLevel !== 'Keine Flamme' ? entry.flameLevel : (entry.hasMasteredSession ? 'Gemeistert' : 'Teil-Session')}
+                                      {entry.hasMasteredSession 
+                                        ? (isTeen ? 'Meisterhaft' : 'Ziel erreicht ✓') 
+                                        : (isTeen ? 'Übe-Session' : 'Fokus-Einheit')}
                                     </span>
                                   </div>
                                 );
@@ -18884,8 +18204,8 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
             )
           );
           const hasSidebarAppointmentAlerts = sidebarAppointmentChanges.length > 0;
-          const hasSidebarFeedAlerts = (unreadClassFeedCount > 0) || ((occurrencesWithMessages || []).length > 0);
-          const sidebarTotalAlertsCount = sidebarAppointmentChanges.length + (unreadClassFeedCount || 0) + ((occurrencesWithMessages || []).length > 0 ? occurrencesWithMessages.length : 0);
+          const hasSidebarFeedAlerts = (unreadClassFeedCount > 0) || (totalUnreadDirectMessages > 0);
+          const sidebarTotalAlertsCount = sidebarAppointmentChanges.length + (unreadClassFeedCount || 0) + (totalUnreadDirectMessages || 0);
 
           return (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', position: 'relative' }}>
@@ -19282,7 +18602,9 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                         date: targetDateStr,
                                         start_time: timeLabel,
                                         label,
-                                        occurrenceId: finalOccurId
+                                        occurrenceId: finalOccurId,
+                                        status: nextOcc?.status || (isCanceled ? 'cancelled' : 'scheduled'),
+                                        isCancelled: isCanceled
                                       });
                                       setShowAppointmentChat(true);
                                     }}
@@ -19578,7 +18900,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                         try {
                           const p = JSON.parse(clean);
                           if (Array.isArray(p)) {
-                            clean = p.filter((x: any) => typeof x === 'string' && !x.startsWith('AUDIO:') && !x.startsWith('STICKER:') && !x.startsWith('LATENCY:') && !x.startsWith('STUDENT_NOTE_PUBLIC:') && !x.startsWith('STUDENT_NOTE_PRIVATE:')).join(' ');
+                            clean = p.filter((x: any) => typeof x === 'string' && !x.startsWith('AUDIO:') && !x.startsWith('STICKER:') && !x.startsWith('LATENCY:') && !x.startsWith('STUDENT_NOTE_PUBLIC:') && !x.startsWith('STUDENT_NOTE_PRIVATE:') && !x.startsWith('STUDENT_QUESTION:')).join(' ');
                           } else if (typeof p === 'string') {
                             clean = p;
                           }
@@ -19587,13 +18909,26 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                       return clean
                         .replace(/\["AUDIO:[^"]*"\]/g, '')
                         .replace(/AUDIO:[^\s,|]+/g, '')
-                        .replace(/.*(STUDENT_NOTE_PUBLIC|STUDENT_NOTE_PRIVATE):[^|]*\|/, '')
+                        .replace(/.*(STUDENT_NOTE_PUBLIC|STUDENT_NOTE_PRIVATE|STUDENT_QUESTION):[^|]*\|/, '')
+                        .replace(/^STUDENT_QUESTION:[^|]*\|?/i, '')
                         .replace(/^❓\s*Frage für den Unterricht:\s*/i, '')
                         .trim();
                     };
 
-                    const generalNoteRaw = currentWeekNotes.find(n => !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('LATENCY:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:'));
+                    const generalNoteRaw = currentWeekNotes.find(n => !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('LATENCY:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:') && !n.startsWith('STUDENT_QUESTION:'));
                     const generalNote = generalNoteRaw ? cleanGeneralNote(generalNoteRaw) : '';
+
+                    const studentQuestionRaw = currentWeekNotes.find(n => typeof n === 'string' && (n.startsWith('STUDENT_QUESTION:') || n.startsWith('❓ Frage für den Unterricht:')));
+                    let studentQuestionText = '';
+                    if (studentQuestionRaw) {
+                      if (studentQuestionRaw.startsWith('STUDENT_QUESTION:')) {
+                        const withoutPrefix = studentQuestionRaw.replace(/^STUDENT_QUESTION:/, '');
+                        const pipeIdx = withoutPrefix.indexOf('|');
+                        studentQuestionText = pipeIdx !== -1 ? withoutPrefix.slice(pipeIdx + 1).trim() : withoutPrefix.trim();
+                      } else {
+                        studentQuestionText = studentQuestionRaw.replace(/^❓\s*Frage für den Unterricht:\s*/i, '').trim();
+                      }
+                    }
 
                     let focusTitle = `${studentInstrumentName || 'Musik'}-Training`;
                     if (activeJuniorBooks.length > 0) {
@@ -19783,7 +19118,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                   <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap', flexShrink: 0 }}>
                                     {b.pages.map((pNum: number, pIdx: number) => (
                                       <span key={`j-p-${pIdx}`} style={{
-                                        fontSize: '0.78rem',
+                                        fontSize: '0.82rem',
                                         fontWeight: 900,
                                         color: '#15803d',
                                         background: '#dcfce7',
@@ -19835,10 +19170,19 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
 
                               {/* Zusätzliche Bemerkung */}
                               {generalNote && generalNote.trim().toLowerCase() !== 'zusätzliche bemerkung' && (
-                                <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', fontSize: '0.78rem', color: '#334155', fontWeight: 600, paddingTop: '6px', borderTop: '1px dashed #e2e8f0' }}>
+                                <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', fontSize: '0.88rem', color: '#334155', fontWeight: 600, paddingTop: '6px', borderTop: '1px dashed #e2e8f0' }}>
                                   <FileText size={14} style={{ color: '#16a34a', flexShrink: 0 }} />
                                   <strong style={{ color: '#15803d', fontWeight: 850, flexShrink: 0 }}>Zusätzliche Bemerkung:</strong>
                                   <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{generalNote}</span>
+                                </div>
+                              )}
+
+                              {/* Frage des Schülers für die Stunde */}
+                              {studentQuestionText && (
+                                <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', fontSize: '0.88rem', color: '#1e40af', fontWeight: 600, paddingTop: '6px', borderTop: '1px dashed #e2e8f0' }}>
+                                  <HelpCircle size={14} style={{ color: '#2563eb', flexShrink: 0 }} />
+                                  <strong style={{ color: '#2563eb', fontWeight: 850, flexShrink: 0 }}>Deine Frage für die Stunde:</strong>
+                                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{studentQuestionText}</span>
                                 </div>
                               )}
 
@@ -20081,7 +19425,32 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                           const unlockedStickersCount = (ALL_STICKERS || []).filter(st => unifiedStickersMap[st.id]?.isUnlocked).length;
                           const nextLockedSticker = (ALL_STICKERS || []).find(st => !unifiedStickersMap[st.id]?.isUnlocked) || (ALL_STICKERS || [])[0];
                           const nextStickerStatus = nextLockedSticker ? unifiedStickersMap[nextLockedSticker.id] : null;
-                          const stickerProgressPercent = Math.min(100, Math.round((unlockedStickersCount / (totalStickersCount || 1)) * 100));
+
+                          // Laser-Synchronous progress percentage towards THIS next milestone sticker (matches Karte B 1:1)
+                          const nextStickerProgressPercent = (() => {
+                            if (!nextLockedSticker) return 100;
+                            if (nextLockedSticker.category === 'ueben') {
+                              const target = nextLockedSticker.id === 'fleiss-pionier' ? 20 : nextLockedSticker.id === 'uebe-meister' ? 100 : nextLockedSticker.id === 'uebe-legende' ? 500 : 1500;
+                              const prev = nextLockedSticker.id === 'fleiss-pionier' ? 0 : nextLockedSticker.id === 'uebe-meister' ? 20 : nextLockedSticker.id === 'uebe-legende' ? 100 : 500;
+                              return Math.min(100, Math.max(0, Math.round(((effectivePracticeMinutes - prev) / (target - prev)) * 100)));
+                            }
+                            if (nextLockedSticker.category === 'xp') {
+                              const target = nextLockedSticker.id === 'xp-sammler' ? 100 : nextLockedSticker.id === 'xp-champion' ? 500 : nextLockedSticker.id === 'xp-meister' ? 1500 : 3500;
+                              const prev = nextLockedSticker.id === 'xp-sammler' ? 0 : nextLockedSticker.id === 'xp-champion' ? 100 : nextLockedSticker.id === 'xp-meister' ? 500 : 1500;
+                              return Math.min(100, Math.max(0, Math.round((((avatar?.xp || 0) - prev) / (target - prev)) * 100)));
+                            }
+                            if (nextLockedSticker.category === 'streaks') {
+                              const target = nextLockedSticker.id === 'dranbleiber' ? 3 : nextLockedSticker.id === 'wochen-held' ? 7 : nextLockedSticker.id === 'streak-koenig' ? 21 : 30;
+                              const prev = nextLockedSticker.id === 'dranbleiber' ? 0 : nextLockedSticker.id === 'wochen-held' ? 3 : nextLockedSticker.id === 'streak-koenig' ? 7 : 21;
+                              return Math.min(100, Math.max(0, Math.round((((avatar?.streak_flame || 0) - prev) / (target - prev)) * 100)));
+                            }
+                            if (nextLockedSticker.category === 'songs') {
+                              const target = nextLockedSticker.id === 'erster-erfolg' ? 1 : nextLockedSticker.id === 'song-sammler' ? 3 : nextLockedSticker.id === 'repertoire-riese' ? 5 : 10;
+                              const prev = nextLockedSticker.id === 'erster-erfolg' ? 0 : nextLockedSticker.id === 'song-sammler' ? 1 : nextLockedSticker.id === 'repertoire-riese' ? 3 : 5;
+                              return Math.min(100, Math.max(0, Math.round((((songStats?.masteredCount || 0) - prev) / (target - prev)) * 100)));
+                            }
+                            return 100;
+                          })();
 
                           return (
                             <div 
@@ -20142,10 +19511,10 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                     {nextStickerStatus?.progressText || nextLockedSticker?.desc || 'Öffne dein Panini-Album und entdecke deine Meilensteine!'}
                                   </p>
 
-                                  {/* Progress bar */}
+                                  {/* Progress bar (100% Synchron zu Karte B) */}
                                   <div style={{ marginTop: '12px', width: '100%', height: '8px', background: '#f1f5f9', borderRadius: '100px', overflow: 'hidden' }}>
                                     <div style={{
-                                      width: `${stickerProgressPercent}%`,
+                                      width: `${nextStickerProgressPercent}%`,
                                       height: '100%',
                                       background: 'linear-gradient(90deg, #f59e0b 0%, #d97706 100%)',
                                       borderRadius: '100px',
@@ -20326,8 +19695,8 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                         </div>
 
                         {(() => {
-                          const { formattedJuniorBooks, otherActiveSongs, audioTracks, generalNote, hasAnyHomework } = getJuniorWeeklyHomeworkSummary();
-                          const cleanTitle = (t: string) => (t || '').replace(/\s*\((gitarre|guitar|e-gitarre|bass|e-bass|drums|schlagzeug|klavier|piano|keys|keyboard|vocals|gesang|stimme|allgemein)\)/i, '');
+                          const { formattedJuniorBooks, otherActiveSongs, audioTracks, generalNote, studentQuestionText, hasAnyHomework } = getJuniorWeeklyHomeworkSummary();
+                          const cleanTitle = (t: string) => (t || '').replace(/linken park/gi, 'Linkin Park').replace(/\s*\((gitarre|guitar|e-gitarre|bass|e-bass|drums|schlagzeug|klavier|piano|keys|keyboard|vocals|gesang|stimme|allgemein)\)/i, '');
 
                           return (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -20618,6 +19987,28 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                         <FileText size={16} color="#15803d" style={{ flexShrink: 0, marginTop: '2px' }} />
                                         <div>
                                           <strong style={{ color: '#15803d', fontWeight: 850 }}>Hinweis:</strong> {generalNote}
+                                        </div>
+                                      </div>
+                                    )}
+
+                                    {/* Student Question */}
+                                    {studentQuestionText && (
+                                      <div style={{
+                                        marginTop: '4px',
+                                        padding: '12px 14px',
+                                        background: '#eff6ff',
+                                        borderRadius: '14px',
+                                        border: '1px solid #bfdbfe',
+                                        display: 'flex',
+                                        alignItems: 'flex-start',
+                                        gap: '8px',
+                                        fontSize: '0.86rem',
+                                        color: '#1e40af',
+                                        fontWeight: 600
+                                      }}>
+                                        <HelpCircle size={16} color="#2563eb" style={{ flexShrink: 0, marginTop: '2px' }} />
+                                        <div>
+                                          <strong style={{ color: '#2563eb', fontWeight: 850 }}>Deine Frage für den Unterricht:</strong> {studentQuestionText}
                                         </div>
                                       </div>
                                     )}
@@ -21561,844 +20952,6 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                     </div>
                   )}
 
-                  {/* ========================================================================= */}
-                  {/* MODAL 5: JUNIOR STICKER-ALBUM (AUTHENTISCHE 20 PANINI-STICKER)            */}
-                  {/* ========================================================================= */}
-                  {showJuniorStickerModal && (
-                    <div style={{
-                      position: 'fixed',
-                      inset: 0,
-                      background: 'rgba(15, 23, 42, 0.88)',
-                      backdropFilter: 'blur(16px)',
-                      zIndex: 99999,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      padding: '16px'
-                    }}>
-                      <div style={{
-                        background: '#ffffff',
-                        borderRadius: '36px',
-                        maxWidth: '880px',
-                        width: '100%',
-                        maxHeight: '92vh',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        padding: '32px 28px',
-                        boxShadow: '0 35px 80px rgba(0, 0, 0, 0.35)',
-                        position: 'relative',
-                        boxSizing: 'border-box',
-                        overflow: 'hidden'
-                      }}>
-                        {/* CLOSE BUTTON */}
-                        <button
-                          onClick={() => setShowJuniorStickerModal(false)}
-                          style={{
-                            position: 'absolute',
-                            top: '20px',
-                            right: '20px',
-                            background: '#f1f5f9',
-                            border: 'none',
-                            width: '44px',
-                            height: '44px',
-                            borderRadius: '50%',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            cursor: 'pointer',
-                            color: '#64748b',
-                            zIndex: 10
-                          }}
-                          className="hover-scale"
-                          title="Album schließen"
-                        >
-                          <X size={24} />
-                        </button>
-
-                        {/* FIXED HEADER (Never overlapped) */}
-                        <div style={{ flexShrink: 0, marginBottom: '16px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '14px' }}>
-                            <div style={{
-                              background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
-                              color: '#d97706',
-                              width: '54px',
-                              height: '54px',
-                              borderRadius: '20px',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              fontSize: '1.8rem',
-                              boxShadow: '0 6px 18px rgba(217, 119, 6, 0.2)',
-                              flexShrink: 0
-                            }}>
-                              🏆
-                            </div>
-                            <div>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                                <span style={{ fontSize: '0.74rem', fontWeight: 950, color: '#d97706', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                                  Deine Auszeichnungen
-                                </span>
-                                <span style={{
-                                  background: '#ecfdf5',
-                                  color: '#059669',
-                                  border: '1px solid #a7f3d0',
-                                  fontSize: '0.7rem',
-                                  fontWeight: 900,
-                                  padding: '2px 10px',
-                                  borderRadius: '100px'
-                                }}>
-                                  {ALL_STICKERS.filter(st => unifiedStickersMap[st.id]?.isUnlocked).length} von {ALL_STICKERS.length} freigeschaltet ✨
-                                </span>
-                              </div>
-                              <h2 style={{ margin: '2px 0 0 0', fontSize: '1.5rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                                Dein Sticker-Sammelalbum ★
-                              </h2>
-                            </div>
-                          </div>
-
-                          {/* CATEGORY FILTER TABS (Generous spacing & Touch-friendly) */}
-                          <div style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px',
-                            overflowX: 'auto',
-                            padding: '4px 2px',
-                            margin: '4px 0 8px 0',
-                            WebkitOverflowScrolling: 'touch'
-                          }}>
-                            {[
-                              { id: 'all', label: `Alle (${ALL_STICKERS.length})` },
-                              { id: 'ueben', label: '⏱️ Übe-Fleiß' },
-                              { id: 'xp', label: '⭐ Zauber-XP' },
-                              { id: 'streaks', label: '🔥 Streaks' },
-                              { id: 'songs', label: '🎵 Repertoire' },
-                              { id: 'spezial', label: '🏆 Spezial' }
-                            ].map(tab => {
-                              const isActive = juniorStickerCategory === tab.id;
-                              return (
-                                <button
-                                  key={tab.id}
-                                  onClick={() => setJuniorStickerCategory(tab.id as any)}
-                                  style={{
-                                    background: isActive ? '#0f172a' : '#f1f5f9',
-                                    color: isActive ? '#ffffff' : '#475569',
-                                    border: isActive ? '1.5px solid #0f172a' : '1.5px solid #e2e8f0',
-                                    borderRadius: '100px',
-                                    padding: '9px 18px',
-                                    fontSize: '0.84rem',
-                                    fontWeight: 850,
-                                    cursor: 'pointer',
-                                    whiteSpace: 'nowrap',
-                                    boxShadow: isActive ? '0 4px 12px rgba(15, 23, 42, 0.2)' : 'none',
-                                    transition: 'all 0.15s ease',
-                                    flexShrink: 0
-                                  }}
-                                  className="hover-scale"
-                                >
-                                  {tab.label}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
-
-                        {/* SCROLLABLE 3D PANINI STICKER GRID */}
-                        <div style={{
-                          overflowY: 'auto',
-                          flex: 1,
-                          padding: '6px 4px 16px 4px'
-                        }}>
-                          <div style={{
-                            display: 'grid',
-                            gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))',
-                            gap: '16px'
-                          }}>
-                            {ALL_STICKERS
-                              .filter(st => juniorStickerCategory === 'all' || st.category === juniorStickerCategory)
-                              .map((st) => {
-                                const status = unifiedStickersMap[st.id] || { isUnlocked: false, progressText: '', count: 0, details: [] };
-                                const isUnlocked = status.isUnlocked;
-                                const progressText = status.progressText;
-
-                                const isLegendary = st.rarity === 'legendary';
-                                const isEpic = st.rarity === 'epic';
-                                const isRare = st.rarity === 'rare';
-
-                                const rarityGlow = isLegendary 
-                                  ? 'rgba(250, 204, 21, 0.45)' 
-                                  : isEpic 
-                                  ? 'rgba(192, 132, 252, 0.4)' 
-                                  : isRare 
-                                  ? 'rgba(96, 165, 250, 0.35)' 
-                                  : 'rgba(52, 168, 83, 0.35)';
-
-                                return (
-                                  <div
-                                    key={st.id}
-                                    onClick={() => setJuniorSelectedPreviewSticker({ ...st, isUnlocked, progressText })}
-                                    style={{
-                                      background: isUnlocked ? '#ffffff' : 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-                                      border: isUnlocked 
-                                        ? (isLegendary ? '3px solid #facc15' : isEpic ? '3px solid #c084fc' : isRare ? '3px solid #93c5fd' : '3px solid #86efac') 
-                                        : '2px dashed #cbd5e1',
-                                      borderRadius: '26px',
-                                      padding: '16px 12px',
-                                      display: 'flex',
-                                      flexDirection: 'column',
-                                      alignItems: 'center',
-                                      textAlign: 'center',
-                                      gap: '10px',
-                                      position: 'relative',
-                                      boxShadow: isUnlocked 
-                                        ? `0 12px 28px ${rarityGlow}` 
-                                        : '0 4px 12px rgba(0, 0, 0, 0.03)',
-                                      cursor: 'pointer',
-                                      transition: 'all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1)',
-                                      overflow: 'hidden'
-                                    }}
-                                    className="hover-scale"
-                                  >
-                                    {/* RARITY BADGE */}
-                                    <span style={{
-                                      fontSize: '0.62rem',
-                                      fontWeight: 950,
-                                      textTransform: 'uppercase',
-                                      letterSpacing: '0.06em',
-                                      padding: '3px 10px',
-                                      borderRadius: '100px',
-                                      background: isLegendary ? '#fef3c7' : isEpic ? '#f3e8ff' : isRare ? '#eff6ff' : '#f1f5f9',
-                                      color: isLegendary ? '#b45309' : isEpic ? '#7e22ce' : isRare ? '#1d4ed8' : '#64748b',
-                                      border: isLegendary ? '1px solid #fde68a' : 'none'
-                                    }}>
-                                      {st.rarityLabel}
-                                    </span>
-
-                                    {/* STICKER IMAGE CONTAINER - COLLECTIBLE PANINI BADGE */}
-                                    <div style={{
-                                      width: '92px',
-                                      height: '92px',
-                                      position: 'relative',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                      borderRadius: '22px',
-                                      background: '#0a0e1a',
-                                      border: isUnlocked 
-                                        ? (isLegendary ? '2.5px solid #facc15' : isEpic ? '2.5px solid #c084fc' : isRare ? '2.5px solid #93c5fd' : '2.5px solid #4ade80')
-                                        : '2px solid #334155',
-                                      boxShadow: isUnlocked
-                                        ? `0 8px 20px ${rarityGlow}`
-                                        : 'inset 0 2px 6px rgba(0,0,0,0.4)',
-                                      overflow: 'hidden',
-                                      padding: '5px'
-                                    }}>
-                                      {/* Genuine Full Color Image */}
-                                      <img
-                                        src={`/stickers/${st.id}.png?v=1`}
-                                        alt={st.title}
-                                        style={{
-                                          width: '100%',
-                                          height: '100%',
-                                          objectFit: 'contain',
-                                          borderRadius: '16px',
-                                          filter: isUnlocked 
-                                            ? 'drop-shadow(0 4px 10px rgba(255,255,255,0.18))' 
-                                            : 'grayscale(25%) contrast(0.9) brightness(0.72)',
-                                          transition: 'transform 0.3s ease'
-                                        }}
-                                        onError={(e) => {
-                                          e.currentTarget.style.display = 'none';
-                                          const parent = e.currentTarget.parentElement;
-                                          if (parent) {
-                                            const span = document.createElement('span');
-                                            span.style.fontSize = '2.8rem';
-                                            span.innerText = st.emoji;
-                                            parent.appendChild(span);
-                                          }
-                                        }}
-                                      />
-
-                                      {/* Gentle Mystery Shimmer Overlay for Locked Stickers */}
-                                      {!isUnlocked && (
-                                        <div 
-                                          style={{
-                                            position: 'absolute',
-                                            inset: 0,
-                                            borderRadius: '20px',
-                                            background: 'radial-gradient(circle at 30% 30%, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0.02) 60%, transparent 100%)',
-                                            pointerEvents: 'none'
-                                          }}
-                                        />
-                                      )}
-
-                                      {/* Floating Mystery Badge or Checkmark */}
-                                      {!isUnlocked ? (
-                                        <div style={{
-                                          position: 'absolute',
-                                          bottom: '-2px',
-                                          right: '-2px',
-                                          background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-                                          color: '#ffffff',
-                                          width: '24px',
-                                          height: '24px',
-                                          borderRadius: '50%',
-                                          display: 'flex',
-                                          alignItems: 'center',
-                                          justifyContent: 'center',
-                                          boxShadow: '0 3px 10px rgba(245, 158, 11, 0.45)',
-                                          border: '2px solid #ffffff'
-                                        }}>
-                                          <Sparkles size={12} color="#ffffff" />
-                                        </div>
-                                      ) : (
-                                        <div style={{
-                                          position: 'absolute',
-                                          bottom: '-2px',
-                                          right: '-2px',
-                                          background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                                          color: '#ffffff',
-                                          width: '24px',
-                                          height: '24px',
-                                          borderRadius: '50%',
-                                          display: 'flex',
-                                          alignItems: 'center',
-                                          justifyContent: 'center',
-                                          boxShadow: '0 3px 10px rgba(16, 185, 129, 0.45)',
-                                          border: '2px solid #ffffff'
-                                        }}>
-                                          <Check size={13} strokeWidth={3} color="#ffffff" />
-                                        </div>
-                                      )}
-                                    </div>
-
-                                    {/* TITLE & CHILD-FRIENDLY PROGRESS/STATUS */}
-                                    <div style={{ width: '100%' }}>
-                                      <h4 style={{ margin: '0 0 4px 0', fontSize: '0.94rem', fontWeight: 950, color: '#0f172a', lineHeight: 1.2 }}>
-                                        {st.title}
-                                      </h4>
-                                      {isUnlocked ? (
-                                        <span style={{
-                                          display: 'inline-flex',
-                                          alignItems: 'center',
-                                          gap: '4px',
-                                          background: '#dcfce7',
-                                          color: '#15803d',
-                                          fontSize: '0.68rem',
-                                          fontWeight: 950,
-                                          padding: '3px 10px',
-                                          borderRadius: '100px',
-                                          border: '1px solid #bbf7d0'
-                                        }}>
-                                          ★ Im Album!
-                                        </span>
-                                      ) : (
-                                        <span style={{
-                                          display: 'inline-flex',
-                                          alignItems: 'center',
-                                          gap: '4px',
-                                          fontSize: '0.70rem',
-                                          color: '#b45309',
-                                          fontWeight: 900,
-                                          background: '#fef3c7',
-                                          padding: '3px 10px',
-                                          borderRadius: '100px',
-                                          border: '1px solid #fde68a'
-                                        }}>
-                                          {progressText || 'Noch gesperrt'}
-                                        </span>
-                                      )}
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                          </div>
-                        </div>
-
-                        {/* BOTTOM ACTION BAR */}
-                        <div style={{ flexShrink: 0, paddingTop: '14px', borderTop: '1px solid #f1f5f9' }}>
-                          <button
-                            onClick={() => setShowJuniorStickerModal(false)}
-                            style={{
-                              width: '100%',
-                              padding: '16px',
-                              borderRadius: '20px',
-                              border: 'none',
-                              background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-                              color: '#ffffff',
-                              fontSize: '1.05rem',
-                              fontWeight: 950,
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              gap: '10px',
-                              boxShadow: '0 8px 24px rgba(217, 119, 6, 0.35)',
-                              transition: 'all 0.2s ease'
-                            }}
-                            className="hover-scale"
-                          >
-                            <Sparkles size={20} fill="#ffffff" />
-                            <span>Auf zum Instrument! 🚀</span>
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* ========================================================================= */}
-                  {/* MODAL 5B: SPECTACULAR APPLE STICKER DETAIL INSPECTOR & QUEST PREVIEW       */}
-                  {/* ========================================================================= */}
-                  {juniorSelectedPreviewSticker && (
-                    <div style={{
-                      position: 'fixed',
-                      inset: 0,
-                      background: 'rgba(15, 23, 42, 0.94)',
-                      backdropFilter: 'blur(20px)',
-                      zIndex: 100001,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      padding: '20px',
-                      animation: 'fadeIn 0.2s ease-out'
-                    }}>
-                      <div style={{
-                        background: '#ffffff',
-                        borderRadius: '38px',
-                        maxWidth: '480px',
-                        width: '100%',
-                        padding: '36px 30px',
-                        textAlign: 'center',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        gap: '22px',
-                        boxShadow: '0 30px 80px rgba(0,0,0,0.5)',
-                        position: 'relative',
-                        animation: 'scaleIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)'
-                      }}>
-                        <button
-                          onClick={() => setJuniorSelectedPreviewSticker(null)}
-                          style={{
-                            position: 'absolute',
-                            top: '20px',
-                            right: '20px',
-                            background: '#f1f5f9',
-                            border: 'none',
-                            width: '40px',
-                            height: '40px',
-                            borderRadius: '50%',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            cursor: 'pointer',
-                            color: '#64748b'
-                          }}
-                          className="hover-scale"
-                        >
-                          <X size={22} />
-                        </button>
-
-                        {/* Rarity Pill */}
-                        {(() => {
-                          const isSongSticker = juniorSelectedPreviewSticker.category === 'songs' || juniorSelectedPreviewSticker.id === 'song-master';
-                          const masteredSong = assignedCampusSongs.find(s => isSongMastered(s)) || assignedCampusSongs[0];
-                          const songTitleDisplay = masteredSong ? `${masteredSong.artist} – ${masteredSong.title}` : (progressItems.find(p => p.status === 'MASTERED')?.topic_name || '');
-
-                          return (
-                            <>
-                              <span style={{
-                                background: juniorSelectedPreviewSticker.rarity === 'legendary' ? '#fef3c7' : juniorSelectedPreviewSticker.rarity === 'epic' ? '#f3e8ff' : juniorSelectedPreviewSticker.rarity === 'rare' ? '#eff6ff' : '#f0fdf4',
-                                color: juniorSelectedPreviewSticker.rarity === 'legendary' ? '#b45309' : juniorSelectedPreviewSticker.rarity === 'epic' ? '#7e22ce' : juniorSelectedPreviewSticker.rarity === 'rare' ? '#1d4ed8' : '#15803d',
-                                fontSize: '0.8rem',
-                                fontWeight: 900,
-                                textTransform: 'uppercase',
-                                letterSpacing: '0.08em',
-                                padding: '6px 16px',
-                                borderRadius: '100px',
-                                border: juniorSelectedPreviewSticker.rarity === 'legendary' ? '1.5px solid #facc15' : 'none',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '6px'
-                              }}>
-                                <Star size={12} fill="currentColor" /> {juniorSelectedPreviewSticker.rarityLabel} • {juniorSelectedPreviewSticker.category === 'ueben' ? 'Übe-Fleiß' : juniorSelectedPreviewSticker.category === 'xp' ? 'Zauber-XP' : juniorSelectedPreviewSticker.category === 'streaks' ? 'Streaks' : juniorSelectedPreviewSticker.category === 'songs' ? 'Repertoire' : 'Spezial'}
-                              </span>
-
-                              {/* Large 150px Full-Color Floating Sticker Card */}
-                              <div style={{
-                                width: '150px',
-                                height: '150px',
-                                borderRadius: '34px',
-                                background: '#0a0e1a',
-                                border: juniorSelectedPreviewSticker.isUnlocked 
-                                  ? (juniorSelectedPreviewSticker.rarity === 'legendary' ? '4px solid #facc15' : juniorSelectedPreviewSticker.rarity === 'epic' ? '4px solid #c084fc' : juniorSelectedPreviewSticker.rarity === 'rare' ? '4px solid #93c5fd' : '4px solid #34a853')
-                                  : '4px solid #f59e0b',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                boxShadow: juniorSelectedPreviewSticker.isUnlocked 
-                                  ? '0 16px 40px rgba(52, 168, 83, 0.35)' 
-                                  : '0 16px 40px rgba(245, 158, 11, 0.35)',
-                                position: 'relative',
-                                overflow: 'hidden',
-                                padding: '10px'
-                              }}>
-                                <img
-                                  src={`/stickers/${juniorSelectedPreviewSticker.id}.png?v=1`}
-                                  alt={juniorSelectedPreviewSticker.title}
-                                  style={{
-                                    width: '100%',
-                                    height: '100%',
-                                    objectFit: 'contain',
-                                    borderRadius: '24px',
-                                    filter: juniorSelectedPreviewSticker.isUnlocked 
-                                      ? 'drop-shadow(0 6px 14px rgba(255,255,255,0.2))' 
-                                      : 'grayscale(20%) brightness(0.85)'
-                                  }}
-                                  onError={(e) => {
-                                    e.currentTarget.style.display = 'none';
-                                    const parent = e.currentTarget.parentElement;
-                                    if (parent) {
-                                      const span = document.createElement('span');
-                                      span.style.fontSize = '4.5rem';
-                                      span.innerText = juniorSelectedPreviewSticker.emoji;
-                                      parent.appendChild(span);
-                                    }
-                                  }}
-                                />
-
-                                {!juniorSelectedPreviewSticker.isUnlocked && (
-                                  <div 
-                                    style={{
-                                      position: 'absolute',
-                                      inset: 0,
-                                      borderRadius: '30px',
-                                      background: 'radial-gradient(circle at 30% 30%, rgba(255,255,255,0.22) 0%, rgba(255,255,255,0.02) 60%, transparent 100%)',
-                                      pointerEvents: 'none'
-                                    }}
-                                  />
-                                )}
-                              </div>
-
-                              <div>
-                                <h2 style={{ fontSize: '1.75rem', fontWeight: 950, color: '#0f172a', margin: '0 0 4px 0', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                                  {juniorSelectedPreviewSticker.title}
-                                </h2>
-                                <p style={{ fontSize: '0.95rem', color: '#475569', fontWeight: 650, margin: 0, lineHeight: 1.35 }}>
-                                  {juniorSelectedPreviewSticker.desc}
-                                </p>
-                              </div>
-
-                              {/* Interpret + Songtitel Display for Song Stickers */}
-                              {isSongSticker && songTitleDisplay && (
-                                <div style={{ textAlign: 'center', margin: '2px 0' }}>
-                                  <div style={{ fontSize: '0.72rem', fontWeight: 900, color: '#d97706', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
-                                    <Music size={12} /> Interpret &amp; Songtitel
-                                  </div>
-                                  <div style={{ fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', marginTop: '2px' }}>
-                                    {songTitleDisplay}
-                                  </div>
-                                </div>
-                              )}
-
-                              {/* Open, Borderless Progress / Achievement Flow */}
-                              <div style={{ textAlign: 'center', padding: '4px 8px' }}>
-                                {juniorSelectedPreviewSticker.isUnlocked ? (
-                                  <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px', color: '#15803d', fontWeight: 800, fontSize: '0.94rem' }}>
-                                    <Check size={16} color="#15803d" />
-                                    <span>Glückwunsch! Du besitzt diesen Sticker bereits!</span>
-                                  </div>
-                                ) : (
-                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                                    <div style={{ fontSize: '0.75rem', fontWeight: 900, color: '#d97706', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                                      Dein Ziel zum Freischalten
-                                    </div>
-                                    <div style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a' }}>
-                                      {juniorSelectedPreviewSticker.progressText || juniorSelectedPreviewSticker.desc}
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-                            </>
-                          );
-                        })()}
-
-                        {/* ACTION BUTTON (Seamless Briefing Board Guidance) */}
-                        {!juniorSelectedPreviewSticker.isUnlocked ? (
-                          <button
-                            onClick={() => {
-                              setJuniorSelectedPreviewSticker(null);
-                              setShowJuniorStickerModal(false);
-                              handleTabChangeLocal('practice_board');
-                              if (sessionActive) {
-                                setJuniorMissionPhase('zen');
-                              } else {
-                                setShowJuniorPreFlightModal(true);
-                              }
-                            }}
-                            style={{
-                              width: '100%',
-                              background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
-                              color: '#ffffff',
-                              border: 'none',
-                              borderRadius: '20px',
-                              padding: '18px',
-                              fontWeight: 950,
-                              fontSize: '1.1rem',
-                              cursor: 'pointer',
-                              boxShadow: '0 8px 24px rgba(99, 102, 241, 0.35)',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              gap: '10px'
-                            }}
-                            className="hover-scale"
-                          >
-                            <Rocket size={20} fill="currentColor" />
-                            <span>Jetzt Übe-Rakete starten! 🚀</span>
-                          </button>
-                        ) : (
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', width: '100%' }}>
-                            <button
-                              type="button"
-                              onClick={() => downloadJuniorStickerJpg(juniorSelectedPreviewSticker)}
-                              style={{
-                                width: '100%',
-                                background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-                                color: '#ffffff',
-                                border: 'none',
-                                borderRadius: '20px',
-                                padding: '16px',
-                                fontWeight: 950,
-                                fontSize: '1rem',
-                                cursor: 'pointer',
-                                boxShadow: '0 6px 18px rgba(245, 158, 11, 0.35)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                gap: '8px'
-                              }}
-                              className="hover-scale"
-                            >
-                              <Download size={18} />
-                              <span>Sticker als JPG herunterladen</span>
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={() => setJuniorSelectedPreviewSticker(null)}
-                              style={{
-                                width: '100%',
-                                background: '#0f172a',
-                                color: '#ffffff',
-                                border: 'none',
-                                borderRadius: '20px',
-                                padding: '14px',
-                                fontWeight: 950,
-                                fontSize: '1rem',
-                                cursor: 'pointer'
-                              }}
-                              className="hover-scale"
-                            >
-                              Schließen
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* GLOBAL STYLES FOR HOLO-PHANTOM BREATHING EFFECT */}
-                  <style dangerouslySetInnerHTML={{__html: `
-                    @keyframes holoPhantomPulse {
-                      0%, 100% { opacity: 0.65; }
-                      50% { opacity: 0.25; }
-                    }
-                    .holo-phantom-overlay {
-                      animation: holoPhantomPulse 3.5s ease-in-out infinite;
-                    }
-                  `}} />
-
-                  {/* ========================================================================= */}
-                  {/* MODAL 6: JUNIOR STICKER AWARD CELEBRATION (ANIMATION & KONFETTI)           */}
-                  {/* ========================================================================= */}
-                  {juniorAwardedStickerToCelebrate && (
-                    <div style={{
-                      position: 'fixed',
-                      inset: 0,
-                      background: 'rgba(15, 23, 42, 0.92)',
-                      backdropFilter: 'blur(16px)',
-                      zIndex: 100000,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      padding: '20px',
-                      animation: 'fadeIn 0.25s ease-out'
-                    }}>
-                      <Suspense fallback={null}>
-                        <Confetti recycle={false} numberOfPieces={350} gravity={0.22} />
-                      </Suspense>
-                      <div style={{
-                        background: '#ffffff',
-                        borderRadius: '36px',
-                        padding: '36px 32px',
-                        textAlign: 'center',
-                        maxWidth: '460px',
-                        width: '100%',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        gap: '20px',
-                        boxShadow: '0 30px 80px rgba(0, 0, 0, 0.45)',
-                        position: 'relative',
-                        animation: 'scaleIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1)'
-                      }}>
-                        <span style={{
-                          background: '#fef3c7',
-                          color: '#d97706',
-                          fontSize: '0.8rem',
-                          fontWeight: 900,
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.08em',
-                          padding: '6px 16px',
-                          borderRadius: '100px',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '6px'
-                        }}>
-                          <Award size={14} /> Neuer Sticker freigeschaltet!
-                        </span>
-
-                        {/* Animated Floating Sticker Badge */}
-                        <div style={{
-                          width: '150px',
-                          height: '150px',
-                          borderRadius: '32px',
-                          background: '#0a0e1a',
-                          border: '4px solid #facc15',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          boxShadow: '0 16px 40px rgba(250, 204, 21, 0.35)',
-                          overflow: 'hidden',
-                          padding: '10px',
-                          animation: 'spinStickerAward 0.8s cubic-bezier(0.34, 1.56, 0.64, 1)'
-                        }}>
-                          <img
-                            src={`/stickers/${juniorAwardedStickerToCelebrate.id}.png?v=1`}
-                            alt={juniorAwardedStickerToCelebrate.title}
-                            style={{
-                              width: '100%',
-                              height: '100%',
-                              objectFit: 'contain',
-                              borderRadius: '22px',
-                              filter: 'drop-shadow(0 6px 14px rgba(255,255,255,0.2))'
-                            }}
-                            onError={(e) => {
-                              e.currentTarget.style.display = 'none';
-                              const parent = e.currentTarget.parentElement;
-                              if (parent) {
-                                const span = document.createElement('span');
-                                span.style.fontSize = '4.5rem';
-                                span.innerText = juniorAwardedStickerToCelebrate.emoji;
-                                parent.appendChild(span);
-                              }
-                            }}
-                          />
-                        </div>
-
-                        <div>
-                          <h2 style={{ fontSize: '1.75rem', fontWeight: 950, color: '#0f172a', margin: '0 0 6px 0', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                            {juniorAwardedStickerToCelebrate.title}
-                          </h2>
-                          {(() => {
-                            const isSongSticker = juniorAwardedStickerToCelebrate.category === 'songs' || juniorAwardedStickerToCelebrate.id === 'song-master';
-                            const masteredSong = assignedCampusSongs.find(s => isSongMastered(s)) || assignedCampusSongs[0];
-                            const songTitleDisplay = masteredSong ? `${masteredSong.artist} – ${masteredSong.title}` : (progressItems.find(p => p.status === 'MASTERED')?.topic_name || '');
-
-                            return (
-                              <>
-                                {isSongSticker && songTitleDisplay && (
-                                  <div style={{ textAlign: 'center', margin: '4px 0 8px 0' }}>
-                                    <div style={{ fontSize: '0.72rem', fontWeight: 900, color: '#d97706', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
-                                      <Music size={12} /> Interpret &amp; Songtitel
-                                    </div>
-                                    <div style={{ fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', marginTop: '2px' }}>
-                                      {songTitleDisplay}
-                                    </div>
-                                  </div>
-                                )}
-                                <div style={{ fontSize: '1.02rem', fontWeight: 800, color: '#15803d', marginBottom: '8px' }}>
-                                  Super gemacht! Du warst richtig fleißig!
-                                </div>
-                                <p style={{ fontSize: '0.88rem', color: '#64748b', fontWeight: 650, margin: 0, lineHeight: 1.3 }}>
-                                  {juniorAwardedStickerToCelebrate.desc}
-                                </p>
-                              </>
-                            );
-                          })()}
-                        </div>
-
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', width: '100%' }}>
-                          <button
-                            type="button"
-                            onClick={() => downloadJuniorStickerJpg(juniorAwardedStickerToCelebrate)}
-                            style={{
-                              width: '100%',
-                              background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-                              color: '#ffffff',
-                              border: 'none',
-                              borderRadius: '20px',
-                              padding: '16px',
-                              fontWeight: 950,
-                              fontSize: '1.05rem',
-                              cursor: 'pointer',
-                              boxShadow: '0 6px 18px rgba(245, 158, 11, 0.35)',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              gap: '8px'
-                            }}
-                            className="hover-scale"
-                          >
-                            <Download size={18} />
-                            <span>Sticker als JPG herunterladen</span>
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => setJuniorAwardedStickerToCelebrate(null)}
-                            style={{
-                              width: '100%',
-                              background: 'linear-gradient(135deg, #34a853 0%, #2e7d32 100%)',
-                              color: '#ffffff',
-                              border: 'none',
-                              borderRadius: '20px',
-                              padding: '16px',
-                              fontWeight: 950,
-                              fontSize: '1.05rem',
-                              cursor: 'pointer',
-                              boxShadow: '0 8px 24px rgba(52, 168, 83, 0.35)',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              gap: '8px'
-                            }}
-                            className="hover-scale"
-                          >
-                            <BookOpen size={18} />
-                            <span>In mein Album kleben</span>
-                          </button>
-                        </div>
-                      </div>
-
-                      <style dangerouslySetInnerHTML={{__html: `
-                        @keyframes spinStickerAward {
-                          from { transform: scale(0) rotate(-180deg); }
-                          to { transform: scale(1) rotate(0deg); }
-                        }
-                      `}} />
-                    </div>
-                  )}
                 </>
               )}
 
@@ -22828,7 +21381,9 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                     date: targetDateStr,
                                     start_time: timeLabel,
                                     label,
-                                    occurrenceId: finalOccurId
+                                    occurrenceId: finalOccurId,
+                                    status: nextOcc?.status || (isCanceled ? 'cancelled' : 'scheduled'),
+                                    isCancelled: isCanceled
                                   });
                                   setShowAppointmentChat(true);
                                 }}
@@ -22914,7 +21469,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                   transition: 'all 0.2s'
                                 }}
                                 className="hover-scale"
-                                title={isCanceled ? "Absage zurücknehmen / Termin reaktivieren" : "Unterrichtstermin absagen (Krankmeldung)"}
+                                title={isCanceled ? "Absage zurücknehmen / Termin reaktivieren" : "Unterrichtstermin absagen"}
                               >
                                 {isCanceled ? (
                                   !isStudentAbsenceAllowed ? <Lock size={14} color="#dc2626" /> : <CalendarX size={14} color="#dc2626" />
@@ -23014,7 +21569,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                           try {
                             const p = JSON.parse(clean);
                             if (Array.isArray(p)) {
-                              clean = p.filter((x: any) => typeof x === 'string' && !x.startsWith('AUDIO:') && !x.startsWith('STICKER:') && !x.startsWith('LATENCY:') && !x.startsWith('STUDENT_NOTE_PUBLIC:') && !x.startsWith('STUDENT_NOTE_PRIVATE:')).join(' ');
+                              clean = p.filter((x: any) => typeof x === 'string' && !x.startsWith('AUDIO:') && !x.startsWith('STICKER:') && !x.startsWith('LATENCY:') && !x.startsWith('STUDENT_NOTE_PUBLIC:') && !x.startsWith('STUDENT_NOTE_PRIVATE:') && !x.startsWith('STUDENT_QUESTION:')).join(' ');
                             } else if (typeof p === 'string') {
                               clean = p;
                             }
@@ -23023,13 +21578,26 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                         return clean
                           .replace(/\["AUDIO:[^"]*"\]/g, '')
                           .replace(/AUDIO:[^\s,|]+/g, '')
-                          .replace(/.*(STUDENT_NOTE_PUBLIC|STUDENT_NOTE_PRIVATE):[^|]*\|/, '')
+                          .replace(/.*(STUDENT_NOTE_PUBLIC|STUDENT_NOTE_PRIVATE|STUDENT_QUESTION):[^|]*\|/, '')
+                          .replace(/^STUDENT_QUESTION:[^|]*\|?/i, '')
                           .replace(/^❓\s*Frage für den Unterricht:\s*/i, '')
                           .trim();
                       };
 
-                      const generalNoteRaw = currentWeekNotes.find(n => !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('LATENCY:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:'));
+                      const generalNoteRaw = currentWeekNotes.find(n => !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('LATENCY:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:') && !n.startsWith('STUDENT_QUESTION:'));
                       const generalNote = generalNoteRaw ? cleanGeneralNote(generalNoteRaw) : '';
+
+                      const studentQuestionEntry = currentWeekNotes.find(n => typeof n === 'string' && (n.startsWith('STUDENT_QUESTION:') || n.startsWith('❓ Frage für den Unterricht:')));
+                      let studentQuestionText = '';
+                      if (studentQuestionEntry) {
+                        if (studentQuestionEntry.startsWith('STUDENT_QUESTION:')) {
+                          const withoutPrefix = studentQuestionEntry.replace(/^STUDENT_QUESTION:/, '');
+                          const pipeIdx = withoutPrefix.indexOf('|');
+                          studentQuestionText = pipeIdx !== -1 ? withoutPrefix.slice(pipeIdx + 1).trim() : withoutPrefix.trim();
+                        } else {
+                          studentQuestionText = studentQuestionEntry.replace(/^❓\s*Frage für den Unterricht:\s*/i, '').trim();
+                        }
+                      }
 
                       const cleanTitle = (t: string) => (t || '')
                         .replace(/\s*\((gitarre|guitar|e-gitarre|bass|e-bass|drums|schlagzeug|klavier|piano|keys|keyboard|vocals|gesang|stimme|allgemein)\)/i, '')
@@ -23373,10 +21941,19 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
 
                                   {/* Zusätzliche Bemerkung */}
                                   {generalNote && generalNote.trim().toLowerCase() !== 'zusätzliche bemerkung' && (
-                                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', fontSize: '0.78rem', color: '#334155', fontWeight: 600, paddingTop: '6px', borderTop: '1px dashed #e2e8f0' }}>
+                                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', fontSize: '0.88rem', color: '#334155', fontWeight: 600, paddingTop: '6px', borderTop: '1px dashed #e2e8f0' }}>
                                       <FileText size={14} style={{ color: '#16a34a', flexShrink: 0 }} />
                                       <strong style={{ color: '#15803d', fontWeight: 850, flexShrink: 0 }}>Zusätzliche Bemerkung:</strong>
                                       <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{generalNote}</span>
+                                    </div>
+                                  )}
+
+                                  {/* Frage des Schülers für die Stunde */}
+                                  {studentQuestionText && (
+                                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', fontSize: '0.88rem', color: '#1e40af', fontWeight: 600, paddingTop: '6px', borderTop: '1px dashed #e2e8f0' }}>
+                                      <HelpCircle size={14} style={{ color: '#2563eb', flexShrink: 0 }} />
+                                      <strong style={{ color: '#2563eb', fontWeight: 850, flexShrink: 0 }}>Deine Frage für die Stunde:</strong>
+                                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{studentQuestionText}</span>
                                     </div>
                                   )}
                                 </>
@@ -23397,7 +21974,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                               border: '1.5px solid #e2e8f0',
                               background: '#f8fafc',
                               color: '#0f172a',
-                              fontSize: '0.80rem',
+                              fontSize: '0.88rem',
                               fontWeight: 900,
                               cursor: 'pointer',
                               display: 'flex',
@@ -24257,7 +22834,9 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                     date: targetDateStr,
                                     start_time: timeLabel,
                                     label,
-                                    occurrenceId: finalOccurId
+                                    occurrenceId: finalOccurId,
+                                    status: nextOcc?.status || (isCanceled ? 'cancelled' : 'scheduled'),
+                                    isCancelled: isCanceled
                                   });
                                   setShowAppointmentChat(true);
                                 }}
@@ -24383,7 +22962,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                   transition: 'all 0.2s'
                                 }}
                                 className="hover-scale"
-                                title={isCanceled ? "Absage zurücknehmen / Termin reaktivieren" : "Unterrichtstermin absagen (Krankmeldung)"}
+                                title={isCanceled ? "Absage zurücknehmen / Termin reaktivieren" : "Unterrichtstermin absagen"}
                               >
                                 {isCanceled ? (
                                   !isStudentAbsenceAllowed ? <Lock size={14} color="#dc2626" /> : <CalendarX size={14} color="#dc2626" />
@@ -24499,7 +23078,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                           try {
                             const p = JSON.parse(clean);
                             if (Array.isArray(p)) {
-                              clean = p.filter((x: any) => typeof x === 'string' && !x.startsWith('AUDIO:') && !x.startsWith('STICKER:') && !x.startsWith('LATENCY:') && !x.startsWith('STUDENT_NOTE_PUBLIC:') && !x.startsWith('STUDENT_NOTE_PRIVATE:')).join(' ');
+                              clean = p.filter((x: any) => typeof x === 'string' && !x.startsWith('AUDIO:') && !x.startsWith('STICKER:') && !x.startsWith('LATENCY:') && !x.startsWith('STUDENT_NOTE_PUBLIC:') && !x.startsWith('STUDENT_NOTE_PRIVATE:') && !x.startsWith('STUDENT_QUESTION:')).join(' ');
                             } else if (typeof p === 'string') {
                               clean = p;
                             }
@@ -24508,15 +23087,30 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                         return clean
                           .replace(/\["AUDIO:[^"]*"\]/g, '')
                           .replace(/AUDIO:[^\s,|]+/g, '')
-                          .replace(/.*(STUDENT_NOTE_PUBLIC|STUDENT_NOTE_PRIVATE):[^|]*\|/, '')
+                          .replace(/.*(STUDENT_NOTE_PUBLIC|STUDENT_NOTE_PRIVATE|STUDENT_QUESTION):[^|]*\|/, '')
+                          .replace(/^STUDENT_QUESTION:[^|]*\|?/i, '')
                           .replace(/^❓\s*Frage für den Unterricht:\s*/i, '')
                           .trim();
                       };
 
-                      const generalNoteRaw = currentWeekNotes.find(n => !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('LATENCY:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:'));
+                      const generalNoteRaw = currentWeekNotes.find(n => !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('LATENCY:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:') && !n.startsWith('STUDENT_QUESTION:'));
                       const generalNote = generalNoteRaw ? cleanGeneralNote(generalNoteRaw) : '';
 
-                      const cleanTitle = (t: string) => (t || '').replace(/\s*\((gitarre|guitar|e-gitarre|bass|e-bass|drums|schlagzeug|klavier|piano|keys|keyboard|vocals|gesang|stimme|allgemein)\)/i, '');
+                      const studentQuestionEntry = currentWeekNotes.find(n => typeof n === 'string' && (n.startsWith('STUDENT_QUESTION:') || n.startsWith('❓ Frage für den Unterricht:')));
+                      let studentQuestionText = '';
+                      if (studentQuestionEntry) {
+                        if (studentQuestionEntry.startsWith('STUDENT_QUESTION:')) {
+                          const withoutPrefix = studentQuestionEntry.replace(/^STUDENT_QUESTION:/, '');
+                          const pipeIdx = withoutPrefix.indexOf('|');
+                          studentQuestionText = pipeIdx !== -1 ? withoutPrefix.slice(pipeIdx + 1).trim() : withoutPrefix.trim();
+                        } else {
+                          studentQuestionText = studentQuestionEntry.replace(/^❓\s*Frage für den Unterricht:\s*/i, '').trim();
+                        }
+                      }
+
+                      const cleanTitle = (t: string) => (t || '')
+                        .replace(/\s*\((gitarre|guitar|e-gitarre|bass|e-bass|drums|schlagzeug|klavier|piano|keys|keyboard|vocals|gesang|stimme|allgemein)\)/i, '')
+                        .replace(/^Linken Park/i, 'Linkin Park');
                       const effectiveId = studentId || studentUser?.id;
 
                       const formatPageNumbers = (pages: number[]): string => {
@@ -24855,11 +23449,20 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                   ))}
 
                                   {/* Zusätzliche Bemerkung */}
-                                  {generalNote && (
-                                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', fontSize: '0.78rem', color: '#334155', fontWeight: 600, paddingTop: '6px', borderTop: '1px dashed #e2e8f0' }}>
+                                  {generalNote && generalNote.trim().toLowerCase() !== 'zusätzliche bemerkung' && (
+                                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', fontSize: '0.88rem', color: '#334155', fontWeight: 600, paddingTop: '6px', borderTop: '1px dashed #e2e8f0' }}>
                                       <FileText size={14} style={{ color: '#16a34a', flexShrink: 0 }} />
                                       <strong style={{ color: '#15803d', fontWeight: 850, flexShrink: 0 }}>Zusätzliche Bemerkung:</strong>
                                       <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{generalNote}</span>
+                                    </div>
+                                  )}
+
+                                  {/* Frage des Schülers für die Stunde */}
+                                  {studentQuestionText && (
+                                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', fontSize: '0.88rem', color: '#1e40af', fontWeight: 600, paddingTop: '6px', borderTop: '1px dashed #e2e8f0' }}>
+                                      <HelpCircle size={14} style={{ color: '#2563eb', flexShrink: 0 }} />
+                                      <strong style={{ color: '#2563eb', fontWeight: 850, flexShrink: 0 }}>Deine Frage für die Stunde:</strong>
+                                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{studentQuestionText}</span>
                                     </div>
                                   )}
                                 </>
@@ -24880,7 +23483,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                               border: '1.5px solid #e2e8f0',
                               background: '#f8fafc',
                               color: '#0f172a',
-                              fontSize: '0.80rem',
+                              fontSize: '0.88rem',
                               fontWeight: 900,
                               cursor: 'pointer',
                               display: 'flex',
@@ -25324,7 +23927,9 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                       date: occ.date,
                                       start_time: occ.start_time?.substring(0, 5),
                                       label,
-                                      occurrenceId: occ.id
+                                      occurrenceId: occ.id,
+                                      status: 'cancelled',
+                                      isCancelled: true
                                     });
                                     setShowAppointmentChat(true);
                                   }}
@@ -25333,8 +23938,8 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                     display: 'flex',
                                     alignItems: 'center',
                                     justifyContent: 'center',
-                                    background: checkOccurrenceHasMessages(occ) ? '#fef3c7' : 'rgba(255, 255, 255, 0.2)',
-                                    color: checkOccurrenceHasMessages(occ) ? '#d97706' : '#ffffff',
+                                    background: getOccurrenceUnreadCount(occ) > 0 ? '#fef3c7' : (checkOccurrenceHasMessages(occ) ? '#fef3c7' : 'rgba(255, 255, 255, 0.2)'),
+                                    color: (getOccurrenceUnreadCount(occ) > 0 || checkOccurrenceHasMessages(occ)) ? '#d97706' : '#ffffff',
                                     width: '32px',
                                     height: '32px',
                                     borderRadius: '50%',
@@ -25346,7 +23951,22 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                   onMouseOver={e => { e.currentTarget.style.background = checkOccurrenceHasMessages(occ) ? '#fde68a' : 'rgba(255, 255, 255, 0.3)'; }}
                                   onMouseOut={e => { e.currentTarget.style.background = checkOccurrenceHasMessages(occ) ? '#fef3c7' : 'rgba(255, 255, 255, 0.2)'; }}
                                 >
-                                  <MessageSquare size={14} fill={checkOccurrenceHasMessages(occ) ? 'currentColor' : 'none'} />
+                                  <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    <MessageSquare size={14} fill={checkOccurrenceHasMessages(occ) ? 'currentColor' : 'none'} />
+                                    {getOccurrenceUnreadCount(occ) > 0 && (
+                                      <span style={{
+                                        position: 'absolute',
+                                        top: '-4px',
+                                        right: '-4px',
+                                        width: '7px',
+                                        height: '7px',
+                                        borderRadius: '50%',
+                                        background: '#ea4335',
+                                        border: '1.5px solid #ffffff',
+                                        boxShadow: '0 0 4px rgba(234, 67, 53, 0.7)'
+                                      }} />
+                                    )}
+                                  </div>
                                 </button>
                               </div>
                             </div>
@@ -25393,7 +24013,9 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                       date: occ.date,
                                       start_time: occ.start_time?.substring(0, 5),
                                       label,
-                                      occurrenceId: occ.id
+                                      occurrenceId: occ.id,
+                                      status: 'rescheduled_confirmed',
+                                      isCancelled: false
                                     });
                                     setShowAppointmentChat(true);
                                   }}
@@ -25402,7 +24024,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                     display: 'flex',
                                     alignItems: 'center',
                                     justifyContent: 'center',
-                                    background: checkOccurrenceHasMessages(occ) ? '#f59e0b' : 'rgba(120, 53, 15, 0.12)',
+                                    background: getOccurrenceUnreadCount(occ) > 0 ? '#fef3c7' : (checkOccurrenceHasMessages(occ) ? '#f59e0b' : 'rgba(120, 53, 15, 0.12)'),
                                     color: checkOccurrenceHasMessages(occ) ? '#ffffff' : '#78350f',
                                     width: '32px',
                                     height: '32px',
@@ -25415,7 +24037,22 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                   onMouseOver={e => { e.currentTarget.style.background = checkOccurrenceHasMessages(occ) ? '#d97706' : 'rgba(120, 53, 15, 0.22)'; }}
                                   onMouseOut={e => { e.currentTarget.style.background = checkOccurrenceHasMessages(occ) ? '#f59e0b' : 'rgba(120, 53, 15, 0.12)'; }}
                                 >
-                                  <MessageSquare size={14} fill={checkOccurrenceHasMessages(occ) ? 'currentColor' : 'none'} />
+                                  <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    <MessageSquare size={14} fill={checkOccurrenceHasMessages(occ) ? 'currentColor' : 'none'} />
+                                    {getOccurrenceUnreadCount(occ) > 0 && (
+                                      <span style={{
+                                        position: 'absolute',
+                                        top: '-4px',
+                                        right: '-4px',
+                                        width: '7px',
+                                        height: '7px',
+                                        borderRadius: '50%',
+                                        background: '#ea4335',
+                                        border: '1.5px solid #ffffff',
+                                        boxShadow: '0 0 4px rgba(234, 67, 53, 0.7)'
+                                      }} />
+                                    )}
+                                  </div>
                                 </button>
                               </div>
                             </div>
@@ -25445,7 +24082,9 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                   date: occ.date,
                                   start_time: occ.start_time?.substring(0, 5),
                                   label,
-                                  occurrenceId: occ.id
+                                  occurrenceId: occ.id,
+                                  status: occ.status || 'scheduled',
+                                  isCancelled: false
                                 });
                                 setShowAppointmentChat(true);
                               }}
@@ -25454,8 +24093,8 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
-                                background: checkOccurrenceHasMessages(occ) ? '#fef3c7' : '#f8fafc',
-                                color: checkOccurrenceHasMessages(occ) ? '#d97706' : '#475569',
+                                background: getOccurrenceUnreadCount(occ) > 0 ? '#fef3c7' : (checkOccurrenceHasMessages(occ) ? '#fef3c7' : '#f8fafc'),
+                                color: (getOccurrenceUnreadCount(occ) > 0 || checkOccurrenceHasMessages(occ)) ? '#d97706' : '#475569',
                                 width: '32px',
                                 height: '32px',
                                 borderRadius: '50%',
@@ -25474,7 +24113,22 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                 e.currentTarget.style.color = checkOccurrenceHasMessages(occ) ? '#d97706' : '#475569';
                               }}
                             >
-                              <MessageSquare size={14} fill={checkOccurrenceHasMessages(occ) ? 'currentColor' : 'none'} />
+                              <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <MessageSquare size={14} fill={checkOccurrenceHasMessages(occ) ? 'currentColor' : 'none'} />
+                                {getOccurrenceUnreadCount(occ) > 0 && (
+                                  <span style={{
+                                    position: 'absolute',
+                                    top: '-4px',
+                                    right: '-4px',
+                                    width: '7px',
+                                    height: '7px',
+                                    borderRadius: '50%',
+                                    background: '#ea4335',
+                                    border: '1.5px solid #ffffff',
+                                    boxShadow: '0 0 4px rgba(234, 67, 53, 0.7)'
+                                  }} />
+                                )}
+                              </div>
                             </button>
                           </div>
                         );
@@ -25512,18 +24166,30 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                         
                         let cardBg = '#fef2f2';
                         let cardBorder = '#fecaca';
-                        let badgeText = '❌ Termin abgesagt';
+                        let badgeNode: React.ReactNode = (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                            <CalendarX size={12} color="#991b1b" /> Termin abgesagt
+                          </span>
+                        );
                         let badgeColor = '#991b1b';
                         
                         if (isReschedule) {
                           cardBg = '#fffbeb';
                           cardBorder = '#fef08a';
-                          badgeText = '🔄 Verschiebung vorgeschlagen';
+                          badgeNode = (
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                              <RotateCcw size={12} color="#854d0e" /> Verschiebung vorgeschlagen
+                            </span>
+                          );
                           badgeColor = '#854d0e';
                         } else if (isRegularReset) {
                           cardBg = '#e6f4ea';
                           cardBorder = '#e6f4ea';
-                          badgeText = '❇️ Wieder regulär';
+                          badgeNode = (
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                              <Check size={12} color="#34a853" /> Findet wieder regulär statt
+                            </span>
+                          );
                           badgeColor = '#34a853';
                         }
                         
@@ -25540,14 +24206,14 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                             zIndex: 5
                           }}>
                             <div>
-                              <div style={{ fontSize: '0.65rem', fontWeight: 800, color: badgeColor, textTransform: 'uppercase', letterSpacing: '0.03em', marginBottom: '2px' }}>
-                                {badgeText}
+                              <div style={{ fontSize: '9px', fontWeight: 800, color: badgeColor, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '4px' }}>
+                                {badgeNode}
                               </div>
-                              <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#1e293b' }}>
+                              <div style={{ fontSize: '13.5px', fontWeight: 800, color: '#1e293b' }}>
                                 {d.toLocaleDateString('de-DE', {weekday: 'long', day: '2-digit', month: '2-digit'})}
                               </div>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px', gap: '8px' }}>
-                                <div style={{ fontSize: '0.75rem', color: '#475569', fontWeight: 600 }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px', gap: '8px' }}>
+                                <div style={{ fontSize: '0.80rem', color: '#475569', fontWeight: 700 }}>
                                   {occ.start_time?.substring(0,5)} Uhr
                                 </div>
                                 {!isReschedule && (
@@ -25561,32 +24227,37 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                       background: (occ.status === 'scheduled' && occ.original_date && occ.date === occ.original_date) ? '#34a853' : '#ef4444', 
                                       color: 'white', 
                                       border: 'none', 
-                                      padding: '4px 10px', 
-                                      borderRadius: '6px', 
-                                      fontSize: '0.7rem', 
-                                      fontWeight: 700, 
+                                      minHeight: '36px',
+                                      padding: '6px 14px', 
+                                      borderRadius: '10px', 
+                                      fontSize: '0.80rem', 
+                                      fontWeight: 800, 
                                       cursor: 'pointer',
-                                      boxShadow: `0 2px 4px ${(occ.status === 'scheduled' && occ.original_date && occ.date === occ.original_date) ? 'rgba(52, 168, 83, 0.15)' : 'rgba(239, 68, 68, 0.15)'}`,
+                                      boxShadow: `0 2px 6px ${(occ.status === 'scheduled' && occ.original_date && occ.date === occ.original_date) ? 'rgba(52, 168, 83, 0.2)' : 'rgba(239, 68, 68, 0.2)'}`,
                                       transition: 'all 0.2s',
                                       flexShrink: 0,
                                       position: 'relative',
-                                      zIndex: 10
+                                      zIndex: 10,
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '4px'
                                     }}
                                   >
-                                    Gelesen abhaken
+                                    <Check size={13} strokeWidth={2.5} />
+                                    <span>Gelesen abhaken</span>
                                   </button>
                                 )}
                               </div>
                               {(occ.status === 'scheduled' && occ.original_date && occ.date === occ.original_date) && (
-                                <div style={{ fontSize: '0.7rem', color: '#34a853', fontWeight: 500, marginTop: '4px', lineHeight: '1.2' }}>
+                                <div style={{ fontSize: '0.74rem', color: '#34a853', fontWeight: 600, marginTop: '4px', lineHeight: '1.3' }}>
                                   Findet wieder regulär statt.
                                 </div>
                               )}
                             </div>
                             
                             {isReschedule && (
-                              <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end', marginTop: '2px' }}>
-                                <div style={{ display: 'flex', gap: '6px' }}>
+                              <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '4px' }}>
+                                <div style={{ display: 'flex', gap: '8px' }}>
                                   <button 
                                     onClick={(e) => {
                                       e.preventDefault();
@@ -25597,41 +24268,51 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                       background: '#ef4444', 
                                       color: 'white', 
                                       border: 'none', 
-                                      padding: '4px 10px', 
-                                      borderRadius: '6px', 
-                                      fontSize: '0.7rem', 
-                                      fontWeight: 700, 
+                                      minHeight: '36px',
+                                      padding: '6px 14px', 
+                                      borderRadius: '10px', 
+                                      fontSize: '0.80rem', 
+                                      fontWeight: 800, 
                                       cursor: 'pointer',
-                                      boxShadow: '0 2px 4px rgba(239, 68, 68, 0.15)',
+                                      boxShadow: '0 2px 6px rgba(239, 68, 68, 0.2)',
                                       transition: 'all 0.2s',
                                       position: 'relative',
-                                      zIndex: 10
+                                      zIndex: 10,
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '4px'
                                     }}
                                   >
-                                    Ablehnen
+                                    <X size={13} strokeWidth={2.5} />
+                                    <span>Ablehnen</span>
                                   </button>
                                   <button 
                                     onClick={(e) => {
                                       e.preventDefault();
                                       e.stopPropagation();
-                                      handleConfirmReschedule(occ.id);
+                                      handleTriggerConfirmReschedule(occ.id);
                                     }}
                                     style={{ 
-                                      background: '#eab308', 
+                                      background: '#34a853', 
                                       color: 'white', 
                                       border: 'none', 
-                                      padding: '4px 10px', 
-                                      borderRadius: '6px', 
-                                      fontSize: '0.7rem', 
-                                      fontWeight: 700, 
+                                      minHeight: '36px',
+                                      padding: '6px 14px', 
+                                      borderRadius: '10px', 
+                                      fontSize: '0.80rem', 
+                                      fontWeight: 800, 
                                       cursor: 'pointer',
-                                      boxShadow: '0 2px 4px rgba(234, 179, 8, 0.15)',
+                                      boxShadow: '0 2px 6px rgba(52, 168, 83, 0.2)',
                                       transition: 'all 0.2s',
                                       position: 'relative',
-                                      zIndex: 10
+                                      zIndex: 10,
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '4px'
                                     }}
                                   >
-                                    Bestätigen
+                                    {!isStudentRescheduleAllowed ? <Lock size={13} strokeWidth={2.5} /> : <Check size={13} strokeWidth={2.5} />}
+                                    <span>{!isStudentRescheduleAllowed ? 'Bestätigen (Eltern-PIN)' : 'Bestätigen'}</span>
                                   </button>
                                 </div>
                               </div>
@@ -28447,6 +27128,9 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                       const curAbsences = currentLvlKey === 'junior' 
                         ? false 
                         : (draftAllowAbsences !== null ? draftAllowAbsences : ((studentUser as any)?.parent_allow_absences !== undefined && (studentUser as any)?.parent_allow_absences !== null ? Boolean((studentUser as any)?.parent_allow_absences) : (studentId && typeof window !== 'undefined' && localStorage.getItem(`groovelab_parent_allow_absences_${studentId}`) !== null ? localStorage.getItem(`groovelab_parent_allow_absences_${studentId}`) === 'true' : (currentLvlKey === 'pro'))));
+                      const curReschedule = currentLvlKey === 'junior'
+                        ? false
+                        : (draftAllowReschedule !== null ? draftAllowReschedule : ((studentUser as any)?.parent_allow_reschedule_confirm !== undefined && (studentUser as any)?.parent_allow_reschedule_confirm !== null ? Boolean((studentUser as any)?.parent_allow_reschedule_confirm) : (studentId && typeof window !== 'undefined' && localStorage.getItem(`groovelab_parent_allow_reschedule_${studentId}`) !== null ? localStorage.getItem(`groovelab_parent_allow_reschedule_${studentId}`) === 'true' : true)));
                       const curChat = draftAllowChat !== null ? draftAllowChat : ((studentUser as any)?.parent_allow_chat !== undefined && (studentUser as any)?.parent_allow_chat !== null ? Boolean((studentUser as any)?.parent_allow_chat) : (studentId && typeof window !== 'undefined' && localStorage.getItem(`groovelab_parent_allow_chat_${studentId}`) !== null ? localStorage.getItem(`groovelab_parent_allow_chat_${studentId}`) === 'true' : (currentLvlKey !== 'junior')));
                       const curTimer = draftAllowTimer !== null ? draftAllowTimer : ((studentUser as any)?.parent_allow_timer !== undefined && (studentUser as any)?.parent_allow_timer !== null ? Boolean((studentUser as any)?.parent_allow_timer) : (studentId && typeof window !== 'undefined' && localStorage.getItem(`groovelab_parent_allow_timer_${studentId}`) !== null ? localStorage.getItem(`groovelab_parent_allow_timer_${studentId}`) === 'true' : true));
                       const curLeaderboard = draftAllowLeaderboard !== null ? draftAllowLeaderboard : ((studentUser as any)?.parent_allow_leaderboard !== undefined && (studentUser as any)?.parent_allow_leaderboard !== null ? Boolean((studentUser as any)?.parent_allow_leaderboard) : (studentId && typeof window !== 'undefined' && localStorage.getItem(`groovelab_parent_allow_leaderboard_${studentId}`) !== null ? localStorage.getItem(`groovelab_parent_allow_leaderboard_${studentId}`) === 'true' : (currentLvlKey !== 'junior')));
@@ -28456,6 +27140,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
 
                       const isDeviating = 
                         curAbsences !== standard.allowAbsences ||
+                        curReschedule !== standard.allowRescheduleConfirm ||
                         curChat !== standard.allowChat ||
                         curTimer !== standard.allowTimer ||
                         curLeaderboard !== standard.allowLeaderboard ||
@@ -28470,6 +27155,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
 
                         const currentValues: Record<string, boolean> = {
                           allowAbsences: curAbsences,
+                          allowRescheduleConfirm: curReschedule,
                           allowChat: curChat,
                           allowTimer: curTimer,
                           allowLeaderboard: curLeaderboard,
@@ -28480,6 +27166,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
 
                         const targetValues: Record<string, boolean> = {
                           allowAbsences: targetStandard.allowAbsences,
+                          allowRescheduleConfirm: targetStandard.allowRescheduleConfirm,
                           allowChat: targetStandard.allowChat,
                           allowTimer: targetStandard.allowTimer,
                           allowLeaderboard: targetStandard.allowLeaderboard,
@@ -28520,6 +27207,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                         await applyAndSaveParentControls({
                           uiLevel: targetLevelId,
                           allowAbsences: targetStandard.allowAbsences,
+                          allowRescheduleConfirm: targetStandard.allowRescheduleConfirm,
                           allowChat: targetStandard.allowChat,
                           allowTimer: targetStandard.allowTimer,
                           allowLeaderboard: targetStandard.allowLeaderboard,
@@ -28575,11 +27263,190 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                       const hlProposals = getHighlightProps('allowProposals');
                       const hlAudio = getHighlightProps('allowAudio');
                       const hlAbsences = getHighlightProps('allowAbsences');
+                      const hlReschedule = getHighlightProps('allowRescheduleConfirm');
                       const hlChat = getHighlightProps('allowChat');
                       const hlLeaderboard = getHighlightProps('allowLeaderboard');
 
+                      // 🛡️ Termin-Updates & Schüler-Absagen seit letztem Besuch
+                      const childFirstName = studentUser?.first_name || 'Dein Kind';
+                      const studentCancellations = cancelledSchoolYearOccurrences.filter((occ: any) => 
+                        occ.status === 'canceled_by_student' || occ.canceled_by_role === 'student'
+                      );
+                      const pendingReschedules = (scheduleOccurrences || []).filter((occ: any) => 
+                        occ.status === 'pending_reschedule'
+                      );
+                      const confirmedReschedules = (scheduleOccurrences || []).filter((occ: any) => 
+                        occ.status === 'rescheduled_confirmed'
+                      );
+                      const totalUpdatesCount = studentCancellations.length + pendingReschedules.length + confirmedReschedules.length;
+                      const hasTerminUpdates = totalUpdatesCount > 0;
+
                       return (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                          {/* 🛡️ Termin-Updates & Ausfälle Zusammenfassungs-Banner für Eltern */}
+                          {hasTerminUpdates && !parentBriefingDismissed && (
+                            <div style={{
+                              background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+                              borderRadius: '20px',
+                              padding: '16px 18px',
+                              border: '1.5px solid #bae6fd',
+                              boxShadow: '0 4px 18px rgba(2, 132, 199, 0.08)',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '12px'
+                            }}>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  <div style={{
+                                    width: '32px',
+                                    height: '32px',
+                                    borderRadius: '10px',
+                                    background: '#e0f2fe',
+                                    color: '#0284c7',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center'
+                                  }}>
+                                    <Bell size={16} />
+                                  </div>
+                                  <div>
+                                    <div style={{ fontSize: '0.88rem', fontWeight: 850, color: '#0f172a' }}>
+                                      Termin-Updates &amp; Ausfälle
+                                    </div>
+                                    <div style={{ fontSize: '0.70rem', color: '#64748b', fontWeight: 600 }}>
+                                      Aktuelle Mitteilungen für {childFirstName}
+                                    </div>
+                                  </div>
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  <span style={{
+                                    background: '#e0f2fe',
+                                    color: '#0369a1',
+                                    fontSize: '0.68rem',
+                                    fontWeight: 800,
+                                    padding: '3px 8px',
+                                    borderRadius: '8px'
+                                  }}>
+                                    {totalUpdatesCount} {totalUpdatesCount === 1 ? 'Mitteilung' : 'Mitteilungen'}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setParentBriefingDismissed(true);
+                                      if (studentId) localStorage.setItem(`groovelab_parent_dismissed_briefing_${studentId}`, String(Date.now()));
+                                    }}
+                                    style={{
+                                      background: '#0284c7',
+                                      color: '#ffffff',
+                                      border: 'none',
+                                      padding: '5px 12px',
+                                      borderRadius: '8px',
+                                      fontSize: '0.72rem',
+                                      fontWeight: 800,
+                                      cursor: 'pointer',
+                                      boxShadow: '0 2px 6px rgba(2, 132, 199, 0.25)',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '4px'
+                                    }}
+                                    className="hover-scale"
+                                  >
+                                    <Check size={12} strokeWidth={3} />
+                                    <span>Verstanden ✓</span>
+                                  </button>
+                                </div>
+                              </div>
+
+                              {/* Event list */}
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                {studentCancellations.slice(0, 3).map((occ: any) => {
+                                  const occD = new Date(occ.date + 'T00:00:00');
+                                  const dateStr = occD.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' });
+                                  const timeStr = occ.start_time ? `${occ.start_time.substring(0, 5)} Uhr` : '';
+                                  const tName = occ.teacher ? formatTeacherFullName(occ.teacher) : (occ.teacher_name ? formatTeacherFullName(occ.teacher_name) : 'Lehrkraft');
+                                  return (
+                                    <div key={occ.id || `${occ.date}_${occ.start_time}`} style={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'space-between',
+                                      padding: '8px 12px',
+                                      background: '#fee2e2',
+                                      borderRadius: '10px',
+                                      fontSize: '0.74rem',
+                                      border: '1px solid #fca5a5'
+                                    }}>
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <CalendarX size={14} color="#dc2626" />
+                                        <span style={{ fontWeight: 700, color: '#991b1b' }}>
+                                          {childFirstName} hat den Unterricht am {dateStr} {timeStr} abgesagt.
+                                        </span>
+                                      </div>
+                                      <span style={{ fontSize: '0.68rem', color: '#b91c1c', fontWeight: 600 }}>
+                                        {tName} informiert
+                                      </span>
+                                    </div>
+                                  );
+                                })}
+
+                                {pendingReschedules.slice(0, 2).map((occ: any) => {
+                                  const occD = new Date(occ.date + 'T00:00:00');
+                                  const dateStr = occD.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' });
+                                  const timeStr = occ.start_time ? `${occ.start_time.substring(0, 5)} Uhr` : '';
+                                  return (
+                                    <div key={occ.id} style={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'space-between',
+                                      padding: '8px 12px',
+                                      background: '#fffbeb',
+                                      borderRadius: '10px',
+                                      fontSize: '0.74rem',
+                                      border: '1px solid #fde68a'
+                                    }}>
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <RotateCcw size={14} color="#d97706" />
+                                        <span style={{ fontWeight: 700, color: '#92400e' }}>
+                                          Ausweichtermin vorgeschlagen: {dateStr} {timeStr}
+                                        </span>
+                                      </div>
+                                      <span style={{ fontSize: '0.68rem', color: '#b45309', fontWeight: 600 }}>
+                                        Bestätigung ausstehend
+                                      </span>
+                                    </div>
+                                  );
+                                })}
+
+                                {confirmedReschedules.slice(0, 2).map((occ: any) => {
+                                  const occD = new Date(occ.date + 'T00:00:00');
+                                  const dateStr = occD.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' });
+                                  const timeStr = occ.start_time ? `${occ.start_time.substring(0, 5)} Uhr` : '';
+                                  return (
+                                    <div key={occ.id} style={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'space-between',
+                                      padding: '8px 12px',
+                                      background: '#f0fdf4',
+                                      borderRadius: '10px',
+                                      fontSize: '0.74rem',
+                                      border: '1px solid #86efac'
+                                    }}>
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <CheckCircle size={14} color="#16a34a" />
+                                        <span style={{ fontWeight: 700, color: '#166534' }}>
+                                          Ausweichtermin bestätigt: {dateStr} {timeStr}
+                                        </span>
+                                      </div>
+                                      <span style={{ fontSize: '0.68rem', color: '#15803d', fontWeight: 600 }}>
+                                        Verbindlich fest
+                                      </span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+
                           {/* 3-Tab Nav: Schutz & Freigaben | Übe-Report & Fortschritt | Absagen-Logbuch */}
                           <div style={{
                             display: 'flex',
@@ -28955,8 +27822,8 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                   {currentLvlKey === 'junior'
                                     ? 'Aus rechtlichen Gründen (Vertragsschutz der Eltern) im Junior-Modus dauerhaft deaktiviert. Absagen erfolgen über den Eltern-Zugang.'
                                     : (currentLvlKey === 'teen'
-                                        ? 'Erlaubt deinem Teenager, Termine bei Krankheit selbstständig abzusagen (Eltern erhalten sofort eine Benachrichtigung).'
-                                        : 'Erlaubt eigenständige Terminabmeldung im Krankheitsfall gemäß den Schul-Stornobedingungen.')}
+                                        ? 'Erlaubt deinem Teenager, Termine bei Verhinderung selbstständig abzusagen (Eltern erhalten sofort eine Benachrichtigung).'
+                                        : 'Erlaubt eigenständige Terminabmeldung im Verhinderungsfall gemäß den Schul-Stornobedingungen.')}
                                 </div>
                               </div>
                               <input
@@ -28966,6 +27833,47 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                 onChange={(e) => {
                                   if (currentLvlKey !== 'junior') {
                                     applyAndSaveParentControls({ allowAbsences: e.target.checked });
+                                  }
+                                }}
+                                style={{ width: '20px', height: '20px', accentColor: '#0284c7', cursor: currentLvlKey === 'junior' ? 'not-allowed' : 'pointer' }}
+                              />
+                            </label>
+
+                            {/* Toggle 5b: Ausweich- & Verschiebungstermine selbstständig annehmen */}
+                            <label style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              padding: '14px 16px',
+                              borderRadius: '16px',
+                              opacity: currentLvlKey === 'junior' ? 0.75 : 1,
+                              cursor: currentLvlKey === 'junior' ? 'not-allowed' : 'pointer',
+                              ...hlReschedule.style
+                            }}>
+                              <div style={{ paddingRight: '12px', textAlign: 'left' }}>
+                                <div style={{ fontSize: '0.86rem', fontWeight: 800, color: currentLvlKey === 'junior' ? '#64748b' : '#0f172a', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                  <RotateCcw size={16} color={currentLvlKey === 'junior' ? '#94a3b8' : '#0284c7'} style={{ flexShrink: 0 }} />
+                                  <span>Ausweich- &amp; Verschiebungstermine annehmen</span>
+                                  {currentLvlKey === 'junior' && (
+                                    <span style={{ fontSize: '0.66rem', fontWeight: 800, padding: '2px 7px', borderRadius: '6px', background: '#fee2e2', color: '#dc2626' }}>
+                                      Im Junior-Modus Eltern-PIN erforderlich
+                                    </span>
+                                  )}
+                                  {hlReschedule.badge}
+                                </div>
+                                <div style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 500, lineHeight: 1.35, marginTop: '2px' }}>
+                                  {currentLvlKey === 'junior'
+                                    ? 'Im Junior-Modus standardmäßig geschützt. Ausweichtermine müssen von den Eltern per PIN freigegeben werden.'
+                                    : 'Erlaubt deinem Kind, von der Lehrkraft vorgeschlagene Ausweichtermine selbstständig anzunehmen. Wenn deaktiviert, wird die Eltern-PIN verlangt.'}
+                                </div>
+                              </div>
+                              <input
+                                type="checkbox"
+                                disabled={currentLvlKey === 'junior'}
+                                checked={currentLvlKey === 'junior' ? false : curReschedule}
+                                onChange={(e) => {
+                                  if (currentLvlKey !== 'junior') {
+                                    applyAndSaveParentControls({ allowRescheduleConfirm: e.target.checked });
                                   }
                                 }}
                                 style={{ width: '20px', height: '20px', accentColor: '#0284c7', cursor: currentLvlKey === 'junior' ? 'not-allowed' : 'pointer' }}
@@ -29975,7 +28883,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                             color: isStudentCancel ? '#b91c1c' : '#b45309',
                                             border: isStudentCancel ? '1px solid #fca5a5' : '1px solid #fde68a'
                                           }}>
-                                            {isStudentCancel ? '❌ Durch Schüler/Eltern storniert' : isTeacherSick ? '⚠️ Durch Lehrkraft entfallen (Krankheit)' : '⚠️ Unterricht abgesagt'}
+                                            {isStudentCancel ? '❌ Durch Schüler/Eltern storniert' : isTeacherSick ? '⚠️ Durch Lehrkraft entfallen (Terminabsage)' : '⚠️ Unterricht abgesagt'}
                                           </span>
                                         </div>
 
@@ -32223,15 +31131,27 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                       </div>
                       <span style={{ fontSize: '0.65rem', color: '#71717a' }}>Virale Partner-ID: ref={studentId}</span>
 
-                      {/* One click WhatsApp Status Share */}
-                      <a 
-                        href={'https://api.whatsapp.com/send?text=' + encodeURIComponent('Schau mal! Mein GrooveLab Rückblick diesen Monat: Ich war ' + wrappedData.monthlyFlashback.focusMinutes + ' Minuten fokussiert und habe mein ' + wrappedData.monthlyFlashback.badgeName + ' freigeschaltet! Musik machen ist genial! Werde auch Mitglied: https://groovelab.app/join?ref=' + studentId)}
-                        target="_blank"
-                        rel="noreferrer"
-                        style={{ background: '#25d366', color: 'white', textDecoration: 'none', padding: '14px 28px', borderRadius: '14px', fontSize: '0.85rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '8px', marginTop: '10px', boxShadow: '0 4px 12px rgba(37, 211, 102, 0.2)' }}
+                      {/* One click Family / Link Share */}
+                      <button 
+                        type="button"
+                        onClick={async () => {
+                          const shareText = `Schau mal! Mein GrooveLab Rückblick diesen Monat: Ich war ${wrappedData.monthlyFlashback.focusMinutes} Minuten fokussiert und habe mein ${wrappedData.monthlyFlashback.badgeName} freigeschaltet! Musik machen ist genial!`;
+                          const shareUrl = `https://groovelab.app/join?ref=${studentId}`;
+                          if (navigator.share) {
+                            try {
+                              await navigator.share({ title: 'GrooveLab Rückblick', text: shareText, url: shareUrl });
+                              return;
+                            } catch (e) {}
+                          }
+                          try {
+                            await navigator.clipboard.writeText(`${shareText} ${shareUrl}`);
+                            alert('Erfolg in Zwischenablage kopiert! Bereit zum Teilen mit der Familie.');
+                          } catch (e) {}
+                        }}
+                        style={{ background: '#3b82f6', color: 'white', border: 'none', cursor: 'pointer', padding: '14px 28px', borderRadius: '14px', fontSize: '0.85rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '8px', marginTop: '10px', boxShadow: '0 4px 12px rgba(59, 130, 246, 0.2)' }}
                       >
-                        <Share2 size={16} /> Auf WhatsApp teilen
-                      </a>
+                        <Share2 size={16} /> Erfolg mit Familie teilen
+                      </button>
                     </div>
                   ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', alignItems: 'center' }}>
@@ -32240,15 +31160,16 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                       </div>
                       <span style={{ fontWeight: 800, fontSize: '0.9rem', color: '#a1a1aa' }}>Badge gesperrt</span>
 
-                      {/* Redirect to WhatsApp upgrade trigger */}
-                      <a 
-                        href={'https://api.whatsapp.com/send?text=' + encodeURIComponent('Hallo Musikschule! Ich möchte mein GrooveLab-Konto auf Premium upgraden, um Avatare, Streaks und monatliche Stories freizuschalten. Bitte sendet mir den Upgrade-Link für 0,49€.')}
-                        target="_blank"
-                        rel="noreferrer"
-                        style={{ background: '#fbbf24', color: '#09090b', textDecoration: 'none', padding: '14px 28px', borderRadius: '14px', fontSize: '0.85rem', fontWeight: 900, display: 'flex', alignItems: 'center', gap: '8px', marginTop: '16px' }}
+                      {/* Upgrade request trigger */}
+                      <button 
+                        type="button"
+                        onClick={() => {
+                          alert('Möchtest du dein Konto erweitern? Bitte wende dich einfach an das Sekretariat oder die Schulleitung deiner Musikschule.');
+                        }}
+                        style={{ background: '#fbbf24', color: '#09090b', border: 'none', cursor: 'pointer', padding: '14px 28px', borderRadius: '14px', fontSize: '0.85rem', fontWeight: 900, display: 'flex', alignItems: 'center', gap: '8px', marginTop: '16px' }}
                       >
-                        <Zap size={16} /> Jetzt Upgrade anfordern (0,49 €)
-                      </a>
+                        <Zap size={16} /> Upgrade bei Musikschule anfragen
+                      </button>
                     </div>
                   )}
                 </div>
@@ -33121,6 +32042,67 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
           isFrozen = Date.now() > lessonDateTime.getTime() + 48 * 60 * 60 * 1000;
         } catch (e) {}
 
+        const isCancelledOcc = Boolean(
+          appointmentChatData.isCancelled ||
+          appointmentChatData.status === 'canceled_by_student' ||
+          appointmentChatData.status === 'cancelled' ||
+          appointmentChatData.status === 'teacher_sick' ||
+          appointmentChatData.status === 'canceled_by_teacher_sick' ||
+          (appointmentChatData.label && appointmentChatData.label.includes('(Ausfall)')) ||
+          (chatMessages.some(m => m.is_system && m.content && (m.content.includes('fällt aus') || m.content.includes('abgesagt')) && !chatMessages.some(m2 => m2.is_system && m2.content && (m2.content.includes('reaktiviert') || m2.content.includes('zurückgenommen')))))
+        );
+
+        const isRescheduledOcc = Boolean(
+          !isCancelledOcc && (
+            appointmentChatData.status === 'rescheduled_confirmed' ||
+            appointmentChatData.status === 'rescheduled' ||
+            (appointmentChatData.label && appointmentChatData.label.includes('(Verschoben)'))
+          )
+        );
+
+        let headerBackground = 'linear-gradient(135deg, #34a853 0%, #137333 100%)';
+        let headerBorder = 'none';
+        let headerTextColor = '#ffffff';
+        let headerSubColor = 'rgba(255, 255, 255, 0.95)';
+        let headerBadgeBg = 'rgba(255, 255, 255, 0.22)';
+        let headerBadgeColor = '#ffffff';
+        let headerBadgeBorder = '1px solid rgba(255, 255, 255, 0.3)';
+        let statusBadgeText = '✓ Regulärer Termin';
+
+        if (isCancelledOcc) {
+          headerBackground = 'repeating-linear-gradient(-45deg, #fef2f2 0px, #fef2f2 10px, #ffffff 10px, #ffffff 20px)';
+          headerBorder = '2px dashed #ef4444';
+          headerTextColor = '#991b1b';
+          headerSubColor = '#dc2626';
+          headerBadgeBg = '#fee2e2';
+          headerBadgeColor = '#dc2626';
+          headerBadgeBorder = '1px solid #fca5a5';
+          statusBadgeText = '✕ Termin abgesagt';
+        } else if (isRescheduledOcc) {
+          headerBackground = 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)';
+          headerBorder = '2px solid #eab308';
+          headerTextColor = '#854d0e';
+          headerSubColor = '#b45309';
+          headerBadgeBg = '#dcfce7';
+          headerBadgeColor = '#15803d';
+          headerBadgeBorder = '1px solid #86efac';
+          statusBadgeText = '✓ Termin Verschoben';
+        }
+
+        const quickReplyChips = isCancelledOcc
+          ? [
+              '🔄 Absage zurücknehmen (Reaktivieren)',
+              '💬 Frage zur Absage stellen',
+              '📅 Neuen Termin vorschlagen'
+            ]
+          : [
+              '👍 Ja, geht klar!',
+              '❌ Nein, geht leider nicht',
+              '⏳ Bin 5 Min. später',
+              '📅 Termin bestätigt',
+              '🎹 Alles klar!'
+            ];
+
         return (
           <div
             onClick={() => setShowAppointmentChat(false)}
@@ -33141,53 +32123,88 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
               onClick={e => e.stopPropagation()}
               style={{
                 background: '#ffffff',
-                borderRadius: '24px',
+                borderRadius: '28px',
                 width: '100%',
-                maxWidth: '480px',
+                maxWidth: '500px',
                 boxShadow: '0 32px 80px rgba(0,0,0,0.25)',
                 overflow: 'hidden',
                 display: 'flex',
                 flexDirection: 'column',
                 position: 'relative',
-                maxHeight: '85vh'
+                maxHeight: '85vh',
+                fontFamily: "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
               }}
             >
               {/* Header */}
               <div style={{
-                background: 'linear-gradient(135deg, #34a853 0%, #137333 100%)',
-                padding: '20px 24px',
-                color: '#ffffff',
+                background: headerBackground,
+                borderBottom: headerBorder,
+                padding: '22px 24px',
+                color: headerTextColor,
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'space-between'
+                justifyContent: 'space-between',
+                transition: 'all 0.2s ease'
               }}>
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                    <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <MessageSquare size={18} color="#ffffff" />
+                    <h3 style={{ 
+                      margin: 0, 
+                      fontSize: '1.38rem', 
+                      fontWeight: 950, 
+                      letterSpacing: '-0.02em',
+                      color: headerTextColor, 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: '8px' 
+                    }}>
+                      <MessageSquare size={22} color={headerTextColor} />
                       <span>1:1 Shoutbox: Absprache</span>
                     </h3>
                   </div>
-                  <p style={{ margin: '4px 0 6px 0', color: 'rgba(255, 255, 255, 0.85)', fontSize: '0.75rem', fontWeight: 600 }}>
+                  <p style={{ 
+                    margin: '6px 0 10px 0', 
+                    color: headerSubColor, 
+                    fontSize: '0.94rem', 
+                    fontWeight: 650,
+                    lineHeight: 1.4
+                  }}>
                     Termin am {new Date(appointmentChatData.date).toLocaleDateString('de-DE')} um {appointmentChatData.start_time.substring(0, 5)} Uhr
                   </p>
                   
                   {/* Badges */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                     <span style={{
-                      padding: '4px 10px',
-                      borderRadius: '8px',
-                      background: 'rgba(255, 255, 255, 0.2)',
-                      color: '#ffffff',
-                      fontSize: '0.68rem',
-                      fontWeight: 800,
-                      backdropFilter: 'blur(4px)',
+                      padding: '6px 14px',
+                      borderRadius: '100px',
+                      background: headerBadgeBg,
+                      color: headerBadgeColor,
+                      fontSize: '0.85rem',
+                      fontWeight: 900,
+                      backdropFilter: 'blur(6px)',
                       display: 'inline-flex',
                       alignItems: 'center',
-                      gap: '5px'
+                      gap: '6px',
+                      border: headerBadgeBorder
                     }}>
-                      <ShieldCheck size={13} color="#ffffff" />
-                      <span>100% DSGVO-konform • TLS 1.3 &amp; AES-256 verschlüsselt</span>
+                      <span>{statusBadgeText}</span>
+                    </span>
+
+                    <span style={{
+                      padding: '6px 14px',
+                      borderRadius: '100px',
+                      background: headerBadgeBg,
+                      color: headerBadgeColor,
+                      fontSize: '0.84rem',
+                      fontWeight: 850,
+                      backdropFilter: 'blur(6px)',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      border: headerBadgeBorder
+                    }}>
+                      <ShieldCheck size={15} color={headerBadgeColor} />
+                      <span>DSGVO-konform • TLS 1.3 &amp; AES-256</span>
                     </span>
                   </div>
                 </div>
@@ -33197,22 +32214,22 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                   onClick={() => setShowAppointmentChat(false)}
                   style={{
                     border: 'none',
-                    background: 'rgba(255, 255, 255, 0.2)',
+                    background: headerBadgeBg,
                     borderRadius: '50%',
-                    width: '32px',
-                    height: '32px',
+                    width: '36px',
+                    height: '36px',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     cursor: 'pointer',
-                    color: '#ffffff',
+                    color: headerBadgeColor,
                     transition: 'all 0.2s',
                     alignSelf: 'flex-start'
                   }}
-                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)'}
-                  onMouseLeave={e => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)'}
+                  onMouseEnter={e => e.currentTarget.style.opacity = '0.8'}
+                  onMouseLeave={e => e.currentTarget.style.opacity = '1'}
                 >
-                  <X size={16} />
+                  <X size={20} />
                 </button>
               </div>
 
@@ -33224,31 +32241,150 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                 background: '#fafbfc',
                 display: 'flex',
                 flexDirection: 'column',
-                gap: '12px',
-                minHeight: '280px',
-                maxHeight: '400px'
+                gap: '14px',
+                minHeight: '290px',
+                maxHeight: '420px'
               }} className="custom-scrollbar">
                 {isFrozen && (
-                  <div style={{ background: '#fef2f2', border: '1px solid #fee2f2', color: '#991b1b', padding: '8px 12px', borderRadius: '100px', fontSize: '0.75rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'center', textAlign: 'center' }}>
-                    <Lock size={14} color="#991b1b" />
+                  <div style={{ background: '#fef2f2', border: '1px solid #fee2f2', color: '#991b1b', padding: '10px 16px', borderRadius: '100px', fontSize: '0.82rem', fontWeight: 750, display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'center', textAlign: 'center' }}>
+                    <Lock size={16} color="#991b1b" />
                     <span>Shoutbox nach 48h eingefroren (Schreibschutz aktiv)</span>
                   </div>
                 )}
-                {chatMessages.length === 0 ? (
-                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#64748b', fontSize: '0.82rem', textAlign: 'center', padding: '24px 16px', gap: '8px', background: 'rgba(255,255,255,0.7)', border: '1.5px dashed #cbd5e1', borderRadius: '16px', margin: 'auto 0' }}>
-                    <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: '#e6f4ea', color: '#34a853', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '4px' }}>
-                      <Calendar size={20} />
+
+                {/* Event Banner when appointment is cancelled */}
+                {isCancelledOcc && (
+                  <div style={{
+                    background: '#fef2f2',
+                    border: '1.5px dashed #f87171',
+                    color: '#991b1b',
+                    padding: '12px 16px',
+                    borderRadius: '18px',
+                    fontSize: '0.88rem',
+                    fontWeight: 700,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '10px'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontSize: '1.1rem' }}>❌</span>
+                      <span>Dieser Unterrichtstermin wurde abgesagt.</span>
                     </div>
-                    <h5 style={{ margin: 0, fontSize: '0.88rem', fontWeight: 800, color: '#0f172a' }}>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const targetOcc = (scheduleOccurrences || []).find((o: any) => o.id === appointmentChatData.occurrenceId || o.date === appointmentChatData.date) || 
+                                          (schoolYearOccurrences || []).find((o: any) => o.id === appointmentChatData.occurrenceId || o.date === appointmentChatData.date) ||
+                                          { id: appointmentChatData.occurrenceId, date: appointmentChatData.date, teacher_id: appointmentChatData.teacherId };
+                        await handleUndoCancelOccurrence(targetOcc, false);
+                        setAppointmentChatData(prev => prev ? { ...prev, isCancelled: false, status: 'scheduled' } : null);
+                        if (targetOcc.teacher_id && (targetOcc.id || targetOcc.date)) {
+                          await fetchChat(targetOcc.teacher_id, targetOcc.id, targetOcc.date);
+                        }
+                      }}
+                      style={{
+                        background: '#15803d',
+                        color: '#ffffff',
+                        border: 'none',
+                        borderRadius: '100px',
+                        padding: '6px 14px',
+                        fontSize: '0.80rem',
+                        fontWeight: 900,
+                        cursor: 'pointer',
+                        whiteSpace: 'nowrap',
+                        boxShadow: '0 2px 6px rgba(21,128,61,0.2)'
+                      }}
+                    >
+                      Reaktivieren
+                    </button>
+                  </div>
+                )}
+
+                {chatMessages.length === 0 ? (
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#64748b', fontSize: '0.88rem', textAlign: 'center', padding: '24px 16px', gap: '8px', background: 'rgba(255,255,255,0.7)', border: '1.5px dashed #cbd5e1', borderRadius: '18px', margin: 'auto 0' }}>
+                    <div style={{ width: '48px', height: '48px', borderRadius: '14px', background: '#e6f4ea', color: '#34a853', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '4px' }}>
+                      <Calendar size={24} />
+                    </div>
+                    <h5 style={{ margin: 0, fontSize: '0.98rem', fontWeight: 800, color: '#0f172a' }}>
                       Termingekoppelter Schulchat
                     </h5>
-                    <p style={{ margin: 0, fontSize: '0.74rem', color: '#64748b', lineHeight: 1.4, maxWidth: '240px' }}>
-                      Geschützte Direktnachrichten für diesen Unterrichtstermin – 100% DSGVO- & datenschutzkonform.
+                    <p style={{ margin: 0, fontSize: '0.82rem', color: '#64748b', lineHeight: 1.45, maxWidth: '280px' }}>
+                      Geschützte Direktnachrichten für diesen Unterrichtstermin – DSGVO- &amp; datenschutzkonform.
                     </p>
                   </div>
                 ) : (
                   chatMessages.map((msg, idx) => {
                     const isMe = msg.sender_id === studentId;
+                    const isCancellation = msg.message_type === 'reschedule_notification' || 
+                                           (msg.content && (msg.content.includes('❌') || msg.content.includes('fällt aus') || msg.content.includes('Termin abgesagt')));
+                    const isReactivation = msg.message_type === 'cancellation_reset' || 
+                                           (msg.content && (msg.content.includes('🔄') || msg.content.includes('reaktiviert') || msg.content.includes('zurückgenommen') || msg.content.includes('regulär statt')));
+
+                    if (isReactivation) {
+                      return (
+                        <div key={msg.id || idx} style={{ alignSelf: 'center', width: '100%', maxWidth: '94%', margin: '6px 0' }}>
+                          <div style={{
+                            background: '#f0fdf4',
+                            border: '1.5px solid #86efac',
+                            borderRadius: '18px',
+                            padding: '12px 18px',
+                            boxShadow: '0 2px 8px rgba(34, 197, 94, 0.08)',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '6px'
+                          }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: '#dcfce7', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                <span style={{ fontSize: '0.95rem' }}>🔄</span>
+                              </div>
+                              <span style={{ fontSize: '0.86rem', fontWeight: 900, color: '#15803d', letterSpacing: '-0.01em' }}>
+                                Termin reaktiviert
+                              </span>
+                              <span style={{ marginLeft: 'auto', fontSize: '0.72rem', color: '#16a34a', fontWeight: 700 }}>
+                                {new Date(msg.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                            </div>
+                            <div style={{ fontSize: '0.92rem', color: '#166534', fontWeight: 650, lineHeight: 1.45, wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>
+                              {msg.content}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    if (isCancellation) {
+                      return (
+                        <div key={msg.id || idx} style={{ alignSelf: 'center', width: '100%', maxWidth: '94%', margin: '6px 0' }}>
+                          <div style={{
+                            background: '#fef2f2',
+                            border: '1.5px dashed #fca5a5',
+                            borderRadius: '18px',
+                            padding: '12px 18px',
+                            boxShadow: '0 2px 8px rgba(239, 68, 68, 0.06)',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '6px'
+                          }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: '#fee2e2', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                <span style={{ fontSize: '0.95rem' }}>❌</span>
+                              </div>
+                              <span style={{ fontSize: '0.86rem', fontWeight: 900, color: '#991b1b', letterSpacing: '-0.01em' }}>
+                                Termin abgesagt
+                              </span>
+                              <span style={{ marginLeft: 'auto', fontSize: '0.72rem', color: '#b91c1c', fontWeight: 700 }}>
+                                {new Date(msg.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                            </div>
+                            <div style={{ fontSize: '0.92rem', color: '#991b1b', fontWeight: 650, lineHeight: 1.45, wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>
+                              {msg.content}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    }
+
                     return (
                       <div key={msg.id || idx} style={{
                         display: 'flex',
@@ -33256,25 +32392,26 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                         alignSelf: isMe ? 'flex-end' : 'flex-start',
                         maxWidth: '82%',
                         alignItems: isMe ? 'flex-end' : 'flex-start',
-                        gap: '2px'
+                        gap: '3px'
                       }}>
                         <div style={{
                           background: isMe ? '#e6f4ea' : '#ffffff',
                           color: '#0f172a',
-                          padding: '10px 14px',
-                          borderRadius: isMe ? '16px 16px 2px 16px' : '16px 16px 16px 2px',
-                          fontSize: '0.85rem',
-                          lineHeight: 1.4,
+                          padding: '12px 16px',
+                          borderRadius: isMe ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
+                          fontSize: '0.98rem',
+                          lineHeight: 1.45,
+                          fontWeight: 600,
                           wordBreak: 'break-word',
                           border: isMe ? '1px solid #bbf7d0' : '1px solid #e2e8f0',
-                          boxShadow: '0 1px 4px rgba(0,0,0,0.04)'
+                          boxShadow: '0 2px 6px rgba(0,0,0,0.03)'
                         }}>
                           {msg.content}
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '3px', marginTop: '4px' }}>
-                            <span style={{ fontSize: '0.62rem', color: isMe ? '#15803d' : '#64748b', fontWeight: 600 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '4px', marginTop: '6px' }}>
+                            <span style={{ fontSize: '0.76rem', color: isMe ? '#15803d' : '#64748b', fontWeight: 650 }}>
                               {new Date(msg.created_at).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })}, {new Date(msg.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}
                             </span>
-                            {isMe && <CheckCheck size={14} color="#15803d" style={{ marginLeft: '2px' }} />}
+                            {isMe && <CheckCheck size={15} color="#15803d" style={{ marginLeft: '2px' }} />}
                           </div>
                         </div>
                       </div>
@@ -33286,18 +32423,23 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
 
               {/* Music Pedagogical Quick Reply Chips */}
               {!isFrozen && (
-                <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', padding: '10px 20px 4px 20px', background: '#fafbfc' }}>
-                  {[
-                    '👍 Ja, geht klar!',
-                    '❌ Nein, geht leider nicht',
-                    '⏳ Bin 5 Min. später',
-                    '📅 Termin bestätigt',
-                    '🎹 Alles klar!'
-                  ].map((chip, idx) => (
+                <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', padding: '12px 20px 6px 20px', background: '#fafbfc' }}>
+                  {quickReplyChips.map((chip, idx) => (
                     <button
                       key={idx}
                       type="button"
-                      onClick={() => {
+                      onClick={async () => {
+                        if (chip.startsWith('🔄 Absage zurücknehmen')) {
+                          const targetOcc = (scheduleOccurrences || []).find((o: any) => o.id === appointmentChatData.occurrenceId || o.date === appointmentChatData.date) || 
+                                            (schoolYearOccurrences || []).find((o: any) => o.id === appointmentChatData.occurrenceId || o.date === appointmentChatData.date) ||
+                                            { id: appointmentChatData.occurrenceId, date: appointmentChatData.date, teacher_id: appointmentChatData.teacherId };
+                          await handleUndoCancelOccurrence(targetOcc, false);
+                          setAppointmentChatData(prev => prev ? { ...prev, isCancelled: false, status: 'scheduled' } : null);
+                          if (targetOcc.teacher_id && (targetOcc.id || targetOcc.date)) {
+                            await fetchChat(targetOcc.teacher_id, targetOcc.id, targetOcc.date);
+                          }
+                          return;
+                        }
                         if (!isStudentChatAllowed && !checkIsParentUnlockedGlobal()) {
                           setGlobalPinPendingAction(() => () => setChatTypedMessage(chip));
                           setGlobalPinInput('');
@@ -33308,16 +32450,18 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                         setChatTypedMessage(chip);
                       }}
                       style={{
-                        padding: '5px 10px',
-                        borderRadius: '20px',
-                        border: '1px solid #e2e8f0',
+                        padding: '8px 14px',
+                        minHeight: '38px',
+                        borderRadius: '100px',
+                        border: '1.5px solid #e2e8f0',
                         background: '#ffffff',
-                        fontSize: '0.72rem',
-                        fontWeight: 600,
-                        color: '#475569',
+                        fontSize: '0.88rem',
+                        fontWeight: 800,
+                        color: '#334155',
                         cursor: 'pointer',
                         whiteSpace: 'nowrap',
-                        transition: 'all 0.15s'
+                        transition: 'all 0.15s',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
                       }}
                       onMouseEnter={e => {
                         e.currentTarget.style.background = '#f1f5f9';
@@ -33325,7 +32469,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                       }}
                       onMouseLeave={e => {
                         e.currentTarget.style.background = '#ffffff';
-                        e.currentTarget.style.color = '#475569';
+                        e.currentTarget.style.color = '#334155';
                       }}
                     >
                       {chip}
@@ -33340,17 +32484,17 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
-                  padding: '8px 14px',
-                  margin: '6px 20px 0 20px',
-                  borderRadius: '12px',
+                  padding: '10px 16px',
+                  margin: '8px 20px 0 20px',
+                  borderRadius: '16px',
                   background: '#eff6ff',
                   border: '1px solid #bfdbfe',
                   color: '#1e40af',
-                  fontSize: '0.78rem',
+                  fontSize: '0.84rem',
                   fontWeight: 700
                 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Lock size={14} color="#2563eb" />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Lock size={15} color="#2563eb" />
                     <span>Antworten durch Eltern geschützt (Lesen frei)</span>
                   </div>
                   <button
@@ -33365,9 +32509,9 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                       background: '#2563eb',
                       color: '#ffffff',
                       border: 'none',
-                      borderRadius: '8px',
-                      padding: '4px 10px',
-                      fontSize: '0.72rem',
+                      borderRadius: '100px',
+                      padding: '6px 12px',
+                      fontSize: '0.78rem',
                       fontWeight: 800,
                       cursor: 'pointer'
                     }}
@@ -33397,7 +32541,8 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                     borderTop: '1px solid #f1f5f9',
                     background: '#ffffff',
                     display: 'flex',
-                    gap: '10px'
+                    alignItems: 'center',
+                    gap: '12px'
                   }}>
                     <input
                       type="text"
@@ -33424,13 +32569,15 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                       }}
                       style={{
                         flex: 1,
-                        padding: '10px 14px',
-                        borderRadius: '12px',
-                        border: isChatLocked ? '1.5px dashed #93c5fd' : '1px solid #e2e8f0',
+                        padding: '12px 20px',
+                        minHeight: '48px',
+                        borderRadius: '100px',
+                        border: isChatLocked ? '1.5px dashed #93c5fd' : '1.5px solid #cbd5e1',
                         background: isFrozen ? '#f1f5f9' : isChatLocked ? '#f8fafc' : '#ffffff',
-                        fontSize: '0.85rem',
+                        fontSize: '0.98rem',
                         outline: 'none',
-                        fontWeight: 650,
+                        fontWeight: 600,
+                        color: '#1e293b',
                         cursor: isChatLocked ? 'pointer' : 'text'
                       }}
                     />
@@ -33441,9 +32588,9 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                         border: 'none',
                         background: isFrozen || !chatTypedMessage.trim() ? '#cbd5e1' : 'linear-gradient(135deg, #34a853, #137333)',
                         color: '#ffffff',
-                        borderRadius: '12px',
-                        width: '42px',
-                        height: '42px',
+                        borderRadius: '50%',
+                        width: '46px',
+                        height: '46px',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -33453,7 +32600,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                         flexShrink: 0
                       }}
                     >
-                      <Send size={16} />
+                      <Send size={19} />
                     </button>
                   </form>
                 );
@@ -33679,8 +32826,8 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                 </h3>
                 <p style={{ margin: '8px 0 0 0', fontSize: '0.85rem', color: '#64748b', fontWeight: 600, lineHeight: 1.4 }}>
                   {isReinstated 
-                    ? 'Deine Lehrkraft ist früher wieder gesund geworden. Dein Unterricht findet wie gewohnt statt:'
-                    : 'Deine Lehrkraft hat sich krankgemeldet. Daher müssen die folgenden Termine leider ausfallen:'}
+                    ? 'Deine Lehrkraft steht wieder zur Verfügung. Dein Unterricht findet wie gewohnt statt:'
+                    : 'Deine Lehrkraft ist verhindert. Daher müssen die folgenden Termine leider entfallen:'}
                 </p>
               </div>
 
@@ -33880,15 +33027,39 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
             return rem > 0 ? `${m}:${String(rem).padStart(2, '0')} Min.` : `${m} Min.`;
           };
 
-          let celebrationTitle = "Der erste Schritt sitzt!";
-          let celebrationSubtitle = `Dein Gehirn und deine Finger lernen ab der 1. Sekunde. Noch ${formatSecs(remainingSecs)} bis zur Tages-Flamme! 🔥`;
+          let celebrationTitle = studentUiLevel === 'pro'
+            ? "Fokus-Session erfasst"
+            : studentUiLevel === 'teen'
+            ? "Groove gestartet!"
+            : "Der erste Schritt sitzt!";
+          let celebrationSubtitle = studentUiLevel === 'pro'
+            ? `${formatSecs(exactSecs)} konzentrierte Spielzeit erfasst. Noch ${formatSecs(remainingSecs)} bis zum vollen Tagesziel.`
+            : studentUiLevel === 'teen'
+            ? `Jede Minute am Instrument zählt. Noch ${formatSecs(remainingSecs)} bis zum vollen Tagesziel! ⚡`
+            : `Dein Gehirn und deine Finger lernen ab der 1. Sekunde. Noch ${formatSecs(remainingSecs)} bis zur Tages-Flamme! 🔥`;
 
           if (isFlow) {
-            celebrationTitle = "Voller Flow & Spielfreude! 🚀";
-            celebrationSubtitle = `Du warst voll im Sound – ${formatSecs(exactSecs)} pure Hingabe! ✨`;
+            celebrationTitle = studentUiLevel === 'pro'
+              ? "Exzellenter Flow & Fokus"
+              : studentUiLevel === 'teen'
+              ? "Voller Groove & Flow! 🎧"
+              : "Voller Flow & Spielfreude! 🚀";
+            celebrationSubtitle = studentUiLevel === 'pro'
+              ? `${formatSecs(exactSecs)} fokussierte Übezeit erfasst. Höchste musikalische Hingabe und Präzision.`
+              : studentUiLevel === 'teen'
+              ? `Du warst voll im Sound – ${formatSecs(exactSecs)} pure Hingabe! ⚡`
+              : `Du warst voll im Sound – ${formatSecs(exactSecs)} pure Hingabe! ✨`;
           } else if (isGoalReached) {
-            celebrationTitle = "Tages-Flamme entfacht! 🔥";
-            celebrationSubtitle = `${targetMins} Minuten voller Fokus. Genau dieses tägliche Dranbleiben macht dich meisterhaft! 🏆`;
+            celebrationTitle = studentUiLevel === 'pro'
+              ? "Tagesziel meisterhaft erreicht"
+              : studentUiLevel === 'teen'
+              ? "Tages-Session gemeistert! ⚡"
+              : "Tages-Flamme entfacht! 🔥";
+            celebrationSubtitle = studentUiLevel === 'pro'
+              ? `${targetMins} Minuten gezielte Übepraxis erfolgreich dokumentiert. Kontinuität formt meisterhafte Virtuosität.`
+              : studentUiLevel === 'teen'
+              ? `${targetMins} Minuten voller Fokus. Dein Timing und Rhythmus werden von Tag zu Tag stabiler! ⚡`
+              : `${targetMins} Minuten voller Fokus. Genau dieses tägliche Dranbleiben macht dich meisterhaft! 🏆`;
           }
 
           return (
@@ -33917,7 +33088,11 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                 borderRadius: '32px',
                 padding: '34px 24px',
                 textAlign: 'center',
-                boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.15), 0 0 1px rgba(0, 0, 0, 0.1), 0 0 40px rgba(52, 168, 83, 0.08)',
+                boxShadow: studentUiLevel === 'pro'
+                  ? '0 25px 60px -15px rgba(0, 0, 0, 0.12), 0 0 1px rgba(0, 0, 0, 0.1), 0 0 40px rgba(0, 113, 227, 0.08)'
+                  : studentUiLevel === 'teen'
+                  ? '0 25px 60px -15px rgba(0, 0, 0, 0.18), 0 0 1px rgba(0, 0, 0, 0.1), 0 0 40px rgba(13, 148, 136, 0.12)'
+                  : '0 25px 60px -15px rgba(0, 0, 0, 0.15), 0 0 1px rgba(0, 0, 0, 0.1), 0 0 40px rgba(52, 168, 83, 0.08)',
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
@@ -33964,18 +33139,22 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                       strokeLinecap="round"
                       style={{
                         transition: 'stroke-dashoffset 1.5s cubic-bezier(0.34, 1.56, 0.64, 1)',
-                        filter: 'drop-shadow(0 2px 6px rgba(52, 168, 83, 0.35))'
+                        filter: studentUiLevel === 'pro'
+                          ? 'drop-shadow(0 2px 6px rgba(0, 113, 227, 0.35))'
+                          : studentUiLevel === 'teen'
+                          ? 'drop-shadow(0 2px 6px rgba(13, 148, 136, 0.35))'
+                          : 'drop-shadow(0 2px 6px rgba(52, 168, 83, 0.35))'
                       }}
                     />
                     <defs>
                       <linearGradient id="celebrationProgressGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" stopColor="#34a853" />
-                        <stop offset="100%" stopColor="#22c55e" />
+                        <stop offset="0%" stopColor={studentUiLevel === 'pro' ? "#0071e3" : studentUiLevel === 'teen' ? "#0d9488" : "#34a853"} />
+                        <stop offset="100%" stopColor={studentUiLevel === 'pro' ? "#38bdf8" : studentUiLevel === 'teen' ? "#f59e0b" : "#22c55e"} />
                       </linearGradient>
                     </defs>
                   </svg>
 
-                  {/* Flame Icon & Streak Count in Center */}
+                  {/* Icon & Streak Count in Center */}
                   <div style={{
                     position: 'absolute',
                     inset: 0,
@@ -33985,27 +33164,54 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                     justifyContent: 'center',
                     zIndex: 5
                   }}>
-                    <Flame
-                      size={34}
-                      color="#ea580c"
-                      fill="#ea580c"
-                      style={{
-                        filter: 'drop-shadow(0 2px 8px rgba(234, 88, 12, 0.45))',
-                        transform: 'scale(1)',
-                        animation: 'pulse 2s infinite ease-in-out'
-                      }}
-                    />
+                    {studentUiLevel === 'pro' ? (
+                      <CheckCircle
+                        size={32}
+                        color="#0071e3"
+                        style={{
+                          filter: 'drop-shadow(0 2px 8px rgba(0, 113, 227, 0.35))'
+                        }}
+                      />
+                    ) : (
+                      <Flame
+                        size={34}
+                        color={studentUiLevel === 'teen' ? "#f59e0b" : "#ea580c"}
+                        fill={studentUiLevel === 'teen' ? "#f59e0b" : "#ea580c"}
+                        style={{
+                          filter: studentUiLevel === 'teen' 
+                            ? 'drop-shadow(0 2px 8px rgba(245, 158, 11, 0.45))'
+                            : 'drop-shadow(0 2px 8px rgba(234, 88, 12, 0.45))',
+                          transform: 'scale(1)',
+                          animation: 'pulse 2s infinite ease-in-out'
+                        }}
+                      />
+                    )}
                     <span style={{ fontSize: '1.35rem', fontWeight: 900, color: '#1e293b', marginTop: '1px', lineHeight: 1 }}>
                       {celebrationDetails.streakFlame && celebrationDetails.streakFlame > 0 ? celebrationDetails.streakFlame : '1.'}
                     </span>
-                    <span style={{ fontSize: '0.72rem', fontWeight: 900, color: '#ea580c', textTransform: 'uppercase', letterSpacing: '0.06em', marginTop: '2px' }}>
-                      {celebrationDetails.streakFlame && celebrationDetails.streakFlame > 0 ? 'Tage Streak' : 'Tag im Anflug'}
+                    <span style={{ 
+                      fontSize: '0.72rem', 
+                      fontWeight: 900, 
+                      color: studentUiLevel === 'pro' ? '#0071e3' : studentUiLevel === 'teen' ? '#f59e0b' : '#ea580c', 
+                      textTransform: 'uppercase', 
+                      letterSpacing: '0.06em', 
+                      marginTop: '2px' 
+                    }}>
+                      {studentUiLevel === 'pro' 
+                        ? (celebrationDetails.streakFlame && celebrationDetails.streakFlame > 0 ? 'Tage Serie' : 'Tag 1') 
+                        : (celebrationDetails.streakFlame && celebrationDetails.streakFlame > 0 ? 'Tage Streak' : 'Tag im Anflug')}
                     </span>
                   </div>
                 </div>
 
                 <div>
-                  <h3 style={{ fontSize: '1.58rem', fontWeight: 900, color: '#166534', margin: '0 0 6px 0', letterSpacing: '-0.03em' }}>
+                  <h3 style={{ 
+                    fontSize: '1.58rem', 
+                    fontWeight: 900, 
+                    color: studentUiLevel === 'pro' ? '#0f172a' : studentUiLevel === 'teen' ? '#0f172a' : '#166534', 
+                    margin: '0 0 6px 0', 
+                    letterSpacing: '-0.03em' 
+                  }}>
                     {celebrationTitle}
                   </h3>
                   <p style={{ fontSize: '0.86rem', color: '#64748b', fontWeight: 600, lineHeight: 1.48, margin: 0, maxWidth: '320px' }}>
@@ -34033,7 +33239,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                     gap: '4px',
                     boxShadow: '0 2px 6px rgba(0, 0, 0, 0.02)'
                   }}>
-                    <Timer size={18} color="#34a853" />
+                    <Timer size={18} color={studentUiLevel === 'pro' ? "#0071e3" : studentUiLevel === 'teen' ? "#0d9488" : "#34a853"} />
                     <span style={{ fontSize: '0.92rem', fontWeight: 900, color: '#1e293b', lineHeight: 1.1 }}>
                       {formatSecs(exactSecs)}
                     </span>
@@ -34044,8 +33250,16 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
 
                   {/* Pill 2: XP / Erfahrung */}
                   <div style={{
-                    background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)',
-                    border: '1px solid #bae6fd',
+                    background: studentUiLevel === 'pro'
+                      ? 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)'
+                      : studentUiLevel === 'teen'
+                      ? 'linear-gradient(135deg, #f0fdfa 0%, #ccfbf1 100%)'
+                      : 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)',
+                    border: studentUiLevel === 'pro'
+                      ? '1px solid #bae6fd'
+                      : studentUiLevel === 'teen'
+                      ? '1px solid #99f6e4'
+                      : '1px solid #bae6fd',
                     borderRadius: '20px',
                     padding: '13px 6px',
                     display: 'flex',
@@ -34055,12 +33269,27 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                     gap: '4px',
                     boxShadow: '0 2px 6px rgba(2, 132, 199, 0.06)'
                   }}>
-                    <Zap size={18} color="#0284c7" />
-                    <span style={{ fontSize: '0.88rem', fontWeight: 900, color: '#0284c7', lineHeight: 1.1 }}>
-                      {exactSecs < 60 ? '1. XP ab 1m' : `+${celebrationDetails.xpGained} XP`}
+                    <Zap size={18} color={studentUiLevel === 'pro' ? "#0071e3" : studentUiLevel === 'teen' ? "#0d9488" : "#0284c7"} />
+                    <span style={{ 
+                      fontSize: '0.88rem', 
+                      fontWeight: 900, 
+                      color: studentUiLevel === 'pro' ? '#0071e3' : studentUiLevel === 'teen' ? '#0d9488' : '#0284c7', 
+                      lineHeight: 1.1 
+                    }}>
+                      {exactSecs < 60 
+                        ? (studentUiLevel === 'pro' ? 'Score ab 1m' : '1. XP ab 1m') 
+                        : `+${celebrationDetails.xpGained} XP`}
                     </span>
-                    <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#0369a1', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                      {exactSecs < 60 ? `Noch ${60 - exactSecs}s 🚀` : 'Erfahrung ✨'}
+                    <span style={{ 
+                      fontSize: '0.72rem', 
+                      fontWeight: 800, 
+                      color: studentUiLevel === 'pro' ? '#0284c7' : studentUiLevel === 'teen' ? '#0f766e' : '#0369a1', 
+                      textTransform: 'uppercase', 
+                      letterSpacing: '0.04em' 
+                    }}>
+                      {exactSecs < 60 
+                        ? (studentUiLevel === 'pro' ? `Noch ${60 - exactSecs}s` : studentUiLevel === 'teen' ? `Noch ${60 - exactSecs}s ⚡` : `Noch ${60 - exactSecs}s 🚀`) 
+                        : (studentUiLevel === 'pro' ? 'Fokus-Score' : studentUiLevel === 'teen' ? 'Erfahrung ⚡' : 'Erfahrung ✨')}
                     </span>
                   </div>
 
@@ -34138,7 +33367,11 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                   }}
                   style={{
                     width: '100%',
-                    background: 'linear-gradient(135deg, #34a853 0%, #22c55e 100%)',
+                    background: studentUiLevel === 'pro'
+                      ? 'linear-gradient(135deg, #0071e3 0%, #0077ed 100%)'
+                      : studentUiLevel === 'teen'
+                      ? 'linear-gradient(135deg, #0d9488 0%, #0f766e 100%)'
+                      : 'linear-gradient(135deg, #34a853 0%, #22c55e 100%)',
                     color: '#ffffff',
                     border: 'none',
                     padding: '16px 20px',
@@ -34147,7 +33380,11 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                     fontSize: '0.98rem',
                     letterSpacing: '-0.01em',
                     cursor: 'pointer',
-                    boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 10px 25px -4px rgba(52, 168, 83, 0.4)',
+                    boxShadow: studentUiLevel === 'pro'
+                      ? 'inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 10px 25px -4px rgba(0, 113, 227, 0.4)'
+                      : studentUiLevel === 'teen'
+                      ? 'inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 10px 25px -4px rgba(13, 148, 136, 0.4)'
+                      : 'inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 10px 25px -4px rgba(52, 168, 83, 0.4)',
                     transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
                     display: 'flex',
                     alignItems: 'center',
@@ -34158,8 +33395,20 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                   onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.02)'}
                   onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
                 >
-                  <Sparkles size={18} />
-                  <span>Super, weiter geht's!</span>
+                  {studentUiLevel === 'pro' ? (
+                    <CheckCircle size={18} />
+                  ) : studentUiLevel === 'teen' ? (
+                    <Zap size={18} />
+                  ) : (
+                    <Sparkles size={18} />
+                  )}
+                  <span>
+                    {studentUiLevel === 'pro'
+                      ? 'Session abschließen'
+                      : studentUiLevel === 'teen'
+                      ? 'Groove mitnehmen'
+                      : "Super, weiter geht's!"}
+                  </span>
                 </button>
               </div>
             </div>
@@ -34642,6 +33891,851 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
             </div>
           );
         })(),
+        document.body
+      )}
+
+      {/* ========================================================================= */}
+      {/* 🏆 GLOBAL JUNIOR STICKER-ALBUM PORTAL (AUTHENTISCHE 20 PANINI-STICKER)   */}
+      {/* ========================================================================= */}
+      {showJuniorStickerModal && typeof document !== 'undefined' && createPortal(
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(15, 23, 42, 0.88)',
+          backdropFilter: 'blur(16px)',
+          zIndex: 99999,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '16px'
+        }}>
+          <div style={{
+            background: '#ffffff',
+            borderRadius: '36px',
+            maxWidth: '880px',
+            width: '100%',
+            maxHeight: '92vh',
+            display: 'flex',
+            flexDirection: 'column',
+            padding: '32px 28px',
+            boxShadow: '0 35px 80px rgba(0, 0, 0, 0.35)',
+            position: 'relative',
+            boxSizing: 'border-box',
+            overflow: 'hidden'
+          }}>
+            {/* CLOSE BUTTON */}
+            <button
+              onClick={() => setShowJuniorStickerModal(false)}
+              style={{
+                position: 'absolute',
+                top: '20px',
+                right: '20px',
+                background: '#f1f5f9',
+                border: 'none',
+                width: '44px',
+                height: '44px',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                color: '#64748b',
+                zIndex: 10
+              }}
+              className="hover-scale"
+              title="Album schließen"
+            >
+              <X size={24} />
+            </button>
+
+            {/* FIXED HEADER (Never overlapped) */}
+            <div style={{ flexShrink: 0, marginBottom: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '14px' }}>
+                <div style={{
+                  background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
+                  color: '#d97706',
+                  width: '54px',
+                  height: '54px',
+                  borderRadius: '20px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '1.8rem',
+                  boxShadow: '0 6px 18px rgba(217, 119, 6, 0.2)',
+                  flexShrink: 0
+                }}>
+                  🏆
+                </div>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: '0.74rem', fontWeight: 950, color: '#d97706', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                      Deine Auszeichnungen
+                    </span>
+                    <span style={{
+                      background: '#ecfdf5',
+                      color: '#059669',
+                      border: '1px solid #a7f3d0',
+                      fontSize: '0.7rem',
+                      fontWeight: 900,
+                      padding: '2px 10px',
+                      borderRadius: '100px'
+                    }}>
+                      {ALL_STICKERS.filter(st => unifiedStickersMap[st.id]?.isUnlocked).length} von {ALL_STICKERS.length} freigeschaltet ✨
+                    </span>
+                  </div>
+                  <h2 style={{ margin: '2px 0 0 0', fontSize: '1.5rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                    Dein Sticker-Sammelalbum ★
+                  </h2>
+                </div>
+              </div>
+
+              {/* CATEGORY FILTER TABS (Generous spacing & Touch-friendly) */}
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                overflowX: 'auto',
+                padding: '4px 2px',
+                margin: '4px 0 8px 0',
+                WebkitOverflowScrolling: 'touch'
+              }}>
+                {[
+                  { id: 'all', label: `Alle (${ALL_STICKERS.length})` },
+                  { id: 'ueben', label: '⏱️ Übe-Fleiß' },
+                  { id: 'xp', label: '⭐ Zauber-XP' },
+                  { id: 'streaks', label: '🔥 Streaks' },
+                  { id: 'songs', label: '🎵 Repertoire' },
+                  { id: 'spezial', label: '🏆 Spezial' }
+                ].map(tab => {
+                  const isActive = juniorStickerCategory === tab.id;
+                  return (
+                    <button
+                      key={tab.id}
+                      onClick={() => setJuniorStickerCategory(tab.id as any)}
+                      style={{
+                        background: isActive ? '#0f172a' : '#f1f5f9',
+                        color: isActive ? '#ffffff' : '#475569',
+                        border: isActive ? '1.5px solid #0f172a' : '1.5px solid #e2e8f0',
+                        borderRadius: '100px',
+                        padding: '9px 18px',
+                        fontSize: '0.84rem',
+                        fontWeight: 850,
+                        cursor: 'pointer',
+                        whiteSpace: 'nowrap',
+                        boxShadow: isActive ? '0 4px 12px rgba(15, 23, 42, 0.2)' : 'none',
+                        transition: 'all 0.15s ease',
+                        flexShrink: 0
+                      }}
+                      className="hover-scale"
+                    >
+                      {tab.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* SCROLLABLE 3D PANINI STICKER GRID */}
+            <div style={{
+              overflowY: 'auto',
+              flex: 1,
+              padding: '6px 4px 16px 4px'
+            }}>
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))',
+                gap: '16px'
+              }}>
+                {ALL_STICKERS
+                  .filter(st => juniorStickerCategory === 'all' || st.category === juniorStickerCategory)
+                  .map((st) => {
+                    const status = unifiedStickersMap[st.id] || { isUnlocked: false, progressText: '', count: 0, details: [] };
+                    const isUnlocked = status.isUnlocked;
+                    const progressText = status.progressText;
+
+                    const isLegendary = st.rarity === 'legendary';
+                    const isEpic = st.rarity === 'epic';
+                    const isRare = st.rarity === 'rare';
+
+                    const rarityGlow = isLegendary 
+                      ? 'rgba(250, 204, 21, 0.45)' 
+                      : isEpic 
+                      ? 'rgba(192, 132, 252, 0.4)' 
+                      : isRare 
+                      ? 'rgba(96, 165, 250, 0.35)' 
+                      : 'rgba(52, 168, 83, 0.35)';
+
+                    return (
+                      <div
+                        key={st.id}
+                        onClick={() => setJuniorSelectedPreviewSticker({ ...st, isUnlocked, progressText })}
+                        style={{
+                          background: isUnlocked ? '#ffffff' : 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+                          border: isUnlocked 
+                            ? (isLegendary ? '3px solid #facc15' : isEpic ? '3px solid #c084fc' : isRare ? '3px solid #93c5fd' : '3px solid #86efac') 
+                            : '2px dashed #cbd5e1',
+                          borderRadius: '26px',
+                          padding: '16px 12px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          textAlign: 'center',
+                          gap: '10px',
+                          position: 'relative',
+                          boxShadow: isUnlocked 
+                            ? `0 12px 28px ${rarityGlow}` 
+                            : '0 4px 12px rgba(0, 0, 0, 0.03)',
+                          cursor: 'pointer',
+                          transition: 'all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                          overflow: 'hidden'
+                        }}
+                        className="hover-scale"
+                      >
+                        {/* RARITY BADGE */}
+                        <span style={{
+                          fontSize: '0.62rem',
+                          fontWeight: 950,
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.06em',
+                          padding: '3px 10px',
+                          borderRadius: '100px',
+                          background: isLegendary ? '#fef3c7' : isEpic ? '#f3e8ff' : isRare ? '#eff6ff' : '#f1f5f9',
+                          color: isLegendary ? '#b45309' : isEpic ? '#7e22ce' : isRare ? '#1d4ed8' : '#64748b',
+                          border: isLegendary ? '1px solid #fde68a' : 'none'
+                        }}>
+                          {st.rarityLabel}
+                        </span>
+
+                        {/* STICKER IMAGE CONTAINER - COLLECTIBLE PANINI BADGE */}
+                        <div style={{
+                          width: '92px',
+                          height: '92px',
+                          position: 'relative',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          borderRadius: '22px',
+                          background: '#0a0e1a',
+                          border: isUnlocked 
+                            ? (isLegendary ? '2.5px solid #facc15' : isEpic ? '2.5px solid #c084fc' : isRare ? '2.5px solid #93c5fd' : '2.5px solid #4ade80')
+                            : '2px solid #334155',
+                          boxShadow: isUnlocked
+                            ? `0 8px 20px ${rarityGlow}`
+                            : 'inset 0 2px 6px rgba(0,0,0,0.4)',
+                          overflow: 'hidden',
+                          padding: '5px'
+                        }}>
+                          {/* Genuine Full Color Image */}
+                          <img
+                            src={`/stickers/${st.id}.png?v=1`}
+                            alt={st.title}
+                            style={{
+                              width: '100%',
+                              height: '100%',
+                              objectFit: 'contain',
+                              borderRadius: '16px',
+                              filter: isUnlocked 
+                                ? 'drop-shadow(0 4px 10px rgba(255,255,255,0.18))' 
+                                : 'grayscale(25%) contrast(0.9) brightness(0.72)',
+                              transition: 'transform 0.3s ease'
+                            }}
+                            onError={(e) => {
+                              e.currentTarget.style.display = 'none';
+                              const parent = e.currentTarget.parentElement;
+                              if (parent) {
+                                const span = document.createElement('span');
+                                span.style.fontSize = '2.8rem';
+                                span.innerText = st.emoji;
+                                parent.appendChild(span);
+                              }
+                            }}
+                          />
+
+                          {/* Gentle Mystery Shimmer Overlay for Locked Stickers */}
+                          {!isUnlocked && (
+                            <div 
+                              style={{
+                                position: 'absolute',
+                                inset: 0,
+                                borderRadius: '20px',
+                                background: 'radial-gradient(circle at 30% 30%, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0.02) 60%, transparent 100%)',
+                                pointerEvents: 'none'
+                              }}
+                            />
+                          )}
+
+                          {/* Floating Mystery Badge or Checkmark */}
+                          {!isUnlocked ? (
+                            <div style={{
+                              position: 'absolute',
+                              bottom: '-2px',
+                              right: '-2px',
+                              background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                              color: '#ffffff',
+                              width: '24px',
+                              height: '24px',
+                              borderRadius: '50%',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              boxShadow: '0 3px 10px rgba(245, 158, 11, 0.45)',
+                              border: '2px solid #ffffff'
+                            }}>
+                              <Sparkles size={12} color="#ffffff" />
+                            </div>
+                          ) : (
+                            <div style={{
+                              position: 'absolute',
+                              bottom: '-2px',
+                              right: '-2px',
+                              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                              color: '#ffffff',
+                              width: '24px',
+                              height: '24px',
+                              borderRadius: '50%',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              boxShadow: '0 3px 10px rgba(16, 185, 129, 0.45)',
+                              border: '2px solid #ffffff'
+                            }}>
+                              <Check size={13} strokeWidth={3} color="#ffffff" />
+                            </div>
+                          )}
+                        </div>
+
+                        {/* TITLE & CHILD-FRIENDLY PROGRESS/STATUS */}
+                        <div style={{ width: '100%' }}>
+                          <h4 style={{ margin: '0 0 4px 0', fontSize: '0.94rem', fontWeight: 950, color: '#0f172a', lineHeight: 1.2 }}>
+                            {st.title}
+                          </h4>
+                          {isUnlocked ? (
+                            <span style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              background: '#dcfce7',
+                              color: '#15803d',
+                              fontSize: '0.68rem',
+                              fontWeight: 950,
+                              padding: '3px 10px',
+                              borderRadius: '100px',
+                              border: '1px solid #bbf7d0'
+                            }}>
+                              ★ Im Album!
+                            </span>
+                          ) : (
+                            <span style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              fontSize: '0.70rem',
+                              color: '#b45309',
+                              fontWeight: 900,
+                              background: '#fef3c7',
+                              padding: '3px 10px',
+                              borderRadius: '100px',
+                              border: '1px solid #fde68a'
+                            }}>
+                              {progressText || 'Noch gesperrt'}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+            </div>
+
+            {/* BOTTOM ACTION BAR */}
+            <div style={{ flexShrink: 0, paddingTop: '14px', borderTop: '1px solid #f1f5f9' }}>
+              <button
+                onClick={() => setShowJuniorStickerModal(false)}
+                style={{
+                  width: '100%',
+                  padding: '16px',
+                  borderRadius: '20px',
+                  border: 'none',
+                  background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                  color: '#ffffff',
+                  fontSize: '1.05rem',
+                  fontWeight: 950,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '10px',
+                  boxShadow: '0 8px 24px rgba(217, 119, 6, 0.35)',
+                  transition: 'all 0.2s ease'
+                }}
+                className="hover-scale"
+              >
+                <Sparkles size={20} fill="#ffffff" />
+                <span>Auf zum Instrument! 🚀</span>
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* ========================================================================= */}
+      {/* 🌟 GLOBAL APPLE STICKER DETAIL INSPECTOR & QUEST PREVIEW                   */}
+      {/* ========================================================================= */}
+      {juniorSelectedPreviewSticker && typeof document !== 'undefined' && createPortal(
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(15, 23, 42, 0.94)',
+          backdropFilter: 'blur(20px)',
+          zIndex: 100001,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '20px',
+          animation: 'fadeIn 0.2s ease-out'
+        }}>
+          <div style={{
+            background: '#ffffff',
+            borderRadius: '38px',
+            maxWidth: '480px',
+            width: '100%',
+            padding: '36px 30px',
+            textAlign: 'center',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '22px',
+            boxShadow: '0 30px 80px rgba(0,0,0,0.5)',
+            position: 'relative',
+            animation: 'scaleIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)'
+          }}>
+            <button
+              onClick={() => setJuniorSelectedPreviewSticker(null)}
+              style={{
+                position: 'absolute',
+                top: '20px',
+                right: '20px',
+                background: '#f1f5f9',
+                border: 'none',
+                width: '40px',
+                height: '40px',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                color: '#64748b'
+              }}
+              className="hover-scale"
+            >
+              <X size={22} />
+            </button>
+
+            {/* Rarity Pill */}
+            {(() => {
+              const isSongSticker = juniorSelectedPreviewSticker.category === 'songs' || juniorSelectedPreviewSticker.id === 'song-master';
+              const masteredSong = assignedCampusSongs.find(s => isSongMastered(s)) || assignedCampusSongs[0];
+              const songTitleDisplay = masteredSong ? `${masteredSong.artist} – ${masteredSong.title}` : (progressItems.find(p => p.status === 'MASTERED')?.topic_name || '');
+
+              return (
+                <>
+                  <span style={{
+                    background: juniorSelectedPreviewSticker.rarity === 'legendary' ? '#fef3c7' : juniorSelectedPreviewSticker.rarity === 'epic' ? '#f3e8ff' : juniorSelectedPreviewSticker.rarity === 'rare' ? '#eff6ff' : '#f0fdf4',
+                    color: juniorSelectedPreviewSticker.rarity === 'legendary' ? '#b45309' : juniorSelectedPreviewSticker.rarity === 'epic' ? '#7e22ce' : juniorSelectedPreviewSticker.rarity === 'rare' ? '#1d4ed8' : '#15803d',
+                    fontSize: '0.8rem',
+                    fontWeight: 900,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.08em',
+                    padding: '6px 16px',
+                    borderRadius: '100px',
+                    border: juniorSelectedPreviewSticker.rarity === 'legendary' ? '1.5px solid #facc15' : 'none',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}>
+                    <Star size={12} fill="currentColor" /> {juniorSelectedPreviewSticker.rarityLabel} • {juniorSelectedPreviewSticker.category === 'ueben' ? 'Übe-Fleiß' : juniorSelectedPreviewSticker.category === 'xp' ? 'Zauber-XP' : juniorSelectedPreviewSticker.category === 'streaks' ? 'Streaks' : juniorSelectedPreviewSticker.category === 'songs' ? 'Repertoire' : 'Spezial'}
+                  </span>
+
+                  {/* Large 150px Full-Color Floating Sticker Card */}
+                  <div style={{
+                    width: '150px',
+                    height: '150px',
+                    borderRadius: '34px',
+                    background: '#0a0e1a',
+                    border: juniorSelectedPreviewSticker.isUnlocked 
+                      ? (juniorSelectedPreviewSticker.rarity === 'legendary' ? '4px solid #facc15' : juniorSelectedPreviewSticker.rarity === 'epic' ? '4px solid #c084fc' : juniorSelectedPreviewSticker.rarity === 'rare' ? '4px solid #93c5fd' : '4px solid #34a853')
+                      : '4px solid #f59e0b',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: juniorSelectedPreviewSticker.isUnlocked 
+                      ? '0 16px 40px rgba(52, 168, 83, 0.35)' 
+                      : '0 16px 40px rgba(245, 158, 11, 0.35)',
+                    position: 'relative',
+                    overflow: 'hidden',
+                    padding: '10px'
+                  }}>
+                    <img
+                      src={`/stickers/${juniorSelectedPreviewSticker.id}.png?v=1`}
+                      alt={juniorSelectedPreviewSticker.title}
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'contain',
+                        borderRadius: '24px',
+                        filter: juniorSelectedPreviewSticker.isUnlocked 
+                          ? 'drop-shadow(0 6px 14px rgba(255,255,255,0.2))' 
+                          : 'grayscale(20%) brightness(0.85)'
+                      }}
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                        const parent = e.currentTarget.parentElement;
+                        if (parent) {
+                          const span = document.createElement('span');
+                          span.style.fontSize = '4.5rem';
+                          span.innerText = juniorSelectedPreviewSticker.emoji;
+                          parent.appendChild(span);
+                        }
+                      }}
+                    />
+
+                    {!juniorSelectedPreviewSticker.isUnlocked && (
+                      <div 
+                        style={{
+                          position: 'absolute',
+                          inset: 0,
+                          borderRadius: '30px',
+                          background: 'radial-gradient(circle at 30% 30%, rgba(255,255,255,0.22) 0%, rgba(255,255,255,0.02) 60%, transparent 100%)',
+                          pointerEvents: 'none'
+                        }}
+                      />
+                    )}
+                  </div>
+
+                  <div>
+                    <h2 style={{ fontSize: '1.75rem', fontWeight: 950, color: '#0f172a', margin: '0 0 4px 0', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                      {juniorSelectedPreviewSticker.title}
+                    </h2>
+                    <p style={{ fontSize: '0.95rem', color: '#475569', fontWeight: 650, margin: 0, lineHeight: 1.35 }}>
+                      {juniorSelectedPreviewSticker.desc}
+                    </p>
+                  </div>
+
+                  {/* Interpret + Songtitel Display for Song Stickers */}
+                  {isSongSticker && songTitleDisplay && (
+                    <div style={{ textAlign: 'center', margin: '2px 0' }}>
+                      <div style={{ fontSize: '0.72rem', fontWeight: 900, color: '#d97706', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                        <Music size={12} /> Interpret &amp; Songtitel
+                      </div>
+                      <div style={{ fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', marginTop: '2px' }}>
+                        {songTitleDisplay}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Open, Borderless Progress / Achievement Flow */}
+                  <div style={{ textAlign: 'center', padding: '4px 8px' }}>
+                    {juniorSelectedPreviewSticker.isUnlocked ? (
+                      <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px', color: '#15803d', fontWeight: 800, fontSize: '0.94rem' }}>
+                        <Check size={16} color="#15803d" />
+                        <span>Glückwunsch! Du besitzt diesen Sticker bereits!</span>
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                        <div style={{ fontSize: '0.75rem', fontWeight: 900, color: '#d97706', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                          Dein Ziel zum Freischalten
+                        </div>
+                        <div style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a' }}>
+                          {juniorSelectedPreviewSticker.progressText || juniorSelectedPreviewSticker.desc}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </>
+              );
+            })()}
+
+            {/* ACTION BUTTON (Seamless Briefing Board Guidance) */}
+            {!juniorSelectedPreviewSticker.isUnlocked ? (
+              <button
+                onClick={() => {
+                  setJuniorSelectedPreviewSticker(null);
+                  setShowJuniorStickerModal(false);
+                  handleTabChangeLocal('practice_board');
+                  if (sessionActive) {
+                    setJuniorMissionPhase('zen');
+                  } else {
+                    setShowJuniorPreFlightModal(true);
+                  }
+                }}
+                style={{
+                  width: '100%',
+                  background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '20px',
+                  padding: '18px',
+                  fontWeight: 950,
+                  fontSize: '1.1rem',
+                  cursor: 'pointer',
+                  boxShadow: '0 8px 24px rgba(99, 102, 241, 0.35)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '10px'
+                }}
+                className="hover-scale"
+              >
+                <Rocket size={20} fill="currentColor" />
+                <span>Jetzt Übe-Rakete starten! 🚀</span>
+              </button>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', width: '100%' }}>
+                <button
+                  type="button"
+                  onClick={() => downloadJuniorStickerJpg(juniorSelectedPreviewSticker)}
+                  style={{
+                    width: '100%',
+                    background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '20px',
+                    padding: '16px',
+                    fontWeight: 950,
+                    fontSize: '1rem',
+                    cursor: 'pointer',
+                    boxShadow: '0 6px 18px rgba(245, 158, 11, 0.35)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px'
+                  }}
+                  className="hover-scale"
+                >
+                  <Download size={18} />
+                  <span>Sticker als JPG herunterladen</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setJuniorSelectedPreviewSticker(null)}
+                  style={{
+                    width: '100%',
+                    background: '#0f172a',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '20px',
+                    padding: '14px',
+                    fontWeight: 950,
+                    fontSize: '1rem',
+                    cursor: 'pointer'
+                  }}
+                  className="hover-scale"
+                >
+                  Schließen
+                </button>
+              </div>
+            )}
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* GLOBAL STYLES FOR HOLO-PHANTOM BREATHING EFFECT */}
+      <style dangerouslySetInnerHTML={{__html: `
+        @keyframes holoPhantomPulse {
+          0%, 100% { opacity: 0.65; }
+          50% { opacity: 0.25; }
+        }
+        .holo-phantom-overlay {
+          animation: holoPhantomPulse 3.5s ease-in-out infinite;
+        }
+      `}} />
+
+      {/* ========================================================================= */}
+      {/* 🎉 GLOBAL JUNIOR STICKER AWARD CELEBRATION (ANIMATION & KONFETTI)          */}
+      {/* ========================================================================= */}
+      {juniorAwardedStickerToCelebrate && typeof document !== 'undefined' && createPortal(
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(15, 23, 42, 0.92)',
+          backdropFilter: 'blur(16px)',
+          zIndex: 100000,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '20px',
+          animation: 'fadeIn 0.25s ease-out'
+        }}>
+          <Suspense fallback={null}>
+            <Confetti recycle={false} numberOfPieces={350} gravity={0.22} />
+          </Suspense>
+          <div style={{
+            background: '#ffffff',
+            borderRadius: '36px',
+            padding: '36px 32px',
+            textAlign: 'center',
+            maxWidth: '460px',
+            width: '100%',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '20px',
+            boxShadow: '0 30px 80px rgba(0, 0, 0, 0.45)',
+            position: 'relative',
+            animation: 'scaleIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1)'
+          }}>
+            <span style={{
+              background: '#fef3c7',
+              color: '#d97706',
+              fontSize: '0.8rem',
+              fontWeight: 900,
+              textTransform: 'uppercase',
+              letterSpacing: '0.08em',
+              padding: '6px 16px',
+              borderRadius: '100px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}>
+              <Award size={14} /> Neuer Sticker freigeschaltet!
+            </span>
+
+            {/* Animated Floating Sticker Badge */}
+            <div style={{
+              width: '150px',
+              height: '150px',
+              borderRadius: '32px',
+              background: '#0a0e1a',
+              border: '4px solid #facc15',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 16px 40px rgba(250, 204, 21, 0.35)',
+              overflow: 'hidden',
+              padding: '10px',
+              animation: 'spinStickerAward 0.8s cubic-bezier(0.34, 1.56, 0.64, 1)'
+            }}>
+              <img
+                src={`/stickers/${juniorAwardedStickerToCelebrate.id}.png?v=1`}
+                alt={juniorAwardedStickerToCelebrate.title}
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'contain',
+                  borderRadius: '22px',
+                  filter: 'drop-shadow(0 6px 14px rgba(255,255,255,0.2))'
+                }}
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none';
+                  const parent = e.currentTarget.parentElement;
+                  if (parent) {
+                    const span = document.createElement('span');
+                    span.style.fontSize = '4.5rem';
+                    span.innerText = juniorAwardedStickerToCelebrate.emoji;
+                    parent.appendChild(span);
+                  }
+                }}
+              />
+            </div>
+
+            <div>
+              <h2 style={{ fontSize: '1.75rem', fontWeight: 950, color: '#0f172a', margin: '0 0 6px 0', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                {juniorAwardedStickerToCelebrate.title}
+              </h2>
+              {(() => {
+                const isSongSticker = juniorAwardedStickerToCelebrate.category === 'songs' || juniorAwardedStickerToCelebrate.id === 'song-master';
+                const masteredSong = assignedCampusSongs.find(s => isSongMastered(s)) || assignedCampusSongs[0];
+                const songTitleDisplay = masteredSong ? `${masteredSong.artist} – ${masteredSong.title}` : (progressItems.find(p => p.status === 'MASTERED')?.topic_name || '');
+
+                return (
+                  <>
+                    {isSongSticker && songTitleDisplay && (
+                      <div style={{ textAlign: 'center', margin: '4px 0 8px 0' }}>
+                        <div style={{ fontSize: '0.72rem', fontWeight: 900, color: '#d97706', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                          <Music size={12} /> Interpret &amp; Songtitel
+                        </div>
+                        <div style={{ fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', marginTop: '2px' }}>
+                          {songTitleDisplay}
+                        </div>
+                      </div>
+                    )}
+                    <div style={{ fontSize: '1.02rem', fontWeight: 800, color: '#15803d', marginBottom: '8px' }}>
+                      Super gemacht! Du warst richtig fleißig!
+                    </div>
+                    <p style={{ fontSize: '0.88rem', color: '#64748b', fontWeight: 650, margin: 0, lineHeight: 1.3 }}>
+                      {juniorAwardedStickerToCelebrate.desc}
+                    </p>
+                  </>
+                );
+              })()}
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', width: '100%' }}>
+              <button
+                type="button"
+                onClick={() => downloadJuniorStickerJpg(juniorAwardedStickerToCelebrate)}
+                style={{
+                  width: '100%',
+                  background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '20px',
+                  padding: '16px',
+                  fontWeight: 950,
+                  fontSize: '1.05rem',
+                  cursor: 'pointer',
+                  boxShadow: '0 6px 18px rgba(245, 158, 11, 0.35)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px'
+                }}
+                className="hover-scale"
+              >
+                <Download size={18} />
+                <span>Sticker als JPG herunterladen</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setJuniorAwardedStickerToCelebrate(null);
+                  setShowJuniorStickerModal(true);
+                }}
+                style={{
+                  width: '100%',
+                  background: 'linear-gradient(135deg, #34a853 0%, #2e7d32 100%)',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '20px',
+                  padding: '16px',
+                  fontWeight: 950,
+                  fontSize: '1.05rem',
+                  cursor: 'pointer',
+                  boxShadow: '0 8px 24px rgba(52, 168, 83, 0.35)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px'
+                }}
+                className="hover-scale"
+              >
+                <BookOpen size={18} />
+                <span>In mein Album kleben</span>
+              </button>
+            </div>
+          </div>
+
+          <style dangerouslySetInnerHTML={{__html: `
+            @keyframes spinStickerAward {
+              from { transform: scale(0) rotate(-180deg); }
+              to { transform: scale(1) rotate(0deg); }
+            }
+          `}} />
+        </div>,
         document.body
       )}
 

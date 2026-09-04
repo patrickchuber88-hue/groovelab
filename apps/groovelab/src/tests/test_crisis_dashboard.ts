@@ -194,8 +194,8 @@ async function main() {
         id: alertId,
         school_id: testSchoolId,
         teacher_id: teacherId1,
-        type: 'Teacher Illness Alert',
-        message: '🚨 NEUE KRANKMELDUNG: Lehrkraft John Doe hat sich krankgemeldet.',
+        type: 'Teacher Absence Alert',
+        message: '🚨 TERMINABSAGE: Lehrkraft John Doe hat Termine abgesagt.',
         resolved: false
       });
       const { data } = await adminClient.from('system_alerts').select('*').eq('id', alertId).single();
@@ -373,13 +373,13 @@ async function main() {
       }
     });
 
-    await runTest(30, 'Verify system alert is created for secretary health reporting', async () => {
+    await runTest(30, 'Verify system alert is created for secretary return reporting', async () => {
       const alertId = crypto.randomUUID();
       await masterClient.from('system_alerts').insert({
-        id: alertId, school_id: testSchoolId, teacher_id: teacherId1, type: 'Teacher Healthy Alert', message: '🍏 LEHRKRAFT GESUND: John Doe wurde gesundgemeldet.', resolved: false
+        id: alertId, school_id: testSchoolId, teacher_id: teacherId1, type: 'Teacher Return Alert', message: '🟢 WIEDER IM DIENST: John Doe steht wieder regulär zur Verfügung.', resolved: false
       });
       const { data } = await adminClient.from('system_alerts').select('*').eq('id', alertId).single();
-      if (!data) throw new Error('Healthy system alert was not created');
+      if (!data) throw new Error('Return system alert was not created');
     });
 
     await runTest(31, 'Verify RLS prevents teacher from modifying other schools users (multi-tenancy RLS)', async () => {

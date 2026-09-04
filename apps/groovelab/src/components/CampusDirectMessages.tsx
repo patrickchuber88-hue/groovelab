@@ -1626,7 +1626,7 @@ export function CampusDirectMessages({
                   boxShadow: '0 2px 8px rgba(0,0,0,0.06)'
                 }}>
                   <ShieldCheck size={14} color="#ffffff" />
-                  <span>100% DSGVO-konform • TLS 1.3 &amp; AES-256 verschlüsselt</span>
+                  <span>DSGVO-konform • TLS 1.3 &amp; AES-256 verschlüsselt</span>
                 </span>
               </div>
             </div>
@@ -2522,7 +2522,7 @@ export function CampusDirectMessages({
                     <CampusGroovelabText campusColor="#ffffff" groovelabColor="#fde047" /> Nachrichten & Shoutbox ({assignedStudents.length})
                   </h3>
                   <p style={{ margin: '3px 0 0 0', fontSize: '0.78rem', color: 'rgba(255,255,255,0.9)', fontWeight: 600 }}>
-                    100% DSGVO-konform • TLS 1.3 &amp; AES-256 verschlüsselte Direktnachrichten &amp; termingekoppelte Abstimmungen
+                    DSGVO-konform • TLS 1.3 &amp; AES-256 verschlüsselte Direktnachrichten &amp; termingekoppelte Abstimmungen
                   </p>
                 </div>
               </div>

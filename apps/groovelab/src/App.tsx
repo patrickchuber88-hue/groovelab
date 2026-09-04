@@ -1691,8 +1691,8 @@ function App() {
               tooltip = 'Suche ausführen';
             } else if (descLower.includes('stundenplan einreichen') || descLower.includes('einreichen')) {
               tooltip = 'Diesen Stundenplan offiziell zur Prüfung einreichen';
-            } else if (descLower.includes('krankmelden') || descLower.includes('krank')) {
-              tooltip = 'Als krank melden und Termine für den Zeitraum absagen';
+            } else if (descLower.includes('abwesend') || descLower.includes('ausfall') || descLower.includes('terminabsage') || descLower.includes('krankmelden') || descLower.includes('krank')) {
+              tooltip = 'Termine für den Abwesenheitszeitraum absagen';
             } else if (descLower.includes('raumzuteilung') || descLower.includes('räume zuteilen')) {
               tooltip = 'Räume für die heutigen Termine zuteilen';
             } else if (descLower.includes('zurück')) {

@@ -97,7 +97,7 @@ export const generateConsentPDF = async (
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7.5);
   doc.setTextColor(textDark[0], textDark[1], textDark[2]);
-  doc.text('• 100% DSGVO-konform', 25, currentY + 13);
+  doc.text('• DSGVO- & schulrechtskonform', 25, currentY + 13);
   doc.text('• Keine Tracker / Werbung', 25, currentY + 18);
 
   // Col 2: Hosting
@@ -151,7 +151,7 @@ export const generateConsentPDF = async (
 
   const bulletPoints = [
     { title: 'Automatischer Sichtschutz (Privacy by Default): ', desc: 'In der App und im Unterricht wird der Nachname zum Schutz vor Schulterblicken stets automatisch auf die Initiale maskiert (z. B. „Max M.“). Die Musikschule verwaltet den Klarnamen sicher im internen Sekretariat.' },
-    { title: 'Datensparsamkeit: ', desc: 'Wir erheben keinerlei E-Mail-Adressen von Kindern, Telefonnummern oder Bankdaten.' },
+    { title: 'Datensparsamkeit: ', desc: 'Wir erheben keinerlei E-Mail-Adressen von Kindern, Telefonnummern oder Bankdaten. Kalender-Sync nutzt pseudonyme, jederzeit widerrufbare Tokens.' },
     { title: 'Zertifiziertes Hosting: ', desc: 'Der Serverbetrieb erfolgt in DSGVO-konformen deutschen Rechenzentren (Hetzner Online GmbH, Standort Falkenstein).' },
     { title: 'Audio-Aufnahmen: ', desc: 'Aufnahmen dienen rein pädagogischen Zwecken (Übe-Nachweis). Bei Löschung des Accounts oder Beitrags werden die Audio-Daten sofort physisch vom Cloud-Speicher gelöscht.' },
     { title: 'Kostenregelung: ', desc: costDetailText }
@@ -1287,7 +1287,7 @@ export const generateResilienceAuditPDF = async (data: ResiliencePDFData) => {
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7);
   doc.setTextColor(mutedText[0], mutedText[1], mutedText[2]);
-  doc.text('Campus-Groovelab • ISO 27001 zertifiziertes deutsches Rechenzentrum (Hetzner Falkenstein) • 100% DSGVO & COPPA konform', 20, 285);
+  doc.text('Campus-Groovelab • ISO 27001 zertifiziertes deutsches Rechenzentrum (Hetzner Falkenstein) • DSGVO & COPPA konform', 20, 285);
 
   const cleanTierName = data.tierName.replace(/[^a-zA-Z0-9]/g, '_');
   const dateStr = new Date().toISOString().split('T')[0];
@@ -2069,7 +2069,7 @@ export const generateInvoicePDF = async (params: InvoicePDFParams) => {
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7.5);
   doc.setTextColor(textMuted[0], textMuted[1], textMuted[2]);
-  doc.text('Campus-Groovelab • 100% DSGVO-konformes Cloud-Hosting • www.campus-groovelab.de', 20, 285);
+  doc.text('Campus-Groovelab • DSGVO-konformes Cloud-Hosting • www.campus-groovelab.de', 20, 285);
   doc.text('Seite 1 von 1', 185, 285, { align: 'right' });
 
   // Trigger Instant Browser Download
@@ -2838,7 +2838,7 @@ export const generateB2BSchoolInvoicePDF = async (params: B2BInvoiceParams) => {
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(6.5);
   doc.setTextColor(slateMuted[0], slateMuted[1], slateMuted[2]);
-  doc.text('Campus-Groovelab • Cloud-Hosting & Musikschul-Systeme • 100% DSGVO-konform (ISO 27001 / OWASP Level 3)', 20, 280);
+  doc.text('Campus-Groovelab • Cloud-Hosting & Musikschul-Systeme • DSGVO-konform (ISO 27001 / OWASP Level 3)', 20, 280);
   doc.text('Seite 1 von 1', 190, 280, { align: 'right' });
 
   doc.save(`Rechnung_${invoiceNumber}.pdf`);
@@ -3038,7 +3038,7 @@ export const generateSlaCertificatePDF = async (params: SlaCertificateParams | s
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(6.5);
   doc.setTextColor(slateMuted[0], slateMuted[1], slateMuted[2]);
-  doc.text('Campus-Groovelab • Enterprise Cloud Infrastructure • Frankfurt am Main • 100% DSGVO-konform', 20, 280);
+  doc.text('Campus-Groovelab • Enterprise Cloud Infrastructure • Frankfurt am Main • DSGVO-konform', 20, 280);
   doc.text('Seite 1 von 1', 190, 280, { align: 'right' });
 
   const cleanSchool = schoolName.replace(/[^a-zA-Z0-9_-]/g, '_');
@@ -3108,7 +3108,7 @@ export const generateIncidentReportPDF = async (params: IncidentReportParams) =>
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
   doc.setTextColor(slateDark[0], slateDark[1], slateDark[2]);
-  doc.text(`Sicherheitsstatus: ✅ 100% Datensicherheit gewährleistet. Zu keinem Zeitpunkt lag ein Datenleck vor.`, 24, 56);
+  doc.text(`Sicherheitsstatus: ✅ Datensicherheit gewährleistet. Zu keinem Zeitpunkt lag ein Datenleck vor.`, 24, 56);
 
   // Section 1: Ursachenanalyse
   let currentY = 70;
@@ -3163,7 +3163,7 @@ export const generateIncidentReportPDF = async (params: IncidentReportParams) =>
   doc.text('5. Rechtliche & Datenschutzrechtliche Einordnung (Art. 33 DSGVO)', 20, currentY);
 
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8);
+  doc.setFontSize(8.5);
   doc.setTextColor(slateDark[0], slateDark[1], slateDark[2]);
   const gdprText = 'Rechtliche Einstufung nach DSGVO: Zu keinem Zeitpunkt lag ein unbefugter Datenabfluss (Data Breach) oder eine Manipulation von Datenbeständen vor. Es handelte sich um eine reine temporäre Verfügbarkeitsbeschränkung ohne Risiko für Rechte und Freiheiten natürlicher Personen (keine Meldepflicht nach Art. 33 DSGVO).';
   const splitGdpr = doc.splitTextToSize(gdprText, 170);
@@ -3197,7 +3197,7 @@ export const generateIncidentReportPDF = async (params: IncidentReportParams) =>
   doc.text('Campus-Groovelab SRE & Incident Response Team', 20, currentY + 5);
   doc.text(`Freigegeben am: ${now.toLocaleDateString('de-DE')}`, 110, currentY + 5);
 
-  doc.text('Campus-Groovelab • Enterprise Cloud Infrastructure • Frankfurt am Main • 100% DSGVO-konform', 20, 280);
+  doc.text('Campus-Groovelab • Enterprise Cloud Infrastructure • Frankfurt am Main • DSGVO-konform', 20, 280);
   doc.text('Seite 1 von 1', 190, 280, { align: 'right' });
 
   doc.save(`Incident_Report_${reportNumber}.pdf`);

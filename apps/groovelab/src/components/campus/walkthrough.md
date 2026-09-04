@@ -12,7 +12,7 @@ Alle Pink- und Magenta-Töne für Musik-Geschenke, Sticker und Meilensteine wurd
 | :--- | :--- | :--- |
 | **Option 3: Musik-Geschenk** | `#ec4899` / `#fdf2f8` (Pink) | **`#f97316` / `#fff7ed`** (Warmer Sunset-Orange Gradient) |
 | **Stufe 4 (Meilenstein)** | `#ec4899` / `#fbcfe8` (Pink) | **`#f97316` / `#fed7aa`** (Warmer Amber-Sunset Akzent) |
-| **WhatsApp / Geschenk-Card** | `#ec4899` Rahmen | **`#f97316`** (Edles, warmes Orange mit weichen Schatten) |
+| **Familien-Teilen / Geschenk-Card** | `#ec4899` Rahmen | **`#f97316`** (Edles, warmes Orange mit weichen Schatten) |
 | **Sticker-Belohnung** | 💖 *Herz-Melodie (Pink)* | **🔥 *Feuer-Solo* / 🌟 *Goldstern* / 👑 *Krone*** |
 | **Empfänger-Buttons** | Rosa/Pinke Akzentrahmen | **Neutrale, saubere Karten mit thematischen Emojis** |
 

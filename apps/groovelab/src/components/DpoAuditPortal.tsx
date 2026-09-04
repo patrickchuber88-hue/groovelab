@@ -764,7 +764,7 @@ export function DpoAuditPortal({ onClose, schoolName = 'Stadtmusikschule', schoo
                     Betroffenenrechte & Automatisches Löschkonzept (Art. 17 DSGVO)
                   </h3>
                   <p style={{ margin: 0, fontSize: '0.82rem', color: '#64748b', fontWeight: 500 }}>
-                    100% DSGVO-konforme Auskunfts- und Löschprozesse für Eltern und Musikschüler
+                    Rechtskonforme Auskunfts- und Löschprozesse für Eltern und Musikschüler (Art. 15-22 DSGVO)
                   </p>
                 </div>
 

@@ -545,12 +545,12 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
           <span>4</span>
         </button>
 
-        {/* Speed Button (Extended rates) */}
+        {/* Speed Button (Percent-based & kid-friendly) */}
         <button
           type="button"
           onClick={(e) => {
             e.stopPropagation();
-            const rates = [1, 0.85, 0.75, 0.5, 1.2];
+            const rates = [1, 0.85, 0.75, 0.5];
             const nextRate = rates[(rates.indexOf(playbackRate) + 1) % rates.length];
             setPlaybackRate(nextRate);
           }}
@@ -558,11 +558,11 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
             border: playbackRate !== 1 ? '1.5px solid #16a34a' : '1px solid #cbd5e1',
             background: playbackRate !== 1 ? '#dcfce7' : '#ffffff',
             color: playbackRate !== 1 ? '#15803d' : '#64748b',
-            fontSize: '0.80rem',
+            fontSize: '0.78rem',
             fontWeight: 850,
             height: '34px',
-            minWidth: '36px',
-            padding: '0 8px',
+            minWidth: '40px',
+            padding: '0 6px',
             borderRadius: '10px',
             cursor: 'pointer',
             display: 'flex',
@@ -572,9 +572,17 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
             transition: 'all 0.15s ease'
           }}
           className="hover-scale-mini"
-          title="Tempo anpassen"
+          title={
+            playbackRate === 1
+              ? 'Originaltempo (100%)'
+              : playbackRate === 0.85
+              ? 'Übetempo (85%)'
+              : playbackRate === 0.75
+              ? 'Übetempo (75%)'
+              : 'Halbes Tempo (50%)'
+          }
         >
-          {playbackRate}×
+          {Math.round(playbackRate * 100)}%
         </button>
 
         {/* ✂️ Studio Trimmer Button */}
@@ -1171,7 +1179,7 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
           type="button"
           onClick={(e) => {
             e.stopPropagation();
-            const rates = [1, 0.85, 0.75, 0.5, 1.2];
+            const rates = [1, 0.85, 0.75, 0.5];
             const nextRate = rates[(rates.indexOf(playbackRate) + 1) % rates.length];
             setPlaybackRate(nextRate);
           }}
@@ -1179,11 +1187,11 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
             border: playbackRate !== 1 ? '1.5px solid #16a34a' : '1px solid #cbd5e1',
             background: playbackRate !== 1 ? '#dcfce7' : '#ffffff',
             color: playbackRate !== 1 ? '#15803d' : '#64748b',
-            fontSize: '0.80rem',
+            fontSize: '0.78rem',
             fontWeight: 850,
             height: '34px',
-            minWidth: '36px',
-            padding: '0 8px',
+            minWidth: '40px',
+            padding: '0 6px',
             borderRadius: '10px',
             cursor: 'pointer',
             display: 'flex',
@@ -1194,9 +1202,17 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
             flexShrink: 0
           }}
           className="hover-scale-mini"
-          title="Wiedergabegeschwindigkeit ändern"
+          title={
+            playbackRate === 1
+              ? 'Originaltempo (100%)'
+              : playbackRate === 0.85
+              ? 'Übetempo (85%)'
+              : playbackRate === 0.75
+              ? 'Übetempo (75%)'
+              : 'Halbes Tempo (50%)'
+          }
         >
-          {playbackRate}×
+          {Math.round(playbackRate * 100)}%
         </button>
 
         {/* ✂️ Studio Trimmer Button */}

@@ -15,6 +15,7 @@ import {
   Scissors 
 } from 'lucide-react';
 import { getBlob, storeBlob } from '../../utils/blobStorage';
+import { shiftAudioBufferPitch } from '../../utils/pitchShifter';
 
 export interface AudioEditorSaveResult {
   url: string;
@@ -138,6 +139,16 @@ export const AudioEditorModal: React.FC<AudioEditorModalProps> = ({
   const startTimeRef = useRef(startTime);
   const endTimeRef = useRef(endTime);
   const isPlayingRef = useRef(false);
+  const pitchCacheRef = useRef<Map<number, AudioBuffer>>(new Map());
+
+  const getPitchShiftedBuffer = (buffer: AudioBuffer, shift: number, ctx: AudioContext | BaseAudioContext): AudioBuffer => {
+    if (!buffer || shift === 0) return buffer;
+    const cached = pitchCacheRef.current.get(shift);
+    if (cached) return cached;
+    const shifted = shiftAudioBufferPitch(buffer, shift, ctx);
+    pitchCacheRef.current.set(shift, shifted);
+    return shifted;
+  };
 
   useEffect(() => {
     startTimeRef.current = startTime;
@@ -191,6 +202,7 @@ export const AudioEditorModal: React.FC<AudioEditorModalProps> = ({
         const decoded = await audioCtx.decodeAudioData(arrayBuffer);
         if (!active) return;
 
+        pitchCacheRef.current.clear();
         setAudioBuffer(decoded);
         const dur = decoded.duration;
         setDuration(dur);
@@ -279,13 +291,13 @@ export const AudioEditorModal: React.FC<AudioEditorModalProps> = ({
       animFrameRef.current = null;
     }
 
-    const source = ctx.createBufferSource();
-    source.buffer = audioBuffer;
+    const bufferToPlay = getPitchShiftedBuffer(audioBuffer, semitones, ctx);
 
+    const source = ctx.createBufferSource();
+    source.buffer = bufferToPlay;
+    source.playbackRate.value = 1.0;
     if (source.detune) {
-      source.detune.value = semitones * 100;
-    } else {
-      source.playbackRate.value = Math.pow(2, semitones / 12);
+      source.detune.value = 0;
     }
 
     source.connect(ctx.destination);
@@ -326,18 +338,17 @@ export const AudioEditorModal: React.FC<AudioEditorModalProps> = ({
     animFrameRef.current = requestAnimationFrame(updatePlayhead);
   };
 
-  // Real-time live pitch shifting during active playback
+  // Real-time live pitch shifting during active playback without altering speed
+  const prevSemitonesRef = useRef(semitones);
   useEffect(() => {
-    if (activeSourceRef.current && isPlaying && audioCtxRef.current) {
-      const source = activeSourceRef.current;
-      const now = audioCtxRef.current.currentTime;
-      if (source.detune) {
-        source.detune.setValueAtTime(semitones * 100, now);
-      } else {
-        source.playbackRate.setValueAtTime(Math.pow(2, semitones / 12), now);
+    if (prevSemitonesRef.current !== semitones) {
+      prevSemitonesRef.current = semitones;
+      if (isPlayingRef.current && audioCtxRef.current) {
+        const curPlayhead = Math.min(endTimeRef.current, Math.max(startTimeRef.current, currentPlayTime));
+        playFrom(curPlayhead);
       }
     }
-  }, [semitones, isPlaying]);
+  }, [semitones, currentPlayTime]);
 
   const togglePlay = () => {
     if (isPlaying) {
@@ -482,19 +493,10 @@ export const AudioEditorModal: React.FC<AudioEditorModalProps> = ({
         }
       }
 
-      // If Pitch Shift is set, apply via offline context
+      // If Pitch Shift is set, apply pitch shifter preserving exact duration & tempo
       let finalBuffer = croppedBuffer;
       if (semitones !== 0) {
-        const pitchSource = offlineCtx.createBufferSource();
-        pitchSource.buffer = croppedBuffer;
-        if (pitchSource.detune) {
-          pitchSource.detune.value = semitones * 100;
-        } else {
-          pitchSource.playbackRate.value = Math.pow(2, semitones / 12);
-        }
-        pitchSource.connect(offlineCtx.destination);
-        pitchSource.start(0);
-        finalBuffer = await offlineCtx.startRendering();
+        finalBuffer = shiftAudioBufferPitch(croppedBuffer, semitones, offlineCtx);
       }
 
       const wavBlob = audioBufferToWavBlob(finalBuffer);

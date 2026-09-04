@@ -352,17 +352,26 @@ export const JuniorAudioBiographyWizard: React.FC<JuniorAudioBiographyWizardProp
     }
   };
 
-  // WhatsApp Share URL for Family Gifts
+  // Share URL for Family Gifts
   const getGiftShareUrl = () => {
     const origin = typeof window !== 'undefined' ? window.location.origin : 'https://campus-groovelab.de';
     return `${origin}/share/audio-bio?student_id=${studentId}`;
   };
 
-  const handleWhatsAppShare = () => {
+  const handleFamilyShare = async () => {
     const url = getGiftShareUrl();
-    const message = `*Ein Musik-Geschenk von ${studentFirstName}!* 🎶🎁\n\nHallo ${selectedRecipient.name}, ich habe auf meiner ${instrumentInfo.name} ein persönliches Stück für dich eingespielt!\n\nHier kannst du es dir direkt im Browser anhören:\n${url}`;
-    const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(message)}`;
-    window.open(waUrl, '_blank');
+    const message = `Ein Musik-Geschenk von ${studentFirstName}! 🎶🎁\n\nHallo ${selectedRecipient.name}, ich habe auf meiner ${instrumentInfo.name} ein persönliches Stück für dich eingespielt!\n\nHier kannst du es dir direkt im Browser anhören:\n${url}`;
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: `Musik-Geschenk von ${studentFirstName}`,
+          text: message,
+          url
+        });
+        return;
+      } catch (err) {}
+    }
+    handleCopyShareLink();
   };
 
   const handleCopyShareLink = () => {
@@ -942,7 +951,7 @@ export const JuniorAudioBiographyWizard: React.FC<JuniorAudioBiographyWizardProp
                           3. Musik-Geschenk für Familie & Freunde
                         </div>
                         <div style={{ fontSize: '0.76rem', color: '#64748b', fontWeight: 600 }}>
-                          Nimm ein Lied für deine Familie auf & verschicke es danach per WhatsApp
+                          Nimm ein Lied für deine Familie auf & teile es direkt mit ihnen
                         </div>
                       </div>
                     </div>
@@ -1407,7 +1416,7 @@ export const JuniorAudioBiographyWizard: React.FC<JuniorAudioBiographyWizardProp
                 </button>
               </div>
 
-              {/* 🎁 FALL 1: GESCHENK-FLOW -> DIRECT WHATSAPP SHARING CARD */}
+              {/* 🎁 FALL 1: GESCHENK-FLOW -> DIRECT FAMILY SHARING CARD */}
               {selectedGoalType === 'gift' ? (
                 <div style={{
                   background: '#ffffff',
@@ -1426,20 +1435,20 @@ export const JuniorAudioBiographyWizard: React.FC<JuniorAudioBiographyWizardProp
                       Dein Musik-Geschenk für {selectedRecipient.name} ist bereit!
                     </h3>
                     <p style={{ margin: 0, fontSize: '0.80rem', color: '#64748b', lineHeight: 1.4 }}>
-                      Teile dein persönliches Musikstück jetzt direkt per WhatsApp mit deiner Familie:
+                      Teile dein persönliches Musikstück jetzt direkt mit deiner Familie:
                     </p>
                   </div>
 
-                  {/* 1-Click WhatsApp Share Button */}
+                  {/* 1-Click Family Share Button */}
                   <button
                     type="button"
-                    onClick={handleWhatsAppShare}
+                    onClick={handleFamilyShare}
                     style={{
                       width: '100%',
                       padding: '16px',
                       borderRadius: '18px',
                       border: 'none',
-                      background: '#25D366',
+                      background: '#f97316',
                       color: 'white',
                       fontWeight: 900,
                       fontSize: '1.02rem',
@@ -1448,12 +1457,12 @@ export const JuniorAudioBiographyWizard: React.FC<JuniorAudioBiographyWizardProp
                       alignItems: 'center',
                       justifyContent: 'center',
                       gap: '10px',
-                      boxShadow: '0 6px 20px rgba(37, 211, 102, 0.35)'
+                      boxShadow: '0 6px 20px rgba(249, 115, 22, 0.35)'
                     }}
                     className="hover-scale"
                   >
                     <Share2 size={20} />
-                    <span>🎁 Jetzt per WhatsApp an {selectedRecipient.name} senden</span>
+                    <span>🎁 Jetzt Musik-Geschenk mit {selectedRecipient.name} teilen</span>
                   </button>
 
                   <button

@@ -77,9 +77,9 @@ export const LEGAL_MASTER_WORDING = {
     sessionLeasing: 'Zero-Trust Session-Leasing mit hardware-gebundenem Fingerprinting und 1-Click Remote-Logout.',
     immutableAuditLedger: 'Revisionssicheres, manipulationsgeschütztes Audit-Ledger mit kryptografischer SHA-512 / SHA-256 Merkle-Chain (GoBD & DSGVO konform).',
     fido2HardwareProtection: 'FIDO2 / WebAuthn Hardware Passkeys mit kryptografischem Signatur-Zähler zum Schutz vor Klon-Angriffen.',
-    dataMinimization: '100% DSGVO-konforme Datenminimierung: Keine Speicherung von SEPA-, Bank- oder Kreditkartendaten, keine E-Mail-Adressen Minderjähriger, automatische Nachnamensmaskierung.',
+    dataMinimization: 'Kompromisslose DSGVO-Datenminimierung: Keine Speicherung von SEPA-, Bank- oder Kreditkartendaten, keine E-Mail-Adressen Minderjähriger, automatische Nachnamensmaskierung.',
     voiceBiometricsExclusion: 'Reines didaktisches Audio-Streaming ohne biometrische Stimm-, Sprecher- oder Verhaltensmusteranalysen (Art. 9 DSGVO / Art. 6 nDSG).',
-    hostingInfrastructure: '100% Hosting in ISO 27001-zertifizierten deutschen Rechenzentren (Hetzner Online GmbH, Falkenstein/Vogtland & Nürnberg, Deutschland) mit stündlichen verschlüsselten Backups.',
+    hostingInfrastructure: 'Ausschließliches Hosting in ISO 27001-zertifizierten deutschen Rechenzentren (Hetzner Online GmbH, Falkenstein/Vogtland & Nürnberg, Deutschland) mit stündlichen verschlüsselten Backups.',
     indexedDbAudioVault: 'Lokaler IndexedDB Audio-Tresor (groovelab_audio_vault) für 0ms Offline-Playback und bandbreitenfreie Proberaumnutzung.'
   }
 } as const;

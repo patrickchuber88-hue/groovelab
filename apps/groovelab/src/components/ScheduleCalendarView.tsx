@@ -8007,7 +8007,7 @@ return (
                             backdropFilter: 'blur(4px)'
                           }}>
                             <ShieldCheck size={12} color="#ffffff" />
-                            <span>100% DSGVO-konform</span>
+                            <span>DSGVO-konform • TLS 1.3</span>
                           </span>
                         </div>
                       </div>
@@ -8090,7 +8090,7 @@ return (
                                   Termingekoppelter Schulchat
                                 </h5>
                                 <p style={{ margin: 0, fontSize: '0.76rem', color: '#64748b', lineHeight: 1.4, maxWidth: '240px' }}>
-                                  Geschützte Direktnachrichten für diesen Unterrichtstermin – 100% DSGVO- & datenschutzkonform.
+                                  Geschützte Direktnachrichten für diesen Unterrichtstermin – DSGVO- &amp; datenschutzkonform.
                                 </p>
                               </div>
                             );

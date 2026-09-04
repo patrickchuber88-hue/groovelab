@@ -75,7 +75,7 @@ export function getSchoolOrigin(schoolName: string, explicitSubdomain?: string |
 
 /**
  * Generates the official school-scoped Parent Onboarding URL.
- * Used in Elternbriefe, Infocenter, WhatsApp/Signal templates, and PDFs.
+ * Used in Elternbriefe, Infocenter, Messenger-Vorlagen, and PDFs.
  */
 export function getParentOnboardingUrl(
   schoolName: string,

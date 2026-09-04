@@ -113,7 +113,7 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
         a: 'Ja, durch PostgreSQL FORCE Row-Level Security (RLS) direkt im Datenbankkern. Jede Datenbankabfrage wird kernel-seitig an die eindeutige Schul-ID gekoppelt. Mandantenübergreifende Datenzugriffe sind auf Kernel-Ebene technisch unmöglich.'
       },
       {
-        q: 'Wie hilft das System bei Krankmeldungen von Lehrkräften?',
+        q: 'Wie hilft das System bei Ausfällen & Abwesenheiten von Lehrkräften?',
         a: 'Meldet sich eine Lehrkraft ab, sagt das System die betroffenen Stunden automatisch ab und benachrichtigt betroffene Schüler und Eltern sofort per Push auf ihrem Handy. Aufwendige Telefonketten im Sekretariat entfallen vollständig.'
       }
     ],
@@ -128,11 +128,11 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
       },
       {
         q: 'Können Kolleginnen oder die Schulleitung meine Schüler und Notizen einsehen?',
-        a: 'Nein. Jede Lehrkraft sieht im Unterrichtsalltag ausschließlich die eigenen Schüler, Stundenpläne und Meisterwerk-Einträge. Andere Lehrkräfte haben keinerlei Zugriff auf deine Dokumentation. Schulleitung und Sekretariat verwalten rein die übergeordneten organisatorischen Rahmendaten (wie Raumbelegungen, Gesamtschul-Stundenplan und Krankmeldungen), haben jedoch keinen Einblick in deine vertraulichen pädagogischen Vorbereitungen oder internen Lehrkraft-Notizen.'
+        a: 'Nein. Jede Lehrkraft sieht im Unterrichtsalltag ausschließlich die eigenen Schüler, Stundenpläne und Meisterwerk-Einträge. Andere Lehrkräfte haben keinerlei Zugriff auf deine Dokumentation. Schulleitung und Sekretariat verwalten rein die übergeordneten organisatorischen Rahmendaten (wie Raumbelegungen, Gesamtschul-Stundenplan und Terminabsagen), haben jedoch keinen Einblick in deine vertraulichen pädagogischen Vorbereitungen oder internen Lehrkraft-Notizen.'
       },
       {
-        q: 'Wie funktioniert die Abmeldung, wenn ich einmal krank bin?',
-        a: 'Du trägst im Lehrer-Dashboard einfach den Ausfallzeitraum ein. Das System markiert deine Stunden automatisch als Ausfall, informiert das Sekretariat und schickt den Schülern eine Benachrichtigung. Wenn du wieder gesund bist, reaktivierst du deinen Stundenplan mit 1 Klick.'
+        q: 'Wie funktioniert die Abmeldung bei Verhinderung oder Ausfall?',
+        a: 'Du trägst im Lehrer-Dashboard einfach den Ausfallzeitraum ein. Das System markiert deine Stunden automatisch als Ausfall, informiert das Sekretariat und schickt den Schülern eine Benachrichtigung. Sobald du wieder verfügbar bist, reaktivierst du deinen Stundenplan mit 1 Klick.'
       },
       {
         q: 'Wie hilft die App beim Üben zu Hause?',
@@ -201,7 +201,7 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
     },
     {
       title: 'Direktnachrichten & Termin-Shoutbox.',
-      slogan: '100% DSGVO- & schulrechtskonform.',
+      slogan: 'Zertifiziert DSGVO- & schulrechtskonform.',
       description: 'Kein WhatsApp-Zwang, keine Preisgabe privater Handynummern. Neben 1:1-Direktnachrichten zwischen Lehrkraft und Schüler sind terminbezogene Stunden-Nachrichten exklusiv an den jeweiligen Unterrichtstermin gekoppelt und frieren 48 Stunden nach der Stunde automatisch ein (Auto-Freeze). Schützt die Privatsphäre der Lehrkräfte, wahrt den Kinderschutz und erfüllt die Dienstaufsichtspflicht der Musikschule.',
       images: ['/screenshots/media__1782677535200.png']
     }
@@ -698,7 +698,7 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: '#475569', fontWeight: 600 }}>
             <ShieldCheck size={15} color="#34a853" />
-            <span>100 % DSGVO- &amp; nDSG-Server</span>
+            <span>DSGVO- &amp; nDSG-konforme Server</span>
           </div>
         </div>
 
@@ -835,7 +835,7 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
                   Direkte Entlastung &amp; Schnelle Prozesse
                 </h4>
                 <p style={{ fontSize: '14.5px', color: '#232326', lineHeight: 1.55, fontWeight: 550 }}>
-                  Schluss mit zeitraubender Kommunikation über drei Ecken. <CampusGroovelabText fontWeight={700} /> bündelt Raumplanung, Krankheitsabwicklung und Schüler-Onboarding in einer zentralen Schaltzentrale. Die Verwaltung behält die volle Kontrolle, spart bis zu 80 % Routine-Aufwand und eliminiert mühsame Telefonketten.
+                  Schluss mit zeitraubender Kommunikation über drei Ecken. <CampusGroovelabText fontWeight={700} /> bündelt Raumplanung, Ausfall- &amp; Abwesenheits-Management und Schüler-Onboarding in einer zentralen Schaltzentrale. Die Verwaltung behält die volle Kontrolle, spart bis zu 80 % Routine-Aufwand und eliminiert mühsame Telefonketten.
                 </p>
               </div>
 
@@ -844,7 +844,7 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
                 <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '12px', padding: 0, margin: 0 }}>
                   <li style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '14px', color: '#232326' }}>
                     <Check size={16} style={{ color: '#ea4335', marginTop: '2px', flexShrink: 0 }} />
-                    <span><strong>1-Klick-Krankheitsabwicklung:</strong> Betroffene Schüler und Lehrkräfte sofort per Push erreichen – Telefonketten entfallen komplett.</span>
+                    <span><strong>1-Klick-Ausfallabwicklung:</strong> Betroffene Schüler und Lehrkräfte sofort per Push erreichen – Telefonketten entfallen komplett.</span>
                   </li>
                   <li style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '14px', color: '#232326' }}>
                     <Check size={16} style={{ color: '#ea4335', marginTop: '2px', flexShrink: 0 }} />
@@ -1448,7 +1448,7 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
             margin: '0 auto 64px auto',
             lineHeight: 1.6
           }}>
-            Faire, planbare Cloud-Flatrates für deine Musikschule. Keine teuren Software-Lizenzen, keine Einrichtungsgebühren und 100 % DSGVO-konformes Hosting in Deutschland.
+            Faire, planbare Cloud-Flatrates für deine Musikschule. Keine teuren Software-Lizenzen, keine Einrichtungsgebühren und DSGVO-konformes Hosting in Deutschland.
           </p>
 
           {/* Professional Senior Sales Pricing Model */}

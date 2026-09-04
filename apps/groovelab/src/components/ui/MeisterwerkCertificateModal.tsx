@@ -241,7 +241,7 @@ export const MeisterwerkCertificateModal: React.FC<MeisterwerkCertificateProps> 
                 boxShadow: isCopied ? '0 2px 8px rgba(21, 128, 61, 0.3)' : '0 2px 8px rgba(37, 99, 235, 0.3)',
                 transition: 'all 0.2s ease'
               }}
-              title="Urkunde & Meisterwerk-Erfolg mit Familie teilen (WhatsApp / Messenger / Link)"
+              title="Urkunde & Meisterwerk-Erfolg mit Familie teilen (Messenger / Link)"
             >
               {isCopied ? <Check size={15} /> : <Share2 size={15} />}
               <span>{isCopied ? 'Link kopiert!' : 'Teilen'}</span>

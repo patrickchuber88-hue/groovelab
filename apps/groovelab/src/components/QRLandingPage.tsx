@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
-import { Music, Shield, Clock, CheckCircle, AlertTriangle, Flame, Zap, /* Car, */ Calendar, MapPin, User, Check, Sparkles, Play, Pause, BookOpen, X, FileText, ArrowLeft, Mail, CreditCard, Lock, Settings, Key, Users, Trophy, MessageSquare, Timer, ChevronDown, Smartphone, Award, ExternalLink, ShieldCheck, CheckCheck, Download, Target, Radio, BarChart3, Fingerprint, Delete } from 'lucide-react';
+import { Music, Shield, Clock, CheckCircle, AlertTriangle, Flame, Zap, /* Car, */ Calendar, MapPin, User, Check, Sparkles, Play, Pause, BookOpen, X, FileText, ArrowLeft, Mail, CreditCard, Lock, Settings, Key, Users, Trophy, MessageSquare, Timer, ChevronDown, Smartphone, Award, ExternalLink, ShieldCheck, CheckCheck, Download, Target, Radio, BarChart3, Fingerprint, Delete, Send } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { maskLastName, cleanHomeworkNotesText, formatTeacherFullName } from '../utils/nameHelper';
 import { isWebAuthnSupported, registerUserBiometrics, getStoredBiometricProfiles } from '../utils/webauthn';
@@ -3312,21 +3312,53 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
   };
 
   // Fetch occurrence-specific chat messages for Shoutbox
-  const fetchChat = async (studentId: string, occurrenceId: string) => {
+  const fetchChat = async (studentId: string, occurrenceId: string, targetDate?: string) => {
     if (!studentId || !occurrenceId) return;
     try {
-      const { data, error } = await supabase
+      let deDate = '';
+      let shortDate = '';
+      if (targetDate && targetDate.includes('-')) {
+        const [y, m, d] = targetDate.split('-');
+        if (y && m && d) {
+          deDate = `${d}.${m}.${y}`;
+          shortDate = `${d}.${m}.${y.slice(-2)}`;
+        }
+      }
+
+      let query = supabase
         .from('campus_direct_messages')
-        .select('*')
-        .eq('occurrence_id', occurrenceId)
-        .order('created_at', { ascending: true });
+        .select('*');
+
+      const sId = activeChatOcc?.schedule_id;
+      const virtualOccId = sId && targetDate ? `virtual-${sId}-${targetDate}` : null;
+      let orClause = `occurrence_id.eq.${occurrenceId}`;
+      if (virtualOccId && virtualOccId !== occurrenceId) {
+        orClause += `,occurrence_id.eq.${virtualOccId}`;
+      }
+      if (targetDate) {
+        orClause += `,content.ilike.%${targetDate}%`;
+      }
+      if (deDate) {
+        orClause += `,content.ilike.%${deDate}%`;
+      }
+      if (shortDate) {
+        orClause += `,content.ilike.%${shortDate}%`;
+      }
+
+      const teacherId = activeChatOcc?.teacher_id || '';
+      query = query.or(orClause);
+      if (studentId && teacherId) {
+        query = query.or(`and(sender_id.eq.${studentId},recipient_id.eq.${teacherId}),and(sender_id.eq.${teacherId},recipient_id.eq.${studentId})`);
+      }
+
+      const { data, error } = await query.order('created_at', { ascending: true });
       if (error) throw error;
       if (data) {
         setChatMessages(data);
         setTimeout(() => chatMessagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 60);
       }
     } catch (err) {
-      console.error('Error fetching chat messages for occurrence:', err);
+      console.error('Error fetching chat messages for occurrence in QRLandingPage:', err);
     }
   };
 
@@ -3337,7 +3369,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
     }
     const studentId = profile.id;
 
-    fetchChat(studentId, activeChatOcc.id);
+    fetchChat(studentId, activeChatOcc.id, activeChatOcc.date);
 
     const markAsRead = async () => {
       try {
@@ -3362,7 +3394,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         table: 'campus_direct_messages', 
         filter: `occurrence_id=eq.${activeChatOcc.id}` 
       }, () => {
-        fetchChat(studentId, activeChatOcc.id);
+        fetchChat(studentId, activeChatOcc.id, activeChatOcc.date);
         setActiveChatOccIds(prev => {
           const newSet = new Set(prev);
           newSet.add(activeChatOcc.id);
@@ -3438,7 +3470,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         console.error('Failed to dispatch push notification for shoutbox:', pushErr);
       }
 
-      await fetchChat(studentId, activeChatOcc.id);
+      await fetchChat(studentId, activeChatOcc.id, activeChatOcc.date);
     } catch (err) {
       console.error('Error sending chat message:', err);
     }
@@ -3512,26 +3544,34 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
   };
 
   const handleUndoCancel = async (occ: any) => {
-    if (!confirm('Möchtest du diese Absage wirklich rückgängig machen?')) return;
+    if (!confirm('Möchtest du diese Absage wirklich rückgängig machen? Der Termin findet dann wieder regulär statt.')) return;
     try {
       if (!occ.id) return;
 
-      if (occ.id.toString().startsWith('virtual-')) {
-        return;
+      let actualOccId = occ.id;
+      if (String(occ.id).startsWith('virtual-') || String(occ.id).startsWith('virt_')) {
+        const { data: existingOcc } = await supabase
+          .from('schedule_occurrences')
+          .select('id')
+          .eq('schedule_id', occ.schedule_id)
+          .eq('date', occ.date)
+          .maybeSingle();
+
+        if (existingOcc?.id) {
+          actualOccId = existingOcc.id;
+        }
       }
 
-      if (occ.schedule_id) {
-        // Recurring override: delete it to restore template
-        const { error: delErr } = await supabase
-          .from('schedule_occurrences')
-          .delete()
-          .eq('id', occ.id);
-        if (delErr) throw delErr;
-      } else {
+      if (actualOccId && !String(actualOccId).startsWith('virtual-') && !String(actualOccId).startsWith('virt_')) {
         const { error: updErr } = await supabase
           .from('schedule_occurrences')
-          .update({ status: 'scheduled' })
-          .eq('id', occ.id);
+          .update({
+            status: 'scheduled',
+            original_date: occ.date,
+            student_acknowledged: true,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', actualOccId);
         if (updErr) throw updErr;
       }
 
@@ -3548,7 +3588,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           const shortDate = occDate.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' });
           const timeLabel = (occ.start_time || '16:30').slice(0, 5);
 
-          const notificationMessage = `Der verschobene oder abgesagte Termin wurde auf den regulären Termin zurückgesetzt:\n${shortDay} ${shortDate} um ${timeLabel} Uhr.`;
+          const notificationMessage = `Der Ausfall für diesen Termin wurde zurückgenommen. Der Termin findet regulär statt:\n${shortDay} ${shortDate} um ${timeLabel} Uhr. (${occ.date})`;
 
           await supabase.from('campus_direct_messages').insert({
             sender_id: studentUserId,
@@ -3556,7 +3596,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
             content: notificationMessage,
             occurrence_id: targetOccId,
             is_system: true,
-            message_type: 'reschedule_notification'
+            message_type: 'cancellation_reset'
           });
         }
       } catch (notifErr) {
@@ -4406,32 +4446,32 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                           alignItems: 'center',
                           justifyContent: 'center',
                           background: isCanceled ? '#fee2e2' : '#f1f5f9',
-                          borderRadius: '8px',
-                          width: '34px',
-                          height: '34px',
-                          border: isCanceled ? '1px solid #fca5a5' : '1px solid rgba(0,0,0,0.04)',
+                          borderRadius: '10px',
+                          width: '44px',
+                          height: '44px',
+                          border: isCanceled ? '1.5px solid #fca5a5' : '1px solid rgba(0,0,0,0.06)',
                           flexShrink: 0
                         }}>
-                          <span style={{ fontSize: '6.5px', fontWeight: 900, textTransform: 'uppercase', color: isCanceled ? '#ef4444' : subColor }}>
+                          <span style={{ fontSize: '9.5px', fontWeight: 900, textTransform: 'uppercase', color: isCanceled ? '#ef4444' : subColor, letterSpacing: '0.04em' }}>
                             {formatWeekday(occ.date)}
                           </span>
-                          <span style={{ fontSize: '12px', fontWeight: 900, color: isCanceled ? '#b91c1c' : textColor, marginTop: '-2px' }}>
+                          <span style={{ fontSize: '15px', fontWeight: 900, color: isCanceled ? '#b91c1c' : textColor, marginTop: '-1px', lineHeight: 1 }}>
                             {occ.date.substring(8, 10)}
                           </span>
                         </div>
                         
                         <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, overflow: 'hidden' }}>
-                          <span style={{ fontSize: '0.8rem', fontWeight: 800, color: textColor, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                          <span style={{ fontSize: '13.5px', fontWeight: 800, color: textColor, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
                             {teacherName}
                           </span>
-                          <span style={{ fontSize: '0.68rem', color: subColor, fontWeight: 650, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden', textDecoration: isCanceled ? 'line-through' : 'none' }}>
+                          <span style={{ fontSize: '0.80rem', color: subColor, fontWeight: 700, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden', textDecoration: isCanceled ? 'line-through' : 'none', marginTop: '2px' }}>
                             {formatDateGerman(occ.date)} • {occ.start_time.substring(0, 5)} Uhr ({occ.duration} Min)
                           </span>
                         </div>
                       </div>
 
                       {/* Right side: Action Buttons & Shoutbox */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexShrink: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
                         {needsAcknowledge && (
                           <button
                             type="button"
@@ -4440,20 +4480,21 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                               background: '#34a853',
                               color: '#ffffff',
                               border: 'none',
-                              borderRadius: '8px',
-                              padding: '4px 8px',
-                              fontSize: '0.7rem',
+                              borderRadius: '10px',
+                              minHeight: '36px',
+                              padding: '6px 14px',
+                              fontSize: '0.80rem',
                               fontWeight: 800,
                               cursor: 'pointer',
                               display: 'flex',
                               alignItems: 'center',
-                              gap: '3px',
+                              gap: '4px',
                               whiteSpace: 'nowrap',
                               boxShadow: '0 1px 3px rgba(52, 168, 83, 0.3)'
                             }}
                             title={isRescheduled ? 'Verschiebung bestätigen' : 'Änderung als gelesen markieren'}
                           >
-                            <Check size={12} /> {isRescheduled ? 'Bestätigen' : 'Gelesen'}
+                            <Check size={14} strokeWidth={2.5} /> {isRescheduled ? 'Bestätigen' : 'Gelesen'}
                           </button>
                         )}
 
@@ -4464,9 +4505,9 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                             border: isUnread ? '1px solid #fca5a5' : hasMessages ? '1px solid #fef08a' : '1px solid #e2e8f0',
                             background: isUnread ? '#fee2e2' : hasMessages ? '#fefce8' : '#f8fafc',
                             color: isUnread ? '#dc2626' : hasMessages ? '#ca8a04' : '#475569',
-                            width: '30px',
-                            height: '30px',
-                            borderRadius: '8px',
+                            width: '38px',
+                            height: '38px',
+                            borderRadius: '12px',
                             cursor: 'pointer',
                             display: 'inline-flex',
                             alignItems: 'center',
@@ -4475,7 +4516,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                           }}
                           title="Shoutbox öffnen"
                         >
-                          <MessageSquare size={13} />
+                          <MessageSquare size={17} />
                           {isUnread && (
                             <span style={{
                               position: 'absolute',
@@ -6206,7 +6247,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                 Unterrichtsstunden selbstständig absagen
               </div>
               <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 500, lineHeight: 1.3 }}>
-                Erlaubt deinem Kind, bei Krankheit oder Verhinderung Termine eigenständig abzusagen.
+                Erlaubt deinem Kind, bei Verhinderung oder Terminkonflikten Termine eigenständig abzusagen.
               </div>
             </div>
             <input
@@ -10734,10 +10775,11 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           (() => {
             const teacherName = formatTeacherFullName(activeChatOcc.teacher);
             const titleText = `1:1 Shoutbox: ${teacherName}`;
+            const isCanceled = activeChatOcc.status === 'cancelled' || activeChatOcc.status === 'canceled_by_student' || activeChatOcc.status === 'teacher_sick' || activeChatOcc.status === 'canceled_by_teacher_sick';
             
             let isFrozen = false;
             try {
-              const timePart = activeChatOcc.start_time.includes(':') ? activeChatOcc.start_time : `${activeChatOcc.start_time}:00`;
+              const timePart = activeChatOcc.start_time?.includes(':') ? activeChatOcc.start_time : `${activeChatOcc.start_time || '00'}:00`;
               const lessonDateTime = new Date(`${activeChatOcc.date}T${timePart}`);
               isFrozen = Date.now() > lessonDateTime.getTime() + 48 * 60 * 60 * 1000;
             } catch (e) {}
@@ -10781,15 +10823,16 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                   alignItems: 'center',
                   justifyContent: 'center',
                   padding: '24px',
+                  fontFamily: "'Plus Jakarta Sans', sans-serif"
                 }}
               >
                 <div
                   onClick={e => e.stopPropagation()}
                   style={{
                     background: '#ffffff',
-                    borderRadius: '24px',
+                    borderRadius: '28px',
                     width: '100%',
-                    maxWidth: '480px',
+                    maxWidth: '500px',
                     boxShadow: '0 32px 80px rgba(0,0,0,0.25)',
                     overflow: 'hidden',
                     display: 'flex',
@@ -10800,52 +10843,79 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                 >
                   {/* Header */}
                   <div style={{
-                    background: stammterminText ? 'linear-gradient(135deg, #d97706 0%, #b45309 100%)' : 'linear-gradient(135deg, #34a853 0%, #248a3d 100%)',
+                    background: isCanceled 
+                      ? 'repeating-linear-gradient(-45deg, #fef2f2, #fef2f2 10px, #fee2e2 10px, #fee2e2 20px)'
+                      : stammterminText 
+                        ? 'linear-gradient(135deg, #d97706 0%, #b45309 100%)' 
+                        : 'linear-gradient(135deg, #34a853 0%, #248a3d 100%)',
+                    borderBottom: isCanceled ? '2px dashed #f87171' : 'none',
                     padding: '24px',
-                    color: '#ffffff',
+                    color: isCanceled ? '#991b1b' : '#ffffff',
                     display: 'flex',
                     alignItems: 'flex-start',
                     justifyContent: 'space-between',
                     gap: '12px'
                   }}>
                     <div style={{ flex: 1 }}>
-                      <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 900, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <h3 style={{ margin: 0, fontSize: '1.38rem', fontWeight: 950, letterSpacing: '-0.02em', display: 'flex', alignItems: 'center', gap: '8px', color: isCanceled ? '#991b1b' : '#ffffff' }}>
                         <span>💬</span> {titleText}
                       </h3>
                       
-                      {stammterminText ? (
-                        <div style={{ margin: '6px 0', color: 'rgba(255, 255, 255, 0.95)', fontSize: '0.76rem', fontWeight: 600, display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                          <div style={{ textDecoration: 'line-through', opacity: 0.85, fontSize: '0.72rem' }}>
+                      {isCanceled ? (
+                        <p style={{ margin: '4px 0 6px 0', color: '#b91c1c', fontSize: '0.94rem', fontWeight: 650 }}>
+                          ⚠️ Dieser Termin am {new Date(activeChatOcc.date).toLocaleDateString('de-DE')} ist aktuell <strong>abgesagt</strong>.
+                        </p>
+                      ) : stammterminText ? (
+                        <div style={{ margin: '6px 0', color: 'rgba(255, 255, 255, 0.95)', fontSize: '0.88rem', fontWeight: 650, display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                          <div style={{ textDecoration: 'line-through', opacity: 0.85, fontSize: '0.82rem' }}>
                             📍 Stammtermin (Original): {stammterminText}
                           </div>
-                          <div style={{ fontWeight: 850, fontSize: '0.82rem' }}>
-                            ➔ Verschoben auf: {new Date(activeChatOcc.date).toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })} um {activeChatOcc.start_time.substring(0, 5)} Uhr
+                          <div style={{ fontWeight: 900, fontSize: '0.94rem' }}>
+                            ➔ Verschoben auf: {new Date(activeChatOcc.date).toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })} um {activeChatOcc.start_time?.substring(0, 5)} Uhr
                           </div>
                         </div>
                       ) : (
-                        <p style={{ margin: '4px 0 6px 0', color: 'rgba(255, 255, 255, 0.85)', fontSize: '0.75rem', fontWeight: 600 }}>
-                          Termin am {new Date(activeChatOcc.date).toLocaleDateString('de-DE')} um {activeChatOcc.start_time.substring(0, 5)} Uhr
+                        <p style={{ margin: '4px 0 6px 0', color: 'rgba(255, 255, 255, 0.92)', fontSize: '0.94rem', fontWeight: 650 }}>
+                          Termin am {new Date(activeChatOcc.date).toLocaleDateString('de-DE')} um {activeChatOcc.start_time?.substring(0, 5)} Uhr
                         </p>
                       )}
 
                       {/* Badges & Schedule Button */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px', flexWrap: 'wrap' }}>
-                        <span style={{
-                          padding: '4px 10px',
-                          borderRadius: '8px',
-                          background: 'rgba(255, 255, 255, 0.2)',
-                          color: '#ffffff',
-                          fontSize: '0.68rem',
-                          fontWeight: 800,
-                          backdropFilter: 'blur(4px)',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '5px',
-                          whiteSpace: 'nowrap'
-                        }}>
-                          <ShieldCheck size={13} color="#ffffff" />
-                          <span>100% DSGVO-konform • TLS 1.3 &amp; AES-256 verschlüsselt</span>
-                        </span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px', flexWrap: 'wrap' }}>
+                        {isCanceled ? (
+                          <span style={{
+                            padding: '6px 14px',
+                            borderRadius: '100px',
+                            background: '#ef4444',
+                            color: '#ffffff',
+                            fontSize: '0.85rem',
+                            fontWeight: 900,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '5px',
+                            whiteSpace: 'nowrap',
+                            boxShadow: '0 2px 6px rgba(239, 68, 68, 0.25)'
+                          }}>
+                            ✕ Termin abgesagt
+                          </span>
+                        ) : (
+                          <span style={{
+                            padding: '5px 12px',
+                            borderRadius: '100px',
+                            background: 'rgba(255, 255, 255, 0.22)',
+                            color: '#ffffff',
+                            fontSize: '0.85rem',
+                            fontWeight: 850,
+                            backdropFilter: 'blur(4px)',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '5px',
+                            whiteSpace: 'nowrap'
+                          }}>
+                            <ShieldCheck size={14} color="#ffffff" />
+                            <span>DSGVO-konform • TLS 1.3</span>
+                          </span>
+                        )}
 
                         <button
                           type="button"
@@ -10862,21 +10932,21 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                             }
                           }}
                           style={{
-                            padding: '4px 10px',
-                            borderRadius: '8px',
-                            background: '#ffffff',
-                            color: stammterminText ? '#b45309' : '#15803d',
-                            fontSize: '0.68rem',
-                            fontWeight: 850,
-                            border: 'none',
+                            padding: '5px 12px',
+                            borderRadius: '100px',
+                            background: isCanceled ? '#fef2f2' : '#ffffff',
+                            color: isCanceled ? '#dc2626' : (stammterminText ? '#b45309' : '#15803d'),
+                            fontSize: '0.85rem',
+                            fontWeight: 900,
+                            border: isCanceled ? '1px solid #fca5a5' : 'none',
                             cursor: 'pointer',
                             display: 'inline-flex',
                             alignItems: 'center',
                             gap: '4px',
-                            boxShadow: '0 2px 6px rgba(0,0,0,0.1)'
+                            boxShadow: '0 2px 6px rgba(0,0,0,0.08)'
                           }}
                         >
-                          <Calendar size={12} color={stammterminText ? '#b45309' : '#15803d'} />
+                          <Calendar size={13} color={isCanceled ? '#dc2626' : (stammterminText ? '#b45309' : '#15803d')} />
                           <span>Im Stundenplan anzeigen</span>
                         </button>
                       </div>
@@ -10885,19 +10955,20 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                       onClick={() => setActiveChatOcc(null)}
                       style={{
                         border: 'none',
-                        background: 'rgba(255, 255, 255, 0.2)',
+                        background: isCanceled ? 'rgba(239, 68, 68, 0.15)' : 'rgba(255, 255, 255, 0.2)',
                         borderRadius: '50%',
-                        width: '32px',
-                        height: '32px',
+                        width: '36px',
+                        height: '36px',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
                         cursor: 'pointer',
-                        color: '#ffffff',
-                        transition: 'all 0.2s'
+                        color: isCanceled ? '#991b1b' : '#ffffff',
+                        transition: 'all 0.2s',
+                        flexShrink: 0
                       }}
                     >
-                      <X size={16} />
+                      <X size={18} />
                     </button>
                   </div>
 
@@ -10913,42 +10984,162 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                     minHeight: '280px',
                     maxHeight: '400px'
                   }}>
+                    {isCanceled && (
+                      <div style={{
+                        background: '#fef2f2',
+                        border: '1.5px dashed #fca5a5',
+                        color: '#991b1b',
+                        padding: '12px 16px',
+                        borderRadius: '16px',
+                        fontSize: '0.88rem',
+                        fontWeight: 700,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: '10px'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ fontSize: '1.2rem' }}>⚠️</span>
+                          <div>
+                            <div style={{ fontWeight: 850 }}>Termin ist abgesagt</div>
+                            <div style={{ fontSize: '0.78rem', color: '#b91c1c', fontWeight: 600 }}>Du kannst die Absage jederzeit rückgängig machen.</div>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            await handleUndoCancel(activeChatOcc);
+                            setActiveChatOcc((prev: any) => prev ? { ...prev, status: 'scheduled' } : null);
+                            const studentId = profile?.id;
+                            if (studentId && activeChatOcc) {
+                              setTimeout(() => {
+                                fetchChat(studentId, activeChatOcc.id, activeChatOcc.date);
+                              }, 300);
+                            }
+                          }}
+                          style={{
+                            background: '#15803d',
+                            color: '#ffffff',
+                            border: 'none',
+                            borderRadius: '100px',
+                            padding: '6px 14px',
+                            fontSize: '0.82rem',
+                            fontWeight: 900,
+                            cursor: 'pointer',
+                            whiteSpace: 'nowrap',
+                            boxShadow: '0 2px 6px rgba(21, 128, 61, 0.25)'
+                          }}
+                          className="hover-scale"
+                        >
+                          Reaktivieren
+                        </button>
+                      </div>
+                    )}
                     {isFrozen && (
-                      <div style={{ background: '#fef2f2', border: '1px solid #fee2f2', color: '#991b1b', padding: '8px 12px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'center', textAlign: 'center' }}>
+                      <div style={{ background: '#fef2f2', border: '1px solid #fee2f2', color: '#991b1b', padding: '10px 14px', borderRadius: '12px', fontSize: '0.85rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'center', textAlign: 'center' }}>
                         🔒 Shoutbox eingefroren (Schreibschutz nach 48h aktiv)
                       </div>
                     )}
                     {chatMessages.length === 0 ? (
-                      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#86868b', fontSize: '0.85rem', textAlign: 'center', padding: '32px', gap: '8px' }}>
-                        <MessageSquare size={32} style={{ opacity: 0.3 }} />
+                      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#86868b', fontSize: '0.94rem', textAlign: 'center', padding: '32px', gap: '8px' }}>
+                        <MessageSquare size={36} style={{ opacity: 0.3 }} />
                         <span>Noch keine Nachrichten für diesen Termin. Schreibe die erste Nachricht für Terminabsprachen.</span>
                       </div>
                     ) : (
                       chatMessages.map((msg, idx) => {
                         const isMe = msg.sender_id === profile.id;
+                        const isCancellation = msg.message_type === 'reschedule_notification' || 
+                                               (msg.content && (msg.content.includes('❌') || msg.content.includes('fällt aus') || msg.content.includes('Termin abgesagt') || msg.content.includes('wurde abgesagt')));
+                        const isReactivation = msg.message_type === 'cancellation_reset' || 
+                                               (msg.content && (msg.content.includes('🔄') || msg.content.includes('reaktiviert') || msg.content.includes('zurückgenommen') || msg.content.includes('regulär statt')));
+
+                        if (isReactivation) {
+                          return (
+                            <div key={msg.id || idx} style={{ alignSelf: 'center', width: '100%', maxWidth: '94%', margin: '6px 0' }}>
+                              <div style={{
+                                background: '#f0fdf4',
+                                border: '1.5px solid #86efac',
+                                borderRadius: '18px',
+                                padding: '12px 18px',
+                                boxShadow: '0 2px 8px rgba(34, 197, 94, 0.08)',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '6px'
+                              }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: '#dcfce7', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                    <span style={{ fontSize: '0.95rem' }}>🔄</span>
+                                  </div>
+                                  <span style={{ fontSize: '0.86rem', fontWeight: 900, color: '#15803d', letterSpacing: '-0.01em' }}>
+                                    Termin reaktiviert
+                                  </span>
+                                  <span style={{ marginLeft: 'auto', fontSize: '0.72rem', color: '#16a34a', fontWeight: 700 }}>
+                                    {new Date(msg.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}
+                                  </span>
+                                </div>
+                                <div style={{ fontSize: '0.92rem', color: '#166534', fontWeight: 650, lineHeight: 1.45, wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>
+                                  {msg.content}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        }
+
+                        if (isCancellation) {
+                          return (
+                            <div key={msg.id || idx} style={{ alignSelf: 'center', width: '100%', maxWidth: '94%', margin: '6px 0' }}>
+                              <div style={{
+                                background: '#fef2f2',
+                                border: '1.5px dashed #fca5a5',
+                                borderRadius: '18px',
+                                padding: '12px 18px',
+                                boxShadow: '0 2px 8px rgba(239, 68, 68, 0.06)',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '6px'
+                              }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: '#fee2e2', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                    <span style={{ fontSize: '0.95rem' }}>❌</span>
+                                  </div>
+                                  <span style={{ fontSize: '0.86rem', fontWeight: 900, color: '#991b1b', letterSpacing: '-0.01em' }}>
+                                    Termin abgesagt
+                                  </span>
+                                  <span style={{ marginLeft: 'auto', fontSize: '0.72rem', color: '#b91c1c', fontWeight: 700 }}>
+                                    {new Date(msg.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}
+                                  </span>
+                                </div>
+                                <div style={{ fontSize: '0.92rem', color: '#991b1b', fontWeight: 650, lineHeight: 1.45, wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>
+                                  {msg.content}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        }
+
                         return (
                           <div key={msg.id || idx} style={{
                             display: 'flex',
                             flexDirection: 'column',
                             alignSelf: isMe ? 'flex-end' : 'flex-start',
-                            maxWidth: '80%',
+                            maxWidth: '82%',
                             alignItems: isMe ? 'flex-end' : 'flex-start',
                             gap: '2px'
                           }}>
                             <div style={{
                               background: isMe ? '#e6f4ea' : '#ffffff',
                               color: '#0f172a',
-                              padding: '10px 14px',
-                              borderRadius: isMe ? '16px 16px 2px 16px' : '16px 16px 16px 2px',
-                              fontSize: '0.85rem',
-                              lineHeight: 1.4,
+                              padding: '12px 16px',
+                              borderRadius: isMe ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
+                              fontSize: '0.98rem',
+                              lineHeight: 1.45,
                               wordBreak: 'break-word',
                               border: isMe ? '1px solid #bbf7d0' : '1px solid #e2e8f0',
-                              boxShadow: '0 1px 4px rgba(0,0,0,0.02)'
+                              boxShadow: '0 2px 6px rgba(0,0,0,0.02)'
                             }}>
                               {msg.content}
-                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '3px', marginTop: '4px' }}>
-                                <span style={{ fontSize: '0.62rem', color: isMe ? '#15803d' : '#86868b' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '4px', marginTop: '6px' }}>
+                                <span style={{ fontSize: '0.76rem', color: isMe ? '#15803d' : '#86868b', fontWeight: 650 }}>
                                   {new Date(msg.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}
                                 </span>
                                 {isMe && <CheckCheck size={14} color="#15803d" style={{ marginLeft: '2px' }} />}
@@ -10961,74 +11152,150 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                     <div ref={chatMessagesEndRef} />
                   </div>
 
-                  {/* Music Pedagogical Quick Reply Chips for Student */}
+                  {/* Context-Adaptive Quick Reply Chips for Student */}
                   {!isFrozen && (
                     <div style={{
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '6px',
+                      gap: '8px',
                       overflowX: 'auto',
-                      padding: '10px 24px 4px 24px',
+                      padding: '12px 24px 6px 24px',
                       background: '#fafbfc',
                       borderTop: '1px solid #f1f5f9',
                       scrollbarWidth: 'none',
                       msOverflowStyle: 'none'
                     }}>
-                      {/* 1-Click Direct Emoji Reaction Buttons */}
-                      <div style={{ display: 'flex', gap: '4px', paddingRight: '6px', borderRight: '1px solid #e2e8f0' }}>
-                        {['👍', '🎵', '👏', '🙏'].map((emoji, idx) => (
+                      {isCanceled ? (
+                        <>
                           <button
-                            key={`student-emoji-${idx}`}
                             type="button"
-                            onClick={() => sendDirectChatMessage(emoji)}
+                            onClick={async () => {
+                              await handleUndoCancel(activeChatOcc);
+                              setActiveChatOcc((prev: any) => prev ? { ...prev, status: 'scheduled' } : null);
+                              const studentId = profile?.id;
+                              if (studentId && activeChatOcc) {
+                                setTimeout(() => {
+                                  fetchChat(studentId, activeChatOcc.id, activeChatOcc.date);
+                                }, 300);
+                              }
+                            }}
                             style={{
-                              padding: '4px 9px',
+                              padding: '6px 14px',
                               borderRadius: '100px',
-                              background: '#ffffff',
-                              border: '1px solid #e2e8f0',
+                              background: '#f0fdf4',
+                              border: '1.5px solid #86efac',
+                              color: '#15803d',
                               fontSize: '0.88rem',
+                              fontWeight: 850,
+                              whiteSpace: 'nowrap',
                               cursor: 'pointer',
-                              boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-                              flexShrink: 0
+                              boxShadow: '0 1px 3px rgba(34, 197, 94, 0.12)',
+                              flexShrink: 0,
+                              minHeight: '38px',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px'
                             }}
                             className="hover-scale"
-                            title={`Schnell-Reaktion ${emoji} senden`}
                           >
-                            {emoji}
+                            🔄 Absage zurücknehmen (Reaktivieren)
                           </button>
-                        ))}
-                      </div>
+                          {[
+                            { label: 'Vielen Dank für das Verständnis!', text: 'Vielen Dank für das Verständnis!' },
+                            { label: 'Ersatztermin anfragen', text: 'Können wir einen Ersatztermin vereinbaren?' }
+                          ].map((phrase, idx) => (
+                            <button
+                              key={`cancel-phrase-${idx}`}
+                              type="button"
+                              onClick={() => setChatTypedMessage(phrase.text)}
+                              style={{
+                                padding: '6px 14px',
+                                borderRadius: '100px',
+                                background: '#ffffff',
+                                border: '1px solid #cbd5e1',
+                                color: '#334155',
+                                fontSize: '0.88rem',
+                                fontWeight: 800,
+                                whiteSpace: 'nowrap',
+                                cursor: 'pointer',
+                                boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                                flexShrink: 0,
+                                minHeight: '38px',
+                                display: 'inline-flex',
+                                alignItems: 'center'
+                              }}
+                              className="hover-scale"
+                            >
+                              {phrase.label}
+                            </button>
+                          ))}
+                        </>
+                      ) : (
+                        <>
+                          {/* 1-Click Direct Emoji Reaction Buttons */}
+                          <div style={{ display: 'flex', gap: '4px', paddingRight: '6px', borderRight: '1px solid #e2e8f0' }}>
+                            {['👍', '🎵', '👏', '🙏'].map((emoji, idx) => (
+                              <button
+                                key={`student-emoji-${idx}`}
+                                type="button"
+                                onClick={() => sendDirectChatMessage(emoji)}
+                                style={{
+                                  padding: '6px 12px',
+                                  borderRadius: '100px',
+                                  background: '#ffffff',
+                                  border: '1px solid #e2e8f0',
+                                  fontSize: '0.98rem',
+                                  cursor: 'pointer',
+                                  boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                                  flexShrink: 0,
+                                  minHeight: '38px',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center'
+                                }}
+                                className="hover-scale"
+                                title={`Schnell-Reaktion ${emoji} senden`}
+                              >
+                                {emoji}
+                              </button>
+                            ))}
+                          </div>
 
-                      {/* Student Authentic Text Phrases */}
-                      {[
-                        { label: 'Vielen Dank!', text: 'Vielen Dank!' },
-                        { label: 'Alles klar, danke!', text: 'Alles klar, danke!' },
-                        { label: 'Termin passt!', text: 'Der Termin passt für mich!' },
-                        { label: 'Bin gleich da', text: 'Ich bin gleich da!' },
-                        { label: 'Werde fleißig üben', text: 'Danke, ich werde fleißig üben!' }
-                      ].map((phrase, idx) => (
-                        <button
-                          key={`student-phrase-${idx}`}
-                          type="button"
-                          onClick={() => setChatTypedMessage(phrase.text)}
-                          style={{
-                            padding: '5px 12px',
-                            borderRadius: '100px',
-                            background: '#ffffff',
-                            border: '1px solid #bbf7d0',
-                            color: '#15803d',
-                            fontSize: '0.75rem',
-                            fontWeight: 700,
-                            whiteSpace: 'nowrap',
-                            cursor: 'pointer',
-                            boxShadow: '0 1px 3px rgba(52, 168, 83, 0.08)',
-                            flexShrink: 0
-                          }}
-                          className="hover-scale"
-                        >
-                          {phrase.label}
-                        </button>
-                      ))}
+                          {/* Student Authentic Text Phrases */}
+                          {[
+                            { label: 'Vielen Dank!', text: 'Vielen Dank!' },
+                            { label: 'Alles klar, danke!', text: 'Alles klar, danke!' },
+                            { label: 'Termin passt!', text: 'Der Termin passt für mich!' },
+                            { label: 'Bin gleich da', text: 'Ich bin gleich da!' },
+                            { label: 'Werde fleißig üben', text: 'Danke, ich werde fleißig üben!' }
+                          ].map((phrase, idx) => (
+                            <button
+                              key={`student-phrase-${idx}`}
+                              type="button"
+                              onClick={() => setChatTypedMessage(phrase.text)}
+                              style={{
+                                padding: '6px 14px',
+                                borderRadius: '100px',
+                                background: '#ffffff',
+                                border: '1px solid #bbf7d0',
+                                color: '#15803d',
+                                fontSize: '0.88rem',
+                                fontWeight: 800,
+                                whiteSpace: 'nowrap',
+                                cursor: 'pointer',
+                                boxShadow: '0 1px 3px rgba(52, 168, 83, 0.08)',
+                                flexShrink: 0,
+                                minHeight: '38px',
+                                display: 'inline-flex',
+                                alignItems: 'center'
+                              }}
+                              className="hover-scale"
+                            >
+                              {phrase.label}
+                            </button>
+                          ))}
+                        </>
+                      )}
                     </div>
                   )}
 
@@ -11037,6 +11304,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                     borderTop: '1px solid #f1f5f9',
                     background: '#f8fafc',
                     display: 'flex',
+                    alignItems: 'center',
                     gap: '10px'
                   }}>
                     <input
@@ -11047,13 +11315,15 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                       onChange={e => setChatTypedMessage(e.target.value)}
                       style={{
                         flex: 1,
-                        padding: '10px 14px',
-                        borderRadius: '12px',
-                        border: '1px solid #e2e8f0',
+                        padding: '12px 20px',
+                        minHeight: '48px',
+                        borderRadius: '100px',
+                        border: '1.5px solid #cbd5e1',
                         background: isFrozen ? '#f1f5f9' : '#ffffff',
-                        fontSize: '0.85rem',
+                        fontSize: '0.98rem',
                         outline: 'none',
-                        fontWeight: 650
+                        fontWeight: 600,
+                        color: '#1e293b'
                       }}
                     />
                     {isCanceled ? (
@@ -11066,11 +11336,12 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                         style={{
                           background: '#f1f5f9',
                           color: '#475569',
-                          border: '1px solid #cbd5e1',
-                          borderRadius: '12px',
-                          padding: '10px 16px',
-                          fontSize: '0.85rem',
-                          fontWeight: 800,
+                          border: '1.5px solid #cbd5e1',
+                          borderRadius: '100px',
+                          padding: '10px 18px',
+                          minHeight: '46px',
+                          fontSize: '0.88rem',
+                          fontWeight: 850,
                           cursor: 'pointer',
                           display: 'flex',
                           alignItems: 'center',
@@ -11091,16 +11362,19 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                           background: '#ef4444',
                           color: '#ffffff',
                           border: 'none',
-                          borderRadius: '12px',
-                          padding: '10px 16px',
-                          fontSize: '0.85rem',
-                          fontWeight: 800,
+                          borderRadius: '100px',
+                          padding: '10px 18px',
+                          minHeight: '46px',
+                          fontSize: '0.88rem',
+                          fontWeight: 850,
                           cursor: 'pointer',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
                           flexShrink: 0
                         }}
+                        onMouseEnter={e => e.currentTarget.style.background = '#dc2626'}
+                        onMouseLeave={e => e.currentTarget.style.background = '#ef4444'}
                       >
                         Absagen
                       </button>
@@ -11109,21 +11383,25 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                       type="submit"
                       disabled={isFrozen || !chatTypedMessage.trim()}
                       style={{
-                        background: isFrozen || !chatTypedMessage.trim() ? '#cbd5e1' : 'linear-gradient(135deg, #34a853, #248a3d)',
+                        background: isFrozen || !chatTypedMessage.trim() ? '#cbd5e1' : '#34a853',
                         color: '#ffffff',
                         border: 'none',
-                        borderRadius: '12px',
-                        padding: '10px 16px',
-                        fontSize: '0.85rem',
-                        fontWeight: 800,
+                        borderRadius: '50%',
+                        width: '46px',
+                        height: '46px',
+                        fontSize: '0.88rem',
+                        fontWeight: 850,
                         cursor: isFrozen || !chatTypedMessage.trim() ? 'not-allowed' : 'pointer',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        flexShrink: 0
+                        flexShrink: 0,
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+                        transition: 'all 0.2s'
                       }}
+                      className={!isFrozen && chatTypedMessage.trim() ? 'hover-scale' : ''}
                     >
-                      Senden
+                      <Send size={18} color="#ffffff" />
                     </button>
                   </form>
                 </div>

@@ -1202,7 +1202,7 @@ export const ReconciliationTab: React.FC<ReconciliationTabProps> = ({
                   </button>
                 </div>
                 <div style={{ fontSize: '0.68rem', color: '#94a3b8', marginTop: '6px' }}>
-                  100% DSGVO-konform: Keine Klarnamen von Minderjährigen auf Bankauszügen.
+                  DSGVO-Datenminimierung: Keine Klarnamen von Minderjährigen auf Bankauszügen.
                 </div>
               </div>
 

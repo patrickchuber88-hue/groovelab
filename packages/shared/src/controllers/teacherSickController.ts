@@ -54,20 +54,6 @@ export async function reportSickHandler(req: Request, res: Response): Promise<vo
       return;
     }
 
-    // Compute sickness duration if we are ending the sick leave
-    let daysDiff = 0;
-    let formattedStartDate = '';
-    let formattedEndDate = '';
-    if (!sickUntilDate && teacher.sick_start) {
-      const startD = new Date(teacher.sick_start);
-      const endD = new Date();
-      startD.setHours(0, 0, 0, 0);
-      endD.setHours(0, 0, 0, 0);
-      daysDiff = Math.round((endD.getTime() - startD.getTime()) / (24 * 3600 * 1000)) + 1;
-      if (daysDiff < 1) daysDiff = 1;
-      formattedStartDate = startD.toLocaleDateString('de-DE');
-      formattedEndDate = endD.toLocaleDateString('de-DE');
-    }
 
     // 2. Fetch all teacher's schedules
     const { data: schedules, error: schedError } = await supabase
@@ -187,15 +173,14 @@ export async function reportSickHandler(req: Request, res: Response): Promise<vo
       }
     }
 
-    // Insert alert for Secretary Cockpit (Krisen-Dashboard)
+    // Insert alert for Secretary Cockpit (Ausfall-Cockpit)
     let alertMessage = '';
     if (!sickUntilDate) {
-      const durationStr = daysDiff > 0 ? ` (Krankheitsdauer: vom ${formattedStartDate} bis zum ${formattedEndDate}, ${daysDiff} ${daysDiff === 1 ? 'Tag' : 'Tage'})` : '';
-      alertMessage = `🟢 GESUNDMELDUNG: Lehrkraft ${teacher.first_name} ${teacher.last_name} hat sich wieder gesundgemeldet.${durationStr}`;
+      alertMessage = `🟢 WIEDER IM DIENST: Lehrkraft ${teacher.first_name} ${teacher.last_name} steht wieder regulär zur Verfügung.`;
     } else if (prevSickUntilStr && sickUntilDate !== prevSickUntilStr.substring(0, 10)) {
-      alertMessage = `🚨 KRANKHEITS-ANPASSUNG: Lehrkraft ${teacher.first_name} ${teacher.last_name} hat den Krankmeldungszeitraum auf den ${new Date(sickUntilDate).toLocaleDateString('de-DE')} geändert.`;
+      alertMessage = `🚨 TERMIN-ANPASSUNG: Lehrkraft ${teacher.first_name} ${teacher.last_name} hat den Abwesenheitszeitraum auf den ${new Date(sickUntilDate).toLocaleDateString('de-DE')} geändert.`;
     } else {
-      alertMessage = `🚨 NEUE KRANKMELDUNG: Lehrkraft ${teacher.first_name} ${teacher.last_name} hat sich bis zum ${new Date(sickUntilDate).toLocaleDateString('de-DE')} krankgemeldet.`;
+      alertMessage = `🚨 TERMINABSAGE: Lehrkraft ${teacher.first_name} ${teacher.last_name} hat Termine bis zum ${new Date(sickUntilDate).toLocaleDateString('de-DE')} abgesagt.`;
     }
 
     await supabase
@@ -203,7 +188,7 @@ export async function reportSickHandler(req: Request, res: Response): Promise<vo
       .insert({
         school_id: teacher.school_id,
         teacher_id: teacherId,
-        type: 'Teacher Illness Alert',
+        type: 'Teacher Absence Alert',
         message: alertMessage,
         resolved: false
       });

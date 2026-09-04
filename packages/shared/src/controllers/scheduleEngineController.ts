@@ -994,9 +994,9 @@ export async function swapScheduleHandler(req: Request, res: Response): Promise<
 }
 
 /**
- * Controller 5: LEHRER-KRANKHEITS-BYPASS & AUTOMATISIERTER ALARM-FLOW
+ * Controller 5: LEHRER-AUSFALL-STEUERUNG & AUTOMATISIERTER ALARM-FLOW
  * POST-Endpunkt: /api/teacher/sick
- * Setzt den Status aller heutigen Stunden auf 'teacher_sick', meldet dies ans Sekretariat und benachrichtigt Eltern.
+ * Setzt den Status aller heutigen Stunden auf 'teacher_sick' (storniert), meldet dies ans Sekretariat und benachrichtigt Eltern.
  */
 export async function reportTeacherIllnessHandler(req: Request, res: Response): Promise<void> {
   try {
@@ -1047,25 +1047,25 @@ export async function reportTeacherIllnessHandler(req: Request, res: Response): 
     }
 
     // 3. Insert HIGH PRIORITY Alert into 'system_alerts' for the Secretary
-    const alertMessage = `🚨 LEHRER-KRANKHEIT: Lehrkraft ${teacher.first_name} ${teacher.last_name} hat sich für heute krankgemeldet. ${updatedSchedules?.length || 0} Unterrichtsstunden entfallen.`;
+    const alertMessage = `🚨 TERMINABSAGE: Lehrkraft ${teacher.first_name} ${teacher.last_name} hat sich für heute abgemeldet. ${updatedSchedules?.length || 0} Unterrichtsstunden entfallen.`;
     
     const { error: alertError } = await supabase
       .from('system_alerts')
       .insert({
         school_id: teacher.school_id,
         teacher_id: teacherId,
-        type: 'Teacher Illness Alert',
+        type: 'Teacher Absence Alert',
         message: alertMessage,
         resolved: false
       });
 
     if (alertError) {
-      console.error('Failed to log illness alert:', alertError.message);
+      console.error('Failed to log absence alert:', alertError.message);
     }
 
     res.status(200).json({
       success: true,
-      message: 'Krankheitsmeldung erfolgreich registriert. Unterrichtsstunden storniert und Sekretariatsalarm ausgelöst.',
+      message: 'Terminabsage erfolgreich registriert. Unterrichtsstunden storniert und Ausfall-Cockpit benachrichtigt.',
       affectedSchedulesCount: updatedSchedules?.length || 0
     });
   } catch (err: any) {

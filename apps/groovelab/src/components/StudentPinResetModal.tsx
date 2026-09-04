@@ -57,10 +57,19 @@ export function StudentPinResetModal({
     }
   };
 
-  const handleWhatsAppShare = () => {
+  const handleShareInvite = async () => {
     const text = `Hallo! Hier ist der Link zur Vergabe einer neuen 4-stelligen PIN für ${studentDisplayName} bei Campus-Groovelab:\n\n${onboardingUrl}\n\nEinfach öffnen, Geburtstagstag bestätigen und neue 4-stellige PIN wählen.`;
-    const shareUrl = `https://wa.me/?text=${encodeURIComponent(text)}`;
-    window.open(shareUrl, '_blank', 'noopener,noreferrer');
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: `PIN-Reset für ${studentDisplayName}`,
+          text,
+          url: onboardingUrl
+        });
+        return;
+      } catch (err) {}
+    }
+    handleCopyLink();
   };
 
   return (
@@ -218,9 +227,9 @@ export function StudentPinResetModal({
         {/* Quick Action Buttons */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
           <button
-            onClick={handleWhatsAppShare}
+            onClick={handleShareInvite}
             style={{
-              background: '#25d366',
+              background: '#0284c7',
               color: '#ffffff',
               border: 'none',
               borderRadius: '14px',
@@ -232,14 +241,14 @@ export function StudentPinResetModal({
               alignItems: 'center',
               justifyContent: 'center',
               gap: '8px',
-              boxShadow: '0 2px 8px rgba(37, 211, 102, 0.25)',
+              boxShadow: '0 2px 8px rgba(2, 132, 199, 0.25)',
               transition: 'transform 0.1s'
             }}
             onMouseDown={e => e.currentTarget.style.transform = 'scale(0.97)'}
             onMouseUp={e => e.currentTarget.style.transform = ''}
           >
-            <MessageCircle size={18} />
-            <span>Per WhatsApp</span>
+            <Share2 size={18} />
+            <span>Einladung teilen</span>
           </button>
 
           <button

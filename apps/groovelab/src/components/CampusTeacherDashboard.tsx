@@ -6,6 +6,7 @@ import { PushNotificationSoftPromptModal } from './ui/PushNotificationSoftPrompt
 import { 
   Clock, 
   Calendar, 
+  CalendarX,
   Users, 
   Settings, 
   AlertTriangle, 
@@ -201,7 +202,7 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
   const [rescheduleNote, setRescheduleNote] = useState('');
   const [currentRescheduleIndex, setCurrentRescheduleIndex] = useState(0);
 
-  // Board 4: Krankheits-Bypass
+  // Board 4: Ausfall & Abwesenheit
   const [sickStartDate, setSickStartDate] = useState('');
   const [sickUntilDate, setSickUntilDate] = useState('');
   const [showCustomStart, setShowCustomStart] = useState(false);
@@ -1357,7 +1358,7 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
       return;
     }
 
-    const confirmMsg = `Möchtest du dich wirklich vom ${new Date(sickStartDate).toLocaleDateString('de-DE')} bis zum ${new Date(sickUntilDate).toLocaleDateString('de-DE')} krankmelden?`;
+    const confirmMsg = `Möchtest du die Unterrichtstermine vom ${new Date(sickStartDate + 'T00:00:00').toLocaleDateString('de-DE')} bis zum ${new Date(sickUntilDate + 'T00:00:00').toLocaleDateString('de-DE')} wirklich absagen?`;
 
     if (!confirm(confirmMsg)) return;
 
@@ -1372,7 +1373,7 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
       });
 
       if (resp.ok) {
-        alert('Krankheitsmeldung erfolgreich aktualisiert.');
+        alert('Terminabsage erfolgreich aktualisiert.');
       } else {
         // Direct Client-Side Supabase fallback
         const { data: profile, error: profileErr } = await supabase
@@ -1502,20 +1503,20 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
 
         // Add Secretary alarm ticket
         const alertMessage = prevSickUntilStr
-          ? `🚨 KRANKHEITS-ANPASSUNG: Lehrkraft ${profile.first_name} ${profile.last_name} hat den Krankmeldungszeitraum auf den ${new Date(sickUntilDate).toLocaleDateString('de-DE')} geändert.`
-          : `🚨 NEUE KRANKMELDUNG: Lehrkraft ${profile.first_name} ${profile.last_name} hat sich bis zum ${new Date(sickUntilDate).toLocaleDateString('de-DE')} krankgemeldet.`;
+          ? `🚨 TERMIN-ANPASSUNG: Lehrkraft ${profile.first_name} ${profile.last_name} hat den Abwesenheitszeitraum auf den ${new Date(sickUntilDate + 'T00:00:00').toLocaleDateString('de-DE')} geändert.`
+          : `🚨 TERMINABSAGE: Lehrkraft ${profile.first_name} ${profile.last_name} hat Termine bis zum ${new Date(sickUntilDate + 'T00:00:00').toLocaleDateString('de-DE')} abgesagt.`;
 
         await supabase
           .from('system_alerts')
           .insert({
             school_id: profile.school_id,
             teacher_id: userId,
-            type: 'Teacher Illness Alert',
+            type: 'Teacher Absence Alert',
             message: alertMessage,
             resolved: false
           });
 
-        alert('Krankheitsmeldung registriert! Stundenplandaten wurden angepasst und Krisenmodus-Meldung wurde gesendet.');
+        alert('Terminabsage registriert! Stundenplandaten wurden angepasst und das Ausfall-Cockpit wurde benachrichtigt.');
       }
 
       // Reload teacher profile and refresh data
@@ -1529,14 +1530,14 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
       await refreshAllData(updatedTeacher.school_id, updatedTeacher.id);
     } catch (err) {
       console.error(err);
-      alert('Fehler bei der Krankheitsmeldung.');
+      alert('Fehler bei der Terminabsage.');
     } finally {
       setReportingSick(false);
     }
   };
 
   const handleEndSick = async () => {
-    if (!confirm('Möchtest du dich wirklich wieder gesundmelden? Alle zukünftigen Krankheitsausfälle werden wieder aktiviert.')) return;
+    if (!confirm('Möchtest du die Abwesenheit wirklich beenden? Alle zukünftigen Termine werden wieder als regulär aktiviert.')) return;
 
     try {
       setReportingSick(true);
@@ -1549,7 +1550,7 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
       });
 
       if (resp.ok) {
-        alert('Gesundmeldung erfolgreich registriert.');
+        alert('Rückkehr in den Dienst erfolgreich registriert.');
       } else {
         // Direct Client-Side Supabase fallback
         const { data: profile, error: profileErr } = await supabase
@@ -1560,21 +1561,6 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
 
         if (profileErr || !profile) {
           throw new Error('Teacher profile not found.');
-        }
-
-        // Compute sickness duration before resetting
-        let daysDiff = 0;
-        let formattedStartDate = '';
-        let formattedEndDate = '';
-        if (profile.sick_start) {
-          const startD = new Date(profile.sick_start);
-          const endD = new Date();
-          startD.setHours(0, 0, 0, 0);
-          endD.setHours(0, 0, 0, 0);
-          daysDiff = Math.round((endD.getTime() - startD.getTime()) / (24 * 3600 * 1000)) + 1;
-          if (daysDiff < 1) daysDiff = 1;
-          formattedStartDate = startD.toLocaleDateString('de-DE');
-          formattedEndDate = endD.toLocaleDateString('de-DE');
         }
 
         // 1. Reset sick_until and sick_start to null to return to regular mode
@@ -1644,21 +1630,20 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
             .in('slot_start_datetime', datesToDeleteNotifs);
         }
 
-        // Add Secretary alarm ticket with logged duration
-        const durationStr = daysDiff > 0 ? ` (Krankheitsdauer: vom ${formattedStartDate} bis zum ${formattedEndDate}, ${daysDiff} ${daysDiff === 1 ? 'Tag' : 'Tage'})` : '';
-        const alertMessage = `🍏 LEHRKRAFT GESUND: Lehrkraft ${profile.first_name} ${profile.last_name} hat sich wieder gesund gemeldet.${durationStr}`;
+        // Add Secretary alert
+        const alertMessage = `🟢 WIEDER IM DIENST: Lehrkraft ${profile.first_name} ${profile.last_name} steht wieder regulär zur Verfügung.`;
 
         await supabase
           .from('system_alerts')
           .insert({
             school_id: profile.school_id,
             teacher_id: userId,
-            type: 'Teacher Healthy Alert',
+            type: 'Teacher Return Alert',
             message: alertMessage,
             resolved: false
           });
 
-        alert('Erfolgreich gesundgemeldet! Zukünftige Stunden wurden wieder aktiviert.');
+        alert('Erfolgreich zurückgemeldet! Zukünftige Unterrichtstermine wurden wieder aktiviert.');
       }
 
       setSickUntilDate('');
@@ -1979,8 +1964,8 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
                   : 'text-red-400 hover:text-red-300 hover:bg-red-950/20'
               }`}
             >
-              <AlertTriangle size={18} />
-              <span>Krankheits-Bypass</span>
+              <CalendarX size={18} />
+              <span>Ausfall &amp; Abwesenheit</span>
             </button>
 
             <button
@@ -2219,10 +2204,10 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
                       }}
                     >
                       <div style={{ flex: 1, minWidth: 0, paddingRight: '12px' }}>
-                        <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#fbbc05', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                        <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#fbbc05', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
                           {n.type} • {new Date(n.created_at).toLocaleDateString('de-DE')}
                         </div>
-                        <div style={{ fontSize: '0.8rem', color: '#cbd5e1', fontWeight: 600, marginTop: '3px', lineHeight: 1.3 }}>
+                        <div style={{ fontSize: '0.84rem', color: '#cbd5e1', fontWeight: 600, marginTop: '3px', lineHeight: 1.35 }}>
                           {n.message}
                         </div>
                       </div>
@@ -2244,9 +2229,10 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
                             background: '#fbbc05',
                             border: 'none',
                             color: '#1f2937',
-                            fontSize: '0.72rem',
+                            fontSize: '0.80rem',
                             fontWeight: 800,
-                            padding: '6px 12px',
+                            padding: '6px 14px',
+                            minHeight: '36px',
                             borderRadius: '8px',
                             cursor: 'pointer',
                             transition: 'all 0.2s',
@@ -2347,13 +2333,13 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
                             {isSick ? (
                               <div className="flex flex-col items-end gap-1" onClick={(e) => e.stopPropagation()}>
                                 <span className="px-2.5 py-1 text-[10px] font-black uppercase bg-red-500/10 text-red-400 border border-red-500/20 rounded-md">
-                                  Ausfall (Krankheit)
+                                  Ausfall (Terminabsage)
                                 </span>
                                 <button
                                   onClick={() => handleOpenProposeReschedule(sched)}
-                                  className="px-2 py-1 text-[9px] font-black uppercase rounded bg-amber-500 hover:bg-amber-400 text-slate-950 shadow transition flex items-center gap-1"
+                                  className="px-3 py-1.5 min-h-[36px] text-xs font-black uppercase rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 shadow transition flex items-center gap-1.5"
                                 >
-                                  <RefreshCw size={10} /> Ersatztermin anbieten
+                                  <RefreshCw size={13} /> Ersatztermin anbieten
                                 </button>
                               </div>
                             ) : !sched.student ? (
@@ -2367,9 +2353,9 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
                                 </span>
                                 <button
                                   onClick={() => handleOpenProposeReschedule(sched)}
-                                  className="px-2 py-1 text-[9px] font-black uppercase rounded bg-amber-500 hover:bg-amber-400 text-slate-950 shadow transition flex items-center gap-1"
+                                  className="px-3 py-1.5 min-h-[36px] text-xs font-black uppercase rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 shadow transition flex items-center gap-1.5"
                                 >
-                                  <RefreshCw size={10} /> Ersatztermin anbieten
+                                  <RefreshCw size={13} /> Ersatztermin anbieten
                                 </button>
                               </div>
                             ) : sched.status === 'pending_reschedule' ? (
@@ -2380,13 +2366,13 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
                                 <div className="flex gap-1.5" onClick={(e) => e.stopPropagation()}>
                                   <button
                                     onClick={() => handleTeacherResolveReschedule(sched.schedule_id, true)}
-                                    className="px-2 py-1 text-[9px] font-bold uppercase rounded bg-emerald-500 hover:bg-emerald-400 text-slate-950 transition"
+                                    className="px-3 py-1.5 min-h-[36px] text-xs font-bold uppercase rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 transition"
                                   >
                                     Annehmen
                                   </button>
                                   <button
                                     onClick={() => handleTeacherResolveReschedule(sched.schedule_id, false)}
-                                    className="px-2 py-1 text-[9px] font-bold uppercase rounded bg-slate-850 hover:bg-slate-755 text-slate-300 border border-slate-700 transition"
+                                    className="px-3 py-1.5 min-h-[36px] text-xs font-bold uppercase rounded-lg bg-slate-850 hover:bg-slate-755 text-slate-300 border border-slate-700 transition"
                                   >
                                     Ablehnen
                                   </button>
@@ -2597,15 +2583,15 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
           </div>
         )}
 
-        {/* Board 4: KRANKHEITS-BYPASS */}
+        {/* Board 4: AUSFALL & ABWESENHEIT */}
         {activeBoard === 'bypass' && (
           <div className="p-8 max-w-lg w-full mx-auto space-y-6">
             <div className="bg-red-950/10 border border-red-900/35 rounded-3xl p-8 space-y-6">
               <div className="flex items-center gap-4 text-red-400">
-                <AlertTriangle size={36} className={teacher?.sick_until ? 'animate-pulse' : ''} />
+                <CalendarX size={36} className={teacher?.sick_until ? 'animate-pulse' : ''} />
                 <div>
-                  <h1 className="text-2xl font-black text-white">Krankheits-Bypass</h1>
-                  <p className="text-xs font-bold uppercase tracking-wider text-red-400/90 mt-0.5">Notfall-Bypass-Schalter</p>
+                  <h1 className="text-2xl font-black text-white">Ausfall &amp; Abwesenheit</h1>
+                  <p className="text-xs font-bold uppercase tracking-wider text-red-400/90 mt-0.5">Unterrichtsausfall &amp; Disposition</p>
                 </div>
               </div>
 
@@ -2623,15 +2609,15 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
                   gap: '6px'
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#f87171', fontWeight: 800, textTransform: 'uppercase', fontSize: '10px', letterSpacing: '0.1em' }}>
-                    <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-ping"></span> status: AKTIV KRANKGEMELDET
+                    <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-ping"></span> STATUS: ABWESEND GEMELDET
                   </div>
                   <div className="text-white text-sm font-semibold mt-1">
-                    Krankgemeldet vom {teacher.sick_start ? new Date(teacher.sick_start).toLocaleDateString('de-DE') : 'Sofort'} bis {new Date(teacher.sick_until).toLocaleDateString('de-DE')}
+                    Abwesend vom {teacher.sick_start ? new Date(teacher.sick_start + 'T00:00:00').toLocaleDateString('de-DE') : 'Sofort'} bis {new Date(teacher.sick_until + 'T00:00:00').toLocaleDateString('de-DE')}
                   </div>
                 </div>
               ) : (
                 <p className="text-sm text-slate-300 font-medium leading-relaxed">
-                  Falls du dich krankmelden musst, wähle bitte das voraussichtliche Start- und Enddatum aus. Alle in diesem Zeitraum betroffenen Stundenplandaten werden automatisch storniert und als Krankheitsausfall rot markiert. Zudem wird ein Alarmticket an das Krisen-Dashboard der Verwaltung gesendet.
+                  Falls du Termine absagen musst, wähle bitte das voraussichtliche Start- und Enddatum aus. Alle in diesem Zeitraum betroffenen Unterrichtstermine werden automatisch storniert und als Ausfall markiert. Zudem wird eine Benachrichtigung an das Ausfall-Cockpit der Disposition gesendet.
                 </p>
               )}
 
@@ -2639,7 +2625,7 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
                 {!showCustomStart ? (
                   <div className="space-y-2">
                     <label className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                      {teacher?.sick_until ? 'Krankmeldung anpassen (bis einschließlich):' : 'Krank bis einschließlich:'}
+                      {teacher?.sick_until ? 'Abwesenheitszeitraum anpassen (bis einschließlich):' : 'Ausfall bis einschließlich:'}
                     </label>
                     <input
                       type="date"
@@ -2660,7 +2646,7 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
                 ) : (
                   <div className="space-y-2">
                     <label className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                      Krankmeldungs-Zeitraum:
+                      Abwesenheits-Zeitraum:
                     </label>
                     <div className="flex items-center gap-2 bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white font-semibold">
                       <span className="text-slate-400 text-xs font-black uppercase tracking-wider">von</span>
@@ -2701,7 +2687,7 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
                     disabled={reportingSick}
                     className="w-full py-4 bg-red-600 hover:bg-red-500 disabled:bg-red-800 text-white font-black text-sm uppercase tracking-widest rounded-xl transition duration-200 shadow-lg shadow-red-900/35"
                   >
-                    {reportingSick ? 'Aktualisiere...' : teacher?.sick_until ? 'Krankmeldungszeitraum anpassen' : 'Krankheit offiziell melden'}
+                    {reportingSick ? 'Aktualisiere...' : teacher?.sick_until ? 'Abwesenheitszeitraum anpassen' : 'Terminabsage jetzt einreichen'}
                   </button>
 
                   {teacher?.sick_until && (
@@ -2711,7 +2697,7 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
                       className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-800 text-white font-black text-sm uppercase tracking-widest rounded-xl transition duration-200 shadow-lg shadow-emerald-900/20 flex items-center justify-center gap-2"
                     >
                       <Check size={18} />
-                      {reportingSick ? 'Gesundmelden...' : 'Wieder gesund melden'}
+                      {reportingSick ? 'Melde wieder im Dienst...' : 'Wieder im Dienst melden'}
                     </button>
                   )}
                 </div>

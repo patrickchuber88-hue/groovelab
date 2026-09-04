@@ -143,15 +143,15 @@ Deno.serve(async (req) => {
       },
     })
 
-    // 1. Fetch user strictly by their secret QR token or dedicated teacher token (prevent ID guessing)
-    const userQuery = supabase
-      .from('users')
-      .select('id, first_name, last_name, role, school_id')
-      .or(`qr_token.eq.${token},teacher_qr_token.eq.${token}`);
-    const { data: user, error: userErr } = await userQuery.maybeSingle();
+    // 1. Fetch user strictly by dedicated calendar_token (Zero-Credential-Leakage)
+    const { data: user, error: userErr } = await supabase
+      .from('users_raw')
+      .select('id, first_name, last_name, role, school_id, calendar_token')
+      .eq('calendar_token', token)
+      .maybeSingle();
 
     if (userErr) {
-      console.error('Error querying user by token:', userErr)
+      console.error('Error querying user by calendar_token:', userErr)
       return new Response(
         JSON.stringify({ error: 'Internal server database error' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -159,9 +159,25 @@ Deno.serve(async (req) => {
     }
 
     if (!user) {
+      // Check if caller used a deprecated legacy login credential (qr_token)
+      const { data: legacyUser } = await supabase
+        .from('users_raw')
+        .select('id')
+        .or(`qr_token.eq.${token},teacher_qr_token.eq.${token}`)
+        .maybeSingle();
+
+      if (legacyUser) {
+        return new Response(
+          JSON.stringify({
+            error: 'Sicherheits-Update: Veralteter Kalender-Link. Bitte erstelle deinen Kalender-Link in der Campus-App neu (1 Klick).'
+          }),
+          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json; charset=utf-8' } }
+        );
+      }
+
       return new Response(
-        JSON.stringify({ error: 'Invalid or expired subscription token' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ error: 'Ungültiger oder abgelaufener Kalender-Schlüssel' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json; charset=utf-8' } }
       )
     }
 
@@ -503,11 +519,11 @@ Deno.serve(async (req) => {
     }
 
     // 7. Generate RFC 5545 iCalendar data stream
-    const calendarName = `Campus & Unterricht (${first_name} ${last_name})`
+    const calendarName = role === 'student' ? `Campus & Musikunterricht (${first_name})` : `Campus & Unterricht (${first_name} ${last_name})`
     let icsContent = [
       'BEGIN:VCALENDAR',
       'VERSION:2.0',
-      'PRODID:-//Groovelab//Campus Calendar//DE',
+      'PRODID:-//Campus-Groovelab//Campus Calendar//DE',
       'CALSCALE:GREGORIAN',
       'METHOD:PUBLISH',
       `X-WR-CALNAME:${calendarName}`,
@@ -593,14 +609,14 @@ Deno.serve(async (req) => {
       const prefix = occ.status === 'pending_reschedule'
         ? '🔄 ÄNDERUNG ANGEFRAGT: '
         : occ.status === 'teacher_sick' || occ.status === 'canceled_by_teacher_sick'
-        ? '🤒 AUSFALL: '
+        ? 'AUSFALL: '
         : isCanceled
         ? '❌ ABGESAGT: '
         : '🎵 '
 
       let summary = ''
       if (role === 'student') {
-        summary = `${prefix}Unterricht bei ${teacherName}`
+        summary = `${prefix}${studentFirstName}: Musikunterricht bei ${teacherName}${instrumentSuffix}`
       } else {
         summary = `${prefix}Unterricht: ${studentName}${instrumentSuffix}`
       }
@@ -610,7 +626,7 @@ Deno.serve(async (req) => {
       if (occ.status === 'pending_reschedule') {
         statusDesc = 'Verschiebung angefragt 🔄'
       } else if (occ.status === 'teacher_sick' || occ.status === 'canceled_by_teacher_sick') {
-        statusDesc = 'Ausfall (Lehrer krank) 🤒'
+        statusDesc = 'Ausfall (Terminabsage)'
       } else if (isCanceled) {
         statusDesc = 'Abgesagt ❌'
       }
@@ -618,6 +634,9 @@ Deno.serve(async (req) => {
       let descriptionLines = []
       descriptionLines.push(`Status: ${statusDesc}`)
       descriptionLines.push(`Partner: ${role === 'student' ? teacherName : studentName}`)
+      if (role === 'student') {
+        descriptionLines.push(`Schüler: ${studentFirstName}`)
+      }
       if (occ.student && occ.student.instrument) {
         descriptionLines.push(`Instrument: ${occ.student.instrument}`)
       }
@@ -625,6 +644,7 @@ Deno.serve(async (req) => {
       if (occ.duration) {
         descriptionLines.push(`Dauer: ${occ.duration} Minuten`)
       }
+      descriptionLines.push('Hinweis: Externe Kalender synchronisieren zeitverzögert. Rechtlich verbindlich bei Ausfall oder Raumwechsel ist stets die Campus-Groovelab App.')
       descriptionLines.push('Plattform: Campus-Groovelab')
       descriptionLines.push('Direktlink: https://app.campus-groovelab.de/campus/homework')
       
@@ -643,7 +663,7 @@ Deno.serve(async (req) => {
       const color = isBandOrEnsemble ? '#1a73e8' : '#137333';
 
       icsContent.push('BEGIN:VEVENT')
-      icsContent.push(`UID:${occ.id}@groovelab.de`)
+      icsContent.push(`UID:${occ.id}@campus-groovelab.de`)
       icsContent.push(`DTSTAMP:${stampStr}Z`)
       icsContent.push(`DTSTART;TZID=Europe/Berlin:${dtStartStr}`)
       icsContent.push(`DTEND;TZID=Europe/Berlin:${dtEndStr}`)
@@ -676,7 +696,7 @@ Deno.serve(async (req) => {
       const locName = ev.room?.name || ev.location_extern || 'Musikschule';
 
       icsContent.push('BEGIN:VEVENT');
-      icsContent.push(`UID:${ev.id}@groovelab.de`);
+      icsContent.push(`UID:${ev.id}@campus-groovelab.de`);
       icsContent.push(`DTSTAMP:${stampStr}Z`);
 
       const startDayStr = formatAllDayDate(ev.event_date);
@@ -704,6 +724,7 @@ Deno.serve(async (req) => {
       const catLower = (ev.category || '').toLowerCase();
       if (catLower.includes('ferien') || catLower.includes('feiertag')) {
         color = '#8f9099';
+        icsContent.push('TRANSP:TRANSPARENT');
       } else if (catLower.includes('planung')) {
         color = '#a062ff';
       } else if (catLower.includes('band') || catLower.includes('ensemble')) {
@@ -717,7 +738,7 @@ Deno.serve(async (req) => {
     // 7c. Write Subscribed External Calendar Events - ALWAYS as all-day events
     for (const ev of subscribedEvents) {
       icsContent.push('BEGIN:VEVENT');
-      icsContent.push(`UID:ext-${ev.id}@groovelab.de`);
+      icsContent.push(`UID:ext-${ev.id}@campus-groovelab.de`);
       icsContent.push(`DTSTAMP:${stampStr}Z`);
 
       const startDayStr = formatAllDayDate(ev.event_date);
@@ -742,9 +763,10 @@ Deno.serve(async (req) => {
 
       // Subscribed external event colors
       let color = '#e37400';
-      const catLower = (ev.category || '').toLowerCase();
-      if (catLower.includes('ferien') || catLower.includes('feiertag')) {
+      const extCatLower = (ev.category || '').toLowerCase();
+      if (extCatLower.includes('ferien') || extCatLower.includes('feiertag')) {
         color = '#8f9099';
+        icsContent.push('TRANSP:TRANSPARENT');
       }
       icsContent.push(`COLOR:${color}`);
 
@@ -755,13 +777,32 @@ Deno.serve(async (req) => {
 
     const icsBody = icsContent.join('\r\n')
 
+    // Deterministic ETag calculation for RFC 7232 HTTP 304 conditional validation
+    const encoder = new TextEncoder()
+    const data = encoder.encode(icsBody)
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data)
+    const hashArray = Array.from(new Uint8Array(hashBuffer))
+    const etag = `"${hashArray.slice(0, 16).map(b => b.toString(16).padStart(2, '0')).join('')}"`
+
+    if (req.headers.get('if-none-match') === etag) {
+      return new Response(null, {
+        status: 304,
+        headers: {
+          ...corsHeaders,
+          'ETag': etag,
+          'Cache-Control': 'private, max-age=1800, stale-while-revalidate=3600'
+        }
+      })
+    }
+
     return new Response(icsBody, {
       status: 200,
       headers: {
         ...corsHeaders,
         'Content-Type': 'text/calendar; charset=utf-8',
-        'Content-Disposition': `attachment; filename="groovelab-unterricht.ics"`,
-        'Cache-Control': 'public, max-age=3600'
+        'Content-Disposition': `attachment; filename="campus-groovelab-unterricht.ics"`,
+        'ETag': etag,
+        'Cache-Control': 'private, max-age=1800, stale-while-revalidate=3600'
       }
     })
 

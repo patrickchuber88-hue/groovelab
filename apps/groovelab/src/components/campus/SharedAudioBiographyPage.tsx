@@ -753,20 +753,21 @@ export const SharedAudioBiographyPage: React.FC<SharedAudioBiographyPageProps> =
 
   const activeTrackObj = tracks.find(t => t.id === activePlayingId) || tracks[currentTrackIndex];
 
-  const handleShareToApp = (platform: 'whatsapp' | 'copy') => {
+  const handleShareToApp = (platform?: 'share' | 'copy') => {
     const url = window.location.href;
     const pin = getExpectedPin();
     const fullText = `🎵 Höre dir meine neuesten Songs aus der Musikschule an!\n\n1. Link öffnen: ${url}\n2. Familien-PIN eingeben: ${pin}\n\n🔒 WICHTIGER RECHTSHINWEIS (§ 15 Abs. 3 UrhG):\nDieser Link & PIN sind ausschließlich für den privaten Familienkreis bestimmt. Ein öffentliches Teilen (z. B. auf Social Media, Instagram, TikTok oder Websites) ist urheberrechtlich strengstens untersagt.`;
 
-    if (platform === 'whatsapp') {
-      window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(fullText)}`, '_blank');
-    } else {
-      if (navigator.clipboard) {
-        navigator.clipboard.writeText(fullText);
-        setCopySuccess(true);
-        setTimeout(() => setCopySuccess(false), 2500);
-        showToast('📋 Vollständige Einladung mit PIN in Zwischenablage kopiert!');
-      }
+    if (platform === 'share' && navigator.share) {
+      navigator.share({ title: 'Musikschule Playlist', text: fullText, url }).catch(() => {});
+      return;
+    }
+
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(fullText);
+      setCopySuccess(true);
+      setTimeout(() => setCopySuccess(false), 2500);
+      showToast('📋 Vollständige Einladung mit PIN in Zwischenablage kopiert!');
     }
   };
 
@@ -2135,7 +2136,7 @@ export const SharedAudioBiographyPage: React.FC<SharedAudioBiographyPageProps> =
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <Shield size={12} color="#10b981" />
-            <span>100% DSGVO-konform • Geschützt nach §§ 15 Abs. 3, 53 UrhG</span>
+            <span>DSGVO-konform • Geschützt nach §§ 15 Abs. 3, 53 UrhG</span>
           </div>
         </div>
       </div>
