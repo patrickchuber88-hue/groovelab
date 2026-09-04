@@ -19061,14 +19061,10 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                     {flamesActive && (
                       <div style={{ 
                         position: 'relative', overflow: 'hidden',
-                        background: studentUiLevel === 'junior'
-                          ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)'
-                          : 'linear-gradient(135deg, #ff4b4b 0%, #dc2626 100%)',
+                        background: 'linear-gradient(135deg, #ff4b4b 0%, #dc2626 100%)',
                         color: 'white',
                         borderRadius: '28px',
-                        boxShadow: studentUiLevel === 'junior'
-                          ? '0 14px 30px -6px rgba(245, 158, 11, 0.35)'
-                          : '0 14px 30px -6px rgba(239, 68, 68, 0.35)',
+                        boxShadow: '0 14px 30px -6px rgba(239, 68, 68, 0.35)',
                         display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
                         minHeight: '100px',
                         padding: '20px 24px',
@@ -19948,11 +19944,19 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                     padding: isMusicStandMode ? '6px 14px' : '5px 12px',
                                     borderRadius: '100px',
                                     border: isGoalAchieved ? '1.5px solid #ddd6fe' : '1.5px solid #c7d2fe',
-                                    whiteSpace: 'nowrap'
+                                    whiteSpace: 'nowrap',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '6px'
                                   }}>
-                                    {isGoalAchieved 
-                                      ? `⭐ ${streak === 0 ? 'Startklar' : streak} ${streak === 1 ? 'Tag' : 'Tage'} • Stern gesichert ✅` 
-                                      : (streak === 0 ? 'Startklar 🚀' : `🚀 ${streak} ${streak === 1 ? 'Tag' : 'Tage'} Serie`)}
+                                    {isGoalAchieved ? (
+                                      <>
+                                        <span>{streak === 0 ? 'Startklar' : streak} {streak === 1 ? 'Tag' : 'Tage'} • Stern gesichert</span>
+                                        <Check size={14} strokeWidth={3} color="#6d28d9" style={{ flexShrink: 0 }} />
+                                      </>
+                                    ) : (
+                                      <span>{streak === 0 ? 'Startklar' : `${streak} ${streak === 1 ? 'Tag' : 'Tage'} Serie`}</span>
+                                    )}
                                   </span>
                                 </div>
 
@@ -19962,15 +19966,15 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                   </div>
                                   <h3 style={{ margin: '4px 0 0 0', fontSize: isMusicStandMode ? '1.55rem' : '1.38rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em' }}>
                                     {isGoalAchieved 
-                                      ? 'Tages-Stern entzündet! ⭐' 
+                                      ? 'Tages-Stern entzündet!' 
                                       : `Tagesziel: ${requiredMins} Minuten`}
                                   </h3>
                                   <p style={{ margin: '4px 0 0 0', fontSize: isMusicStandMode ? '1.05rem' : '0.92rem', color: isGoalAchieved ? '#5b21b6' : '#64748b', fontWeight: 650, lineHeight: 1.4 }}>
                                     {isGoalAchieved 
-                                      ? `Heute ${todayMins} Min. geübt • Dein Stern leuchtet sicher! ⭐` 
+                                      ? `Heute ${todayMins} Min. geübt • Dein Stern leuchtet sicher!` 
                                       : hasPracticedSome 
-                                        ? `${todayMins} von ${requiredMins} Min. geschafft 🚀` 
-                                        : `${requiredMins} Min. üben & Stern entzünden! ⭐`}
+                                        ? `${todayMins} von ${requiredMins} Min. geschafft` 
+                                        : `${requiredMins} Min. üben & Stern entzünden`}
                                   </p>
 
                                   {/* Progress bar */}
@@ -20001,7 +20005,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                                 fontWeight: 900
                               }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                  <span style={{ fontSize: '1.1rem' }}>{streak >= 9 ? '👑' : streak >= 4 ? '⭐⭐' : '⭐'}</span>
+                                  <Star size={16} fill="#6366f1" color="#6366f1" style={{ flexShrink: 0 }} />
                                   <span style={{ color: '#4338ca' }}>
                                     {streak >= 9 ? 'Sternen-Königsstufe' : streak >= 4 ? 'Sternen-Stufe 2' : 'Sternen-Stufe 1'}
                                   </span>
