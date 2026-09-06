@@ -53,6 +53,7 @@ import {
 import { fetchHolidaysCached } from '../utils/holidayHelper';
 import { downloadCsvFile } from '../utils/csvHelper';
 import { logSecurityEvent } from '../services/auditLogService';
+import { areArraysEqualFast, areObjectsEqualFast } from '../utils/fastCompare';
 
 const cleanRoomName = (name: string | null | undefined): string => {
   if (!name) return 'Unbenannter Raum';
@@ -1792,7 +1793,7 @@ export function AdminDashboard({
     }
 
     setAdmin((prev: any) => {
-      if (prev && JSON.stringify(prev) === JSON.stringify(adminData)) return prev;
+      if (prev && areObjectsEqualFast(prev, adminData)) return prev;
       return adminData;
     });
     currentAdmin = adminData;
@@ -1845,7 +1846,7 @@ export function AdminDashboard({
 
           // Immediately render student list without stalling on DB mutations
           setStudents(prev => {
-            if (prev && JSON.stringify(prev) === JSON.stringify(activeStudentsForState)) return prev;
+            if (prev && areArraysEqualFast(prev, activeStudentsForState)) return prev;
             return activeStudentsForState;
           });
 
@@ -1885,7 +1886,7 @@ export function AdminDashboard({
             .is('check_out_time', null);
           setActiveSessions(prev => {
             const nextVal = sData || [];
-            if (prev && JSON.stringify(prev) === JSON.stringify(nextVal)) return prev;
+            if (prev && areArraysEqualFast(prev, nextVal)) return prev;
             return nextVal;
           });
 
@@ -1940,135 +1941,37 @@ export function AdminDashboard({
         setKiosks(kiosksData || []);
       }
 
-      try {
-        const { data: prefData } = await supabase
-          .from('student_schedule_preferences')
-          .select('student_id, preference_type, day_of_week, start_time');
-        if (prefData) {
-          const map: Record<string, any[]> = {};
-          prefData.forEach((p: any) => {
-            if (!map[p.student_id]) map[p.student_id] = [];
-            map[p.student_id].push(p);
-          });
-          setAllSchedulePreferences(map);
+      if (activeTab === 'students' || activeTab === 'schedule') {
+        try {
+          const { data: prefData } = await supabase
+            .from('student_schedule_preferences')
+            .select('student_id, preference_type, day_of_week, start_time')
+            .eq('school_id', currentAdmin.school_id);
+          if (prefData) {
+            const map: Record<string, any[]> = {};
+            prefData.forEach((p: any) => {
+              if (!map[p.student_id]) map[p.student_id] = [];
+              map[p.student_id].push(p);
+            });
+            setAllSchedulePreferences(map);
+          }
+        } catch (e) {
+          console.warn('Failed to fetch schedule preferences:', e);
         }
-      } catch (e) {
-        console.warn('Failed to fetch schedule preferences:', e);
       }
       const adminData = currentAdmin;
 
-      // Unconditionally fetch active sessions to keep online indicators and Live Lab realtime
-      try {
-        const { data: activeSessionsData } = await supabase
-          .from('sessions')
-          .select('*, profiles:users!inner(*), stations(*)')
-          .eq('profiles.school_id', adminData.school_id)
-          .is('check_out_time', null);
-        setActiveSessions(activeSessionsData || []);
-      } catch (err) {
-        console.warn('Failed to fetch active sessions:', err);
-      }
-
       if (activeTab === 'live') {
-        // Already fetched above
-      } else if (activeTab === 'students') {
-        // ─── Student Visibility Rules ──────────────────────────────────────────
-        //  • Admin / Secretary in Campus:    is_campus_active = true (all school)
-        //  • Admin / Secretary in GrooveLab: is_groovelab_active = true (all school)
-        //  • Teacher in Campus:              all own assigned pupils (teacher_id, no activation filter)
-        //  • Teacher in GrooveLab:           ALL groovelab-active students school-wide
-        //                                    (no teacher_id filter — GrooveLab is a shared platform)
-        // ──────────────────────────────────────────────────────────────────────
-        const activeWorkspace = typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_active_workspace') || localStorage.getItem('groovelab_active_workspace')) : null;
-        const isTeacherMode = adminData.role === 'teacher' || activeWorkspace === 'teacher';
-        const canSeeAllStudents = (adminData.role === 'admin' || adminData.role === 'secretary') && !isTeacherMode;
-        let studentsData: any[] = [];
-
-        if (canSeeAllStudents) {
-          const schoolRoster = await fetchSchoolRoster(adminData.school_id, supabase);
-          studentsData = activePlatform === 'groovelab' 
-            ? schoolRoster.filter(s => s.is_groovelab_active) 
-            : schoolRoster;
-        } else {
-          studentsData = await fetchTeacherStudentsHelper(adminData.id, adminData.school_id, activePlatform);
-        }
-
-        if (studentsData) {
-          // --- AUTO-CLEANUP DELETED/ARCHIVED STUDENTS ---
-          const expiredStudents = studentsData.filter((s: any) => s.contract_ends_at && new Date(s.contract_ends_at).getTime() < Date.now());
-          const expiredIds = expiredStudents.map((s: any) => s.id);
-          
-          let activeStudentsForState = studentsData;
-
-          if (expiredIds.length > 0) {
-            // Remove all expired users from bands to free the spot
-            await supabase.from('band_members').delete().in('user_id', expiredIds);
-            
-            // Hard delete users who requested deletion
-            const toDelete = expiredStudents.filter((s: any) => s.delete_after_contract === true).map((s: any) => s.id);
-            if (toDelete.length > 0) {
-              await deleteUserStorageAssets(toDelete);
-              await supabase.from('bands').update({ coach_id: null }).in('coach_id', toDelete);
-              await supabase.from('user_song_skills').delete().in('user_id', toDelete);
-              await supabase.from('user_song_skills').update({ verified_by_id: null }).in('verified_by_id', toDelete);
-              await supabase.from('sessions').delete().in('user_id', toDelete);
-              await supabase.from('band_songs').update({ suggested_by: null }).in('suggested_by', toDelete);
-              await supabase.from('lab_planning').delete().in('user_id', toDelete);
-              await supabase.from('band_shoutbox').delete().in('user_id', toDelete);
-              await supabase.from('band_song_slots').delete().in('user_id', toDelete);
-              await supabase.from('help_requests').delete().in('user_id', toDelete);
-              await supabase.from('avatars').delete().in('user_id', toDelete);
-              await supabase.from('users').delete().in('id', toDelete);
-              
-              activeStudentsForState = studentsData.filter((s: any) => !toDelete.includes(s.id));
-            }
-          }
-
-          setStudents(activeStudentsForState);
-          const studentIds = activeStudentsForState.map((s: any) => s.id);
-          
-          // Fetch active sessions for school's students
-          const { data: sData } = await supabase
+        // Unconditionally fetch active sessions to keep online indicators and Live Lab realtime
+        try {
+          const { data: activeSessionsData } = await supabase
             .from('sessions')
             .select('*, profiles:users!inner(*), stations(*)')
             .eq('profiles.school_id', adminData.school_id)
             .is('check_out_time', null);
-          setActiveSessions(sData || []);
-
-          if (studentIds.length > 0) {
-            // Fetch skills for XP calculation
-            const { data: skillsData } = await supabase
-              .from('user_song_skills')
-              .select('user_id, instrument, is_stage_ready')
-              .in('user_id', studentIds);
-
-            // Fetch band song slots for Vocals XP
-            const { data: slotsData } = await supabase
-              .from('band_song_slots')
-              .select('user_id, instrument, status')
-              .in('user_id', studentIds);
-
-            const xpMap: Record<string, number> = {};
-            studentsData.forEach(student => {
-              const studentSkills = (skillsData || []).filter(sk => sk.user_id === student.id);
-              const studentSlots = (slotsData || []).filter(sl => sl.user_id === student.id);
-
-              const stageReadyCount = studentSkills.filter(sk => {
-                const isVocal = (sk.instrument || '').toLowerCase().includes('vocal') || (sk.instrument || '').toLowerCase().includes('gesang');
-                return sk.is_stage_ready && !isVocal;
-              }).length;
-
-              const vocalsCount = studentSlots.filter(sl => {
-                const isVocal = (sl.instrument || '').toLowerCase().includes('vocal') || (sl.instrument || '').toLowerCase().includes('gesang');
-                return isVocal && sl.status !== 'declined';
-              }).length;
-
-              xpMap[student.id] = (stageReadyCount + vocalsCount) * 100;
-            });
-            setStudentsXP(xpMap);
-          } else {
-            setStudentsXP({});
-          }
+          setActiveSessions(activeSessionsData || []);
+        } catch (err) {
+          console.warn('Failed to fetch active sessions:', err);
         }
       } else if (activeTab === 'team') {
         let tsq = supabase
@@ -2243,25 +2146,6 @@ export function AdminDashboard({
           .order('sort_order', { ascending: true })
           .order('name');
 
-        if (roomsData && stationsData) {
-          const missingLehrerInserts = [];
-          for (const room of roomsData) {
-            const hasLehrer = stationsData.some(s => s.room_id === room.id && s.name.toLowerCase() === 'lehrer ipad');
-            if (!hasLehrer) {
-              missingLehrerInserts.push({
-                room_id: room.id,
-                name: 'Lehrer iPad',
-                color: '#34a853'
-              });
-            }
-          }
-          if (missingLehrerInserts.length > 0) {
-            const { data: newStations } = await supabase.from('stations').insert(missingLehrerInserts).select();
-            if (newStations) {
-              stationsData = [...stationsData, ...newStations];
-            }
-          }
-        }
         if (stationsData) setStations(stationsData);
       } else if (activeTab === 'songs') {
         let sq = supabase

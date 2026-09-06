@@ -120,13 +120,34 @@ export function deduplicateRoster(students: RosterStudent[]): RosterStudent[] {
   );
 }
 
+import { dedupeQuery } from '../utils/dedupeQuery';
+
+const inMemoryRoster = new Map<string, { timestamp: number; data: RosterStudent[] }>();
+const ROSTER_CACHE_TTL_MS = 20 * 1000; // 20 seconds fast in-memory TTL
+
+export function invalidateSchoolRosterCache(schoolId?: string): void {
+  if (schoolId) {
+    inMemoryRoster.delete(schoolId);
+  } else {
+    inMemoryRoster.clear();
+  }
+}
+
 /**
  * Fetches and resolves the complete, authoritative student roster for a music school.
  * Merges registered `users` and decrypted `pending_students_decrypted` without duplicates or phantom stubs.
  */
-export async function fetchSchoolRoster(schoolId: string, supabaseClient: any): Promise<RosterStudent[]> {
+export async function fetchSchoolRoster(schoolId: string, supabaseClient: any, force = false): Promise<RosterStudent[]> {
   if (!schoolId || !supabaseClient) return [];
 
+  if (!force && inMemoryRoster.has(schoolId)) {
+    const cached = inMemoryRoster.get(schoolId)!;
+    if (Date.now() - cached.timestamp < ROSTER_CACHE_TTL_MS) {
+      return cached.data;
+    }
+  }
+
+  return dedupeQuery(`school_roster_${schoolId}`, async () => {
   // 1. Fetch registered students from users table
   const { data: regUsers, error: regError } = await supabaseClient
     .from('users')
@@ -206,8 +227,11 @@ export async function fetchSchoolRoster(schoolId: string, supabaseClient: any): 
     console.warn('[StudentRosterService] Pending students fetch warning:', err);
   }
 
-  // 3. Deduplicate and return authoritative roster
-  return deduplicateRoster([...registeredStudents, ...pendingMapped]);
+    // 3. Deduplicate and return authoritative roster
+    const roster = deduplicateRoster([...registeredStudents, ...pendingMapped]);
+    inMemoryRoster.set(schoolId, { timestamp: Date.now(), data: roster });
+    return roster;
+  });
 }
 
 /**

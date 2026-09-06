@@ -4444,7 +4444,8 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
           .eq('school_id', schoolId),
         supabase
           .from('activation_days')
-          .select('student_id, day_of_birth'),
+          .select('student_id, day_of_birth')
+          .eq('school_id', schoolId),
         supabase
           .from('schedules')
           .select('status, teacher_id, student_id')

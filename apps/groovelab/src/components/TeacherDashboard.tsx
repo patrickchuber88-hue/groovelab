@@ -57,6 +57,7 @@ import {
   fetchUserBandIds, 
   fetchUnreadShouts 
 } from '../repositories';
+import { areArraysEqualFast, areObjectsEqualFast } from '../utils/fastCompare';
 import { DEFAULT_FOKUS_LEVELS } from '../utils/studentProgressEngine';
 
 const cleanRoomName = (name: string | null | undefined): string => {
@@ -3076,11 +3077,11 @@ export function TeacherDashboard({
         });
 
         setMyBookings(prev => {
-          if (JSON.stringify(prev) === JSON.stringify(filteredBookings)) return prev;
+          if (areArraysEqualFast(prev, filteredBookings)) return prev;
           return filteredBookings;
         });
         setMyChangedAppointments(prev => {
-          if (JSON.stringify(prev) === JSON.stringify(finalOccurs)) return prev;
+          if (areArraysEqualFast(prev, finalOccurs)) return prev;
           return finalOccurs;
         });
       } catch (err) {
@@ -4626,7 +4627,7 @@ export function TeacherDashboard({
         }
 
         setRawBriefingData((prev: any) => {
-          if (prev && JSON.stringify(prev) === JSON.stringify(nextBriefing)) return prev;
+          if (prev && areObjectsEqualFast(prev, nextBriefing)) return prev;
           return nextBriefing;
         });
       } catch (err) {
@@ -4931,10 +4932,9 @@ export function TeacherDashboard({
           setInitialSchoolData(JSON.parse(JSON.stringify(sd)));
         }
       } else {
-        const [bIds, tDataRes, actDayRes] = await Promise.all([
+        const [bIds, tDataRes] = await Promise.all([
           fetchUserBandIds(userId),
-          supabase.from('users').select('*, schools(*)').eq('id', userId).single(),
-          supabase.from('activation_days').select('day_of_birth').eq('student_id', userId).maybeSingle()
+          supabase.from('users').select('*, schools(*)').eq('id', userId).single()
         ]);
 
         tData = tDataRes.data;
@@ -4947,10 +4947,6 @@ export function TeacherDashboard({
           }
         }
 
-        if (tData) {
-          tData.day_of_birth = actDayRes?.data?.day_of_birth || null;
-        }
-
         if (bIds.length > 0) {
           const unread = await fetchUnreadShouts(bIds, userId);
           setUnreadShouts(unread);
@@ -4959,7 +4955,7 @@ export function TeacherDashboard({
 
       // 1. Info
       setTeacher((prev: any) => {
-        if (prev && JSON.stringify(prev) === JSON.stringify(tData)) return prev;
+        if (prev && areObjectsEqualFast(prev, tData)) return prev;
         return tData;
       });
       if (tData?.briefing_sidebar_collapsed !== undefined && tData?.briefing_sidebar_collapsed !== null) {
@@ -5052,8 +5048,8 @@ export function TeacherDashboard({
           (isGrooveLabMode && (activeTab === 'live' || activeTab === 'briefing' || activeTab === 'proposals'))
             ? Promise.resolve(supabase.from('user_song_skills').select('*, users!user_id(*), songs(*)').eq('is_pending_approval', true)).catch(e => ({ data: [], error: e }))
             : Promise.resolve({ data: [], error: null }),
-          // bands - Strictly GrooveLab
-          (isGrooveLabMode && (activeTab === 'briefing' || activeTab === 'bands'))
+          // bands - Strictly GrooveLab (only fetched on bands tab to keep briefing mount sub-300ms)
+          (isGrooveLabMode && activeTab === 'bands')
             ? Promise.resolve(supabase.from('bands').select('*, band_members(*, users(*)), coach:users!coach_id(id, first_name, last_name, photo_url), band_songs(*, songs(*), band_song_slots(*, profiles:users!user_id(id, first_name, last_name, photo_url, user_song_skills:user_song_skills!user_song_skills_user_id_fkey(id, song_id, instrument, progress_percent, is_pending_approval, is_stage_ready))))').eq('school_id', tData.school_id).order('name')).catch(e => ({ data: [], error: e }))
             : Promise.resolve({ data: [], error: null }),
           // student list (always fetched to ensure student roster and messaging board are populated)
@@ -5100,7 +5096,7 @@ export function TeacherDashboard({
         const crisisData = crisisRes.data;
         const sData = stationsRes.data;
 
-        setCrisisNotifications(prev => JSON.stringify(prev) === JSON.stringify(crisisData || []) ? prev : (crisisData || []));
+        setCrisisNotifications(prev => areArraysEqualFast(prev, crisisData || []) ? prev : (crisisData || []));
 
         const effectivePlatform = activePlatform || (typeof window !== 'undefined' ? (localStorage.getItem('groovelab_active_platform') || 'campus') : 'campus');
         const effectiveRooms = (rData || []).filter((r: any) => {
@@ -5113,8 +5109,8 @@ export function TeacherDashboard({
           return true;
         });
 
-        setRooms(prev => JSON.stringify(prev) === JSON.stringify(effectiveRooms) ? prev : effectiveRooms);
-        setAvailabilities(prev => JSON.stringify(prev) === JSON.stringify(avData || []) ? prev : (avData || []));
+        setRooms(prev => areArraysEqualFast(prev, effectiveRooms) ? prev : effectiveRooms);
+        setAvailabilities(prev => areArraysEqualFast(prev, avData || []) ? prev : (avData || []));
         
         if (effectiveRooms && effectiveRooms.length > 0 && (!selectedRoomId || !effectiveRooms.some(r => r.id === selectedRoomId))) {
           const savedRoomId = localStorage.getItem(`groovelab_teacher_selected_room_id_${effectivePlatform}`) || localStorage.getItem('groovelab_teacher_selected_room_id');
@@ -5124,7 +5120,7 @@ export function TeacherDashboard({
             setSelectedRoomId(effectiveRooms[0].id);
           }
         }
-        setStations(prev => JSON.stringify(prev) === JSON.stringify(sData || []) ? prev : (sData || []));
+        setStations(prev => areArraysEqualFast(prev, sData || []) ? prev : (sData || []));
 
         if (sessErr) {
           console.error('[Dashboard] Error fetching sessions:', sessErr);
@@ -5152,7 +5148,7 @@ export function TeacherDashboard({
           }));
 
         const trulyActive = schoolSess;
-        setActiveSessions(prev => JSON.stringify(prev) === JSON.stringify(trulyActive) ? prev : trulyActive);
+        setActiveSessions(prev => areArraysEqualFast(prev, trulyActive) ? prev : trulyActive);
 
         // Auto-checkout stale session for current student removed to prevent race conditions and login/check-in loops.
         // The frontend should align to the DB state rather than checking out valid sessions.
