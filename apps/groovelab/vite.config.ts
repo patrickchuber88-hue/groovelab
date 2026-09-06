@@ -44,6 +44,31 @@ export default defineConfig({
     sourcemap: false, // Strict block on production source maps
     minify: 'esbuild',
     chunkSizeWarningLimit: 800,
+    modulePreload: {
+      resolveDependencies: (_filename, deps) => {
+        // High-performance filter: Do not eagerly preload heavy dashboards on initial boot
+        return deps.filter(dep => {
+          const isHeavyChunk = 
+            dep.includes('master-') ||
+            dep.includes('teacher') ||
+            dep.includes('admin-') ||
+            dep.includes('secretary') ||
+            dep.includes('meisterwerk') ||
+            dep.includes('schedule-designer') ||
+            dep.includes('campus-events') ||
+            dep.includes('audio-loopstation') ||
+            dep.includes('vendor-charts') ||
+            dep.includes('vendor-jspdf') ||
+            dep.includes('vendor-canvas') ||
+            dep.includes('vendor-qr') ||
+            dep.includes('StudentAvatarDashboard') ||
+            dep.includes('student-') ||
+            dep.includes('Startseite2') ||
+            dep.includes('Startseite');
+          return !isHeavyChunk;
+        });
+      }
+    },
     rollupOptions: {
       output: {
         manualChunks: (id) => {
@@ -66,17 +91,44 @@ export default defineConfig({
           if (id.includes('ScheduleBoard') || id.includes('ScheduleCalendarView')) {
             return 'schedule-designer-suite';
           }
-          if (id.includes('MasterAdminDashboard') || id.includes('masterAdmin/') || id.includes('BillingDashboard') || id.includes('SchoolDetailDrawer')) {
-            return 'master-admin-suite';
+          if (id.includes('BillingDashboard') || id.includes('SchoolDetailDrawer') || id.includes('MasterAdminDashboard') || id.includes('masterAdmin/')) {
+            return 'master-admin-core';
+          }
+          if (id.includes('components/admin/')) {
+            return 'admin-subviews';
           }
           if (id.includes('AdminDashboard')) {
             return 'admin-core-suite';
           }
-          if (id.includes('SecretaryDashboard') || id.includes('SecretaryDutiesView') || id.includes('SecretaryCrisisView') || id.includes('SecretaryAuditView') || id.includes('SecretaryEquipmentView')) {
+          if (id.includes('secretary/Secretary') || id.includes('SecretaryDutiesView') || id.includes('SecretaryCrisisView') || id.includes('SecretaryAuditView') || id.includes('SecretaryEquipmentView') || id.includes('SecretaryRoomsView') || id.includes('SecretaryLicensesView') || id.includes('SecretarySetupView')) {
+            return 'secretary-subviews';
+          }
+          if (id.includes('SecretaryDashboard')) {
             return 'secretary-suite';
           }
-          if (id.includes('TeacherDashboard') || id.includes('CampusTeacherDashboard')) {
+          if (id.includes('CampusTeacherDashboard')) {
+            return 'teacher-campus-suite';
+          }
+          if (id.includes('components/teacher/')) {
+            return 'teacher-subviews';
+          }
+          if (id.includes('TeacherDashboard')) {
             return 'teacher-suite';
+          }
+          if (id.includes('StudentBriefingTab')) {
+            return 'student-briefing-tab';
+          }
+          if (id.includes('StudentSettingsTab')) {
+            return 'student-settings-tab';
+          }
+          if (id.includes('StudentPracticeTab')) {
+            return 'student-practice-tab';
+          }
+          if (id.includes('StudentCampusCupTab') || id.includes('StudentSongsTab') || id.includes('StudentProfileTab')) {
+            return 'student-secondary-tabs';
+          }
+          if (id.includes('MeisterwerkStickerAlbumTab') || id.includes('MeisterwerkSkillRadarTab') || id.includes('MeisterwerkAudioPlayers')) {
+            return 'meisterwerk-subviews';
           }
           if (id.includes('MeisterwerkDocumentationModal')) {
             return 'meisterwerk-suite';

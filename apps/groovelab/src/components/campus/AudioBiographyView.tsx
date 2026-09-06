@@ -4972,8 +4972,8 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
           {/* 💽 Pro-Level 1:1 Square Album-Karten Raster (Kindgerecht & Vertikal) */}
           <div style={{
             display: 'grid',
-            gridTemplateColumns: isMobileOrSim ? 'repeat(2, 1fr)' : 'repeat(auto-fill, minmax(170px, 1fr))',
-            gap: '16px'
+            gridTemplateColumns: isMobileOrSim ? 'repeat(2, 1fr)' : 'repeat(5, minmax(0, 1fr))',
+            gap: '14px'
           }}>
             {displayPlaylists.map((pl, idx) => {
               const isGiftPl = pl.id === 'pl_gifts';

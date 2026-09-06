@@ -7,6 +7,7 @@ import { StudentMobileScheduleWizard } from './StudentMobileScheduleWizard';
 import { IDBadgeCard, inlineAllImagesInElement } from './IDBadgeCard';
 import { isDevEnvironment } from '../utils/tenantUrlHelper';
 import { getSchoolProfileDTO } from '../api/bffClient';
+import { formatUserDisplayName } from '../utils/userDisplayName';
 
 interface QRCodeModalProps {
   user: {
@@ -376,7 +377,7 @@ export function QRCodeModal({ user, activePlatform, onClose }: QRCodeModalProps)
           {
             key: "name",
             label: "AUSWEISINHABER",
-            value: `${user.first_name || ''} ${user.last_name ? user.last_name.charAt(0) + '.' : ''}`.trim()
+            value: formatUserDisplayName(user)
           }
         ],
         secondaryFields: [
@@ -428,7 +429,7 @@ export function QRCodeModal({ user, activePlatform, onClose }: QRCodeModalProps)
   const downloadGoogleWalletPass = () => {
     // Senior Developer Google Wallet Pass Handler & Web Save Link
     const userQr = user.qr_token || user.teacher_qr_token || user.id;
-    const userName = `${user.first_name || ''} ${user.last_name ? user.last_name.charAt(0) + '.' : ''}`.trim();
+    const userName = formatUserDisplayName(user);
     const userRole = user.role === 'admin' ? 'Administrator' : (user.role === 'secretary' ? 'Sekretariat' : (user.role === 'teacher' ? 'Lehrkraft' : 'Schüler'));
     
     // Official Google Wallet Web Save Intent / Pass Link

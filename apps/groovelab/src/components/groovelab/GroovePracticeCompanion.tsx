@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Play, Square, Volume2, VolumeX, Music, Clock, Sliders, RotateCcw, Mic, Zap, Activity, CheckCircle2, Sparkles, Star, BookOpen, Check, Settings, Pause, Headphones, ChevronRight, X } from 'lucide-react';
+import { Play, Square, Volume2, VolumeX, Music, Clock, Sliders, RotateCcw, Mic, Zap, Activity, CheckCircle2, Sparkles, Star, BookOpen, Check, Settings, Pause, Headphones, ChevronRight, X, Minus, Plus } from 'lucide-react';
 import { ACOUSTIC_STUDIO_SAMPLES } from './AcousticDrumSamples';
 import { storeBlob } from '../../utils/blobStorage';
 import { 
@@ -98,13 +98,19 @@ const playKlopfgeistClick = (
   } catch (_) {}
 };
 
-// 🎛️ IN-THE-BOX DIRECT-STEM BACKING-BEAT MIXER (Phase-Locked & EBU R128 Mastered)
+// 🥁 High-Fidelity Studio Acoustic Drum Samples Decoders
+export const renderRimBuffer = (ctx: BaseAudioContext): AudioBuffer => decodeBase64Wav(ctx, ACOUSTIC_STUDIO_SAMPLES.rim);
+export const renderRideBuffer = (ctx: BaseAudioContext): AudioBuffer => decodeBase64Wav(ctx, ACOUSTIC_STUDIO_SAMPLES.ride);
+export const renderShakerBuffer = (ctx: BaseAudioContext, forward = true): AudioBuffer => decodeBase64Wav(ctx, forward ? ACOUSTIC_STUDIO_SAMPLES.shakerFwd : ACOUSTIC_STUDIO_SAMPLES.shakerBack);
+
+
 // 🎛️ IN-THE-BOX DIRECT-STEM BACKING-BEAT MIXER (PDC Phase-Locked & EBU R128 Mastered)
 async function mixMicWithDirectBackingBeat(
   micBlob: Blob,
   bpm: number,
   style: string,
-  variation: 'A' | 'B' | 'C'
+  variation: 'A' | 'B' | 'C',
+  meter: string = '4/4'
 ): Promise<{ processedBlob: Blob; processedUrl: string; durationSec: number }> {
   try {
     const arrayBuffer = await micBlob.arrayBuffer();
@@ -163,244 +169,332 @@ async function mixMicWithDirectBackingBeat(
     backingMasterGain.gain.setValueAtTime(0.20, 0);
     backingMasterGain.connect(offlineCtx.destination);
 
-    // Render Wooden Rimshot AudioBuffer on offlineCtx
-    const renderOfflineRimBuffer = (): AudioBuffer => {
-      const dur = 0.05;
-      const sr = offlineCtx.sampleRate;
-      const buf = offlineCtx.createBuffer(2, Math.floor(sr * dur), sr);
-      const L = buf.getChannelData(0);
-      const R = buf.getChannelData(1);
-      const len = buf.length;
-
-      for (let i = 0; i < len; i++) {
-        const t = i / sr;
-        const woodClick = Math.sin(2 * Math.PI * 980 * t) * Math.exp(-t * 80);
-        const val = woodClick * 0.40;
-        L[i] = val;
-        R[i] = val;
-      }
-      return buf;
-    };
-
-    // Decode sample buffers on offlineCtx
+    // Decode sample buffers on offlineCtx + Physical Acoustic Modeling
     const kitBuffers: Record<string, AudioBuffer> = {
       kick: decodeBase64Wav(offlineCtx, ACOUSTIC_STUDIO_SAMPLES.kick),
       snare: decodeBase64Wav(offlineCtx, ACOUSTIC_STUDIO_SAMPLES.snare),
       hatClosed: decodeBase64Wav(offlineCtx, ACOUSTIC_STUDIO_SAMPLES.hatClosed),
       hatOpen: decodeBase64Wav(offlineCtx, ACOUSTIC_STUDIO_SAMPLES.hatOpen),
       click: decodeBase64Wav(offlineCtx, ACOUSTIC_STUDIO_SAMPLES.click),
-      rim: renderOfflineRimBuffer()
+      rim: renderRimBuffer(offlineCtx),
+      ride: renderRideBuffer(offlineCtx),
+      shakerFwd: renderShakerBuffer(offlineCtx, true),
+      shakerBack: renderShakerBuffer(offlineCtx, false),
     };
 
-    const playOfflineSample = (buffer: AudioBuffer, volMul = 1.0, time: number) => {
-      if (!buffer || time >= duration) return;
+    let lastOpenHatGainNode: GainNode | null = null;
+
+    const playOfflineSample = (buffer: AudioBuffer, volMul = 1.0, time: number, filterNode?: BiquadFilterNode): GainNode | null => {
+      if (!buffer || time >= duration) return null;
       const source = offlineCtx.createBufferSource();
       source.buffer = buffer;
       const gain = offlineCtx.createGain();
+      const targetGain = volMul * 0.85;
       gain.gain.setValueAtTime(0.0001, time);
-      gain.gain.linearRampToValueAtTime(volMul, time + 0.0008);
-      source.connect(gain);
+      gain.gain.linearRampToValueAtTime(targetGain, time + 0.0008);
+
+      if (filterNode) {
+        source.connect(filterNode);
+        filterNode.connect(gain);
+      } else {
+        source.connect(gain);
+      }
       gain.connect(backingMasterGain);
       source.start(time);
+      return gain;
     };
+
+    // 🌟 Tonmeister Calibrated Offline Instrument Functions
+    const playOfflineKick = (volMul = 1.0, time: number) => playOfflineSample(kitBuffers.kick, volMul * 1.0, time);
+    const playOfflineRim = (volMul = 1.0, time: number) => playOfflineSample(kitBuffers.rim, volMul * 0.63, time);
+
+    // 🌟 Hi-Hat Choking Engine (8ms physical pedal clamp)
+    const playOfflineHat = (isOpen = false, volMul = 1.0, time: number) => {
+      if (isOpen) {
+        lastOpenHatGainNode = playOfflineSample(kitBuffers.hatOpen, volMul * 0.38, time);
+      } else {
+        if (lastOpenHatGainNode) {
+          try {
+            lastOpenHatGainNode.gain.setValueAtTime(volMul * 0.38 * 0.85, time);
+            lastOpenHatGainNode.gain.exponentialRampToValueAtTime(0.0001, time + 0.008);
+          } catch {}
+          lastOpenHatGainNode = null;
+        }
+        playOfflineSample(kitBuffers.hatClosed, volMul * 0.45, time);
+      }
+    };
+
+    // 🌟 Multi-Velocity Snare (Dynamic Ghost-Note Layer at volMul <= 0.35)
+    const playOfflineSnare = (volMul = 1.0, time: number) => {
+      if (volMul <= 0.35) {
+        const ghostFilter = offlineCtx.createBiquadFilter();
+        ghostFilter.type = 'lowpass';
+        ghostFilter.frequency.setValueAtTime(2600, time);
+        ghostFilter.Q.setValueAtTime(0.7, time);
+        return playOfflineSample(kitBuffers.snare, volMul * 0.84, time, ghostFilter);
+      }
+      return playOfflineSample(kitBuffers.snare, volMul * 0.84, time);
+    };
+
+    const playOfflineRide = (volMul = 1.0, time: number) => playOfflineSample(kitBuffers.ride, volMul * 0.33, time);
+    const playOfflineShaker = (forward = true, volMul = 1.0, time: number) => playOfflineSample(forward ? kitBuffers.shakerFwd : kitBuffers.shakerBack, volMul * 0.26, time);
 
     const isSwing = style === 'swing';
     const isWaltz = style === 'walzer';
     const isBallad = style === 'ballad68';
+    const isHipHopOrFunk = style === 'hiphop' || style === 'funk';
 
-    const stepsPerBar = isSwing ? 12 : (isWaltz ? 12 : (isBallad ? 12 : 16));
-    const stepDuration = isSwing 
+    let stepsPerBar = isSwing ? 12 : (isWaltz ? 12 : (isBallad ? 12 : 16));
+    let stepDuration = isSwing 
       ? (60.0 / bpm) / 3 
       : (isBallad ? (60.0 / bpm) / 2 : (60.0 / bpm) / 4);
+
+    if (style === 'metronome') {
+      if (meter === '3/4') {
+        stepsPerBar = 12;
+        stepDuration = (60.0 / bpm) / 4;
+      } else if (meter === '2/4') {
+        stepsPerBar = 8;
+        stepDuration = (60.0 / bpm) / 4;
+      } else if (meter === '6/8') {
+        stepsPerBar = 12;
+        stepDuration = (60.0 / bpm) / 2;
+      } else {
+        stepsPerBar = 16;
+        stepDuration = (60.0 / bpm) / 4;
+      }
+    }
 
     let step = 0;
     while (step * stepDuration < duration) {
       const time = step * stepDuration;
       const currentStepInBar = step % stepsPerBar;
 
+      // 🌟 MPC Micro-Swing Offset for Hip-Hop & Funk Pocket
+      const microSwing = (isHipHopOrFunk && currentStepInBar % 2 === 1) ? stepDuration * 0.12 : 0;
+      const hitTime = time + microSwing;
+
       if (style === 'metronome') {
-        const beatIdx = Math.floor(currentStepInBar / 4);
-        if (variation === 'A') {
-          if (currentStepInBar % 4 === 0) playKlopfgeistClick(offlineCtx, time, beatIdx === 0, 1.0, backingMasterGain);
-        } else if (variation === 'B') {
-          if (currentStepInBar % 2 === 0) playKlopfgeistClick(offlineCtx, time, currentStepInBar === 0, 1.0, backingMasterGain);
+        if (meter === '6/8') {
+          const beatIdx = Math.floor(currentStepInBar / 2);
+          if (currentStepInBar % 2 === 0) {
+            playKlopfgeistClick(offlineCtx, hitTime, beatIdx === 0, 1.0, backingMasterGain);
+          }
         } else {
-          playKlopfgeistClick(offlineCtx, time, currentStepInBar === 0, 1.0, backingMasterGain);
+          const beatIdx = Math.floor(currentStepInBar / 4);
+          if (variation === 'A') {
+            if (currentStepInBar % 4 === 0) playKlopfgeistClick(offlineCtx, hitTime, beatIdx === 0, 1.0, backingMasterGain);
+          } else if (variation === 'B') {
+            if (currentStepInBar % 2 === 0) playKlopfgeistClick(offlineCtx, hitTime, currentStepInBar === 0, 1.0, backingMasterGain);
+          } else {
+            playKlopfgeistClick(offlineCtx, hitTime, currentStepInBar === 0, 1.0, backingMasterGain);
+          }
         }
       } else if (style === 'rock') {
         if (variation === 'A') {
-          if (currentStepInBar === 0 || currentStepInBar === 8 || currentStepInBar === 10) playOfflineSample(kitBuffers.kick, 1.0, time);
-          if (currentStepInBar === 4 || currentStepInBar === 12) playOfflineSample(kitBuffers.snare, 1.0, time);
-          if (currentStepInBar % 2 === 0) playOfflineSample(kitBuffers.hatClosed, currentStepInBar % 4 === 0 ? 1.0 : 0.62, time);
+          if (currentStepInBar === 0 || currentStepInBar === 8 || currentStepInBar === 10) playOfflineKick(1.0, hitTime);
+          if (currentStepInBar === 4 || currentStepInBar === 12) playOfflineSnare(1.0, hitTime);
+          if (currentStepInBar % 2 === 0) playOfflineHat(false, currentStepInBar % 4 === 0 ? 1.0 : 0.62, hitTime);
         } else if (variation === 'B') {
-          if (currentStepInBar === 0 || currentStepInBar === 6 || currentStepInBar === 8 || currentStepInBar === 10 || currentStepInBar === 14) playOfflineSample(kitBuffers.kick, 1.0, time);
-          if (currentStepInBar === 4 || currentStepInBar === 12) playOfflineSample(kitBuffers.snare, 1.0, time);
-          if (currentStepInBar % 2 === 0) playOfflineSample(kitBuffers.hatClosed, currentStepInBar % 4 === 0 ? 1.0 : 0.65, time);
+          if (currentStepInBar === 0 || currentStepInBar === 6 || currentStepInBar === 8 || currentStepInBar === 10 || currentStepInBar === 14) playOfflineKick(1.0, hitTime);
+          if (currentStepInBar === 4 || currentStepInBar === 12) playOfflineSnare(1.0, hitTime);
+          if (currentStepInBar === 14) playOfflineHat(true, 0.85, hitTime);
+          else if (currentStepInBar % 2 === 0) playOfflineHat(false, currentStepInBar % 4 === 0 ? 1.0 : 0.65, hitTime);
         } else {
-          if (currentStepInBar === 0 || currentStepInBar === 3 || currentStepInBar === 8 || currentStepInBar === 10 || currentStepInBar === 11) playOfflineSample(kitBuffers.kick, 1.0, time);
-          if (currentStepInBar === 4 || currentStepInBar === 12) playOfflineSample(kitBuffers.snare, 1.0, time);
-          else if (currentStepInBar === 7 || currentStepInBar === 15) playOfflineSample(kitBuffers.snare, 0.25, time);
-          if (currentStepInBar % 2 === 0) playOfflineSample(kitBuffers.hatClosed, currentStepInBar % 4 === 0 ? 1.05 : 0.72, time);
-          else if (currentStepInBar === 11) playOfflineSample(kitBuffers.hatClosed, 0.45, time);
+          if (currentStepInBar === 0 || currentStepInBar === 3 || currentStepInBar === 8 || currentStepInBar === 10 || currentStepInBar === 11) playOfflineKick(1.0, hitTime);
+          if (currentStepInBar === 4 || currentStepInBar === 12) playOfflineSnare(1.0, hitTime);
+          else if (currentStepInBar === 7 || currentStepInBar === 15) playOfflineSnare(0.25, hitTime); // Ghost note
+          if (currentStepInBar % 2 === 0) playOfflineHat(false, currentStepInBar % 4 === 0 ? 1.05 : 0.72, hitTime);
+          else if (currentStepInBar === 11) playOfflineHat(false, 0.45, hitTime);
         }
       } else if (style === 'hiphop') {
         if (variation === 'A') {
-          if (currentStepInBar === 0) playOfflineSample(kitBuffers.kick, 1.3, time);
-          else if (currentStepInBar === 3 || currentStepInBar === 10) playOfflineSample(kitBuffers.kick, 0.9, time);
-          if (currentStepInBar === 4 || currentStepInBar === 12) playOfflineSample(kitBuffers.snare, 1.1, time);
-          else if (currentStepInBar === 7 || currentStepInBar === 15) playOfflineSample(kitBuffers.snare, 0.22, time);
-          if (currentStepInBar % 2 === 0) playOfflineSample(currentStepInBar === 14 ? kitBuffers.hatOpen : kitBuffers.hatClosed, currentStepInBar % 4 === 0 ? 0.9 : 0.55, time);
+          if (currentStepInBar === 0) playOfflineKick(1.3, hitTime);
+          else if (currentStepInBar === 3 || currentStepInBar === 10) playOfflineKick(0.9, hitTime);
+          if (currentStepInBar === 4 || currentStepInBar === 12) playOfflineSnare(1.1, hitTime);
+          else if (currentStepInBar === 7 || currentStepInBar === 15) playOfflineSnare(0.22, hitTime); // Ghost note
+          if (currentStepInBar % 2 === 0) playOfflineHat(currentStepInBar === 14, currentStepInBar % 4 === 0 ? 0.9 : 0.55, hitTime);
         } else if (variation === 'B') {
-          if (currentStepInBar === 0 || currentStepInBar === 2 || currentStepInBar === 8 || currentStepInBar === 10) playOfflineSample(kitBuffers.kick, 1.2, time);
-          if (currentStepInBar === 4 || currentStepInBar === 12) playOfflineSample(kitBuffers.snare, 1.1, time);
-          else if (currentStepInBar === 15) playOfflineSample(kitBuffers.snare, 0.25, time);
-          if (currentStepInBar % 2 === 0) playOfflineSample(kitBuffers.hatClosed, currentStepInBar % 4 === 0 ? 0.95 : 0.62, time);
+          if (currentStepInBar === 0 || currentStepInBar === 2 || currentStepInBar === 8 || currentStepInBar === 10) playOfflineKick(1.2, hitTime);
+          if (currentStepInBar === 4 || currentStepInBar === 12) playOfflineSnare(1.1, hitTime);
+          else if (currentStepInBar === 15) playOfflineSnare(0.25, hitTime);
+          if (currentStepInBar % 2 === 0) playOfflineHat(false, currentStepInBar % 4 === 0 ? 0.95 : 0.62, hitTime);
         } else {
-          if (currentStepInBar === 0 || currentStepInBar === 8 || currentStepInBar === 11) playOfflineSample(kitBuffers.kick, 1.3, time);
-          if (currentStepInBar === 4 || currentStepInBar === 12) playOfflineSample(kitBuffers.snare, 1.15, time);
-          if (currentStepInBar === 14 || currentStepInBar === 15) playOfflineSample(kitBuffers.hatClosed, 0.75, time);
-          else if (currentStepInBar % 2 === 0) playOfflineSample(kitBuffers.hatClosed, currentStepInBar % 4 === 0 ? 1.0 : 0.6, time);
+          if (currentStepInBar === 0 || currentStepInBar === 8 || currentStepInBar === 11) playOfflineKick(1.3, hitTime);
+          if (currentStepInBar === 4 || currentStepInBar === 12) playOfflineSnare(1.15, hitTime);
+          if (currentStepInBar === 14 || currentStepInBar === 15) playOfflineHat(false, 0.75, hitTime);
+          else if (currentStepInBar % 2 === 0) playOfflineHat(false, currentStepInBar % 4 === 0 ? 1.0 : 0.6, hitTime);
         }
       } else if (style === 'singersongwriter') {
         if (variation === 'A') {
-          if (currentStepInBar === 0 || currentStepInBar === 10) playOfflineSample(kitBuffers.kick, 0.75, time);
-          if (currentStepInBar === 4 || currentStepInBar === 12) playOfflineSample(kitBuffers.click, 0.9, time);
-          if (currentStepInBar % 2 === 0) playOfflineSample(kitBuffers.hatClosed, currentStepInBar % 4 === 0 ? 0.7 : 0.4, time);
+          if (currentStepInBar === 0 || currentStepInBar === 10) playOfflineKick(0.70, hitTime);
+          if (currentStepInBar === 4 || currentStepInBar === 12) playOfflineRim(0.85, hitTime);
+          if (currentStepInBar % 2 === 0) playOfflineHat(false, currentStepInBar % 4 === 0 ? 0.65 : 0.35, hitTime);
+          playOfflineShaker(currentStepInBar % 2 === 0, 0.32, hitTime);
         } else if (variation === 'B') {
-          if (currentStepInBar === 0 || currentStepInBar === 10) playOfflineSample(kitBuffers.kick, 0.8, time);
-          if (currentStepInBar === 4 || currentStepInBar === 12) playOfflineSample(kitBuffers.snare, 0.55, time);
-          else if (currentStepInBar === 7 || currentStepInBar === 15) playOfflineSample(kitBuffers.snare, 0.18, time);
-          if (currentStepInBar % 2 === 0) playOfflineSample(kitBuffers.hatClosed, currentStepInBar % 4 === 0 ? 0.75 : 0.45, time);
+          if (currentStepInBar === 0 || currentStepInBar === 10) playOfflineKick(0.75, hitTime);
+          if (currentStepInBar === 4 || currentStepInBar === 12) playOfflineSnare(0.48, hitTime);
+          else if (currentStepInBar === 7 || currentStepInBar === 15) playOfflineSnare(0.16, hitTime);
+          if (currentStepInBar % 2 === 0) playOfflineHat(false, currentStepInBar % 4 === 0 ? 0.70 : 0.40, hitTime);
+          playOfflineShaker(currentStepInBar % 2 === 0, 0.38, hitTime);
         } else {
-          if (currentStepInBar === 0 || currentStepInBar === 6 || currentStepInBar === 10) playOfflineSample(kitBuffers.kick, 0.85, time);
-          if (currentStepInBar === 4 || currentStepInBar === 12) playOfflineSample(kitBuffers.snare, 0.65, time);
-          else if (currentStepInBar === 14 || currentStepInBar === 15) playOfflineSample(kitBuffers.click, 0.75, time);
-          if (currentStepInBar % 2 === 0) playOfflineSample(currentStepInBar === 10 ? kitBuffers.hatOpen : kitBuffers.hatClosed, currentStepInBar === 10 ? 0.8 : 0.5, time);
+          if (currentStepInBar === 0 || currentStepInBar === 6 || currentStepInBar === 10) playOfflineKick(0.80, hitTime);
+          if (currentStepInBar === 4 || currentStepInBar === 12) playOfflineSnare(0.55, hitTime);
+          else if (currentStepInBar === 14 || currentStepInBar === 15) playOfflineRim(0.70, hitTime);
+          if (currentStepInBar % 2 === 0) playOfflineHat(currentStepInBar === 10, currentStepInBar === 10 ? 0.70 : 0.45, hitTime);
+          playOfflineShaker(currentStepInBar % 2 === 0, 0.40, hitTime);
         }
       } else if (style === 'swing') {
         if (variation === 'A') {
-          if (currentStepInBar === 0 || currentStepInBar === 3 || currentStepInBar === 6 || currentStepInBar === 9) playOfflineSample(kitBuffers.kick, 0.32, time);
-          if (currentStepInBar === 2) playOfflineSample(kitBuffers.rim, 0.45, time);
-          else if (currentStepInBar === 8) playOfflineSample(kitBuffers.snare, 0.4, time);
-          if (currentStepInBar === 0 || currentStepInBar === 3 || currentStepInBar === 6 || currentStepInBar === 9) playOfflineSample(kitBuffers.hatClosed, 1.0, time);
-          else if (currentStepInBar === 2 || currentStepInBar === 5 || currentStepInBar === 8 || currentStepInBar === 11) playOfflineSample(kitBuffers.hatOpen, 0.55, time);
-          if (currentStepInBar === 3 || currentStepInBar === 9) playOfflineSample(kitBuffers.rim, 0.25, time);
+          // 🌟 10/10 Goldstandard: 20" Ride Cymbal & Hi-Hat Foot Chick
+          if (currentStepInBar === 0 || currentStepInBar === 3 || currentStepInBar === 6 || currentStepInBar === 9) playOfflineKick(0.20, hitTime);
+          if (currentStepInBar === 2) playOfflineRim(0.35, hitTime);
+          else if (currentStepInBar === 8) playOfflineSnare(0.30, hitTime);
+          if (currentStepInBar === 0 || currentStepInBar === 3 || currentStepInBar === 6 || currentStepInBar === 9) playOfflineRide(0.75, hitTime);
+          else if (currentStepInBar === 2 || currentStepInBar === 5 || currentStepInBar === 8 || currentStepInBar === 11) playOfflineRide(0.38, hitTime);
+          if (currentStepInBar === 3 || currentStepInBar === 9) playOfflineHat(false, 0.65, hitTime);
         } else if (variation === 'B') {
-          if (currentStepInBar === 0 || currentStepInBar === 6) playOfflineSample(kitBuffers.kick, 0.35, time);
-          if (currentStepInBar === 2 || currentStepInBar === 5 || currentStepInBar === 11) playOfflineSample(kitBuffers.snare, 0.5, time);
-          if (currentStepInBar === 0 || currentStepInBar === 3 || currentStepInBar === 6 || currentStepInBar === 9) playOfflineSample(kitBuffers.hatClosed, 1.05, time);
-          else if (currentStepInBar === 2 || currentStepInBar === 5 || currentStepInBar === 8 || currentStepInBar === 11) playOfflineSample(kitBuffers.hatOpen, 0.62, time);
-          if (currentStepInBar === 3 || currentStepInBar === 9) playOfflineSample(kitBuffers.rim, 0.3, time);
+          if (currentStepInBar === 0 || currentStepInBar === 6) playOfflineKick(0.22, hitTime);
+          if (currentStepInBar === 2 || currentStepInBar === 5 || currentStepInBar === 11) playOfflineSnare(0.38, hitTime);
+          if (currentStepInBar === 0 || currentStepInBar === 3 || currentStepInBar === 6 || currentStepInBar === 9) playOfflineRide(0.80, hitTime);
+          else if (currentStepInBar === 2 || currentStepInBar === 5 || currentStepInBar === 8 || currentStepInBar === 11) playOfflineRide(0.42, hitTime);
+          if (currentStepInBar === 3 || currentStepInBar === 9) playOfflineHat(false, 0.70, hitTime);
         } else {
-          if (currentStepInBar === 0 || currentStepInBar === 6) playOfflineSample(kitBuffers.kick, 0.5, time);
-          if (currentStepInBar === 9 || currentStepInBar === 10 || currentStepInBar === 11) playOfflineSample(kitBuffers.snare, 0.7, time);
-          else if (currentStepInBar === 2 || currentStepInBar === 5) playOfflineSample(kitBuffers.snare, 0.32, time);
-          if (currentStepInBar === 0 || currentStepInBar === 3 || currentStepInBar === 6 || currentStepInBar === 9) playOfflineSample(kitBuffers.hatClosed, 1.0, time);
+          if (currentStepInBar === 0 || currentStepInBar === 6) playOfflineKick(0.28, hitTime);
+          if (currentStepInBar === 9 || currentStepInBar === 10 || currentStepInBar === 11) playOfflineSnare(0.55, hitTime);
+          else if (currentStepInBar === 2 || currentStepInBar === 5) playOfflineSnare(0.26, hitTime);
+          if (currentStepInBar === 0 || currentStepInBar === 3 || currentStepInBar === 6 || currentStepInBar === 9) playOfflineRide(0.75, hitTime);
+          else if (currentStepInBar === 2 || currentStepInBar === 5 || currentStepInBar === 8) playOfflineRide(0.40, hitTime);
+          if (currentStepInBar === 3 || currentStepInBar === 9) playOfflineHat(false, 0.68, hitTime);
         }
       } else if (style === 'latin') {
         if (variation === 'A') {
-          if (currentStepInBar === 0 || currentStepInBar === 3 || currentStepInBar === 8 || currentStepInBar === 11) playOfflineSample(kitBuffers.kick, 0.95, time);
-          if (currentStepInBar === 0 || currentStepInBar === 3 || currentStepInBar === 6 || currentStepInBar === 10 || currentStepInBar === 12) playOfflineSample(kitBuffers.rim, 1.0, time);
-          if (currentStepInBar % 2 === 0) playOfflineSample(kitBuffers.hatClosed, currentStepInBar % 4 === 0 ? 0.8 : 0.48, time);
+          if (currentStepInBar === 0 || currentStepInBar === 3 || currentStepInBar === 8 || currentStepInBar === 11) playOfflineKick(0.90, hitTime);
+          if (currentStepInBar === 0 || currentStepInBar === 3 || currentStepInBar === 6 || currentStepInBar === 10 || currentStepInBar === 12) playOfflineRim(0.95, hitTime);
+          if (currentStepInBar % 2 === 0) playOfflineHat(false, currentStepInBar % 4 === 0 ? 0.70 : 0.40, hitTime);
+          playOfflineShaker(currentStepInBar % 2 === 0, 0.35, hitTime);
         } else if (variation === 'B') {
-          if (currentStepInBar % 2 === 0) playOfflineSample(kitBuffers.kick, currentStepInBar % 4 === 2 ? 1.15 : 0.6, time);
-          if (currentStepInBar === 0 || currentStepInBar === 4 || currentStepInBar === 8 || currentStepInBar === 12) playOfflineSample(kitBuffers.rim, 0.95, time);
-          if (currentStepInBar % 2 === 0) playOfflineSample(kitBuffers.hatClosed, 0.75, time);
+          if (currentStepInBar % 2 === 0) playOfflineKick(currentStepInBar % 4 === 2 ? 1.05 : 0.55, hitTime);
+          if (currentStepInBar === 0 || currentStepInBar === 4 || currentStepInBar === 8 || currentStepInBar === 12) playOfflineRim(0.90, hitTime);
+          if (currentStepInBar % 2 === 0) playOfflineHat(false, 0.65, hitTime);
+          playOfflineShaker(currentStepInBar % 2 === 0, 0.40, hitTime);
         } else {
-          if (currentStepInBar === 0 || currentStepInBar === 3 || currentStepInBar === 8 || currentStepInBar === 11) playOfflineSample(kitBuffers.kick, 1.0, time);
+          if (currentStepInBar === 0 || currentStepInBar === 3 || currentStepInBar === 8 || currentStepInBar === 11) playOfflineKick(0.95, hitTime);
           if (currentStepInBar === 0 || currentStepInBar === 2 || currentStepInBar === 3 || currentStepInBar === 5 || currentStepInBar === 6 || currentStepInBar === 8 || currentStepInBar === 10 || currentStepInBar === 11 || currentStepInBar === 13 || currentStepInBar === 14) {
-            playOfflineSample(kitBuffers.rim, 0.85, time);
+            playOfflineRim(0.80, hitTime);
           }
-          if (currentStepInBar % 4 === 2) playOfflineSample(kitBuffers.hatOpen, 0.7, time);
+          if (currentStepInBar % 4 === 2) playOfflineHat(true, 0.65, hitTime);
+          playOfflineShaker(currentStepInBar % 2 === 0, 0.42, hitTime);
         }
       } else if (style === 'funk') {
         if (variation === 'A') {
-          if (currentStepInBar === 0 || currentStepInBar === 6 || currentStepInBar === 10 || currentStepInBar === 11) playOfflineSample(kitBuffers.kick, 1.15, time);
-          if (currentStepInBar === 4 || currentStepInBar === 12) playOfflineSample(kitBuffers.snare, 1.1, time);
-          else if (currentStepInBar === 7 || currentStepInBar === 13 || currentStepInBar === 15) playOfflineSample(kitBuffers.snare, 0.28, time);
-          if (currentStepInBar % 2 === 0) playOfflineSample(currentStepInBar === 6 || currentStepInBar === 14 ? kitBuffers.hatOpen : kitBuffers.hatClosed, (currentStepInBar === 6 || currentStepInBar === 14) ? 1.0 : (currentStepInBar % 4 === 0 ? 0.95 : 0.55), time);
-          else if (currentStepInBar === 3 || currentStepInBar === 11) playOfflineSample(kitBuffers.hatClosed, 0.35, time);
+          if (currentStepInBar === 0 || currentStepInBar === 6 || currentStepInBar === 10 || currentStepInBar === 11) playOfflineKick(1.15, hitTime);
+          if (currentStepInBar === 4 || currentStepInBar === 12) playOfflineSnare(1.1, hitTime);
+          else if (currentStepInBar === 7 || currentStepInBar === 13 || currentStepInBar === 15) playOfflineSnare(0.28, hitTime); // Ghost note
+          if (currentStepInBar % 2 === 0) playOfflineHat(currentStepInBar === 6 || currentStepInBar === 14, (currentStepInBar === 6 || currentStepInBar === 14) ? 1.0 : (currentStepInBar % 4 === 0 ? 0.95 : 0.55), hitTime);
+          else if (currentStepInBar === 3 || currentStepInBar === 11) playOfflineHat(false, 0.35, hitTime);
         } else if (variation === 'B') {
-          if (currentStepInBar === 0 || currentStepInBar === 6 || currentStepInBar === 10) playOfflineSample(kitBuffers.kick, 1.2, time);
-          else if (currentStepInBar === 4 || currentStepInBar === 12 || currentStepInBar === 14) playOfflineSample(kitBuffers.snare, 1.15, time);
-          else if (currentStepInBar === 2 || currentStepInBar === 8 || currentStepInBar === 15) playOfflineSample(kitBuffers.hatClosed, 0.85, time);
+          if (currentStepInBar === 0 || currentStepInBar === 6 || currentStepInBar === 10) playOfflineKick(1.2, hitTime);
+          else if (currentStepInBar === 4 || currentStepInBar === 12 || currentStepInBar === 14) playOfflineSnare(1.15, hitTime);
+          else if (currentStepInBar === 2 || currentStepInBar === 8 || currentStepInBar === 15) playOfflineHat(false, 0.85, hitTime);
         } else {
-          if (currentStepInBar === 0 || currentStepInBar === 6 || currentStepInBar === 11) playOfflineSample(kitBuffers.kick, 1.2, time);
-          if (currentStepInBar === 4 || currentStepInBar === 12) playOfflineSample(kitBuffers.snare, 1.1, time);
-          else if (currentStepInBar === 13 || currentStepInBar === 14 || currentStepInBar === 15) playOfflineSample(kitBuffers.snare, 0.9, time);
-          if (currentStepInBar % 2 === 0) playOfflineSample(kitBuffers.hatClosed, 0.8, time);
+          if (currentStepInBar === 0 || currentStepInBar === 6 || currentStepInBar === 11) playOfflineKick(1.2, hitTime);
+          if (currentStepInBar === 4 || currentStepInBar === 12) playOfflineSnare(1.1, hitTime);
+          else if (currentStepInBar === 13 || currentStepInBar === 14 || currentStepInBar === 15) playOfflineSnare(0.9, hitTime);
+          if (currentStepInBar % 2 === 0) playOfflineHat(false, 0.8, hitTime);
         }
       } else if (style === 'reggae') {
         if (variation === 'A') {
-          if (currentStepInBar === 8) { playOfflineSample(kitBuffers.kick, 1.2, time); playOfflineSample(kitBuffers.snare, 1.05, time); }
-          if (currentStepInBar === 4 || currentStepInBar === 12) playOfflineSample(kitBuffers.rim, 0.9, time);
-          if (currentStepInBar === 0) playOfflineSample(kitBuffers.rim, 0.22, time);
-          if (currentStepInBar % 2 === 0) playOfflineSample(kitBuffers.hatClosed, (currentStepInBar === 2 || currentStepInBar === 6 || currentStepInBar === 10 || currentStepInBar === 14) ? 1.0 : 0.58, time);
+          if (currentStepInBar === 8) { playOfflineKick(1.2, hitTime); playOfflineSnare(1.05, hitTime); }
+          if (currentStepInBar === 4 || currentStepInBar === 12) playOfflineRim(0.9, hitTime);
+          if (currentStepInBar === 0) playOfflineRim(0.22, hitTime);
+          if (currentStepInBar % 2 === 0) playOfflineHat(false, (currentStepInBar === 2 || currentStepInBar === 6 || currentStepInBar === 10 || currentStepInBar === 14) ? 1.0 : 0.58, hitTime);
         } else if (variation === 'B') {
-          if (currentStepInBar === 0 || currentStepInBar === 4 || currentStepInBar === 8 || currentStepInBar === 12) playOfflineSample(kitBuffers.kick, 1.15, time);
-          if (currentStepInBar === 8) playOfflineSample(kitBuffers.snare, 1.05, time);
-          if (currentStepInBar === 4 || currentStepInBar === 12) playOfflineSample(kitBuffers.rim, 0.85, time);
-          if (currentStepInBar % 2 === 0) playOfflineSample(kitBuffers.hatClosed, 0.88, time);
+          if (currentStepInBar === 0 || currentStepInBar === 4 || currentStepInBar === 8 || currentStepInBar === 12) playOfflineKick(1.15, hitTime);
+          if (currentStepInBar === 8) playOfflineSnare(1.05, hitTime);
+          if (currentStepInBar === 4 || currentStepInBar === 12) playOfflineRim(0.85, hitTime);
+          if (currentStepInBar % 2 === 0) playOfflineHat(false, 0.88, hitTime);
         } else {
-          if (currentStepInBar === 8) playOfflineSample(kitBuffers.kick, 1.2, time);
-          if (currentStepInBar === 8 || currentStepInBar === 14 || currentStepInBar === 15) playOfflineSample(kitBuffers.snare, 1.0, time);
-          if (currentStepInBar === 4 || currentStepInBar === 12) playOfflineSample(kitBuffers.rim, 0.9, time);
-          if (currentStepInBar % 2 === 0) playOfflineSample(kitBuffers.hatClosed, 0.8, time);
+          if (currentStepInBar === 8) playOfflineKick(1.2, hitTime);
+          if (currentStepInBar === 8 || currentStepInBar === 14 || currentStepInBar === 15) playOfflineSnare(1.0, hitTime);
+          if (currentStepInBar === 4 || currentStepInBar === 12) playOfflineRim(0.9, hitTime);
+          if (currentStepInBar % 2 === 0) playOfflineHat(false, 0.8, hitTime);
         }
       } else if (style === 'walzer') {
         if (variation === 'A') {
-          if (currentStepInBar === 0) playOfflineSample(kitBuffers.kick, 1.0, time);
-          if (currentStepInBar === 4 || currentStepInBar === 8) { playOfflineSample(kitBuffers.rim, 0.85, time); playOfflineSample(kitBuffers.snare, 0.22, time); }
-          if (currentStepInBar % 2 === 0) playOfflineSample(kitBuffers.hatClosed, currentStepInBar === 0 ? 0.95 : (currentStepInBar === 4 || currentStepInBar === 8 ? 0.72 : 0.45), time);
+          if (currentStepInBar === 0) playOfflineKick(1.0, hitTime);
+          if (currentStepInBar === 4 || currentStepInBar === 8) { playOfflineRim(0.85, hitTime); playOfflineSnare(0.22, hitTime); }
+          if (currentStepInBar % 2 === 0) playOfflineHat(false, currentStepInBar === 0 ? 0.95 : (currentStepInBar === 4 || currentStepInBar === 8 ? 0.72 : 0.45), hitTime);
         } else if (variation === 'B') {
-          if (currentStepInBar === 0 || currentStepInBar === 6) playOfflineSample(kitBuffers.kick, 0.9, time);
-          if (currentStepInBar === 4 || currentStepInBar === 8) playOfflineSample(kitBuffers.snare, 0.75, time);
-          if (currentStepInBar === 0 || currentStepInBar === 3 || currentStepInBar === 4 || currentStepInBar === 7 || currentStepInBar === 8 || currentStepInBar === 11) playOfflineSample(kitBuffers.hatClosed, 0.8, time);
+          if (currentStepInBar === 0 || currentStepInBar === 6) playOfflineKick(0.9, hitTime);
+          if (currentStepInBar === 4 || currentStepInBar === 8) playOfflineSnare(0.75, hitTime);
+          if (currentStepInBar === 0 || currentStepInBar === 3 || currentStepInBar === 4 || currentStepInBar === 7 || currentStepInBar === 8 || currentStepInBar === 11) playOfflineHat(false, 0.8, hitTime);
         } else {
-          if (currentStepInBar === 0) playOfflineSample(kitBuffers.kick, 1.0, time);
-          if (currentStepInBar === 4) playOfflineSample(kitBuffers.snare, 0.7, time);
-          if (currentStepInBar === 8 || currentStepInBar === 9 || currentStepInBar === 10 || currentStepInBar === 11) playOfflineSample(kitBuffers.snare, 0.8, time);
-          if (currentStepInBar % 2 === 0) playOfflineSample(kitBuffers.hatClosed, 0.8, time);
+          if (currentStepInBar === 0) playOfflineKick(1.0, hitTime);
+          if (currentStepInBar === 4) playOfflineSnare(0.7, hitTime);
+          if (currentStepInBar === 8 || currentStepInBar === 9 || currentStepInBar === 10 || currentStepInBar === 11) playOfflineSnare(0.8, hitTime);
+          if (currentStepInBar % 2 === 0) playOfflineHat(false, 0.8, hitTime);
         }
       } else if (style === 'ballad68') {
         if (variation === 'A') {
-          if (currentStepInBar === 0) playOfflineSample(kitBuffers.kick, 1.2, time);
-          else if (currentStepInBar === 5) playOfflineSample(kitBuffers.kick, 0.6, time);
-          if (currentStepInBar === 6) playOfflineSample(kitBuffers.snare, 1.1, time);
-          if (currentStepInBar % 2 === 0) playOfflineSample(kitBuffers.hatClosed, (currentStepInBar === 0 || currentStepInBar === 6) ? 1.0 : 0.6, time);
+          if (currentStepInBar === 0) playOfflineKick(1.2, hitTime);
+          else if (currentStepInBar === 5) playOfflineKick(0.6, hitTime);
+          if (currentStepInBar === 6) playOfflineSnare(1.1, hitTime);
+          if (currentStepInBar % 2 === 0) playOfflineHat(false, (currentStepInBar === 0 || currentStepInBar === 6) ? 1.0 : 0.6, hitTime);
         } else if (variation === 'B') {
-          if (currentStepInBar === 0 || currentStepInBar === 4 || currentStepInBar === 5) playOfflineSample(kitBuffers.kick, 1.1, time);
-          if (currentStepInBar === 6) playOfflineSample(kitBuffers.snare, 1.15, time);
-          else if (currentStepInBar === 11) playOfflineSample(kitBuffers.rim, 0.5, time);
-          if (currentStepInBar % 2 === 0) playOfflineSample(kitBuffers.hatClosed, 0.82, time);
+          if (currentStepInBar === 0 || currentStepInBar === 4 || currentStepInBar === 5) playOfflineKick(1.1, hitTime);
+          if (currentStepInBar === 6) playOfflineSnare(1.15, hitTime);
+          else if (currentStepInBar === 11) playOfflineRim(0.5, hitTime);
+          if (currentStepInBar % 2 === 0) playOfflineHat(false, 0.82, hitTime);
         } else {
-          if (currentStepInBar === 0 || currentStepInBar === 5) playOfflineSample(kitBuffers.kick, 1.2, time);
-          if (currentStepInBar === 6) playOfflineSample(kitBuffers.snare, 1.1, time);
-          else if (currentStepInBar === 10 || currentStepInBar === 11) playOfflineSample(kitBuffers.snare, 0.85, time);
-          if (currentStepInBar % 2 === 0) playOfflineSample(kitBuffers.hatClosed, 0.8, time);
+          if (currentStepInBar === 0 || currentStepInBar === 5) playOfflineKick(1.2, hitTime);
+          if (currentStepInBar === 6) playOfflineSnare(1.1, hitTime);
+          else if (currentStepInBar === 10 || currentStepInBar === 11) playOfflineSnare(0.85, hitTime);
+          if (currentStepInBar % 2 === 0) playOfflineHat(false, 0.8, hitTime);
         }
       } else if (style === 'disco') {
         if (variation === 'A') {
-          if (currentStepInBar === 0 || currentStepInBar === 4 || currentStepInBar === 8 || currentStepInBar === 12) playOfflineSample(kitBuffers.kick, 1.15, time);
-          if (currentStepInBar === 4 || currentStepInBar === 12) playOfflineSample(kitBuffers.snare, 1.0, time);
-          if (currentStepInBar % 2 === 0) playOfflineSample(currentStepInBar === 2 || currentStepInBar === 6 || currentStepInBar === 10 || currentStepInBar === 14 ? kitBuffers.hatOpen : kitBuffers.hatClosed, (currentStepInBar === 2 || currentStepInBar === 6 || currentStepInBar === 10 || currentStepInBar === 14) ? 1.05 : 0.5, time);
+          if (currentStepInBar === 0 || currentStepInBar === 4 || currentStepInBar === 8 || currentStepInBar === 12) playOfflineKick(1.15, hitTime);
+          if (currentStepInBar === 4 || currentStepInBar === 12) playOfflineSnare(1.0, hitTime);
+          if (currentStepInBar % 2 === 0) playOfflineHat(currentStepInBar === 2 || currentStepInBar === 6 || currentStepInBar === 10 || currentStepInBar === 14, (currentStepInBar === 2 || currentStepInBar === 6 || currentStepInBar === 10 || currentStepInBar === 14) ? 1.05 : 0.5, hitTime);
         } else if (variation === 'B') {
-          if (currentStepInBar === 0 || currentStepInBar === 4 || currentStepInBar === 8 || currentStepInBar === 12) playOfflineSample(kitBuffers.kick, 1.15, time);
-          if (currentStepInBar === 4 || currentStepInBar === 12) playOfflineSample(kitBuffers.snare, 1.0, time);
-          if (currentStepInBar === 2 || currentStepInBar === 6 || currentStepInBar === 10 || currentStepInBar === 14) playOfflineSample(kitBuffers.hatOpen, 1.1, time);
-          else if (currentStepInBar === 3 || currentStepInBar === 7 || currentStepInBar === 11 || currentStepInBar === 15) playOfflineSample(kitBuffers.hatClosed, 0.5, time);
-          else if (currentStepInBar % 4 === 0) playOfflineSample(kitBuffers.hatClosed, 0.85, time);
+          // 🌟 V2: 10/10 Goldstandard Disco Groove+ (Studio 54 / Chic / Daft Punk Energy)
+          if (currentStepInBar === 0 || currentStepInBar === 4 || currentStepInBar === 8 || currentStepInBar === 10 || currentStepInBar === 12) {
+            playOfflineKick(currentStepInBar === 10 ? 0.95 : 1.20, hitTime);
+          }
+          if (currentStepInBar === 4 || currentStepInBar === 12) {
+            playOfflineSnare(1.15, hitTime);
+            playOfflineRim(0.70, hitTime);
+          } else if (currentStepInBar === 15) {
+            playOfflineSnare(0.32, hitTime);
+          }
+          if (currentStepInBar === 2 || currentStepInBar === 6 || currentStepInBar === 10 || currentStepInBar === 14) {
+            playOfflineHat(true, 1.15, hitTime);
+          } else if (currentStepInBar === 3 || currentStepInBar === 7 || currentStepInBar === 11 || currentStepInBar === 15) {
+            playOfflineHat(false, 0.55, hitTime);
+          } else if (currentStepInBar % 4 === 0) {
+            playOfflineHat(false, 0.85, hitTime);
+          } else {
+            playOfflineHat(false, 0.38, hitTime);
+          }
+          playOfflineShaker(currentStepInBar % 2 === 0, 0.38, hitTime);
         } else {
-          if (currentStepInBar === 0 || currentStepInBar === 3 || currentStepInBar === 4 || currentStepInBar === 8 || currentStepInBar === 11 || currentStepInBar === 12) playOfflineSample(kitBuffers.kick, 1.1, time);
-          if (currentStepInBar === 4 || currentStepInBar === 12) playOfflineSample(kitBuffers.snare, 1.1, time);
-          else if (currentStepInBar === 15) playOfflineSample(kitBuffers.snare, 0.8, time);
-          if (currentStepInBar % 2 === 0) playOfflineSample(kitBuffers.hatClosed, 0.8, time);
+          // 🌟 V3: Complex (Full Disco fill with rolling snares & crash transition)
+          if (currentStepInBar === 0 || currentStepInBar === 4 || currentStepInBar === 8 || currentStepInBar === 10 || currentStepInBar === 11) playOfflineKick(1.15, hitTime);
+          if (currentStepInBar === 4) {
+            playOfflineSnare(1.15, hitTime);
+            playOfflineRim(0.70, hitTime);
+          } else if (currentStepInBar === 12 || currentStepInBar === 13 || currentStepInBar === 14 || currentStepInBar === 15) {
+            playOfflineSnare(currentStepInBar === 12 ? 1.15 : (currentStepInBar === 13 ? 0.70 : (currentStepInBar === 14 ? 0.85 : 1.05)), hitTime);
+          }
+          if (currentStepInBar % 2 === 0) playOfflineHat(currentStepInBar === 2 || currentStepInBar === 6, (currentStepInBar === 2 || currentStepInBar === 6) ? 1.1 : 0.65, hitTime);
+          playOfflineShaker(currentStepInBar % 2 === 0, 0.40, hitTime);
         }
       } else {
         // Steady 4/4 groove fallback
-        if (currentStepInBar === 0 || currentStepInBar === 8) playOfflineSample(kitBuffers.kick, 1.0, time);
-        if (currentStepInBar === 4 || currentStepInBar === 12) playOfflineSample(kitBuffers.snare, 0.9, time);
-        if (currentStepInBar % 2 === 0) playOfflineSample(kitBuffers.hatClosed, 0.6, time);
+        if (currentStepInBar === 0 || currentStepInBar === 8) playOfflineKick(1.0, hitTime);
+        if (currentStepInBar === 4 || currentStepInBar === 12) playOfflineSnare(0.9, hitTime);
+        if (currentStepInBar % 2 === 0) playOfflineHat(false, 0.6, hitTime);
       }
 
       step++;
@@ -458,10 +552,23 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
   student,
   onNavigateToRecordings
 }) => {
-  const getBeatsPerBar = (style: string) => {
-    if (style === 'walzer') return 3;
-    if (style === 'ballad68') return 6;
-    return 4;
+  const getActiveMeter = (style: string, metMeter: string) => {
+    if (style === 'walzer') {
+      return { meter: '3/4', beats: 3, countInBeats: 3, stepsInBar: 12, stepDivision: 4 };
+    }
+    if (style === 'ballad68') {
+      return { meter: '6/8', beats: 6, countInBeats: 6, stepsInBar: 12, stepDivision: 2 };
+    }
+    if (style === 'swing') {
+      return { meter: '4/4', beats: 4, countInBeats: 4, stepsInBar: 12, stepDivision: 3 };
+    }
+    if (style === 'metronome') {
+      if (metMeter === '3/4') return { meter: '3/4', beats: 3, countInBeats: 3, stepsInBar: 12, stepDivision: 4 };
+      if (metMeter === '2/4') return { meter: '2/4', beats: 2, countInBeats: 2, stepsInBar: 8, stepDivision: 4 };
+      if (metMeter === '6/8') return { meter: '6/8', beats: 6, countInBeats: 6, stepsInBar: 12, stepDivision: 2 };
+      return { meter: '4/4', beats: 4, countInBeats: 4, stepsInBar: 16, stepDivision: 4 };
+    }
+    return { meter: '4/4', beats: 4, countInBeats: 4, stepsInBar: 16, stepDivision: 4 };
   };
 
   const [mobileTab, setMobileTab] = useState<'metronome' | 'rhythms'>('metronome');
@@ -482,11 +589,20 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
   const [bpm, setBpm] = useState(activeSongContext?.targetBpm || targetBpm || 120);
   const [selectedStyle, setSelectedStyle] = useState<'metronome' | 'rock' | 'hiphop' | 'swing' | 'latin' | 'funk' | 'reggae' | 'walzer' | 'ballad68' | 'disco' | 'singersongwriter'>('metronome');
   const [selectedVariation, setSelectedVariation] = useState<'A' | 'B' | 'C'>('A');
+  const [metronomeMeter, setMetronomeMeter] = useState<'4/4' | '3/4' | '2/4' | '6/8'>('4/4');
+  const metronomeMeterRef = useRef(metronomeMeter);
+  useEffect(() => { metronomeMeterRef.current = metronomeMeter; }, [metronomeMeter]);
+
+  const activeMeterInfo = getActiveMeter(selectedStyle, metronomeMeter);
   const [volMaster, setVolMaster] = useState(100);
   const [volKick, setVolKick] = useState(100);
   const [volSnare, setVolSnare] = useState(100);
   const [volHat, setVolHat] = useState(100);
   const [volMetronome, setVolMetronome] = useState(100);
+
+  // 🎯 Kindgerechte Fokus-Ebenen (Sekundär-Toolbox Drawer)
+  const [showAllStyles, setShowAllStyles] = useState(false);
+  const [showStudioMixer, setShowStudioMixer] = useState(false);
 
   // 🎙️ Campus Rhythmus-Coach States & Realtime Audio Tracking
   const [rhythmCoachActive, setRhythmCoachActive] = useState(false);
@@ -999,6 +1115,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
   const selectedStyleRef = useRef(selectedStyle);
   const isPlayingRef = useRef(isPlaying);
   const sampleBufferCacheRef = useRef<Record<string, Record<string, AudioBuffer>>>({});
+  const activeOpenHatGainsRef = useRef<GainNode[]>([]);
 
   const getOrCreateGenreSampleBuffers = (ctx: AudioContext, genre: string): Record<string, AudioBuffer> => {
     if (sampleBufferCacheRef.current[genre]) {
@@ -1012,32 +1129,16 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
     const hatOpenBuf = decodeBase64Wav(ctx, ACOUSTIC_STUDIO_SAMPLES.hatOpen);
     const clickBuf = decodeBase64Wav(ctx, ACOUSTIC_STUDIO_SAMPLES.click);
 
-    // Helper: Render Wooden Rimshot AudioBuffer
-    const renderRimBuffer = (): AudioBuffer => {
-      const dur = 0.05;
-      const sr = ctx.sampleRate;
-      const buf = ctx.createBuffer(2, Math.floor(sr * dur), sr);
-      const L = buf.getChannelData(0);
-      const R = buf.getChannelData(1);
-      const len = buf.length;
-
-      for (let i = 0; i < len; i++) {
-        const t = i / sr;
-        const woodClick = Math.sin(2 * Math.PI * 980 * t) * Math.exp(-t * 80);
-        const val = woodClick * 0.40;
-        L[i] = val;
-        R[i] = val;
-      }
-      return buf;
-    };
-
     const kitBuffers: Record<string, AudioBuffer> = {
       kick: kickBuf,
       snare: snareBuf,
       hatClosed: hatClosedBuf,
       hatOpen: hatOpenBuf,
-      rim: renderRimBuffer(),
-      click: clickBuf
+      click: clickBuf,
+      rim: renderRimBuffer(ctx),
+      ride: renderRideBuffer(ctx),
+      shakerFwd: renderShakerBuffer(ctx, true),
+      shakerBack: renderShakerBuffer(ctx, false),
     };
 
     sampleBufferCacheRef.current[genre] = kitBuffers;
@@ -1084,6 +1185,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
     setIsCountingIn(false);
     setIsPlaying(false);
     setRecordSeconds(0);
+    activeOpenHatGainsRef.current = [];
 
     if (isRecordingRef.current) {
       setIsRecording(false);
@@ -1190,7 +1292,8 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
             rawBlob,
             bpmRef.current,
             selectedStyleRef.current,
-            selectedVariationRef.current
+            selectedVariationRef.current,
+            metronomeMeterRef.current
           );
           finalBlob = mixResult.processedBlob;
           blobUrl = mixResult.processedUrl;
@@ -1415,8 +1518,28 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
     compressor.attack.setValueAtTime(0.015, audioCtx.currentTime);
     compressor.release.setValueAtTime(0.12, audioCtx.currentTime);
 
-    // Pure Direct Routing: MasterGain -> Compressor -> Destination
+    // 🌟 3D Studio Room Ambience bus (-22 dB diffuse wooden studio reflection)
+    const roomGain = audioCtx.createGain();
+    roomGain.gain.setValueAtTime(0.08, audioCtx.currentTime); // subtle -22 dB
+    const roomDelayL = audioCtx.createDelay();
+    roomDelayL.delayTime.setValueAtTime(0.019, audioCtx.currentTime);
+    const roomDelayR = audioCtx.createDelay();
+    roomDelayR.delayTime.setValueAtTime(0.027, audioCtx.currentTime);
+    const roomFilter = audioCtx.createBiquadFilter();
+    roomFilter.type = 'lowpass';
+    roomFilter.frequency.setValueAtTime(4200, audioCtx.currentTime);
+
+    const roomMerger = audioCtx.createChannelMerger(2);
+    roomDelayL.connect(roomMerger, 0, 0);
+    roomDelayR.connect(roomMerger, 0, 1);
+    roomMerger.connect(roomFilter);
+    roomFilter.connect(roomGain);
+    roomGain.connect(compressor);
+
+    // Direct Dry Signal + Parallel Acoustic Room Glue
     masterGain.connect(compressor);
+    masterGain.connect(roomDelayL);
+    masterGain.connect(roomDelayR);
     compressor.connect(audioCtx.destination);
     masterGainRef.current = masterGain;
 
@@ -1438,24 +1561,25 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
     const initialStartTime = audioCtx.currentTime + 0.05;
 
     if (isCountInActive) {
-      // 🌟 UNIFIED 4-BEAT COUNT-IN (In the EXACT same AudioContext with Klopfgeist!)
-      const c1 = initialStartTime;
-      const c2 = initialStartTime + secondsPerBeat;
-      const c3 = initialStartTime + 2 * secondsPerBeat;
-      const c4 = initialStartTime + 3 * secondsPerBeat;
-      const rhythmStart = initialStartTime + 4 * secondsPerBeat;
+      const activeMeter = getActiveMeter(selectedStyleRef.current, metronomeMeterRef.current);
+      const totalCountInBeats = activeMeter.countInBeats;
+      const countInInterval = activeMeter.meter === '6/8' ? (secondsPerBeat / 2) : secondsPerBeat;
+      const rhythmStart = initialStartTime + totalCountInBeats * countInInterval;
 
-      // 1. Audio Scheduling for 4 Count-In Clicks (Audio Thread)
-      playKlopfgeistClick(audioCtx, c1, true, 0.95, masterGain);  // Beat 1: High Pitch Accent
-      playKlopfgeistClick(audioCtx, c2, false, 0.75, masterGain); // Beat 2
-      playKlopfgeistClick(audioCtx, c3, false, 0.75, masterGain); // Beat 3
-      playKlopfgeistClick(audioCtx, c4, false, 0.75, masterGain); // Beat 4
+      // 1. Audio Scheduling for Count-In Clicks (Audio Thread)
+      for (let b = 0; b < totalCountInBeats; b++) {
+        const clickTime = initialStartTime + b * countInInterval;
+        const isAccent = b === 0;
+        playKlopfgeistClick(audioCtx, clickTime, isAccent, isAccent ? 0.95 : 0.75, masterGain);
+      }
 
       // 2. Visual UI Counters (Synchronized to Audio Clock)
       setCountInBeat(1);
-      const t2 = setTimeout(() => setCountInBeat(2), Math.max(0, (c2 - audioCtx.currentTime) * 1000));
-      const t3 = setTimeout(() => setCountInBeat(3), Math.max(0, (c3 - audioCtx.currentTime) * 1000));
-      const t4 = setTimeout(() => setCountInBeat(4), Math.max(0, (c4 - audioCtx.currentTime) * 1000));
+      const timers: any[] = [];
+      for (let b = 1; b < totalCountInBeats; b++) {
+        const clickTime = initialStartTime + b * countInInterval;
+        timers.push(setTimeout(() => setCountInBeat(b + 1), Math.max(0, (clickTime - audioCtx.currentTime) * 1000)));
+      }
 
       // 3. Exact Seamless Transition to Measure 1 Beat 1 (0ms Delay)
       const tRec = setTimeout(() => {
@@ -1483,7 +1607,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
         }, 1000);
       }, Math.max(0, (rhythmStart - audioCtx.currentTime) * 1000));
 
-      countInTimersRef.current = [t2, t3, t4, tRec];
+      countInTimersRef.current = [...timers, tRec];
 
       nextNoteTimeRef.current = rhythmStart;
       barStartAudioTimeRef.current = rhythmStart;
@@ -1498,9 +1622,8 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
       if (!audioCtxRef.current || !isPlayingRef.current) return;
       const ctx = audioCtxRef.current;
       const secondsPerBeat = 60.0 / bpmRef.current;
-      const style = selectedStyleRef.current;
-      const beats = style === 'walzer' ? 3 : (style === 'ballad68' ? 6 : 4);
-      const secondsPerBar = secondsPerBeat * beats;
+      const meterInfo = getActiveMeter(selectedStyleRef.current, metronomeMeterRef.current);
+      const secondsPerBar = meterInfo.stepsInBar * (secondsPerBeat / meterInfo.stepDivision);
       
       const elapsed = ctx.currentTime - barStartAudioTimeRef.current;
       const progressPercent = Math.min(100, Math.max(0, (elapsed / secondsPerBar) * 100));
@@ -1518,19 +1641,10 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
 
     const advanceNote = () => {
       const secondsPerBeat = 60.0 / bpmRef.current;
-      const style = selectedStyleRef.current;
-      let stepsInBar = 16;
-      let stepDuration = secondsPerBeat / 4;
-      if (style === 'swing') {
-        stepsInBar = 12;
-        stepDuration = secondsPerBeat / 3;
-      } else if (style === 'walzer') {
-        stepsInBar = 12;
-        stepDuration = secondsPerBeat / 4;
-      } else if (style === 'ballad68') {
-        stepsInBar = 12;
-        stepDuration = secondsPerBeat / 2;
-      }
+      const meterInfo = getActiveMeter(selectedStyleRef.current, metronomeMeterRef.current);
+      const stepsInBar = meterInfo.stepsInBar;
+      const stepDuration = secondsPerBeat / meterInfo.stepDivision;
+
       nextNoteTimeRef.current += stepDuration;
       current16thNoteRef.current = (current16thNoteRef.current + 1) % stepsInBar;
       
@@ -1726,30 +1840,82 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
     const style = selectedStyleRef.current;
     const kitBuffers = getOrCreateGenreSampleBuffers(ctx, style);
 
+    // 🌟 MPC Micro-Swing Offset for Hip-Hop & Funk Pocket (56% Shuffle feel)
+    const isHipHopOrFunk = style === 'hiphop' || style === 'funk';
+    const microSwingOffset = (isHipHopOrFunk && step % 2 === 1) ? ((60.0 / bpmRef.current) / 4) * 0.12 : 0;
+    const noteTime = time + microSwingOffset;
+
+    // 🌟 Hi-Hat Choking Engine (8ms physical pedal clamp)
+    const chokeOpenHats = (atTime: number) => {
+      const gains = activeOpenHatGainsRef.current;
+      activeOpenHatGainsRef.current = [];
+      for (const g of gains) {
+        try {
+          g.gain.cancelScheduledValues(atTime);
+          g.gain.setValueAtTime(Math.max(0.0001, g.gain.value), atTime);
+          g.gain.exponentialRampToValueAtTime(0.0001, atTime + 0.008);
+        } catch {}
+      }
+    };
+
     // High-End Sample Playback with Micro-Ramp (Zero Clicking & Phase-Locked Metronome Alignment)
-    const playSample = (buffer: AudioBuffer, vol: number, volMultiplier = 1.0, pitchJitter = 0.0) => {
-      if (vol <= 0.001 || !buffer) return;
+    const playSample = (buffer: AudioBuffer, vol: number, volMultiplier = 1.0, pitchJitter = 0.0, filterNode?: BiquadFilterNode): GainNode | null => {
+      if (vol <= 0.001 || !buffer) return null;
       const source = ctx.createBufferSource();
       source.buffer = buffer;
       if (pitchJitter > 0) {
         source.playbackRate.value = 1 + (Math.random() * 2 - 1) * pitchJitter;
       }
       const gain = ctx.createGain();
-      const targetGain = vol * volMultiplier * 1.5;
+      const targetGain = vol * volMultiplier * 0.85;
       // Micro 0.8ms linear ramp prevents DC zero-crossing clicks & pops
-      gain.gain.setValueAtTime(0.0001, time);
-      gain.gain.linearRampToValueAtTime(targetGain, time + 0.0008);
+      gain.gain.setValueAtTime(0.0001, noteTime);
+      gain.gain.linearRampToValueAtTime(targetGain, noteTime + 0.0008);
       
-      source.connect(gain);
+      if (filterNode) {
+        source.connect(filterNode);
+        filterNode.connect(gain);
+      } else {
+        source.connect(gain);
+      }
       gain.connect(masterGain);
-      source.start(time);
+      source.start(noteTime);
+      return gain;
     };
 
-    const playKick = (volMul = 1.0) => playSample(kitBuffers.kick, kVol, volMul, 0.008);
-    const playSnare = (volMul = 1.0) => playSample(kitBuffers.snare, sVol, volMul, 0.015);
-    const playRimClick = (volMul = 1.0) => playSample(kitBuffers.rim, sVol, volMul * 0.8, 0.010);
-    const playHat = (isOpen = false, volMul = 1.0) => playSample(isOpen ? kitBuffers.hatOpen : kitBuffers.hatClosed, hVol, volMul, 0.018);
-    const playClick = (isAccent = false) => playKlopfgeistClick(ctx, time, isAccent, mVol, masterGain);
+    // 🎚️ Tonmeister Studio Mix Calibration:
+    const playKick = (volMul = 1.0) => playSample(kitBuffers.kick, kVol, volMul * 1.0, 0.008);
+
+    // 🌟 Multi-Velocity Snare (Dynamic Ghost-Note Layer at volMul <= 0.35)
+    const playSnare = (volMul = 1.0) => {
+      if (volMul <= 0.35) {
+        const ghostFilter = ctx.createBiquadFilter();
+        ghostFilter.type = 'lowpass';
+        ghostFilter.frequency.setValueAtTime(2600, noteTime);
+        ghostFilter.Q.setValueAtTime(0.7, noteTime);
+        return playSample(kitBuffers.snare, sVol, volMul * 0.84, 0.022, ghostFilter);
+      }
+      return playSample(kitBuffers.snare, sVol, volMul * 0.84, 0.015);
+    };
+
+    const playRimClick = (volMul = 1.0) => playSample(kitBuffers.rim, sVol, volMul * 0.63, 0.010);
+
+    // 🌟 Hi-Hat with automatic Choking on pedal closing
+    const playHat = (isOpen = false, volMul = 1.0) => {
+      if (isOpen) {
+        const g = playSample(kitBuffers.hatOpen, hVol, volMul * 0.38, 0.018);
+        if (g) activeOpenHatGainsRef.current.push(g);
+        return g;
+      } else {
+        chokeOpenHats(noteTime);
+        return playSample(kitBuffers.hatClosed, hVol, volMul * 0.45, 0.018);
+      }
+    };
+
+    // 🌟 Supplementary Studio Instruments (Warm Ride & Organic Shaker)
+    const playRide = (volMul = 1.0) => playSample(kitBuffers.ride, hVol, volMul * 0.33, 0.012);
+    const playShaker = (forward = true, volMul = 1.0) => playSample(forward ? kitBuffers.shakerFwd : kitBuffers.shakerBack, hVol, volMul * 0.26, 0.025);
+    const playClick = (isAccent = false) => playKlopfgeistClick(ctx, noteTime, isAccent, selectedStyleRef.current === 'metronome' ? mVol : mVol * 0.75, masterGain);
 
     const triggerVisualBeat = (beatIdx: number) => {
       // Record scheduled quarter beat timestamp for Rhythmus-Coach transient alignment
@@ -1767,23 +1933,32 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
     const variant = selectedVariationRef.current; // 'A', 'B' or 'C'
 
     if (selectedStyleRef.current === 'metronome') {
-      const beatIdx = Math.floor(step / 4);
-      if (variant === 'A') {
-        // V1: Classic quarter-note clicks
-        if (step % 4 === 0) {
+      const meterInfo = getActiveMeter('metronome', metronomeMeterRef.current);
+      if (meterInfo.meter === '6/8') {
+        const beatIdx = Math.floor(step / 2);
+        if (step % 2 === 0) {
           playClick(beatIdx === 0);
           triggerVisualBeat(beatIdx);
         }
-      } else if (variant === 'B') {
-        // V2: Eighth-note clicks (pedagogical subdivision)
-        if (step % 2 === 0) {
+      } else {
+        const beatIdx = Math.floor(step / 4);
+        if (variant === 'A') {
+          // V1: Classic quarter-note clicks
+          if (step % 4 === 0) {
+            playClick(beatIdx === 0);
+            triggerVisualBeat(beatIdx);
+          }
+        } else if (variant === 'B') {
+          // V2: Eighth-note clicks (pedagogical subdivision)
+          if (step % 2 === 0) {
+            playClick(step === 0);
+            if (step % 4 === 0) triggerVisualBeat(beatIdx);
+          }
+        } else {
+          // V3: 16th-note clicks (high resolution micro-timing)
           playClick(step === 0);
           if (step % 4 === 0) triggerVisualBeat(beatIdx);
         }
-      } else {
-        // V3: 16th-note clicks (high resolution micro-timing)
-        playClick(step === 0);
-        if (step % 4 === 0) triggerVisualBeat(beatIdx);
       }
     } else if (selectedStyleRef.current === 'rock') {
       if (variant === 'A') {
@@ -1792,10 +1967,11 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
         if (step === 4 || step === 12) playSnare(1.0);
         if (step % 2 === 0) playHat(false, step % 4 === 0 ? 1.0 : 0.62);
       } else if (variant === 'B') {
-        // V2: Groove+ (Syncopated kick upbeats)
+        // V2: Groove+ (Syncopated kick upbeats + open hat lift)
         if (step === 0 || step === 6 || step === 8 || step === 10 || step === 14) playKick(1.0);
         if (step === 4 || step === 12) playSnare(1.0);
-        if (step % 2 === 0) playHat(false, step % 4 === 0 ? 1.0 : 0.65);
+        if (step === 14) playHat(true, 0.85); // Sizzling upbeat open hat lift on 4+
+        else if (step % 2 === 0) playHat(false, step % 4 === 0 ? 1.0 : 0.65);
       } else {
         // V3: Complex (Snare ghost notes + ride feel)
         if (step === 0 || step === 3 || step === 8 || step === 10 || step === 11) playKick(1.0);
@@ -1811,7 +1987,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
         if (step === 0) playKick(1.3);
         else if (step === 3 || step === 10) playKick(0.9);
         if (step === 4 || step === 12) playSnare(1.1);
-        else if (step === 7 || step === 15) playSnare(0.22);
+        else if (step === 7 || step === 15) playSnare(0.22); // Multi-velocity ghost
         if (step % 2 === 0) playHat(step === 14, step % 4 === 0 ? 0.9 : 0.55);
       } else if (variant === 'B') {
         // V2: Groove+ (Boom-Bap double kick)
@@ -1833,52 +2009,57 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
       if (step % 4 === 0) triggerVisualBeat(Math.floor(step / 4));
     } else if (isSwing) {
       if (variant === 'A') {
-        // V1: Classic jazz swing ride cymbal with feathered kick
-        if (step === 0 || step === 3 || step === 6 || step === 9) playKick(0.32);
-        if (step === 2) playRimClick(0.45);
-        else if (step === 8) playSnare(0.4);
-        if (step === 0 || step === 3 || step === 6 || step === 9) playHat(false, 1.0);
-        else if (step === 2 || step === 5 || step === 8 || step === 11) playHat(true, 0.55);
-        if (step === 3 || step === 9) playRimClick(0.25);
+        // 🌟 V1: Classic jazz swing - Authentic 20" Ride cymbal with feathered kick & hi-hat foot chick
+        if (step === 0 || step === 3 || step === 6 || step === 9) playKick(0.20);
+        if (step === 2) playRimClick(0.35);
+        else if (step === 8) playSnare(0.30);
+        if (step === 0 || step === 3 || step === 6 || step === 9) playRide(0.75);
+        else if (step === 2 || step === 5 || step === 8 || step === 11) playRide(0.38);
+        if (step === 3 || step === 9) playHat(false, 0.65); // Hi-Hat foot chick on 2 & 4
       } else if (variant === 'B') {
-        // V2: Groove+ (Comping snare hits)
-        if (step === 0 || step === 6) playKick(0.35);
-        if (step === 2 || step === 5 || step === 11) playSnare(0.5); // active snare comping
-        if (step === 0 || step === 3 || step === 6 || step === 9) playHat(false, 1.05);
-        else if (step === 2 || step === 5 || step === 8 || step === 11) playHat(true, 0.62);
-        if (step === 3 || step === 9) playRimClick(0.3);
+        // 🌟 V2: Groove+ (Comping snare hits & Ride)
+        if (step === 0 || step === 6) playKick(0.22);
+        if (step === 2 || step === 5 || step === 11) playSnare(0.38);
+        if (step === 0 || step === 3 || step === 6 || step === 9) playRide(0.80);
+        else if (step === 2 || step === 5 || step === 8 || step === 11) playRide(0.42);
+        if (step === 3 || step === 9) playHat(false, 0.70);
       } else {
-        // V3: Complex (Swing triplets fill)
-        if (step === 0 || step === 6) playKick(0.5);
+        // 🌟 V3: Complex (Swing triplets fill & Ride wash)
+        if (step === 0 || step === 6) playKick(0.28);
         if (step === 9 || step === 10 || step === 11) {
-          playSnare(0.7); // crescendo snare fill
+          playSnare(0.55); // crescendo snare fill
         } else if (step === 2 || step === 5) {
-          playSnare(0.32);
+          playSnare(0.26);
         }
-        if (step === 0 || step === 3 || step === 6 || step === 9) playHat(false, 1.0);
+        if (step === 0 || step === 3 || step === 6 || step === 9) playRide(0.75);
+        else if (step === 2 || step === 5 || step === 8) playRide(0.40);
+        if (step === 3 || step === 9) playHat(false, 0.68);
       }
       if (step % 3 === 0) triggerVisualBeat(Math.floor(step / 3));
     } else if (selectedStyleRef.current === 'latin') {
       if (variant === 'A') {
-        // V1: Classic Bossa double kick & rim clave
-        if (step === 0 || step === 3 || step === 8 || step === 11) playKick(0.95);
-        if (step === 0 || step === 3 || step === 6 || step === 10 || step === 12) playRimClick(1.0);
-        if (step % 2 === 0) playHat(false, step % 4 === 0 ? 0.8 : 0.48);
+        // V1: Classic Bossa double kick & rim clave with subtle studio shaker
+        if (step === 0 || step === 3 || step === 8 || step === 11) playKick(0.90);
+        if (step === 0 || step === 3 || step === 6 || step === 10 || step === 12) playRimClick(0.95);
+        if (step % 2 === 0) playHat(false, step % 4 === 0 ? 0.70 : 0.40);
+        playShaker(step % 2 === 0, 0.35);
       } else if (variant === 'B') {
-        // V2: Groove+ (High-energy Samba surdo sweep)
+        // V2: Groove+ (High-energy Samba surdo sweep with subtle shaker)
         if (step === 0 || step === 2 || step === 4 || step === 6 || step === 8 || step === 10 || step === 12 || step === 14) {
-          playKick(step % 4 === 2 ? 1.15 : 0.6); // typical surdo groove
+          playKick(step % 4 === 2 ? 1.05 : 0.55); // typical surdo groove
         }
-        if (step === 0 || step === 4 || step === 8 || step === 12) playRimClick(0.95);
-        if (step % 2 === 0) playHat(false, 0.75);
+        if (step === 0 || step === 4 || step === 8 || step === 12) playRimClick(0.90);
+        if (step % 2 === 0) playHat(false, 0.65);
+        playShaker(step % 2 === 0, 0.40);
       } else {
         // V3: Complex (Cascara clave & open hats)
-        if (step === 0 || step === 3 || step === 8 || step === 11) playKick(1.0);
+        if (step === 0 || step === 3 || step === 8 || step === 11) playKick(0.95);
         // Cascara rimshot pattern
         if (step === 0 || step === 2 || step === 3 || step === 5 || step === 6 || step === 8 || step === 10 || step === 11 || step === 13 || step === 14) {
-          playRimClick(0.85);
+          playRimClick(0.80);
         }
-        if (step % 4 === 2) playHat(true, 0.7); // open hat barks
+        if (step % 4 === 2) playHat(true, 0.65); // open hat barks with choke
+        playShaker(step % 2 === 0, 0.42);
       }
       if (step % 4 === 0) triggerVisualBeat(Math.floor(step / 4));
     } else if (selectedStyleRef.current === 'funk') {
@@ -1886,7 +2067,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
         // V1: Funky Breakbeat with ghost snares
         if (step === 0 || step === 6 || step === 10 || step === 11) playKick(1.15);
         if (step === 4 || step === 12) playSnare(1.1);
-        else if (step === 7 || step === 13 || step === 15) playSnare(0.28);
+        else if (step === 7 || step === 13 || step === 15) playSnare(0.28); // Multi-velocity ghost
         if (step % 2 === 0) playHat(step === 6 || step === 14, (step === 6 || step === 14) ? 1.0 : (step % 4 === 0 ? 0.95 : 0.55));
         else if (step === 3 || step === 11) playHat(false, 0.35);
       } else if (variant === 'B') {
@@ -1970,43 +2151,64 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
         if (step === 4 || step === 12) playSnare(1.0);
         if (step % 2 === 0) playHat(step === 2 || step === 6 || step === 10 || step === 14, (step === 2 || step === 6 || step === 10 || step === 14) ? 1.05 : 0.5);
       } else if (variant === 'B') {
-        // V2: Groove+ (Syncopated Hi-hat opening)
-        if (step === 0 || step === 4 || step === 8 || step === 12) playKick(1.15);
-        if (step === 4 || step === 12) playSnare(1.0);
-        // Hi-Hat bark on all offbeat eighths (2, 6, 10, 14 open, then closed on 3, 7, 11, 15)
-        if (step === 2 || step === 6 || step === 10 || step === 14) {
-          playHat(true, 1.1);
-        } else if (step === 3 || step === 7 || step === 11 || step === 15) {
-          playHat(false, 0.5);
-        } else if (step % 4 === 0) {
-          playHat(false, 0.85);
+        // 🌟 V2: 10/10 Goldstandard Disco Groove+ (Studio 54 / Chic / Daft Punk Energy)
+        // 1. Four-on-the-floor with infectious "3 und" bounce kick
+        if (step === 0 || step === 4 || step === 8 || step === 10 || step === 12) {
+          playKick(step === 10 ? 0.95 : 1.20);
         }
+        // 2. Layered Snare & Rimshot backbeat + 16th prep ghost note
+        if (step === 4 || step === 12) {
+          playSnare(1.15);
+          playRimClick(0.70);
+        } else if (step === 15) {
+          playSnare(0.32); // subtle 16th ghost pickup
+        }
+        // 3. Relentless 16th-note pumping Hi-Hat with open offbeat barks & pedal chokes
+        if (step === 2 || step === 6 || step === 10 || step === 14) {
+          playHat(true, 1.15); // open hat sizzle on offbeats
+        } else if (step === 3 || step === 7 || step === 11 || step === 15) {
+          playHat(false, 0.55); // instant physical pedal choke
+        } else if (step % 4 === 0) {
+          playHat(false, 0.85); // crisp quarter tap
+        } else {
+          playHat(false, 0.38); // driving 16th ghost tick
+        }
+        // 4. Shimmering Studio Shaker Teppich for air & forward momentum
+        playShaker(step % 2 === 0, 0.38);
       } else {
-        // V3: Complex (Disco fill)
-        if (step === 0 || step === 3 || step === 4 || step === 8 || step === 11 || step === 12) playKick(1.1);
-        if (step === 4 || step === 12) playSnare(1.1);
-        else if (step === 15) playSnare(0.8);
-        if (step % 2 === 0) playHat(false, 0.8);
+        // 🌟 V3: Complex (Full Disco fill with rolling snares & crash transition)
+        if (step === 0 || step === 4 || step === 8 || step === 10 || step === 11) playKick(1.15);
+        if (step === 4) {
+          playSnare(1.15);
+          playRimClick(0.70);
+        } else if (step === 12 || step === 13 || step === 14 || step === 15) {
+          playSnare(step === 12 ? 1.15 : (step === 13 ? 0.70 : (step === 14 ? 0.85 : 1.05))); // crescendo fill
+        }
+        if (step % 2 === 0) playHat(step === 2 || step === 6, (step === 2 || step === 6) ? 1.1 : 0.65);
+        playShaker(step % 2 === 0, 0.40);
       }
       if (step % 4 === 0) triggerVisualBeat(Math.floor(step / 4));
     } else if (selectedStyleRef.current === 'singersongwriter') {
       if (variant === 'A') {
-        // V1: Soft Acoustic Folk Pocket (Feathered Kick & Rimshot / Cross-Stick)
-        if (step === 0 || step === 10) playKick(0.75);
-        if (step === 4 || step === 12) playRimClick(0.9);
-        if (step % 2 === 0) playHat(false, step % 4 === 0 ? 0.7 : 0.4);
+        // V1: Soft Acoustic Folk Pocket (Feathered Kick & Rimshot + Studio Shaker)
+        if (step === 0 || step === 10) playKick(0.70);
+        if (step === 4 || step === 12) playRimClick(0.85);
+        if (step % 2 === 0) playHat(false, step % 4 === 0 ? 0.65 : 0.35);
+        playShaker(step % 2 === 0, 0.32);
       } else if (variant === 'B') {
         // V2: Groove+ (Shaker & Soft Brush Snare)
-        if (step === 0 || step === 10) playKick(0.8);
-        if (step === 4 || step === 12) playSnare(0.55); // soft brush snare
-        else if (step === 7 || step === 15) playSnare(0.18); // subtle brush scrape
-        if (step % 2 === 0) playHat(false, step % 4 === 0 ? 0.75 : 0.45);
+        if (step === 0 || step === 10) playKick(0.75);
+        if (step === 4 || step === 12) playSnare(0.48); // soft brush snare
+        else if (step === 7 || step === 15) playSnare(0.16); // subtle brush scrape
+        if (step % 2 === 0) playHat(false, step % 4 === 0 ? 0.70 : 0.40);
+        playShaker(step % 2 === 0, 0.38);
       } else {
-        // V3: Complex (Singer-Songwriter Acoustic Fill & Open Hat Sizzle)
-        if (step === 0 || step === 6 || step === 10) playKick(0.85);
-        if (step === 4 || step === 12) playSnare(0.65);
-        else if (step === 14 || step === 15) playRimClick(0.75); // acoustic wooden fill
-        if (step % 2 === 0) playHat(step === 10, step === 10 ? 0.8 : 0.5);
+        // V3: Complex (Singer-Songwriter Acoustic Fill & Open Hat Sizzle + Shaker)
+        if (step === 0 || step === 6 || step === 10) playKick(0.80);
+        if (step === 4 || step === 12) playSnare(0.55);
+        else if (step === 14 || step === 15) playRimClick(0.70); // acoustic wooden fill
+        if (step % 2 === 0) playHat(step === 10, step === 10 ? 0.70 : 0.45);
+        playShaker(step % 2 === 0, 0.40);
       }
       if (step % 4 === 0) triggerVisualBeat(Math.floor(step / 4));
     }
@@ -2314,33 +2516,137 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
             </svg>
           </div>
 
-          {/* Constant Metronome Beat Indicator Dots */}
-          <div style={{ display: 'flex', gap: '10px', margin: '2px 0' }}>
-            {Array.from({ length: 4 }).map((_, idx) => {
-              const isActive = (activeBeatIndex !== null && activeBeatIndex !== undefined) ? (activeBeatIndex % 4 === idx) : false;
+          {/* Zählzeiten Header mit Taktart-Pille */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            width: '100%',
+            maxWidth: '280px',
+            margin: '2px 0 4px 0',
+            padding: '0 2px'
+          }}>
+            <span style={{
+              fontSize: '0.64rem',
+              fontWeight: 800,
+              color: '#64748b',
+              textTransform: 'uppercase',
+              letterSpacing: '0.06em',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '5px'
+            }}>
+              <Clock size={11} />
+              Zählzeiten
+            </span>
+            <span style={{
+              fontSize: '0.68rem',
+              fontWeight: 900,
+              color: '#854d0e',
+              background: '#fefce8',
+              border: '1px solid #fde047',
+              padding: '1px 8px',
+              borderRadius: '100px',
+              fontFamily: 'SF Mono, monospace'
+            }}>
+              {activeMeterInfo.meter} Takt
+            </span>
+          </div>
+
+          {/* Dynamische Beat-Karten je Taktart */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: `repeat(${activeMeterInfo.beats}, 1fr)`,
+            gap: activeMeterInfo.beats > 4 ? '5px' : '8px',
+            width: '100%',
+            maxWidth: '280px',
+            margin: '2px 0 4px 0'
+          }}>
+            {Array.from({ length: activeMeterInfo.beats }).map((_, idx) => {
+              const isActive = (activeBeatIndex !== null && activeBeatIndex !== undefined) ? (activeBeatIndex % activeMeterInfo.beats === idx) : false;
+              const isDown = idx === 0;
+              const isSecondaryAccent = activeMeterInfo.meter === '6/8' && idx === 3;
               return (
                 <div
                   key={idx}
                   style={{
-                    width: '10px',
-                    height: '10px',
-                    borderRadius: '50%',
+                    height: activeMeterInfo.beats > 4 ? '34px' : '36px',
+                    borderRadius: activeMeterInfo.beats > 4 ? '8px' : '10px',
                     background: isActive 
-                      ? (idx === 0 ? '#ea4335' : '#34a853') 
-                      : '#e5e5e7',
+                      ? (isDown ? '#eab308' : (isSecondaryAccent ? '#0284c7' : '#0f172a')) 
+                      : (isSecondaryAccent ? '#f8fafc' : '#f1f5f9'),
+                    border: isActive 
+                      ? (isDown ? '2px solid #facc15' : (isSecondaryAccent ? '2px solid #38bdf8' : '2px solid #334155')) 
+                      : (isSecondaryAccent ? '1.5px dashed #cbd5e1' : '1px solid #e2e8f0'),
                     boxShadow: isActive 
-                      ? `0 0 8px ${idx === 0 ? 'rgba(234, 67, 53, 0.5)' : 'rgba(52, 168, 83, 0.5)'}` 
+                      ? (isDown ? '0 0 12px rgba(234, 179, 8, 0.45)' : (isSecondaryAccent ? '0 0 10px rgba(2, 132, 199, 0.4)' : '0 0 8px rgba(15, 23, 42, 0.25)')) 
                       : 'none',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: isActive ? '#ffffff' : (isSecondaryAccent ? '#0f172a' : '#64748b'),
+                    fontSize: activeMeterInfo.beats > 4 ? '0.80rem' : '0.90rem',
+                    fontWeight: 950,
+                    transform: isActive ? 'scale(1.05)' : 'scale(1)',
                     transition: 'all 0.08s ease'
                   }}
-                />
+                  title={isDown ? `Zählzeit ${idx + 1} (Haupt-Downbeat)` : isSecondaryAccent ? `Zählzeit ${idx + 1} (Halbtakt-Akzent)` : `Zählzeit ${idx + 1}`}
+                >
+                  {idx + 1}
+                </div>
               );
             })}
           </div>
 
+          {/* Schnelle Taktart-Wahl bei Metronom */}
+          {selectedStyle === 'metronome' && (
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '4px',
+              width: '100%',
+              maxWidth: '280px',
+              margin: '2px 0 4px 0',
+              background: '#f1f5f9',
+              padding: '3px',
+              borderRadius: '10px'
+            }}>
+              {(['4/4', '3/4', '2/4', '6/8'] as const).map((meterOpt) => {
+                const isSelected = metronomeMeter === meterOpt;
+                return (
+                  <button
+                    key={meterOpt}
+                    type="button"
+                    onClick={() => {
+                      setMetronomeMeter(meterOpt);
+                      setActiveBeatIndex(null);
+                    }}
+                    style={{
+                      flex: 1,
+                      padding: '4px 0',
+                      fontSize: '0.68rem',
+                      fontWeight: 850,
+                      borderRadius: '7px',
+                      border: 'none',
+                      background: isSelected ? '#ffffff' : 'transparent',
+                      color: isSelected ? '#854d0e' : '#64748b',
+                      boxShadow: isSelected ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                      cursor: 'pointer',
+                      transition: 'all 0.12s ease'
+                    }}
+                  >
+                    {meterOpt}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
           {/* Takt-Fortschritts-Sweep-Bar */}
           <div style={{
-            width: '140px',
+            width: '100%',
+            maxWidth: '280px',
             height: '4px',
             background: '#e5e5e7',
             borderRadius: '10px',
@@ -2355,193 +2661,212 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
               left: 0,
               height: '100%',
               width: `${barProgress}%`,
-              background: 'linear-gradient(90deg, #34a853 0%, #2ecc71 100%)',
-              boxShadow: '0 0 6px rgba(52, 168, 83, 0.3)',
+              background: 'linear-gradient(90deg, #facc15 0%, #eab308 100%)',
+              boxShadow: '0 0 6px rgba(234, 179, 8, 0.4)',
               borderRadius: '10px',
               transition: isPlaying ? 'none' : 'width 0.1s ease-out'
             }} />
           </div>
 
-          {/* Large Tempo Display */}
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-            <span style={{ fontSize: '2.5rem', fontWeight: 900, color: '#1d1d1f', lineHeight: 1.05, fontFamily: 'SF Mono, monospace' }}>
-              {bpm}
-            </span>
-            <span style={{ fontSize: '0.62rem', color: '#86868b', fontWeight: 700 }}>
-              BEATS PER MINUTE
-            </span>
-          </div>
-
-          {/* Plus / Minus Tempo Controls */}
-          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+          {/* Large Tempo Display & Touch Stepper */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', maxWidth: '280px', gap: '6px' }}>
             <button
               type="button"
               onClick={() => setBpm(prev => Math.max(40, prev - 5))}
-              className="tactile-btn"
               style={{
-                width: '38px',
-                height: '32px',
-                borderRadius: '8px',
-                background: '#f5f5f7',
-                border: 'none',
-                color: '#1d1d1f',
-                fontSize: '0.74rem',
-                fontWeight: 700,
+                height: '38px',
+                padding: '0 10px',
+                borderRadius: '10px',
+                border: '1px solid #cbd5e1',
+                background: '#ffffff',
+                color: '#475569',
+                fontWeight: 800,
+                fontSize: '0.76rem',
                 cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
+                boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
               }}
+              title="5 BPM langsamer"
             >
               -5
             </button>
             <button
               type="button"
               onClick={() => setBpm(prev => Math.max(40, prev - 1))}
-              className="tactile-btn"
               style={{
-                width: '32px',
-                height: '32px',
-                borderRadius: '8px',
-                background: '#f5f5f7',
-                border: 'none',
-                color: '#1d1d1f',
-                fontSize: '0.74rem',
-                fontWeight: 700,
+                width: '42px',
+                height: '42px',
+                borderRadius: '12px',
+                border: '1px solid #cbd5e1',
+                background: '#ffffff',
+                color: '#0f172a',
+                fontWeight: 900,
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'center'
+                justifyContent: 'center',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
               }}
+              title="1 BPM langsamer"
             >
-              -1
+              <Minus size={16} strokeWidth={2.5} />
             </button>
+
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: '90px' }}>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: '3px' }}>
+                <span style={{ fontSize: '2.4rem', fontWeight: 950, color: '#0f172a', lineHeight: 1, fontFamily: 'SF Mono, monospace' }}>
+                  {bpm}
+                </span>
+                <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 800 }}>
+                  BPM
+                </span>
+              </div>
+              <span style={{
+                fontSize: '0.68rem',
+                fontWeight: 800,
+                color: '#854d0e',
+                background: '#fefce8',
+                border: '1px solid #fde047',
+                padding: '1px 8px',
+                borderRadius: '100px',
+                marginTop: '3px'
+              }}>
+                {bpm < 60 ? 'Largo' : bpm < 76 ? 'Adagio' : bpm < 108 ? 'Andante' : bpm < 120 ? 'Moderato' : bpm < 168 ? 'Allegro' : 'Presto'}
+              </span>
+            </div>
+
             <button
               type="button"
               onClick={() => setBpm(prev => Math.min(240, prev + 1))}
-              className="tactile-btn"
               style={{
-                width: '32px',
-                height: '32px',
-                borderRadius: '8px',
-                background: '#f5f5f7',
-                border: 'none',
-                color: '#1d1d1f',
-                fontSize: '0.74rem',
-                fontWeight: 700,
+                width: '42px',
+                height: '42px',
+                borderRadius: '12px',
+                border: '1px solid #cbd5e1',
+                background: '#ffffff',
+                color: '#0f172a',
+                fontWeight: 900,
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'center'
+                justifyContent: 'center',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
               }}
+              title="1 BPM schneller"
             >
-              +1
+              <Plus size={16} strokeWidth={2.5} />
             </button>
             <button
               type="button"
               onClick={() => setBpm(prev => Math.min(240, prev + 5))}
-              className="tactile-btn"
               style={{
-                width: '38px',
-                height: '32px',
-                borderRadius: '8px',
-                background: '#f5f5f7',
-                border: 'none',
-                color: '#1d1d1f',
-                fontSize: '0.74rem',
-                fontWeight: 700,
+                height: '38px',
+                padding: '0 10px',
+                borderRadius: '10px',
+                border: '1px solid #cbd5e1',
+                background: '#ffffff',
+                color: '#475569',
+                fontWeight: 800,
+                fontSize: '0.76rem',
                 cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
+                boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
               }}
+              title="5 BPM schneller"
             >
               +5
             </button>
           </div>
 
-          <button
-            type="button"
-            onClick={handleTapTempo}
-            className="tactile-btn"
-            style={{
-              width: '100%',
-              background: '#f5f5f7',
-              color: '#1d1d1f',
-              border: 'none',
-              borderRadius: '10px',
-              padding: '7px 10px',
-              fontSize: '0.68rem',
-              fontWeight: 800,
-              cursor: 'pointer',
-              textTransform: 'uppercase',
-              letterSpacing: '0.04em'
-            }}
-          >
-            TAP TEMPO
-          </button>
+          {/* Slider with integrated Tap-Tempo pill */}
+          <div style={{ width: '100%', maxWidth: '280px', display: 'flex', flexDirection: 'column', gap: '3px' }}>
+            <input
+              type="range"
+              min="40"
+              max="240"
+              value={bpm}
+              onChange={(e) => setBpm(Number(e.target.value))}
+              style={{ width: '100%', height: '6px', accentColor: '#eab308', cursor: 'pointer' }}
+            />
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.62rem', color: '#94a3b8', fontWeight: 700 }}>
+              <span>40 Langsam</span>
+              <button
+                type="button"
+                onClick={handleTapTempo}
+                style={{
+                  border: '1px solid #cbd5e1',
+                  background: '#f8fafc',
+                  padding: '2px 8px',
+                  borderRadius: '6px',
+                  fontSize: '0.62rem',
+                  fontWeight: 800,
+                  color: '#0f172a',
+                  cursor: 'pointer'
+                }}
+              >
+                ⚡ Tap Tempo
+              </button>
+              <span>240 Schnell</span>
+            </div>
+          </div>
 
           {/* Active Song Context Banner */}
           {activeSongContext?.songTitle && (
             <div style={{
               width: '100%',
-              background: 'linear-gradient(135deg, #e6f4ea 0%, #d1fae5 100%)',
-              border: '1px solid #34a853',
+              maxWidth: '280px',
+              background: 'linear-gradient(135deg, #fefce8 0%, #fef9c3 100%)',
+              border: '1px solid #fde047',
               borderRadius: '10px',
-              padding: '8px 12px',
+              padding: '6px 10px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between'
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Music size={14} style={{ color: '#34a853' }} />
-                <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#15803d' }}>
+                <Music size={13} style={{ color: '#ca8a04' }} />
+                <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#854d0e' }}>
                   Song: <strong>{activeSongContext.songTitle}</strong>
                 </span>
               </div>
-              <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#166534', background: '#ffffff', padding: '2px 6px', borderRadius: '6px' }}>
+              <span style={{ fontSize: '0.66rem', fontWeight: 700, color: '#854d0e', background: '#ffffff', padding: '1px 6px', borderRadius: '4px' }}>
                 {activeSongContext.targetBpm} BPM
               </span>
             </div>
           )}
 
-          {/* Dual Action: Starten (Play) + Aufnahme (Record with Count-In) */}
+          {/* Dual Action: Starten & Aufnahme (52px Hero Buttons) */}
           <div style={{ display: 'flex', gap: '8px', width: '100%' }}>
             <button
               type="button"
               onClick={handleTogglePlay}
-              className="tactile-btn"
               disabled={isRecording || isCountingIn}
               style={{
-                flex: 1,
-                background: (isPlaying && !isRecording) ? '#1e293b' : (isRecording || isCountingIn ? '#cbd5e1' : '#34a853'),
-                color: '#ffffff',
+                flex: 1.2,
+                minHeight: '52px',
+                background: (isPlaying && !isRecording) ? '#0f172a' : (isRecording || isCountingIn ? '#cbd5e1' : 'linear-gradient(135deg, #facc15 0%, #eab308 100%)'),
+                color: (isPlaying && !isRecording) ? '#ffffff' : (isRecording || isCountingIn ? '#ffffff' : '#0f172a'),
                 border: 'none',
-                borderRadius: '12px',
-                padding: '10px 8px',
-                fontSize: '0.78rem',
-                fontWeight: 800,
+                borderRadius: '16px',
+                padding: '10px 14px',
+                fontSize: '0.96rem',
+                fontWeight: 950,
                 cursor: (isRecording || isCountingIn) ? 'not-allowed' : 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: '6px',
-                textTransform: 'uppercase',
-                letterSpacing: '0.04em',
-                boxShadow: (isPlaying && !isRecording) ? '0 4px 14px rgba(30, 41, 59, 0.3)' : '0 4px 14px rgba(52, 168, 83, 0.3)',
-                transition: 'all 0.2s ease-in-out',
-                opacity: (isRecording || isCountingIn) ? 0.6 : 1
+                gap: '8px',
+                boxShadow: (isPlaying && !isRecording) ? '0 4px 16px rgba(15, 23, 42, 0.25)' : '0 6px 20px rgba(234, 179, 8, 0.35)',
+                transition: 'all 0.15s ease'
               }}
             >
               {isPlaying && !isRecording ? (
                 <>
-                  <Square size={13} fill="currentColor" />
+                  <Square size={16} fill="currentColor" />
                   <span>Stoppen</span>
                 </>
               ) : (
                 <>
-                  <Play size={13} fill="currentColor" />
-                  <span>Starten</span>
+                  <Play size={16} fill="currentColor" />
+                  <span>Beat starten</span>
                 </>
               )}
             </button>
@@ -2549,41 +2874,38 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
             <button
               type="button"
               onClick={handleToggleRecording}
-              className="tactile-btn"
               style={{
                 flex: 1,
+                minHeight: '52px',
                 background: isRecording ? '#dc2626' : (isCountingIn ? '#f59e0b' : '#fef2f2'),
                 color: isRecording || isCountingIn ? '#ffffff' : '#dc2626',
-                border: isRecording ? '1.5px solid #ef4444' : (isCountingIn ? '1.5px solid #d97706' : '1.5px solid #fecaca'),
-                borderRadius: '12px',
-                padding: '10px 8px',
-                fontSize: '0.78rem',
-                fontWeight: 800,
+                border: isRecording ? '2px solid #ef4444' : (isCountingIn ? '2px solid #d97706' : '1.5px solid #fecaca'),
+                borderRadius: '16px',
+                padding: '10px 12px',
+                fontSize: '0.92rem',
+                fontWeight: 950,
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: '6px',
-                textTransform: 'uppercase',
-                letterSpacing: '0.04em',
-                boxShadow: isRecording ? '0 0 20px rgba(220, 38, 38, 0.55), 0 4px 14px rgba(220, 38, 38, 0.4)' : (isCountingIn ? '0 4px 14px rgba(245, 158, 11, 0.3)' : '0 2px 8px rgba(220, 38, 38, 0.1)'),
-                transition: 'all 0.2s ease-in-out',
-                animation: isRecording ? 'paniniGlow 1.2s infinite alternate' : 'none'
+                boxShadow: isRecording ? '0 0 20px rgba(220, 38, 38, 0.55)' : '0 2px 8px rgba(220, 38, 38, 0.08)',
+                transition: 'all 0.15s ease'
               }}
             >
               {isRecording ? (
                 <>
-                  <Square size={13} fill="currentColor" />
+                  <Square size={15} fill="currentColor" />
                   <span>Rec Stopp ({formatTime(recordSeconds)})</span>
                 </>
               ) : isCountingIn ? (
                 <>
-                  <Clock size={13} className="animate-spin" />
-                  <span>Einzähler {countInBeat}/4</span>
+                  <Clock size={15} className="animate-spin" />
+                  <span>Einzähler {countInBeat}/{activeMeterInfo.countInBeats}</span>
                 </>
               ) : (
                 <>
-                  <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#dc2626', flexShrink: 0 }} />
+                  <div style={{ width: '9px', height: '9px', borderRadius: '50%', background: '#dc2626' }} />
                   <span>Aufnahme</span>
                 </>
               )}
@@ -2749,8 +3071,8 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                   className="tactile-btn"
                   style={{
                     flex: 1.4,
-                    background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
-                    color: '#ffffff',
+                    background: 'linear-gradient(135deg, #facc15 0%, #eab308 100%)',
+                    color: '#0f172a',
                     border: 'none',
                     borderRadius: '10px',
                     padding: '8px 10px',
@@ -2761,7 +3083,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                     alignItems: 'center',
                     justifyContent: 'center',
                     gap: '5px',
-                    boxShadow: '0 3px 10px rgba(22, 163, 74, 0.35)',
+                    boxShadow: '0 3px 10px rgba(234, 179, 8, 0.35)',
                     transition: 'all 0.15s ease'
                   }}
                 >
@@ -2776,20 +3098,20 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
           {savedTakeSuccessToast && (
             <div style={{
               width: '100%',
-              background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
-              border: '1.5px solid #86efac',
+              background: 'linear-gradient(135deg, #fefce8 0%, #fef9c3 100%)',
+              border: '1.5px solid #fde047',
               borderRadius: '14px',
               padding: '10px 14px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
               animation: 'scaleIn 0.2s ease-out',
-              boxShadow: '0 4px 12px rgba(22, 163, 74, 0.15)',
+              boxShadow: '0 4px 12px rgba(234, 179, 8, 0.15)',
               boxSizing: 'border-box'
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <CheckCircle2 size={16} color="#16a34a" />
-                <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#166534' }}>
+                <CheckCircle2 size={16} color="#ca8a04" />
+                <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#854d0e' }}>
                   ✨ Im Aufnahmen-Modul gesichert!
                 </span>
               </div>
@@ -2798,13 +3120,13 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                   type="button"
                   onClick={onNavigateToRecordings}
                   style={{
-                    background: '#16a34a',
-                    color: '#ffffff',
+                    background: '#eab308',
+                    color: '#0f172a',
                     border: 'none',
                     borderRadius: '6px',
                     padding: '3px 8px',
                     fontSize: '0.64rem',
-                    fontWeight: 750,
+                    fontWeight: 800,
                     cursor: 'pointer'
                   }}
                 >
@@ -2848,18 +3170,18 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                   width: '60px',
                   height: '60px',
                   borderRadius: '50%',
-                  background: 'linear-gradient(135deg, #e6f4ea 0%, #d1fae5 100%)',
-                  border: '2px solid #34a853',
+                  background: 'linear-gradient(135deg, #fefce8 0%, #fef9c3 100%)',
+                  border: '2px solid #facc15',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  color: '#34a853'
+                  color: '#ca8a04'
                 }}>
                   <Sparkles size={30} />
                 </div>
 
                 <div>
-                  <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#34a853', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                  <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#ca8a04', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                     RHYTHMUS-EVALUATION
                   </span>
                   <h3 style={{ margin: '4px 0 0 0', fontSize: '1.25rem', fontWeight: 900, color: '#1e293b' }}>
@@ -2902,7 +3224,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <span style={{ fontSize: '0.82rem', color: '#64748b', fontWeight: 700 }}>Rhythmus-Präzision</span>
-                    <span style={{ fontSize: '1.3rem', fontWeight: 900, color: '#15803d', fontFamily: 'SF Mono, monospace' }}>
+                    <span style={{ fontSize: '1.3rem', fontWeight: 900, color: '#854d0e', fontFamily: 'SF Mono, monospace' }}>
                       {summaryCardData.precision}%
                     </span>
                   </div>
@@ -2927,7 +3249,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                   }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.66rem', fontWeight: 800 }}>
                       <span style={{ color: '#f59e0b' }}>-100ms (Zu früh ⚡)</span>
-                      <span style={{ color: '#34a853', background: 'rgba(52, 168, 83, 0.2)', padding: '1px 6px', borderRadius: '4px' }}>
+                      <span style={{ color: '#ca8a04', background: 'rgba(234, 179, 8, 0.2)', padding: '1px 6px', borderRadius: '4px' }}>
                         🎯 Golden Zone (±35ms)
                       </span>
                       <span style={{ color: '#3b82f6' }}>+100ms (Zu spät 🐢)</span>
@@ -2942,16 +3264,16 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                       borderRadius: '8px',
                       overflow: 'hidden'
                     }}>
-                      {/* Central Green Target Zone (±35ms) */}
+                      {/* Central Target Zone (±35ms) */}
                       <div style={{
                         position: 'absolute',
                         left: '32.5%',
                         width: '35%',
                         top: 0,
                         bottom: 0,
-                        background: 'rgba(52, 168, 83, 0.25)',
-                        borderLeft: '1.5px dashed #34a853',
-                        borderRight: '1.5px dashed #34a853'
+                        background: 'rgba(234, 179, 8, 0.25)',
+                        borderLeft: '1.5px dashed #eab308',
+                        borderRight: '1.5px dashed #eab308'
                       }} />
 
                       {/* Center 0ms Line */}
@@ -2961,7 +3283,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                         top: 0,
                         bottom: 0,
                         width: '2px',
-                        background: '#34a853'
+                        background: '#eab308'
                       }} />
 
                       {/* Plot Student Hit Markers */}
@@ -2970,7 +3292,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                         const pct = ((clampedDelta + 100) / 200) * 100;
                         const isPerfect = Math.abs(clampedDelta) <= 35;
                         const isRushing = clampedDelta < -35;
-                        const color = isPerfect ? '#34a853' : (isRushing ? '#f59e0b' : '#3b82f6');
+                        const color = isPerfect ? '#eab308' : (isRushing ? '#f59e0b' : '#3b82f6');
 
                         return (
                           <div
@@ -2999,9 +3321,9 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                   <div style={{
                     fontSize: '0.72rem',
                     fontWeight: 800,
-                    color: '#166534',
-                    background: '#e6f4ea',
-                    border: '1px solid #bbf7d0',
+                    color: '#854d0e',
+                    background: '#fefce8',
+                    border: '1px solid #fde047',
                     borderRadius: '10px',
                     padding: '6px 12px',
                     width: '100%',
@@ -3012,7 +3334,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                 )}
 
                 {/* Didactic AI Advice Text */}
-                <p style={{ margin: 0, fontSize: '0.82rem', color: '#475569', lineHeight: 1.5, background: '#f0fdf4', padding: '12px 14px', borderRadius: '12px', borderLeft: '4px solid #34a853' }}>
+                <p style={{ margin: 0, fontSize: '0.82rem', color: '#475569', lineHeight: 1.5, background: '#fefce8', padding: '12px 14px', borderRadius: '12px', borderLeft: '4px solid #eab308' }}>
                   {summaryCardData.advice}
                 </p>
 
@@ -3052,8 +3374,8 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                     }}
                     style={{
                       flex: 1.6,
-                      background: '#34a853',
-                      color: '#ffffff',
+                      background: 'linear-gradient(135deg, #facc15 0%, #eab308 100%)',
+                      color: '#0f172a',
                       border: 'none',
                       borderRadius: '12px',
                       padding: '12px',
@@ -3064,7 +3386,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                       alignItems: 'center',
                       justifyContent: 'center',
                       gap: '6px',
-                      boxShadow: '0 4px 12px rgba(52, 168, 83, 0.3)'
+                      boxShadow: '0 4px 12px rgba(234, 179, 8, 0.3)'
                     }}
                   >
                     <BookOpen size={14} />
@@ -3091,110 +3413,47 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
           height: '100%',
           boxSizing: 'border-box'
         }}>
-          {/* Header */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+          {/* Header mit klarer Micro-Copy & Live-Status */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
             <div>
-              <span style={{ fontSize: '0.66rem', color: '#64748b', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+              <span style={{ fontSize: '0.66rem', color: '#64748b', fontWeight: 850, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
                 BEAT GENERATOR
               </span>
-              <h3 style={{ fontSize: '1.05rem', fontWeight: 900, color: '#0f172a', margin: '2px 0 0 0' }}>Begleit-Rhythmen</h3>
+              <h3 style={{ fontSize: '1.05rem', fontWeight: 950, color: '#0f172a', margin: '2px 0 0 0' }}>
+                Begleit-Rhythmen
+              </h3>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <button
-                type="button"
-                onClick={handleTogglePlay}
-                className="tactile-btn"
-                disabled={isRecording || isCountingIn}
-                style={{
-                  background: (isPlaying && !isRecording) ? '#1e293b' : (isRecording || isCountingIn ? '#cbd5e1' : '#34a853'),
-                  color: '#ffffff',
-                  border: 'none',
-                  borderRadius: '12px',
-                  padding: '9px 16px',
-                  fontSize: '0.82rem',
-                  fontWeight: 800,
-                  cursor: (isRecording || isCountingIn) ? 'not-allowed' : 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  boxShadow: (isPlaying && !isRecording) ? '0 4px 14px rgba(30, 41, 59, 0.3)' : '0 4px 14px rgba(52, 168, 83, 0.25)',
-                  transition: 'all 0.2s ease-in-out',
-                  opacity: (isRecording || isCountingIn) ? 0.6 : 1
-                }}
-              >
-                {isPlaying && !isRecording ? (
-                  <>
-                    <Square size={14} fill="currentColor" />
-                    <span>Stoppen</span>
-                  </>
-                ) : (
-                  <>
-                    <Play size={14} fill="currentColor" />
-                    <span>Starten</span>
-                  </>
-                )}
-              </button>
-
-              <button
-                type="button"
-                onClick={handleToggleRecording}
-                className="tactile-btn"
-                style={{
-                  background: isRecording ? '#dc2626' : (isCountingIn ? '#f59e0b' : '#fef2f2'),
-                  color: isRecording || isCountingIn ? '#ffffff' : '#dc2626',
-                  border: isRecording ? '1.5px solid #ef4444' : (isCountingIn ? '1.5px solid #d97706' : '1.5px solid #fecaca'),
-                  borderRadius: '12px',
-                  padding: '9px 16px',
-                  fontSize: '0.82rem',
-                  fontWeight: 800,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  boxShadow: isRecording ? '0 0 20px rgba(220, 38, 38, 0.55), 0 4px 14px rgba(220, 38, 38, 0.4)' : (isCountingIn ? '0 4px 14px rgba(245, 158, 11, 0.3)' : '0 2px 8px rgba(220, 38, 38, 0.1)'),
-                  transition: 'all 0.2s ease-in-out',
-                  animation: isRecording ? 'paniniGlow 1.2s infinite alternate' : 'none'
-                }}
-              >
-                {isRecording ? (
-                  <>
-                    <Square size={14} fill="currentColor" />
-                    <span>Rec Stopp ({formatTime(recordSeconds)})</span>
-                  </>
-                ) : isCountingIn ? (
-                  <>
-                    <Clock size={14} className="animate-spin" />
-                    <span>Einzähler {countInBeat}/4</span>
-                  </>
-                ) : (
-                  <>
-                    <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#dc2626', flexShrink: 0 }} />
-                    <span>Aufnahme</span>
-                  </>
-                )}
-              </button>
-            </div>
+            {isPlaying && (
+              <span style={{
+                fontSize: '0.70rem',
+                fontWeight: 850,
+                color: '#854d0e',
+                background: '#fefce8',
+                border: '1px solid #fef08a',
+                padding: '4px 10px',
+                borderRadius: '100px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}>
+                <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#eab308' }} />
+                Beat läuft
+              </span>
+            )}
           </div>
 
-          {/* Rhythms Selector Grid (Enlarged, Symmetrical 2-Column Grid) */}
+          {/* ANKER 2: DIE 4 BELIEBTESTEN RHYTHMEN (Primärer Fokus) */}
           <div style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(2, 1fr)',
-            gap: '8px'
+            gap: '10px'
           }}>
             {[
-              { id: 'metronome', label: 'Metronom Klick' },
-              { id: 'singersongwriter', label: 'Singer-Songwriter (Akustik)' },
-              { id: 'rock', label: 'Rock & Pop Groove' },
-              { id: 'hiphop', label: 'Hip-Hop Pocket' },
-              { id: 'swing', label: 'Jazz Swing' },
-              { id: 'latin', label: 'Latin Bossa' },
-              { id: 'funk', label: 'Funk Break' },
-              { id: 'reggae', label: 'Reggae One-Drop' },
-              { id: 'walzer', label: 'Walzer (3/4 Takt)' },
-              { id: 'ballad68', label: '6/8 Ballade' },
-              { id: 'disco', label: 'Disco (4-on-the-Floor)', spanFull: true }
+              { id: 'metronome', label: 'Metronom Klick', desc: 'Akustischer Klick' },
+              { id: 'rock', label: 'Rock & Pop Groove', desc: 'Kräftiger Drums-Beat' },
+              { id: 'hiphop', label: 'Hip-Hop Pocket', desc: 'Lässiger Boom-Bap' },
+              { id: 'singersongwriter', label: 'Singer-Songwriter', desc: 'Akustik-Schlagzeug' }
             ].map((styleOpt) => {
               const isSelected = selectedStyle === styleOpt.id;
               return (
@@ -3210,98 +3469,149 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                   }}
                   className="tactile-btn"
                   style={{
-                    gridColumn: (styleOpt as any).spanFull ? '1 / -1' : undefined,
-                    background: isSelected ? '#34a853' : '#f8fafc',
-                    color: isSelected ? '#ffffff' : '#1e293b',
-                    border: isSelected ? '1.5px solid #2d9249' : '1px solid #e2e8f0',
-                    borderRadius: '12px',
-                    padding: '10px 14px',
-                    fontSize: '0.80rem',
-                    fontWeight: isSelected ? 800 : 700,
+                    background: isSelected ? 'linear-gradient(135deg, #facc15 0%, #eab308 100%)' : '#f8fafc',
+                    color: isSelected ? '#0f172a' : '#1e293b',
+                    border: isSelected ? '2px solid #ca8a04' : '1px solid #e2e8f0',
+                    borderRadius: '14px',
+                    padding: '12px 14px',
                     cursor: 'pointer',
                     display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    minHeight: '42px',
+                    flexDirection: 'column',
+                    alignItems: 'flex-start',
+                    justifyContent: 'center',
+                    gap: '2px',
+                    minHeight: '56px',
                     transition: 'all 0.15s ease',
-                    boxShadow: isSelected ? '0 4px 12px rgba(52, 168, 83, 0.25)' : 'none'
+                    boxShadow: isSelected ? '0 4px 14px rgba(234, 179, 8, 0.35)' : 'none',
+                    textAlign: 'left'
                   }}
                 >
-                  <span>{styleOpt.label}</span>
-                  {isSelected && (
-                    <span style={{
-                      fontSize: '0.64rem',
-                      fontWeight: 900,
-                      background: 'rgba(255, 255, 255, 0.25)',
-                      padding: '2px 8px',
-                      borderRadius: '999px',
-                      letterSpacing: '0.04em'
-                    }}>
-                      Aktiv
-                    </span>
-                  )}
+                  <div style={{ display: 'flex', width: '100%', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.86rem', fontWeight: 900 }}>{styleOpt.label}</span>
+                    {isSelected && (
+                      <span style={{
+                        fontSize: '0.62rem',
+                        fontWeight: 900,
+                        background: 'rgba(15, 23, 42, 0.12)',
+                        color: '#0f172a',
+                        padding: '2px 6px',
+                        borderRadius: '100px'
+                      }}>
+                        Aktiv
+                      </span>
+                    )}
+                  </div>
+                  <span style={{ fontSize: '0.66rem', color: isSelected ? 'rgba(15, 23, 42, 0.75)' : '#64748b', fontWeight: 650 }}>
+                    {styleOpt.desc}
+                  </span>
                 </button>
               );
             })}
           </div>
 
-          {/* Master Volume & Power Boost Control (Container Card) */}
+          {/* Einklapp-Schalter für weitere 7 Rhythmen */}
+          <button
+            type="button"
+            onClick={() => setShowAllStyles(!showAllStyles)}
+            style={{
+              width: '100%',
+              padding: '8px 12px',
+              borderRadius: '10px',
+              border: '1px dashed #cbd5e1',
+              background: showAllStyles ? '#f1f5f9' : '#ffffff',
+              color: '#475569',
+              fontSize: '0.74rem',
+              fontWeight: 800,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px',
+              transition: 'all 0.15s ease'
+            }}
+          >
+            <span>{showAllStyles ? '▴ Weniger Rhythmen anzeigen' : '▾ Weitere 7 Rhythmen anzeigen (Walzer, Jazz, Latin, Disco...)'}</span>
+          </button>
+
+          {/* Ausgeklappte Rhythmus-Karten */}
+          {showAllStyles && (
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(2, 1fr)',
+              gap: '8px',
+              padding: '10px',
+              background: '#f8fafc',
+              borderRadius: '14px',
+              border: '1px solid #e2e8f0',
+              animation: 'fadeIn 0.15s ease'
+            }}>
+              {[
+                { id: 'swing', label: 'Jazz Swing' },
+                { id: 'latin', label: 'Latin Bossa' },
+                { id: 'funk', label: 'Funk Break' },
+                { id: 'reggae', label: 'Reggae One-Drop' },
+                { id: 'walzer', label: 'Walzer (3/4 Takt)' },
+                { id: 'ballad68', label: '6/8 Ballade' },
+                { id: 'disco', label: 'Disco (4-on-the-Floor)', spanFull: true }
+              ].map((styleOpt) => {
+                const isSelected = selectedStyle === styleOpt.id;
+                return (
+                  <button
+                    key={styleOpt.id}
+                    type="button"
+                    onClick={() => {
+                      setSelectedStyle(styleOpt.id as any);
+                      if (audioCtxRef.current && audioCtxRef.current.state === 'suspended') {
+                        audioCtxRef.current.resume();
+                      }
+                      setIsPlaying(true);
+                    }}
+                    style={{
+                      gridColumn: (styleOpt as any).spanFull ? '1 / -1' : undefined,
+                      background: isSelected ? 'linear-gradient(135deg, #facc15 0%, #eab308 100%)' : '#ffffff',
+                      color: isSelected ? '#0f172a' : '#1e293b',
+                      border: isSelected ? '1.5px solid #ca8a04' : '1px solid #cbd5e1',
+                      borderRadius: '10px',
+                      padding: '8px 12px',
+                      fontSize: '0.78rem',
+                      fontWeight: isSelected ? 850 : 700,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      minHeight: '38px',
+                      boxShadow: isSelected ? '0 2px 8px rgba(234, 179, 8, 0.25)' : 'none'
+                    }}
+                  >
+                    <span>{styleOpt.label}</span>
+                    {isSelected && (
+                      <span style={{ fontSize: '0.60rem', fontWeight: 900, background: 'rgba(15, 23, 42, 0.12)', color: '#0f172a', padding: '2px 6px', borderRadius: '100px' }}>
+                        Aktiv
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {/* ANKER 4: GROOVE-STUFE (Standard / Mehr Pep) */}
           <div style={{
             display: 'flex',
             flexDirection: 'column',
             gap: '6px',
-            background: volMaster > 100 ? 'rgba(234, 179, 8, 0.08)' : '#f8fafc',
-            border: volMaster > 100 ? '1px solid rgba(234, 179, 8, 0.3)' : '1px solid #e2e8f0',
-            borderRadius: '16px',
-            padding: '12px 16px',
-            transition: 'all 0.2s ease'
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Volume2 style={{ width: '15px', height: '15px', color: volMaster > 100 ? '#d97706' : '#1e293b' }} />
-                <span style={{ fontSize: '0.76rem', fontWeight: 800, color: '#0f172a' }}>Master-Lautstärke</span>
-                {volMaster > 100 && (
-                  <span style={{ fontSize: '0.56rem', fontWeight: 800, padding: '2px 6px', borderRadius: '6px', background: '#eab308', color: '#ffffff', letterSpacing: '0.04em' }}>
-                    ⚡ POWER BOOST (+{Math.round((volMaster - 100) / 8.33)}dB)
-                  </span>
-                )}
-              </div>
-              <span style={{ fontSize: '0.72rem', fontWeight: 800, color: volMaster > 100 ? '#d97706' : '#64748b', fontFamily: 'SF Mono, monospace' }}>
-                {volMaster}%
-              </span>
-            </div>
-            <input
-              type="range"
-              min="0"
-              max="200"
-              value={volMaster}
-              onChange={(e) => setVolMaster(Number(e.target.value))}
-              className="groovelab-fader"
-              style={{ width: '100%' }}
-            />
-          </div>
-
-          {/* Beat Variations Selector (Container Card) */}
-          <div style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '8px',
             background: '#f8fafc',
             border: '1px solid #e2e8f0',
-            borderRadius: '16px',
-            padding: '12px 16px'
+            borderRadius: '14px',
+            padding: '10px 14px'
           }}>
-            <span style={{ fontSize: '0.62rem', color: '#64748b', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-              Groove-Variationen
+            <span style={{ fontSize: '0.66rem', color: '#64748b', fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+              Groove-Stufe
             </span>
-            <div style={{
-              display: 'flex',
-              gap: '8px'
-            }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
               {[
-                { id: 'A', label: 'Variante A: Standard' },
-                { id: 'B', label: 'Variante B: Groove+' },
-                { id: 'C', label: 'Variante C: Fill / Komplex' }
+                { id: 'A', label: 'Basis-Groove (Standard)' },
+                { id: 'B', label: 'Mehr Pep (Groove+)' }
               ].map((varOpt) => {
                 const isSelected = selectedVariation === varOpt.id;
                 return (
@@ -3309,20 +3619,17 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                     key={varOpt.id}
                     type="button"
                     onClick={() => setSelectedVariation(varOpt.id as any)}
-                    className="tactile-btn"
                     style={{
-                      flex: 1,
-                      background: isSelected ? '#eab308' : '#ffffff',
-                      color: isSelected ? '#ffffff' : '#334155',
-                      border: isSelected ? '1.5px solid #ca8a04' : '1px solid #cbd5e1',
+                      background: isSelected ? '#fefce8' : '#ffffff',
+                      color: isSelected ? '#854d0e' : '#475569',
+                      border: isSelected ? '1.5px solid #eab308' : '1px solid #cbd5e1',
                       borderRadius: '10px',
-                      padding: '9px 8px',
-                      fontSize: '0.74rem',
-                      fontWeight: 800,
+                      padding: '8px 10px',
+                      fontSize: '0.76rem',
+                      fontWeight: 850,
                       cursor: 'pointer',
                       textAlign: 'center',
-                      transition: 'all 0.15s ease-in-out',
-                      boxShadow: isSelected ? '0 3px 8px rgba(234, 179, 8, 0.3)' : '0 1px 2px rgba(0,0,0,0.03)'
+                      transition: 'all 0.15s ease'
                     }}
                   >
                     {varOpt.label}
@@ -3332,293 +3639,130 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
             </div>
           </div>
 
-          {/* Mixer Channel Strips (Container Card) */}
+          {/* SEKUNDÄR-TOOLBOX: Profi-Studio, Mixer & Fills */}
           <div style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '10px',
-            background: '#f8fafc',
+            borderRadius: '14px',
             border: '1px solid #e2e8f0',
-            borderRadius: '16px',
-            padding: '12px 16px'
+            background: showStudioMixer ? '#ffffff' : '#f8fafc',
+            overflow: 'hidden',
+            transition: 'all 0.2s ease',
+            marginTop: 'auto'
           }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
-              <span style={{ fontSize: '0.62rem', color: '#64748b', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-                INSTRUMENTEN MIXER
-              </span>
-              <span style={{ fontSize: '0.58rem', color: '#334155', background: '#ffffff', padding: '2px 8px', borderRadius: '6px', fontWeight: 800, border: '1px solid #cbd5e1' }}>
-                🥁 {selectedStyle === 'singersongwriter' ? 'Singer-Songwriter Soft Mahogany Kit' :
-                     selectedStyle === 'swing' ? 'Smoky Vintage Jazz Brush Kit' :
-                     selectedStyle === 'hiphop' ? 'Dark Tape Boom-Bap Sub Kit' :
-                     selectedStyle === 'reggae' ? 'Deep Dub One-Drop Sub Kit' :
-                     selectedStyle === 'latin' ? 'Warm Percussive Bossa Kit' :
-                     selectedStyle === 'funk' ? '70s Vintage Damped Funk Break Kit' :
-                     selectedStyle === 'rock' ? 'Dark Vintage Birch Studio Rock Kit' :
-                     selectedStyle === 'walzer' ? 'Acoustic Chamber Waltz Kit' :
-                     selectedStyle === 'ballad68' ? 'Warm Slow Ballad Heartbeat Kit' :
-                     selectedStyle === 'disco' ? 'Damped 70s Studio Disco Kit' : 'Soft Hardwood Teak Click Kit'}
-              </span>
-            </div>
-
-            {selectedStyle === 'metronome' ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#1e293b' }}>Klick-Lautstärke</span>
-                  <span style={{ fontSize: '0.66rem', color: volMetronome > 100 ? '#d97706' : '#64748b', fontFamily: 'SF Mono, monospace', fontWeight: 800 }}>
-                    {volMetronome}% {volMetronome > 100 && '⚡'}
+            <button
+              type="button"
+              onClick={() => setShowStudioMixer(!showStudioMixer)}
+              style={{
+                width: '100%',
+                padding: '10px 14px',
+                border: 'none',
+                background: 'transparent',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                cursor: 'pointer',
+                color: showStudioMixer ? '#0f172a' : '#64748b',
+                fontWeight: 800,
+                fontSize: '0.78rem'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Sliders size={14} color={showStudioMixer ? '#eab308' : '#64748b'} />
+                <span>Profi-Mixer & Sound-Optionen</span>
+                {selectedVariation === 'C' && (
+                  <span style={{ fontSize: '0.62rem', fontWeight: 850, background: '#fef3c7', color: '#92400e', padding: '1px 6px', borderRadius: '100px' }}>
+                    Fill C aktiv
                   </span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <div style={{ display: 'flex', gap: '4px' }}>
-                    <button
-                      type="button"
-                      onClick={() => toggleMute('click')}
-                      style={{
-                        width: '26px',
-                        height: '26px',
-                        borderRadius: '6px',
-                        border: 'none',
-                        fontSize: '0.65rem',
-                        fontWeight: 900,
-                        cursor: 'pointer',
-                        background: isMuted('click') ? '#ea4335' : '#ffffff',
-                        color: isMuted('click') ? '#ffffff' : '#64748b',
-                        boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
-                        transition: 'all 0.15s ease-in-out'
-                      }}
-                    >
-                      M
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => toggleSolo('click')}
-                      style={{
-                        width: '26px',
-                        height: '26px',
-                        borderRadius: '6px',
-                        border: 'none',
-                        fontSize: '0.65rem',
-                        fontWeight: 900,
-                        cursor: 'pointer',
-                        background: isSolo('click') ? '#eab308' : '#ffffff',
-                        color: isSolo('click') ? '#ffffff' : '#64748b',
-                        boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
-                        transition: 'all 0.15s ease-in-out'
-                      }}
-                    >
-                      S
-                    </button>
+                )}
+              </div>
+              <ChevronRight size={16} style={{ transform: showStudioMixer ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s ease' }} />
+            </button>
+
+            {showStudioMixer && (
+              <div style={{
+                padding: '12px 14px',
+                borderTop: '1px solid #f1f5f9',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '12px',
+                background: '#fafbfc'
+              }}>
+                {/* Master Volume Slider */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Volume2 size={14} color="#0f172a" />
+                      <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#0f172a' }}>Master-Lautstärke</span>
+                      {volMaster > 100 && (
+                        <span style={{ fontSize: '0.56rem', fontWeight: 800, padding: '1px 5px', borderRadius: '4px', background: '#eab308', color: '#ffffff' }}>
+                          BOOST
+                        </span>
+                      )}
+                    </div>
+                    <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b' }}>{volMaster}%</span>
                   </div>
                   <input
                     type="range"
                     min="0"
                     max="200"
-                    value={volMetronome}
-                    onChange={(e) => setVolMetronome(Number(e.target.value))}
-                    className="groovelab-fader"
-                    style={{ flex: 1 }}
+                    value={volMaster}
+                    onChange={(e) => setVolMaster(Number(e.target.value))}
+                    style={{ width: '100%', accentColor: '#eab308', cursor: 'pointer' }}
                   />
                 </div>
-              </div>
-            ) : (
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: isMobileView ? '1fr' : 'repeat(2, 1fr)',
-                gap: '10px 16px'
-              }}>
-                {/* Bass Drum (Kick) Channel */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#1e293b' }}>Bass Drum (Kick)</span>
-                    <span style={{ fontSize: '0.62rem', color: volKick > 100 ? '#d97706' : '#64748b', fontFamily: 'SF Mono, monospace', fontWeight: 800 }}>
-                      {volKick}% {volKick > 100 && '⚡'}
-                    </span>
+
+                {/* Variante C (Fill/Komplex) */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div>
+                    <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#0f172a', display: 'block' }}>Variante C: Fill / Komplex</span>
+                    <span style={{ fontSize: '0.64rem', color: '#64748b' }}>Zusätzliche Drum-Fills und Synkopen</span>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <div style={{ display: 'flex', gap: '4px' }}>
-                      <button
-                        type="button"
-                        onClick={() => toggleMute('kick')}
-                        style={{
-                          width: '24px',
-                          height: '24px',
-                          borderRadius: '6px',
-                          border: 'none',
-                          fontSize: '0.62rem',
-                          fontWeight: 900,
-                          cursor: 'pointer',
-                          background: isMuted('kick') ? '#ea4335' : '#ffffff',
-                          color: isMuted('kick') ? '#ffffff' : '#64748b',
-                          boxShadow: '0 1px 2px rgba(0,0,0,0.06)',
-                          transition: 'all 0.15s ease-in-out'
-                        }}
-                      >
-                        M
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => toggleSolo('kick')}
-                        style={{
-                          width: '24px',
-                          height: '24px',
-                          borderRadius: '6px',
-                          border: 'none',
-                          fontSize: '0.62rem',
-                          fontWeight: 900,
-                          cursor: 'pointer',
-                          background: isSolo('kick') ? '#eab308' : '#ffffff',
-                          color: isSolo('kick') ? '#ffffff' : '#64748b',
-                          boxShadow: '0 1px 2px rgba(0,0,0,0.06)',
-                          transition: 'all 0.15s ease-in-out'
-                        }}
-                      >
-                        S
-                      </button>
-                    </div>
-                    <input
-                      type="range"
-                      min="0"
-                      max="200"
-                      value={volKick}
-                      onChange={(e) => setVolKick(Number(e.target.value))}
-                      className="groovelab-fader"
-                      style={{ flex: 1 }}
-                    />
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedVariation(selectedVariation === 'C' ? 'A' : 'C')}
+                    style={{
+                      padding: '4px 10px',
+                      borderRadius: '8px',
+                      border: selectedVariation === 'C' ? '1.5px solid #eab308' : '1px solid #cbd5e1',
+                      background: selectedVariation === 'C' ? '#fefce8' : '#ffffff',
+                      color: selectedVariation === 'C' ? '#854d0e' : '#64748b',
+                      fontSize: '0.72rem',
+                      fontWeight: 800,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {selectedVariation === 'C' ? '✓ Aktiviert' : 'Einschalten'}
+                  </button>
                 </div>
 
-                {/* Snare Drum Channel */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                {/* Instrumenten Mixer */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#1e293b' }}>Snare Drum</span>
-                    <span style={{ fontSize: '0.62rem', color: volSnare > 100 ? '#d97706' : '#64748b', fontFamily: 'SF Mono, monospace', fontWeight: 800 }}>
-                      {volSnare}% {volSnare > 100 && '⚡'}
+                    <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b' }}>DRUM KIT:</span>
+                    <span style={{ fontSize: '0.64rem', fontWeight: 800, color: '#0f172a' }}>
+                      🥁 {selectedStyle === 'singersongwriter' ? 'Soft Mahogany Kit' :
+                           selectedStyle === 'swing' ? 'Smoky Vintage Jazz Kit' :
+                           selectedStyle === 'hiphop' ? 'Tape Boom-Bap Sub Kit' :
+                           selectedStyle === 'reggae' ? 'Deep Dub One-Drop Sub Kit' :
+                           selectedStyle === 'latin' ? 'Warm Percussive Bossa Kit' :
+                           selectedStyle === 'funk' ? '70s Vintage Funk Kit' :
+                           selectedStyle === 'rock' ? 'Birch Studio Rock Kit' :
+                           selectedStyle === 'walzer' ? 'Acoustic Waltz Kit' :
+                           selectedStyle === 'ballad68' ? 'Slow Ballad Kit' :
+                           selectedStyle === 'disco' ? '70s Disco Kit' : 'Soft Hardwood Click Kit'}
                     </span>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <div style={{ display: 'flex', gap: '4px' }}>
-                      <button
-                        type="button"
-                        onClick={() => toggleMute('snare')}
-                        style={{
-                          width: '24px',
-                          height: '24px',
-                          borderRadius: '6px',
-                          border: 'none',
-                          fontSize: '0.62rem',
-                          fontWeight: 900,
-                          cursor: 'pointer',
-                          background: isMuted('snare') ? '#ea4335' : '#ffffff',
-                          color: isMuted('snare') ? '#ffffff' : '#64748b',
-                          boxShadow: '0 1px 2px rgba(0,0,0,0.06)',
-                          transition: 'all 0.15s ease-in-out'
-                        }}
-                      >
-                        M
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => toggleSolo('snare')}
-                        style={{
-                          width: '24px',
-                          height: '24px',
-                          borderRadius: '6px',
-                          border: 'none',
-                          fontSize: '0.62rem',
-                          fontWeight: 900,
-                          cursor: 'pointer',
-                          background: isSolo('snare') ? '#eab308' : '#ffffff',
-                          color: isSolo('snare') ? '#ffffff' : '#64748b',
-                          boxShadow: '0 1px 2px rgba(0,0,0,0.06)',
-                          transition: 'all 0.15s ease-in-out'
-                        }}
-                      >
-                        S
-                      </button>
-                    </div>
-                    <input
-                      type="range"
-                      min="0"
-                      max="200"
-                      value={volSnare}
-                      onChange={(e) => setVolSnare(Number(e.target.value))}
-                      className="groovelab-fader"
-                      style={{ flex: 1 }}
-                    />
-                  </div>
-                </div>
 
-                {/* Hi-Hat Channel */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#1e293b' }}>Hi-Hat</span>
-                    <span style={{ fontSize: '0.62rem', color: volHat > 100 ? '#d97706' : '#64748b', fontFamily: 'SF Mono, monospace', fontWeight: 800 }}>
-                      {volHat}% {volHat > 100 && '⚡'}
-                    </span>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <div style={{ display: 'flex', gap: '4px' }}>
-                      <button
-                        type="button"
-                        onClick={() => toggleMute('hat')}
-                        style={{
-                          width: '24px',
-                          height: '24px',
-                          borderRadius: '6px',
-                          border: 'none',
-                          fontSize: '0.62rem',
-                          fontWeight: 900,
-                          cursor: 'pointer',
-                          background: isMuted('hat') ? '#ea4335' : '#ffffff',
-                          color: isMuted('hat') ? '#ffffff' : '#64748b',
-                          boxShadow: '0 1px 2px rgba(0,0,0,0.06)',
-                          transition: 'all 0.15s ease-in-out'
-                        }}
-                      >
-                        M
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => toggleSolo('hat')}
-                        style={{
-                          width: '24px',
-                          height: '24px',
-                          borderRadius: '6px',
-                          border: 'none',
-                          fontSize: '0.62rem',
-                          fontWeight: 900,
-                          cursor: 'pointer',
-                          background: isSolo('hat') ? '#eab308' : '#ffffff',
-                          color: isSolo('hat') ? '#ffffff' : '#64748b',
-                          boxShadow: '0 1px 2px rgba(0,0,0,0.06)',
-                          transition: 'all 0.15s ease-in-out'
-                        }}
-                      >
-                        S
-                      </button>
-                    </div>
-                    <input
-                      type="range"
-                      min="0"
-                      max="200"
-                      value={volHat}
-                      onChange={(e) => setVolHat(Number(e.target.value))}
-                      className="groovelab-fader"
-                      style={{ flex: 1 }}
-                    />
-                  </div>
-                </div>
-
-                {/* Metronom Klick Channel (in Drum Mode) */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#1e293b' }}>Metronom Klick</span>
-                    <span style={{ fontSize: '0.62rem', color: volMetronome > 100 ? '#d97706' : '#64748b', fontFamily: 'SF Mono, monospace', fontWeight: 800 }}>
-                      {volMetronome}% {volMetronome > 100 && '⚡'}
-                    </span>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <div style={{ display: 'flex', gap: '4px' }}>
+                  {selectedStyle === 'metronome' ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontSize: '0.70rem', color: '#64748b', fontWeight: 750, minWidth: '70px' }}>Klick: {volMetronome}%</span>
+                      <input
+                        type="range"
+                        min="0"
+                        max="200"
+                        value={volMetronome}
+                        onChange={(e) => setVolMetronome(Number(e.target.value))}
+                        style={{ flex: 1, accentColor: '#eab308' }}
+                      />
                       <button
                         type="button"
                         onClick={() => toggleMute('click')}
@@ -3632,42 +3776,46 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                           cursor: 'pointer',
                           background: isMuted('click') ? '#ea4335' : '#ffffff',
                           color: isMuted('click') ? '#ffffff' : '#64748b',
-                          boxShadow: '0 1px 2px rgba(0,0,0,0.06)',
-                          transition: 'all 0.15s ease-in-out'
+                          boxShadow: '0 1px 2px rgba(0,0,0,0.06)'
                         }}
                       >
                         M
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => toggleSolo('click')}
-                        style={{
-                          width: '24px',
-                          height: '24px',
-                          borderRadius: '6px',
-                          border: 'none',
-                          fontSize: '0.62rem',
-                          fontWeight: 900,
-                          cursor: 'pointer',
-                          background: isSolo('click') ? '#eab308' : '#ffffff',
-                          color: isSolo('click') ? '#ffffff' : '#64748b',
-                          boxShadow: '0 1px 2px rgba(0,0,0,0.06)',
-                          transition: 'all 0.15s ease-in-out'
-                        }}
-                      >
-                        S
-                      </button>
                     </div>
-                    <input
-                      type="range"
-                      min="0"
-                      max="200"
-                      value={volMetronome}
-                      onChange={(e) => setVolMetronome(Number(e.target.value))}
-                      className="groovelab-fader"
-                      style={{ flex: 1 }}
-                    />
-                  </div>
+                  ) : (
+                    <div style={{ display: 'grid', gridTemplateColumns: isMobileView ? '1fr' : 'repeat(2, 1fr)', gap: '8px' }}>
+                      {/* Kick */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.66rem', fontWeight: 750 }}>
+                          <span>Kick</span>
+                          <span>{volKick}%</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="0"
+                          max="200"
+                          value={volKick}
+                          onChange={(e) => setVolKick(Number(e.target.value))}
+                          style={{ accentColor: '#eab308' }}
+                        />
+                      </div>
+                      {/* Snare */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.66rem', fontWeight: 750 }}>
+                          <span>Snare</span>
+                          <span>{volSnare}%</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="0"
+                          max="200"
+                          value={volSnare}
+                          onChange={(e) => setVolSnare(Number(e.target.value))}
+                          style={{ accentColor: '#eab308' }}
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -3702,15 +3850,15 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
             boxShadow: '0 20px 40px rgba(0,0,0,0.3)'
           }}>
             <div style={{
-              background: loopstationPhaseState === 'result' ? '#e6f4ea' : '#e0e7ff',
-              color: loopstationPhaseState === 'result' ? '#34a853' : '#4f46e5',
+              background: loopstationPhaseState === 'result' ? '#fefce8' : '#e0e7ff',
+              color: loopstationPhaseState === 'result' ? '#ca8a04' : '#4f46e5',
               width: '56px',
               height: '56px',
               borderRadius: '50%',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              boxShadow: loopstationPhaseState === 'result' ? '0 6px 18px rgba(52, 168, 83, 0.25)' : '0 6px 18px rgba(79, 70, 229, 0.25)',
+              boxShadow: loopstationPhaseState === 'result' ? '0 6px 18px rgba(234, 179, 8, 0.25)' : '0 6px 18px rgba(79, 70, 229, 0.25)',
               transition: 'all 0.3s ease'
             }}>
               {loopstationPhaseState === 'result' ? <CheckCircle2 size={28} /> : <Zap size={28} style={{ animation: 'pulse 1.5s infinite' }} />}
@@ -3750,7 +3898,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                   <div style={{
                     height: '100%',
                     width: loopstationPhaseState === 'ambient' ? '20%' : `${20 + (loopstationClickCount / 5) * 80}%`,
-                    background: 'linear-gradient(90deg, #34a853 0%, #4f46e5 100%)',
+                    background: 'linear-gradient(90deg, #eab308 0%, #4f46e5 100%)',
                     borderRadius: '4px',
                     transition: 'width 0.3s ease'
                   }} />
@@ -3768,8 +3916,8 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                   }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.64rem', fontWeight: 800 }}>
                       <span style={{ color: '#94a3b8' }}>Geräte-Lautstärke Pegel</span>
-                      <span style={{ color: '#34a853', background: 'rgba(52, 168, 83, 0.2)', padding: '1px 6px', borderRadius: '4px' }}>
-                        🎯 Ziel: Grüne Zone (35-75%)
+                      <span style={{ color: '#ca8a04', background: 'rgba(234, 179, 8, 0.2)', padding: '1px 6px', borderRadius: '4px' }}>
+                        🎯 Ziel: Optimale Zone (35-75%)
                       </span>
                     </div>
 
@@ -3781,29 +3929,29 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                       borderRadius: '6px',
                       overflow: 'hidden'
                     }}>
-                      {/* Target Green Level Window (35% to 75%) */}
+                      {/* Target Level Window (35% to 75%) */}
                       <div style={{
                         position: 'absolute',
                         left: '35%',
                         width: '40%',
                         top: 0,
                         bottom: 0,
-                        background: 'rgba(52, 168, 83, 0.25)',
-                        borderLeft: '1.5px dashed #34a853',
-                        borderRight: '1.5px dashed #34a853'
+                        background: 'rgba(234, 179, 8, 0.25)',
+                        borderLeft: '1.5px dashed #eab308',
+                        borderRight: '1.5px dashed #eab308'
                       }} />
 
                       {/* Live VU Meter Level Bar */}
                       <div style={{
                         height: '100%',
                         width: `${Math.min(100, loopstationMicLevel)}%`,
-                        background: loopstationMicLevel > 80 ? '#ef4444' : (loopstationMicLevel >= 30 ? '#34a853' : '#3b82f6'),
+                        background: loopstationMicLevel > 80 ? '#ef4444' : (loopstationMicLevel >= 30 ? '#eab308' : '#3b82f6'),
                         borderRadius: '6px',
                         transition: 'width 0.05s ease-out'
                       }} />
                     </div>
                     <span style={{ fontSize: '0.60rem', color: '#94a3b8', textAlign: 'center', fontWeight: 700 }}>
-                      💡 Bitte stelle die Lautsprecher-Lautstärke deines Geräts so ein, dass der Pegel im grünen Bereich liegt.
+                      💡 Bitte stelle die Lautsprecher-Lautstärke deines Geräts so ein, dass der Pegel im optimalen Bereich liegt.
                     </span>
                   </div>
                 )}
@@ -3821,10 +3969,10 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                 gap: '6px'
               }}>
                 <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 800 }}>ERMITTELTE HARDWARE-LATENZ</span>
-                <span style={{ fontSize: '1.8rem', color: '#34a853', fontWeight: 900, fontFamily: 'SF Mono, monospace' }}>
+                <span style={{ fontSize: '1.8rem', color: '#ca8a04', fontWeight: 900, fontFamily: 'SF Mono, monospace' }}>
                   +{loopstationLatencyResult} ms
                 </span>
-                <span style={{ fontSize: '0.62rem', color: '#166534', background: '#d1fae5', padding: '2px 8px', borderRadius: '6px', fontWeight: 800 }}>
+                <span style={{ fontSize: '0.62rem', color: '#854d0e', background: '#fefce8', border: '1px solid #fde047', padding: '2px 8px', borderRadius: '6px', fontWeight: 800 }}>
                   🎯 100% Sample-Genau Kalibriert (DSP Matrix)
                 </span>
               </div>
@@ -3838,15 +3986,15 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                   className="tactile-btn"
                   style={{
                     width: '100%',
-                    background: 'linear-gradient(135deg, #34a853 0%, #4f46e5 100%)',
-                    color: '#ffffff',
+                    background: 'linear-gradient(135deg, #facc15 0%, #eab308 100%)',
+                    color: '#0f172a',
                     border: 'none',
                     borderRadius: '14px',
                     padding: '14px',
                     fontSize: '0.82rem',
                     fontWeight: 800,
                     cursor: 'pointer',
-                    boxShadow: '0 6px 18px rgba(52, 168, 83, 0.3)'
+                    boxShadow: '0 6px 18px rgba(234, 179, 8, 0.3)'
                   }}
                 >
                   Lautstärke ist eingestellt ➔ Weiter zu Schritt 2 (Latenz Messen) 🚀
@@ -3863,15 +4011,15 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                   className="tactile-btn"
                   style={{
                     width: '100%',
-                    background: 'linear-gradient(135deg, #34a853 0%, #4f46e5 100%)',
-                    color: '#ffffff',
+                    background: 'linear-gradient(135deg, #facc15 0%, #eab308 100%)',
+                    color: '#0f172a',
                     border: 'none',
                     borderRadius: '14px',
                     padding: '14px',
                     fontSize: '0.82rem',
                     fontWeight: 800,
                     cursor: 'pointer',
-                    boxShadow: '0 6px 18px rgba(52, 168, 83, 0.3)'
+                    boxShadow: '0 6px 18px rgba(234, 179, 8, 0.3)'
                   }}
                 >
                   Latenz Übernehmen & Weiter zu Schritt 3 🚀
@@ -3940,15 +4088,16 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                   width: '64px',
                   height: '64px',
                   borderRadius: '50%',
-                  background: '#e6f4ea',
+                  background: '#fefce8',
+                  border: '1.5px solid #fde047',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  color: '#34a853'
+                  color: '#ca8a04'
                 }}>
                   <CheckCircle2 size={36} />
                 </div>
-                <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 900, color: '#15803d' }}>Instrument Perfekt Einpegeilt!</h3>
+                <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 900, color: '#854d0e' }}>Instrument Perfekt Eingepegelt!</h3>
                 <p style={{ margin: 0, fontSize: '0.82rem', color: '#475569', fontWeight: 700 }}>
                   {instrumentToneDoneText}
                 </p>
@@ -3959,15 +4108,16 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                   width: '64px',
                   height: '64px',
                   borderRadius: '50%',
-                  background: '#e6f4ea',
+                  background: '#fefce8',
+                  border: '1.5px solid #fde047',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  color: '#34a853'
+                  color: '#ca8a04'
                 }}>
                   <Mic size={32} />
                 </div>
-                <span style={{ fontSize: '0.68rem', fontWeight: 900, color: '#34a853', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                <span style={{ fontSize: '0.68rem', fontWeight: 900, color: '#ca8a04', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
                   SCHRITT 3/3: INSTRUMENT EINPEGELN (3 TÖNE)
                 </span>
                 <h3 style={{ margin: '2px 0 0 0', fontSize: '1.15rem', fontWeight: 900, color: '#1e293b' }}>
@@ -3984,15 +4134,15 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                         width: '54px',
                         height: '54px',
                         borderRadius: '16px',
-                        background: num <= instrumentToneCount ? '#34a853' : '#f1f5f9',
-                        color: num <= instrumentToneCount ? '#ffffff' : '#94a3b8',
+                        background: num <= instrumentToneCount ? 'linear-gradient(135deg, #facc15 0%, #eab308 100%)' : '#f1f5f9',
+                        color: num <= instrumentToneCount ? '#0f172a' : '#94a3b8',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
                         fontWeight: 900,
                         fontSize: '1rem',
                         transition: 'all 0.2s ease-out',
-                        boxShadow: num <= instrumentToneCount ? '0 6px 14px rgba(52, 168, 83, 0.35)' : 'none'
+                        boxShadow: num <= instrumentToneCount ? '0 6px 14px rgba(234, 179, 8, 0.35)' : 'none'
                       }}
                     >
                       {num <= instrumentToneCount ? '✓' : `Ton ${num}`}
@@ -4072,7 +4222,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
               gap: '10px',
               marginTop: '4px'
             }}>
-              {[1, 2, 3, 4].map(b => (
+              {Array.from({ length: activeMeterInfo.countInBeats }, (_, i) => i + 1).map(b => (
                 <div
                   key={b}
                   style={{
@@ -4089,7 +4239,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
             </div>
 
             <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>
-              Mache dich bereit für Takt 1 ({bpm} BPM)
+              Mache dich bereit für Takt 1 ({bpm} BPM • {activeMeterInfo.meter} Takt)
             </span>
 
             <button
@@ -4140,11 +4290,11 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
             width: '32px',
             height: '32px',
             borderRadius: '50%',
-            background: '#22c55e',
+            background: '#eab308',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            color: '#ffffff',
+            color: '#0f172a',
             flexShrink: 0
           }}>
             <CheckCircle2 size={18} />

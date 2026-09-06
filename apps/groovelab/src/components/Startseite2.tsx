@@ -2367,7 +2367,7 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
                         items: [
                           { title: '16. Continuous Supply-Chain Security & CI/CD Gates', desc: 'Automatischer Pre-Commit Secret-Scanner, automatische Vitest-Mandantentrennungstests und CVE-Schwachstellen-Scans vor jedem Deployment.' },
                           { title: '17. Revisionssicheres WORM Audit-Ledger', desc: 'Manipulationssichere SHA-256 Merkle-Chain zur unveränderbaren Protokollierung aller administrativen Aktionen und Belege (GoBD).' },
-                          { title: '18. DIN 66398 Löschkonzept & Storage-Janitor', desc: 'Automatischer Purge-Bot zur physischen Vernichtung gelöschter Audios und Inaktivitäts-Stopp nach 60 Tagen.' },
+                          { title: '18. DIN 66398 Löschkonzept & Storage-Janitor', desc: 'Strukturierte 5-Klassen-Löschfristen, physische Vernichtung gelöschter Audios und 60-Tage-Sparmodus zum Budgetschutz der Musikschule.' },
                           { title: '19. Periodische Penetrationstests & RFC 9116 security.txt', desc: 'Regelmäßige externe IT-Sicherheitsaudits und vertrauliche Meldeschnittstelle für Responsible Disclosure.' },
                           { title: '20. Revisionssicheres DSGVO-Einwilligungsmanagement', desc: 'Zeitgestempelte, rechtssichere Protokollierung aller Eltern-Einwilligungen nach Art. 7 & Art. 8 DSGVO.' }
                         ]

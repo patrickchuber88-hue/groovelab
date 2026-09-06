@@ -23,13 +23,14 @@
   3. `npx tsc --noEmit` (TypeScript Typprüfung)
 - **Ergebnisbericht**: Die Antwort liefert direkt das strukturierte **Morning Health & Security Briefing**, das den aktuellen Systemstatus, Code-Integrität (0 Verstöße, 0 Leaks) und den Status des Live-Systems transparent zusammenfasst.
 
-## 🎯 Prompt Agent Trigger ("prompt Agent starten")
-- **Persona**: Elite Prompt Engineer.
-- **Workflow (3-Round Optimization Cycle)**:
-  1. *Initial Trigger Handling*: Wenn kein Thema mitgegeben wird, antworte mit einer einzigen, direkten Frage nach dem Ziel/Task. Wenn ein Thema mitgegeben wird, starte direkt mit Runde 1.
-  2. *Round 1 (Analysis & Draft v1.0)*: Erstelle Struktur mit `[ROLE / PERSONA]`, `[CONTEXT]`, `[TASK / STEPS]`, `[OUTPUT FORMAT & CONSTRAINTS]` und stelle 3-4 gezielte Klärungsfragen.
-  3. *Round 2 (Hardening & Draft v2.0)*: Antworten einarbeiten, negative Constraints & Few-Shot Slots injizieren, Draft v2.0 präsentieren und nach Feinabstimmung fragen.
-  4. *Round 3 (Master Prompt v3.0)*: Finaler, produktionsreifer Master-Prompt im Codeblock mit standardisierten `[VARIABLE_PLACEHOLDERS]` + 2 konkrete Laufzeit-Ausführungstipps.
+## 🎯 Master Prompt Trigger ("master prompt" / "prompt Agent starten")
+- **Kernprinzip**: Rein neutrales, modulares Architektur- und Struktur-Framework basierend auf `.agents/prompts/MASTER_PROMPT_TEMPLATE.md`.
+- **Dynamische Rollenableitung**: Die Rolle ist niemals statisch vorgegeben, sondern wird vollkommen dynamisch und hochpräzise anhand des übergebenen Themas und Ziels definiert (z. B. *Senior UI/UX Architect*, *Database Optimization Expert*, *Security Engineer*, *Refactoring Lead*).
+- **Trigger "master prompt"**:
+  - Wenn der Benutzer „master prompt“ (oder „prompt Agent starten“) schreibt:
+    1. *Thema/Ziel mitgegeben*: Leite sofort die spezialisierte Experten-Rolle ab und generiere direkt den schlüsselfertigen, neutralen Master-Prompt im Codeblock (vollständig ausgefüllte Struktur, ohne unnötige Interview-Runden).
+    2. *Kein Thema mitgegeben*: Antworte mit einer einzigen, direkten Frage nach dem konkreten Thema/Ziel, um die Experten-Rolle und die Ziel-Parameter unmittelbar passgenau einzusetzen.
+  - **Inhaltliche Leitplanken**: Reine Software-Architektur, Bounded Contexts, System-Invarianten, deterministischer 4-Phasen-Ablauf (1. Exploration -> 2. Planung -> 3. Implementierung -> 4. Verifikation) und strukturiertes Status-Reporting. Keine domänenspezifischen Vorab-Festlegungen.
 
 ## Platform Naming
 - Always refer to the platform as **Campus-Groovelab** in all UI elements, user communications, messages, and document descriptions.

@@ -555,7 +555,7 @@ Deine Vorteile auf einen Blick:
         boxSizing: 'border-box'
       }}>
 
-        {/* 0. Legal Parental Consent Box (Art. 8 DSGVO & § 31 UrhG) */}
+        {/* 0. Legal Parental Consent Box (Art. 8 DSGVO & § 73 UrhG) */}
         <div style={{
           background: consentSaved ? '#f0fdf4' : '#fefce8',
           border: `1.5px solid ${consentSaved ? '#bbf7d0' : '#fef08a'}`,
@@ -568,7 +568,7 @@ Deine Vorteile auf einen Blick:
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <span style={{ fontSize: '1.1rem' }}>{consentSaved ? '✅' : '📜'}</span>
             <div style={{ fontSize: '0.82rem', fontWeight: 800, color: consentSaved ? '#166534' : '#854d0e' }}>
-              {consentSaved ? 'Eltern-Einwilligung erteilt & datiert' : 'Einwilligung der Erziehungsberechtigten (Art. 8 DSGVO / § 31 UrhG)'}
+              {consentSaved ? 'Eltern-Einwilligung erteilt & datiert' : 'Einwilligung der Erziehungsberechtigten (Art. 8 DSGVO / § 73 UrhG)'}
             </div>
           </div>
 
@@ -692,7 +692,7 @@ Deine Vorteile auf einen Blick:
                   <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', fontSize: '0.74rem', color: '#334155', fontWeight: 650, cursor: 'pointer', background: '#f8fafc', padding: '10px 12px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                       <input type="checkbox" checked={parentAllowAudio} onChange={e => setParentAllowAudio(e.target.checked)} style={{ accentColor: '#34a853', width: '16px', height: '16px', flexShrink: 0 }} />
-                      <span>🎙️ Audio-Feedback &amp; Loopstation im Unterricht</span>
+                      <span>🎙️ Audio-Feedback &amp; Loopstation im Unterricht (§ 73 UrhG)</span>
                     </div>
                     <span style={{ fontSize: '0.6rem', fontWeight: 800, color: '#166534', background: '#dcfce7', padding: '2px 6px', borderRadius: '6px', whiteSpace: 'nowrap' }}>
                       Empfohlen
@@ -706,10 +706,10 @@ Deine Vorteile auf einen Blick:
                   type="checkbox"
                   checked={parentalConsent}
                   onChange={(e) => setParentalConsent(e.target.checked)}
-                  style={{ marginTop: '2px', cursor: 'pointer', accentColor: '#34a853', width: '18px', height: '18px', flexShrink: 0 }}
+                  style={{ marginTop: '2px', cursor: 'pointer', accentColor: '#15803d', width: '18px', height: '18px', flexShrink: 0 }}
                 />
                 <span style={{ fontSize: '0.72rem', color: '#14532d', fontWeight: 650, lineHeight: 1.45 }}>
-                  Ich willige als Erziehungsberechtigte(r) in die datenschutzkonforme Profilverarbeitung meines Kindes gemäß Datenschutzerklärung ein und erteile die Zustimmung zur Speicherung & unterrichtlichen Nutzung der erstellten Audio-Loops in der Loopstation (§ 31 UrhG).
+                  <strong>Zustimmung der Erziehungsberechtigten (Art. 8 DSGVO / § 10 BDSG / Art. 6 nDSG):</strong> Ich willige als Sorgeberechtigte(r) in die datenschutzkonforme Profilverarbeitung meines Kindes (mindestens 6 Jahre alt; einheitliche elterliche Freigabe bis 16 Jahre in DE, AT und CH) gemäß Datenschutzerklärung ein (Hausaufgaben, Termine, Übeziffern).
                 </span>
               </label>
 

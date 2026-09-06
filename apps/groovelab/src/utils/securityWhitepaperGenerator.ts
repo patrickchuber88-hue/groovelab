@@ -162,7 +162,7 @@ export async function generateEnterpriseSecurityWhitepaperPDF(): Promise<void> {
         cat: '3. Verfügbarkeit & Löschkonzept (Art. 32 & Art. 17 DSGVO / DIN 66398)',
         items: [
           '• Datensicherung: Stündlich automatisierte, verschlüsselte Datenbank-Backups (RTO < 15 Min, RPO < 1 Std.).',
-          '• DIN 66398 Löschkonzept: Automatischer Purge-Bot nach 60 Tagen Inaktivität; physische Storage-Löschung bei Austritt.',
+          '• DIN 66398 Löschkonzept (5 Klassen): 60-Tage Sparmodus-Wechsel auf Basis-Bereitstellung (0,09 €); physische Profillöschung erst 30 Tage nach Exmatrikulation; Meisterwerke kumulativ über Ausbildungsdauer.',
           '• Offline-Resilienz: IndexedDB Audio-Tresor (groovelab_audio_vault) für unterbrechungsfreie Musikproben.'
         ]
       }

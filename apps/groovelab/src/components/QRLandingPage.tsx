@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
-import { Music, Shield, Clock, CheckCircle, AlertTriangle, Flame, Zap, /* Car, */ Calendar, MapPin, User, Check, Sparkles, Play, Pause, BookOpen, X, FileText, ArrowLeft, Mail, CreditCard, Lock, Settings, Key, Users, Trophy, MessageSquare, Timer, ChevronDown, Smartphone, Award, ExternalLink, ShieldCheck, CheckCheck, Download, Target, Radio, BarChart3, Fingerprint, Delete, Send } from 'lucide-react';
+import { Music, Shield, Clock, CheckCircle, AlertTriangle, Flame, Zap, /* Car, */ Calendar, MapPin, User, Check, Sparkles, Play, Pause, BookOpen, X, FileText, ArrowLeft, Mail, CreditCard, Lock, Settings, Key, Users, Trophy, MessageSquare, Timer, ChevronDown, Smartphone, Award, ExternalLink, ShieldCheck, CheckCheck, Download, Target, Radio, BarChart3, Fingerprint, Delete, Send, RotateCcw } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { maskLastName, cleanHomeworkNotesText, formatTeacherFullName } from '../utils/nameHelper';
 import { isWebAuthnSupported, registerUserBiometrics, getStoredBiometricProfiles } from '../utils/webauthn';
 import { validateNewPin } from '../utils/pinValidation';
 import { AudioTrackCarousel } from './AudioTrackCarousel';
+import { CampusAppointmentShoutboxModal } from './CampusAppointmentShoutboxModal';
 
 import { useMasterPricing } from '../context/MasterPricingContext';
 import { computeGroundTruthMetrics, broadcastPracticeUpdate, DEFAULT_FOKUS_LEVELS, getEngineEffectiveLevel, getEngineTargetMinutes, getEngineFlameCategory } from '../utils/studentProgressEngine';
@@ -3486,6 +3487,15 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
   };
 
   const handleCancelOccurrence = async (occ: any) => {
+    try {
+      const timePart = occ.start_time?.includes(':') ? occ.start_time : `${occ.start_time || '00'}:00`;
+      const lessonDateTime = new Date(`${occ.date}T${timePart}`);
+      if (Date.now() > lessonDateTime.getTime()) {
+        alert('Vergangene Termine können nicht mehr abgesagt werden.');
+        return;
+      }
+    } catch (e) {}
+
     const formattedDate = new Date(occ.date).toLocaleDateString('de-DE');
 
     try {
@@ -3511,6 +3521,11 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         if (updateErr) throw updateErr;
       }
 
+      const now = new Date();
+      const execDateStr = now.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+      const execTimeStr = now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+      const execTimestampStr = `${execDateStr} um ${execTimeStr} Uhr`;
+
       // Add system alert
       try {
         const userName = `${profile?.first_name || 'Schüler'} ${maskLastName(profile?.last_name)}`;
@@ -3518,7 +3533,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           school_id: profile?.school_id || null,
           teacher_id: occ.teacher_id,
           type: 'Termin abgesagt',
-          message: `❌ Absage: Schüler ${userName} hat den Termin am ${formattedDate} um ${occ.start_time?.substring(0, 5)} Uhr abgesagt.`
+          message: `❌ Absage: Schüler ${userName} hat den Termin am ${formattedDate} um ${occ.start_time?.substring(0, 5)} Uhr abgesagt (Eingang: ${execTimestampStr}).`
         });
       } catch (alertErr) {
         console.warn('Could not create system alert:', alertErr);
@@ -3526,11 +3541,14 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
 
       // Send a chat message informing about the cancellation
       try {
+        const studentName = `${profile?.first_name || 'Schüler'} ${maskLastName(profile?.last_name)}`;
         await supabase.from('campus_direct_messages').insert({
           sender_id: profile?.id,
           recipient_id: occ.teacher_id,
-          content: `❌ Termin am ${formattedDate} abgesagt.`,
-          occurrence_id: occ.id
+          content: `❌ Terminabsage: Unterrichtstermin am ${formattedDate} um ${occ.start_time?.substring(0, 5)} Uhr fällt aus.\n🕒 Abgemeldet am: ${execTimestampStr} durch ${studentName}.`,
+          occurrence_id: occ.id,
+          is_system: true,
+          message_type: 'reschedule_notification'
         });
       } catch (chatErr) {
         console.warn('Could not send cancellation chat msg:', chatErr);
@@ -3544,6 +3562,15 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
   };
 
   const handleUndoCancel = async (occ: any) => {
+    try {
+      const timePart = occ.start_time?.includes(':') ? occ.start_time : `${occ.start_time || '00'}:00`;
+      const lessonDateTime = new Date(`${occ.date}T${timePart}`);
+      if (Date.now() > lessonDateTime.getTime()) {
+        alert('Termine in der Vergangenheit können nicht mehr reaktiviert werden.');
+        return;
+      }
+    } catch (e) {}
+
     if (!confirm('Möchtest du diese Absage wirklich rückgängig machen? Der Termin findet dann wieder regulär statt.')) return;
     try {
       if (!occ.id) return;
@@ -3588,7 +3615,13 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           const shortDate = occDate.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' });
           const timeLabel = (occ.start_time || '16:30').slice(0, 5);
 
-          const notificationMessage = `Der Ausfall für diesen Termin wurde zurückgenommen. Der Termin findet regulär statt:\n${shortDay} ${shortDate} um ${timeLabel} Uhr. (${occ.date})`;
+          const now = new Date();
+          const execDateStr = now.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+          const execTimeStr = now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+          const execTimestampStr = `${execDateStr} um ${execTimeStr} Uhr`;
+          const studentName = profile?.first_name ? `${profile.first_name} ${maskLastName(profile.last_name, true)}` : 'Schüler:in';
+
+          const notificationMessage = `🔄 Termin reaktiviert: Dein Unterrichtstermin am ${shortDay} ${shortDate} um ${timeLabel} Uhr findet regulär statt.\n🕒 Reaktiviert am: ${execTimestampStr} durch ${studentName}.`;
 
           await supabase.from('campus_direct_messages').insert({
             sender_id: studentUserId,
@@ -4782,7 +4815,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                   Alle Termine des Schuljahres freischalten
                 </span>
                 <span style={{ fontSize: '0.74rem', color: '#16a34a', fontWeight: 650 }}>
-                  Inaktives Profil: Zeigt 4 Termine • Hier tippen für Vollzugriff
+                  Basis-Bereitstellung: Zeigt 4 Termine • Hier tippen für vollen Campus-Zugriff
                 </span>
               </div>
             </div>
@@ -5417,7 +5450,10 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                   return {
                     url: parts[0],
                     duration: parseInt(parts[1] || '0', 10),
+                    date: parts[2],
                     label: parts[3] || 'Aufnahme',
+                    author: parts[4] || 'teacher',
+                    songTag: parts[7] || undefined,
                     originalIdx: aIdx,
                     idx: aIdx
                   };
@@ -10772,642 +10808,24 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
 
         {/* 4. Shoutbox (placed outside the Focus Timer condition so it works on appointments list) */}
         {activeChatOcc && createPortal(
-          (() => {
-            const teacherName = formatTeacherFullName(activeChatOcc.teacher);
-            const titleText = `1:1 Shoutbox: ${teacherName}`;
-            const isCanceled = activeChatOcc.status === 'cancelled' || activeChatOcc.status === 'canceled_by_student' || activeChatOcc.status === 'teacher_sick' || activeChatOcc.status === 'canceled_by_teacher_sick';
-            
-            let isFrozen = false;
-            try {
-              const timePart = activeChatOcc.start_time?.includes(':') ? activeChatOcc.start_time : `${activeChatOcc.start_time || '00'}:00`;
-              const lessonDateTime = new Date(`${activeChatOcc.date}T${timePart}`);
-              isFrozen = Date.now() > lessonDateTime.getTime() + 48 * 60 * 60 * 1000;
-            } catch (e) {}
-
-            let stammterminText: string | null = null;
-            if (activeChatOcc) {
-              let rawOrig = activeChatOcc.original_date || activeChatOcc.rescheduled_from;
-              if (!rawOrig && activeChatOcc.notes) {
-                const match = activeChatOcc.notes.match(/(\d{4}-\d{2}-\d{2})/);
-                if (match) rawOrig = match[1];
+          <CampusAppointmentShoutboxModal
+            isOpen={Boolean(activeChatOcc)}
+            onClose={() => setActiveChatOcc(null)}
+            occurrence={{
+              ...activeChatOcc,
+              student: activeChatOcc.student || profile,
+              teacher: activeChatOcc.teacher
+            }}
+            currentUserId={profile?.id || activeChatOcc.student_id}
+            currentUserRole="student"
+            currentUserProfile={profile}
+            isParentUnlocked={parentUnlocked}
+            onStatusChange={(newStatus, updatedOcc) => {
+              if (activeChatOcc) {
+                setActiveChatOcc((prev: any) => prev ? ({ ...prev, status: newStatus, ...updatedOcc }) : null);
               }
-              if (rawOrig && rawOrig !== activeChatOcc.date) {
-                try {
-                  const clean = rawOrig.split('T')[0];
-                  const parts = clean.split('-').map(Number);
-                  let origDate: Date;
-                  if (parts.length === 3 && !isNaN(parts[0]) && !isNaN(parts[1]) && !isNaN(parts[2])) {
-                    origDate = new Date(parts[0], parts[1] - 1, parts[2]);
-                  } else {
-                    origDate = new Date(rawOrig);
-                  }
-                  if (!isNaN(origDate.getTime())) {
-                    const origDayName = origDate.toLocaleDateString('de-DE', { weekday: 'long' });
-                    const origDateFormatted = origDate.toLocaleDateString('de-DE', { day: '2-digit', month: 'long', year: 'numeric' });
-                    stammterminText = `${origDayName}, ${origDateFormatted}`;
-                  }
-                } catch (e) {}
-              }
-            }
-
-            return (
-              <div
-                onClick={() => setActiveChatOcc(null)}
-                style={{
-                  position: 'fixed',
-                  inset: 0,
-                  zIndex: 11000,
-                  background: 'rgba(15,23,42,0.65)',
-                  backdropFilter: 'blur(8px)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  padding: '24px',
-                  fontFamily: "'Plus Jakarta Sans', sans-serif"
-                }}
-              >
-                <div
-                  onClick={e => e.stopPropagation()}
-                  style={{
-                    background: '#ffffff',
-                    borderRadius: '28px',
-                    width: '100%',
-                    maxWidth: '500px',
-                    boxShadow: '0 32px 80px rgba(0,0,0,0.25)',
-                    overflow: 'hidden',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    position: 'relative',
-                    maxHeight: '85vh'
-                  }}
-                >
-                  {/* Header */}
-                  <div style={{
-                    background: isCanceled 
-                      ? 'repeating-linear-gradient(-45deg, #fef2f2, #fef2f2 10px, #fee2e2 10px, #fee2e2 20px)'
-                      : stammterminText 
-                        ? 'linear-gradient(135deg, #d97706 0%, #b45309 100%)' 
-                        : 'linear-gradient(135deg, #34a853 0%, #248a3d 100%)',
-                    borderBottom: isCanceled ? '2px dashed #f87171' : 'none',
-                    padding: '24px',
-                    color: isCanceled ? '#991b1b' : '#ffffff',
-                    display: 'flex',
-                    alignItems: 'flex-start',
-                    justifyContent: 'space-between',
-                    gap: '12px'
-                  }}>
-                    <div style={{ flex: 1 }}>
-                      <h3 style={{ margin: 0, fontSize: '1.38rem', fontWeight: 950, letterSpacing: '-0.02em', display: 'flex', alignItems: 'center', gap: '8px', color: isCanceled ? '#991b1b' : '#ffffff' }}>
-                        <span>💬</span> {titleText}
-                      </h3>
-                      
-                      {isCanceled ? (
-                        <p style={{ margin: '4px 0 6px 0', color: '#b91c1c', fontSize: '0.94rem', fontWeight: 650 }}>
-                          ⚠️ Dieser Termin am {new Date(activeChatOcc.date).toLocaleDateString('de-DE')} ist aktuell <strong>abgesagt</strong>.
-                        </p>
-                      ) : stammterminText ? (
-                        <div style={{ margin: '6px 0', color: 'rgba(255, 255, 255, 0.95)', fontSize: '0.88rem', fontWeight: 650, display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                          <div style={{ textDecoration: 'line-through', opacity: 0.85, fontSize: '0.82rem' }}>
-                            📍 Stammtermin (Original): {stammterminText}
-                          </div>
-                          <div style={{ fontWeight: 900, fontSize: '0.94rem' }}>
-                            ➔ Verschoben auf: {new Date(activeChatOcc.date).toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })} um {activeChatOcc.start_time?.substring(0, 5)} Uhr
-                          </div>
-                        </div>
-                      ) : (
-                        <p style={{ margin: '4px 0 6px 0', color: 'rgba(255, 255, 255, 0.92)', fontSize: '0.94rem', fontWeight: 650 }}>
-                          Termin am {new Date(activeChatOcc.date).toLocaleDateString('de-DE')} um {activeChatOcc.start_time?.substring(0, 5)} Uhr
-                        </p>
-                      )}
-
-                      {/* Badges & Schedule Button */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px', flexWrap: 'wrap' }}>
-                        {isCanceled ? (
-                          <span style={{
-                            padding: '6px 14px',
-                            borderRadius: '100px',
-                            background: '#ef4444',
-                            color: '#ffffff',
-                            fontSize: '0.85rem',
-                            fontWeight: 900,
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '5px',
-                            whiteSpace: 'nowrap',
-                            boxShadow: '0 2px 6px rgba(239, 68, 68, 0.25)'
-                          }}>
-                            ✕ Termin abgesagt
-                          </span>
-                        ) : (
-                          <span style={{
-                            padding: '5px 12px',
-                            borderRadius: '100px',
-                            background: 'rgba(255, 255, 255, 0.22)',
-                            color: '#ffffff',
-                            fontSize: '0.85rem',
-                            fontWeight: 850,
-                            backdropFilter: 'blur(4px)',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '5px',
-                            whiteSpace: 'nowrap'
-                          }}>
-                            <ShieldCheck size={14} color="#ffffff" />
-                            <span>DSGVO-konform • TLS 1.3</span>
-                          </span>
-                        )}
-
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (typeof window !== 'undefined') {
-                              if (activeChatOcc?.date) {
-                                localStorage.setItem('campus_calendar_target_date', activeChatOcc.date);
-                              }
-                              setActiveChatOcc(null);
-                              setActiveTab('lessons');
-                              localStorage.setItem('campus_calendar_target_date', activeChatOcc.date);
-                              localStorage.setItem('campus_active_tab', 'schedule');
-                              localStorage.setItem('groovelab_active_tab', 'schedule');
-                            }
-                          }}
-                          style={{
-                            padding: '5px 12px',
-                            borderRadius: '100px',
-                            background: isCanceled ? '#fef2f2' : '#ffffff',
-                            color: isCanceled ? '#dc2626' : (stammterminText ? '#b45309' : '#15803d'),
-                            fontSize: '0.85rem',
-                            fontWeight: 900,
-                            border: isCanceled ? '1px solid #fca5a5' : 'none',
-                            cursor: 'pointer',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '4px',
-                            boxShadow: '0 2px 6px rgba(0,0,0,0.08)'
-                          }}
-                        >
-                          <Calendar size={13} color={isCanceled ? '#dc2626' : (stammterminText ? '#b45309' : '#15803d')} />
-                          <span>Im Stundenplan anzeigen</span>
-                        </button>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => setActiveChatOcc(null)}
-                      style={{
-                        border: 'none',
-                        background: isCanceled ? 'rgba(239, 68, 68, 0.15)' : 'rgba(255, 255, 255, 0.2)',
-                        borderRadius: '50%',
-                        width: '36px',
-                        height: '36px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        cursor: 'pointer',
-                        color: isCanceled ? '#991b1b' : '#ffffff',
-                        transition: 'all 0.2s',
-                        flexShrink: 0
-                      }}
-                    >
-                      <X size={18} />
-                    </button>
-                  </div>
-
-                  {/* Messages Viewport */}
-                  <div style={{
-                    flex: 1,
-                    overflowY: 'auto',
-                    padding: '24px',
-                    background: '#fafbfc',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '12px',
-                    minHeight: '280px',
-                    maxHeight: '400px'
-                  }}>
-                    {isCanceled && (
-                      <div style={{
-                        background: '#fef2f2',
-                        border: '1.5px dashed #fca5a5',
-                        color: '#991b1b',
-                        padding: '12px 16px',
-                        borderRadius: '16px',
-                        fontSize: '0.88rem',
-                        fontWeight: 700,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        gap: '10px'
-                      }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <span style={{ fontSize: '1.2rem' }}>⚠️</span>
-                          <div>
-                            <div style={{ fontWeight: 850 }}>Termin ist abgesagt</div>
-                            <div style={{ fontSize: '0.78rem', color: '#b91c1c', fontWeight: 600 }}>Du kannst die Absage jederzeit rückgängig machen.</div>
-                          </div>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={async () => {
-                            await handleUndoCancel(activeChatOcc);
-                            setActiveChatOcc((prev: any) => prev ? { ...prev, status: 'scheduled' } : null);
-                            const studentId = profile?.id;
-                            if (studentId && activeChatOcc) {
-                              setTimeout(() => {
-                                fetchChat(studentId, activeChatOcc.id, activeChatOcc.date);
-                              }, 300);
-                            }
-                          }}
-                          style={{
-                            background: '#15803d',
-                            color: '#ffffff',
-                            border: 'none',
-                            borderRadius: '100px',
-                            padding: '6px 14px',
-                            fontSize: '0.82rem',
-                            fontWeight: 900,
-                            cursor: 'pointer',
-                            whiteSpace: 'nowrap',
-                            boxShadow: '0 2px 6px rgba(21, 128, 61, 0.25)'
-                          }}
-                          className="hover-scale"
-                        >
-                          Reaktivieren
-                        </button>
-                      </div>
-                    )}
-                    {isFrozen && (
-                      <div style={{ background: '#fef2f2', border: '1px solid #fee2f2', color: '#991b1b', padding: '10px 14px', borderRadius: '12px', fontSize: '0.85rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'center', textAlign: 'center' }}>
-                        🔒 Shoutbox eingefroren (Schreibschutz nach 48h aktiv)
-                      </div>
-                    )}
-                    {chatMessages.length === 0 ? (
-                      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#86868b', fontSize: '0.94rem', textAlign: 'center', padding: '32px', gap: '8px' }}>
-                        <MessageSquare size={36} style={{ opacity: 0.3 }} />
-                        <span>Noch keine Nachrichten für diesen Termin. Schreibe die erste Nachricht für Terminabsprachen.</span>
-                      </div>
-                    ) : (
-                      chatMessages.map((msg, idx) => {
-                        const isMe = msg.sender_id === profile.id;
-                        const isCancellation = msg.message_type === 'reschedule_notification' || 
-                                               (msg.content && (msg.content.includes('❌') || msg.content.includes('fällt aus') || msg.content.includes('Termin abgesagt') || msg.content.includes('wurde abgesagt')));
-                        const isReactivation = msg.message_type === 'cancellation_reset' || 
-                                               (msg.content && (msg.content.includes('🔄') || msg.content.includes('reaktiviert') || msg.content.includes('zurückgenommen') || msg.content.includes('regulär statt')));
-
-                        if (isReactivation) {
-                          return (
-                            <div key={msg.id || idx} style={{ alignSelf: 'center', width: '100%', maxWidth: '94%', margin: '6px 0' }}>
-                              <div style={{
-                                background: '#f0fdf4',
-                                border: '1.5px solid #86efac',
-                                borderRadius: '18px',
-                                padding: '12px 18px',
-                                boxShadow: '0 2px 8px rgba(34, 197, 94, 0.08)',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                gap: '6px'
-                              }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                  <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: '#dcfce7', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                                    <span style={{ fontSize: '0.95rem' }}>🔄</span>
-                                  </div>
-                                  <span style={{ fontSize: '0.86rem', fontWeight: 900, color: '#15803d', letterSpacing: '-0.01em' }}>
-                                    Termin reaktiviert
-                                  </span>
-                                  <span style={{ marginLeft: 'auto', fontSize: '0.72rem', color: '#16a34a', fontWeight: 700 }}>
-                                    {new Date(msg.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}
-                                  </span>
-                                </div>
-                                <div style={{ fontSize: '0.92rem', color: '#166534', fontWeight: 650, lineHeight: 1.45, wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>
-                                  {msg.content}
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        }
-
-                        if (isCancellation) {
-                          return (
-                            <div key={msg.id || idx} style={{ alignSelf: 'center', width: '100%', maxWidth: '94%', margin: '6px 0' }}>
-                              <div style={{
-                                background: '#fef2f2',
-                                border: '1.5px dashed #fca5a5',
-                                borderRadius: '18px',
-                                padding: '12px 18px',
-                                boxShadow: '0 2px 8px rgba(239, 68, 68, 0.06)',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                gap: '6px'
-                              }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                  <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: '#fee2e2', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                                    <span style={{ fontSize: '0.95rem' }}>❌</span>
-                                  </div>
-                                  <span style={{ fontSize: '0.86rem', fontWeight: 900, color: '#991b1b', letterSpacing: '-0.01em' }}>
-                                    Termin abgesagt
-                                  </span>
-                                  <span style={{ marginLeft: 'auto', fontSize: '0.72rem', color: '#b91c1c', fontWeight: 700 }}>
-                                    {new Date(msg.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}
-                                  </span>
-                                </div>
-                                <div style={{ fontSize: '0.92rem', color: '#991b1b', fontWeight: 650, lineHeight: 1.45, wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>
-                                  {msg.content}
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        }
-
-                        return (
-                          <div key={msg.id || idx} style={{
-                            display: 'flex',
-                            flexDirection: 'column',
-                            alignSelf: isMe ? 'flex-end' : 'flex-start',
-                            maxWidth: '82%',
-                            alignItems: isMe ? 'flex-end' : 'flex-start',
-                            gap: '2px'
-                          }}>
-                            <div style={{
-                              background: isMe ? '#e6f4ea' : '#ffffff',
-                              color: '#0f172a',
-                              padding: '12px 16px',
-                              borderRadius: isMe ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
-                              fontSize: '0.98rem',
-                              lineHeight: 1.45,
-                              wordBreak: 'break-word',
-                              border: isMe ? '1px solid #bbf7d0' : '1px solid #e2e8f0',
-                              boxShadow: '0 2px 6px rgba(0,0,0,0.02)'
-                            }}>
-                              {msg.content}
-                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '4px', marginTop: '6px' }}>
-                                <span style={{ fontSize: '0.76rem', color: isMe ? '#15803d' : '#86868b', fontWeight: 650 }}>
-                                  {new Date(msg.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}
-                                </span>
-                                {isMe && <CheckCheck size={14} color="#15803d" style={{ marginLeft: '2px' }} />}
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })
-                    )}
-                    <div ref={chatMessagesEndRef} />
-                  </div>
-
-                  {/* Context-Adaptive Quick Reply Chips for Student */}
-                  {!isFrozen && (
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      overflowX: 'auto',
-                      padding: '12px 24px 6px 24px',
-                      background: '#fafbfc',
-                      borderTop: '1px solid #f1f5f9',
-                      scrollbarWidth: 'none',
-                      msOverflowStyle: 'none'
-                    }}>
-                      {isCanceled ? (
-                        <>
-                          <button
-                            type="button"
-                            onClick={async () => {
-                              await handleUndoCancel(activeChatOcc);
-                              setActiveChatOcc((prev: any) => prev ? { ...prev, status: 'scheduled' } : null);
-                              const studentId = profile?.id;
-                              if (studentId && activeChatOcc) {
-                                setTimeout(() => {
-                                  fetchChat(studentId, activeChatOcc.id, activeChatOcc.date);
-                                }, 300);
-                              }
-                            }}
-                            style={{
-                              padding: '6px 14px',
-                              borderRadius: '100px',
-                              background: '#f0fdf4',
-                              border: '1.5px solid #86efac',
-                              color: '#15803d',
-                              fontSize: '0.88rem',
-                              fontWeight: 850,
-                              whiteSpace: 'nowrap',
-                              cursor: 'pointer',
-                              boxShadow: '0 1px 3px rgba(34, 197, 94, 0.12)',
-                              flexShrink: 0,
-                              minHeight: '38px',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '4px'
-                            }}
-                            className="hover-scale"
-                          >
-                            🔄 Absage zurücknehmen (Reaktivieren)
-                          </button>
-                          {[
-                            { label: 'Vielen Dank für das Verständnis!', text: 'Vielen Dank für das Verständnis!' },
-                            { label: 'Ersatztermin anfragen', text: 'Können wir einen Ersatztermin vereinbaren?' }
-                          ].map((phrase, idx) => (
-                            <button
-                              key={`cancel-phrase-${idx}`}
-                              type="button"
-                              onClick={() => setChatTypedMessage(phrase.text)}
-                              style={{
-                                padding: '6px 14px',
-                                borderRadius: '100px',
-                                background: '#ffffff',
-                                border: '1px solid #cbd5e1',
-                                color: '#334155',
-                                fontSize: '0.88rem',
-                                fontWeight: 800,
-                                whiteSpace: 'nowrap',
-                                cursor: 'pointer',
-                                boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-                                flexShrink: 0,
-                                minHeight: '38px',
-                                display: 'inline-flex',
-                                alignItems: 'center'
-                              }}
-                              className="hover-scale"
-                            >
-                              {phrase.label}
-                            </button>
-                          ))}
-                        </>
-                      ) : (
-                        <>
-                          {/* 1-Click Direct Emoji Reaction Buttons */}
-                          <div style={{ display: 'flex', gap: '4px', paddingRight: '6px', borderRight: '1px solid #e2e8f0' }}>
-                            {['👍', '🎵', '👏', '🙏'].map((emoji, idx) => (
-                              <button
-                                key={`student-emoji-${idx}`}
-                                type="button"
-                                onClick={() => sendDirectChatMessage(emoji)}
-                                style={{
-                                  padding: '6px 12px',
-                                  borderRadius: '100px',
-                                  background: '#ffffff',
-                                  border: '1px solid #e2e8f0',
-                                  fontSize: '0.98rem',
-                                  cursor: 'pointer',
-                                  boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-                                  flexShrink: 0,
-                                  minHeight: '38px',
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center'
-                                }}
-                                className="hover-scale"
-                                title={`Schnell-Reaktion ${emoji} senden`}
-                              >
-                                {emoji}
-                              </button>
-                            ))}
-                          </div>
-
-                          {/* Student Authentic Text Phrases */}
-                          {[
-                            { label: 'Vielen Dank!', text: 'Vielen Dank!' },
-                            { label: 'Alles klar, danke!', text: 'Alles klar, danke!' },
-                            { label: 'Termin passt!', text: 'Der Termin passt für mich!' },
-                            { label: 'Bin gleich da', text: 'Ich bin gleich da!' },
-                            { label: 'Werde fleißig üben', text: 'Danke, ich werde fleißig üben!' }
-                          ].map((phrase, idx) => (
-                            <button
-                              key={`student-phrase-${idx}`}
-                              type="button"
-                              onClick={() => setChatTypedMessage(phrase.text)}
-                              style={{
-                                padding: '6px 14px',
-                                borderRadius: '100px',
-                                background: '#ffffff',
-                                border: '1px solid #bbf7d0',
-                                color: '#15803d',
-                                fontSize: '0.88rem',
-                                fontWeight: 800,
-                                whiteSpace: 'nowrap',
-                                cursor: 'pointer',
-                                boxShadow: '0 1px 3px rgba(52, 168, 83, 0.08)',
-                                flexShrink: 0,
-                                minHeight: '38px',
-                                display: 'inline-flex',
-                                alignItems: 'center'
-                              }}
-                              className="hover-scale"
-                            >
-                              {phrase.label}
-                            </button>
-                          ))}
-                        </>
-                      )}
-                    </div>
-                  )}
-
-                  <form onSubmit={handleSendChatMessage} style={{
-                    padding: '16px 24px',
-                    borderTop: '1px solid #f1f5f9',
-                    background: '#f8fafc',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '10px'
-                  }}>
-                    <input
-                      type="text"
-                      placeholder={isFrozen ? "Eingefroren..." : "Schreibe eine Nachricht..."}
-                      disabled={isFrozen}
-                      value={chatTypedMessage}
-                      onChange={e => setChatTypedMessage(e.target.value)}
-                      style={{
-                        flex: 1,
-                        padding: '12px 20px',
-                        minHeight: '48px',
-                        borderRadius: '100px',
-                        border: '1.5px solid #cbd5e1',
-                        background: isFrozen ? '#f1f5f9' : '#ffffff',
-                        fontSize: '0.98rem',
-                        outline: 'none',
-                        fontWeight: 600,
-                        color: '#1e293b'
-                      }}
-                    />
-                    {isCanceled ? (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          handleUndoCancel(activeChatOcc);
-                          setActiveChatOcc(null);
-                        }}
-                        style={{
-                          background: '#f1f5f9',
-                          color: '#475569',
-                          border: '1.5px solid #cbd5e1',
-                          borderRadius: '100px',
-                          padding: '10px 18px',
-                          minHeight: '46px',
-                          fontSize: '0.88rem',
-                          fontWeight: 850,
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          flexShrink: 0
-                        }}
-                      >
-                        Reaktivieren
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          handleCancelOccurrence(activeChatOcc);
-                          setActiveChatOcc(null);
-                        }}
-                        style={{
-                          background: '#ef4444',
-                          color: '#ffffff',
-                          border: 'none',
-                          borderRadius: '100px',
-                          padding: '10px 18px',
-                          minHeight: '46px',
-                          fontSize: '0.88rem',
-                          fontWeight: 850,
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          flexShrink: 0
-                        }}
-                        onMouseEnter={e => e.currentTarget.style.background = '#dc2626'}
-                        onMouseLeave={e => e.currentTarget.style.background = '#ef4444'}
-                      >
-                        Absagen
-                      </button>
-                    )}
-                    <button
-                      type="submit"
-                      disabled={isFrozen || !chatTypedMessage.trim()}
-                      style={{
-                        background: isFrozen || !chatTypedMessage.trim() ? '#cbd5e1' : '#34a853',
-                        color: '#ffffff',
-                        border: 'none',
-                        borderRadius: '50%',
-                        width: '46px',
-                        height: '46px',
-                        fontSize: '0.88rem',
-                        fontWeight: 850,
-                        cursor: isFrozen || !chatTypedMessage.trim() ? 'not-allowed' : 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        flexShrink: 0,
-                        boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
-                        transition: 'all 0.2s'
-                      }}
-                      className={!isFrozen && chatTypedMessage.trim() ? 'hover-scale' : ''}
-                    >
-                      <Send size={18} color="#ffffff" />
-                    </button>
-                  </form>
-                </div>
-              </div>
-            );
-          })(),
+            }}
+          />,
           document.body
         )}
       </div>

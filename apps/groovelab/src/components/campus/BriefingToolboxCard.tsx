@@ -86,7 +86,8 @@ export const BriefingToolboxCard: React.FC = () => {
   const [currentSubbeat, setCurrentSubbeat] = useState<number>(0);
   const [volume, setVolume] = useState<number>(0.7);
 
-  // Tempo Trainer
+  // Tempo Trainer & Advanced Options
+  const [showAdvancedMetronome, setShowAdvancedMetronome] = useState<boolean>(false);
   const [isTrainerOpen, setIsTrainerOpen] = useState<boolean>(false);
   const [isTrainerActive, setIsTrainerActive] = useState<boolean>(false);
   const [trainerStepBpm, setTrainerStepBpm] = useState<number>(2);
@@ -468,21 +469,21 @@ export const BriefingToolboxCard: React.FC = () => {
   return (
     <div style={{
       background: '#ffffff',
-      borderRadius: '20px',
+      borderRadius: '24px',
       border: '1px solid #e2e8f0',
       boxShadow: '0 8px 24px -4px rgba(0,0,0,0.06)',
-      padding: '16px',
+      padding: '20px',
       display: 'flex',
       flexDirection: 'column',
-      gap: '14px',
+      gap: '16px',
       minHeight: '440px'
     }}>
-      {/* Sub-Header Toggle (Rhythmus vs. Tuner) */}
+      {/* Sub-Header Toggle (Metronom vs. Stimmgerät) */}
       <div style={{
         display: 'flex',
         background: '#f1f5f9',
-        borderRadius: '12px',
-        padding: '3px',
+        borderRadius: '14px',
+        padding: '4px',
         gap: '4px'
       }}>
         <button
@@ -490,24 +491,25 @@ export const BriefingToolboxCard: React.FC = () => {
           onClick={() => handleSwitchTool('metronome')}
           style={{
             flex: 1,
-            padding: '7px 10px',
-            borderRadius: '9px',
+            minHeight: '40px',
+            padding: '8px 12px',
+            borderRadius: '10px',
             border: activeTool === 'metronome' ? '1px solid #cbd5e1' : 'none',
             background: activeTool === 'metronome' ? '#ffffff' : 'transparent',
             color: activeTool === 'metronome' ? '#0f172a' : '#64748b',
-            fontWeight: activeTool === 'metronome' ? 800 : 600,
-            fontSize: '0.76rem',
+            fontWeight: activeTool === 'metronome' ? 850 : 600,
+            fontSize: '0.84rem',
             cursor: 'pointer',
-            boxShadow: activeTool === 'metronome' ? '0 2px 5px rgba(0,0,0,0.04)' : 'none',
+            boxShadow: activeTool === 'metronome' ? '0 2px 6px rgba(0,0,0,0.05)' : 'none',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            gap: '6px',
+            gap: '8px',
             transition: 'all 0.15s ease'
           }}
         >
-          <Activity size={13} color={activeTool === 'metronome' ? '#34a853' : '#64748b'} />
-          <span>Rhythmus-Trainer</span>
+          <Activity size={15} color={activeTool === 'metronome' ? '#34a853' : '#64748b'} />
+          <span>Metronom & Beat</span>
         </button>
 
         <button
@@ -515,168 +517,195 @@ export const BriefingToolboxCard: React.FC = () => {
           onClick={() => handleSwitchTool('tuner')}
           style={{
             flex: 1,
-            padding: '7px 10px',
-            borderRadius: '9px',
+            minHeight: '40px',
+            padding: '8px 12px',
+            borderRadius: '10px',
             border: activeTool === 'tuner' ? '1px solid #cbd5e1' : 'none',
             background: activeTool === 'tuner' ? '#ffffff' : 'transparent',
             color: activeTool === 'tuner' ? '#0f172a' : '#64748b',
-            fontWeight: activeTool === 'tuner' ? 800 : 600,
-            fontSize: '0.76rem',
+            fontWeight: activeTool === 'tuner' ? 850 : 600,
+            fontSize: '0.84rem',
             cursor: 'pointer',
-            boxShadow: activeTool === 'tuner' ? '0 2px 5px rgba(0,0,0,0.04)' : 'none',
+            boxShadow: activeTool === 'tuner' ? '0 2px 6px rgba(0,0,0,0.05)' : 'none',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            gap: '6px',
+            gap: '8px',
             transition: 'all 0.15s ease'
           }}
         >
-          <Radio size={13} color={activeTool === 'tuner' ? '#34a853' : '#64748b'} />
+          <Radio size={15} color={activeTool === 'tuner' ? '#34a853' : '#64748b'} />
           <span>Stimmgerät & Pitch</span>
         </button>
       </div>
 
       {activeTool === 'metronome' ? (
         /* ================= METRONOM & RHYTHMUS-TRAINER ================= */
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
           
-          {/* BPM Large Hero Display & Dial */}
+          {/* ANKER 1: DER TEMPO-HERO (Groß, zentriert, fingerfreundlich) */}
           <div style={{
             background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
-            borderRadius: '16px',
-            padding: '14px 16px',
+            borderRadius: '20px',
+            padding: '18px 20px',
+            border: '1px solid #e2e8f0',
             display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            border: '1px solid #e2e8f0'
+            flexDirection: 'column',
+            gap: '14px'
           }}>
-            <div style={{ display: 'flex', flexDirection: 'column' }}>
-              <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                Tempo (BPM)
-              </span>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
-                <span style={{ fontSize: '2.4rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.03em', lineHeight: 1 }}>
-                  {bpm}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+              {/* Stepper Left: -5 & -1 */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <button
+                  type="button"
+                  onClick={() => setBpm(b => Math.max(30, b - 5))}
+                  style={{
+                    height: '42px',
+                    padding: '0 12px',
+                    borderRadius: '12px',
+                    border: '1px solid #cbd5e1',
+                    background: '#ffffff',
+                    color: '#475569',
+                    fontWeight: 800,
+                    fontSize: '0.78rem',
+                    cursor: 'pointer',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                    transition: 'all 0.15s ease'
+                  }}
+                  title="5 BPM langsamer"
+                >
+                  -5
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBpm(b => Math.max(30, b - 1))}
+                  style={{
+                    width: '46px',
+                    height: '46px',
+                    borderRadius: '14px',
+                    border: '1px solid #cbd5e1',
+                    background: '#ffffff',
+                    color: '#0f172a',
+                    fontWeight: 900,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: '0 2px 6px rgba(0,0,0,0.05)',
+                    transition: 'all 0.15s ease'
+                  }}
+                  title="1 BPM langsamer"
+                >
+                  <Minus size={18} strokeWidth={2.5} />
+                </button>
+              </div>
+
+              {/* Center Display: BPM Zahl & Tempo-Name */}
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: '130px' }}>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px' }}>
+                  <span style={{
+                    fontSize: '3.1rem',
+                    fontWeight: 950,
+                    color: '#0f172a',
+                    letterSpacing: '-0.04em',
+                    lineHeight: 1,
+                    fontVariantNumeric: 'tabular-nums'
+                  }}>
+                    {bpm}
+                  </span>
+                  <span style={{ fontSize: '0.85rem', fontWeight: 850, color: '#64748b' }}>
+                    BPM
+                  </span>
+                </div>
+                <span style={{
+                  fontSize: '0.80rem',
+                  fontWeight: 850,
+                  color: '#166534',
+                  background: '#e6f4ea',
+                  padding: '2px 10px',
+                  borderRadius: '100px',
+                  marginTop: '4px'
+                }}>
+                  {bpm < 60 ? 'Largo (Sehr langsam)' : bpm < 76 ? 'Adagio (Ruhig)' : bpm < 108 ? 'Andante (Gehend)' : bpm < 120 ? 'Moderato (Mäßig)' : bpm < 168 ? 'Allegro (Munter)' : 'Presto (Sehr schnell)'}
                 </span>
-                <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#64748b' }}>
-                  {bpm < 60 ? 'Largo' : bpm < 76 ? 'Adagio' : bpm < 108 ? 'Andante' : bpm < 120 ? 'Moderato' : bpm < 168 ? 'Allegro' : 'Presto'}
-                </span>
+              </div>
+
+              {/* Stepper Right: +1 & +5 */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <button
+                  type="button"
+                  onClick={() => setBpm(b => Math.min(300, b + 1))}
+                  style={{
+                    width: '46px',
+                    height: '46px',
+                    borderRadius: '14px',
+                    border: '1px solid #cbd5e1',
+                    background: '#ffffff',
+                    color: '#0f172a',
+                    fontWeight: 900,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: '0 2px 6px rgba(0,0,0,0.05)',
+                    transition: 'all 0.15s ease'
+                  }}
+                  title="1 BPM schneller"
+                >
+                  <Plus size={18} strokeWidth={2.5} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBpm(b => Math.min(300, b + 5))}
+                  style={{
+                    height: '42px',
+                    padding: '0 12px',
+                    borderRadius: '12px',
+                    border: '1px solid #cbd5e1',
+                    background: '#ffffff',
+                    color: '#475569',
+                    fontWeight: 800,
+                    fontSize: '0.78rem',
+                    cursor: 'pointer',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                    transition: 'all 0.15s ease'
+                  }}
+                  title="5 BPM schneller"
+                >
+                  +5
+                </button>
               </div>
             </div>
 
-            {/* Quick Step Buttons */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-              <button
-                type="button"
-                onClick={() => setBpm(b => Math.max(30, b - 5))}
+            {/* Slider */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              <input
+                type="range"
+                min="30"
+                max="260"
+                value={bpm}
+                onChange={(e) => setBpm(parseInt(e.target.value, 10))}
                 style={{
-                  width: '32px',
-                  height: '32px',
-                  borderRadius: '8px',
-                  border: '1px solid #cbd5e1',
-                  background: '#ffffff',
-                  color: '#0f172a',
-                  fontWeight: 700,
-                  fontSize: '0.72rem',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}
-                title="-5 BPM"
-              >
-                -5
-              </button>
-              <button
-                type="button"
-                onClick={() => setBpm(b => Math.max(30, b - 1))}
-                style={{
-                  width: '32px',
-                  height: '32px',
-                  borderRadius: '8px',
-                  border: '1px solid #cbd5e1',
-                  background: '#ffffff',
-                  color: '#0f172a',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
+                  width: '100%',
+                  height: '8px',
+                  accentColor: '#34a853',
                   cursor: 'pointer'
                 }}
-                title="-1 BPM"
-              >
-                <Minus size={13} />
-              </button>
-              <button
-                type="button"
-                onClick={() => setBpm(b => Math.min(300, b + 1))}
-                style={{
-                  width: '32px',
-                  height: '32px',
-                  borderRadius: '8px',
-                  border: '1px solid #cbd5e1',
-                  background: '#ffffff',
-                  color: '#0f172a',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer'
-                }}
-                title="+1 BPM"
-              >
-                <Plus size={13} />
-              </button>
-              <button
-                type="button"
-                onClick={() => setBpm(b => Math.min(300, b + 5))}
-                style={{
-                  width: '32px',
-                  height: '32px',
-                  borderRadius: '8px',
-                  border: '1px solid #cbd5e1',
-                  background: '#ffffff',
-                  color: '#0f172a',
-                  fontWeight: 700,
-                  fontSize: '0.72rem',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}
-                title="+5 BPM"
-              >
-                +5
-              </button>
+              />
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.68rem', fontWeight: 700, color: '#94a3b8' }}>
+                <span>30 Langsam</span>
+                <span>120 Moderato</span>
+                <span>260 Schnell</span>
+              </div>
             </div>
           </div>
 
-          {/* BPM Slider */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            <input
-              type="range"
-              min="30"
-              max="300"
-              value={bpm}
-              onChange={(e) => setBpm(parseInt(e.target.value, 10))}
-              style={{
-                width: '100%',
-                accentColor: '#34a853',
-                cursor: 'pointer'
-              }}
-            />
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.62rem', fontWeight: 700, color: '#94a3b8' }}>
-              <span>30 BPM</span>
-              <span>120 BPM</span>
-              <span>300 BPM</span>
-            </div>
-          </div>
-
-          {/* Visual Beat Bar Display */}
+          {/* ANKER 2: DIE VISUELLE BEAT-BÜHNE (Große, hüpfende Beat-Karten) */}
           <div style={{
-            display: 'flex',
-            gap: '6px',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '10px 0'
+            display: 'grid',
+            gridTemplateColumns: `repeat(${timeSignature}, 1fr)`,
+            gap: '8px',
+            padding: '2px 0'
           }}>
             {Array.from({ length: timeSignature }).map((_, idx) => {
               const isCurrent = isPlaying && currentBeat === idx;
@@ -686,20 +715,25 @@ export const BriefingToolboxCard: React.FC = () => {
                 <div
                   key={idx}
                   style={{
-                    flex: 1,
-                    height: isCurrent ? '22px' : '14px',
-                    borderRadius: '7px',
+                    height: '46px',
+                    borderRadius: '14px',
                     background: isCurrent 
                       ? (isDown ? '#34a853' : '#0f172a') 
-                      : '#e2e8f0',
+                      : '#f1f5f9',
+                    border: isCurrent 
+                      ? (isDown ? '2px solid #22c55e' : '2px solid #334155') 
+                      : '1px solid #e2e8f0',
                     transition: 'all 0.08s cubic-bezier(0.16, 1, 0.3, 1)',
-                    boxShadow: isCurrent ? '0 0 10px rgba(52, 168, 83, 0.4)' : 'none',
+                    transform: isCurrent ? 'scale(1.05)' : 'scale(1)',
+                    boxShadow: isCurrent 
+                      ? (isDown ? '0 0 16px rgba(52, 168, 83, 0.45)' : '0 0 10px rgba(15, 23, 42, 0.25)') 
+                      : 'none',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     color: isCurrent ? '#ffffff' : '#64748b',
-                    fontSize: '0.65rem',
-                    fontWeight: 900
+                    fontSize: '1.05rem',
+                    fontWeight: 950
                   }}
                 >
                   {idx + 1}
@@ -708,54 +742,31 @@ export const BriefingToolboxCard: React.FC = () => {
             })}
           </div>
 
-          {/* Main Controls Row (Play, Tap Tempo, Taktart, Subdivisions) */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr', gap: '8px' }}>
+          {/* ANKER 3 & 4: DER GROSSE HAUPTAKTIONS-BUTTON & TAKTART */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '10px' }}>
             {/* Play / Pause Primary Button */}
             <button
               type="button"
               onClick={() => setIsPlaying(!isPlaying)}
               style={{
-                padding: '10px',
-                borderRadius: '12px',
+                minHeight: '52px',
+                borderRadius: '16px',
                 border: 'none',
                 background: isPlaying ? '#0f172a' : '#34a853',
                 color: '#ffffff',
-                fontWeight: 800,
-                fontSize: '0.85rem',
+                fontWeight: 950,
+                fontSize: '1.02rem',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: '8px',
-                boxShadow: isPlaying ? '0 4px 12px rgba(15, 23, 42, 0.25)' : '0 4px 12px rgba(52, 168, 83, 0.3)',
+                gap: '10px',
+                boxShadow: isPlaying ? '0 4px 16px rgba(15, 23, 42, 0.25)' : '0 6px 20px rgba(52, 168, 83, 0.35)',
                 transition: 'all 0.15s ease'
               }}
             >
-              {isPlaying ? <Pause size={16} /> : <Play size={16} />}
-              <span>{isPlaying ? 'Stopp' : 'Start'}</span>
-            </button>
-
-            {/* Tap Tempo Button */}
-            <button
-              type="button"
-              onClick={handleTapTempo}
-              style={{
-                padding: '10px',
-                borderRadius: '12px',
-                border: '1px solid #cbd5e1',
-                background: '#f8fafc',
-                color: '#0f172a',
-                fontWeight: 800,
-                fontSize: '0.78rem',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '6px'
-              }}
-            >
-              <Zap size={14} color="#64748b" />
-              <span>Tap Tempo</span>
+              {isPlaying ? <Pause size={20} /> : <Play size={20} fill="#ffffff" />}
+              <span>{isPlaying ? 'Metronom stoppen' : 'Beat starten'}</span>
             </button>
 
             {/* Time Signature Selector */}
@@ -763,168 +774,229 @@ export const BriefingToolboxCard: React.FC = () => {
               value={timeSignature}
               onChange={(e) => setTimeSignature(parseInt(e.target.value, 10))}
               style={{
-                padding: '8px 10px',
-                borderRadius: '12px',
+                minHeight: '52px',
+                padding: '0 12px',
+                borderRadius: '16px',
                 border: '1px solid #cbd5e1',
-                background: '#ffffff',
+                background: '#f8fafc',
                 color: '#0f172a',
-                fontWeight: 800,
-                fontSize: '0.78rem',
-                cursor: 'pointer'
+                fontWeight: 850,
+                fontSize: '0.88rem',
+                cursor: 'pointer',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
               }}
             >
-              <option value="2">2/4 Takt</option>
-              <option value="3">3/4 Takt</option>
-              <option value="4">4/4 Takt</option>
-              <option value="5">5/4 Takt</option>
+              <option value="4">4/4 Takt (Standard)</option>
+              <option value="3">3/4 Takt (Walzer)</option>
+              <option value="2">2/4 Takt (Marsch)</option>
               <option value="6">6/8 Takt</option>
+              <option value="5">5/4 Takt</option>
             </select>
           </div>
 
-          {/* Subdivisions & Tempo Trainer Accordion */}
+          {/* SEKUNDÄR-TOOLBOX: "Mehr Optionen" (Einklappbar, hält die Hauptbühne ruhig) */}
           <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            padding: '8px 12px',
-            background: '#f8fafc',
-            borderRadius: '10px',
-            border: '1px solid #e2e8f0'
+            borderRadius: '14px',
+            border: '1px solid #e2e8f0',
+            background: showAdvancedMetronome ? '#ffffff' : '#f8fafc',
+            overflow: 'hidden',
+            transition: 'all 0.2s ease'
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b' }}>Unterteilung:</span>
-              <div style={{ display: 'flex', gap: '3px' }}>
-                {[
-                  { id: 1, label: '1/4' },
-                  { id: 2, label: '1/8' },
-                  { id: 3, label: '3-el' },
-                  { id: 4, label: '1/16' }
-                ].map(sub => (
-                  <button
-                    key={sub.id}
-                    type="button"
-                    onClick={() => setSubdivision(sub.id)}
-                    style={{
-                      padding: '2px 6px',
-                      borderRadius: '6px',
-                      border: subdivision === sub.id ? '1px solid #34a853' : '1px solid #e2e8f0',
-                      background: subdivision === sub.id ? '#e6f4ea' : '#ffffff',
-                      color: subdivision === sub.id ? '#1e7e34' : '#64748b',
-                      fontSize: '0.62rem',
-                      fontWeight: 800,
-                      cursor: 'pointer'
-                    }}
-                  >
-                    {sub.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
             <button
               type="button"
-              onClick={() => setIsTrainerOpen(!isTrainerOpen)}
+              onClick={() => setShowAdvancedMetronome(!showAdvancedMetronome)}
               style={{
+                width: '100%',
+                padding: '11px 14px',
                 border: 'none',
                 background: 'transparent',
-                color: isTrainerActive ? '#34a853' : '#64748b',
-                fontSize: '0.70rem',
-                fontWeight: 800,
-                cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '4px'
+                justifyContent: 'space-between',
+                cursor: 'pointer',
+                color: showAdvancedMetronome ? '#0f172a' : '#64748b',
+                fontWeight: 800,
+                fontSize: '0.78rem'
               }}
             >
-              <span>{isTrainerActive ? '⚡ Trainer aktiv' : 'Tempo-Trainer'}</span>
-              {isTrainerOpen ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Sliders size={14} color={showAdvancedMetronome ? '#34a853' : '#64748b'} />
+                <span>Mehr Optionen (Tap Tempo, Notenwerte, Tempo-Trainer)</span>
+                {isTrainerActive && (
+                  <span style={{
+                    fontSize: '0.62rem',
+                    fontWeight: 850,
+                    background: '#e6f4ea',
+                    color: '#166534',
+                    padding: '2px 8px',
+                    borderRadius: '100px'
+                  }}>
+                    Trainer aktiv
+                  </span>
+                )}
+              </div>
+              {showAdvancedMetronome ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
             </button>
+
+            {showAdvancedMetronome && (
+              <div style={{
+                padding: '12px 14px',
+                borderTop: '1px solid #f1f5f9',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '12px',
+                background: '#fafbfc'
+              }}>
+                {/* Row 1: Tap Tempo & Notenwert Unterteilung */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                  <button
+                    type="button"
+                    onClick={handleTapTempo}
+                    style={{
+                      padding: '8px 14px',
+                      borderRadius: '10px',
+                      border: '1px solid #cbd5e1',
+                      background: '#ffffff',
+                      color: '#0f172a',
+                      fontWeight: 800,
+                      fontSize: '0.78rem',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
+                    }}
+                  >
+                    <Zap size={14} color="#f59e0b" />
+                    <span>Tap Tempo (Im Takt mitklicken)</span>
+                  </button>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b' }}>Notenwert:</span>
+                    <div style={{ display: 'flex', gap: '4px' }}>
+                      {[
+                        { id: 1, label: '1/4' },
+                        { id: 2, label: '1/8' },
+                        { id: 3, label: 'Triolen' },
+                        { id: 4, label: '1/16' }
+                      ].map(sub => (
+                        <button
+                          key={sub.id}
+                          type="button"
+                          onClick={() => setSubdivision(sub.id)}
+                          style={{
+                            padding: '4px 8px',
+                            borderRadius: '6px',
+                            border: subdivision === sub.id ? '1px solid #34a853' : '1px solid #e2e8f0',
+                            background: subdivision === sub.id ? '#e6f4ea' : '#ffffff',
+                            color: subdivision === sub.id ? '#166534' : '#64748b',
+                            fontSize: '0.70rem',
+                            fontWeight: 800,
+                            cursor: 'pointer'
+                          }}
+                        >
+                          {sub.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Row 2: Tempo Trainer Steigerung */}
+                <div style={{
+                  background: '#ffffff',
+                  borderRadius: '10px',
+                  border: '1px solid #e2e8f0',
+                  padding: '10px 12px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '8px'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Activity size={14} color="#34a853" />
+                      <span style={{ fontSize: '0.74rem', fontWeight: 850, color: '#0f172a' }}>
+                        Automatisches Steigerungstraining (Accelerando)
+                      </span>
+                    </div>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '0.72rem', fontWeight: 700, color: '#475569' }}>
+                      <span>Einschalten</span>
+                      <input
+                        type="checkbox"
+                        checked={isTrainerActive}
+                        onChange={(e) => setIsTrainerActive(e.target.checked)}
+                        style={{ accentColor: '#34a853', width: '16px', height: '16px', cursor: 'pointer' }}
+                      />
+                    </label>
+                  </div>
+
+                  {isTrainerActive && (
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', fontSize: '0.70rem', paddingTop: '4px' }}>
+                      <div>
+                        <span style={{ color: '#64748b', fontWeight: 700, display: 'block', marginBottom: '2px' }}>Steigerung:</span>
+                        <select
+                          value={trainerStepBpm}
+                          onChange={(e) => setTrainerStepBpm(parseInt(e.target.value, 10))}
+                          style={{ width: '100%', padding: '5px', borderRadius: '6px', border: '1px solid #cbd5e1', fontWeight: 700 }}
+                        >
+                          <option value="1">+1 BPM</option>
+                          <option value="2">+2 BPM</option>
+                          <option value="5">+5 BPM</option>
+                        </select>
+                      </div>
+                      <div>
+                        <span style={{ color: '#64748b', fontWeight: 700, display: 'block', marginBottom: '2px' }}>Intervall:</span>
+                        <select
+                          value={trainerBars}
+                          onChange={(e) => setTrainerBars(parseInt(e.target.value, 10))}
+                          style={{ width: '100%', padding: '5px', borderRadius: '6px', border: '1px solid #cbd5e1', fontWeight: 700 }}
+                        >
+                          <option value="1">Jeder Takt</option>
+                          <option value="2">Alle 2 Takte</option>
+                          <option value="4">Alle 4 Takte</option>
+                          <option value="8">Alle 8 Takte</option>
+                        </select>
+                      </div>
+                      <div>
+                        <span style={{ color: '#64748b', fontWeight: 700, display: 'block', marginBottom: '2px' }}>Ziel-Tempo:</span>
+                        <select
+                          value={trainerTargetBpm}
+                          onChange={(e) => setTrainerTargetBpm(parseInt(e.target.value, 10))}
+                          style={{ width: '100%', padding: '5px', borderRadius: '6px', border: '1px solid #cbd5e1', fontWeight: 700 }}
+                        >
+                          <option value="140">140 BPM</option>
+                          <option value="160">160 BPM</option>
+                          <option value="180">180 BPM</option>
+                          <option value="200">200 BPM</option>
+                        </select>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* Tempo Trainer Drawer */}
-          {isTrainerOpen && (
-            <div style={{
-              background: '#ffffff',
-              borderRadius: '12px',
-              border: '1px solid #cbd5e1',
-              padding: '10px 12px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '8px',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.03)'
-            }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#0f172a' }}>
-                  Automatisches Steigerungstraining (Accelerando)
-                </span>
-                <input
-                  type="checkbox"
-                  checked={isTrainerActive}
-                  onChange={(e) => setIsTrainerActive(e.target.checked)}
-                  style={{ accentColor: '#34a853', width: '16px', height: '16px', cursor: 'pointer' }}
-                />
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px', fontSize: '0.68rem' }}>
-                <div>
-                  <span style={{ color: '#64748b', fontWeight: 700 }}>Steigerung:</span>
-                  <select
-                    value={trainerStepBpm}
-                    onChange={(e) => setTrainerStepBpm(parseInt(e.target.value, 10))}
-                    style={{ width: '100%', padding: '4px', borderRadius: '6px', border: '1px solid #cbd5e1', fontWeight: 700 }}
-                  >
-                    <option value="1">+1 BPM</option>
-                    <option value="2">+2 BPM</option>
-                    <option value="5">+5 BPM</option>
-                  </select>
-                </div>
-                <div>
-                  <span style={{ color: '#64748b', fontWeight: 700 }}>Intervall:</span>
-                  <select
-                    value={trainerBars}
-                    onChange={(e) => setTrainerBars(parseInt(e.target.value, 10))}
-                    style={{ width: '100%', padding: '4px', borderRadius: '6px', border: '1px solid #cbd5e1', fontWeight: 700 }}
-                  >
-                    <option value="1">Jeder Takt</option>
-                    <option value="2">Alle 2 Takte</option>
-                    <option value="4">Alle 4 Takte</option>
-                    <option value="8">Alle 8 Takte</option>
-                  </select>
-                </div>
-                <div>
-                  <span style={{ color: '#64748b', fontWeight: 700 }}>Ziel-Tempo:</span>
-                  <select
-                    value={trainerTargetBpm}
-                    onChange={(e) => setTrainerTargetBpm(parseInt(e.target.value, 10))}
-                    style={{ width: '100%', padding: '4px', borderRadius: '6px', border: '1px solid #cbd5e1', fontWeight: 700 }}
-                  >
-                    <option value="140">140 BPM</option>
-                    <option value="160">160 BPM</option>
-                    <option value="180">180 BPM</option>
-                    <option value="200">200 BPM</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
       ) : (
         /* ================= CHROMATISCHER TUNER & PITCH GENERATOR ================= */
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
           
-          {/* Preset Selector */}
-          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+          {/* Preset Selector & Kammerton Bar */}
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
             <select
               value={selectedPresetId}
               onChange={(e) => setSelectedPresetId(e.target.value)}
               style={{
                 flex: 1,
-                padding: '8px 10px',
-                borderRadius: '10px',
+                minHeight: '44px',
+                padding: '0 12px',
+                borderRadius: '12px',
                 border: '1px solid #cbd5e1',
                 background: '#ffffff',
                 color: '#0f172a',
                 fontWeight: 800,
-                fontSize: '0.74rem',
+                fontSize: '0.80rem',
                 cursor: 'pointer'
               }}
             >
@@ -937,13 +1009,14 @@ export const BriefingToolboxCard: React.FC = () => {
               type="button"
               onClick={() => setReferenceA4(r => r === 440 ? 442 : r === 442 ? 432 : 440)}
               style={{
-                padding: '7px 10px',
-                borderRadius: '10px',
+                minHeight: '44px',
+                padding: '0 14px',
+                borderRadius: '12px',
                 border: '1px solid #cbd5e1',
                 background: '#f8fafc',
                 color: '#0f172a',
                 fontWeight: 800,
-                fontSize: '0.70rem',
+                fontSize: '0.78rem',
                 cursor: 'pointer'
               }}
               title="Kammerton A4 Kalibrierung (440Hz / 442Hz / 432Hz)"
@@ -957,39 +1030,39 @@ export const BriefingToolboxCard: React.FC = () => {
             background: isTunerActive && isInTune 
               ? 'linear-gradient(135deg, #e6f4ea 0%, #d1fae5 100%)' 
               : 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
-            borderRadius: '16px',
-            padding: '16px',
+            borderRadius: '20px',
+            padding: '20px',
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'center',
-            gap: '8px',
-            border: isTunerActive && isInTune ? '1px solid #34a853' : '1px solid #e2e8f0',
+            gap: '10px',
+            border: isTunerActive && isInTune ? '2px solid #34a853' : '1px solid #e2e8f0',
             transition: 'all 0.2s ease',
-            minHeight: '170px'
+            minHeight: '180px'
           }}>
             {/* Note & Octave */}
             <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px' }}>
               <span style={{
-                fontSize: '3.2rem',
-                fontWeight: 900,
-                color: isTunerActive ? (isInTune ? '#1e7e34' : '#0f172a') : '#94a3b8',
+                fontSize: '3.6rem',
+                fontWeight: 950,
+                color: isTunerActive ? (isInTune ? '#15803d' : '#0f172a') : '#94a3b8',
                 letterSpacing: '-0.04em',
                 lineHeight: 1
               }}>
                 {isTunerActive ? detectedNote : '--'}
               </span>
               {isTunerActive && detectedOctave !== null && (
-                <span style={{ fontSize: '1.2rem', fontWeight: 800, color: isInTune ? '#1e7e34' : '#64748b' }}>
+                <span style={{ fontSize: '1.4rem', fontWeight: 900, color: isInTune ? '#15803d' : '#64748b' }}>
                   {detectedOctave}
                 </span>
               )}
             </div>
 
             {/* Cents Needle Display */}
-            <div style={{ width: '100%', maxWidth: '240px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <div style={{ width: '100%', maxWidth: '280px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
               <div style={{
-                height: '8px',
+                height: '10px',
                 background: '#e2e8f0',
                 borderRadius: '100px',
                 position: 'relative',
@@ -1013,7 +1086,7 @@ export const BriefingToolboxCard: React.FC = () => {
                     position: 'absolute',
                     top: 0,
                     bottom: 0,
-                    width: '12px',
+                    width: '14px',
                     borderRadius: '100px',
                     background: isInTune ? '#34a853' : (centsDiff < 0 ? '#ea4335' : '#eab308'),
                     left: `${Math.max(5, Math.min(95, 50 + centsDiff))}%`,
@@ -1025,54 +1098,54 @@ export const BriefingToolboxCard: React.FC = () => {
               </div>
 
               {/* Cents Text & Hz */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.68rem', fontWeight: 800 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.74rem', fontWeight: 850 }}>
                 <span style={{ color: '#64748b' }}>
                   {isTunerActive && detectedFreq > 0 ? `${detectedFreq} Hz` : 'Bereit'}
                 </span>
-                <span style={{ color: isInTune ? '#1e7e34' : (centsDiff > 0 ? '#eab308' : '#ea4335') }}>
-                  {isTunerActive ? (isInTune ? '✓ Perfekt gestimmt' : `${centsDiff > 0 ? '+' : ''}${centsDiff} Cent`) : 'Mikrofon starten'}
+                <span style={{ color: isInTune ? '#15803d' : (centsDiff > 0 ? '#b45309' : '#b91c1c') }}>
+                  {isTunerActive ? (isInTune ? '✓ Perfekt gestimmt!' : `${centsDiff > 0 ? '+' : ''}${centsDiff} Cent`) : 'Mikrofon starten'}
                 </span>
               </div>
             </div>
           </div>
 
           {/* Tuner Mic Action Button & Pitch Generator */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: '8px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: '10px' }}>
             <button
               type="button"
               onClick={isTunerActive ? stopTuner : startTuner}
               style={{
-                padding: '11px',
-                borderRadius: '12px',
+                minHeight: '52px',
+                borderRadius: '16px',
                 border: 'none',
                 background: isTunerActive ? '#ea4335' : '#34a853',
                 color: '#ffffff',
-                fontWeight: 800,
-                fontSize: '0.80rem',
+                fontWeight: 950,
+                fontSize: '0.95rem',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: '8px',
-                boxShadow: isTunerActive ? '0 4px 12px rgba(234, 67, 53, 0.25)' : '0 4px 12px rgba(52, 168, 83, 0.3)',
+                gap: '10px',
+                boxShadow: isTunerActive ? '0 4px 16px rgba(234, 67, 53, 0.25)' : '0 6px 20px rgba(52, 168, 83, 0.35)',
                 transition: 'all 0.15s ease'
               }}
             >
-              {isTunerActive ? <MicOff size={15} /> : <Mic size={15} />}
-              <span>{isTunerActive ? 'Stimmgerät stoppen' : 'Live-Stimmgerät'}</span>
+              {isTunerActive ? <MicOff size={18} /> : <Mic size={18} />}
+              <span>{isTunerActive ? 'Stimmgerät stoppen' : 'Stimmgerät starten'}</span>
             </button>
 
             <button
               type="button"
               onClick={toggleReferencePitch}
               style={{
-                padding: '11px',
-                borderRadius: '12px',
+                minHeight: '52px',
+                borderRadius: '16px',
                 border: '1px solid #cbd5e1',
                 background: isPitchGenActive ? '#0f172a' : '#f8fafc',
                 color: isPitchGenActive ? '#ffffff' : '#0f172a',
-                fontWeight: 800,
-                fontSize: '0.74rem',
+                fontWeight: 850,
+                fontSize: '0.84rem',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
@@ -1080,28 +1153,28 @@ export const BriefingToolboxCard: React.FC = () => {
                 gap: '6px'
               }}
             >
-              <Music size={14} color={isPitchGenActive ? '#ffffff' : '#64748b'} />
+              <Music size={16} color={isPitchGenActive ? '#ffffff' : '#64748b'} />
               <span>{isPitchGenActive ? 'Ton Stopp' : `Kammerton A (${referenceA4}Hz)`}</span>
             </button>
           </div>
 
           {/* Instrument String Helper Pills (if preset selected) */}
           {selectedPreset.strings.length > 0 && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '2px' }}>
-              <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>
-                Saiten-Übersicht ({selectedPreset.name}):
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '4px' }}>
+              <span style={{ fontSize: '0.68rem', fontWeight: 850, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                Saiten ({selectedPreset.name}):
               </span>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(80px, 1fr))', gap: '4px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(85px, 1fr))', gap: '6px' }}>
                 {selectedPreset.strings.map((str, idx) => (
                   <div
                     key={idx}
                     style={{
-                      padding: '4px 6px',
-                      borderRadius: '6px',
+                      padding: '6px 8px',
+                      borderRadius: '8px',
                       background: isTunerActive && detectedNote === str.name ? '#e6f4ea' : '#f8fafc',
                       border: isTunerActive && detectedNote === str.name ? '1px solid #34a853' : '1px solid #e2e8f0',
-                      color: isTunerActive && detectedNote === str.name ? '#1e7e34' : '#475569',
-                      fontSize: '0.62rem',
+                      color: isTunerActive && detectedNote === str.name ? '#166534' : '#475569',
+                      fontSize: '0.72rem',
                       fontWeight: 800,
                       textAlign: 'center'
                     }}

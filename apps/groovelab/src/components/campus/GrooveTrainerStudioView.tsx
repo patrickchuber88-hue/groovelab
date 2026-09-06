@@ -36,7 +36,7 @@ import {
 export interface GrooveTrainerProps {
   student?: any;
   onClose?: () => void;
-  onRewardXp?: (xp: number) => void;
+  onRewardXp?: (xp: number, durationSeconds?: number) => void;
   initialBpm?: number;
   uiLevel?: 'junior' | 'teen' | 'pro';
   embedded?: boolean;
@@ -69,43 +69,43 @@ interface HitRecord {
 const RHYTHM_LEVELS: LevelConfig[] = [
   {
     id: 'viertel',
-    title: 'Level 1: Viertel-Puls (4/4)',
+    title: '1. Bären-Puls',
     subtitle: 'Der Grund-Puls: Finde den Herzschlag der Musik',
-    defaultBpm: 85,
+    defaultBpm: 80,
     subdivisions: 4,
-    syllables: ['TA', 'TA', 'TA', 'TA'],
+    syllables: ['BUMM', 'BUMM', 'BUMM', 'BUMM'],
     targetPattern: [true, true, true, true],
-    badge: 'Basis-Puls'
+    badge: 'Herzschlag'
   },
   {
     id: 'achtel',
-    title: 'Level 2: Achtel-Groove',
-    subtitle: 'Fließender Rhythmus: 1 und 2 und 3 und 4 und',
+    title: '2. Häschen-Groove',
+    subtitle: 'Hüpfen im Takt: Hä-schen, Hä-schen',
     defaultBpm: 90,
     subdivisions: 8,
-    syllables: ['1', 'und', '2', 'und', '3', 'und', '4', 'und'],
+    syllables: ['HÄ', 'schen', 'HÄ', 'schen', 'HÄ', 'schen', 'HÄ', 'schen'],
     targetPattern: [true, true, true, true, true, true, true, true],
-    badge: 'Subdivision'
+    badge: 'Laufschritt'
   },
   {
     id: 'synkopen',
-    title: 'Level 3: Off-Beat & Synkopen',
-    subtitle: 'Funk & Reggae: Spiele genau zwischen den Schlägen',
+    title: '3. Off-Beat & Pause',
+    subtitle: 'Spiele genau zwischen den Schlägen',
     defaultBpm: 95,
     subdivisions: 8,
     syllables: ['·', 'UND', '·', 'UND', '·', 'UND', '·', 'UND'],
     targetPattern: [false, true, false, true, false, true, false, true],
-    badge: 'Off-Beat'
+    badge: 'Reggae-Kick'
   },
   {
     id: 'shuffle',
-    title: 'Level 4: Blues & Triolen-Shuffle',
-    subtitle: 'Swung Feel: Das rollende Triolen-Gefühl',
+    title: '4. Galopp & Swing',
+    subtitle: 'Das rollende Pferde-Galopp-Gefühl',
     defaultBpm: 75,
     subdivisions: 12,
-    syllables: ['SCHO', 'ko', 'LA', 'de', 'SCHO', 'ko', 'LA', 'de', 'SCHO', 'ko', 'LA', 'de'],
-    targetPattern: [true, false, true, false, true, false, true, false, true, false, true, false],
-    badge: 'Swing'
+    syllables: ['HOPP', '·', 'e', 'HOPP', '·', 'e', 'HOPP', '·', 'e', 'HOPP', '·', 'e'],
+    targetPattern: [true, false, true, true, false, true, true, false, true, true, false, true],
+    badge: 'Galopp'
   }
 ];
 
@@ -115,6 +115,80 @@ const SOUND_KITS: { id: SoundKitType; label: string }[] = [
   { id: 'urban_808', label: 'Urban 808' },
   { id: 'latin', label: 'Latin Congas' }
 ];
+
+export interface LevelTheme {
+  id: RhythmLevel;
+  primary: string;
+  lightBg: string;
+  border: string;
+  badgeBg: string;
+  badgeText: string;
+  accent: string;
+  gradient: string;
+  padGlow: string;
+  emoji: string;
+  animal: string;
+  meter: string;
+}
+
+export const LEVEL_THEMES: Record<RhythmLevel, LevelTheme> = {
+  viertel: {
+    id: 'viertel',
+    primary: '#f59e0b',
+    lightBg: '#fffbeb',
+    border: '#fde68a',
+    badgeBg: '#fef3c7',
+    badgeText: '#b45309',
+    accent: '#d97706',
+    gradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+    padGlow: 'rgba(245, 158, 11, 0.35)',
+    emoji: '🐻',
+    animal: 'Bär',
+    meter: 'Viertel'
+  },
+  achtel: {
+    id: 'achtel',
+    primary: '#f97316',
+    lightBg: '#fff7ed',
+    border: '#fed7aa',
+    badgeBg: '#ffedd5',
+    badgeText: '#c2410c',
+    accent: '#ea580c',
+    gradient: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
+    padGlow: 'rgba(249, 115, 22, 0.40)',
+    emoji: '🐰',
+    animal: 'Hase',
+    meter: 'Achtel'
+  },
+  synkopen: {
+    id: 'synkopen',
+    primary: '#fb923c',
+    lightBg: '#fff7ed',
+    border: '#fdba74',
+    badgeBg: '#ffedd5',
+    badgeText: '#9a3412',
+    accent: '#ea580c',
+    gradient: 'linear-gradient(135deg, #fb923c 0%, #c2410c 100%)',
+    padGlow: 'rgba(234, 88, 12, 0.35)',
+    emoji: '🦘',
+    animal: 'Känguru',
+    meter: 'Off-Beat'
+  },
+  shuffle: {
+    id: 'shuffle',
+    primary: '#ea580c',
+    lightBg: '#fff7ed',
+    border: '#fed7aa',
+    badgeBg: '#ffedd5',
+    badgeText: '#7c2d12',
+    accent: '#9a3412',
+    gradient: 'linear-gradient(135deg, #ea580c 0%, #9a3412 100%)',
+    padGlow: 'rgba(234, 88, 12, 0.40)',
+    emoji: '🐎',
+    animal: 'Pferd',
+    meter: 'Swing'
+  }
+};
 
 export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
   student,
@@ -133,16 +207,44 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
   const [isMuted, setIsMuted] = useState<boolean>(false);
   const [isBassEnabled, setIsBassEnabled] = useState<boolean>(true);
   const [isProMode, setIsProMode] = useState<boolean>(false);
+  const [isSoundSettingsOpen, setIsSoundSettingsOpen] = useState<boolean>(false);
 
   // Persistent Student XP & Session Vault Accumulator
   const [studentBaseXp, setStudentBaseXp] = useState<number>(() => {
     if (typeof window !== 'undefined' && student?.id) {
+      try {
+        const off = JSON.parse(localStorage.getItem(`cg_offline_stats_${student.id}`) || 'null');
+        if (off?.current_xp) return off.current_xp;
+      } catch (_) {}
       const stored = localStorage.getItem(`campus_bonus_xp_${student.id}`);
-      return stored ? Number(stored) : (student?.xp || 0);
+      return stored ? Number(stored) : (student?.campus_xp || student?.xp || 0);
     }
-    return student?.xp || 0;
+    return student?.campus_xp || student?.xp || 0;
   });
   const [sessionAccumulatedXp, setSessionAccumulatedXp] = useState<number>(0);
+
+  // 🛡️ Forensic Session Stopwatch & Commit State Tracking
+  const sessionActiveSecondsRef = useRef<number>(0);
+  const sessionAccumulatedXpRef = useRef<number>(0);
+  const hasCommittedRef = useRef<boolean>(false);
+
+  // Keep ref synchronized with state for leak-free unmount flush
+  useEffect(() => {
+    sessionAccumulatedXpRef.current = sessionAccumulatedXp;
+  }, [sessionAccumulatedXp]);
+
+  // Active playing stopwatch: increments each second audio playback is active
+  useEffect(() => {
+    let timer: any = null;
+    if (isPlaying) {
+      timer = setInterval(() => {
+        sessionActiveSecondsRef.current += 1;
+      }, 1000);
+    }
+    return () => {
+      if (timer) clearInterval(timer);
+    };
+  }, [isPlaying]);
 
   // Source of calibration detection
   const [calibrationSource, setCalibrationSource] = useState<'trainer' | 'loopstation' | 'bluetooth' | 'default'>('default');
@@ -213,6 +315,7 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
   const [sessionHits, setSessionHits] = useState<HitRecord[]>([]);
 
   const activeLevelConfig = RHYTHM_LEVELS.find(l => l.id === selectedLevel) || RHYTHM_LEVELS[0];
+  const currentTheme = LEVEL_THEMES[selectedLevel] || LEVEL_THEMES.viertel;
 
   const getAudioContext = useCallback(() => {
     if (!audioCtxRef.current || audioCtxRef.current.state === 'closed') {
@@ -520,32 +623,54 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
     const earnedRound = accuracy >= 90 ? 50 : (accuracy >= 75 ? 35 : (accuracy >= 50 ? 20 : 5));
     setAwardedRoundXp(earnedRound);
     setSessionAccumulatedXp(prev => prev + earnedRound);
+    // Guarantee minimum 30 seconds practice credit per finished 16-bar round
+    sessionActiveSecondsRef.current = Math.max(sessionActiveSecondsRef.current, 30);
   }, [scoreSum, totalHits]);
+
+  // Centralized Atomic Session Commit: Syncs XP and Practice Time to DB and Parent Callbacks
+  const commitSessionData = useCallback(() => {
+    if (hasCommittedRef.current) return;
+    const xpToCommit = sessionAccumulatedXpRef.current;
+    const secondsToCommit = sessionActiveSecondsRef.current;
+
+    // Only commit if at least some XP or practice seconds were accumulated
+    if (xpToCommit <= 0 && secondsToCommit < 5) return;
+    hasCommittedRef.current = true;
+
+    if (student?.id) {
+      const key = `campus_bonus_xp_${student.id}`;
+      const current = Number(localStorage.getItem(key) || 0);
+      const updated = current + xpToCommit;
+      localStorage.setItem(key, String(updated));
+      setStudentBaseXp(prev => prev + xpToCommit);
+    }
+
+    if (onRewardXp) {
+      onRewardXp(xpToCommit, secondsToCommit);
+    }
+
+    // Broadcast standardized event across the entire platform
+    if (typeof window !== 'undefined' && student?.id) {
+      window.dispatchEvent(new CustomEvent('campus-xp-awarded', {
+        detail: { studentId: student.id, amount: xpToCommit, reason: 'Groove-Trainer gemeistert' }
+      }));
+    }
+  }, [onRewardXp, student?.id]);
 
   // Safe Exit with Atomic Batch Commit to persistent storage
   const handleSafeClose = useCallback(() => {
-    if (sessionAccumulatedXp > 0 && student?.id) {
-      const key = `campus_bonus_xp_${student.id}`;
-      const current = Number(localStorage.getItem(key) || 0);
-      const updated = current + sessionAccumulatedXp;
-      localStorage.setItem(key, String(updated));
-      setStudentBaseXp(prev => prev + sessionAccumulatedXp);
-
-      if (onRewardXp) {
-        onRewardXp(sessionAccumulatedXp);
-      }
-
-      // Broadcast Real-Time CustomEvent to update dashboard & skill radar without reload
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('campus_xp_updated', {
-          detail: { studentId: student.id, addedXp: sessionAccumulatedXp, totalXp: updated }
-        }));
-      }
-    }
+    commitSessionData();
     if (onClose) {
       onClose();
     }
-  }, [onClose, onRewardXp, sessionAccumulatedXp, student?.id]);
+  }, [commitSessionData, onClose]);
+
+  // 🛡️ Fail-Safe Auto-Commit on Unmount (e.g. modal closed via outer button or tab switch)
+  useEffect(() => {
+    return () => {
+      commitSessionData();
+    };
+  }, [commitSessionData]);
 
   // Audio Scheduler Loop
   const scheduleAudioEvents = useCallback(() => {
@@ -917,726 +1042,785 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
   return (
     <div style={{
       width: '100%',
-      maxWidth: '840px',
+      maxWidth: '490px',
       margin: '0 auto',
       background: '#ffffff',
-      borderRadius: '24px',
-      border: '1.5px solid #e2e8f0',
-      boxShadow: '0 12px 36px -6px rgba(15, 23, 42, 0.06), 0 2px 10px rgba(0,0,0,0.02)',
-      padding: embedded ? '18px' : '26px',
+      borderRadius: '32px',
+      border: '1px solid #e2e8f0',
+      boxShadow: '0 24px 48px -12px rgba(234, 88, 12, 0.12), 0 2px 8px rgba(0,0,0,0.02)',
+      padding: embedded ? '14px' : '18px 20px',
       display: 'flex',
       flexDirection: 'column',
-      gap: '20px',
-      fontFamily: "'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, sans-serif"
+      gap: '14px',
+      fontFamily: "'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
+      position: 'relative',
+      userSelect: 'none',
+      WebkitUserSelect: 'none'
     }} className="animate-fade-in">
       
-      {/* 1. Header Toolbar: Pure Apple & Campus Green with Permanent XP HUD */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+      {/* 1. Header: Absolut puristisch & ruhig */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <div style={{
-            width: '46px',
-            height: '46px',
-            borderRadius: '14px',
-            background: 'linear-gradient(135deg, #34a853 0%, #15803d 100%)',
+            width: '36px',
+            height: '36px',
+            borderRadius: '11px',
+            background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            boxShadow: '0 4px 14px rgba(52, 168, 83, 0.25)',
-            border: '1px solid rgba(255, 255, 255, 0.4)'
+            boxShadow: '0 4px 12px rgba(234, 88, 12, 0.32)',
+            flexShrink: 0
           }}>
-            <Radio size={22} color="#ffffff" strokeWidth={2.4} />
+            <Radio size={18} color="#ffffff" strokeWidth={2.5} />
           </div>
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <h3 style={{ margin: 0, fontSize: '1.20rem', fontWeight: 950, color: '#0f172a', letterSpacing: '-0.02em' }}>
-                Groove- &amp; Timing-Trainer
-              </h3>
-              <span style={{
-                background: '#e6f4ea',
-                color: '#15803d',
-                fontSize: '0.68rem',
-                fontWeight: 850,
-                padding: '2px 8px',
-                borderRadius: '100px',
-                border: '1px solid #bbf7d0'
-              }}>
-                {activeLevelConfig.badge}
-              </span>
-            </div>
-            <p style={{ margin: '2px 0 0 0', fontSize: '0.78rem', color: '#64748b', fontWeight: 550 }}>
-              {activeLevelConfig.subtitle}
-            </p>
+            <h3 style={{ margin: 0, fontSize: '1.10rem', fontWeight: 950, color: '#0f172a', letterSpacing: '-0.02em' }}>
+              Groove-Trainer
+            </h3>
           </div>
         </div>
 
-        {/* Permanent XP Cockpit & Action Buttons */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-          
-          {/* Permanent Apple Frosted XP HUD */}
+        {/* Header Right: Glänzendes XP-Pill & Micro-Tools */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          {/* ⚡ XP-Anzeige */}
           <div style={{
             display: 'flex',
             alignItems: 'center',
-            gap: '8px',
-            background: '#f8fafc',
-            border: '1.5px solid #e2e8f0',
-            borderRadius: '12px',
-            padding: '5px 12px',
-            boxShadow: '0 1px 4px rgba(0,0,0,0.02)'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-              <Trophy size={14} color="#15803d" />
-              <span style={{ fontSize: '0.80rem', fontWeight: 950, color: '#0f172a' }}>
-                {studentBaseXp + sessionAccumulatedXp} XP
-              </span>
-            </div>
+            gap: '5px',
+            background: 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)',
+            border: '1.5px solid #fde68a',
+            padding: '4px 9px',
+            borderRadius: '11px',
+            boxShadow: '0 2px 6px rgba(217, 119, 6, 0.12)'
+          }} title="Gesammelte XP">
+            <Zap size={13} fill="#d97706" color="#d97706" />
+            <span style={{ fontSize: '0.76rem', fontWeight: 950, color: '#92400e' }}>
+              {studentBaseXp + sessionAccumulatedXp} XP
+            </span>
             {sessionAccumulatedXp > 0 && (
               <span style={{
-                background: '#dcfce7',
-                color: '#15803d',
-                fontSize: '0.68rem',
+                fontSize: '0.62rem',
                 fontWeight: 900,
-                padding: '2px 7px',
-                borderRadius: '100px',
-                border: '1px solid #bbf7d0',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '3px'
+                color: '#15803d',
+                background: '#dcfce7',
+                padding: '1px 5px',
+                borderRadius: '6px'
               }}>
-                <Sparkles size={11} /> +{sessionAccumulatedXp} Session
+                +{sessionAccumulatedXp}
               </span>
             )}
           </div>
 
-          {/* Bass Play-Along Toggle */}
+          {/* Klangkiste (Tools) */}
           <button
             type="button"
-            onClick={() => setIsBassEnabled(!isBassEnabled)}
+            onClick={() => setIsSoundSettingsOpen(!isSoundSettingsOpen)}
             style={{
-              background: isBassEnabled ? '#e6f4ea' : '#f8fafc',
-              border: isBassEnabled ? '1.5px solid #34a853' : '1px solid #cbd5e1',
-              color: isBassEnabled ? '#15803d' : '#64748b',
+              background: isSoundSettingsOpen ? '#fff7ed' : '#f8fafc',
+              border: isSoundSettingsOpen ? '1.5px solid #f97316' : '1px solid #e2e8f0',
+              color: isSoundSettingsOpen ? '#ea580c' : '#64748b',
               borderRadius: '10px',
-              padding: '6px 10px',
+              width: '32px',
+              height: '32px',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
-              gap: '5px',
-              fontSize: '0.72rem',
-              fontWeight: 800,
+              justifyContent: 'center',
               transition: 'all 0.15s ease'
             }}
-            title="Groovige Bassline zu- oder abschalten"
+            className="hover-scale"
+            title="Klangkiste (Tools für Sound, Tempo, Spielmodi & Latenz)"
           >
-            <Music size={13} color={isBassEnabled ? '#15803d' : '#64748b'} />
-            <span>Bass {isBassEnabled ? 'AN' : 'AUS'}</span>
+            <SlidersHorizontal size={14} color={isSoundSettingsOpen ? '#ea580c' : '#64748b'} />
           </button>
-
-          {/* Kids / Profi Mode Toggle */}
-          <button
-            type="button"
-            onClick={() => setIsProMode(!isProMode)}
-            style={{
-              background: isProMode ? '#f1f5f9' : '#f8fafc',
-              border: isProMode ? '1.5px solid #0f172a' : '1px solid #cbd5e1',
-              color: isProMode ? '#0f172a' : '#64748b',
-              borderRadius: '10px',
-              padding: '6px 10px',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '5px',
-              fontSize: '0.72rem',
-              fontWeight: 800
-            }}
-            title="Zwischen kindgerechten Symbolen und Millisekunden-Anzeige wechseln"
-          >
-            <Gauge size={13} color={isProMode ? '#0f172a' : '#64748b'} />
-            <span>{isProMode ? 'Profi (ms)' : 'Kids-Modus'}</span>
-          </button>
-
-          {/* Latency Calibration */}
-          <button
-            type="button"
-            onClick={() => setShowCalibrationModal(true)}
-            style={{
-              background: isBluetoothDetected ? '#eff6ff' : (calibrationSource === 'loopstation' ? '#f0fdf4' : '#f8fafc'),
-              border: isBluetoothDetected ? '1px solid #bfdbfe' : (calibrationSource === 'loopstation' ? '1px solid #bbf7d0' : '1px solid #cbd5e1'),
-              borderRadius: '10px',
-              padding: '6px 10px',
-              cursor: 'pointer',
-              color: isBluetoothDetected ? '#1d4ed8' : (calibrationSource === 'loopstation' ? '#15803d' : '#334155'),
-              display: 'flex',
-              alignItems: 'center',
-              gap: '5px',
-              fontSize: '0.72rem',
-              fontWeight: 800
-            }}
-            title="Latenz-Kompensation anpassen oder automatisch einmessen"
-          >
-            {isBluetoothDetected ? (
-              <Bluetooth size={13} color="#1d4ed8" />
-            ) : (
-              <SlidersHorizontal size={13} color={calibrationSource === 'loopstation' ? '#15803d' : '#64748b'} />
-            )}
-            <span>{latencyOffsetMs}ms {calibrationSource === 'loopstation' ? '(Loop-Sync)' : ''}</span>
-          </button>
-
-          {/* Mute */}
-          <button
-            type="button"
-            onClick={() => setIsMuted(!isMuted)}
-            style={{
-              background: isMuted ? '#fee2e2' : '#f8fafc',
-              border: '1px solid #e2e8f0',
-              borderRadius: '10px',
-              padding: '6px 10px',
-              cursor: 'pointer',
-              color: isMuted ? '#dc2626' : '#64748b',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px',
-              fontSize: '0.72rem',
-              fontWeight: 800
-            }}
-          >
-            {isMuted ? <VolumeX size={14} color="#dc2626" /> : <Volume2 size={14} color="#64748b" />}
-          </button>
-
-          {/* Safe Close Button */}
-          {onClose && (
-            <button
-              type="button"
-              onClick={handleSafeClose}
-              style={{
-                background: '#f1f5f9',
-                border: 'none',
-                borderRadius: '10px',
-                width: '32px',
-                height: '32px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: 'pointer',
-                color: '#64748b',
-                fontWeight: 900
-              }}
-              title="Groove-Trainer beenden & XP sichern"
-            >
-              ✕
-            </button>
-          )}
         </div>
       </div>
 
-      {/* 2. Sound-Kit Selector & Rhythm Levels Grid */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-        
-        {/* Sound Kits Pill Bar */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>
-              Sound-Kit:
-            </span>
-            <div style={{ display: 'flex', gap: '4px', background: '#f8fafc', padding: '3px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-              {SOUND_KITS.map(kit => {
-                const isSel = soundKit === kit.id;
-                return (
-                  <button
-                    key={kit.id}
-                    type="button"
-                    onClick={() => setSoundKit(kit.id)}
-                    style={{
-                      border: 'none',
-                      background: isSel ? '#ffffff' : 'transparent',
-                      color: isSel ? '#15803d' : '#64748b',
-                      borderRadius: '8px',
-                      padding: '5px 10px',
-                      fontSize: '0.72rem',
-                      fontWeight: isSel ? 900 : 700,
-                      cursor: 'pointer',
-                      boxShadow: isSel ? '0 2px 6px rgba(0,0,0,0.06)' : 'none',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '5px'
-                    }}
-                  >
-                    <Layers size={12} color={isSel ? '#15803d' : '#94a3b8'} />
-                    <span>{kit.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* BPM Controls */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <button
-              type="button"
-              onClick={() => setBpm(b => Math.max(40, b - 5))}
-              style={{ width: '28px', height: '28px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#0f172a', fontWeight: 900, cursor: 'pointer' }}
-            >
-              -
-            </button>
-            <span style={{ fontSize: '0.86rem', fontWeight: 900, color: '#0f172a', minWidth: '64px', textAlign: 'center' }}>
-              {bpm} BPM
-            </span>
-            <button
-              type="button"
-              onClick={() => setBpm(b => Math.min(180, b + 5))}
-              style={{ width: '28px', height: '28px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#0f172a', fontWeight: 900, cursor: 'pointer' }}
-            >
-              +
-            </button>
-          </div>
-        </div>
-
-        {/* 4 Rhythm Levels */}
+      {/* 🎛️ Collapsible Klangkiste (Floating Tools Shelf) */}
+      {isSoundSettingsOpen && (
         <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(4, 1fr)',
-          gap: '6px',
-          background: '#f8fafc',
-          padding: '4px',
-          borderRadius: '14px',
-          border: '1px solid #e2e8f0'
-        }}>
-          {RHYTHM_LEVELS.map(lvl => {
-            const isSel = selectedLevel === lvl.id;
-            return (
+          background: '#fafafa',
+          borderRadius: '20px',
+          border: '1px solid #e2e8f0',
+          padding: '14px 16px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '12px',
+          boxShadow: '0 4px 14px rgba(15, 23, 42, 0.04)'
+        }} className="animate-fade-in">
+          
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+            {/* Sound-Kits */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: '0.72rem', fontWeight: 900, color: '#64748b', textTransform: 'uppercase' }}>
+                Sound:
+              </span>
+              <div style={{ display: 'flex', gap: '3px', background: '#ffffff', padding: '3px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                {SOUND_KITS.map(kit => {
+                  const isSel = soundKit === kit.id;
+                  return (
+                    <button
+                      key={kit.id}
+                      type="button"
+                      onClick={() => setSoundKit(kit.id)}
+                      style={{
+                        border: 'none',
+                        background: isSel ? '#fff7ed' : 'transparent',
+                        color: isSel ? '#c2410c' : '#64748b',
+                        borderRadius: '8px',
+                        padding: '5px 10px',
+                        fontSize: '0.72rem',
+                        fontWeight: isSel ? 950 : 700,
+                        cursor: 'pointer',
+                        boxShadow: isSel ? '0 1px 4px rgba(234, 88, 12, 0.15)' : 'none',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}
+                    >
+                      <Layers size={11} color={isSel ? '#ea580c' : '#94a3b8'} />
+                      <span>{kit.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Bass Play-Along Toggle */}
+            <button
+              type="button"
+              onClick={() => setIsBassEnabled(!isBassEnabled)}
+              style={{
+                background: isBassEnabled ? '#fff7ed' : '#ffffff',
+                border: isBassEnabled ? '1.5px solid #f97316' : '1px solid #cbd5e1',
+                color: isBassEnabled ? '#c2410c' : '#64748b',
+                borderRadius: '10px',
+                padding: '5px 10px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px',
+                fontSize: '0.72rem',
+                fontWeight: 900,
+                transition: 'all 0.15s ease'
+              }}
+              title="Groovige Bassline zu- oder abschalten"
+            >
+              <Music size={12} color={isBassEnabled ? '#ea580c' : '#64748b'} />
+              <span>Bass {isBassEnabled ? 'AN' : 'AUS'}</span>
+            </button>
+          </div>
+
+          {/* Spielmodi / Challenge-Auswahl in der Klangkiste */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', borderTop: '1px solid #e2e8f0', paddingTop: '8px' }}>
+            <span style={{ fontSize: '0.72rem', fontWeight: 900, color: '#64748b', textTransform: 'uppercase' }}>
+              Modus:
+            </span>
+            <div style={{ display: 'flex', gap: '3px', background: '#ffffff', padding: '3px', borderRadius: '10px', border: '1px solid #e2e8f0', flex: 1 }}>
               <button
-                key={lvl.id}
                 type="button"
-                onClick={() => {
-                  if (isPlaying) handleTogglePlay();
-                  setSelectedLevel(lvl.id);
-                  setBpm(lvl.defaultBpm);
-                }}
+                onClick={() => setTrainingMode('call_response')}
                 style={{
+                  flex: 1,
                   border: 'none',
-                  background: isSel ? '#ffffff' : 'transparent',
-                  color: isSel ? '#15803d' : '#64748b',
-                  borderRadius: '10px',
-                  padding: '9px 6px',
-                  fontSize: '0.76rem',
-                  fontWeight: isSel ? 900 : 700,
+                  background: trainingMode === 'call_response' ? '#fff7ed' : 'transparent',
+                  color: trainingMode === 'call_response' ? '#c2410c' : '#64748b',
+                  borderRadius: '7px',
+                  padding: '5px 6px',
+                  fontSize: '0.68rem',
+                  fontWeight: trainingMode === 'call_response' ? 950 : 700,
                   cursor: 'pointer',
-                  boxShadow: isSel ? '0 2px 8px rgba(0,0,0,0.06)' : 'none',
-                  transition: 'all 0.15s ease',
-                  textAlign: 'center',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  gap: '6px'
+                  gap: '4px'
                 }}
               >
-                <CircleDot size={13} color={isSel ? '#34a853' : '#94a3b8'} />
-                <span>{lvl.id === 'viertel' ? '1. Viertel' : lvl.id === 'achtel' ? '2. Achtel' : lvl.id === 'synkopen' ? '3. Off-Beat' : '4. Shuffle'}</span>
+                <Headphones size={11} color={trainingMode === 'call_response' ? '#ea580c' : '#64748b'} />
+                <span>Echo (Standard)</span>
               </button>
-            );
-          })}
-        </div>
+              <button
+                type="button"
+                onClick={() => setTrainingMode('disappearing_beat')}
+                style={{
+                  flex: 1,
+                  border: 'none',
+                  background: trainingMode === 'disappearing_beat' ? '#fff7ed' : 'transparent',
+                  color: trainingMode === 'disappearing_beat' ? '#c2410c' : '#64748b',
+                  borderRadius: '7px',
+                  padding: '5px 6px',
+                  fontSize: '0.68rem',
+                  fontWeight: trainingMode === 'disappearing_beat' ? 950 : 700,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '4px'
+                }}
+              >
+                <Clock size={11} color={trainingMode === 'disappearing_beat' ? '#ea580c' : '#64748b'} />
+                <span>Tunnel</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setTrainingMode('tempo_sprint')}
+                style={{
+                  flex: 1,
+                  border: 'none',
+                  background: trainingMode === 'tempo_sprint' ? '#fff7ed' : 'transparent',
+                  color: trainingMode === 'tempo_sprint' ? '#c2410c' : '#64748b',
+                  borderRadius: '7px',
+                  padding: '5px 6px',
+                  fontSize: '0.68rem',
+                  fontWeight: trainingMode === 'tempo_sprint' ? 950 : 700,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '4px'
+                }}
+              >
+                <FastForward size={11} color={trainingMode === 'tempo_sprint' ? '#ea580c' : '#64748b'} />
+                <span>Sprint (+2)</span>
+              </button>
+            </div>
+          </div>
 
-        {/* Didactic Training Modes */}
-        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-          <button
-            type="button"
-            onClick={() => setTrainingMode('call_response')}
-            style={{
-              border: trainingMode === 'call_response' ? '1.5px solid #34a853' : '1px solid #cbd5e1',
-              background: trainingMode === 'call_response' ? '#e6f4ea' : '#ffffff',
-              color: trainingMode === 'call_response' ? '#15803d' : '#64748b',
-              borderRadius: '8px',
-              padding: '6px 12px',
-              fontSize: '0.72rem',
-              fontWeight: 850,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '5px',
-              transition: 'all 0.15s ease'
-            }}
-          >
-            <Headphones size={13} color={trainingMode === 'call_response' ? '#15803d' : '#64748b'} />
-            <span>Call &amp; Response (Vor- &amp; Nach-Grooven)</span>
-          </button>
-          
-          <button
-            type="button"
-            onClick={() => setTrainingMode('disappearing_beat')}
-            style={{
-              border: trainingMode === 'disappearing_beat' ? '1.5px solid #34a853' : '1px solid #cbd5e1',
-              background: trainingMode === 'disappearing_beat' ? '#e6f4ea' : '#ffffff',
-              color: trainingMode === 'disappearing_beat' ? '#15803d' : '#64748b',
-              borderRadius: '8px',
-              padding: '6px 12px',
-              fontSize: '0.72rem',
-              fontWeight: 850,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '5px',
-              transition: 'all 0.15s ease'
-            }}
-          >
-            <Clock size={13} color={trainingMode === 'disappearing_beat' ? '#15803d' : '#64748b'} />
-            <span>Innere Uhr (Disappearing Beat)</span>
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px', borderTop: '1px solid #e2e8f0', paddingTop: '8px' }}>
+            {/* BPM Feineinstellung */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{ fontSize: '0.72rem', fontWeight: 900, color: '#64748b', textTransform: 'uppercase' }}>
+                Tempo:
+              </span>
+              <button
+                type="button"
+                onClick={() => setBpm(b => Math.max(40, b - 5))}
+                style={{ width: '26px', height: '26px', borderRadius: '7px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#0f172a', fontWeight: 900, cursor: 'pointer' }}
+              >
+                -
+              </button>
+              <span style={{ fontSize: '0.84rem', fontWeight: 950, color: '#0f172a', minWidth: '60px', textAlign: 'center' }}>
+                {bpm} BPM
+              </span>
+              <button
+                type="button"
+                onClick={() => setBpm(b => Math.min(180, b + 5))}
+                style={{ width: '26px', height: '26px', borderRadius: '7px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#0f172a', fontWeight: 900, cursor: 'pointer' }}
+              >
+                +
+              </button>
+            </div>
 
-          <button
-            type="button"
-            onClick={() => setTrainingMode('tempo_sprint')}
-            style={{
-              border: trainingMode === 'tempo_sprint' ? '1.5px solid #34a853' : '1px solid #cbd5e1',
-              background: trainingMode === 'tempo_sprint' ? '#e6f4ea' : '#ffffff',
-              color: trainingMode === 'tempo_sprint' ? '#15803d' : '#64748b',
-              borderRadius: '8px',
-              padding: '6px 12px',
-              fontSize: '0.72rem',
-              fontWeight: 850,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '5px',
-              transition: 'all 0.15s ease'
-            }}
-          >
-            <FastForward size={13} color={trainingMode === 'tempo_sprint' ? '#15803d' : '#64748b'} />
-            <span>Tempo-Sprint (+2 BPM alle 4 Takte)</span>
-          </button>
+            {/* Hardware-Latenz & Profi-Modus */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                onClick={() => setShowCalibrationModal(true)}
+                style={{
+                  background: isBluetoothDetected ? '#eff6ff' : (calibrationSource === 'loopstation' ? '#f0fdf4' : '#ffffff'),
+                  border: isBluetoothDetected ? '1px solid #bfdbfe' : (calibrationSource === 'loopstation' ? '1px solid #bbf7d0' : '1px solid #cbd5e1'),
+                  borderRadius: '9px',
+                  padding: '5px 10px',
+                  cursor: 'pointer',
+                  color: isBluetoothDetected ? '#1d4ed8' : (calibrationSource === 'loopstation' ? '#15803d' : '#334155'),
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  fontSize: '0.70rem',
+                  fontWeight: 850
+                }}
+                title="Latenz-Kompensation anpassen oder automatisch einmessen"
+              >
+                {isBluetoothDetected ? (
+                  <Bluetooth size={12} color="#1d4ed8" />
+                ) : (
+                  <SlidersHorizontal size={12} color={calibrationSource === 'loopstation' ? '#15803d' : '#64748b'} />
+                )}
+                <span>{latencyOffsetMs}ms {calibrationSource === 'loopstation' ? '(Loop-Sync)' : ''}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsProMode(!isProMode)}
+                style={{
+                  background: isProMode ? '#0f172a' : '#ffffff',
+                  border: isProMode ? '1.5px solid #0f172a' : '1px solid #cbd5e1',
+                  color: isProMode ? '#ffffff' : '#64748b',
+                  borderRadius: '9px',
+                  padding: '5px 10px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  fontSize: '0.70rem',
+                  fontWeight: 850
+                }}
+                title="Zwischen kindgerechter Symbolik und genauer Millisekunden-Anzeige wechseln"
+              >
+                <Gauge size={12} color={isProMode ? '#ffffff' : '#64748b'} />
+                <span>{isProMode ? 'Profi (ms aktiv)' : 'Profi-Modus'}</span>
+              </button>
+            </div>
+          </div>
         </div>
+      )}
+
+      {/* 🌟 FOKUS-ZONE 1: DIE 4 RHYTHMUS-WELTEN (PURISTISCH) */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(4, 1fr)',
+        gap: '5px',
+        background: '#f8fafc',
+        padding: '4px',
+        borderRadius: '16px',
+        border: '1px solid #e2e8f0'
+      }}>
+        {RHYTHM_LEVELS.map(lvl => {
+          const isSel = selectedLevel === lvl.id;
+          return (
+            <button
+              key={lvl.id}
+              type="button"
+              onClick={() => {
+                if (isPlaying) handleTogglePlay();
+                setSelectedLevel(lvl.id);
+                setBpm(lvl.defaultBpm);
+              }}
+              style={{
+                border: isSel ? '1.5px solid #f97316' : '1.5px solid transparent',
+                background: isSel ? '#ffffff' : 'transparent',
+                color: isSel ? '#c2410c' : '#475569',
+                borderRadius: '12px',
+                padding: '7px 2px',
+                cursor: 'pointer',
+                boxShadow: isSel ? '0 3px 10px rgba(234, 88, 12, 0.15)' : 'none',
+                transition: 'all 0.15s cubic-bezier(0.16, 1, 0.3, 1)',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '2px',
+                transform: isSel ? 'scale(1.02)' : 'scale(1)'
+              }}
+              className="hover-scale-mini"
+            >
+              <div style={{
+                color: isSel ? '#ea580c' : '#94a3b8',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}>
+                {lvl.id === 'viertel' && <CircleDot size={15} strokeWidth={2.8} />}
+                {lvl.id === 'achtel' && <Layers size={15} strokeWidth={2.8} />}
+                {lvl.id === 'synkopen' && <Activity size={15} strokeWidth={2.8} />}
+                {lvl.id === 'shuffle' && <Flame size={15} strokeWidth={2.8} />}
+              </div>
+              <div style={{ fontSize: '0.80rem', fontWeight: 950, color: isSel ? '#c2410c' : '#0f172a', lineHeight: 1.1 }}>
+                {lvl.id === 'viertel' ? 'Viertel' : (lvl.id === 'achtel' ? 'Achtel' : (lvl.id === 'synkopen' ? 'Off-Beat' : 'Shuffle'))}
+              </div>
+              <div style={{ fontSize: '0.62rem', fontWeight: 850, color: isSel ? '#ea580c' : '#94a3b8' }}>
+                {lvl.badge}
+              </div>
+            </button>
+          );
+        })}
       </div>
 
-      {/* 3. The Bright Apple Interactive Stage with Live Spring Radar */}
-      <div style={{
-        background: 'linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%)',
-        borderRadius: '22px',
-        padding: '24px 22px',
-        boxShadow: 'inset 0 1px 4px rgba(255, 255, 255, 0.9), 0 4px 18px rgba(15, 23, 42, 0.04)',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '20px',
-        border: '1.5px solid #e2e8f0',
-        position: 'relative'
-      }}>
-        
-        {/* Stage Status & Streak Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{
-              background: isCallPhase ? '#eff6ff' : '#e6f4ea',
-              color: isCallPhase ? '#1d4ed8' : '#15803d',
-              border: isCallPhase ? '1px solid #bfdbfe' : '1px solid #bbf7d0',
-              fontSize: '0.70rem',
-              fontWeight: 900,
-              padding: '4px 12px',
+      {/* 🌟 FOKUS-ZONE 2: 16-TAKTE-PULSBALKEN & VISUELLE BEAT-BÜHNE */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        {/* Nahtlose Takt-Fortschrittszeile */}
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '4px',
+          padding: '0 2px'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.74rem', fontWeight: 950 }}>
+            <span style={{ color: '#0f172a', display: 'flex', alignItems: 'center', gap: '5px' }}>
+              <Activity size={13} color="#ea580c" />
+              <span>Takt {Math.min(16, currentBar + 1)} von 16</span>
+            </span>
+            <span style={{ color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.70rem', fontWeight: 800 }}>
+              <Target size={12} color="#64748b" />
+              <span>{16 - Math.min(16, currentBar + 1) <= 0 ? 'Ziel erreicht!' : `noch ${16 - Math.min(16, currentBar + 1)} Takte`}</span>
+            </span>
+          </div>
+
+          <div style={{
+            position: 'relative',
+            width: '100%',
+            height: '6px',
+            background: '#f1f5f9',
+            borderRadius: '100px',
+            overflow: 'hidden'
+          }}>
+            <div style={{
+              width: `${Math.min(100, Math.max(0, ((currentBar * activeLevelConfig.subdivisions + currentStep) / (16 * activeLevelConfig.subdivisions)) * 100))}%`,
+              height: '100%',
               borderRadius: '100px',
-              textTransform: 'uppercase',
-              letterSpacing: '0.04em',
+              background: 'linear-gradient(90deg, #f97316 0%, #ea580c 60%, #16a34a 100%)',
+              transition: 'width 0.10s linear',
+              boxShadow: '0 0 10px rgba(234, 88, 12, 0.45)'
+            }} />
+          </div>
+        </div>
+
+        {/* Die Magische Beat-Bühne (Visual Metronome Pulse) */}
+        <div style={{
+          background: 'linear-gradient(180deg, #fafaf9 0%, #fff7ed 100%)',
+          borderRadius: '24px',
+          padding: '14px 16px',
+          boxShadow: 'inset 0 1px 3px rgba(255, 255, 255, 0.9), 0 8px 20px -6px rgba(234, 88, 12, 0.08)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '12px',
+          border: '1.5px solid #fed7aa',
+          position: 'relative'
+        }}>
+          
+          {/* Signal-Pill & Streak */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
+            <span style={{
+              background: isCallPhase ? '#fef3c7' : 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
+              color: isCallPhase ? '#92400e' : '#ffffff',
+              border: isCallPhase ? '1.5px solid #fde68a' : 'none',
+              fontSize: '0.78rem',
+              fontWeight: 950,
+              padding: '5px 13px',
+              borderRadius: '100px',
               display: 'flex',
               alignItems: 'center',
-              gap: '5px'
+              gap: '6px',
+              boxShadow: isCallPhase ? '0 2px 8px rgba(217, 119, 6, 0.15)' : '0 2px 10px rgba(234, 88, 12, 0.30)'
             }}>
               {trainingMode === 'call_response' 
                 ? (isCallPhase 
-                  ? <><Headphones size={12} color="#1d4ed8" /> 1. Hören (Call)</> 
-                  : <><Target size={12} color="#15803d" /> 2. Du bist dran! (Response)</>)
+                  ? <><Headphones size={13} color="#92400e" strokeWidth={2.5} /> HÖR GUT ZU!</> 
+                  : <><Target size={13} color="#ffffff" strokeWidth={2.4} /> DU BIST DRAN!</>)
                 : (trainingMode === 'tempo_sprint'
-                  ? <><FastForward size={12} color="#15803d" /> Tempo-Sprint ({bpm} BPM)</>
+                  ? <><FastForward size={13} color="#ffffff" /> Sprint ({bpm} BPM)</>
                   : (isDisappeared 
-                    ? <><Clock size={12} color="#64748b" /> Takt im Kopf halten...</> 
-                    : <><Activity size={12} color="#15803d" /> Groove läuft</>))}
+                    ? <><Clock size={13} color="#64748b" /> Beat im Tunnel – Zähle!</> 
+                    : <><Activity size={13} color="#ffffff" /> Der Beat groovt</>))}
             </span>
-            <span style={{ fontSize: '0.76rem', color: '#64748b', fontWeight: 700 }}>
-              Takt {currentBar + 1} von 16
-            </span>
-          </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            {pocketStreak >= 4 && (
-              <span style={{
-                background: '#fef3c7',
-                border: '1px solid #fde68a',
-                color: '#b45309',
-                fontSize: '0.68rem',
-                fontWeight: 900,
-                padding: '2px 8px',
-                borderRadius: '100px'
-              }}>
-                COMBO {comboMultiplier}
-              </span>
-            )}
-            <span style={{ fontSize: '0.76rem', fontWeight: 900, color: '#15803d', display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <Flame size={14} color="#15803d" /> Streak: {pocketStreak}
-            </span>
-            <span style={{ fontSize: '0.74rem', color: '#94a3b8' }}>
-              (Best: {bestStreak})
-            </span>
-          </div>
-        </div>
-
-        {/* Rhythm Syllables Grid with Visual Anticipation Pulse */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: `repeat(${activeLevelConfig.syllables.length}, 1fr)`,
-          gap: '6px',
-          padding: '2px 0'
-        }}>
-          {activeLevelConfig.syllables.map((syl, sIdx) => {
-            const isCurrent = isPlaying && currentStep === sIdx;
-            const isAnticipating = isPlaying && anticipatingStep === sIdx;
-            const isTarget = activeLevelConfig.targetPattern[sIdx];
-
-            return (
-              <div
-                key={sIdx}
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  gap: '6px'
-                }}
-              >
+            {/* Streak & Combo Badge */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+              {pocketStreak >= 4 && (
                 <span style={{
-                  fontSize: '0.74rem',
-                  fontWeight: 900,
-                  color: isCurrent ? '#15803d' : (isTarget ? '#0f172a' : '#94a3b8'),
-                  transition: 'all 0.08s ease'
+                  background: '#fef3c7',
+                  border: '1px solid #fde68a',
+                  color: '#b45309',
+                  fontSize: '0.66rem',
+                  fontWeight: 950,
+                  padding: '2px 8px',
+                  borderRadius: '100px'
                 }}>
-                  {syl}
+                  COMBO x{comboMultiplier}
                 </span>
+              )}
+              <span style={{
+                fontSize: '0.74rem',
+                fontWeight: 950,
+                color: '#c2410c',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                background: '#ffffff',
+                padding: '3px 8px',
+                borderRadius: '8px',
+                border: '1px solid #fed7aa'
+              }}>
+                <Flame size={13} color="#ea580c" /> Streak: {pocketStreak}
+              </span>
+            </div>
+          </div>
 
-                <div style={{
-                  width: '100%',
-                  height: '50px',
-                  borderRadius: '12px',
-                  background: isCurrent 
-                    ? 'linear-gradient(135deg, #34a853 0%, #15803d 100%)' 
-                    : (isAnticipating ? '#e6f4ea' : (isTarget ? '#ffffff' : '#f1f5f9')),
-                  border: isCurrent 
-                    ? '2px solid #86efac' 
-                    : (isAnticipating ? '2px solid #34a853' : (isTarget ? '1.5px solid #cbd5e1' : '1px dashed #e2e8f0')),
-                  boxShadow: isCurrent 
-                    ? '0 4px 14px rgba(52, 168, 83, 0.35)' 
-                    : (isAnticipating ? '0 0 12px rgba(52, 168, 83, 0.28)' : (isTarget ? '0 2px 6px rgba(0,0,0,0.03)' : 'none')),
-                  transform: isAnticipating ? 'scale(1.04)' : 'scale(1)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  transition: 'all 0.08s cubic-bezier(0.16, 1, 0.3, 1)'
-                }}>
-                  {isTarget && (
-                    <div style={{
-                      width: '8px',
-                      height: '8px',
-                      borderRadius: '50%',
-                      background: isCurrent ? '#ffffff' : (isAnticipating ? '#15803d' : '#34a853')
-                    }} />
-                  )}
+          {/* Konzentrische Beat-Trigger-Pads */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: `repeat(${activeLevelConfig.syllables.length}, 1fr)`,
+            gap: '6px',
+            padding: '2px 0'
+          }}>
+            {activeLevelConfig.syllables.map((syl, sIdx) => {
+              const isCurrent = isPlaying && currentStep === sIdx;
+              const isAnticipating = isPlaying && anticipatingStep === sIdx;
+              const isTarget = activeLevelConfig.targetPattern[sIdx];
+
+              return (
+                <div
+                  key={sIdx}
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}
+                >
+                  <span style={{
+                    fontSize: activeLevelConfig.syllables.length > 8 ? '0.70rem' : '0.84rem',
+                    fontWeight: 950,
+                    color: isCurrent ? '#ea580c' : (isTarget ? '#0f172a' : '#94a3b8'),
+                    letterSpacing: '0.01em',
+                    transition: 'all 0.08s ease'
+                  }}>
+                    {syl}
+                  </span>
+
+                  <div style={{
+                    width: '100%',
+                    height: '56px',
+                    borderRadius: '16px',
+                    background: isCurrent 
+                      ? 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)'
+                      : (isAnticipating ? '#fff7ed' : (isTarget ? '#ffffff' : '#f8fafc')),
+                    border: isCurrent 
+                      ? '2px solid #ffffff' 
+                      : (isAnticipating ? '2px solid #f97316' : (isTarget ? '1.5px solid #fed7aa' : '1px dashed #cbd5e1')),
+                    boxShadow: isCurrent 
+                      ? '0 6px 16px rgba(234, 88, 12, 0.45), inset 0 1.5px 0 rgba(255, 255, 255, 0.6)' 
+                      : (isAnticipating 
+                        ? '0 0 12px rgba(234, 88, 12, 0.30), inset 0 1px 0 rgba(255, 255, 255, 0.8)' 
+                        : (isTarget 
+                          ? '0 2px 5px rgba(0,0,0,0.02), inset 0 1.5px 0 rgba(255, 255, 255, 0.95), inset 0 -2px 4px rgba(0,0,0,0.02)' 
+                          : 'none')),
+                    transform: isCurrent ? 'scale(1.09)' : (isAnticipating ? 'scale(1.04)' : 'scale(1)'),
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    transition: 'all 0.08s cubic-bezier(0.16, 1, 0.3, 1)'
+                  }}>
+                    {isTarget && (
+                      <div style={{
+                        width: isCurrent ? '13px' : '9px',
+                        height: isCurrent ? '13px' : '9px',
+                        borderRadius: '50%',
+                        background: isCurrent ? '#ffffff' : (isAnticipating ? '#ea580c' : '#f97316'),
+                        transition: 'all 0.08s ease',
+                        boxShadow: isCurrent 
+                          ? '0 0 10px rgba(255,255,255,0.95)' 
+                          : (isAnticipating ? '0 0 8px rgba(234, 88, 12, 0.6)' : 'none')
+                      }} />
+                    )}
+                  </div>
                 </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
 
-        {/* Live Apple Spring-Dampened Micro-Timing Radar */}
-        <div style={{
-          background: '#ffffff',
-          border: '1.5px solid #e2e8f0',
-          borderRadius: '16px',
-          padding: '14px 18px',
+          {/* Profi-Modus: Millisekunden-Gauge (nur wenn aktiv) */}
+          {isProMode && (
+            <div style={{
+              position: 'relative',
+              width: '100%',
+              height: '10px',
+              background: '#f1f5f9',
+              borderRadius: '6px',
+              overflow: 'hidden',
+              border: '1px solid #e2e8f0'
+            }}>
+              <div style={{ position: 'absolute', left: '15%', width: '22%', top: 0, bottom: 0, background: '#dbeafe' }} />
+              <div style={{ position: 'absolute', left: '37%', width: '26%', top: 0, bottom: 0, background: '#dcfce7' }} />
+              <div style={{ position: 'absolute', left: '63%', width: '22%', top: 0, bottom: 0, background: '#fef3c7' }} />
+              <div style={{ position: 'absolute', left: '50%', top: 0, bottom: 0, width: '2px', background: '#f97316', transform: 'translateX(-50%)' }} />
+              {timingOffsetMs !== null && (
+                <div style={{
+                  position: 'absolute',
+                  left: `${gaugeNeedlePercent}%`,
+                  top: '1px',
+                  bottom: '1px',
+                  width: '6px',
+                  borderRadius: '3px',
+                  background: lastRating === 'pocket' ? '#ea580c' : (lastRating === 'good' ? '#16a34a' : (lastRating === 'rush' ? '#2563eb' : (lastRating === 'drag' ? '#d97706' : '#dc2626'))),
+                  transform: 'translateX(-50%)',
+                  transition: 'left 0.12s ease'
+                }} />
+              )}
+            </div>
+          )}
+
+        </div>
+      </div>
+
+      {/* 🌟 FOKUS-ZONE 3: DAS HERO 3D MPC DRUM-PAD (ALL-IN-ONE TRIGGER) */}
+      <button
+        type="button"
+        onPointerDown={(e) => {
+          e.preventDefault();
+          handleUserTap();
+        }}
+        style={{
+          width: '100%',
+          minHeight: '108px',
+          borderRadius: '24px',
+          border: 'none',
+          background: !isPlaying 
+            ? 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)'
+            : (isPadPressed 
+              ? '#ea580c' 
+              : 'linear-gradient(180deg, #fb923c 0%, #ea580c 100%)'),
+          color: '#ffffff',
           display: 'flex',
           flexDirection: 'column',
-          gap: '10px',
-          boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
-          position: 'relative'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <Activity size={15} color="#15803d" />
-              <span style={{ fontSize: '0.76rem', fontWeight: 850, color: '#334155' }}>
-                Groove-Radar:
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '4px',
+          cursor: 'pointer',
+          boxShadow: isPadPressed 
+            ? '0 2px 0 #9a3412, inset 0 3px 8px rgba(0, 0, 0, 0.25)' 
+            : '0 6px 0 #9a3412, 0 16px 32px -6px rgba(234, 88, 12, 0.42), inset 0 1.5px 0 rgba(255, 255, 255, 0.42)',
+          userSelect: 'none',
+          WebkitUserSelect: 'none',
+          touchAction: 'manipulation',
+          transform: isPadPressed ? 'translateY(4px)' : 'translateY(0)',
+          transition: 'all 0.07s cubic-bezier(0.16, 1, 0.3, 1)'
+        }}
+        className="hover-scale-mini"
+      >
+        {!isPlaying ? (
+          <>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '9px' }}>
+              <Play size={24} fill="#ffffff" color="#ffffff" strokeWidth={2.4} />
+              <span style={{ fontSize: '1.24rem', fontWeight: 950, letterSpacing: '-0.01em', color: '#ffffff' }}>
+                TIPPEN ZUM STARTEN
+              </span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.76rem', color: 'rgba(255, 255, 255, 0.92)', fontWeight: 750 }}>
+              <span>Tippe hier oder drücke</span>
+              <span style={{
+                background: 'rgba(0, 0, 0, 0.22)',
+                border: '1px solid rgba(255, 255, 255, 0.35)',
+                padding: '1px 6px',
+                borderRadius: '6px',
+                fontSize: '0.68rem',
+                fontWeight: 900,
+                letterSpacing: '0.04em'
+              }}>
+                LEERTASTE
+              </span>
+            </div>
+          </>
+        ) : (
+          <>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Target size={22} color="#ffffff" strokeWidth={2.8} />
+              <span style={{ fontSize: '1.18rem', fontWeight: 950, letterSpacing: '-0.01em', color: '#ffffff' }}>
+                HIER IM TAKT TROMMELN
               </span>
             </div>
 
-            {/* Rating Feedback */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {/* Live-Feedback direkt im Hero-Pad */}
+            <div style={{ minHeight: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               {lastRating === 'pocket' && (
-                <span style={{ fontSize: '0.84rem', fontWeight: 950, color: '#15803d', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <Sparkles size={14} color="#15803d" /> Volltreffer! Im Pocket {isProMode && timingOffsetMs !== null ? `(${timingOffsetMs > 0 ? `+${timingOffsetMs}` : timingOffsetMs}ms)` : ''}
+                <span style={{ fontSize: '0.82rem', fontWeight: 950, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <Sparkles size={14} color="#ffffff" /> PERFEKT IM POCKET! {isProMode && timingOffsetMs !== null && `(${timingOffsetMs > 0 ? `+${timingOffsetMs}` : timingOffsetMs}ms)`}
                 </span>
               )}
               {lastRating === 'good' && (
-                <span style={{ fontSize: '0.82rem', fontWeight: 900, color: '#16a34a', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <Check size={14} color="#16a34a" /> Gut im Groove! {isProMode && timingOffsetMs !== null ? `(${timingOffsetMs > 0 ? `+${timingOffsetMs}` : timingOffsetMs}ms)` : ''}
+                <span style={{ fontSize: '0.82rem', fontWeight: 950, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <Check size={14} color="#ffffff" /> SUPER IM GROOVE! {isProMode && timingOffsetMs !== null && `(${timingOffsetMs > 0 ? `+${timingOffsetMs}` : timingOffsetMs}ms)`}
                 </span>
               )}
               {lastRating === 'rush' && (
-                <span style={{ fontSize: '0.82rem', fontWeight: 900, color: '#2563eb' }}>
-                  Zu eilig (Rush) {isProMode && timingOffsetMs !== null ? `(${timingOffsetMs}ms)` : ''}
+                <span style={{ fontSize: '0.78rem', fontWeight: 900, color: '#fee2e2', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <Clock size={13} color="#fee2e2" /> Etwas zu eilig – bleib ruhig!
                 </span>
               )}
               {lastRating === 'drag' && (
-                <span style={{ fontSize: '0.82rem', fontWeight: 900, color: '#d97706' }}>
-                  Zu spät (Drag) {isProMode && timingOffsetMs !== null ? `(+${timingOffsetMs}ms)` : ''}
+                <span style={{ fontSize: '0.78rem', fontWeight: 900, color: '#fef3c7', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <Clock size={13} color="#fef3c7" /> Lass dir Zeit, ganz entspannt!
                 </span>
               )}
               {lastRating === 'miss' && (
-                <span style={{ fontSize: '0.82rem', fontWeight: 900, color: '#dc2626' }}>
-                  Neuer Versuch {isProMode && timingOffsetMs !== null ? `(${timingOffsetMs > 0 ? `+${timingOffsetMs}` : timingOffsetMs}ms)` : ''}
+                <span style={{ fontSize: '0.78rem', fontWeight: 900, color: '#fee2e2', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <RotateCcw size={13} color="#fee2e2" /> Neuer Versuch – hör auf den Beat!
                 </span>
               )}
               {!lastRating && (
-                <span style={{ fontSize: '0.74rem', color: '#64748b' }}>
-                  Tippe im Takt auf das Touch-Pad oder die Leertaste
+                <span style={{ fontSize: '0.74rem', color: 'rgba(255, 255, 255, 0.85)', fontWeight: 750 }}>
+                  Tippe im Rhythmus der Beats
                 </span>
               )}
             </div>
-          </div>
+          </>
+        )}
+      </button>
 
-          {/* Precision Visual Gauge Bar with Tolerance Zones */}
-          <div style={{ position: 'relative', width: '100%', height: '16px', background: '#f1f5f9', borderRadius: '10px', overflow: 'hidden', border: '1px solid #e2e8f0' }}>
-            <div style={{ position: 'absolute', left: '15%', width: '22%', top: 0, bottom: 0, background: '#dbeafe', borderRight: '1px dashed #93c5fd' }} title="Zu eilig" />
-            <div style={{ position: 'absolute', left: '37%', width: '26%', top: 0, bottom: 0, background: '#dcfce7', borderLeft: '1px solid #86efac', borderRight: '1px solid #86efac' }} title="Im Pocket" />
-            <div style={{ position: 'absolute', left: '63%', width: '22%', top: 0, bottom: 0, background: '#fef3c7', borderLeft: '1px dashed #fde68a' }} title="Zu spät" />
-            
-            {/* Center Zero Line with Sub-15ms Perfect Aura Glow */}
-            <div style={{
-              position: 'absolute',
-              left: '50%',
-              top: 0,
-              bottom: 0,
-              width: isCenterAuraPulse ? '4px' : '2px',
-              background: isCenterAuraPulse ? '#22c55e' : '#15803d',
-              boxShadow: isCenterAuraPulse ? '0 0 12px rgba(34, 197, 94, 0.9)' : 'none',
-              transform: 'translateX(-50%)',
-              transition: 'all 0.1s ease'
-            }} />
-
-            {/* Dynamic Apple Spring-Dampened Needle */}
-            {timingOffsetMs !== null && (
-              <div style={{
-                position: 'absolute',
-                left: `${gaugeNeedlePercent}%`,
-                top: '2px',
-                bottom: '2px',
-                width: '6px',
-                borderRadius: '4px',
-                background: lastRating === 'pocket' ? '#15803d' : (lastRating === 'good' ? '#16a34a' : (lastRating === 'rush' ? '#2563eb' : (lastRating === 'drag' ? '#d97706' : '#dc2626'))),
-                boxShadow: '0 0 6px rgba(0,0,0,0.25)',
-                transform: 'translateX(-50%)',
-                transition: 'left 0.14s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
-              }} />
-            )}
+      {/* 4. Minimaler Fußbereich: 3 Sterne & dezenter Stop-Button */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: '0 4px',
+        minHeight: '34px'
+      }}>
+        {/* 3 Goldsterne */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '6px',
+          background: '#f8fafc',
+          border: '1px solid #f1f5f9',
+          padding: '4px 9px',
+          borderRadius: '10px'
+        }}>
+          <div style={{ display: 'flex', gap: '2px' }}>
+            <Star size={15} color={starsEarned >= 1 ? '#f59e0b' : '#cbd5e1'} fill={starsEarned >= 1 ? '#f59e0b' : 'none'} />
+            <Star size={15} color={starsEarned >= 2 ? '#f59e0b' : '#cbd5e1'} fill={starsEarned >= 2 ? '#f59e0b' : 'none'} />
+            <Star size={15} color={starsEarned >= 3 ? '#f59e0b' : '#cbd5e1'} fill={starsEarned >= 3 ? '#f59e0b' : 'none'} />
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.66rem', color: '#64748b', fontWeight: 700 }}>
-            <span>-100ms (Zu eilig)</span>
-            <span style={{ color: '#15803d' }}>0ms (Perfekter Pocket)</span>
-            <span>+100ms (Zu spät)</span>
-          </div>
+          {totalHits > 0 && (
+            <span style={{ fontSize: '0.74rem', fontWeight: 950, color: '#854d0e', background: '#fef9c3', padding: '1px 5px', borderRadius: '5px' }}>
+              {accuracyPercent}%
+            </span>
+          )}
         </div>
 
-        {/* Tactile Bright Apple Drum Pad with 0ms PointerDown Interrupt */}
-        <button
-          type="button"
-          onPointerDown={(e) => {
-            e.preventDefault();
-            handleUserTap();
-          }}
-          style={{
-            width: '100%',
-            height: '115px',
-            borderRadius: '18px',
-            border: isPadPressed ? '2.5px solid #34a853' : '2px solid #cbd5e1',
-            background: isPadPressed 
-              ? 'linear-gradient(180deg, #dcfce7 0%, #bbf7d0 100%)' 
-              : 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)',
-            color: '#0f172a',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '4px',
-            cursor: 'pointer',
-            boxShadow: isPadPressed 
-              ? 'inset 0 2px 6px rgba(21, 128, 61, 0.2), 0 2px 8px rgba(21, 128, 61, 0.15)' 
-              : '0 6px 18px rgba(15, 23, 42, 0.05), 0 1px 3px rgba(0, 0, 0, 0.03)',
-            userSelect: 'none',
-            WebkitUserSelect: 'none',
-            touchAction: 'manipulation',
-            transform: isPadPressed ? 'scale(0.98)' : 'scale(1)',
-            transition: 'all 0.08s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
-          }}
-          className="hover-scale-mini"
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <Target size={18} color="#15803d" />
-            <span style={{ fontSize: '1.08rem', fontWeight: 950, letterSpacing: '0.01em', color: '#0f172a' }}>
-              HIER IM TAKT TIPPEN (ODER LEERTASTE)
+        {/* Rechter Status / Stop Button */}
+        <div>
+          {isPlaying ? (
+            <button
+              type="button"
+              onClick={handleTogglePlay}
+              style={{
+                background: '#fee2e2',
+                border: '1px solid #fecaca',
+                color: '#dc2626',
+                borderRadius: '10px',
+                padding: '5px 12px',
+                fontSize: '0.76rem',
+                fontWeight: 900,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px',
+                transition: 'all 0.15s ease'
+              }}
+              className="hover-scale"
+              title="Übung stoppen"
+            >
+              <Square size={11} fill="#dc2626" color="#dc2626" />
+              <span>Stop</span>
+            </button>
+          ) : (
+            <span style={{
+              fontSize: '0.74rem',
+              color: '#64748b',
+              fontWeight: 900,
+              background: '#f8fafc',
+              border: '1px solid #f1f5f9',
+              padding: '4px 9px',
+              borderRadius: '10px',
+              letterSpacing: '0.02em',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px'
+            }}>
+              ♩ = {bpm} BPM
             </span>
-          </div>
-          <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 600 }}>
-            {isPlaying ? 'Treffe den Puls mit dem Finger oder der Tastatur' : 'Tippe hier, um den Beat zu starten'}
-          </span>
-        </button>
-
-      </div>
-
-      {/* 4. Bottom Control Bar: Campus Green Button & 3-Star Live Progress */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
-        <button
-          type="button"
-          onClick={handleTogglePlay}
-          style={{
-            background: isPlaying ? '#dc2626' : 'linear-gradient(135deg, #34a853 0%, #15803d 100%)',
-            border: 'none',
-            borderRadius: '14px',
-            padding: '12px 24px',
-            color: '#ffffff',
-            fontSize: '0.94rem',
-            fontWeight: 900,
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            boxShadow: isPlaying ? '0 4px 14px rgba(220, 38, 38, 0.25)' : '0 4px 16px rgba(52, 168, 83, 0.3)'
-          }}
-          className="hover-scale"
-        >
-          {isPlaying ? <Square size={16} fill="#ffffff" color="#ffffff" /> : <Play size={16} fill="#ffffff" color="#ffffff" />}
-          <span>{isPlaying ? 'Training stoppen' : 'Beat-Trainer starten'}</span>
-        </button>
-
-        {/* 3-Star Live Rating & Accuracy Display */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-          
-          {/* Stars */}
-          <div style={{ display: 'flex', gap: '4px' }}>
-            <Star size={20} color={starsEarned >= 1 ? '#eab308' : '#cbd5e1'} fill={starsEarned >= 1 ? '#eab308' : 'none'} />
-            <Star size={20} color={starsEarned >= 2 ? '#eab308' : '#cbd5e1'} fill={starsEarned >= 2 ? '#eab308' : 'none'} />
-            <Star size={20} color={starsEarned >= 3 ? '#eab308' : '#cbd5e1'} fill={starsEarned >= 3 ? '#eab308' : 'none'} />
-          </div>
-
-          <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>
-              Timing-Genauigkeit
-            </div>
-            <div style={{ fontSize: '1.15rem', fontWeight: 950, color: accuracyPercent >= 80 ? '#15803d' : '#0f172a' }}>
-              {totalHits > 0 ? `${accuracyPercent}%` : '—'}
-            </div>
-          </div>
-
-          <div style={{
-            width: '42px',
-            height: '42px',
-            borderRadius: '10px',
-            background: '#f8fafc',
-            border: '1px solid #e2e8f0',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center'
-          }}>
-            <Award size={20} color={accuracyPercent >= 80 ? '#15803d' : '#94a3b8'} />
-          </div>
+          )}
         </div>
       </div>
 
@@ -1677,16 +1861,19 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
                   <span style={{
                     background: '#dcfce7',
                     color: '#15803d',
-                    fontSize: '0.74rem',
+                    fontSize: '0.78rem',
                     fontWeight: 900,
-                    padding: '2px 8px',
-                    borderRadius: '100px'
+                    padding: '3px 10px',
+                    borderRadius: '100px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
                   }}>
-                    +{awardedRoundXp} RUNDEN-XP
+                    <Sparkles size={12} /> +{awardedRoundXp} XP gesichert!
                   </span>
                 </div>
-                <p style={{ margin: '3px 0 0 0', fontSize: '0.80rem', color: '#64748b', fontWeight: 600 }}>
-                  16 Takte gemeistert • {accuracyPercent}% Pocket-Präzision • Sitzungs-Tresor: <strong style={{ color: '#15803d' }}>+{sessionAccumulatedXp} XP</strong>
+                <p style={{ margin: '3px 0 0 0', fontSize: '0.82rem', color: '#64748b', fontWeight: 650 }}>
+                  16 Takte meisterhaft abgeschlossen! • {accuracyPercent}% Trefferquote • Heute gesammelt: <strong style={{ color: '#15803d' }}>+{sessionAccumulatedXp} XP für dein Profil</strong>
                 </p>
               </div>
             </div>
@@ -1859,8 +2046,9 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
             <p style={{ margin: 0, fontSize: '0.82rem', color: '#475569', lineHeight: 1.5 }}>
               Jedes Gerät (AirPods, Lautsprecher, Mac-Klinke) hat messbare Audio-Verzögerungen.
               {isBluetoothDetected && (
-                <span style={{ display: 'block', marginTop: '6px', color: '#2563eb', fontWeight: 700 }}>
-                  🎧 Bluetooth-Verbindung erkannt: Latenzausgleich aktiv.
+                <span style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '6px', color: '#2563eb', fontWeight: 700 }}>
+                  <Bluetooth size={13} color="#2563eb" />
+                  <span>Bluetooth-Verbindung erkannt: Latenzausgleich aktiv.</span>
                 </span>
               )}
             </p>
@@ -1945,8 +2133,9 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
             }}>
               {!is4TapWizardActive ? (
                 <>
-                  <span style={{ fontSize: '0.80rem', fontWeight: 800, color: '#0f172a' }}>
-                    🎯 4-Tap Schnell-Einmessung
+                  <span style={{ fontSize: '0.80rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Target size={14} color="#0f172a" />
+                    <span>4-Tap Schnell-Einmessung</span>
                   </span>
                   <span style={{ fontSize: '0.74rem', color: '#64748b' }}>
                     Spielt 4 Klicks ab – tippe 4x im Takt mit, um dein Gerät auf 0ms zu eichen.
@@ -1988,7 +2177,7 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
                       cursor: 'pointer'
                     }}
                   >
-                    👉 JETZT TIPPEN ({wizardTapCount + 1}. Schlag)
+                    JETZT TIPPEN ({wizardTapCount + 1}. Schlag)
                   </button>
                 </div>
               )}

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Check, Award, Flame, AlertCircle, BookOpen, Music, History, Plus, ChevronLeft, ChevronRight, ChevronDown, Book, Star, Sliders, RotateCcw, Mic, Square, Play, VolumeX, Volume2, Trash2, Headphones, Minimize2, Maximize2, Calendar, FileText, Zap, Clock, Info, Activity, ArrowLeft, Edit3, Disc, Search, Lock, Unlock, Share2, Sparkles, Radio, Download, Repeat, Timer, Scissors, Moon, Wrench, Hash, Filter, Target, Printer, MessageSquare, Mail, Copy, ExternalLink, HelpCircle, Hand, Lightbulb } from 'lucide-react';
+import { X, Check, Award, Flame, AlertCircle, BookOpen, Music, History, Plus, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Book, Star, Sliders, RotateCcw, RotateCw, Mic, Square, Play, Pause, VolumeX, Volume2, Trash2, Headphones, Minimize2, Maximize2, Calendar, FileText, Zap, Clock, Info, Activity, ArrowLeft, Edit3, Disc, Search, Lock, Unlock, Share2, Sparkles, Radio, Download, Repeat, Timer, Scissors, Moon, Wrench, Hash, Filter, Target, User, Printer, MessageSquare, Mail, Copy, ExternalLink, HelpCircle, Hand, Lightbulb, MoreHorizontal, Pin, EyeOff, ArrowRightLeft } from 'lucide-react';
 import Confetti from 'react-confetti';
 import { supabase } from '../lib/supabase';
 // @ts-ignore
@@ -8,7 +8,7 @@ import * as lamejs from '@breezystack/lamejs';
 import { GroovePracticeCompanion } from './groovelab/GroovePracticeCompanion';
 import { GrooveTrainerStudioView } from './campus/GrooveTrainerStudioView';
 import type { CustomPlaylist, CustomPlaylistTrack } from './campus/AudioBiographyView';
-import { processPureRawBlob, processStudioMastering, TARGET_PURE_RAW_LUFS, TARGET_STUDIO_LUFS, TARGET_PEAK_DBTP } from '../utils/audioMasteringEngine';
+import { processPureRawBlob, processStudioMastering, TARGET_PURE_RAW_LUFS, TARGET_STUDIO_LUFS, TARGET_PEAK_DBTP, MAX_PURE_RAW_LIMITER_GR_DB } from '../utils/audioMasteringEngine';
 import { storeBlob, getBlob, deleteBlob } from '../utils/blobStorage';
 import { AudioTrackCarousel } from './AudioTrackCarousel';
 import { MeisterOhrSticker } from './MeisterOhrSticker';
@@ -22,18 +22,9 @@ import { isDevEnvironment } from '../utils/tenantUrlHelper';
 import { generateStudentHomeworkPrintoutPDF } from '../utils/pdfGenerator';
 import { formatTeacherFullName, capitalizeFirstLetter, formatSongTitleCase, copyTextToClipboard, maskLastName } from '../utils/nameHelper';
 import { AudioWaveformVisualizer } from './ui/AudioWaveformVisualizer';
-
-
-
-const getSimulatedNow = (): Date => {
-  const sim = localStorage.getItem('simulated_date');
-  if (sim) {
-    const d = new Date(sim);
-    if (!isNaN(d.getTime())) return d;
-  }
-  return new Date();
-};
-
+import { harmonizeAudioList, formatHarmonizedAudioTitle, cleanSongOrBookTitle, extractBaseTopic, formatAudioDate, getNextSequentialTakeNumber } from '../utils/audioNamingHelper';
+import { HomeworkTransferModal } from './campus/HomeworkTransferModal';
+import { broadcastPracticeUpdate } from '../utils/studentProgressEngine';
 import { 
   ALL_STICKERS, 
   getUnifiedStickerStatus, 
@@ -57,450 +48,54 @@ export {
 };
 export type { StickerUnlockContext, StickerUnlockResult };
 
-interface Student {
-  id: string;
-  first_name: string;
-  last_name: string;
-  photo_url?: string;
-  school_id?: string;
-  schoolId?: string;
-  is_campus_active?: boolean;
-  [key: string]: any;
-}
+import { getSimulatedNow, getISOWeekRaw } from './student/studentDateUtils';
+import { getInstrumentAvatarUrl } from './student/studentAvatars.constants';
+import { SpeechDictationButton } from './student/SpeechDictationButton';
+import {
+  type Student,
+  type MeisterwerkDocumentationModalProps,
+  type ProgressItem,
+  type ParsedStudentQuestion,
+  type ParsedStudentAnnotation,
+  formatPageNumbers,
+  getCleanPageNotes,
+  getCleanTeacherHomeworkText,
+  formatStudentNoteDisplay,
+  parseStudentQuestionFromNotes,
+  parseStudentAnnotation,
+  parseSongArtistAndTitle,
+  SKILL_TAGS
+} from './student/meisterwerk.types';
 
-interface MeisterwerkDocumentationModalProps {
-  student: Student;
-  onClose: () => void;
-  teacherId?: string;
-  teacherName?: string;
-  schoolName?: string;
-  initialLehrwerkId?: string;
-  initialViewMode?: 'document' | 'recordings' | 'loopstation' | 'practice';
-  initialModalTab?: 'document' | 'logbook' | 'stickeralbum' | 'skillradar' | 'audiobiography';
-  onProfileClick?: (student: Student) => void;
-  readOnly?: boolean;
-  isEmbed?: boolean;
-  isTeacherTools?: boolean;
-  uiLevel?: 'junior' | 'teen' | 'pro';
-  initialXp?: number;
-  initialStreak?: number;
-  initialPracticeMinutes?: number;
-  initialMasteredSongsCount?: number;
-  hasTresorStorage?: boolean;
-  groupStudents?: Student[];
-}
+import {
+  CassetteIcon,
+  playCountInBeep,
+  MasterworkAudioCapsule,
+  InlineAudioPlayer,
+  RetroCassettePlayer
+} from './student/meisterwerk/MeisterwerkAudioPlayers';
+import { MeisterwerkStickerAlbumTab } from './student/meisterwerk/MeisterwerkStickerAlbumTab';
+import { MeisterwerkSkillRadarTab } from './student/meisterwerk/MeisterwerkSkillRadarTab';
+import { MeisterwerkRecordingsTab } from './student/meisterwerk/MeisterwerkRecordingsTab';
+import { MeisterwerkLogbuchTab } from './student/meisterwerk/MeisterwerkLogbuchTab';
+import { MeisterwerkDocumentTab } from './student/meisterwerk/MeisterwerkDocumentTab';
 
-interface ProgressItem {
-  id?: string;
-  topic_name: string;
-  status: 'IN_PROGRESS' | 'THEORY_DONE' | 'MASTERED';
-  is_current_homework: boolean;
-  teacher_notes: string;
-  homework_notes?: string;
-  updated_at?: string;
-  student_rating?: number | null;
-  is_match_mode_enabled?: boolean;
-  last_matched_at?: string | null;
-  last_matched_teacher_percent?: number | null;
-  last_matched_student_percent?: number | null;
-  is_match_successful?: boolean | null;
-}
-
-const getISOWeekRaw = (dateInput?: string | Date, lessonDay: number = 1): string => {
-  let date: Date;
-  if (!dateInput) {
-    date = new Date();
-  } else if (dateInput instanceof Date) {
-    date = dateInput;
-  } else {
-    date = new Date(dateInput);
-  }
-  
-  if (isNaN(date.getTime())) {
-    date = new Date();
-  }
-
-  // Adjust the date back to the most recent lesson day
-  const currentDay = date.getDay(); // 0 (Sun) to 6 (Sat)
-  let diff = currentDay - lessonDay;
-  if (diff < 0) {
-    diff += 7;
-  }
-  
-  const lessonStart = new Date(date);
-  lessonStart.setDate(date.getDate() - diff);
-
-  const d = new Date(Date.UTC(lessonStart.getFullYear(), lessonStart.getMonth(), lessonStart.getDate()));
-  const dayNum = d.getUTCDay() || 7;
-  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
-  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-  const weekNo = Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
-  return `${d.getUTCFullYear()}-W${String(weekNo).padStart(2, '0')}`;
-};
-
-const getInstrumentAvatarUrl = (instrument: string | null | undefined): string => {
-  if (!instrument) return '/avatars/gitarre_avatar_new.png';
-  const inst = instrument.toLowerCase().trim();
-  if (inst.includes('e-gitarre')) return '/avatars/egitarre_avatar.png';
-  if (inst.includes('guitar') || inst.includes('gitarre')) return '/avatars/gitarre_avatar_new.png';
-  if (inst.includes('e-bass')) return '/avatars/ebass_avatar.png';
-  if (inst.includes('kontrabass') || inst.includes('double bass')) return '/avatars/kontrabass_avatar.png';
-  if (inst.includes('bass')) return '/avatars/bass_avatar.png';
-  if (inst.includes('drum') || inst.includes('schlagzeug')) return '/avatars/schlagzeug_avatar.png';
-  if (inst.includes('piano') || inst.includes('keys') || inst.includes('klavier') || inst.includes('keyboard')) return '/avatars/klavier_avatar_new.png';
-  if (inst.includes('vocal') || inst.includes('gesang') || inst.includes('stimme') || inst.includes('singer')) return '/avatars/gesang_avatar.png';
-  if (inst.includes('trompete') || inst.includes('trumpet')) return '/avatars/trompete_avatar_new.png';
-  if (inst.includes('posaune') || inst.includes('trombone')) return '/avatars/posaune_avatar.png';
-  if (inst.includes('horn')) return '/avatars/horn_avatar_new.png';
-  if (inst.includes('cello')) return '/avatars/cello_avatar_new.png';
-  if (inst.includes('geige') || inst.includes('violin') || inst.includes('violine')) return '/avatars/violine_avatar_new.png';
-  if (inst.includes('klarinette') || inst.includes('clarinet')) return '/avatars/klarinette_avatar.png';
-  if (inst.includes('querflöte') || inst.includes('flute')) return '/avatars/querfloete_avatar.png';
-  if (inst.includes('saxofon') || inst.includes('saxophone') || inst.includes('sax')) return '/avatars/saxophon_avatar_new.png';
-  if (inst.includes('blockflöte') || inst.includes('recorder') || inst.includes('blockfloete')) return '/avatars/blockfloete_avatar.png';
-  if (inst.includes('bariton') || inst.includes('baritone')) return '/avatars/bariton_avatar.png';
-  if (inst.includes('oboe')) return '/avatars/oboe_avatar.png';
-  return '/avatars/gitarre_avatar_new.png';
-};
-
-export const formatPageNumbers = (pages: number[]): string => {
-  if (pages.length === 0) return '';
-  const sorted = [...pages].sort((a, b) => a - b);
-  const ranges: string[] = [];
-  let start = sorted[0];
-  let end = start;
-
-  for (let i = 1; i < sorted.length; i++) {
-    if (sorted[i] === end + 1) {
-      end = sorted[i];
-    } else {
-      if (start === end) {
-        ranges.push(`${start}`);
-      } else {
-        ranges.push(`${start}–${end}`);
-      }
-      start = sorted[i];
-      end = start;
-    }
-  }
-  if (start === end) {
-    ranges.push(`${start}`);
-  } else {
-    ranges.push(`${start}–${end}`);
-  }
-  
-  if (ranges.length === 1) return `S. ${ranges[0]}`;
-  const last = ranges.pop();
-  return `S. ${ranges.join(', ')} & ${last}`;
-};
-
-export const getCleanPageNotes = (notes: any): string => {
-  if (!notes) return '';
-  let text = '';
-  if (typeof notes === 'string') {
-    if (notes.startsWith('[') || notes.startsWith('{')) {
-      try {
-        const parsed = JSON.parse(notes);
-        if (Array.isArray(parsed)) {
-          text = parsed.join('\n');
-        } else {
-          text = String(parsed);
-        }
-      } catch {
-        text = notes;
-      }
-    } else {
-      text = notes;
-    }
-  } else if (Array.isArray(notes)) {
-    text = notes.join('\n');
-  } else {
-    text = String(notes);
-  }
-  return text
-    .split('\n')
-    .filter((line: string) => !isInternalMetadataNote(line))
-    .map((line: string) => line.replace(/^[•\-\*\s]+/, '').trim())
-    .filter(Boolean)
-    .join('\n')
-    .trim();
-};
-
-export const getCleanTeacherHomeworkText = (notes: any): string => {
-  if (!notes) return '';
-  let text = '';
-  if (typeof notes === 'string') {
-    if (notes.startsWith('[') || notes.startsWith('{')) {
-      try {
-        const parsed = JSON.parse(notes);
-        if (Array.isArray(parsed)) {
-          text = parsed.join('\n');
-        } else {
-          text = String(parsed);
-        }
-      } catch {
-        text = notes;
-      }
-    } else {
-      text = notes;
-    }
-  } else if (Array.isArray(notes)) {
-    text = notes.join('\n');
-  } else {
-    text = String(notes);
-  }
-  return text
-    .split('\n')
-    .filter((line: string) => !isInternalMetadataNote(line))
-    .map((line: string) => line.replace(/^[•\-\*\s]+/, '').trim())
-    .filter(Boolean)
-    .join('\n')
-    .trim();
-};
-
-export const formatStudentNoteDisplay = (note: string): { isStudentNote: boolean; isPrivate: boolean; text: string } => {
-  if (!note) return { isStudentNote: false, isPrivate: false, text: '' };
-  
-  if (note.startsWith('STUDENT_NOTE_PUBLIC:')) {
-    const raw = note.replace(/^STUDENT_NOTE_PUBLIC:[^|]*\|/, '').trim();
-    const clean = raw.replace(/^❓\s*Frage für den Unterricht:\s*/i, '').trim();
-    return { isStudentNote: true, isPrivate: false, text: clean || raw };
-  }
-  
-  if (note.startsWith('STUDENT_NOTE_PRIVATE:')) {
-    const raw = note.replace(/^STUDENT_NOTE_PRIVATE:[^|]*\|/, '').trim();
-    const clean = raw.replace(/^❓\s*Frage für den Unterricht:\s*/i, '').trim();
-    return { isStudentNote: true, isPrivate: true, text: clean || raw };
-  }
-  
-  return { isStudentNote: false, isPrivate: false, text: note };
-};
-
-export interface ParsedStudentQuestion {
-  hasQuestion: boolean;
-  rawEntry: string | null;
-  text: string;
-  timestamp: string | null;
-}
-
-export const parseStudentQuestionFromNotes = (notesList: any[]): ParsedStudentQuestion => {
-  if (!Array.isArray(notesList)) {
-    return { hasQuestion: false, rawEntry: null, text: '', timestamp: null };
-  }
-  const qEntry = notesList.find(
-    n => typeof n === 'string' && (n.startsWith('STUDENT_QUESTION:') || n.startsWith('❓ Frage für den Unterricht:'))
-  );
-  if (!qEntry) {
-    return { hasQuestion: false, rawEntry: null, text: '', timestamp: null };
-  }
-  if (qEntry.startsWith('STUDENT_QUESTION:')) {
-    const withoutPrefix = qEntry.replace(/^STUDENT_QUESTION:/, '');
-    const pipeIdx = withoutPrefix.indexOf('|');
-    if (pipeIdx !== -1) {
-      const ts = withoutPrefix.slice(0, pipeIdx);
-      const txt = withoutPrefix.slice(pipeIdx + 1).trim();
-      return { hasQuestion: true, rawEntry: qEntry, text: txt, timestamp: ts };
-    }
-    return { hasQuestion: true, rawEntry: qEntry, text: withoutPrefix.trim(), timestamp: null };
-  }
-  if (qEntry.startsWith('❓ Frage für den Unterricht:')) {
-    const txt = qEntry.replace(/^❓\s*Frage für den Unterricht:\s*/i, '').trim();
-    return { hasQuestion: true, rawEntry: qEntry, text: txt, timestamp: null };
-  }
-  return { hasQuestion: false, rawEntry: null, text: '', timestamp: null };
-};
-
-export interface ParsedStudentAnnotation {
-  targetStudentName: string | null;
-  isSpecificToAnother: boolean;
-  isSpecificToCurrent: boolean;
-  isGeneralOrAll: boolean;
-  cleanText: string;
-  rawText: string;
-}
-
-export const parseStudentAnnotation = (
-  line: string, 
-  currentStudentFirstName: string, 
-  isTeacherMode: boolean = false
-): ParsedStudentAnnotation => {
-  if (!line || typeof line !== 'string') {
-    return { targetStudentName: null, isSpecificToAnother: false, isSpecificToCurrent: false, isGeneralOrAll: true, cleanText: '', rawText: '' };
-  }
-  
-  const trimmed = line.trim();
-  const match = trimmed.match(/^@([a-zA-ZäöüÄÖÜß0-9_-]+)(?::|\s)\s*(.*)$/i);
-  
-  if (!match) {
-    return {
-      targetStudentName: null,
-      isSpecificToAnother: false,
-      isSpecificToCurrent: false,
-      isGeneralOrAll: true,
-      cleanText: trimmed,
-      rawText: trimmed
-    };
-  }
-
-  const target = match[1].trim();
-  const rest = match[2].trim();
-  const targetLower = target.toLowerCase();
-  const currentLower = (currentStudentFirstName || '').toLowerCase().trim();
-
-  const isAll = targetLower === 'alle' || targetLower === 'all' || targetLower === 'gruppe' || targetLower === 'group' || targetLower === 'duo' || targetLower === 'band';
-  
-  if (isAll) {
-    return {
-      targetStudentName: 'Alle',
-      isSpecificToAnother: false,
-      isSpecificToCurrent: false,
-      isGeneralOrAll: true,
-      cleanText: rest || trimmed,
-      rawText: trimmed
-    };
-  }
-
-  const isCurrent = currentLower.length > 0 && (targetLower === currentLower || targetLower.startsWith(currentLower) || currentLower.startsWith(targetLower));
-
-  return {
-    targetStudentName: target,
-    isSpecificToAnother: !isTeacherMode && !isCurrent,
-    isSpecificToCurrent: isCurrent,
-    isGeneralOrAll: false,
-    cleanText: rest || trimmed,
-    rawText: trimmed
-  };
-};
-
-const SKILL_TAGS = [
-  { key: 'rhythmus', label: 'Rhythmus & Timing', shortLabel: 'Rhythmus', icon: '🥁', color: '#4338ca', bg: '#e0e7ff', lightBg: '#eef2ff', border: '#c7d2fe', dotColor: '#4338ca', category: 'musical' },
-  { key: 'technik', label: 'Spieltechnik & Motorik', shortLabel: 'Technik', icon: '⚡', color: '#1e40af', bg: '#eff6ff', lightBg: '#eff6ff', border: '#bfdbfe', dotColor: '#2563eb', category: 'musical' },
-  { key: 'intonation', label: 'Klang & Intonation', shortLabel: 'Klang', icon: '🎵', color: '#166534', bg: '#e6f4ea', lightBg: '#f0fdf4', border: '#bbf7d0', dotColor: '#16a34a', category: 'musical' },
-  { key: 'ausdruck', label: 'Ausdruck & Dynamik', shortLabel: 'Ausdruck', icon: '🎭', color: '#6b21a8', bg: '#f3e8ff', lightBg: '#faf5ff', border: '#e9d5ff', dotColor: '#9333ea', category: 'musical' },
-  { key: 'repertoire', label: 'Repertoire & Performance', shortLabel: 'Repertoire', icon: '🌟', color: '#854d0e', bg: '#fef9c3', lightBg: '#fefce8', border: '#fef08a', dotColor: '#d97706', category: 'musical' },
-];
-
-export const SpeechDictationButton: React.FC<{
-  onTranscript: (text: string) => void;
-  title?: string;
-  size?: 'sm' | 'md';
-}> = ({ onTranscript, title = "Diktieren", size = 'sm' }) => {
-  const [isListening, setIsListening] = useState(false);
-  const recognitionRef = useRef<any>(null);
-
-  // 🛡️ Hardware-Sicherheit: Automatische Hard-Termination bei Tab-Wechsel oder Unmount
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'hidden') {
-        if (recognitionRef.current) {
-          try { recognitionRef.current.abort(); } catch {}
-        }
-        setIsListening(false);
-      }
-    };
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      if (recognitionRef.current) {
-        try { recognitionRef.current.abort(); } catch {}
-      }
-    };
-  }, []);
-
-  const toggleListening = () => {
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      alert("Spracherkennung wird von Ihrem Browser leider nicht unterstützt (empfohlen: Google Chrome, Safari oder Microsoft Edge).");
-      return;
-    }
-
-    if (isListening) {
-      setIsListening(false);
-      if (recognitionRef.current) {
-        try { recognitionRef.current.stop(); } catch {}
-      }
-      return;
-    }
-
-    try {
-      const recognition = new SpeechRecognition();
-      recognition.lang = 'de-DE';
-      recognition.continuous = false;
-      recognition.interimResults = false;
-      recognition.maxAlternatives = 1;
-
-      recognition.onstart = () => {
-        setIsListening(true);
-      };
-
-      recognition.onresult = (event: any) => {
-        let transcript = '';
-        for (let i = event.resultIndex; i < event.results.length; ++i) {
-          if (event.results[i].isFinal) {
-            transcript += event.results[i][0].transcript;
-          }
-        }
-        if (!transcript && event.results?.[0]?.[0]?.transcript) {
-          transcript = event.results[0][0].transcript;
-        }
-        if (transcript && transcript.trim()) {
-          onTranscript(transcript.trim());
-        }
-      };
-
-      recognition.onerror = (event: any) => {
-        console.warn("[SpeechDictation] Error:", event.error);
-        setIsListening(false);
-      };
-
-      recognition.onend = () => {
-        setIsListening(false);
-      };
-
-      recognitionRef.current = recognition;
-      recognition.start();
-    } catch (e) {
-      console.error("[SpeechDictation] Start failed:", e);
-      setIsListening(false);
-    }
-  };
-
-  return (
-    <button
-      type="button"
-      onClick={toggleListening}
-      className="tactile-btn"
-      title={isListening ? "Aufnahme stoppen..." : "Sprache zu Text diktieren"}
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: '5px',
-        padding: size === 'sm' ? '4px 10px' : '6px 12px',
-        borderRadius: '999px',
-        fontSize: size === 'sm' ? '0.70rem' : '0.76rem',
-        fontWeight: 800,
-        cursor: 'pointer',
-        border: isListening ? '1.5px solid #ef4444' : '1px solid #cbd5e1',
-        background: isListening ? '#fef2f2' : '#ffffff',
-        color: isListening ? '#dc2626' : '#475569',
-        boxShadow: isListening ? '0 0 12px rgba(239, 68, 68, 0.4)' : '0 1px 3px rgba(0,0,0,0.04)',
-        transition: 'all 0.2s ease',
-        animation: isListening ? 'paniniGlow 1.2s infinite alternate' : 'none'
-      }}
-    >
-      {isListening ? (
-        <>
-          <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#dc2626', display: 'inline-block' }} />
-          <span>Hört zu... (Stopp)</span>
-        </>
-      ) : (
-        <>
-          <Mic size={size === 'sm' ? 12 : 14} style={{ color: '#0284c7' }} />
-          <span>{title}</span>
-        </>
-      )}
-    </button>
-  );
+export type { Student, MeisterwerkDocumentationModalProps, ProgressItem, ParsedStudentQuestion, ParsedStudentAnnotation };
+export { 
+  formatPageNumbers, 
+  getCleanPageNotes, 
+  getCleanTeacherHomeworkText, 
+  formatStudentNoteDisplay, 
+  parseStudentQuestionFromNotes, 
+  parseStudentAnnotation, 
+  parseSongArtistAndTitle, 
+  SKILL_TAGS,
+  SpeechDictationButton,
+  InlineAudioPlayer,
+  RetroCassettePlayer,
+  MasterworkAudioCapsule,
+  CassetteIcon,
+  playCountInBeep
 };
 
 export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationModalProps> = ({ 
@@ -516,15 +111,33 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   readOnly = false, 
   isEmbed = false, 
   isTeacherTools = false, 
-  uiLevel = 'pro',
+  uiLevel: propUiLevel,
   initialXp,
   initialStreak,
   initialPracticeMinutes,
   initialMasteredSongsCount,
   hasTresorStorage: propHasTresor,
-  groupStudents: propGroupStudents
+  groupStudents: propGroupStudents,
+  isParentUnlocked = false,
+  parentPermissions: propParentPermissions,
+  onSaveParentOverrides
 }) => {
-  const isTeacherMode = !readOnly || isTeacherTools;
+  const uiLevel: 'junior' | 'teen' | 'pro' = propUiLevel || (student as any)?.campus_ui_level || 'pro';
+  const isSessionTeacher = typeof window !== 'undefined' && (() => {
+    try {
+      const ws = sessionStorage.getItem('groovelab_active_workspace');
+      if (ws === 'teacher' || ws === 'admin' || ws === 'secretary') return true;
+      const cached = sessionStorage.getItem('groovelab_cached_user');
+      if (cached) {
+        const u = JSON.parse(cached);
+        if (u && (u.role === 'teacher' || u.role === 'admin' || u.role === 'secretary' || u.is_teacher)) return true;
+      }
+      const role = sessionStorage.getItem('groovelab_user_role') || localStorage.getItem('groovelab_user_role');
+      if (role === 'teacher' || role === 'admin' || role === 'secretary') return true;
+    } catch (e) {}
+    return false;
+  })();
+  const isTeacherMode = !readOnly || isTeacherTools || isSessionTeacher;
   const studentFirstName = (student?.first_name || (student as any)?.name?.split(' ')[0] || 'Schüler').trim();
 
   // 👥 DUO & GRUPPENUNTERRICHT: Compute all participants of the current lesson group
@@ -1499,6 +1112,59 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   const [audioDuration, setAudioDuration] = useState(0);
   const [isUploadingAudio, setIsUploadingAudio] = useState(false);
   const [localJuniorRecordingsTrigger, setLocalJuniorRecordingsTrigger] = useState(0);
+
+  // 🏷️ Reactive Song-Tag Overrides for Audio Recordings: audioUrl -> songTag
+  const [audioSongTags, setAudioSongTags] = useState<{ [url: string]: string }>(() => {
+    try {
+      if (student?.id) {
+        const stored = localStorage.getItem(`campus_audio_song_tags_${student.id}`);
+        if (stored) return JSON.parse(stored);
+      }
+    } catch {}
+    return {};
+  });
+
+  const handleUpdateAudioSongTag = (audioUrl: string, songTag: string | null) => {
+    if (!audioUrl) return;
+    setAudioSongTags(prev => {
+      const next = { ...prev };
+      if (songTag && songTag.trim() !== '') {
+        next[audioUrl] = songTag.trim();
+      } else {
+        delete next[audioUrl];
+      }
+      try {
+        if (student?.id) {
+          localStorage.setItem(`campus_audio_song_tags_${student.id}`, JSON.stringify(next));
+        }
+      } catch {}
+      return next;
+    });
+
+    // Also update student recordings in localStorage if applicable
+    try {
+      if (student?.id) {
+        const juniorKey = `campus_junior_recordings_${student.id}`;
+        const stored = localStorage.getItem(juniorKey);
+        if (stored) {
+          const list = JSON.parse(stored);
+          if (Array.isArray(list)) {
+            let changed = false;
+            list.forEach((rec: any) => {
+              if (rec.url === audioUrl) {
+                rec.songTag = songTag && songTag.trim() !== '' ? songTag.trim() : undefined;
+                changed = true;
+              }
+            });
+            if (changed) {
+              localStorage.setItem(juniorKey, JSON.stringify(list));
+              setLocalJuniorRecordingsTrigger(p => p + 1);
+            }
+          }
+        }
+      }
+    } catch {}
+  };
   const [mediaRecorderInstance, setMediaRecorderInstance] = useState<MediaRecorder | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordingTargetRef = useRef<{ songId?: string; label?: string; isMasterwork?: boolean }>({});
@@ -1507,25 +1173,37 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   const activeAudioPlayerRef = useRef<HTMLAudioElement | null>(null);
   const useNotebookLayout = false;
   const recordingTimerRef = React.useRef<any>(null);
+  const recordStartTimeRef = React.useRef<number>(0);
   const accumulatedTranscriptRef = React.useRef<string>('');
 
-  // ⏱️ Mechanical Metronome Icon Component
+  // ⏱️ Mechanical Metronome Icon Component (Harmonic Precision Silhouette)
   const MechanicalMetronomeIcon = ({ size = 18, color = "currentColor", strokeWidth = 2 }: { size?: number; color?: string; strokeWidth?: number }) => (
     <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
-      <path d="M6 21h12" />
-      <path d="M7.5 21L11 3.5h2l3.5 17.5" />
-      <path d="M12 4v17" />
-      <path d="M9 13.5l5.5-3" />
-      <circle cx="14.5" cy="10.5" r="1.8" fill={color} />
+      {/* Precision pyramid body */}
+      <path d="M5.5 21h13l-3.8-15.5a1 1 0 0 0-.97-.8h-3.46a1 1 0 0 0-.97.8L5.5 21z" />
+      {/* Center pendulum slot */}
+      <path d="M12 7.5v10.5" strokeOpacity={0.45} />
+      {/* Swinging pendulum arm */}
+      <path d="M12 18l4.2-9.5" />
+      {/* Sliding tempo weight / bob */}
+      <rect x="14.2" y="10" width="3.4" height="2.4" rx="0.7" fill={color} strokeWidth={0} />
     </svg>
   );
 
-  // 🔍 Unified Omnisearch, Favorites & Month Album States
+
+  // 🔍 Unified Omnisearch, Favorites, Month & Song Album States
   const [recordingSearchQuery, setRecordingSearchQuery] = useState<string>("");
   const [selectedTeacherMonth, setSelectedTeacherMonth] = useState<{ key: string; label: string } | null>(null);
   const [selectedStudentMonth, setSelectedStudentMonth] = useState<{ key: string; label: string } | null>(null);
+  const [selectedTeacherSongAlbum, setSelectedTeacherSongAlbum] = useState<string | null>(null);
+  const [selectedStudentSongAlbum, setSelectedStudentSongAlbum] = useState<string | null>(null);
   const [showTeacherFavoritesOnly, setShowTeacherFavoritesOnly] = useState<boolean>(false);
   const [showStudentFavoritesOnly, setShowStudentFavoritesOnly] = useState<boolean>(false);
+  const [showTeacherHomeworkArchive, setShowTeacherHomeworkArchive] = useState<boolean>(false);
+  const [openHomeworkWeekAccordions, setOpenHomeworkWeekAccordions] = useState<string[]>([]);
+  const [isTeacherHomeworkExpanded, setIsTeacherHomeworkExpanded] = useState<boolean>(readOnly ? true : false);
+  const [isStudentWeekExpanded, setIsStudentWeekExpanded] = useState<boolean>(false);
+  const [recordingSavedToast, setRecordingSavedToast] = useState<string | null>(null);
   const [mobileRecordingsTab, setMobileRecordingsTab] = useState<'teacher' | 'student'>('teacher');
   const [favoriteAudioUrls, setFavoriteAudioUrls] = useState<string[]>(() => {
     try {
@@ -1546,8 +1224,137 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     });
   };
 
-  // 📅 KW Week Navigation Offset (0 = Current Week, -1 = Previous Week, etc.)
+  // 🎨 Curated Seasonal Jewel Vinyl Spectrum for Monthly Album Covers
+  const getMonthAlbumTheme = (monthKey: string) => {
+    const monthNum = parseInt(monthKey.split('-')[1] || '1', 10);
+    switch (monthNum) {
+      case 1: // Januar - Nordic Glacier
+        return {
+          bg: 'linear-gradient(135deg, #0284c7 0%, #0369a1 60%, #075985 100%)',
+          shadow: 'rgba(2, 132, 199, 0.35)',
+          glow: '#38bdf8'
+        };
+      case 2: // Februar - Amethyst Velvet
+        return {
+          bg: 'linear-gradient(135deg, #7c3aed 0%, #6d28d9 60%, #5b21b6 100%)',
+          shadow: 'rgba(124, 58, 237, 0.35)',
+          glow: '#a78bfa'
+        };
+      case 3: // März - Spring Emerald
+        return {
+          bg: 'linear-gradient(135deg, #059669 0%, #047857 60%, #064e3b 100%)',
+          shadow: 'rgba(5, 150, 105, 0.35)',
+          glow: '#34d399'
+        };
+      case 4: // April - Cherry Blossom
+        return {
+          bg: 'linear-gradient(135deg, #e11d48 0%, #be123c 60%, #9f1239 100%)',
+          shadow: 'rgba(225, 29, 72, 0.35)',
+          glow: '#fb7185'
+        };
+      case 5: // Mai - Fresh Meadow
+        return {
+          bg: 'linear-gradient(135deg, #16a34a 0%, #15803d 60%, #166534 100%)',
+          shadow: 'rgba(22, 163, 74, 0.35)',
+          glow: '#4ade80'
+        };
+      case 6: // Juni - Sunburst Gold
+        return {
+          bg: 'linear-gradient(135deg, #f59e0b 0%, #d97706 60%, #b45309 100%)',
+          shadow: 'rgba(217, 119, 6, 0.35)',
+          glow: '#fde047'
+        };
+      case 7: // Juli - Azure Lagoon
+        return {
+          bg: 'linear-gradient(135deg, #0891b2 0%, #0e7490 60%, #155e75 100%)',
+          shadow: 'rgba(8, 145, 178, 0.35)',
+          glow: '#22d3ee'
+        };
+      case 8: // August - Sunset Tangerine
+        return {
+          bg: 'linear-gradient(135deg, #ea580c 0%, #c2410c 60%, #9a3412 100%)',
+          shadow: 'rgba(234, 88, 12, 0.35)',
+          glow: '#fb923c'
+        };
+      case 9: // September - Electric Cobalt
+        return {
+          bg: 'linear-gradient(135deg, #4f46e5 0%, #4338ca 60%, #3730a3 100%)',
+          shadow: 'rgba(79, 70, 229, 0.35)',
+          glow: '#818cf8'
+        };
+      case 10: // Oktober - Autumn Terracotta
+        return {
+          bg: 'linear-gradient(135deg, #b45309 0%, #92400e 60%, #78350f 100%)',
+          shadow: 'rgba(180, 83, 9, 0.35)',
+          glow: '#f59e0b'
+        };
+      case 11: // November - Deep Slate Mocha
+        return {
+          bg: 'linear-gradient(135deg, #57534e 0%, #44403c 60%, #292524 100%)',
+          shadow: 'rgba(87, 83, 78, 0.35)',
+          glow: '#a8a29e'
+        };
+      case 12: // Dezember - Crimson Velvet
+        return {
+          bg: 'linear-gradient(135deg, #be123c 0%, #9f1239 60%, #881337 100%)',
+          shadow: 'rgba(190, 18, 60, 0.35)',
+          glow: '#f43f5e'
+        };
+      default:
+        return {
+          bg: 'linear-gradient(135deg, #4f46e5 0%, #4338ca 60%, #3730a3 100%)',
+          shadow: 'rgba(79, 70, 229, 0.35)',
+          glow: '#818cf8'
+        };
+    }
+  };
+
+  // 📅 KW Week Navigation Offset (0 = Current Week, -1 = Previous Week, etc. Hausaufgabe zeigt immer 'Diese Woche')
   const [viewingWeekOffset, setViewingWeekOffset] = useState<number>(0);
+  const [isTransferModalOpen, setIsTransferModalOpen] = useState<boolean>(false);
+
+  useEffect(() => {
+    setViewingWeekOffset(0);
+  }, [student?.id]);
+
+  const getTargetWeekIso = useCallback((offset: number): string => {
+    const target = getSimulatedNow();
+    if (offset !== 0) {
+      target.setDate(target.getDate() + (offset * 7));
+    }
+    return getISOWeek(target);
+  }, []);
+
+  const getWeekDateRange = useCallback((offset: number) => {
+    const target = getSimulatedNow();
+    target.setDate(target.getDate() + (offset * 7));
+
+    const day = target.getDay();
+    const diffToMonday = (day === 0 ? -6 : 1) - day;
+    const monday = new Date(target);
+    monday.setDate(target.getDate() + diffToMonday);
+
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+
+    const startDay = monday.getDate();
+    const endDay = sunday.getDate();
+    const startMonth = monday.toLocaleDateString('de-DE', { month: 'short' }).replace('.', '');
+    const endMonth = sunday.toLocaleDateString('de-DE', { month: 'short' }).replace('.', '');
+
+    const dateSpan = startMonth === endMonth
+      ? `${startDay}. – ${endDay}. ${startMonth}`
+      : `${startDay}. ${startMonth} – ${endDay}. ${endMonth}`;
+
+    let label = 'Diese Woche';
+    if (offset === -1) label = 'Letzte Woche';
+    else if (offset < -1) label = `Vor ${Math.abs(offset)} Wochen`;
+    else if (offset === 1) label = 'Folgewoche';
+    else if (offset > 1) label = `In ${offset} Wochen`;
+    else if (offset === 0) label = 'Diese Woche';
+
+    return { dateSpan, label };
+  }, []);
 
   // 🏷️ Didaktischer Kategorie-Filter (#Technik, #Repertoire, #Theorie, #Konzert, #Hausaufgabe, #Wichtig)
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string | null>(null);
@@ -1848,53 +1655,37 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     return [narrative];
   };
 
-  const generateSmartAudioTitle = (isTeacher: boolean, customLabel?: string, overrideSongId?: string): string => {
-    const trimmedCustom = (customLabel || "").trim();
-    if (trimmedCustom && trimmedCustom !== 'Meisterwerk-Aufnahme') {
-      return trimmedCustom;
-    }
-
-    const now = getSimulatedNow();
-    const weekdayShort = now.toLocaleDateString("de-DE", { weekday: "short" });
-    const dateShort = now.toLocaleDateString("de-DE", { day: "2-digit", month: "short" });
-    const timeShort = now.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
-    const weekStr = getISOWeek(now);
-    const weekNum = weekStr.split("-W")[1] || "";
-
+  const generateSmartAudioTitle = (
+    isTeacher: boolean, 
+    customLabel?: string, 
+    overrideSongId?: string,
+    existingAudios?: any[]
+  ): string => {
     // 1. Check if an active song or topic exists
     const activeSong = (activeSongSkills || []).find(s => (overrideSongId && s.id === overrideSongId) || (selectedActiveSongId && s.id === selectedActiveSongId));
     const songTitle = activeSong?.songs?.title || activeSong?.title || activeSong?.song_title;
     const cleanTopic = (topicName || "").trim();
     const meaningfulTopic = cleanTopic && !cleanTopic.toLowerCase().startsWith("hausaufgabe") && !cleanTopic.toLowerCase().startsWith("allgemein") && cleanTopic !== 'Meisterwerk-Aufnahme' ? cleanTopic : null;
-    const targetSubject = songTitle || meaningfulTopic;
+    const targetSubject = songTitle || meaningfulTopic || undefined;
 
-    const instrumentName = studentInstrument || (student as any)?.instrument || (student as any)?.instrument_name || '';
-
-    if (isTeacher) {
-      // 👨‍🏫 LEHRKRAFT (Vom Unterricht / Feedback & Play-Along):
-      if (targetSubject) {
-        return `${targetSubject} • Unterricht (${weekdayShort}, ${dateShort} • ${timeShort})`;
-      }
-      return `Unterrichts-Audio • ${weekdayShort}, ${dateShort} (KW ${weekNum} • ${timeShort})`;
-    } else {
-      // 🎓 SCHÜLER (Übe-Studio & Eigene Aufnahmen):
-      if (targetSubject) {
-        return `${targetSubject} • Übe-Take (${weekdayShort}, ${dateShort} • ${timeShort})`;
-      }
-      if (instrumentName) {
-        return `${instrumentName}-Übung • ${weekdayShort}, ${dateShort} (${timeShort})`;
-      }
-      return `Übe-Take • ${weekdayShort}, ${dateShort} (KW ${weekNum} • ${timeShort})`;
-    }
+    return formatHarmonizedAudioTitle({
+      label: customLabel,
+      songTag: targetSubject,
+      topic: targetSubject,
+      date: getSimulatedNow().toISOString(),
+      isTeacher
+    }, existingAudios, isTeacher, targetSubject);
   };
 
   const matchesAudioSearch = (aud: any, searchQuery: string): boolean => {
     if (!searchQuery || !searchQuery.trim()) return true;
     const q = searchQuery.toLowerCase().trim();
     
-    // 1. Match in direct text label / title / notes
-    const label = (aud.label || aud.title || "").toLowerCase();
-    if (label.includes(q)) return true;
+    // 1. Match in direct text label / title / notes / songTag / harmonizedTitle / baseTopic
+    const label = (aud.harmonizedTitle || aud.label || aud.title || "").toLowerCase();
+    const songTag = (aud.songTag || "").toLowerCase();
+    const baseTopic = (aud.baseTopic || "").toLowerCase();
+    if (label.includes(q) || songTag.includes(q) || baseTopic.includes(q)) return true;
 
     // 2. Resolve date keywords
     const d = aud.date ? new Date(aud.date) : null;
@@ -1951,6 +1742,27 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   const [recordingBpm, setRecordingBpm] = useState<number>(100);
   const [showRecordingMetronomePopup, setShowRecordingMetronomePopup] = useState<boolean>(false);
   const recordingMetronomeIntervalRef = useRef<any>(null);
+  const recordingMetronomeRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!showRecordingMetronomePopup) return;
+    const handleOutside = (e: MouseEvent | TouchEvent) => {
+      if (recordingMetronomeRef.current && !recordingMetronomeRef.current.contains(e.target as Node)) {
+        setShowRecordingMetronomePopup(false);
+      }
+    };
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setShowRecordingMetronomePopup(false);
+    };
+    window.addEventListener('mousedown', handleOutside);
+    window.addEventListener('touchstart', handleOutside);
+    window.addEventListener('keydown', handleEsc);
+    return () => {
+      window.removeEventListener('mousedown', handleOutside);
+      window.removeEventListener('touchstart', handleOutside);
+      window.removeEventListener('keydown', handleEsc);
+    };
+  }, [showRecordingMetronomePopup]);
 
   const playMetronomeTick = (isAccent: boolean) => {
     try {
@@ -2037,7 +1849,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   });
 
   useEffect(() => {
-    if (propHasTresor === true) {
+    if (propHasTresor === true || checkIsAudioTresorActive(student)) {
       setHasTresorStorage(true);
     } else {
       setHasTresorStorage(checkIsAudioTresorActive(student));
@@ -2051,11 +1863,12 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         if (active) setHasTresorStorage(true);
         return;
       }
+      const rawSch = (student as any)?.schools || (student as any)?.school;
+      const schObj = Array.isArray(rawSch) ? rawSch[0] : rawSch;
       let targetSchoolId = 
         student?.school_id || 
         (student as any)?.schoolId || 
-        (student as any)?.schools?.id ||
-        (student as any)?.school?.id ||
+        schObj?.id ||
         sessionStorage.getItem('groovelab_school_id') || 
         localStorage.getItem('groovelab_school_id') || 
         sessionStorage.getItem('campus_school_id') ||
@@ -2316,6 +2129,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       // Takes raw microphone input and routes it 1:1 identically to Left and Right channels (100% centered stereo, 0 left-bias!)
       const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
       const recordAudioCtx = new AudioCtx();
+      if (recordAudioCtx.state === 'suspended') {
+        await recordAudioCtx.resume().catch(() => {});
+      }
       const sourceNode = recordAudioCtx.createMediaStreamSource(stream);
       const mergerNode = recordAudioCtx.createChannelMerger(2);
       sourceNode.connect(mergerNode, 0, 0); // Duplicate to Left
@@ -2324,21 +2140,20 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       mergerNode.connect(destNode);
       const recordStream = destNode.stream;
 
-      // 🎙️ Dynamic Audio Quality Adaptation based on Audio-Tresor Storage
+      // 🎙️ Dynamic Audio Quality Adaptation based on Audio-Tresor Storage (Instant Non-Blocking Startup)
       let targetSchoolId = student?.school_id || (student as any)?.schoolId || localStorage.getItem('groovelab_school_id') || localStorage.getItem('campus_school_id');
-      let effectiveTresor = hasTresorStorage;
+      let effectiveTresor = hasTresorStorage || checkIsAudioTresorActive(student);
       if (targetSchoolId && !effectiveTresor) {
-        try {
-          const { data: sch } = await supabase
-            .from('schools')
-            .select('storage_addon_gb, storage_addon_status')
-            .eq('id', targetSchoolId)
-            .maybeSingle();
-          if (sch && Number(sch.storage_addon_gb || 0) > 0 && sch.storage_addon_status !== 'cancelled') {
-            effectiveTresor = true;
-            setHasTresorStorage(true);
-          }
-        } catch (e) {}
+        supabase
+          .from('schools')
+          .select('storage_addon_gb, storage_addon_status')
+          .eq('id', targetSchoolId)
+          .maybeSingle()
+          .then(({ data: sch }: any) => {
+            if (sch && Number(sch.storage_addon_gb || 0) > 0 && sch.storage_addon_status !== 'cancelled') {
+              setHasTresorStorage(true);
+            }
+          }, () => {});
       }
 
       // 256 kbps Crystal-Clear Studio Audio when Audio-Tresor is booked, else 128 kbps High-Quality Audio
@@ -2377,14 +2192,20 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         } catch (e) {}
 
         const rawBlob = new Blob(chunks, { type: recorder.mimeType || 'audio/webm' });
-        // 🎙️ 100% PURE RAW + EBU R128 Loudness Calibration (-14.5 LUFS / -1.0 dBTP):
-        let blob = rawBlob;
+        // 🎙️ 100% PURE RAW + EBU R128 Loudness Calibration (-14.5 LUFS / -1.0 dBTP / Max 3.5 dB Limiter GR):
+        let dspDuration = 0;
+        let blob: Blob = rawBlob;
         let url = '';
         try {
-          const pureRawRes = await processPureRawBlob(rawBlob, { targetLufs: TARGET_PURE_RAW_LUFS, targetPeakDb: TARGET_PEAK_DBTP });
+          const pureRawRes = await processPureRawBlob(rawBlob, { 
+            targetLufs: TARGET_PURE_RAW_LUFS, 
+            targetPeakDb: TARGET_PEAK_DBTP,
+            maxLimiterGrDb: MAX_PURE_RAW_LIMITER_GR_DB
+          });
           blob = pureRawRes.processedBlob;
           url = pureRawRes.processedUrl;
           if (pureRawRes.durationSec) {
+            dspDuration = pureRawRes.durationSec;
             durationInSeconds = Math.round(pureRawRes.durationSec);
           }
         } catch (dspErr) {
@@ -2395,15 +2216,59 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         setAudioBlob(blob);
         setAudioUrl(url);
 
-        const recDuration = durationInSeconds || Math.round(audioDuration) || 1;
+        const exactElapsedSec = Math.max(0.1, (Date.now() - (recordStartTimeRef.current || Date.now())) / 1000);
+        // Exakte Dauer: Kein früheres Abschneiden erlaubt, lieber eine Sekunde zu spät als zu früh
+        const recDuration = Math.max(
+          1,
+          Math.ceil(dspDuration || exactElapsedSec),
+          Math.ceil(exactElapsedSec)
+        );
         const targetInfo = recordingTargetRef.current;
         const isMasterwork = targetInfo.isMasterwork || Boolean(targetInfo.songId);
         const currentSongId = targetInfo.songId || selectedActiveSongId;
         const currentAudioLabel = targetInfo.label || audioLabel || '';
         const normKey = currentAudioLabel.toLowerCase().trim();
-        const isTeacherActor = !readOnly;
+        const isTeacherActor = isTeacherMode;
         const isStudentSession = !isTeacherActor;
-        const smartTitle = generateSmartAudioTitle(isTeacherActor, currentAudioLabel, currentSongId);
+
+        // 🎯 Collect existing audios for this actor to calculate the next strictly sequential take number (#1, #2, #3...)
+        const existingAudios: any[] = [];
+        if (isTeacherActor) {
+          (homeworkNotesList || []).forEach((n: string) => {
+            if (typeof n === 'string' && n.startsWith('AUDIO:')) {
+              const parts = n.substring(6).split('|');
+              existingAudios.push({
+                url: parts[0]?.trim(),
+                date: parts[2]?.trim(),
+                label: parts[3]?.trim(),
+                songTag: parts[7]?.trim(),
+                author: 'teacher',
+                isTeacher: true
+              });
+            }
+          });
+        } else {
+          try {
+            const stored = localStorage.getItem(`campus_junior_recordings_${student.id}`);
+            if (stored) {
+              const parsed = JSON.parse(stored);
+              if (Array.isArray(parsed)) {
+                parsed.forEach((r: any) => {
+                  existingAudios.push({
+                    url: r.url,
+                    date: r.date,
+                    label: r.title || r.label,
+                    songTag: r.songTag || r.song || r.songTitle,
+                    author: 'student',
+                    isTeacher: false
+                  });
+                });
+              }
+            }
+          } catch {}
+        }
+
+        const smartTitle = generateSmartAudioTitle(isTeacherActor, currentAudioLabel, currentSongId, existingAudios);
 
         const fileExt = hasTresorStorage ? 'wav' : (blob.type.includes('wav') ? 'wav' : blob.type.includes('webm') ? 'webm' : blob.type.includes('ogg') ? 'ogg' : 'mp3');
         const contentType = hasTresorStorage ? 'audio/wav' : (blob.type || 'audio/webm');
@@ -2510,7 +2375,10 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           // 👨‍🏫 Teacher homework voice note - INSTANT UPDATE
           const creatorRole = 'teacher';
           const initialVisibility = 'shared_with_teacher';
-          const audioMetaStr = `AUDIO:${localBlobKey}|${recDuration}|${new Date().toISOString()}|${smartTitle}|${creatorRole}|${initialVisibility}`;
+          const activeSong = (activeSongSkills || []).find(s => (currentSongId && s.id === currentSongId) || (selectedActiveSongId && s.id === selectedActiveSongId));
+          const songTitle = activeSong?.songs?.title || activeSong?.title || activeSong?.song_title;
+          const assignedTag = songTitle || cleanSongOrBookTitle(currentAudioLabel) || '';
+          const audioMetaStr = `AUDIO:${localBlobKey}|${recDuration}|${new Date().toISOString()}|${smartTitle}|${creatorRole}|${initialVisibility}|${uniqueRecId}|${assignedTag}`;
           
           setHomeworkNotesList(prev => {
             const ex = prev || [];
@@ -2519,6 +2387,10 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             return updatedList;
           });
         }
+
+        // 🌟 Kid & Teacher Celebration Feedback Toast
+        setRecordingSavedToast(isTeacherActor ? '🎙️ Unterrichts-Aufnahme gespeichert!' : '🌟 Klasse Take gespeichert!');
+        setTimeout(() => setRecordingSavedToast(null), 3500);
 
         notifyHomeworkChange();
         setAudioLabel('');
@@ -2620,19 +2492,21 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
       setAudioDuration(0);
       setIsRecordingAudio(true);
-      recorder.start(250);
+      recordStartTimeRef.current = Date.now();
+      recorder.start(100);
       setMediaRecorderInstance(recorder);
       mediaRecorderRef.current = recorder;
       
       const maxRecordSeconds = effectiveTresor ? 420 : 60;
 
       recordingTimerRef.current = setInterval(() => {
-        durationInSeconds += 1;
-        setAudioDuration(durationInSeconds);
-        if (durationInSeconds >= maxRecordSeconds) {
+        const elapsed = Math.floor((Date.now() - recordStartTimeRef.current) / 1000);
+        durationInSeconds = elapsed;
+        setAudioDuration(elapsed);
+        if (elapsed >= maxRecordSeconds) {
           stopRecordingAudio(recorder);
         }
-      }, 1000);
+      }, 500);
       
     } catch (err) {
       console.error("Failed to start recording:", err);
@@ -2647,7 +2521,14 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       try {
         rec.requestData();
       } catch (e) {}
-      rec.stop();
+      // 🛡️ Safety buffer (120ms): Garantiert, dass der letzte Takt vollständig im Puffer landet (kein vorzeitiges Abschneiden)
+      setTimeout(() => {
+        try {
+          if (rec.state !== 'inactive') {
+            rec.stop();
+          }
+        } catch (e) {}
+      }, 120);
     }
     if (recordingTimerRef.current) {
       clearInterval(recordingTimerRef.current);
@@ -3085,16 +2966,24 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       }
       setSongsLoading(true);
       try {
-        const { data: studentUser, error: studentError } = await supabase
-          .from('users')
-          .select('school_id, teacher_id')
-          .eq('id', student.id)
-          .maybeSingle();
+        let effectiveSchoolId = (student as any)?.school_id || (student as any)?.schoolId || studentSchoolId;
+        let activeTId = teacherId || (student as any)?.teacher_id;
 
-        if (studentError) throw studentError;
+        if (!effectiveSchoolId || !activeTId) {
+          const { data: studentUser, error: studentError } = await supabase
+            .from('users')
+            .select('school_id, teacher_id')
+            .eq('id', student.id)
+            .maybeSingle();
 
-        const effectiveSchoolId = studentUser?.school_id || (student as any)?.school_id || studentSchoolId;
-        const activeTId = teacherId || studentUser?.teacher_id || await getCurrentTeacherId();
+          if (!studentError && studentUser) {
+            if (!effectiveSchoolId) effectiveSchoolId = studentUser.school_id;
+            if (!activeTId) activeTId = studentUser.teacher_id;
+          }
+        }
+        if (!activeTId) {
+          activeTId = await getCurrentTeacherId();
+        }
 
         if (effectiveSchoolId) {
           let sq = supabase
@@ -3381,17 +3270,39 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         }
       }
 
-      // Single source of truth for active weekly homework notes
+      // Single source of truth for active weekly homework notes - Smart Merge preserving all AUDIO: attachments
       try {
         const cachedHW = localStorage.getItem(`campus_homework_notes_${student.id}`);
         if (cachedHW) {
+          let cachedList: string[] = [];
           if (cachedHW.startsWith('[') && cachedHW.endsWith(']')) {
             const parsed = JSON.parse(cachedHW);
             if (Array.isArray(parsed)) {
-              loadedHomeworkNotesList = parsed;
+              cachedList = parsed.map(String);
             }
           } else if (cachedHW.trim()) {
-            loadedHomeworkNotesList = [cachedHW.trim()];
+            cachedList = [cachedHW.trim()];
+          }
+
+          if (cachedList.length > 0) {
+            // Combine loadedHomeworkNotesList and cachedList preserving all AUDIO: entries
+            const mergedList = [...loadedHomeworkNotesList];
+            cachedList.forEach(cachedItem => {
+              if (!cachedItem || typeof cachedItem !== 'string') return;
+              if (cachedItem.includes('AUDIO:')) {
+                const cParts = cachedItem.substring(cachedItem.indexOf('AUDIO:') + 6).split('|');
+                const cUrl = cParts[0]?.trim();
+                const alreadyExists = mergedList.some(m => typeof m === 'string' && m.includes('AUDIO:') && m.includes(cUrl));
+                if (!alreadyExists) {
+                  mergedList.push(cachedItem);
+                }
+              } else if (!mergedList.includes(cachedItem)) {
+                if (cachedItem.trim()) {
+                  mergedList.push(cachedItem);
+                }
+              }
+            });
+            loadedHomeworkNotesList = mergedList;
           }
         }
       } catch (lsErr) {}
@@ -3455,60 +3366,83 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
       const fetchProfile = async () => {
         try {
-          const { data, error } = await supabase
-            .from('users')
-            .select('instrument, school_id')
-            .eq('id', student.id)
-            .maybeSingle();
-          if (!error && data) {
-            if (data.instrument) {
-              setStudentInstrument(data.instrument);
-            }
-            if (data.school_id) {
-              setStudentSchoolId(data.school_id);
-              loadLehrwerke(data.school_id);
-              
-              // Fetch school name
-              const { data: schoolData } = await supabase
-                .from('schools')
-                .select('name')
-                .eq('id', data.school_id)
-                .maybeSingle();
-              if (schoolData && schoolData.name) {
-                setSchoolName(schoolData.name);
+          const knownInstrument = (student as any)?.instrument || (student as any)?.resolved_instrument;
+          const knownSchoolId = student?.school_id || (student as any)?.schoolId;
+          const knownSchoolName = propSchoolName || student?.school_name || (Array.isArray((student as any)?.schools) ? (student as any)?.schools[0]?.name : (student as any)?.schools?.name);
+
+          if (knownInstrument) {
+            setStudentInstrument(knownInstrument);
+          }
+          if (knownSchoolId) {
+            setStudentSchoolId(knownSchoolId);
+            loadLehrwerke(knownSchoolId);
+          }
+          if (knownSchoolName) {
+            setSchoolName(knownSchoolName);
+          }
+
+          // Query users and schools only if instrument or schoolId is missing
+          if (!knownInstrument || !knownSchoolId) {
+            const { data, error } = await supabase
+              .from('users')
+              .select('instrument, school_id')
+              .eq('id', student.id)
+              .maybeSingle();
+            if (!error && data) {
+              if (data.instrument && !knownInstrument) {
+                setStudentInstrument(data.instrument);
+              }
+              if (data.school_id && !knownSchoolId) {
+                setStudentSchoolId(data.school_id);
+                loadLehrwerke(data.school_id);
+                
+                if (!knownSchoolName) {
+                  const { data: schoolData } = await supabase
+                    .from('schools')
+                    .select('name')
+                    .eq('id', data.school_id)
+                    .maybeSingle();
+                  if (schoolData && schoolData.name) {
+                    setSchoolName(schoolData.name);
+                  }
+                }
               }
             }
           }
 
-          // Fetch avatars (streak_flame, xp)
-          const { data: avatarData, error: avatarError } = await supabase
-            .from('avatars')
-            .select('xp, streak_flame')
-            .eq('user_id', student.id)
-            .maybeSingle();
+          // Fetch avatars only if initial values were not provided via props
+          if (initialXp === undefined || initialStreak === undefined) {
+            const { data: avatarData, error: avatarError } = await supabase
+              .from('avatars')
+              .select('xp, streak_flame')
+              .eq('user_id', student.id)
+              .maybeSingle();
 
-          if (!avatarError && avatarData) {
-            setStudentXP(avatarData.xp || 0);
-            setStudentStreak(avatarData.streak_flame || 0);
+            if (!avatarError && avatarData) {
+              if (initialXp === undefined) setStudentXP(avatarData.xp || 0);
+              if (initialStreak === undefined) setStudentStreak(avatarData.streak_flame || 0);
+            }
           }
 
-          // Fetch fokus_logs and calculate total minutes & distinct practice days for the current week
-          const { data: focusData, error: focusError } = await supabase
-            .from('fokus_logs')
-            .select('created_at, duration_seconds')
-            .eq('user_id', student.id);
+          // Fetch fokus_logs only if initialPracticeMinutes was not provided
+          if (initialPracticeMinutes === undefined) {
+            const { data: focusData, error: focusError } = await supabase
+              .from('fokus_logs')
+              .select('created_at, duration_seconds')
+              .eq('user_id', student.id);
 
-          if (!focusError && focusData) {
-            const totalSeconds = focusData.reduce((sum, item) => sum + (item.duration_seconds || 0), 0);
-            setStudentPracticeMinutes(Math.floor(totalSeconds / 60));
+            if (!focusError && focusData) {
+              const totalSeconds = focusData.reduce((sum, item) => sum + (item.duration_seconds || 0), 0);
+              setStudentPracticeMinutes(Math.floor(totalSeconds / 60));
 
-            const currentWeek = getISOWeek();
-            const currentWeekDays = new Set(
-              focusData
-                .filter(item => item.created_at && getISOWeek(item.created_at) === currentWeek)
-                .map(item => new Date(item.created_at).toISOString().split('T')[0])
-            );
-            setWeeklyPracticeDays(currentWeekDays.size);
+              const currentWeek = getISOWeek();
+              const currentWeekDays = new Set(
+                focusData
+                  .filter(item => item.created_at && getISOWeek(item.created_at) === currentWeek)
+                  .map(item => new Date(item.created_at).toISOString().split('T')[0])
+              );
+              setWeeklyPracticeDays(currentWeekDays.size);
+            }
           }
         } catch (e) {
           console.error('Error loading student profile in modal:', e);
@@ -3997,6 +3931,10 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       });
 
       setIsCurrentHomework(false);
+      try {
+        const currentIso = getTargetWeekIso(viewingWeekOffset);
+        localStorage.removeItem(`week_transferred_${student.id}_${currentIso}`);
+      } catch (e) {}
       setSessionLogs(prev => [...prev, `🗑️ Alle aktiven Hausaufgaben zurückgesetzt`]);
       await fetchProgress();
       await loadActiveSongSkills();
@@ -4005,6 +3943,208 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       console.error('Error resetting current homework:', e);
     }
   };
+
+  // 📥 Source-Daten für Hausaufgaben-Übertrag in eine neue Kalenderwoche
+  const sourceTransferData = useMemo(() => {
+    // 1. Lehrwerke from assignedLehrwerke and progressItems
+    const lwMap: Record<string, { pages: number[]; notes: string[]; bookColor?: any }> = {};
+    (assignedLehrwerke || []).forEach((assignment: any) => {
+      const book = globalLehrwerke.find(g => g.id === assignment.lehrwerkId);
+      if (!book || !assignment.pageStates) return;
+      Object.entries(assignment.pageStates).forEach(([pStr, pState]: [string, any]) => {
+        if (pState?.status === 'homework' || pState?.isCurrentHomework) {
+          const pNum = parseInt(pStr, 10);
+          if (!isNaN(pNum)) {
+            if (!lwMap[book.title]) lwMap[book.title] = { pages: [], notes: [], bookColor: getLehrwerkColor(book.title) };
+            if (!lwMap[book.title].pages.includes(pNum)) lwMap[book.title].pages.push(pNum);
+          }
+        }
+      });
+    });
+
+    (progressItems || []).forEach((item: any) => {
+      if (item.topic_name && item.topic_name.includes(' - Seite ') && item.is_current_homework) {
+        const parts = item.topic_name.split(' - Seite ');
+        const bTitle = parts[0].trim();
+        const pNum = parseInt(parts[1], 10);
+        if (!lwMap[bTitle]) lwMap[bTitle] = { pages: [], notes: [], bookColor: getLehrwerkColor(bTitle) };
+        if (!isNaN(pNum) && !lwMap[bTitle].pages.includes(pNum)) lwMap[bTitle].pages.push(pNum);
+      }
+    });
+
+    const sourceLW = Object.entries(lwMap).map(([title, info]) => ({
+      title,
+      pages: info.pages.sort((a, b) => a - b),
+      notes: info.notes,
+      bookColor: info.bookColor
+    }));
+
+    // 2. Songs
+    const sourceS: any[] = [];
+    (progressItems || []).forEach((item: any) => {
+      if (item.is_current_homework && !item.topic_name?.includes(' - Seite ') && !item.topic_name?.startsWith('Hausaufgabe KW ')) {
+        const cleanTopic = getNormalizedSongTitle(item);
+        const canKey = getCanonicalSongKey(item);
+        if (cleanTopic && !sourceS.some(x => getCanonicalSongKey(x) === canKey || getNormalizedSongTitle(x) === cleanTopic)) {
+          sourceS.push({
+            id: item.id,
+            topic_name: item.topic_name,
+            homework_notes: item.homework_notes
+          });
+        }
+      }
+    });
+
+    (activeSongSkills || []).forEach((skill: any) => {
+      const isHwInLs = localStorage.getItem(`song_hw_${student.id}_${skill.id}`) === 'true' ||
+                       localStorage.getItem(`song_hw_${student.id}_${skill.song_id}`) === 'true';
+      if (isHwInLs) {
+        const cleanTopic = getNormalizedSongTitle(skill);
+        const canKey = getCanonicalSongKey(skill);
+        if (!sourceS.some(x => getCanonicalSongKey(x) === canKey || getNormalizedSongTitle(x) === cleanTopic)) {
+          const songArtist = skill.songs?.artist || skill.artist || '';
+          const songTitle = skill.songs?.title || skill.title || skill.song_title || 'Song';
+          const songInstrument = skill.instrument ? ` (${skill.instrument})` : '';
+          const fullTitle = songArtist ? `${songArtist} - ${songTitle}${songInstrument}` : `${songTitle}${songInstrument}`;
+          sourceS.push({
+            id: skill.id,
+            topic_name: fullTitle,
+            homework_notes: skill.homework_notes
+          });
+        }
+      }
+    });
+
+    // 3. Audios
+    const rawAudioList = (homeworkNotesList || [])
+      .map((note, idx) => ({ note: typeof note === 'string' ? note : String(note || ''), idx }))
+      .filter(item => item.note.includes("AUDIO:"))
+      .map((item, index) => {
+        const cleanStr = item.note.startsWith('[') ? item.note.replace(/[\[\]"]/g, '') : item.note;
+        const parts = cleanStr.substring(cleanStr.indexOf('AUDIO:') + 6).split('|');
+        return {
+          url: parts[0]?.trim(),
+          duration: parseInt(parts[1] || '0', 10),
+          date: parts[2]?.trim(),
+          label: parts[3]?.trim() || `Aufnahme #${index + 1}`,
+          author: parts[4]?.trim() || 'teacher',
+          uniqueRecId: parts[6]?.trim(),
+          songTag: parts[7]?.trim(),
+          originalIdx: item.idx,
+          idx: item.idx
+        };
+      })
+      .filter(a => !!a.url);
+
+    const harmonizedSourceAudios = harmonizeAudioList(rawAudioList, true, topicName);
+    const sourceA = harmonizedSourceAudios.map(aud => ({
+      ...aud,
+      label: aud.harmonizedTitle || aud.label
+    }));
+
+    return { sourceLW, sourceS, sourceA };
+  }, [assignedLehrwerke, globalLehrwerke, progressItems, activeSongSkills, homeworkNotesList, student.id, topicName]);
+
+  // ⚡ Atomare Ausführung des Hausaufgaben-Übertrags in eine neue Kalenderwoche
+  const handleExecuteBatchTransfer = async (decisions: {
+    lehrwerke: Record<string, 'master' | 'reactivate' | 'park'>;
+    lehrwerkePages?: Record<string, Record<number, 'master' | 'reactivate' | 'park'>>;
+    songs: Record<string, 'master' | 'reactivate' | 'park'>;
+    audios: Record<string, 'keep' | 'hide'>;
+  }) => {
+    try {
+      // 1. Lehrwerke (mit granularer Einzel-Seiten-Triage)
+      for (const [title, action] of Object.entries(decisions.lehrwerke)) {
+        const bookPagesDecision = decisions.lehrwerkePages?.[title];
+        if (bookPagesDecision && Object.keys(bookPagesDecision).length > 0) {
+          for (const [pNumStr, pAction] of Object.entries(bookPagesDecision)) {
+            const pageNum = parseInt(pNumStr, 10);
+            if (isNaN(pageNum)) continue;
+            if (pAction === 'master') {
+              await handleMasterSinglePageDirect(title, pageNum);
+            } else if (pAction === 'park') {
+              await handleRemoveSinglePageHomework(title, pageNum);
+            } else if (pAction === 'reactivate') {
+              await handleReactivateSinglePageDirect(title, pageNum);
+            }
+          }
+        } else {
+          if (action === 'master') {
+            await handleMasterBookDirect(title);
+          } else if (action === 'park') {
+            await handleRemoveBookHomework(title);
+          } else if (action === 'reactivate') {
+            await handleReactivateBookDirect(title);
+          }
+        }
+      }
+
+      // 2. Songs
+      for (const [songKey, action] of Object.entries(decisions.songs)) {
+        const songItem = sourceTransferData.sourceS.find(s => (s.id === songKey || s.topic_name === songKey));
+        if (!songItem) continue;
+        if (action === 'master') {
+          await handleMasterSongDirect(songItem);
+        } else if (action === 'park') {
+          await handleRemoveSongHomework(songItem);
+        } else if (action === 'reactivate') {
+          await handleReactivateSongDirect(songItem);
+        }
+      }
+
+      // 3. Audios
+      for (const [url, action] of Object.entries(decisions.audios)) {
+        const aItem = sourceTransferData.sourceA.find(a => a.url === url);
+        if (action === 'keep') {
+          if (aItem) await handleKeepAudioTrack(aItem.originalIdx, url);
+        } else if (action === 'hide') {
+          if (aItem) await handleHideAudioTrack(aItem.originalIdx, url);
+        }
+      }
+
+      // 4. Mark target week as transferred in local storage
+      const targetIso = getTargetWeekIso(viewingWeekOffset);
+      const targetNum = targetIso.split('-W')[1] || '';
+      localStorage.setItem(`week_transferred_${student.id}_${targetIso}`, 'true');
+
+      // 5. Create / update weekly snapshot in progress_matrix for the target week with harmonized titles
+      const activeTId = await getCurrentTeacherId();
+      const existingSnap = progressItems.find(it => it.topic_name === `Hausaufgabe KW ${targetNum}`);
+      const keptAudios = sourceTransferData.sourceA
+        .filter(a => decisions.audios[a.url] === 'keep')
+        .map(a => `AUDIO:${a.url}|${a.duration || 0}|${new Date().toISOString()}|${a.label}|${(a as any).author || 'teacher'}|shared_with_teacher|${(a as any).uniqueRecId || ''}|${(a as any).songTag || ''}`);
+      const snapNotesJson = JSON.stringify([...keptAudios]);
+
+      if (existingSnap) {
+        await supabase
+          .from('progress_matrix')
+          .update({ homework_notes: snapNotesJson, is_current_homework: true, updated_at: new Date().toISOString() })
+          .eq('id', existingSnap.id);
+      } else {
+        await supabase
+          .from('progress_matrix')
+          .insert({
+            student_id: student.id,
+            teacher_id: activeTId,
+            topic_name: `Hausaufgabe KW ${targetNum}`,
+            status: 'IN_PROGRESS',
+            is_current_homework: true,
+            teacher_notes: '',
+            homework_notes: snapNotesJson,
+            updated_at: new Date().toISOString()
+          });
+      }
+
+      notifyHomeworkChange();
+      await fetchProgress();
+      await loadLehrwerke();
+      await loadActiveSongSkills();
+      setIsTransferModalOpen(false);
+    } catch (err) {
+      console.error('[handleExecuteBatchTransfer] Error:', err);
+    }
+  };
+
 
   const handleRemoveSinglePageHomework = async (bookTitle: string, pageNum: number) => {
     try {
@@ -4199,6 +4339,359 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     }
   };
 
+  const handleMasterSongDirect = async (songItemOrSkill: any) => {
+    try {
+      const matchingSkill = activeSongSkills.find(s => isSongMatch(s, songItemOrSkill));
+      const skillId = matchingSkill?.id || songItemOrSkill?.id;
+
+      try {
+        if (student?.id) {
+          if (skillId) localStorage.setItem(`song_hw_${student.id}_${skillId}`, 'false');
+          if (matchingSkill?.id) localStorage.setItem(`song_hw_${student.id}_${matchingSkill.id}`, 'false');
+          if (matchingSkill?.song_id) localStorage.setItem(`song_hw_${student.id}_${matchingSkill.song_id}`, 'false');
+        }
+      } catch (e) {}
+
+      const matchingItems = progressItems.filter(item => isSongMatch(item, songItemOrSkill));
+      const matchingIds = matchingItems.map(i => i.id).filter(id => id && !String(id).startsWith('temp-'));
+
+      if (matchingIds.length > 0) {
+        await supabase
+          .from('progress_matrix')
+          .update({ is_current_homework: false, status: 'MASTERED', updated_at: new Date().toISOString() })
+          .in('id', matchingIds);
+      }
+
+      if (selectedActiveSongId && matchingSkill && (selectedActiveSongId === matchingSkill.id || selectedActiveSongId === matchingSkill.song_id)) {
+        setIsCurrentHomework(false);
+        setStatus('MASTERED');
+      }
+
+      setProgressItems(prev => prev.map(item => {
+        if (isSongMatch(item, songItemOrSkill)) {
+          return { ...item, is_current_homework: false, status: 'MASTERED' };
+        }
+        return item;
+      }));
+
+      setShowMatchConfetti(true);
+      setTimeout(() => setShowMatchConfetti(false), 3500);
+
+      await fetchProgress();
+      await loadActiveSongSkills();
+      notifyHomeworkChange();
+    } catch (err) {
+      console.error('Error mastering song homework:', err);
+    }
+  };
+
+  const handleReactivateSongDirect = async (songItemOrSkill: any) => {
+    try {
+      const matchingSkill = activeSongSkills.find(s => isSongMatch(s, songItemOrSkill));
+      const skillId = matchingSkill?.id || songItemOrSkill?.id;
+
+      try {
+        if (student?.id) {
+          if (skillId) localStorage.setItem(`song_hw_${student.id}_${skillId}`, 'true');
+          if (matchingSkill?.id) localStorage.setItem(`song_hw_${student.id}_${matchingSkill.id}`, 'true');
+          if (matchingSkill?.song_id) localStorage.setItem(`song_hw_${student.id}_${matchingSkill.song_id}`, 'true');
+        }
+      } catch (e) {}
+
+      const matchingItems = progressItems.filter(item => isSongMatch(item, songItemOrSkill));
+      const matchingIds = matchingItems.map(i => i.id).filter(id => id && !String(id).startsWith('temp-'));
+
+      if (matchingIds.length > 0) {
+        await supabase
+          .from('progress_matrix')
+          .update({ is_current_homework: true, status: 'IN_PROGRESS', updated_at: new Date().toISOString() })
+          .in('id', matchingIds);
+      }
+
+      if (selectedActiveSongId && matchingSkill && (selectedActiveSongId === matchingSkill.id || selectedActiveSongId === matchingSkill.song_id)) {
+        setIsCurrentHomework(true);
+        setStatus('IN_PROGRESS');
+      }
+
+      setProgressItems(prev => prev.map(item => {
+        if (isSongMatch(item, songItemOrSkill)) {
+          return { ...item, is_current_homework: true, status: 'IN_PROGRESS' };
+        }
+        return item;
+      }));
+
+      await fetchProgress();
+      await loadActiveSongSkills();
+      notifyHomeworkChange();
+    } catch (err) {
+      console.error('Error reactivating song homework:', err);
+    }
+  };
+
+  const handleMasterBookDirect = async (bookTitle: string) => {
+    try {
+      const book = globalLehrwerke.find(b => b.title === bookTitle);
+      if (book) {
+        const stored = localStorage.getItem('student_lehrwerke_progress');
+        const parsed = stored ? JSON.parse(stored) : [];
+        
+        const updated = parsed.map((item: any) => {
+          if (item.studentId === student.id && item.lehrwerkId === book.id) {
+            const pageStates = { ...item.pageStates };
+            Object.keys(pageStates).forEach(pKey => {
+              if (pageStates[pKey]?.status === 'homework' || pageStates[pKey]?.isCurrentHomework) {
+                pageStates[pKey] = {
+                  ...pageStates[pKey],
+                  status: 'mastered',
+                  isCurrentHomework: false,
+                  updatedAt: new Date().toISOString()
+                };
+              }
+            });
+            return { ...item, pageStates };
+          }
+          return item;
+        });
+        
+        localStorage.setItem('student_lehrwerke_progress', JSON.stringify(updated));
+        setAssignedLehrwerke(updated.filter((item: any) => item.studentId === student.id));
+        loadLehrwerke();
+      }
+
+      const matchingItems = progressItems.filter(item => item.topic_name && item.topic_name.startsWith(`${bookTitle} - Seite `));
+      const matchingIds = matchingItems.map(i => i.id).filter(id => id && !String(id).startsWith('temp-'));
+      if (matchingIds.length > 0) {
+        await supabase
+          .from('progress_matrix')
+          .update({ is_current_homework: false, status: 'MASTERED', updated_at: new Date().toISOString() })
+          .in('id', matchingIds);
+      }
+
+      setProgressItems(prev => prev.map(item => {
+        if (item.topic_name && item.topic_name.startsWith(`${bookTitle} - Seite `)) {
+          return { ...item, is_current_homework: false, status: 'MASTERED' };
+        }
+        return item;
+      }));
+
+      setShowMatchConfetti(true);
+      setTimeout(() => setShowMatchConfetti(false), 3500);
+
+      await fetchProgress();
+      notifyHomeworkChange();
+    } catch (e) {
+      console.error('Error mastering book homework:', e);
+    }
+  };
+
+  const handleReactivateBookDirect = async (bookTitle: string) => {
+    try {
+      const book = globalLehrwerke.find(b => b.title === bookTitle);
+      if (book) {
+        const stored = localStorage.getItem('student_lehrwerke_progress');
+        const parsed = stored ? JSON.parse(stored) : [];
+        
+        const updated = parsed.map((item: any) => {
+          if (item.studentId === student.id && item.lehrwerkId === book.id) {
+            const pageStates = { ...item.pageStates };
+            Object.keys(pageStates).forEach(pKey => {
+              pageStates[pKey] = {
+                ...pageStates[pKey],
+                status: 'homework',
+                isCurrentHomework: true,
+                updatedAt: new Date().toISOString()
+              };
+            });
+            return { ...item, pageStates };
+          }
+          return item;
+        });
+        
+        localStorage.setItem('student_lehrwerke_progress', JSON.stringify(updated));
+        setAssignedLehrwerke(updated.filter((item: any) => item.studentId === student.id));
+        loadLehrwerke();
+      }
+
+      const matchingItems = progressItems.filter(item => item.topic_name && item.topic_name.startsWith(`${bookTitle} - Seite `));
+      const matchingIds = matchingItems.map(i => i.id).filter(id => id && !String(id).startsWith('temp-'));
+      if (matchingIds.length > 0) {
+        await supabase
+          .from('progress_matrix')
+          .update({ is_current_homework: true, status: 'IN_PROGRESS', updated_at: new Date().toISOString() })
+          .in('id', matchingIds);
+      }
+
+      setProgressItems(prev => prev.map(item => {
+        if (item.topic_name && item.topic_name.startsWith(`${bookTitle} - Seite `)) {
+          return { ...item, is_current_homework: true, status: 'IN_PROGRESS' };
+        }
+        return item;
+      }));
+
+      await fetchProgress();
+      notifyHomeworkChange();
+    } catch (e) {
+      console.error('Error reactivating book homework:', e);
+    }
+  };
+
+  const handleMasterSinglePageDirect = async (bookTitle: string, pageNum: number) => {
+    try {
+      const book = globalLehrwerke.find(b => b.title === bookTitle);
+      if (book) {
+        const stored = localStorage.getItem('student_lehrwerke_progress');
+        const parsed = stored ? JSON.parse(stored) : [];
+        
+        const updated = parsed.map((item: any) => {
+          if (item.studentId === student.id && item.lehrwerkId === book.id) {
+            const pageStates = { ...item.pageStates };
+            pageStates[pageNum] = {
+              ...pageStates[pageNum],
+              status: 'mastered',
+              isCurrentHomework: false,
+              updatedAt: new Date().toISOString()
+            };
+            return { ...item, pageStates };
+          }
+          return item;
+        });
+        
+        localStorage.setItem('student_lehrwerke_progress', JSON.stringify(updated));
+        setAssignedLehrwerke(updated.filter((item: any) => item.studentId === student.id));
+        loadLehrwerke();
+      }
+
+      const pageTopic = `${bookTitle} - Seite ${pageNum}`;
+      const matchingItems = progressItems.filter(item => item.topic_name === pageTopic);
+      const matchingIds = matchingItems.map(i => i.id).filter(id => id && !String(id).startsWith('temp-'));
+      if (matchingIds.length > 0) {
+        await supabase
+          .from('progress_matrix')
+          .update({ is_current_homework: false, status: 'MASTERED', updated_at: new Date().toISOString() })
+          .in('id', matchingIds);
+      }
+
+      setProgressItems(prev => prev.map(item => {
+        if (item.topic_name === pageTopic) {
+          return { ...item, is_current_homework: false, status: 'MASTERED' };
+        }
+        return item;
+      }));
+
+      setShowMatchConfetti(true);
+      setTimeout(() => setShowMatchConfetti(false), 3500);
+
+      await fetchProgress();
+      notifyHomeworkChange();
+    } catch (e) {
+      console.error('Error mastering single page:', e);
+    }
+  };
+
+  const handleReactivateSinglePageDirect = async (bookTitle: string, pageNum: number) => {
+    try {
+      const book = globalLehrwerke.find(b => b.title === bookTitle);
+      if (book) {
+        const stored = localStorage.getItem('student_lehrwerke_progress');
+        const parsed = stored ? JSON.parse(stored) : [];
+        
+        const updated = parsed.map((item: any) => {
+          if (item.studentId === student.id && item.lehrwerkId === book.id) {
+            const pageStates = { ...item.pageStates };
+            pageStates[pageNum] = {
+              ...pageStates[pageNum],
+              status: 'homework',
+              isCurrentHomework: true,
+              updatedAt: new Date().toISOString()
+            };
+            return { ...item, pageStates };
+          }
+          return item;
+        });
+        
+        localStorage.setItem('student_lehrwerke_progress', JSON.stringify(updated));
+        setAssignedLehrwerke(updated.filter((item: any) => item.studentId === student.id));
+        loadLehrwerke();
+      }
+
+      const pageTopic = `${bookTitle} - Seite ${pageNum}`;
+      const matchingItems = progressItems.filter(item => item.topic_name === pageTopic);
+      const matchingIds = matchingItems.map(i => i.id).filter(id => id && !String(id).startsWith('temp-'));
+      if (matchingIds.length > 0) {
+        await supabase
+          .from('progress_matrix')
+          .update({ is_current_homework: true, status: 'IN_PROGRESS', updated_at: new Date().toISOString() })
+          .in('id', matchingIds);
+      }
+
+      setProgressItems(prev => prev.map(item => {
+        if (item.topic_name === pageTopic) {
+          return { ...item, is_current_homework: true, status: 'IN_PROGRESS' };
+        }
+        return item;
+      }));
+
+      await fetchProgress();
+      notifyHomeworkChange();
+    } catch (e) {
+      console.error('Error reactivating single page:', e);
+    }
+  };
+
+  const handleKeepAudioTrack = async (_originalIdx: number, _url?: string) => {
+    setShowMatchConfetti(true);
+    setTimeout(() => setShowMatchConfetti(false), 2000);
+    notifyHomeworkChange();
+  };
+
+  const handleHideAudioTrack = async (noteIndexOrUrl: number | string, optionalUrl?: string) => {
+    try {
+      let targetUrl: string | undefined = typeof noteIndexOrUrl === 'string' ? noteIndexOrUrl : optionalUrl;
+      let targetIndex: number = typeof noteIndexOrUrl === 'number' ? noteIndexOrUrl : -1;
+
+      const updatedList = (homeworkNotesList || []).filter((item, idx) => {
+        if (targetIndex >= 0 && idx === targetIndex) return false;
+        if (targetUrl && typeof item === 'string' && item.includes(targetUrl)) return false;
+        return true;
+      });
+
+      setHomeworkNotesList(updatedList);
+
+      try {
+        localStorage.setItem(`campus_homework_notes_${student.id}`, JSON.stringify(updatedList));
+      } catch {}
+
+      if (student?.id) {
+        try {
+          const currentKw = getISOWeek();
+          const { data: currentRows } = await supabase
+            .from('progress_matrix')
+            .select('id, topic_name, homework_notes')
+            .eq('student_id', student.id)
+            .like('topic_name', `Hausaufgabe KW %`);
+
+          if (currentRows && currentRows.length > 0) {
+            for (const row of currentRows) {
+              const rowKw = getISOWeek(row.topic_name.replace('Hausaufgabe KW ', ''));
+              if (rowKw === currentKw) {
+                await supabase
+                  .from('progress_matrix')
+                  .update({ homework_notes: updatedList })
+                  .eq('id', row.id);
+              }
+            }
+          }
+        } catch (dbErr) {
+          console.warn('DB update on hide audio note:', dbErr);
+        }
+      }
+
+      notifyHomeworkChange();
+    } catch (e) {
+      console.error('Error hiding audio note:', e);
+    }
+  };
+
   const handleDeleteNote = async (noteIndexOrUrl: number | string, optionalUrl?: string) => {
     try {
       let targetUrl: string | undefined = typeof noteIndexOrUrl === 'string' ? noteIndexOrUrl : optionalUrl;
@@ -4344,6 +4837,131 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       console.error('Error deleting note:', e);
     }
   };
+
+  const handleRenameTeacherAudio = async (url: string, newTitle: string, originalIdx?: number) => {
+    const trimmedTitle = newTitle.trim();
+    if (!trimmedTitle) return;
+
+    try {
+      let targetIdx = originalIdx;
+      if (targetIdx === undefined || targetIdx < 0 || !homeworkNotesList[targetIdx]?.includes(url)) {
+        targetIdx = homeworkNotesList.findIndex(n => typeof n === 'string' && n.startsWith('AUDIO:') && n.includes(url));
+      }
+
+      let originalNote = '';
+      let updatedNote = '';
+
+      if (targetIdx >= 0 && homeworkNotesList[targetIdx]) {
+        originalNote = homeworkNotesList[targetIdx];
+        const parts = originalNote.substring(6).split('|');
+        parts[3] = trimmedTitle;
+        while (parts.length < 8) parts.push('');
+        parts[8] = 'custom';
+        updatedNote = `AUDIO:${parts.join('|')}`;
+
+        const updatedList = [...homeworkNotesList];
+        updatedList[targetIdx] = updatedNote;
+        setHomeworkNotesList(updatedList);
+
+        try {
+          localStorage.setItem(`campus_homework_notes_${student.id}`, JSON.stringify(updatedList));
+        } catch {}
+
+        await syncHomeworkNotes(updatedList);
+        notifyHomeworkChange();
+      }
+
+      if (student?.id && originalNote && updatedNote) {
+        try {
+          const { data: allStudentMatrix } = await supabase
+            .from('progress_matrix')
+            .select('id, homework_notes')
+            .eq('student_id', student.id);
+
+          if (allStudentMatrix) {
+            for (const row of allStudentMatrix) {
+              if (row.homework_notes && row.homework_notes.includes(originalNote)) {
+                const updatedRowNotes = row.homework_notes.replace(originalNote, updatedNote);
+                await supabase
+                  .from('progress_matrix')
+                  .update({ homework_notes: updatedRowNotes, updated_at: new Date().toISOString() })
+                  .eq('id', row.id);
+              }
+            }
+          }
+        } catch (mErr) {
+          console.warn('[handleRenameTeacherAudio] Error updating matrix rows:', mErr);
+        }
+
+        setProgressItems(prev => prev.map(p => {
+          let notesStr = p.homework_notes ? String(p.homework_notes) : '';
+          if (notesStr && notesStr.includes(originalNote)) {
+            return { ...p, homework_notes: notesStr.replace(originalNote, updatedNote) };
+          }
+          return p;
+        }));
+      }
+
+      const juniorKey = `campus_junior_recordings_${student.id}`;
+      try {
+        const storedJunior = localStorage.getItem(juniorKey);
+        if (storedJunior) {
+          const parsed = JSON.parse(storedJunior);
+          if (Array.isArray(parsed)) {
+            let modified = false;
+            const updatedJunior = parsed.map((r: any) => {
+              if (url && (r.url === url || r.url?.includes(url))) {
+                modified = true;
+                return { ...r, title: trimmedTitle, label: trimmedTitle, isCustomTitle: true };
+              }
+              return r;
+            });
+            if (modified) {
+              localStorage.setItem(juniorKey, JSON.stringify(updatedJunior));
+              setLocalJuniorRecordingsTrigger(prev => prev + 1);
+            }
+          }
+        }
+      } catch {}
+    } catch (err) {
+      console.warn('[handleRenameTeacherAudio] Error:', err);
+    }
+  };
+
+  const handleRenameStudentAudio = (url: string, newTitle: string, id?: string) => {
+    const trimmedTitle = newTitle.trim();
+    if (!trimmedTitle) return;
+
+    try {
+      const juniorKey = `campus_junior_recordings_${student.id}`;
+      const storedJunior = localStorage.getItem(juniorKey);
+      if (storedJunior) {
+        const parsed = JSON.parse(storedJunior);
+        if (Array.isArray(parsed)) {
+          let modified = false;
+          const updatedJunior = parsed.map((r: any) => {
+            if ((id && r.id === id) || (url && (r.url === url || r.url?.includes(url)))) {
+              modified = true;
+              return {
+                ...r,
+                title: trimmedTitle,
+                label: trimmedTitle,
+                isCustomTitle: true
+              };
+            }
+            return r;
+          });
+          if (modified) {
+            localStorage.setItem(juniorKey, JSON.stringify(updatedJunior));
+            setLocalJuniorRecordingsTrigger(prev => prev + 1);
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('[handleRenameStudentAudio] Error:', err);
+    }
+  };
+
 
   const handleDeletePageNote = async (bookTitle: string, pageNum: number) => {
     try {
@@ -5400,10 +6018,11 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     setPageHomeworkNotes('');
   };
 
-  const awardCampusXP = async (amount: number, reason: string) => {
+  const awardCampusXP = async (amount: number, reason: string, durationSeconds: number = 0) => {
     try {
-      if (!student.id || amount <= 0) return;
+      if (!student?.id || (amount <= 0 && durationSeconds <= 0)) return;
       const nowIso = new Date().toISOString();
+      const durationMins = Math.round(durationSeconds / 60);
 
       // 1. Fetch current user XP
       const { data: userProfile } = await supabase
@@ -5416,14 +6035,16 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       const newCampusXP = currentCampusXP + amount;
 
       // Update users table
-      await supabase
-        .from('users')
-        .update({
-          campus_xp: newCampusXP,
-          xp: newCampusXP,
-          updated_at: nowIso
-        })
-        .eq('id', student.id);
+      if (amount > 0) {
+        await supabase
+          .from('users')
+          .update({
+            campus_xp: newCampusXP,
+            xp: newCampusXP,
+            updated_at: nowIso
+          })
+          .eq('id', student.id);
+      }
 
       // 2. Fetch & update student_stats record
       const { data: statsRecord } = await supabase
@@ -5433,11 +6054,16 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         .maybeSingle();
 
       const currentStatsXp = (statsRecord?.current_xp || 0) + amount;
+      const currentFocusMins = (statsRecord?.total_focus_minutes || 0) + durationMins;
+      const currentMonthlyMins = (statsRecord?.monthly_focus_minutes || 0) + durationMins;
+
       await supabase
         .from('student_stats')
         .upsert({
           student_id: student.id,
           current_xp: currentStatsXp,
+          total_focus_minutes: currentFocusMins,
+          monthly_focus_minutes: currentMonthlyMins,
           updated_at: nowIso
         }, { onConflict: 'student_id' });
 
@@ -5452,19 +6078,49 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           .or(`user_id.eq.${student.id},student_id.eq.${student.id}`);
       } catch (avErr) {}
 
-      // 4. Insert log entry in fokus_logs for transparency & auditing
+      // 4. Update offline local storage cache for instant offline & engine sync
+      try {
+        if (typeof window !== 'undefined') {
+          const offStatsKey = `cg_offline_stats_${student.id}`;
+          const offPracticeKey = `cg_offline_practice_${student.id}`;
+          const existingOffStats = JSON.parse(localStorage.getItem(offStatsKey) || '{}');
+          const existingOffPractice = JSON.parse(localStorage.getItem(offPracticeKey) || '{}');
+
+          const updatedOffStats = {
+            ...existingOffStats,
+            current_xp: Math.max(existingOffStats.current_xp || 0, currentStatsXp),
+            total_focus_minutes: Math.max(existingOffStats.total_focus_minutes || 0, currentFocusMins),
+            monthly_focus_minutes: Math.max(existingOffStats.monthly_focus_minutes || 0, currentMonthlyMins),
+            saved_at: nowIso
+          };
+          localStorage.setItem(offStatsKey, JSON.stringify(updatedOffStats));
+
+          const updatedOffPractice = {
+            ...existingOffPractice,
+            xp: Math.max(existingOffPractice.xp || 0, currentStatsXp),
+            total_focus_minutes: Math.max(existingOffPractice.total_focus_minutes || 0, currentFocusMins),
+            monthly_focus_minutes: Math.max(existingOffPractice.monthly_focus_minutes || 0, currentMonthlyMins),
+            saved_at: nowIso
+          };
+          localStorage.setItem(offPracticeKey, JSON.stringify(updatedOffPractice));
+        }
+      } catch (e) {}
+
+      // 5. Insert log entry in fokus_logs for transparency & auditing
       try {
         await supabase.from('fokus_logs').insert({
           student_id: student.id,
-          duration_minutes: 0,
-          duration_seconds: 0,
+          duration_minutes: durationMins,
+          duration_seconds: durationSeconds,
           xp_earned: amount,
           is_extra: true,
           created_at: nowIso
         });
       } catch (logErr) {}
 
-      // 5. Dispatch real-time custom event so open student widgets instantly update
+      // 6. Broadcast updates across tabs and DOM events
+      broadcastPracticeUpdate(student.id, { xpEarned: amount, durationMinutes: durationMins, durationSeconds });
+
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('campus-xp-awarded', {
           detail: { studentId: student.id, amount, newTotal: newCampusXP, reason }
@@ -6678,6 +7334,88 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     return Array.from(songsMap.values());
   }, [activeSongSkills, progressItems, student.id]);
 
+  // 🎵 Extrahierte Liste verfügbarer Schüler-Songs für das 1-Tap Song-Tagging (+Tag)
+  // 🎵 Extrahierte Liste verfügbarer Schüler-Songs & Lehrwerke für das 1-Tap Tagging (+Zuordnen)
+  const availableSongsForTagging = useMemo(() => {
+    const list: { title: string; artist?: string; fullLabel: string; type?: 'song' | 'book' }[] = [];
+    const seen = new Set<string>();
+
+    const addSong = (rawTitle: string, rawArtist?: string) => {
+      if (!rawTitle) return;
+      const parsed = parseSongArtistAndTitle(rawTitle);
+      const title = parsed.title;
+      const artist = rawArtist || parsed.artist;
+      const fullLabel = artist ? `${artist} - ${title}` : title;
+      const norm = title.toLowerCase().trim();
+      if (!norm || seen.has(norm)) return;
+      seen.add(norm);
+      list.push({ title, artist, fullLabel, type: 'song' });
+    };
+
+    const addBook = (rawTitle: string) => {
+      if (!rawTitle) return;
+      const title = cleanSongOrBookTitle(rawTitle);
+      const norm = title.toLowerCase().trim();
+      if (!norm || seen.has(norm) || norm === 'test') return;
+      seen.add(norm);
+      list.push({ title, fullLabel: title, type: 'book' });
+    };
+
+    // 1. Lehrwerke from globalLehrwerke
+    (globalLehrwerke || []).forEach((b: any) => {
+      if (b && b.title) addBook(b.title);
+    });
+
+    // 2. From assignedLehrwerke
+    (assignedLehrwerke || []).forEach((a: any) => {
+      if (a && a.title) addBook(a.title);
+    });
+
+    // 3. From resolvedActiveSongs
+    (resolvedActiveSongs || []).forEach((s: any) => {
+      const t = s.title || s.songs?.title;
+      const a = s.artist || s.songs?.artist;
+      if (t) addSong(t, a);
+    });
+
+    // 4. From activeSongSkills
+    (activeSongSkills || []).forEach((s: any) => {
+      const t = s.songs?.title || s.title || s.song_title;
+      const a = s.songs?.artist || s.artist;
+      if (t) addSong(t, a);
+    });
+
+    // 5. From progressItems
+    (progressItems || []).forEach((p: any) => {
+      const topic = (p.topic_name || p.title || '').trim();
+      if (topic && !topic.startsWith('Hausaufgabe KW ') && topic.toLowerCase() !== 'test') {
+        if (topic.includes(' - Seite ') || topic.toLowerCase().includes('lehrwerk') || topic.toLowerCase().includes('buch') || topic.toLowerCase().includes('fitness')) {
+          addBook(topic);
+        } else {
+          addSong(topic);
+        }
+      }
+    });
+
+    // 6. From student songs if available
+    if (Array.isArray((student as any)?.songs)) {
+      (student as any).songs.forEach((s: any) => {
+        if (typeof s === 'string') addSong(s);
+        else if (s && s.title) addSong(s.title, s.artist);
+      });
+    }
+
+    return list;
+  }, [globalLehrwerke, assignedLehrwerke, resolvedActiveSongs, activeSongSkills, progressItems, student]);
+
+  const isBookAlbum = useCallback((rawTitle: string): boolean => {
+    if (!rawTitle) return false;
+    const norm = rawTitle.toLowerCase().trim();
+    const matched = availableSongsForTagging.find(item => item.title.toLowerCase().trim() === norm || item.fullLabel.toLowerCase().trim() === norm);
+    if (matched && matched.type) return matched.type === 'book';
+    return norm.includes('lehrwerk') || norm.includes('buch') || norm.includes('schule') || norm.includes('band ') || norm.includes('heft') || norm.includes('methode') || norm.includes('fitness') || norm.includes(' - seite ');
+  }, [availableSongsForTagging]);
+
   const activeBook = activeLehrwerkId ? globalLehrwerke.find(g => g.id === activeLehrwerkId) : null;
   const activeSong = selectedActiveSongId ? (resolvedActiveSongs.find(s => s.id === selectedActiveSongId || s.song_id === selectedActiveSongId) || activeSongSkills.find(s => s.id === selectedActiveSongId)) : null;
   const bookColor = (activeBook && activeSubView === 'lehrwerk') 
@@ -6777,869 +7515,24 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   };
 
   const renderSkillRadarTabContent = () => {
-    const feedbackEntries = (progressItems || [])
-      .map((item: any) => {
-        try {
-          const notes: string[] = JSON.parse(item.homework_notes || '[]');
-          const fbStr = notes.find(n => n.startsWith('FEEDBACK:'));
-          if (!fbStr) return null;
-          return JSON.parse(fbStr.substring(9));
-        } catch { return null; }
-      })
-      .filter(Boolean)
-      .slice(0, 12);
-
-    const currentWeekStr = getISOWeek();
-    const allActiveNotesText = [
-      generalHomeworkNotes || '',
-      latestGeneralHomeworkNotesRef.current || '',
-      homeworkNotes || '',
-      ...(homeworkNotesList || []),
-      ...((progressItems || [])
-        .filter((item: any) => item.is_current_homework && (item.updated_at ? getISOWeek(item.updated_at) === currentWeekStr : true))
-        .map((item: any) => item.homework_notes || ''))
-    ].join(' ');
-
-    const counts = SKILL_TAGS.map(tag => {
-      let level = skillOverrides[tag.key];
-
-      if (typeof level !== 'number' || level < 1 || level > 5) {
-        // Standardmässig Stufe 1 (Fundament 🌱) als didaktische Basis-Geometrie für maximale Progression
-        level = 1;
-      }
-
-      const pct = Math.max(0.20, level / 5);
-      
-      const rankTitle = 
-        tag.key === 'rhythmus' ? (level === 5 ? 'Groove-Meister' : (level === 4 ? 'Timing-Sicher' : (level === 3 ? 'Puls-Entdecker' : (level === 2 ? 'Rhythmus-Aufbau' : 'Rhythmus-Fundament')))) :
-        tag.key === 'technik' ? (level === 5 ? 'Meister-Virtuose' : (level === 4 ? 'Feinmotoriker' : (level === 3 ? 'Technik-Aufsteiger' : (level === 2 ? 'Technik-Aufbau' : 'Technik-Fundament')))) :
-        tag.key === 'intonation' ? (level === 5 ? 'Klang-Künstler' : (level === 4 ? 'Klang-Bewusst' : (level === 3 ? 'Klang-Gestalter' : (level === 2 ? 'Klang-Aufbau' : 'Klang-Fundament')))) :
-        tag.key === 'ausdruck' ? (level === 5 ? 'Bühnen-Magier' : (level === 4 ? 'Ausdrucksstark' : (level === 3 ? 'Gefühls-Pionier' : (level === 2 ? 'Ausdruck-Aufbau' : 'Ausdrucks-Fundament')))) :
-        (level === 5 ? 'Repertoire-Profi' : (level === 4 ? 'Spielfluss-Star' : (level === 3 ? 'Song-Entdecker' : (level === 2 ? 'Song-Aufbau' : 'Repertoire-Fundament'))));
-
-      return {
-        ...tag,
-        baseInterventions: 0,
-        interventions: 5 - level,
-        count: level,
-        level,
-        pct,
-        rankTitle
-      };
-    });
-
-    const tagCounts = counts;
-
-    // Single Source of Truth: Aktive Wochenschwerpunkte (dynamisch alle gesetzten Tags)
-    const activeWeeklyTargetTags = SKILL_TAGS.filter(tag => {
-      if (pendingTargetFocusTags.includes(tag.key)) return true;
-      const cleanNotes = allActiveNotesText.trim();
-      if (!cleanNotes) return false;
-      const lowerText = cleanNotes.toLowerCase();
-      if (tag.key === 'rhythmus' && (lowerText.includes('#rhythmus') || lowerText.includes('#timing'))) return true;
-      if (tag.key === 'technik' && (lowerText.includes('#technik') || lowerText.includes('#motorik') || lowerText.includes('#fingersatz'))) return true;
-      if (tag.key === 'intonation' && (lowerText.includes('#klang') || lowerText.includes('#intonation') || lowerText.includes('#tonkultur'))) return true;
-      if (tag.key === 'ausdruck' && (lowerText.includes('#ausdruck') || lowerText.includes('#dynamik') || lowerText.includes('#phrasierung'))) return true;
-      if (tag.key === 'repertoire' && (lowerText.includes('#repertoire') || lowerText.includes('#konzert') || lowerText.includes('#bühne') || lowerText.includes('#song') || lowerText.includes('#stück'))) return true;
-      return false;
-    }).map(t => t.key);
-
-    const topStrength = tagCounts.find(t => t.level >= 4) || tagCounts[0];
-    const currentFocus = tagCounts.find(t => activeWeeklyTargetTags.includes(t.key)) || tagCounts[0];
-
-    const customTagCounts: { key: string; count: number }[] = [];
-    feedbackEntries.forEach((fb: any) => {
-      if (Array.isArray(fb.tags)) {
-        fb.tags.forEach((t: string) => {
-          if (!SKILL_TAGS.some(st => st.key === t)) {
-            const existing = customTagCounts.find(c => c.key === t);
-            if (existing) {
-              existing.count++;
-            } else {
-              customTagCounts.push({ key: t, count: 1 });
-            }
-          }
-        });
-      }
-    });
-
-    const N = SKILL_TAGS.length;
-    const cx = 260, cy = 250, rMax = 135;
-    const getPoint = (index: number, val: number) => {
-      const angle = (Math.PI * 2 / N) * index - Math.PI / 2;
-      return {
-        x: cx + rMax * val * Math.cos(angle),
-        y: cy + rMax * val * Math.sin(angle),
-        angle
-      };
-    };
-
-    const dataPoints = tagCounts.map((t, i) => getPoint(i, Math.max(t.pct, 0.20)));
-    const dataPath = dataPoints.map((p, i) => (i === 0 ? `M ${p.x} ${p.y}` : `L ${p.x} ${p.y}`)).join(' ') + ' Z';
-    const gridLevels = [0.25, 0.5, 0.75, 1.0];
-    const gridPaths = gridLevels.map(lvl => {
-      const pts = SKILL_TAGS.map((_, i) => getPoint(i, lvl));
-      return pts.map((p, i) => (i === 0 ? `M ${p.x} ${p.y}` : `L ${p.x} ${p.y}`)).join(' ') + ' Z';
-    });
-
-    const isMobileOrTabletView = (windowWidth <= 768 && !isInsideSimTabletLandscape) || isInsideSimMobile;
     return (
-      <div style={{ flex: 1, width: '100%', display: 'flex', flexDirection: isMobileOrTabletView ? 'column' : 'row', overflowY: isMobileOrTabletView ? 'auto' : 'hidden', background: useNotebookLayout ? '#fcfaf7' : '#ffffff' }} className="modal-content-container custom-scrollbar">
-        {/* LINKE BUCHSEITE: 5-PENTAGON SKILL-RADAR */}
-        <div style={{
-          flex: isMobileOrTabletView ? 'none' : '1 1 0%',
-          width: '100%',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          borderRight: isMobileOrTabletView ? 'none' : '1px solid #e8e8ed',
-          borderBottom: isMobileOrTabletView ? '1.5px solid #e8e8ed' : 'none',
-          padding: isMobileOrTabletView ? '16px 14px' : '24px 28px',
-          position: 'relative',
-          background: '#ffffff'
-        }}>
-          {/* Apple Glassmorphic Legend Pill */}
-          <div style={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '10px',
-            padding: '6px 16px',
-            fontSize: '0.74rem',
-            fontWeight: 750,
-            background: 'rgba(255, 255, 255, 0.90)',
-            backdropFilter: 'blur(20px)',
-            border: '1px solid #e2e8f0',
-            borderRadius: '100px',
-            boxShadow: '0 2px 8px -2px rgba(0, 0, 0, 0.04)',
-            zIndex: 5
-          }}>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', color: '#0f172a' }}>
-              <span>🎯</span>
-              <span>Aktiver Wochenfokus</span>
-            </span>
-            <span style={{ color: '#cbd5e1' }}>•</span>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', color: '#0f172a' }}>
-              <span>🌟</span>
-              <span>Meisterstufe (Stufe 5)</span>
-            </span>
-            <span style={{ color: '#cbd5e1' }}>•</span>
-            <span style={{ color: '#64748b', fontWeight: 650 }}>
-              Stufen 1–5: Kompetenz-Profil
-            </span>
-          </div>
-
-          {/* Screenreader Accessible Data Table (WCAG 2.2 AA) */}
-          <div style={{ position: 'absolute', width: '1px', height: '1px', padding: 0, margin: '-1px', overflow: 'hidden', clip: 'rect(0, 0, 0, 0)', whiteSpace: 'nowrap', border: 0 }} aria-live="polite">
-            <table>
-              <caption>Musikalische Fähigkeiten und Wochen-Lernziele (5 Säulen)</caption>
-              <thead>
-                <tr>
-                  <th scope="col">Musikalische Säule</th>
-                  <th scope="col">Aktuelle Stufe</th>
-                  <th scope="col">Status-Titel</th>
-                  <th scope="col">Wochenschwerpunkt</th>
-                </tr>
-              </thead>
-              <tbody>
-                {tagCounts.map(tag => (
-                  <tr key={tag.key}>
-                    <td>{tag.label}</td>
-                    <td>Stufe {tag.level} von 5</td>
-                    <td>{tag.rankTitle}</td>
-                    <td>{activeWeeklyTargetTags.includes(tag.key) ? 'Aktiver Wochenschwerpunkt' : 'Reguläre Übung'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {/* SVG Radar Center Container (Apple Health / Watch Aesthetic) */}
-          <div style={{
-            margin: 'auto 0',
-            width: '100%',
-            maxHeight: isMobileOrTabletView ? '340px' : '440px',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            position: 'relative'
-          }}>
-            <svg
-              width="100%"
-              height="100%"
-              viewBox="-20 -20 560 520"
-              style={{
-                maxWidth: '520px',
-                maxHeight: '490px',
-                display: 'block',
-                overflow: 'visible'
-              }}
-            >
-              <defs>
-                {/* Apple Aurora Liquid-Glass Gradient (Harmonizes with Indigo, Blue, Green, Purple, Gold) */}
-                <linearGradient id="appleAuroraGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stopColor="#6366f1" stopOpacity="0.22" />
-                  <stop offset="45%" stopColor="#a855f7" stopOpacity="0.18" />
-                  <stop offset="100%" stopColor="#3b82f6" stopOpacity="0.14" />
-                </linearGradient>
-
-                {/* Soft Aurora Polygon Diffusion Shadow */}
-                <filter id="applePolyShadow" x="-20%" y="-20%" width="140%" height="140%">
-                  <feDropShadow dx="0" dy="4" stdDeviation="10" floodColor="#6366f1" floodOpacity="0.18" />
-                </filter>
-              </defs>
-
-              {/* 1. Concentric Chronometer Grid Pentagons */}
-              {gridPaths.map((d, i) => {
-                const isOuter = i === 3;
-                return (
-                  <path
-                    key={i}
-                    d={d}
-                    fill="none"
-                    stroke={isOuter ? "#cbd5e1" : "#e2e8f0"}
-                    strokeWidth={isOuter ? "1.4" : "0.9"}
-                  />
-                );
-              })}
-
-              {/* 2. Axis Spokes (Fine Precision Lines) */}
-              {SKILL_TAGS.map((_, i) => {
-                const pt = getPoint(i, 1);
-                return (
-                  <line
-                    key={i}
-                    x1={cx}
-                    y1={cy}
-                    x2={pt.x}
-                    y2={pt.y}
-                    stroke="#e2e8f0"
-                    strokeWidth="0.9"
-                  />
-                );
-              })}
-
-              {/* 3. Primary Apple Aurora Liquid-Glass Radar Polygon */}
-              <path
-                d={dataPath}
-                fill="url(#appleAuroraGradient)"
-                stroke="#6366f1"
-                strokeWidth="2.4"
-                strokeLinejoin="round"
-                strokeLinecap="round"
-                filter="url(#applePolyShadow)"
-                style={{ transition: 'all 0.6s cubic-bezier(0.16, 1, 0.3, 1)' }}
-              />
-
-              {/* 4. Apple Minimalist Nodes */}
-              {tagCounts.map((tag, i) => {
-                const p = getPoint(i, Math.max(tag.pct, 0.20));
-                const isSuperkraft = tag.level >= 4;
-                const isTargetFocus = activeWeeklyTargetTags.includes(tag.key);
-                const tagThemeColor = tag.color || '#ff9f0a';
-                return (
-                  <g key={i}>
-                    {isTargetFocus ? (
-                      <g>
-                        <circle
-                          cx={p.x}
-                          cy={p.y}
-                          r="15"
-                          fill={`${tagThemeColor}22`}
-                          stroke={tagThemeColor}
-                          strokeWidth="1.6"
-                        />
-                        <circle
-                          cx={p.x}
-                          cy={p.y}
-                          r="6.5"
-                          fill={tagThemeColor}
-                          stroke="#ffffff"
-                          strokeWidth="2.5"
-                          style={{ filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.15))' }}
-                        />
-                      </g>
-                    ) : isSuperkraft ? (
-                      <circle
-                        cx={p.x}
-                        cy={p.y}
-                        r="5.5"
-                        fill="#34c759"
-                        stroke="#ffffff"
-                        strokeWidth="2.5"
-                        style={{ filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.12))' }}
-                      />
-                    ) : (
-                      <circle
-                        cx={p.x}
-                        cy={p.y}
-                        r="5"
-                        fill={tag.dotColor || '#0a84ff'}
-                        stroke="#ffffff"
-                        strokeWidth="2"
-                        style={{ filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.12))' }}
-                      />
-                    )}
-                  </g>
-                );
-              })}
-
-              {/* 5. Apple 2-Line Typographic Labels with Distinct Category Tag Colors */}
-              {tagCounts.map((tag, i) => {
-                const p = getPoint(i, 1.25);
-                const isSuperkraft = tag.level >= 4;
-                const isTargetFocus = activeWeeklyTargetTags.includes(tag.key);
-                
-                let textAnchor: "middle" | "start" | "end" = "middle";
-                let offsetX = 0;
-                let offsetY = 0;
-
-                if (i === 0) {
-                  // Top (Rhythmus)
-                  textAnchor = "middle";
-                  offsetY = -14;
-                } else if (i === 1) {
-                  // Top Right (Spieltechnik)
-                  textAnchor = "start";
-                  offsetX = 10;
-                  offsetY = -4;
-                } else if (i === 2) {
-                  // Bottom Right (Klang)
-                  textAnchor = "start";
-                  offsetX = 10;
-                  offsetY = 10;
-                } else if (i === 3) {
-                  // Bottom Left (Ausdruck)
-                  textAnchor = "end";
-                  offsetX = -10;
-                  offsetY = 10;
-                } else if (i === 4) {
-                  // Top Left (Repertoire)
-                  textAnchor = "end";
-                  offsetX = -10;
-                  offsetY = -4;
-                }
-
-                const posX = p.x + offsetX;
-                const posY = p.y + offsetY;
-
-                return (
-                  <g key={i}>
-                    {/* Zeile 1: Name mit didaktischer Kategoriefarbe */}
-                    <text
-                      x={posX}
-                      y={posY}
-                      textAnchor={textAnchor}
-                      fontSize="12"
-                      fontWeight="800"
-                      fill={tag.color || '#1d1d1f'}
-                      style={{ letterSpacing: '-0.01em', fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif' }}
-                    >
-                      {tag.icon} {tag.shortLabel}
-                    </text>
-                    {/* Zeile 2: Subtitle & Level */}
-                    <text
-                      x={posX}
-                      y={posY + 14}
-                      textAnchor={textAnchor}
-                      fontSize="10.5"
-                      fontWeight="650"
-                      fill={isTargetFocus ? (tag.color || '#d97706') : (isSuperkraft ? '#15803d' : '#0284c7')}
-                      style={{ letterSpacing: '0.01em', fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif' }}
-                    >
-                      Stufe {tag.level} · {isTargetFocus ? 'Fokus 🎯' : (isSuperkraft ? 'Meister 🌟' : 'Aufsteiger 🚀')}
-                    </text>
-                  </g>
-                );
-              })}
-            </svg>
-          </div>
-
-          {/* VORWOCHEN-RÜCKBLICK & LEHRER-STUNDENEINSTIEG */}
-          {(!readOnly || isTeacherTools) && (() => {
-            const now = new Date();
-            const prevWeekDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-            const prevWeekISO = getISOWeek(prevWeekDate);
-            const prevWeekNum = prevWeekISO.split('-W')[1] || '';
-
-            const prevWeekItem = (progressItems || []).find((item: any) => {
-              if (!item.homework_notes) return false;
-              const isMatch = (item.updated_at && getISOWeek(item.updated_at) === prevWeekISO) ||
-                              (item.created_at && getISOWeek(item.created_at) === prevWeekISO);
-              if (!isMatch) return false;
-              const clean = item.homework_notes.replace(/\["STICKER:[^\]]+"\]/g, '').trim();
-              return clean.length > 0 && clean !== '[]';
-            });
-
-            let prevWeekText = '';
-            if (prevWeekItem?.homework_notes) {
-              try {
-                const parsed = JSON.parse(prevWeekItem.homework_notes);
-                if (Array.isArray(parsed)) {
-                  prevWeekText = parsed.filter((n: string) => !n.startsWith('STICKER:')).join(' ');
-                }
-              } catch (e) {
-                prevWeekText = String(prevWeekItem.homework_notes).replace(/STICKER:[^|]+\|[^|]+\|[^|]+/, '').trim();
-              }
-            }
-
-            return (
-              <div style={{
-                width: '100%',
-                background: '#ffffff',
-                border: '1px solid #e2e8f0',
-                borderRadius: '18px',
-                padding: '14px 16px',
-                marginTop: '10px',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '10px',
-                boxShadow: '0 2px 10px rgba(0, 0, 0, 0.03)',
-                zIndex: 5
-              }}>
-                {/* Header Row */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.76rem', fontWeight: 800, color: '#0f172a' }}>
-                    <span>📅</span>
-                    <span>Vorwochen-Check-In & Stundeneinstieg</span>
-                  </div>
-                  {prevWeekText && (
-                    <span style={{
-                      fontSize: '0.64rem',
-                      fontWeight: 750,
-                      color: '#0369a1',
-                      background: '#f0f9ff',
-                      border: '1px solid #e0f2fe',
-                      padding: '2px 8px',
-                      borderRadius: '100px'
-                    }}>
-                      KW {prevWeekNum}
-                    </span>
-                  )}
-                </div>
-
-                {prevWeekText ? (
-                  <>
-                    {/* Vorwochen-Hausaufgabe (Kompakte Apple-Infozeile) */}
-                    <div style={{
-                      background: '#f8fafc',
-                      border: '1px solid #f1f5f9',
-                      borderRadius: '10px',
-                      padding: '8px 12px',
-                      fontSize: '0.74rem',
-                      color: '#334155',
-                      lineHeight: '1.4'
-                    }}>
-                      <strong style={{ color: '#0f172a' }}>{prevWeekItem?.topic_name || `Hausaufgabe KW ${prevWeekNum}`}:</strong> {prevWeekText}
-                    </div>
-
-                    {/* 1-Tap Quittierung & Fokus-Ziele */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      <button
-                        type="button"
-                        onClick={handleMasterAllSkills}
-                        style={{
-                          background: 'linear-gradient(180deg, #16a34a 0%, #15803d 100%)',
-                          border: 'none',
-                          color: '#ffffff',
-                          borderRadius: '10px',
-                          padding: '8px 14px',
-                          fontSize: '0.74rem',
-                          fontWeight: 800,
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '6px',
-                          boxShadow: '0 2px 6px rgba(22, 163, 74, 0.25)',
-                          transition: 'all 0.15s ease'
-                        }}
-                        className="hover-scale"
-                      >
-                        <span>🌟 Vorwoche super gemeistert (+100 XP)</span>
-                      </button>
-
-                      {/* 5 Säulen Quick Focus Selector */}
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
-                        {SKILL_TAGS.map(t => {
-                          const isTarget = activeWeeklyTargetTags.includes(t.key);
-                          return (
-                            <button
-                              key={t.key}
-                              type="button"
-                              onClick={() => handleTriggerSkillQuest(t.key)}
-                              style={{
-                                background: isTarget ? '#fefce8' : '#f8fafc',
-                                border: `1px solid ${isTarget ? '#fde047' : '#e2e8f0'}`,
-                                color: isTarget ? '#854d0e' : '#475569',
-                                borderRadius: '100px',
-                                padding: '4px 10px',
-                                fontSize: '0.68rem',
-                                fontWeight: 750,
-                                cursor: 'pointer',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                                transition: 'all 0.15s ease'
-                              }}
-                              className="hover-scale-mini"
-                            >
-                              <span>{t.icon}</span>
-                              <span>{t.shortLabel}</span>
-                              {isTarget && <span style={{ fontSize: '0.60rem' }}>🎯</span>}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </>
-                ) : (
-                  <div style={{
-                    background: '#f8fafc',
-                    border: '1px solid #f1f5f9',
-                    borderRadius: '10px',
-                    padding: '10px 12px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '10px'
-                  }}>
-                    <span style={{ fontSize: '1.2rem' }}>🎵</span>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                      <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#0f172a' }}>
-                        Bereit für den neuen Stundeneinstieg
-                      </span>
-                      <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 550 }}>
-                        Wähle ein Stück oder Lehrwerk aus, um die heutige Einheit zu beginnen.
-                      </span>
-                    </div>
-                  </div>
-                )}
-              </div>
-            );
-          })()}
-
-          {/* Floating Apple Scroll Indicator Pill for Mobile */}
-          {isMobileOrTabletView && (
-            <button
-              type="button"
-              onClick={() => {
-                radarAnalysisCardsRef.current?.scrollIntoView({ behavior: 'smooth' });
-              }}
-              style={{
-                marginTop: '10px',
-                marginBottom: '4px',
-                background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
-                color: '#ffffff',
-                border: '1px solid rgba(255, 255, 255, 0.2)',
-                borderRadius: '100px',
-                padding: '8px 16px',
-                fontSize: '0.78rem',
-                fontWeight: 800,
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                cursor: 'pointer',
-                boxShadow: '0 4px 14px rgba(0, 0, 0, 0.15)',
-                transition: 'all 0.2s ease',
-                zIndex: 10
-              }}
-              className="hover-scale"
-            >
-              <span>Detail-Analyse & Superkräfte anzeigen</span>
-              <ChevronDown size={14} color="#22c55e" />
-            </button>
-          )}
-        </div>
-
-        {/* RECHTE BUCHSEITE: 5 SÄULEN SUPERKRÄFTE & EXPEDITION */}
-        <div
-          ref={radarAnalysisCardsRef}
-          style={{
-            flex: isMobileOrTabletView ? 'none' : '1 1 0%',
-            width: '100%',
-            overflowY: isMobileOrTabletView ? 'visible' : 'auto',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '14px',
-            padding: isMobileOrTabletView ? '16px 16px calc(140px + env(safe-area-inset-bottom, 20px)) 16px' : '24px',
-            position: 'relative'
-          }}
-        >
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-            {/* 1. HERO WOCHENFOKUS & LEHRER-IMPULS (Pure White Stage) */}
-            <div style={{
-              background: '#ffffff',
-              border: '1px solid #e2e8f0',
-              borderRadius: '20px',
-              padding: isMobileOrTabletView ? '14px 16px' : '18px 20px',
-              boxShadow: '0 4px 16px -2px rgba(0, 0, 0, 0.04)',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '12px'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#0f172a', fontWeight: 850, fontSize: isMobileOrTabletView ? '0.82rem' : '0.86rem' }}>
-                  <span style={{ fontSize: '1.1rem' }}>🎯</span>
-                  <span style={{ whiteSpace: 'nowrap' }}>Aktiver Wochenschwerpunkt</span>
-                </div>
-                <span style={{
-                  fontSize: '0.68rem',
-                  fontWeight: 800,
-                  color: activeWeeklyTargetTags.length > 0 ? '#b45309' : '#64748b',
-                  background: activeWeeklyTargetTags.length > 0 ? '#fef3c7' : '#f1f5f9',
-                  border: `1px solid ${activeWeeklyTargetTags.length > 0 ? '#fde68a' : '#e2e8f0'}`,
-                  padding: '2px 9px',
-                  borderRadius: '100px',
-                  whiteSpace: 'nowrap'
-                }}>
-                  {activeWeeklyTargetTags.length > 0 ? 'Fokus aktiv' : 'Ausgeglichen'}
-                </span>
-              </div>
-
-              {activeWeeklyTargetTags.length > 0 ? (
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                  {activeWeeklyTargetTags.map(tagKey => {
-                    const tagObj = SKILL_TAGS.find(t => t.key === tagKey);
-                    if (!tagObj) return null;
-                    return (
-                      <span key={tagKey} style={{
-                        background: tagObj.bg || '#fefce8',
-                        border: `1px solid ${tagObj.border || '#fef08a'}`,
-                        color: tagObj.color || '#854d0e',
-                        padding: '4px 12px',
-                        borderRadius: '100px',
-                        fontSize: '0.78rem',
-                        fontWeight: 800,
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
-                      }}>
-                        {tagObj.icon} {tagObj.label} 🎯
-                      </span>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600 }}>
-                  Gleichmäßiges Training aller 5 Kern-Säulen in dieser Unterrichtswoche.
-                </div>
-              )}
-
-              {/* Didaktischer Wochen-Leitfaden (Tier-1 Enterprise+ Master-Standard) */}
-              {(() => {
-                const currentWeekStr = getISOWeek();
-                const currentItem = (progressItems || []).find((item: any) => 
-                  (item.updated_at && getISOWeek(item.updated_at) === currentWeekStr) ||
-                  (item.created_at && getISOWeek(item.created_at) === currentWeekStr) ||
-                  item.is_current_homework
-                );
-
-                let rawImpulseLines: string[] = [];
-                if (currentItem?.teacher_notes) {
-                  const cleaned = cleanNotesText(currentItem.teacher_notes);
-                  if (cleaned) rawImpulseLines = cleaned.split('\n').map(s => s.trim()).filter(s => s.length > 0 && !isInternalMetadataNote(s));
-                }
-                if (rawImpulseLines.length === 0 && currentItem?.homework_notes) {
-                  try {
-                    const parsed = typeof currentItem.homework_notes === 'string'
-                      ? JSON.parse(currentItem.homework_notes)
-                      : currentItem.homework_notes;
-                    if (Array.isArray(parsed)) {
-                      rawImpulseLines = parsed.filter((n: string) => typeof n === 'string' && !isInternalMetadataNote(n)).map(s => s.trim()).filter(Boolean);
-                    }
-                  } catch (e) {
-                    const cleaned = cleanNotesText(currentItem.homework_notes);
-                    if (cleaned) rawImpulseLines = cleaned.split('\n').map(s => s.trim()).filter(s => s.length > 0 && !isInternalMetadataNote(s));
-                  }
-                }
-                if (rawImpulseLines.length === 0 && generalHomeworkNotes) {
-                  rawImpulseLines = String(generalHomeworkNotes).split('\n').map(s => s.trim()).filter(s => s.length > 0 && !isInternalMetadataNote(s));
-                }
-
-                return (
-                  <div style={{
-                    background: '#f8fafc',
-                    border: '1px solid #f1f5f9',
-                    borderRadius: '14px',
-                    padding: '10px 14px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '6px'
-                  }}>
-                    <span style={{ fontSize: '0.64rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <Target size={11} color="#64748b" strokeWidth={2.6} />
-                      <span>Didaktischer Wochen-Leitfaden</span>
-                    </span>
-                    {rawImpulseLines.length > 1 ? (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', marginTop: '2px' }}>
-                        {rawImpulseLines.map((line, lIdx) => (
-                          <div key={`impulse-line-${lIdx}`} style={{ display: 'flex', alignItems: 'baseline', gap: '6px', fontSize: '0.78rem', color: '#1e293b', lineHeight: 1.45, fontWeight: 550 }}>
-                            <span style={{ color: '#94a3b8', fontSize: '0.70rem', flexShrink: 0 }}>•</span>
-                            <span>{renderTextWithDidacticBadges(line)}</span>
-                          </div>
-                        ))}
-                      </div>
-                    ) : rawImpulseLines.length === 1 ? (
-                      <p style={{ margin: 0, fontSize: '0.78rem', color: '#1e293b', lineHeight: 1.45, fontWeight: 550 }}>
-                        „{renderTextWithDidacticBadges(rawImpulseLines[0])}“
-                      </p>
-                    ) : (
-                      <p style={{ margin: 0, fontSize: '0.78rem', color: '#94a3b8', fontStyle: 'italic', lineHeight: 1.45 }}>
-                        „Jede musikalische Meisterleistung beginnt mit Freude am Entdecken und geduldigem Wachsen.“
-                      </p>
-                    )}
-                  </div>
-                );
-              })()}
-            </div>
-
-            {/* 2. 5-SÄULEN KOMPETENZ-ÜBERSICHT (Minimalist Apple-Dots Equalizer) */}
-            <div style={{
-              background: '#ffffff',
-              border: '1px solid #e2e8f0',
-              borderRadius: '20px',
-              padding: isMobileOrTabletView ? '14px 16px' : '18px 20px',
-              boxShadow: '0 4px 16px -2px rgba(0, 0, 0, 0.04)',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '12px'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#0f172a', fontWeight: 850, fontSize: isMobileOrTabletView ? '0.82rem' : '0.86rem' }}>
-                  <span style={{ fontSize: '1.1rem' }}>📊</span>
-                  <span style={{ whiteSpace: 'nowrap' }}>Kompetenz-Übersicht (5 Säulen)</span>
-                </div>
-                <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#64748b', whiteSpace: 'nowrap' }}>
-                  5 Stufen System
-                </span>
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {tagCounts.map(s => {
-                  const isTarget = activeWeeklyTargetTags.includes(s.key);
-                  const isMeister = s.level >= 5;
-                  return (
-                    <div
-                      key={s.key}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        padding: '8px 12px',
-                        borderRadius: '12px',
-                        background: isTarget ? (s.lightBg || '#fffbeb') : '#f8fafc',
-                        border: `1px solid ${isTarget ? (s.border || '#fde68a') : '#f1f5f9'}`,
-                        transition: 'all 0.2s ease'
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: isMobileOrTabletView ? '100px' : '130px' }}>
-                        <span style={{ fontSize: '0.84rem' }}>{s.icon}</span>
-                        <span style={{ fontSize: '0.78rem', fontWeight: 800, color: s.color || '#0f172a' }}>
-                          {s.shortLabel}
-                        </span>
-                        {isTarget && (
-                          <span style={{ fontSize: '0.60rem', fontWeight: 850, color: s.color || '#b45309', background: s.bg || '#fef3c7', border: `1px solid ${s.border || '#fde68a'}`, padding: '1px 5px', borderRadius: '100px' }}>
-                            Fokus
-                          </span>
-                        )}
-                      </div>
-
-                      {/* 5 Apple-Dots (Direkt klickbar für Lehrkräfte mit 22px Touch-Hitbox) */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
-                        {[1, 2, 3, 4, 5].map(seg => {
-                          const isFilled = s.level >= seg;
-                          let dotColor = '#e2e8f0';
-                          if (isFilled) {
-                            if (isTarget) dotColor = s.dotColor || s.color || '#f59e0b';
-                            else if (isMeister) dotColor = '#16a34a';
-                            else dotColor = s.dotColor || s.color || '#3b82f6';
-                          }
-                          return (
-                            <button
-                              key={seg}
-                              type="button"
-                              disabled={readOnly && !isTeacherTools}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleSetSkillLevel(s.key, seg);
-                              }}
-                              title={`Stufe ${seg}/5 für ${s.shortLabel} festlegen`}
-                              style={{
-                                width: '22px',
-                                height: '22px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                background: 'transparent',
-                                border: 'none',
-                                padding: 0,
-                                cursor: (readOnly && !isTeacherTools) ? 'default' : 'pointer'
-                              }}
-                              className={(!readOnly || isTeacherTools) ? 'hover-scale-mini' : ''}
-                            >
-                              <span style={{
-                                width: '11px',
-                                height: '11px',
-                                borderRadius: '50%',
-                                background: dotColor,
-                                transition: 'all 0.15s ease',
-                                boxShadow: isFilled ? `0 1px 3px ${dotColor}66` : 'none',
-                                display: 'inline-block'
-                              }} />
-                            </button>
-                          );
-                        })}
-                      </div>
-
-                      {/* Level / Meister Badge */}
-                      <div style={{ minWidth: '85px', textAlign: 'right' }}>
-                        {isMeister ? (
-                          <span style={{ fontSize: '0.72rem', fontWeight: 850, color: '#16a34a' }}>
-                            🌟 Meister
-                          </span>
-                        ) : (
-                          <span style={{ fontSize: '0.72rem', fontWeight: 750, color: s.color || '#64748b' }}>
-                            Stufe {s.level}/5
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              <div style={{ fontSize: '0.70rem', color: '#64748b', lineHeight: 1.4, fontWeight: 500, marginTop: '2px' }}>
-                Mit jedem geübten Song und jeder Vorwochen-Quittierung wachsen deine musikalischen Fähigkeiten kontinuierlich weiter.
-              </div>
-            </div>
-          </div>
-
-          {/* Custom tag pills */}
-          {customTagCounts.length > 0 && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', borderTop: '1px solid #f1f5f9', paddingTop: '12px' }}>
-              <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                Weitere dokumentierte Trainings-Schwerpunkte
-              </span>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                {customTagCounts.sort((a, b) => b.count - a.count).map(tag => (
-                  <span key={tag.key} style={{
-                    background: '#f8fafc',
-                    color: '#475569',
-                    border: '1px solid #e2e8f0',
-                    padding: '4px 10px', borderRadius: '20px', fontSize: '0.72rem', fontWeight: 800
-                  }}>
-                    ✏️ {tag.key} · {tag.count}×
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
+      <MeisterwerkSkillRadarTab
+        progressItems={progressItems}
+        generalHomeworkNotes={generalHomeworkNotes}
+        latestGeneralHomeworkNotesRef={latestGeneralHomeworkNotesRef}
+        homeworkNotes={homeworkNotes}
+        homeworkNotesList={homeworkNotesList}
+        skillOverrides={skillOverrides}
+        pendingTargetFocusTags={pendingTargetFocusTags}
+        readOnly={readOnly}
+        isTeacherTools={isTeacherTools}
+        isMobileView={isMobileView}
+        useNotebookLayout={useNotebookLayout}
+        handleMasterAllSkills={handleMasterAllSkills}
+        handleTriggerSkillQuest={handleTriggerSkillQuest}
+        handleSetSkillLevel={handleSetSkillLevel}
+        renderTextWithDidacticBadges={renderTextWithDidacticBadges}
+      />
     );
   };
 
@@ -8351,6 +8244,11 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                     <Info size={13} color="#ffffff" />
                   </button>
                 </div>
+                {(activeViewMode === 'recordings' || activeModalTab === 'audiobiography') && (
+                  <span style={{ fontSize: '0.68rem', fontWeight: 650, color: 'rgba(255, 255, 255, 0.75)', lineHeight: 1, marginTop: '2px' }}>
+                    Aufgabenheft · Audio-Studio
+                  </span>
+                )}
               </div>
             </div>
 
@@ -8466,13 +8364,13 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             const tabOptions = [
               { value: 'modules', label: 'Module (Studio)' },
               { value: 'protocol', label: isTeacherTools ? 'Aufgabenheft' : 'Schüler-Protokoll' },
-              { value: 'loopstation', label: 'Audio-Loopstation' },
+              ...(uiLevel !== 'junior' ? [{ value: 'loopstation', label: 'Audio-Loopstation' }] : []),
               { value: 'practice', label: 'Übe-Begleiter' },
               { value: 'recordings', label: 'Audio-Aufnahmen' },
               { value: 'tuner', label: 'Stimmgerät (Tuner)' },
               { value: 'groovetrainer', label: 'Groove-Trainer' },
-              { value: 'radar', label: 'Skill-Radar' },
-              { value: 'history', label: 'Archiv & Historie' }
+              ...(uiLevel !== 'junior' ? [{ value: 'radar', label: 'Skill-Radar' }] : []),
+              ...(uiLevel === 'pro' ? [{ value: 'history', label: 'Archiv & Historie' }] : [])
             ];
 
             const currentTabValue = 
@@ -8678,7 +8576,12 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             <div style={{
               width: '100%',
               boxSizing: 'border-box',
-              padding: isMobileOrSim ? '16px 16px calc(280px + env(safe-area-inset-bottom, 40px)) 16px' : '20px 24px 80px 24px'
+              padding: isMobileOrSim ? '16px 16px calc(280px + env(safe-area-inset-bottom, 40px)) 16px' : '20px 24px 80px 24px',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              alignItems: 'center',
+              minHeight: isMobileOrSim ? 'auto' : 'calc(70vh - 60px)'
             }}>
               <GrooveTrainerStudioView
                 student={student}
@@ -8687,11 +8590,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                   setHubTab('modules');
                 }}
                 uiLevel={uiLevel}
-                onRewardXp={(xp) => {
-                  if (student?.id) {
-                    const key = `campus_bonus_xp_${student.id}`;
-                    const current = Number(localStorage.getItem(key) || 0);
-                    localStorage.setItem(key, String(current + xp));
+                onRewardXp={async (xp, durationSeconds = 0) => {
+                  if (student?.id && (xp > 0 || durationSeconds > 0)) {
+                    await awardCampusXP(xp, 'Groove-Trainer gemeistert', durationSeconds);
                   }
                 }}
               />
@@ -8762,11630 +8663,340 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
               </React.Suspense>
             </div>
           ) : activeViewMode === 'recordings' ? (
-            <div style={{
-              display: 'flex',
-              flexDirection: isMobileOrSim ? 'column' : 'row',
-              width: '100%',
-              height: '100%',
-              minHeight: 0,
-              overflow: isMobileOrSim ? 'auto' : 'hidden'
-            }}>
-              {/* 44px Segmented Capsule Touch Switcher for Mobile */}
-              {isMobileOrSim && !isTeacherTools && (
-                <div style={{
-                  width: '100%',
-                  display: 'flex',
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  padding: '8px 16px',
-                  background: '#ffffff',
-                  borderBottom: '1px solid #e2e8f0',
-                  flexShrink: 0,
-                  zIndex: 35
-                }}>
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    background: '#f1f5f9',
-                    borderRadius: '100px',
-                    padding: '3px',
-                    width: '100%',
-                    maxWidth: '380px',
-                    height: '44px',
-                    boxSizing: 'border-box',
-                    gap: '4px'
-                  }}>
-                    <button
-                      type="button"
-                      onClick={() => setMobileRecordingsTab('teacher')}
-                      style={{
-                        flex: 1,
-                        height: '38px',
-                        borderRadius: '100px',
-                        border: 'none',
-                        background: mobileRecordingsTab === 'teacher' ? '#ffffff' : 'transparent',
-                        color: mobileRecordingsTab === 'teacher' ? '#15803d' : '#64748b',
-                        fontWeight: 800,
-                        fontSize: '0.78rem',
-                        cursor: 'pointer',
-                        boxShadow: mobileRecordingsTab === 'teacher' ? '0 2px 8px rgba(0,0,0,0.1)' : 'none',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '6px',
-                        transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
-                      }}
-                    >
-                      <Mic size={14} color={mobileRecordingsTab === 'teacher' ? '#15803d' : '#64748b'} />
-                      <span>Vom Unterricht</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setMobileRecordingsTab('student')}
-                      style={{
-                        flex: 1,
-                        height: '38px',
-                        borderRadius: '100px',
-                        border: 'none',
-                        background: mobileRecordingsTab === 'student' ? '#ffffff' : 'transparent',
-                        color: mobileRecordingsTab === 'student' ? '#6d28d9' : '#64748b',
-                        fontWeight: 800,
-                        fontSize: '0.78rem',
-                        cursor: 'pointer',
-                        boxShadow: mobileRecordingsTab === 'student' ? '0 2px 8px rgba(0,0,0,0.1)' : 'none',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '6px',
-                        transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
-                      }}
-                    >
-                      <Star size={14} color={mobileRecordingsTab === 'student' ? '#6d28d9' : '#64748b'} fill={mobileRecordingsTab === 'student' ? '#6d28d9' : 'none'} />
-                      <span>Dein Übe-Studio</span>
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* ========================================================================= */}
-              {/* LEFT PAGE: 🎙️ AUFNAHMEN VOM LEHRER (Play-Alongs & Unterrichts-Audios)     */}
-              {/* ========================================================================= */}
-              <div style={{
-                flex: isMobileOrSim ? 'none' : (isTeacherTools ? '1 1 100%' : '1 1 0%'),
-                width: isMobileOrSim ? '100%' : undefined,
-                display: isMobileOrSim ? (mobileRecordingsTab === 'teacher' || isTeacherTools ? 'flex' : 'none') : 'flex',
-                overflowY: 'auto',
-                flexDirection: 'column',
-                background: useNotebookLayout ? '#faf8f2' : '#ffffff',
-                borderRadius: isTeacherTools ? '0 0 20px 20px' : (useNotebookLayout ? '0 0 0 20px' : '0'),
-                boxShadow: useNotebookLayout ? '-10px 10px 20px rgba(0,0,0,0.15)' : 'none',
-                borderRight: isTeacherTools || isMobileOrSim ? 'none' : (useNotebookLayout ? '1px dashed #e5e0d4' : '1px solid #e8e8ed'),
-                padding: isMobileOrSim ? '20px 16px calc(140px + env(safe-area-inset-bottom, 20px)) 16px' : '28px'
-              }}>
-                {useNotebookLayout && !isTeacherTools && (
-                  <div style={{
-                    position: 'absolute',
-                    top: '20px',
-                    bottom: '20px',
-                    right: '8px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    justifyContent: 'space-around',
-                    zIndex: 25
-                  }}>
-                    {Array.from({ length: 6 }).map((_, idx) => (
-                      <div key={idx} style={{
-                        width: '8px',
-                        height: '8px',
-                        borderRadius: '50%',
-                        background: '#121214',
-                        boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.8)'
-                      }} />
-                    ))}
-                  </div>
-                )}
-                
-                {/* Header: Teacher Recordings */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
-                  <div style={{
-                    width: '42px',
-                    height: '42px',
-                    borderRadius: '14px',
-                    background: 'linear-gradient(135deg, #e6f4ea 0%, #d1fae5 100%)',
-                    color: '#15803d',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    boxShadow: '0 4px 10px rgba(52, 168, 83, 0.15)',
-                    flexShrink: 0
-                  }}>
-                    <Mic size={20} strokeWidth={2.4} />
-                  </div>
-                  <div>
-                    <span style={{ fontSize: '0.70rem', fontWeight: 900, color: '#15803d', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                      Vom Unterricht
-                    </span>
-                    <h3 style={{ margin: '1px 0 0 0', fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em' }}>
-                      {isTeacherMode ? `Unterrichts-Aufnahmen & Play-Alongs für ${studentFirstName}` : 'Aufnahmen von deiner Lehrkraft'}
-                    </h3>
-                  </div>
-                </div>
-
-                {/* Teacher Record Tool (when teacher is viewing) */}
-                {isTeacherMode && (
-                  <div style={{
-                    margin: '0 0 16px 0',
-                    padding: '12px 14px',
-                    background: '#f8fafc',
-                    border: '1.5px solid #e2e8f0',
-                    borderRadius: '16px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '8px',
-                    boxShadow: '0 2px 6px rgba(0,0,0,0.02)'
-                  }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
-                      <span style={{ fontSize: '0.80rem', fontWeight: 900, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span>🎙️ Neue Lehrkraft-Aufnahme</span>
-                        <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 650 }}>
-                          {hasTresorStorage ? '(max. 7 Min.)' : '(max. 60s)'}
-                        </span>
-                      </span>
-                      {!isRecordingAudio ? (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', position: 'relative' }}>
-                          {/* ⏱️ Metronom / Klick Button */}
-                          <button
-                            type="button"
-                            onClick={() => setShowRecordingMetronomePopup(prev => !prev)}
-                            style={{
-                              background: isRecordingMetronomeActive ? '#dcfce7' : '#f8fafc',
-                              border: isRecordingMetronomeActive ? '1.5px solid #16a34a' : '1.5px solid #cbd5e1',
-                              color: isRecordingMetronomeActive ? '#15803d' : '#64748b',
-                              borderRadius: '10px',
-                              width: '32px',
-                              height: '32px',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              cursor: 'pointer',
-                              flexShrink: 0,
-                              boxShadow: isRecordingMetronomeActive ? '0 2px 8px rgba(22, 163, 74, 0.25)' : 'none',
-                              transition: 'all 0.15s ease'
-                            }}
-                            className="hover-scale-mini"
-                            title={isRecordingMetronomeActive ? `Klick aktiv (${recordingBpm} BPM)` : 'Klick / Metronom einstellen'}
-                          >
-                            <MechanicalMetronomeIcon size={16} color={isRecordingMetronomeActive ? '#15803d' : '#64748b'} strokeWidth={isRecordingMetronomeActive ? 2.4 : 2} />
-                          </button>
-
-                          {/* Metronome Flyout Popup */}
-                          {showRecordingMetronomePopup && (
-                            <div style={{
-                              position: 'absolute',
-                              bottom: '100%',
-                              right: 0,
-                              marginBottom: '10px',
-                              background: '#ffffff',
-                              borderRadius: '16px',
-                              border: '1.5px solid #e2e8f0',
-                              boxShadow: '0 12px 30px rgba(0, 0, 0, 0.15), 0 2px 6px rgba(0,0,0,0.05)',
-                              padding: '12px 14px',
-                              width: '240px',
-                              zIndex: 100,
-                              display: 'flex',
-                              flexDirection: 'column',
-                              gap: '10px'
-                            }}>
-                              {/* Header */}
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <span style={{ fontSize: '0.80rem', fontWeight: 900, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                                  <MechanicalMetronomeIcon size={16} color="#16a34a" strokeWidth={2.2} />
-                                  <span>Klick / Metronom</span>
-                                </span>
-                                <button
-                                  type="button"
-                                  onClick={() => setShowRecordingMetronomePopup(false)}
-                                  style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '2px' }}
-                                >
-                                  <X size={14} />
-                                </button>
-                              </div>
-
-                              {/* Toggle Button */}
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  const next = !isRecordingMetronomeActive;
-                                  setIsRecordingMetronomeActive(next);
-                                  if (next) playMetronomeTick(true);
-                                }}
-                                style={{
-                                  width: '100%',
-                                  background: isRecordingMetronomeActive ? '#16a34a' : '#f1f5f9',
-                                  color: isRecordingMetronomeActive ? '#ffffff' : '#475569',
-                                  border: 'none',
-                                  borderRadius: '10px',
-                                  padding: '7px 10px',
-                                  fontSize: '0.76rem',
-                                  fontWeight: 850,
-                                  cursor: 'pointer',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  gap: '6px',
-                                  boxShadow: isRecordingMetronomeActive ? '0 2px 8px rgba(22, 163, 74, 0.25)' : 'none'
-                                }}
-                                className="hover-scale-mini"
-                              >
-                                <span>{isRecordingMetronomeActive ? '✓ Klick ist AN' : 'Klick einschalten'}</span>
-                              </button>
-
-                              {/* BPM Slider & Stepper */}
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.72rem', fontWeight: 800, color: '#475569' }}>
-                                  <span>Tempo</span>
-                                  <span style={{ color: '#16a34a', fontWeight: 900 }}>{recordingBpm} BPM</span>
-                                </div>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                  <button
-                                    type="button"
-                                    onClick={() => setRecordingBpm(b => Math.max(40, b - 5))}
-                                    style={{ background: '#f1f5f9', border: 'none', borderRadius: '6px', width: '24px', height: '24px', fontWeight: 900, cursor: 'pointer' }}
-                                  >-</button>
-                                  <input
-                                    type="range"
-                                    min="40"
-                                    max="240"
-                                    value={recordingBpm}
-                                    onChange={(e) => setRecordingBpm(parseInt(e.target.value, 10))}
-                                    style={{ flex: 1, accentColor: '#16a34a', cursor: 'pointer' }}
-                                  />
-                                  <button
-                                    type="button"
-                                    onClick={() => setRecordingBpm(b => Math.min(240, b + 5))}
-                                    style={{ background: '#f1f5f9', border: 'none', borderRadius: '6px', width: '24px', height: '24px', fontWeight: 900, cursor: 'pointer' }}
-                                  >+</button>
-                                </div>
-                              </div>
-
-                              {/* Test Click Button */}
-                              <button
-                                type="button"
-                                onClick={() => playMetronomeTick(true)}
-                                style={{
-                                  background: '#f8fafc',
-                                  border: '1px solid #e2e8f0',
-                                  borderRadius: '8px',
-                                  padding: '5px 8px',
-                                  fontSize: '0.70rem',
-                                  fontWeight: 750,
-                                  color: '#64748b',
-                                  cursor: 'pointer'
-                                }}
-                              >
-                                🔊 Klick kurz testen
-                              </button>
-                            </div>
-                          )}
-
-                          <button
-                            type="button"
-                            onClick={startRecordingAudio}
-                            disabled={isUploadingAudio}
-                            style={{
-                              background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
-                              color: '#fff',
-                              border: 'none',
-                              padding: '6px 14px',
-                              borderRadius: '10px',
-                              fontSize: '0.74rem',
-                              fontWeight: 850,
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '6px',
-                              boxShadow: '0 2px 8px rgba(34, 197, 94, 0.25)'
-                            }}
-                            className="hover-scale"
-                          >
-                            <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#ffffff', display: 'inline-block' }} />
-                            <span>Aufnahme starten</span>
-                          </button>
-                        </div>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => stopRecordingAudio()}
-                          style={{
-                            background: '#ef4444',
-                            color: '#fff',
-                            border: 'none',
-                            padding: '6px 14px',
-                            borderRadius: '10px',
-                            fontSize: '0.74rem',
-                            fontWeight: 850,
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '6px',
-                            boxShadow: '0 2px 8px rgba(239, 68, 68, 0.3)',
-                            animation: 'pulse 1.5s infinite'
-                          }}
-                          className="hover-scale"
-                        >
-                          <span style={{ width: '7px', height: '7px', background: '#ffffff', display: 'inline-block' }} />
-                          <span>Stopp ({hasTresorStorage ? `${formatRecordTime(audioDuration)} / 7:00 Min.` : `${audioDuration}s / 60s`})</span>
-                        </button>
-                      )}
-                    </div>
-                    
-                    {!isRecordingAudio && (
-                      <input
-                        type="text"
-                        placeholder="Titel der Aufnahme (z. B. Song-Teil A langsam üben)..."
-                        value={audioLabel}
-                        onChange={(e) => setAudioLabel(e.target.value)}
-                        style={{
-                          width: '100%',
-                          fontSize: '0.80rem',
-                          padding: '8px 12px',
-                          borderRadius: '10px',
-                          border: '1.5px solid #cbd5e1',
-                          background: '#fff',
-                          outline: 'none',
-                          boxSizing: 'border-box'
-                        }}
-                      />
-                    )}
-
-                    {isUploadingAudio && (
-                      <div style={{ fontSize: '0.74rem', color: '#15803d', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 700 }}>
-                        <span>⏳</span> Audio wird gesichert und zur Schüler-Übersicht hinzugefügt...
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Teacher Recordings Gallery with Weekly Accordions */}
-                {(() => {
-                  // Collect ALL teacher audios from homeworkNotesList, local storage, and progressItems
-                  const rawAudioStrings: { str: string; originalIdx: number }[] = [];
-                  (homeworkNotesList || []).forEach((note, idx) => {
-                    if (typeof note === 'string' && note.includes('AUDIO:')) {
-                      rawAudioStrings.push({ str: note, originalIdx: idx });
-                    }
-                  });
-
-                  try {
-                    if (student?.id) {
-                      const localGen = localStorage.getItem(`campus_homework_notes_${student.id}`);
-                      if (localGen && localGen.includes('AUDIO:')) {
-                        try {
-                          const p = JSON.parse(localGen);
-                          if (Array.isArray(p)) {
-                            p.forEach((item: any) => {
-                              if (typeof item === 'string' && item.includes('AUDIO:') && !rawAudioStrings.some(x => x.str === item)) {
-                                rawAudioStrings.push({ str: item, originalIdx: -1 });
-                              }
-                            });
-                          }
-                        } catch {
-                          if (!rawAudioStrings.some(x => x.str === localGen)) {
-                            rawAudioStrings.push({ str: localGen, originalIdx: -1 });
-                          }
-                        }
-                      }
-                    }
-                  } catch {}
-
-                  // Also scan progressItems across all lessons/history
-                  (progressItems || []).forEach((pItem) => {
-                    if (pItem.homework_notes && pItem.homework_notes.includes('AUDIO:')) {
-                      try {
-                        const parsed = JSON.parse(pItem.homework_notes);
-                        if (Array.isArray(parsed)) {
-                          parsed.forEach(n => {
-                            if (typeof n === 'string' && n.includes('AUDIO:') && !rawAudioStrings.some(x => x.str === n)) {
-                              rawAudioStrings.push({ str: n, originalIdx: -1 });
-                            }
-                          });
-                        } else if (typeof parsed === 'string' && parsed.includes('AUDIO:') && !rawAudioStrings.some(x => x.str === parsed)) {
-                          rawAudioStrings.push({ str: parsed, originalIdx: -1 });
-                        }
-                      } catch {
-                        if (!rawAudioStrings.some(x => x.str === pItem.homework_notes)) {
-                          rawAudioStrings.push({ str: pItem.homework_notes, originalIdx: -1 });
-                        }
-                      }
-                    }
-                  });
-
-                  const teacherAudios: any[] = [];
-                  const seenTeacherUrls = new Set<string>();
-
-                  rawAudioStrings.forEach(item => {
-                    const cleanStr = item.str.startsWith('[') ? item.str.replace(/[\[\]"]/g, '') : item.str;
-                    const audioIndex = cleanStr.indexOf('AUDIO:');
-                    if (audioIndex === -1) return;
-                    const parts = cleanStr.substring(audioIndex + 6).split('|');
-                    const url = parts[0]?.trim() || '';
-                    const label = parts[3]?.trim() || `Aufnahme #${teacherAudios.length + 1}`;
-                    const author = parts[4]?.trim() || 'teacher';
-                    // Strict Segregation: Student recordings belong on the right page
-                    if (author === 'student') return;
-                    const uniqueKey = parts[6] || (url && url !== '#' ? url : null) || `teacher_audio_${item.originalIdx}_${label}`;
-                    if (seenTeacherUrls.has(uniqueKey)) return;
-
-                    seenTeacherUrls.add(uniqueKey);
-                    teacherAudios.push({
-                      url,
-                      duration: parseInt(parts[1] || '0', 10),
-                      date: parts[2] || new Date().toISOString(),
-                      label,
-                      originalIdx: item.originalIdx
-                    });
-                  });
-
-                  if (teacherAudios.length === 0) {
-                    return (
-                      <div style={{
-                        flex: 1,
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: '#94a3b8',
-                        padding: '40px 20px',
-                        gap: '12px',
-                        textAlign: 'center',
-                        background: '#f8fafc',
-                        borderRadius: '20px',
-                        border: '1.5px dashed #e2e8f0'
-                      }}>
-                        <div style={{
-                          width: '48px',
-                          height: '48px',
-                          borderRadius: '50%',
-                          background: '#ffffff',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          color: '#34a853',
-                          boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
-                        }}>
-                          <Music size={22} />
-                        </div>
-                        <div>
-                          <h4 style={{ margin: '0 0 4px 0', fontSize: '0.92rem', fontWeight: 900, color: '#1e293b' }}>
-                            Noch keine Aufnahmen deiner Lehrkraft
-                          </h4>
-                          <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748b', fontWeight: 600, maxWidth: '260px', lineHeight: 1.45 }}>
-                            Sobald deine Lehrkraft im Unterricht ein Übe-Beispiel aufnimmt, findest du es hier.
-                          </p>
-                        </div>
-                      </div>
-                    );
-                  }
-
-                  const now = getSimulatedNow();
-                  const currentWeekStr = getISOWeek(now);
-                  const currentWeekNum = currentWeekStr.split("-W")[1] || "";
-
-                  // Filter by Search Query if active
-                  const isSearching = recordingSearchQuery.trim() !== "";
-                  const searchResults = isSearching ? teacherAudios.filter(aud => matchesAudioSearch(aud, recordingSearchQuery)) : [];
-
-                  // Current Week Audios
-                  const currentWeekAudios = teacherAudios.filter(aud => {
-                    const d = aud.date ? new Date(aud.date) : now;
-                    return getISOWeek(isNaN(d.getTime()) ? now : d) === currentWeekStr;
-                  });
-
-                  // Favorite Audios
-                  const favoriteTeacherAudios = teacherAudios.filter(aud => favoriteAudioUrls.includes(aud.url));
-
-                  // Group Past Audios into Month Albums
-                  const pastAudios = teacherAudios.filter(aud => {
-                    const d = aud.date ? new Date(aud.date) : now;
-                    return getISOWeek(isNaN(d.getTime()) ? now : d) !== currentWeekStr;
-                  });
-
-                  const monthGroups: { [monthKey: string]: { monthKey: string; monthLabel: string; weeks: { [weekKey: string]: any[] }; totalTakes: number } } = {};
-                  pastAudios.forEach(aud => {
-                    const d = aud.date ? new Date(aud.date) : now;
-                    const dateObj = isNaN(d.getTime()) ? now : d;
-                    const monthKey = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, "0")}`;
-                    const monthLabel = dateObj.toLocaleDateString("de-DE", { month: "long", year: "numeric" });
-                    const weekKey = getISOWeek(dateObj);
-
-                    if (!monthGroups[monthKey]) {
-                      monthGroups[monthKey] = { monthKey, monthLabel, weeks: {}, totalTakes: 0 };
-                    }
-                    if (!monthGroups[monthKey].weeks[weekKey]) {
-                      monthGroups[monthKey].weeks[weekKey] = [];
-                    }
-                    monthGroups[monthKey].weeks[weekKey].push(aud);
-                    monthGroups[monthKey].totalTakes += 1;
-                  });
-
-                  const sortedMonths = Object.values(monthGroups).sort((a, b) => b.monthKey.localeCompare(a.monthKey));
-
-                  // 🔍 SEARCH RESULTS VIEW
-                  if (isSearching) {
-                    return (
-                      <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                        <div style={{ fontSize: "0.76rem", fontWeight: 850, color: "#15803d", marginBottom: "4px" }}>
-                          🔍 {searchResults.length} {searchResults.length === 1 ? "Treffer" : "Treffer"} zur Suche „{recordingSearchQuery}“
-                        </div>
-                        {searchResults.map((aud, idx) => (
-                          <InlineAudioPlayer 
-                            key={`teacher-search-${idx}`}
-                            url={aud.url} 
-                            label={aud.label} 
-                            duration={aud.duration}
-                            date={aud.date}
-                            isFavorite={favoriteAudioUrls.includes(aud.url)}
-                            onToggleFavorite={() => toggleFavoriteAudio(aud.url)}
-                            themeColor="#15803d"
-                            themeBg="#e6f4ea"
-                            badge="👨‍🏫 Lehrkraft"
-                            badgeBg="#dcfce7"
-                            badgeColor="#15803d"
-                            onDelete={!readOnly ? () => handleDeleteNote(aud.originalIdx, aud.url) : undefined}
-                          />
-                        ))}
-                      </div>
-                    );
-                  }
-
-                  // ⭐ FAVORITES DRILLDOWN VIEW
-                  if (showTeacherFavoritesOnly) {
-                    return (
-                      <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "4px" }}>
-                          <button
-                            type="button"
-                            onClick={() => setShowTeacherFavoritesOnly(false)}
-                            style={{
-                              background: "#ffffff",
-                              border: "1px solid #cbd5e1",
-                              borderRadius: "100px",
-                              padding: "4px 12px",
-                              fontSize: "0.72rem",
-                              fontWeight: 800,
-                              color: "#475569",
-                              cursor: "pointer",
-                              display: "inline-flex",
-                              alignItems: "center",
-                              gap: "4px"
-                            }}
-                            className="hover-scale"
-                          >
-                            <ArrowLeft size={12} /> Zurück zur Übersicht
-                          </button>
-                          <span style={{ fontSize: "0.76rem", fontWeight: 900, color: "#ca8a04" }}>
-                            ⭐ {favoriteTeacherAudios.length} Favoriten
-                          </span>
-                        </div>
-
-                        {favoriteTeacherAudios.length === 0 ? (
-                          <div style={{ textAlign: "center", padding: "30px 16px", color: "#94a3b8", fontSize: "0.80rem", fontWeight: 700 }}>
-                            Noch keine Favoriten markiert. Klicke bei einer Aufnahme auf das Stern-Symbol ⭐!
-                          </div>
-                        ) : (
-                          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                            {favoriteTeacherAudios.map((aud, idx) => (
-                              <InlineAudioPlayer 
-                                key={`teacher-fav-${idx}`}
-                                url={aud.url} 
-                                label={aud.label} 
-                                duration={aud.duration}
-                                date={aud.date}
-                                isFavorite={true}
-                                onToggleFavorite={() => toggleFavoriteAudio(aud.url)}
-                                themeColor="#15803d"
-                                themeBg="#e6f4ea"
-                                badge="👨‍🏫 Lehrkraft"
-                                badgeBg="#dcfce7"
-                                badgeColor="#15803d"
-                                onDelete={!readOnly ? () => handleDeleteNote(aud.originalIdx, aud.url) : undefined}
-                              />
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  }
-
-                  // 📁 SELECTED MONTH DRILLDOWN VIEW
-                  if (selectedTeacherMonth) {
-                    const monthData = monthGroups[selectedTeacherMonth.key];
-                    const weekKeys = monthData ? Object.keys(monthData.weeks).sort((a, b) => b.localeCompare(a)) : [];
-
-                    return (
-                      <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "4px" }}>
-                          <button
-                            type="button"
-                            onClick={() => setSelectedTeacherMonth(null)}
-                            style={{
-                              background: "#ffffff",
-                              border: "1px solid #cbd5e1",
-                              borderRadius: "100px",
-                              padding: "4px 12px",
-                              fontSize: "0.72rem",
-                              fontWeight: 800,
-                              color: "#475569",
-                              cursor: "pointer",
-                              display: "inline-flex",
-                              alignItems: "center",
-                              gap: "4px"
-                            }}
-                            className="hover-scale"
-                          >
-                            <ArrowLeft size={12} /> Zurück zur Übersicht
-                          </button>
-                          <span style={{ fontSize: "0.78rem", fontWeight: 900, color: "#15803d" }}>
-                            📁 {selectedTeacherMonth.label}
-                          </span>
-                        </div>
-
-                        {weekKeys.map(wkKey => {
-                          const wkAudios = monthData.weeks[wkKey] || [];
-                          const isExpanded = expandedTeacherAudioWeeks[wkKey] !== undefined ? expandedTeacherAudioWeeks[wkKey] : true;
-                          const wkNum = wkKey.split("-W")[1] || "";
-
-                          return (
-                            <div key={`teacher-month-week-${wkKey}`} style={{ display: "flex", flexDirection: "column" }}>
-                              <div
-                                onClick={() => toggleTeacherAudioWeek(wkKey, true)}
-                                style={{
-                                  display: "flex",
-                                  alignItems: "center",
-                                  justifyContent: "space-between",
-                                  padding: "8px 12px",
-                                  background: "#ffffff",
-                                  borderRadius: "12px",
-                                  border: "1px solid #e2e8f0",
-                                  cursor: "pointer",
-                                  marginBottom: "8px",
-                                  boxShadow: "0 1px 3px rgba(0,0,0,0.02)",
-                                  userSelect: "none"
-                                }}
-                                className="hover-scale"
-                              >
-                                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                                  <span style={{ fontSize: "0.74rem", color: "#64748b", transform: isExpanded ? "rotate(90deg)" : "rotate(0deg)", transition: "transform 0.15s ease" }}>▶</span>
-                                  <span style={{ fontSize: "0.78rem", fontWeight: 850, color: "#334155" }}>KW {wkNum}</span>
-                                </div>
-                                <span style={{ fontSize: "0.66rem", fontWeight: 800, background: "#f1f5f9", color: "#64748b", padding: "2px 8px", borderRadius: "100px" }}>
-                                  {wkAudios.length} {wkAudios.length === 1 ? "Aufnahme" : "Aufnahmen"}
-                                </span>
-                              </div>
-
-                              {isExpanded && (
-                                <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginBottom: "8px" }}>
-                                  {wkAudios.map((aud, idx) => (
-                                    <InlineAudioPlayer 
-                                      key={`teacher-month-aud-${wkKey}-${idx}`}
-                                      url={aud.url} 
-                                      label={aud.label} 
-                                      duration={aud.duration}
-                                      date={aud.date}
-                                      isFavorite={favoriteAudioUrls.includes(aud.url)}
-                                      onToggleFavorite={() => toggleFavoriteAudio(aud.url)}
-                                      themeColor="#15803d"
-                                      themeBg="#e6f4ea"
-                                      badge="👨‍🏫 Lehrkraft"
-                                      badgeBg="#dcfce7"
-                                      badgeColor="#15803d"
-                                      onDelete={!readOnly ? () => handleDeleteNote(aud.originalIdx, aud.url) : undefined}
-                                    />
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    );
-                  }
-
-                  // 🏠 DEFAULT VIEW: Top Hero (Diese Woche) + Square Album Grid (Monate & Favoriten)
-                  return (
-                    <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-                      {/* 1. TOP HERO: Diese Woche (KW x) */}
-                      <div style={{
-                        background: "#ffffff",
-                        borderRadius: "18px",
-                        border: "1.5px solid #bbf7d0",
-                        padding: "12px 14px",
-                        boxShadow: "0 4px 14px rgba(34, 197, 94, 0.08)",
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: "8px"
-                      }}>
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                            <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#16a34a", display: "inline-block" }} />
-                            <span style={{ fontSize: "0.82rem", fontWeight: 900, color: "#15803d" }}>Diese Woche (KW {currentWeekNum})</span>
-                          </div>
-                          <span style={{ fontSize: "0.68rem", fontWeight: 800, background: "#dcfce7", color: "#15803d", padding: "2px 8px", borderRadius: "100px" }}>
-                            {currentWeekAudios.length} {currentWeekAudios.length === 1 ? "Aufnahme" : "Aufnahmen"}
-                          </span>
-                        </div>
-
-                        {currentWeekAudios.length === 0 ? (
-                          <div style={{ padding: "14px", textAlign: "center", color: "#94a3b8", fontSize: "0.76rem", fontWeight: 700, background: "#f8fafc", borderRadius: "12px" }}>
-                            Noch keine Aufnahmen in dieser Woche vorhanden
-                          </div>
-                        ) : (
-                          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                            {currentWeekAudios.map((aud, idx) => (
-                              <InlineAudioPlayer 
-                                key={`teacher-curr-aud-${idx}`}
-                                url={aud.url} 
-                                label={aud.label} 
-                                duration={aud.duration}
-                                date={aud.date}
-                                isFavorite={favoriteAudioUrls.includes(aud.url)}
-                                onToggleFavorite={() => toggleFavoriteAudio(aud.url)}
-                                themeColor="#15803d"
-                                themeBg="#e6f4ea"
-                                badge="👨‍🏫 Lehrkraft"
-                                badgeBg="#dcfce7"
-                                badgeColor="#15803d"
-                                onDelete={!readOnly ? () => handleDeleteNote(aud.originalIdx, aud.url) : undefined}
-                              />
-                            ))}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* 2. VISUAL SQUARE ALBUM COVERS (6er-Reihe: Favoriten + Monate) */}
-                      <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                          <span style={{ fontSize: "0.70rem", fontWeight: 900, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                            Monats-Alben & Archiv
-                          </span>
-                          <span style={{ fontSize: "0.66rem", color: "#94a3b8", fontWeight: 700 }}>
-                            {sortedMonths.length} {sortedMonths.length === 1 ? "Monat" : "Monate"}
-                          </span>
-                        </div>
-
-                        <div style={{
-                          display: "grid",
-                          gridTemplateColumns: isMobileOrSim ? (windowWidth < 600 ? "repeat(3, 1fr)" : "repeat(4, 1fr)") : "repeat(6, 1fr)",
-                          gap: "8px"
-                        }}>
-                          {/* ⭐ Radiant Apple Liquid Gold & Spotify Starburst Favoriten Cover Card */}
-                          <div
-                            onClick={() => setShowTeacherFavoritesOnly(true)}
-                            style={{
-                              aspectRatio: "1 / 1",
-                              background: "linear-gradient(135deg, #f59e0b 0%, #d97706 60%, #b45309 100%)",
-                              borderRadius: "14px",
-                              border: "1px solid rgba(255, 255, 255, 0.4)",
-                              padding: "8px 4px",
-                              display: "flex",
-                              flexDirection: "column",
-                              alignItems: "center",
-                              justifyContent: "space-between",
-                              cursor: "pointer",
-                              boxShadow: "0 6px 18px -2px rgba(217, 119, 6, 0.35), 0 2px 6px rgba(0,0,0,0.06)",
-                              position: "relative",
-                              overflow: "hidden",
-                              transition: "all 0.18s cubic-bezier(0.16, 1, 0.3, 1)",
-                              textAlign: "center"
-                            }}
-                            className="hover-scale"
-                          >
-                            {/* Specular Highlight Sheen */}
-                            <div style={{
-                              position: "absolute",
-                              top: 0,
-                              left: 0,
-                              right: 0,
-                              height: "50%",
-                              background: "linear-gradient(180deg, rgba(255,255,255,0.22) 0%, rgba(255,255,255,0) 100%)",
-                              pointerEvents: "none"
-                            }} />
-
-                            {/* Luminous Floating Glass Capsule with White Star */}
-                            <div style={{
-                              width: "28px",
-                              height: "28px",
-                              borderRadius: "9px",
-                              background: "rgba(255, 255, 255, 0.22)",
-                              backdropFilter: "blur(8px)",
-                              WebkitBackdropFilter: "blur(8px)",
-                              border: "1px solid rgba(255, 255, 255, 0.65)",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              boxShadow: "0 2px 8px rgba(0, 0, 0, 0.15), inset 0 1px 1px rgba(255, 255, 255, 0.8)",
-                              marginTop: "2px",
-                              color: "#ffffff"
-                            }}>
-                              <Star size={14} fill="#ffffff" color="#ffffff" strokeWidth={0} />
-                            </div>
-
-                            {/* Typography */}
-                            <div style={{ width: "100%", position: "relative", zIndex: 1 }}>
-                              <div style={{
-                                fontSize: "0.64rem",
-                                fontWeight: 900,
-                                color: "#ffffff",
-                                letterSpacing: "-0.01em",
-                                lineHeight: 1.1,
-                                whiteSpace: "nowrap",
-                                overflow: "hidden",
-                                textOverflow: "ellipsis",
-                                textShadow: "0 1px 3px rgba(0,0,0,0.25)"
-                              }}>
-                                Favoriten
-                              </div>
-                              <div style={{
-                                display: "inline-block",
-                                background: "rgba(0, 0, 0, 0.18)",
-                                backdropFilter: "blur(4px)",
-                                WebkitBackdropFilter: "blur(4px)",
-                                padding: "1px 6px",
-                                borderRadius: "999px",
-                                fontSize: "0.52rem",
-                                fontWeight: 800,
-                                color: "#fef3c7",
-                                marginTop: "2px",
-                                border: "1px solid rgba(255, 255, 255, 0.2)"
-                              }}>
-                                {favoriteTeacherAudios.length} {favoriteTeacherAudios.length === 1 ? "Take" : "Takes"}
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* 📅 Monthly Album Cover Cards (Kompakte Apple-Mini-Covers) */}
-                          {sortedMonths.map(m => {
-                            const dParts = m.monthKey.split("-");
-                            const dObj = new Date(parseInt(dParts[0], 10), parseInt(dParts[1], 10) - 1, 1);
-                            const shortLabel = dObj.toLocaleDateString("de-DE", { month: "short" }) + " " + String(dObj.getFullYear()).slice(2);
-                            return (
-                              <div
-                                key={`teacher-month-card-${m.monthKey}`}
-                                onClick={() => setSelectedTeacherMonth({ key: m.monthKey, label: m.monthLabel })}
-                                style={{
-                                  aspectRatio: "1 / 1",
-                                  background: "linear-gradient(145deg, #ffffff 0%, #f8fafc 100%)",
-                                  borderRadius: "14px",
-                                  border: "1.5px solid #e2e8f0",
-                                  padding: "8px 4px",
-                                  display: "flex",
-                                  flexDirection: "column",
-                                  alignItems: "center",
-                                  justifyContent: "space-between",
-                                  cursor: "pointer",
-                                  boxShadow: "0 2px 6px rgba(0,0,0,0.03)",
-                                  transition: "all 0.18s cubic-bezier(0.16, 1, 0.3, 1)",
-                                  textAlign: "center"
-                                }}
-                                className="hover-scale"
-                              >
-                                <div style={{
-                                  width: "28px",
-                                  height: "28px",
-                                  borderRadius: "9px",
-                                  background: "#f0fdf4",
-                                  color: "#16a34a",
-                                  display: "flex",
-                                  alignItems: "center",
-                                  justifyContent: "center",
-                                  border: "1px solid #dcfce7",
-                                  marginTop: "2px"
-                                }}>
-                                  <Calendar size={13} strokeWidth={2.4} />
-                                </div>
-                                <div style={{ width: "100%" }}>
-                                  <div style={{ fontSize: "0.64rem", fontWeight: 900, color: "#1e293b", letterSpacing: "-0.01em", lineHeight: 1.1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                                    {shortLabel}
-                                  </div>
-                                  <div style={{ fontSize: "0.56rem", fontWeight: 750, color: "#64748b", marginTop: "1px" }}>
-                                    {m.totalTakes} {m.totalTakes === 1 ? "Take" : "Takes"}
-                                  </div>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })()}
-              </div>
-
-              {/* ========================================================================= */}
-              {/* RIGHT PAGE: ⭐ EIGENE AUFNAHMEN (SCHÜLER - Private Audio-Sandbox)          */}
-              {/* ========================================================================= */}
-              <div style={{
-                flex: isMobileOrSim ? 'none' : '1 1 0%',
-                width: isMobileOrSim ? '100%' : undefined,
-                display: isMobileOrSim ? (mobileRecordingsTab === 'student' && !isTeacherTools ? 'flex' : 'none') : 'flex',
-                overflowY: 'auto',
-                flexDirection: 'column',
-                background: useNotebookLayout ? 'white' : '#f8fafc',
-                backgroundImage: useNotebookLayout ? 'repeating-linear-gradient(white, white 27px, #e5e0d4 27px, #e5e0d4 28px)' : 'none',
-                borderLeft: useNotebookLayout || isMobileOrSim ? 'none' : '1px solid #e4e4e7',
-                borderRadius: useNotebookLayout ? '0 0 20px 0' : '0',
-                boxShadow: useNotebookLayout ? '10px 10px 20px rgba(0,0,0,0.15)' : 'none',
-                position: 'relative',
-                padding: isMobileOrSim ? '20px 16px calc(140px + env(safe-area-inset-bottom, 20px)) 16px' : '24px'
-              }}>
-                {useNotebookLayout && (
-                  <div style={{
-                    position: 'absolute',
-                    top: 0,
-                    bottom: 0,
-                    left: '42px',
-                    width: '2px',
-                    background: '#fca5a5',
-                    zIndex: 10
-                  }} />
-                )}
-                {useNotebookLayout && (
-                  <div style={{
-                    position: 'absolute',
-                    top: '20px',
-                    bottom: '20px',
-                    left: '8px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    justifyContent: 'space-around',
-                    zIndex: 25
-                  }}>
-                    {Array.from({ length: 6 }).map((_, idx) => (
-                      <div key={idx} style={{
-                        width: '8px',
-                        height: '8px',
-                        borderRadius: '50%',
-                        background: '#121214',
-                        boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.8)'
-                      }} />
-                    ))}
-                  </div>
-                )}
-
-                {/* Header: Student Own Recordings */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', marginBottom: '14px', flexWrap: 'wrap' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <div style={{
-                      width: '36px',
-                      height: '36px',
-                      borderRadius: '11px',
-                      background: 'linear-gradient(135deg, #ede9fe 0%, #ddd6fe 100%)',
-                      color: '#6d28d9',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      boxShadow: '0 2px 6px rgba(109, 40, 217, 0.12)',
-                      flexShrink: 0
-                    }}>
-                      <Star size={16} strokeWidth={2.4} fill="#6d28d9" />
-                    </div>
-                    <div>
-                      <span style={{ fontSize: '0.64rem', fontWeight: 900, color: '#6d28d9', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                        {isTeacherMode ? 'Schüler-Studio' : 'Dein Übe-Studio'}
-                      </span>
-                      <h3 style={{ margin: 0, fontSize: '0.98rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', lineHeight: 1.2 }}>
-                        {isTeacherMode ? `Freigegebene Aufnahmen von ${studentFirstName}` : 'Deine eigenen Aufnahmen'}
-                      </h3>
-                    </div>
-                  </div>
-
-                  {/* Compact Apple Privacy Badge directly inline beside the title */}
-                  <div style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '5px',
-                    padding: '4px 10px',
-                    background: '#ffffff',
-                    border: '1px solid #e2e8f0',
-                    borderRadius: '100px',
-                    fontSize: '0.68rem',
-                    color: '#64748b',
-                    fontWeight: 650,
-                    boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
-                  }}>
-                    <Lock size={12} color="#6366f1" style={{ flexShrink: 0 }} />
-                    <span>
-                      {isTeacherMode
-                        ? `Nur für Lehrkraft freigegeben`
-                        : <>Standardmäßig privat & nur für dich sichtbar</>}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Kid-Friendly Studio Recording Tool (for students) */}
-                {!isTeacherMode && (
-                  <div style={{
-                    margin: '0 0 16px 0',
-                    padding: '14px 16px',
-                    background: '#ffffff',
-                    borderRadius: '18px',
-                    border: '1.5px solid #e0e7ff',
-                    boxShadow: '0 4px 16px rgba(99, 102, 241, 0.05)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '10px'
-                  }}>
-                    {(() => {
-                      let studentRecordingsTotalSec = 0;
-                      try {
-                        if (student?.id) {
-                          const stored = localStorage.getItem(`campus_junior_recordings_${student.id}`);
-                          if (stored) {
-                            const recs = JSON.parse(stored);
-                            studentRecordingsTotalSec = recs.reduce((acc: number, r: any) => acc + (parseInt(r.duration, 10) || 0), 0);
-                          }
-                        }
-                      } catch {}
-
-                      const schoolObj = (student as any)?.schools || (student as any)?.school;
-                      let overridesData: any = {};
-                      try {
-                        const overridesStr = localStorage.getItem('groovelab_school_overrides') || '{}';
-                        const allOverrides = JSON.parse(overridesStr);
-                        const sId = student?.school_id || schoolObj?.id;
-                        if (sId && allOverrides[sId]) overridesData = allOverrides[sId];
-                      } catch (e) {}
-
-                      const activeAddonGb = Number(overridesData.storage_addon_gb ?? schoolObj?.storage_addon_gb ?? 0);
-                      const totalCapGb = 1.0 + activeAddonGb;
-                      const usedBytes = Number(overridesData.storage_used_bytes ?? schoolObj?.storage_used_bytes ?? 0);
-                      const usedGb = usedBytes / (1024 * 1024 * 1024);
-                      const isStorageOverCap = hasTresorStorage && activeAddonGb > 0 && usedGb >= totalCapGb;
-
-                      const monthlyLimit = 240;
-                      const effectiveTresorAvailable = hasTresorStorage && !isStorageOverCap;
-                      const isLimitReached = !effectiveTresorAvailable && studentRecordingsTotalSec >= monthlyLimit;
-
-                      const studentIdVal = (student as any)?.id;
-                      const localAudioKey = studentIdVal && typeof window !== 'undefined' ? localStorage.getItem(`groovelab_parent_allow_audio_${studentIdVal}`) : null;
-                      const isAudioAllowed = (student as any)?.parent_allow_audio !== false && 
-                        (localAudioKey !== null ? localAudioKey !== 'false' : true) &&
-                        (typeof window !== 'undefined' ? localStorage.getItem('campus_board_override_recordings') !== 'false' && localStorage.getItem('campus_allow_audio') !== 'false' : true);
-
-                      if (!isAudioAllowed) {
-                        return (
-                          <div style={{
-                            padding: '14px 16px',
-                            background: '#f8fafc',
-                            border: '1.5px dashed #cbd5e1',
-                            borderRadius: '16px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '12px',
-                            textAlign: 'left'
-                          }}>
-                            <div style={{
-                              width: '36px',
-                              height: '36px',
-                              borderRadius: '10px',
-                              background: '#f1f5f9',
-                              color: '#64748b',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              flexShrink: 0
-                            }}>
-                              <Lock size={18} />
-                            </div>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                              <div style={{ fontSize: '0.82rem', fontWeight: 850, color: '#475569' }}>
-                                Eigene Aufnahmen im Elternbereich pausiert
-                              </div>
-                              <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 550, lineHeight: 1.35 }}>
-                                Aufnahmen deiner Lehrkraft auf der linken Seite kannst du weiterhin jederzeit anhören. Eigene Mikrofonaufnahmen können im Eltern-Kontrollzentrum aktiviert werden.
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      }
-
-                      return (
-                        <>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <span style={{ fontSize: '0.80rem', fontWeight: 900, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                              <span>🎙️ Selbstaufnahme {effectiveTresorAvailable ? '(max. 7 Min.)' : '(max. 60s)'}</span>
-                            </span>
-                            {effectiveTresorAvailable ? (
-                              <span style={{ fontSize: '0.70rem', color: '#15803d', fontWeight: 850, background: '#dcfce7', padding: '2px 8px', borderRadius: '100px' }}>
-                                ✨ Unbegrenzt (Audio-Tresor)
-                              </span>
-                            ) : (
-                              <span style={{ fontSize: '0.70rem', color: isLimitReached ? '#dc2626' : '#6366f1', fontWeight: 800, background: isLimitReached ? '#fee2e2' : '#eef2ff', padding: '2px 8px', borderRadius: '100px' }}>
-                                ⏱️ {studentRecordingsTotalSec}s / {monthlyLimit}s verbraucht {isStorageOverCap ? '(Cloud voll)' : ''}
-                              </span>
-                            )}
-                          </div>
-
-                          <div style={{
-                            display: 'flex',
-                            flexDirection: isMobileOrSim ? 'column' : 'row',
-                            alignItems: isMobileOrSim ? 'stretch' : 'center',
-                            gap: '8px',
-                            width: '100%'
-                          }}>
-                            {!isRecordingAudio && !isLimitReached && (
-                              <input
-                                type="text"
-                                placeholder="Name deiner Aufnahme (z. B. Mein Gitarren-Hit)..."
-                                value={audioLabel}
-                                onChange={(e) => setAudioLabel(e.target.value)}
-                                style={{
-                                  flex: isMobileOrSim ? 'none' : 1,
-                                  width: isMobileOrSim ? '100%' : undefined,
-                                  minWidth: 0,
-                                  fontSize: '0.82rem',
-                                  padding: '9px 12px',
-                                  borderRadius: '10px',
-                                  border: '1.5px solid #cbd5e1',
-                                  background: '#f8fafc',
-                                  outline: 'none',
-                                  boxSizing: 'border-box'
-                                }}
-                              />
-                            )}
-
-                            {!isRecordingAudio ? (
-                              <div style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '8px',
-                                flexShrink: 0,
-                                width: isMobileOrSim ? '100%' : 'auto',
-                                position: 'relative'
-                              }}>
-                                {/* ⏱️ Metronom / Klick Button */}
-                                <button
-                                  type="button"
-                                  onClick={() => setShowRecordingMetronomePopup(prev => !prev)}
-                                  style={{
-                                    background: isRecordingMetronomeActive ? '#dcfce7' : '#f8fafc',
-                                    border: isRecordingMetronomeActive ? '1.5px solid #16a34a' : '1.5px solid #cbd5e1',
-                                    color: isRecordingMetronomeActive ? '#15803d' : '#64748b',
-                                    borderRadius: '12px',
-                                    width: isMobileOrSim ? '42px' : '36px',
-                                    height: isMobileOrSim ? '42px' : '36px',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    cursor: 'pointer',
-                                    flexShrink: 0,
-                                    boxShadow: isRecordingMetronomeActive ? '0 2px 8px rgba(22, 163, 74, 0.25)' : 'none',
-                                    transition: 'all 0.15s ease'
-                                  }}
-                                  className="hover-scale-mini"
-                                  title={isRecordingMetronomeActive ? `Klick aktiv (${recordingBpm} BPM)` : 'Klick / Metronom einstellen'}
-                                >
-                                  <MechanicalMetronomeIcon size={18} color={isRecordingMetronomeActive ? "#15803d" : "#64748b"} strokeWidth={isRecordingMetronomeActive ? 2.4 : 2} />
-                                </button>
-
-                                {/* Metronome Flyout Popup */}
-                                {showRecordingMetronomePopup && (
-                                  <div style={{
-                                    position: 'absolute',
-                                    bottom: '100%',
-                                    right: 0,
-                                    marginBottom: '10px',
-                                    background: '#ffffff',
-                                    borderRadius: '16px',
-                                    border: '1.5px solid #e2e8f0',
-                                    boxShadow: '0 12px 30px rgba(0, 0, 0, 0.15), 0 2px 6px rgba(0,0,0,0.05)',
-                                    padding: '12px 14px',
-                                    width: '240px',
-                                    zIndex: 100,
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    gap: '10px'
-                                  }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                      <span style={{ fontSize: '0.80rem', fontWeight: 900, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                                        <MechanicalMetronomeIcon size={16} color="#16a34a" strokeWidth={2.2} />
-                                        <span>Klick / Metronom</span>
-                                      </span>
-                                      <button type="button" onClick={() => setShowRecordingMetronomePopup(false)} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '2px' }}>
-                                        <X size={14} />
-                                      </button>
-                                    </div>
-
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        const next = !isRecordingMetronomeActive;
-                                        setIsRecordingMetronomeActive(next);
-                                        if (next) playMetronomeTick(true);
-                                      }}
-                                      style={{
-                                        width: '100%',
-                                        background: isRecordingMetronomeActive ? '#16a34a' : '#f1f5f9',
-                                        color: isRecordingMetronomeActive ? '#ffffff' : '#475569',
-                                        border: 'none',
-                                        borderRadius: '10px',
-                                        padding: '7px 10px',
-                                        fontSize: '0.76rem',
-                                        fontWeight: 800,
-                                        cursor: 'pointer',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        gap: '6px'
-                                      }}
-                                    >
-                                      <span>{isRecordingMetronomeActive ? '✓ Klick aktiv' : 'Klick einschalten'}</span>
-                                    </button>
-
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.72rem', fontWeight: 800, color: '#475569' }}>
-                                        <span>Tempo</span>
-                                        <span style={{ color: '#16a34a', fontWeight: 900 }}>{recordingBpm} BPM</span>
-                                      </div>
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                        <button
-                                          type="button"
-                                          onClick={() => setRecordingBpm(b => Math.max(40, b - 5))}
-                                          style={{ background: '#f1f5f9', border: 'none', borderRadius: '6px', width: '24px', height: '24px', fontWeight: 900, cursor: 'pointer' }}
-                                        >-</button>
-                                        <input
-                                          type="range"
-                                          min="40"
-                                          max="240"
-                                          value={recordingBpm}
-                                          onChange={(e) => setRecordingBpm(parseInt(e.target.value, 10))}
-                                          style={{ flex: 1, accentColor: '#16a34a', cursor: 'pointer' }}
-                                        />
-                                        <button
-                                          type="button"
-                                          onClick={() => setRecordingBpm(b => Math.min(240, b + 5))}
-                                          style={{ background: '#f1f5f9', border: 'none', borderRadius: '6px', width: '24px', height: '24px', fontWeight: 900, cursor: 'pointer' }}
-                                        >+</button>
-                                      </div>
-                                    </div>
-
-                                    <button
-                                      type="button"
-                                      onClick={() => playMetronomeTick(true)}
-                                      style={{ background: '#f8fafc', border: '1px dashed #cbd5e1', color: '#64748b', borderRadius: '8px', padding: '5px', fontSize: '0.68rem', fontWeight: 750, cursor: 'pointer' }}
-                                    >
-                                      🔊 Klick kurz testen
-                                    </button>
-                                  </div>
-                                )}
-
-                                <button
-                                  type="button"
-                                  onClick={startRecordingAudio}
-                                  disabled={isUploadingAudio || isLimitReached}
-                                  style={{
-                                    flex: isMobileOrSim ? 1 : 'none',
-                                    height: isMobileOrSim ? '42px' : '36px',
-                                    background: isLimitReached ? '#cbd5e1' : 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
-                                    color: '#fff',
-                                    border: 'none',
-                                    padding: '8px 16px',
-                                    borderRadius: '12px',
-                                    fontSize: '0.80rem',
-                                    fontWeight: 900,
-                                    cursor: isLimitReached ? 'not-allowed' : 'pointer',
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    gap: '6px',
-                                    boxShadow: isLimitReached ? 'none' : '0 3px 10px rgba(99, 102, 241, 0.25)',
-                                    whiteSpace: 'nowrap',
-                                    boxSizing: 'border-box'
-                                  }}
-                                  className={isLimitReached ? '' : 'hover-scale'}
-                                >
-                                  <Mic size={15} strokeWidth={2.4} />
-                                  <span>Aufnahme starten</span>
-                                </button>
-                              </div>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() => stopRecordingAudio()}
-                                style={{
-                                  width: '100%',
-                                  background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
-                                  color: '#fff',
-                                  border: 'none',
-                                  padding: '10px 16px',
-                                  borderRadius: '12px',
-                                  fontSize: '0.84rem',
-                                  fontWeight: 900,
-                                  cursor: 'pointer',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  gap: '8px',
-                                  boxShadow: '0 3px 10px rgba(239, 68, 68, 0.3)',
-                                  animation: 'pulse 1.5s infinite'
-                                }}
-                                className="hover-scale"
-                              >
-                                <span style={{ width: '8px', height: '8px', background: '#ffffff', borderRadius: '2px', display: 'inline-block' }} />
-                                <span>Aufnahme beenden ({hasTresorStorage ? `${formatRecordTime(audioDuration)} / 7:00 Min.` : `${audioDuration}s / 60s`})</span>
-                              </button>
-                            )}
-                          </div>
-
-                          {isUploadingAudio && (
-                            <div style={{ fontSize: '0.74rem', color: '#4f46e5', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 750 }}>
-                              <span>⏳</span> Deine Aufnahme wird gespeichert...
-                            </div>
-                          )}
-                        </>
-                      );
-                    })()}
-                  </div>
-                )}
-
-                {/* Student Recordings Gallery with Weekly Accordions */}
-                {(() => {
-                  const studentAudios: any[] = [];
-                  const seenStudentUrls = new Set<string>();
-
-                  // 1. Load from local student recordings vault
-                  try {
-                    if (student?.id) {
-                      const juniorKey = `campus_junior_recordings_${student.id}`;
-                      const stored = localStorage.getItem(juniorKey);
-                      if (stored) {
-                        const parsed = JSON.parse(stored);
-                        if (Array.isArray(parsed)) {
-                          parsed.forEach((rec: any, idx: number) => {
-                            if (rec.url && !seenStudentUrls.has(rec.url)) {
-                              seenStudentUrls.add(rec.url);
-                              studentAudios.push({
-                                id: rec.id || `stud-${idx}`,
-                                url: rec.url,
-                                duration: parseInt(rec.duration || '0', 10),
-                                date: rec.date || new Date().toISOString(),
-                                label: rec.title || rec.label || `Eigene Aufnahme #${studentAudios.length + 1}`,
-                                visibility: rec.visibility || 'private',
-                                originalIdx: -1,
-                                source: 'local_junior'
-                              });
-                            }
-                          });
-                        }
-                      }
-                    }
-                  } catch {}
-
-                  // If teacher is viewing, only show student recordings that are shared
-                  if (isTeacherMode) {
-                    const sharedAudios = studentAudios.filter(aud => aud.visibility === 'shared_with_teacher');
-
-                    if (sharedAudios.length === 0) {
-                      return (
-                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', padding: '40px 20px', gap: '12px', textAlign: 'center' }}>
-                          <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b' }}>
-                            <Lock size={20} />
-                          </div>
-                          <div>
-                            <p style={{ fontWeight: 800, fontSize: '0.86rem', color: '#334155', margin: '0 0 4px' }}>Keine freigegebenen Aufnahmen von ${studentFirstName}</p>
-                            <p style={{ fontSize: '0.74rem', color: '#64748b', margin: 0, maxWidth: '280px', lineHeight: 1.45 }}>
-                              ${studentFirstName} nutzt diesen Bereich zum ungestörten, privaten Ausprobieren. Sobald eine Übe-Aufnahme für dich freigegeben wird, erscheint sie hier.
-                            </p>
-                          </div>
-                        </div>
-                      );
-                    }
-
-                    return (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                        {sharedAudios.map((aud, idx) => (
-                          <InlineAudioPlayer 
-                            key={`shared-aud-${idx}`}
-                            url={aud.url} 
-                            label={aud.label} 
-                            duration={aud.duration}
-                            date={aud.date}
-                            themeColor="#16a34a"
-                            themeBg="#dcfce7"
-                            badge="🎓 Lehrer"
-                            badgeTitle="Vom Schüler für die Lehrkraft freigegeben"
-                            badgeBg="#dcfce7"
-                            badgeColor="#15803d"
-                          />
-                        ))}
-                      </div>
-                    );
-                  }
-
-                  // Student view: show all student audios
-                  if (studentAudios.length === 0) {
-                    return (
-                      <div style={{
-                        flex: 1,
-                        display: "flex",
-                        flexDirection: "column",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        color: "#94a3b8",
-                        padding: "40px 20px",
-                        gap: "12px",
-                        textAlign: "center",
-                        background: "#ffffff",
-                        borderRadius: "20px",
-                        border: "1.5px dashed #e2e8f0"
-                      }}>
-                        <div style={{
-                          width: "48px",
-                          height: "48px",
-                          borderRadius: "50%",
-                          background: "#f5f3ff",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          color: "#6366f1"
-                        }}>
-                          <Star size={22} />
-                        </div>
-                        <div>
-                          <h4 style={{ margin: "0 0 4px 0", fontSize: "0.92rem", fontWeight: 900, color: "#1e293b" }}>
-                            Noch keine eigenen Aufnahmen
-                          </h4>
-                          <p style={{ margin: 0, fontSize: "0.78rem", color: "#64748b", fontWeight: 600, maxWidth: "260px", lineHeight: 1.45 }}>
-                            Nimm dein Spiel im Übe-Studio auf und sammle deine besten Takes.
-                          </p>
-                        </div>
-                      </div>
-                    );
-                  }
-
-                  const now = getSimulatedNow();
-                  const currentWeekStr = getISOWeek(now);
-                  const currentWeekNum = currentWeekStr.split("-W")[1] || "";
-
-                  // Filter by Search Query if active
-                  const isSearching = recordingSearchQuery.trim() !== "";
-                  const searchResults = isSearching ? studentAudios.filter(aud => matchesAudioSearch(aud, recordingSearchQuery)) : [];
-
-                  // Current Week Audios
-                  const currentWeekAudios = studentAudios.filter(aud => {
-                    const d = aud.date ? new Date(aud.date) : now;
-                    return getISOWeek(isNaN(d.getTime()) ? now : d) === currentWeekStr;
-                  });
-
-                  // Favorite Audios
-                  const favoriteStudentAudios = studentAudios.filter(aud => favoriteAudioUrls.includes(aud.url));
-
-                  // Group Past Audios into Month Albums
-                  const pastAudios = studentAudios.filter(aud => {
-                    const d = aud.date ? new Date(aud.date) : now;
-                    return getISOWeek(isNaN(d.getTime()) ? now : d) !== currentWeekStr;
-                  });
-
-                  const monthGroups: { [monthKey: string]: { monthKey: string; monthLabel: string; weeks: { [weekKey: string]: any[] }; totalTakes: number } } = {};
-                  pastAudios.forEach(aud => {
-                    const d = aud.date ? new Date(aud.date) : now;
-                    const dateObj = isNaN(d.getTime()) ? now : d;
-                    const monthKey = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, "0")}`;
-                    const monthLabel = dateObj.toLocaleDateString("de-DE", { month: "long", year: "numeric" });
-                    const weekKey = getISOWeek(dateObj);
-
-                    if (!monthGroups[monthKey]) {
-                      monthGroups[monthKey] = { monthKey, monthLabel, weeks: {}, totalTakes: 0 };
-                    }
-                    if (!monthGroups[monthKey].weeks[weekKey]) {
-                      monthGroups[monthKey].weeks[weekKey] = [];
-                    }
-                    monthGroups[monthKey].weeks[weekKey].push(aud);
-                    monthGroups[monthKey].totalTakes += 1;
-                  });
-
-                  const sortedMonths = Object.values(monthGroups).sort((a, b) => b.monthKey.localeCompare(a.monthKey));
-
-                  const renderStudentPlayer = (aud: any, idxKey: string) => {
-                    const isShared = aud.visibility === "shared_with_teacher";
-                    return (
-                      <InlineAudioPlayer 
-                        key={idxKey}
-                        url={aud.url} 
-                        label={aud.label} 
-                        duration={aud.duration}
-                        date={aud.date}
-                        isFavorite={favoriteAudioUrls.includes(aud.url)}
-                        onToggleFavorite={() => toggleFavoriteAudio(aud.url)}
-                        themeColor={isShared ? "#16a34a" : "#6366f1"}
-                        themeBg={isShared ? "#dcfce7" : "#ede9fe"}
-                        badge={isShared ? "🎓 Lehrer" : "🔒 Privat"}
-                        badgeTitle={isShared ? "Für Lehrkraft freigegeben (Klicken zum Umschalten)" : "Privat (Klicken zum Umschalten)"}
-                        badgeBg={isShared ? "#dcfce7" : "#ede9fe"}
-                        badgeColor={isShared ? "#15803d" : "#6d28d9"}
-                        onBadgeClick={!isTeacherMode ? () => {
-                          if (student?.id) {
-                            try {
-                              const juniorKey = `campus_junior_recordings_${student.id}`;
-                              const stored = localStorage.getItem(juniorKey);
-                              if (stored) {
-                                const recs = JSON.parse(stored).map((r: any) => {
-                                  if (r.url === aud.url || r.id === aud.id) {
-                                    return { ...r, visibility: isShared ? "private" : "shared_with_teacher" };
-                                  }
-                                  return r;
-                                });
-                                localStorage.setItem(juniorKey, JSON.stringify(recs));
-                                setLocalJuniorRecordingsTrigger(p => p + 1);
-                              }
-                            } catch {}
-                          }
-                        } : undefined}
-                        onDelete={!isTeacherMode ? () => {
-                          if (student?.id) {
-                            try {
-                              const juniorKey = `campus_junior_recordings_${student.id}`;
-                              const stored = localStorage.getItem(juniorKey);
-                              if (stored) {
-                                const recs = JSON.parse(stored).filter((r: any) => r.url !== aud.url && r.id !== aud.id);
-                                localStorage.setItem(juniorKey, JSON.stringify(recs));
-                                setLocalJuniorRecordingsTrigger(p => p + 1);
-                              }
-                            } catch {}
-                          }
-                        } : undefined}
-                        onSaveEdited={(res) => {
-                          if (student?.id) {
-                            try {
-                              const juniorKey = `campus_junior_recordings_${student.id}`;
-                              const stored = localStorage.getItem(juniorKey);
-                              let recs = stored ? JSON.parse(stored) : [];
-                              if (res.mode === "overwrite") {
-                                recs = recs.map((r: any) => {
-                                  if (r.url === aud.url || r.id === aud.id) {
-                                    return { ...r, url: res.url, duration: res.duration, label: res.label, title: res.label };
-                                  }
-                                  return r;
-                                });
-                              } else {
-                                const newRecord = {
-                                  id: `stud-${Date.now()}`,
-                                  url: res.url,
-                                  duration: res.duration,
-                                  date: new Date().toISOString(),
-                                  title: res.label,
-                                  label: res.label,
-                                  visibility: aud.visibility || "private"
-                                };
-                                recs = [newRecord, ...recs];
-                              }
-                              localStorage.setItem(juniorKey, JSON.stringify(recs));
-                              setLocalJuniorRecordingsTrigger(p => p + 1);
-                            } catch {}
-                          }
-                        }}
-                      />
-                    );
-                  };
-
-                  // 🔍 SEARCH RESULTS VIEW
-                  if (isSearching) {
-                    return (
-                      <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                        <div style={{ fontSize: "0.76rem", fontWeight: 850, color: "#6d28d9", marginBottom: "4px" }}>
-                          🔍 {searchResults.length} {searchResults.length === 1 ? "Treffer" : "Treffer"} zur Suche „{recordingSearchQuery}“
-                        </div>
-                        {searchResults.map((aud, idx) => renderStudentPlayer(aud, `stud-search-${idx}`))}
-                      </div>
-                    );
-                  }
-
-                  // ⭐ FAVORITES DRILLDOWN VIEW
-                  if (showStudentFavoritesOnly) {
-                    return (
-                      <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "4px" }}>
-                          <button
-                            type="button"
-                            onClick={() => setShowStudentFavoritesOnly(false)}
-                            style={{
-                              background: "#ffffff",
-                              border: "1px solid #cbd5e1",
-                              borderRadius: "100px",
-                              padding: "4px 12px",
-                              fontSize: "0.72rem",
-                              fontWeight: 800,
-                              color: "#475569",
-                              cursor: "pointer",
-                              display: "inline-flex",
-                              alignItems: "center",
-                              gap: "4px"
-                            }}
-                            className="hover-scale"
-                          >
-                            <ArrowLeft size={12} /> Zurück zur Übersicht
-                          </button>
-                          <span style={{ fontSize: "0.76rem", fontWeight: 900, color: "#ca8a04" }}>
-                            ⭐ {favoriteStudentAudios.length} Favoriten
-                          </span>
-                        </div>
-
-                        {favoriteStudentAudios.length === 0 ? (
-                          <div style={{ textAlign: "center", padding: "30px 16px", color: "#94a3b8", fontSize: "0.80rem", fontWeight: 700 }}>
-                            Noch keine Favoriten markiert. Klicke bei einem deiner Takes auf das Stern-Symbol ⭐!
-                          </div>
-                        ) : (
-                          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                            {favoriteStudentAudios.map((aud, idx) => renderStudentPlayer(aud, `stud-fav-${idx}`))}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  }
-
-                  // 📁 SELECTED MONTH DRILLDOWN VIEW
-                  if (selectedStudentMonth) {
-                    const monthData = monthGroups[selectedStudentMonth.key];
-                    const weekKeys = monthData ? Object.keys(monthData.weeks).sort((a, b) => b.localeCompare(a)) : [];
-
-                    return (
-                      <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "4px" }}>
-                          <button
-                            type="button"
-                            onClick={() => setSelectedStudentMonth(null)}
-                            style={{
-                              background: "#ffffff",
-                              border: "1px solid #cbd5e1",
-                              borderRadius: "100px",
-                              padding: "4px 12px",
-                              fontSize: "0.72rem",
-                              fontWeight: 800,
-                              color: "#475569",
-                              cursor: "pointer",
-                              display: "inline-flex",
-                              alignItems: "center",
-                              gap: "4px"
-                            }}
-                            className="hover-scale"
-                          >
-                            <ArrowLeft size={12} /> Zurück zur Übersicht
-                          </button>
-                          <span style={{ fontSize: "0.78rem", fontWeight: 900, color: "#6d28d9" }}>
-                            📁 {selectedStudentMonth.label}
-                          </span>
-                        </div>
-
-                        {weekKeys.map(wkKey => {
-                          const wkAudios = monthData.weeks[wkKey] || [];
-                          const isExpanded = expandedStudentAudioWeeks[wkKey] !== undefined ? expandedStudentAudioWeeks[wkKey] : true;
-                          const wkNum = wkKey.split("-W")[1] || "";
-
-                          return (
-                            <div key={`stud-month-week-${wkKey}`} style={{ display: "flex", flexDirection: "column" }}>
-                              <div
-                                onClick={() => toggleStudentAudioWeek(wkKey, true)}
-                                style={{
-                                  display: "flex",
-                                  alignItems: "center",
-                                  justifyContent: "space-between",
-                                  padding: "8px 12px",
-                                  background: "#ffffff",
-                                  borderRadius: "12px",
-                                  border: "1px solid #e2e8f0",
-                                  cursor: "pointer",
-                                  marginBottom: "8px",
-                                  boxShadow: "0 1px 3px rgba(0,0,0,0.02)",
-                                  userSelect: "none"
-                                }}
-                                className="hover-scale"
-                              >
-                                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                                  <span style={{ fontSize: "0.74rem", color: "#64748b", transform: isExpanded ? "rotate(90deg)" : "rotate(0deg)", transition: "transform 0.15s ease" }}>▶</span>
-                                  <span style={{ fontSize: "0.78rem", fontWeight: 850, color: "#334155" }}>KW {wkNum}</span>
-                                </div>
-                                <span style={{ fontSize: "0.66rem", fontWeight: 800, background: "#f1f5f9", color: "#64748b", padding: "2px 8px", borderRadius: "100px" }}>
-                                  {wkAudios.length} {wkAudios.length === 1 ? "Aufnahme" : "Aufnahmen"}
-                                </span>
-                              </div>
-
-                              {isExpanded && (
-                                <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginBottom: "8px" }}>
-                                  {wkAudios.map((aud, idx) => renderStudentPlayer(aud, `stud-month-aud-${wkKey}-${idx}`))}
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    );
-                  }
-
-                  // 🏠 DEFAULT VIEW: Top Hero (Diese Woche) + Square Album Grid (6er-Reihe)
-                  return (
-                    <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-                      {/* 1. TOP HERO: Diese Woche (KW x) */}
-                      <div style={{
-                        background: "#ffffff",
-                        borderRadius: "18px",
-                        border: "1.5px solid #e9d5ff",
-                        padding: "12px 14px",
-                        boxShadow: "0 4px 14px rgba(109, 40, 217, 0.08)",
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: "8px"
-                      }}>
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                            <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#9333ea", display: "inline-block" }} />
-                            <span style={{ fontSize: "0.82rem", fontWeight: 900, color: "#6d28d9" }}>Diese Woche (KW {currentWeekNum})</span>
-                          </div>
-                          <span style={{ fontSize: "0.68rem", fontWeight: 800, background: "#ede9fe", color: "#6d28d9", padding: "2px 8px", borderRadius: "100px" }}>
-                            {currentWeekAudios.length} {currentWeekAudios.length === 1 ? "Aufnahme" : "Aufnahmen"}
-                          </span>
-                        </div>
-
-                        {currentWeekAudios.length === 0 ? (
-                          <div style={{ padding: "14px", textAlign: "center", color: "#94a3b8", fontSize: "0.76rem", fontWeight: 700, background: "#faf5ff", borderRadius: "12px" }}>
-                            Noch keine eigenen Aufnahmen in dieser Woche
-                          </div>
-                        ) : (
-                          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                            {currentWeekAudios.map((aud, idx) => renderStudentPlayer(aud, `stud-curr-aud-${idx}`))}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* 2. VISUAL SQUARE ALBUM COVERS (6er-Reihe: Favoriten + Monate) */}
-                      <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                          <span style={{ fontSize: "0.70rem", fontWeight: 900, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                            Monats-Alben & Archiv
-                          </span>
-                          <span style={{ fontSize: "0.66rem", color: "#94a3b8", fontWeight: 700 }}>
-                            {sortedMonths.length} {sortedMonths.length === 1 ? "Monat" : "Monate"}
-                          </span>
-                        </div>
-
-                        <div style={{
-                          display: "grid",
-                          gridTemplateColumns: isMobileOrSim ? (windowWidth < 600 ? "repeat(3, 1fr)" : "repeat(4, 1fr)") : "repeat(6, 1fr)",
-                          gap: "8px"
-                        }}>
-                          {/* ⭐ Radiant Apple Liquid Gold & Spotify Starburst Favoriten Cover Card */}
-                          <div
-                            onClick={() => setShowStudentFavoritesOnly(true)}
-                            style={{
-                              aspectRatio: "1 / 1",
-                              background: "linear-gradient(135deg, #f59e0b 0%, #d97706 60%, #b45309 100%)",
-                              borderRadius: "14px",
-                              border: "1px solid rgba(255, 255, 255, 0.4)",
-                              padding: "8px 4px",
-                              display: "flex",
-                              flexDirection: "column",
-                              alignItems: "center",
-                              justifyContent: "space-between",
-                              cursor: "pointer",
-                              boxShadow: "0 6px 18px -2px rgba(217, 119, 6, 0.35), 0 2px 6px rgba(0,0,0,0.06)",
-                              position: "relative",
-                              overflow: "hidden",
-                              transition: "all 0.18s cubic-bezier(0.16, 1, 0.3, 1)",
-                              textAlign: "center"
-                            }}
-                            className="hover-scale"
-                          >
-                            {/* Specular Highlight Sheen */}
-                            <div style={{
-                              position: "absolute",
-                              top: 0,
-                              left: 0,
-                              right: 0,
-                              height: "50%",
-                              background: "linear-gradient(180deg, rgba(255,255,255,0.22) 0%, rgba(255,255,255,0) 100%)",
-                              pointerEvents: "none"
-                            }} />
-
-                            {/* Luminous Floating Glass Capsule with White Star */}
-                            <div style={{
-                              width: "28px",
-                              height: "28px",
-                              borderRadius: "9px",
-                              background: "rgba(255, 255, 255, 0.22)",
-                              backdropFilter: "blur(8px)",
-                              WebkitBackdropFilter: "blur(8px)",
-                              border: "1px solid rgba(255, 255, 255, 0.65)",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              boxShadow: "0 2px 8px rgba(0, 0, 0, 0.15), inset 0 1px 1px rgba(255, 255, 255, 0.8)",
-                              marginTop: "2px",
-                              color: "#ffffff"
-                            }}>
-                              <Star size={14} fill="#ffffff" color="#ffffff" strokeWidth={0} />
-                            </div>
-
-                            {/* Typography */}
-                            <div style={{ width: "100%", position: "relative", zIndex: 1 }}>
-                              <div style={{
-                                fontSize: "0.64rem",
-                                fontWeight: 900,
-                                color: "#ffffff",
-                                letterSpacing: "-0.01em",
-                                lineHeight: 1.1,
-                                whiteSpace: "nowrap",
-                                overflow: "hidden",
-                                textOverflow: "ellipsis",
-                                textShadow: "0 1px 3px rgba(0,0,0,0.25)"
-                              }}>
-                                Favoriten
-                              </div>
-                              <div style={{
-                                display: "inline-block",
-                                background: "rgba(0, 0, 0, 0.18)",
-                                backdropFilter: "blur(4px)",
-                                WebkitBackdropFilter: "blur(4px)",
-                                padding: "1px 6px",
-                                borderRadius: "999px",
-                                fontSize: "0.52rem",
-                                fontWeight: 800,
-                                color: "#fef3c7",
-                                marginTop: "2px",
-                                border: "1px solid rgba(255, 255, 255, 0.2)"
-                              }}>
-                                {favoriteStudentAudios.length} {favoriteStudentAudios.length === 1 ? "Take" : "Takes"}
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* 📅 Monthly Album Cover Cards (Kompakte Apple-Mini-Covers) */}
-                          {sortedMonths.map(m => {
-                            const dParts = m.monthKey.split("-");
-                            const dObj = new Date(parseInt(dParts[0], 10), parseInt(dParts[1], 10) - 1, 1);
-                            const shortLabel = dObj.toLocaleDateString("de-DE", { month: "short" }) + " " + String(dObj.getFullYear()).slice(2);
-                            return (
-                              <div
-                                key={`stud-month-card-${m.monthKey}`}
-                                onClick={() => setSelectedStudentMonth({ key: m.monthKey, label: m.monthLabel })}
-                                style={{
-                                  aspectRatio: "1 / 1",
-                                  background: "linear-gradient(145deg, #ffffff 0%, #faf5ff 100%)",
-                                  borderRadius: "14px",
-                                  border: "1.5px solid #e9d5ff",
-                                  padding: "8px 4px",
-                                  display: "flex",
-                                  flexDirection: "column",
-                                  alignItems: "center",
-                                  justifyContent: "space-between",
-                                  cursor: "pointer",
-                                  boxShadow: "0 2px 6px rgba(0,0,0,0.03)",
-                                  transition: "all 0.18s cubic-bezier(0.16, 1, 0.3, 1)",
-                                  textAlign: "center"
-                                }}
-                                className="hover-scale"
-                              >
-                                <div style={{
-                                  width: "28px",
-                                  height: "28px",
-                                  borderRadius: "9px",
-                                  background: "#f5f3ff",
-                                  color: "#9333ea",
-                                  display: "flex",
-                                  alignItems: "center",
-                                  justifyContent: "center",
-                                  border: "1px solid #ede9fe",
-                                  marginTop: "2px"
-                                }}>
-                                  <Calendar size={13} strokeWidth={2.4} />
-                                </div>
-                                <div style={{ width: "100%" }}>
-                                  <div style={{ fontSize: "0.64rem", fontWeight: 900, color: "#1e293b", letterSpacing: "-0.01em", lineHeight: 1.1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                                    {shortLabel}
-                                  </div>
-                                  <div style={{ fontSize: "0.56rem", fontWeight: 750, color: "#64748b", marginTop: "1px" }}>
-                                    {m.totalTakes} {m.totalTakes === 1 ? "Take" : "Takes"}
-                                  </div>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })()}
-              </div>
-
-                {/* 💽 Share to Audio-Biografie Playlist Modal */}
-                {shareAudioModal && shareAudioModal.isOpen && (
-                  <div style={{
-                    position: 'fixed',
-                    top: 0, left: 0, right: 0, bottom: 0,
-                    background: 'rgba(15, 23, 42, 0.55)',
-                    backdropFilter: 'blur(8px)',
-                    zIndex: 1100,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    padding: '20px'
-                  }} onClick={() => !isSharingToPlaylist && setShareAudioModal(null)}>
-                    <div style={{
-                      background: '#ffffff',
-                      borderRadius: '24px',
-                      boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.35)',
-                      border: '1px solid rgba(0,0,0,0.08)',
-                      width: '100%',
-                      maxWidth: '480px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      overflow: 'hidden'
-                    }} onClick={(e) => e.stopPropagation()}>
-                      
-                      {/* Header */}
-                      <div style={{
-                        padding: '18px 24px',
-                        borderBottom: '1px solid #f1f5f9',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        background: '#fafafa'
-                      }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          <div style={{
-                            width: '36px',
-                            height: '36px',
-                            borderRadius: '10px',
-                            background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
-                            color: '#ffffff',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            boxShadow: '0 2px 6px rgba(99, 102, 241, 0.3)'
-                          }}>
-                            <Share2 size={18} />
-                          </div>
-                          <div>
-                            <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 900, color: '#0f172a' }}>In Audio-Biografie teilen</h3>
-                            <p style={{ margin: 0, fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>Track in deiner persönlichen Playlist hinterlegen</p>
-                          </div>
-                        </div>
-
-                        <button
-                          type="button"
-                          disabled={isSharingToPlaylist}
-                          onClick={() => setShareAudioModal(null)}
-                          style={{
-                            background: '#f1f5f9',
-                            border: 'none',
-                            borderRadius: '50%',
-                            width: '32px',
-                            height: '32px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            cursor: 'pointer',
-                            color: '#64748b'
-                          }}
-                        >
-                          <X size={16} />
-                        </button>
-                      </div>
-
-                      {/* Body */}
-                      <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                        
-                        {/* Track Title */}
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                          <label style={{ fontSize: '0.76rem', fontWeight: 800, color: '#334155' }}>Titel in der Playlist</label>
-                          <input
-                            type="text"
-                            value={shareCustomTitle}
-                            onChange={(e) => setShareCustomTitle(e.target.value)}
-                            placeholder="z. B. Mein erstes Solo..."
-                            style={{
-                              width: '100%',
-                              padding: '10px 14px',
-                              borderRadius: '12px',
-                              border: '1.5px solid #e2e8f0',
-                              fontSize: '0.85rem',
-                              fontWeight: 600,
-                              outline: 'none',
-                              background: '#f8fafc',
-                              boxSizing: 'border-box'
-                            }}
-                          />
-                        </div>
-
-                        {/* Playlist Selection */}
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <label style={{ fontSize: '0.76rem', fontWeight: 800, color: '#334155' }}>Ziel-Playliste wählen</label>
-                            <button
-                              type="button"
-                              onClick={() => setShowNewPlaylistInput(!showNewPlaylistInput)}
-                              style={{
-                                background: 'transparent',
-                                border: 'none',
-                                color: '#34a853',
-                                fontSize: '0.72rem',
-                                fontWeight: 800,
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '3px'
-                              }}
-                            >
-                              <Plus size={12} /> {showNewPlaylistInput ? 'Aus Liste wählen' : 'Neue Playliste erstellen'}
-                            </button>
-                          </div>
-
-                          {showNewPlaylistInput ? (
-                            <input
-                              type="text"
-                              value={newPlaylistTitle}
-                              onChange={(e) => setNewPlaylistTitle(e.target.value)}
-                              placeholder="Name der neuen Playlist (z.B. Akustik-Sessions)..."
-                              style={{
-                                width: '100%',
-                                padding: '10px 14px',
-                                borderRadius: '12px',
-                                border: '1.5px solid #34a853',
-                                fontSize: '0.85rem',
-                                fontWeight: 600,
-                                outline: 'none',
-                                background: '#f0fdf4',
-                                boxSizing: 'border-box'
-                              }}
-                              autoFocus
-                            />
-                          ) : (
-                            <select
-                              value={sharePlaylistId}
-                              onChange={(e) => setSharePlaylistId(e.target.value)}
-                              style={{
-                                width: '100%',
-                                padding: '10px 14px',
-                                borderRadius: '12px',
-                                border: '1.5px solid #e2e8f0',
-                                fontSize: '0.85rem',
-                                fontWeight: 700,
-                                outline: 'none',
-                                background: '#f8fafc',
-                                cursor: 'pointer',
-                                boxSizing: 'border-box'
-                              }}
-                            >
-                              {availablePlaylists.map(pl => (
-                                <option key={pl.id} value={pl.id}>
-                                  {pl.title} ({pl.tracks?.length || 0} Tracks)
-                                </option>
-                              ))}
-                            </select>
-                          )}
-                        </div>
-
-                        {/* Audio Processing Mode Selection */}
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                          <label style={{ fontSize: '0.76rem', fontWeight: 800, color: '#334155' }}>Audio-Processing für die Playlist</label>
-                          
-                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                            {/* Pure Raw */}
-                            <div
-                              onClick={() => setShareProcessing('raw')}
-                              style={{
-                                padding: '12px',
-                                borderRadius: '14px',
-                                border: shareProcessing === 'raw' ? '2px solid #34a853' : '1.5px solid #e2e8f0',
-                                background: shareProcessing === 'raw' ? '#f0fdf4' : '#ffffff',
-                                cursor: 'pointer',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                gap: '4px',
-                                transition: 'all 0.15s ease'
-                              }}
-                            >
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', fontWeight: 900, color: shareProcessing === 'raw' ? '#16a34a' : '#0f172a' }}>
-                                <Mic size={14} />
-                                <span>Pure Raw</span>
-                              </div>
-                              <span style={{ fontSize: '0.68rem', color: '#64748b', lineHeight: 1.3 }}>
-                                Unverfälschter Original-Sound wie im Proberaum aufgenommen.
-                              </span>
-                            </div>
-
-                            {/* Studio Master */}
-                            <div
-                              onClick={() => setShareProcessing('master')}
-                              style={{
-                                padding: '12px',
-                                borderRadius: '14px',
-                                border: shareProcessing === 'master' ? '2px solid #6366f1' : '1.5px solid #e2e8f0',
-                                background: shareProcessing === 'master' ? '#f5f3ff' : '#ffffff',
-                                cursor: 'pointer',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                gap: '4px',
-                                transition: 'all 0.15s ease'
-                              }}
-                            >
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', fontWeight: 900, color: shareProcessing === 'master' ? '#6366f1' : '#0f172a' }}>
-                                <Sparkles size={14} />
-                                <span>Studio Master</span>
-                              </div>
-                              <span style={{ fontSize: '0.68rem', color: '#64748b', lineHeight: 1.3 }}>
-                                High-End Dynamik-EQ, Röhrenwärme & Stereo-Breite.
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Action Buttons */}
-                        <div style={{ display: 'flex', gap: '10px', marginTop: '6px' }}>
-                          <button
-                            type="button"
-                            disabled={isSharingToPlaylist}
-                            onClick={() => setShareAudioModal(null)}
-                            style={{
-                              flex: 1,
-                              background: '#f1f5f9',
-                              color: '#64748b',
-                              border: 'none',
-                              borderRadius: '12px',
-                              padding: '11px',
-                              fontSize: '0.82rem',
-                              fontWeight: 800,
-                              cursor: 'pointer'
-                            }}
-                          >
-                            Abbrechen
-                          </button>
-                          
-                          <button
-                            type="button"
-                            disabled={isSharingToPlaylist || (showNewPlaylistInput && !newPlaylistTitle.trim())}
-                            onClick={handleSaveShareToPlaylist}
-                            style={{
-                              flex: 2,
-                              background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
-                              color: 'white',
-                              border: 'none',
-                              borderRadius: '12px',
-                              padding: '11px',
-                              fontSize: '0.82rem',
-                              fontWeight: 900,
-                              cursor: isSharingToPlaylist ? 'wait' : 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              gap: '6px',
-                              boxShadow: '0 4px 12px rgba(99, 102, 241, 0.3)'
-                            }}
-                          >
-                            {isSharingToPlaylist ? (
-                              <span>⏳ Verarbeite & Speichere...</span>
-                            ) : (
-                              <>
-                                <Check size={16} />
-                                <span>In Playliste speichern</span>
-                              </>
-                            )}
-                          </button>
-                        </div>
-
-                      </div>
-
-                    </div>
-                  </div>
-                )}
-              </div>
+            <MeisterwerkRecordingsTab
+              isTeacherTools={isTeacherTools}
+              readOnly={readOnly}
+              student={student}
+              activeSongSkills={activeSongSkills}
+              audioDuration={audioDuration}
+              audioLabel={audioLabel}
+              audioSongTags={audioSongTags}
+              availablePlaylists={availablePlaylists}
+              availableSongsForTagging={availableSongsForTagging}
+              expandedStudentAudioWeeks={expandedStudentAudioWeeks}
+              expandedTeacherAudioWeeks={expandedTeacherAudioWeeks}
+              favoriteAudioUrls={favoriteAudioUrls}
+              formatRecordTime={formatRecordTime}
+              getISOWeek={getISOWeek}
+              getMonthAlbumTheme={getMonthAlbumTheme}
+              getNormalizedSongTitle={getNormalizedSongTitle}
+              handleDeleteNote={handleDeleteNote}
+              handleRenameStudentAudio={handleRenameStudentAudio}
+              handleRenameTeacherAudio={handleRenameTeacherAudio}
+              handleSaveShareToPlaylist={handleSaveShareToPlaylist}
+              handleUpdateAudioSongTag={handleUpdateAudioSongTag}
+              hasTresorStorage={hasTresorStorage}
+              homeworkNotes={homeworkNotes}
+              homeworkNotesList={homeworkNotesList}
+              isBookAlbum={isBookAlbum}
+              isCurrentHomework={isCurrentHomework}
+              isMobileOrSim={isMobileOrSim}
+              isRecordingAudio={isRecordingAudio}
+              isRecordingMetronomeActive={isRecordingMetronomeActive}
+              isSharingToPlaylist={isSharingToPlaylist}
+              isStudentWeekExpanded={isStudentWeekExpanded}
+              isTeacherHomeworkExpanded={isTeacherHomeworkExpanded}
+              isTeacherMode={isTeacherMode}
+              isUploadingAudio={isUploadingAudio}
+              matchesAudioSearch={matchesAudioSearch}
+              mobileRecordingsTab={mobileRecordingsTab}
+              newPlaylistTitle={newPlaylistTitle}
+              openHomeworkWeekAccordions={openHomeworkWeekAccordions}
+              playMetronomeTick={playMetronomeTick}
+              progressItems={progressItems}
+              recordingBpm={recordingBpm}
+              recordingMetronomeRef={recordingMetronomeRef}
+              recordingSearchQuery={recordingSearchQuery}
+              selectedStudentMonth={selectedStudentMonth}
+              selectedStudentSongAlbum={selectedStudentSongAlbum}
+              selectedTeacherMonth={selectedTeacherMonth}
+              selectedTeacherSongAlbum={selectedTeacherSongAlbum}
+              setAudioLabel={setAudioLabel}
+              setIsRecordingMetronomeActive={setIsRecordingMetronomeActive}
+              setIsStudentWeekExpanded={setIsStudentWeekExpanded}
+              setIsTeacherHomeworkExpanded={setIsTeacherHomeworkExpanded}
+              setLocalJuniorRecordingsTrigger={setLocalJuniorRecordingsTrigger}
+              setMobileRecordingsTab={setMobileRecordingsTab}
+              setNewPlaylistTitle={setNewPlaylistTitle}
+              setOpenHomeworkWeekAccordions={setOpenHomeworkWeekAccordions}
+              setRecordingBpm={setRecordingBpm}
+              setSelectedStudentMonth={setSelectedStudentMonth}
+              setSelectedStudentSongAlbum={setSelectedStudentSongAlbum}
+              setSelectedTeacherMonth={setSelectedTeacherMonth}
+              setSelectedTeacherSongAlbum={setSelectedTeacherSongAlbum}
+              setShareAudioModal={setShareAudioModal}
+              setShareCustomTitle={setShareCustomTitle}
+              setSharePlaylistId={setSharePlaylistId}
+              setShareProcessing={setShareProcessing}
+              setShowNewPlaylistInput={setShowNewPlaylistInput}
+              setShowRecordingMetronomePopup={setShowRecordingMetronomePopup}
+              setShowStudentFavoritesOnly={setShowStudentFavoritesOnly}
+              setShowTeacherFavoritesOnly={setShowTeacherFavoritesOnly}
+              setShowTeacherHomeworkArchive={setShowTeacherHomeworkArchive}
+              shareAudioModal={shareAudioModal}
+              shareCustomTitle={shareCustomTitle}
+              sharePlaylistId={sharePlaylistId}
+              shareProcessing={shareProcessing}
+              showNewPlaylistInput={showNewPlaylistInput}
+              showRecordingMetronomePopup={showRecordingMetronomePopup}
+              showStudentFavoritesOnly={showStudentFavoritesOnly}
+              showTeacherFavoritesOnly={showTeacherFavoritesOnly}
+              showTeacherHomeworkArchive={showTeacherHomeworkArchive}
+              songs={songs}
+              startRecordingAudio={startRecordingAudio}
+              stopRecordingAudio={stopRecordingAudio}
+              studentFirstName={studentFirstName}
+              toggleFavoriteAudio={toggleFavoriteAudio}
+              toggleStudentAudioWeek={toggleStudentAudioWeek}
+              toggleTeacherAudioWeek={toggleTeacherAudioWeek}
+              topicName={topicName}
+              useNotebookLayout={useNotebookLayout}
+            />
           ) : activeModalTab === 'document' ? (
-            <>
-          
-          {/* LEFT COLUMN: 🎯 FOKUS-ARBEITSPLATZ (Lehrwerke & Songs) */}
-
-          {/* MOBILE SEGMENTED CONTROL PILL-BAR FOR 2 SWIPE CARDS (Hidden for junior students for max focus) */}
-          {isMobileView && !(readOnly && uiLevel === 'junior') && (
-            <div style={{
-              width: '100%',
-              display: 'flex',
-              justifyContent: 'center',
-              alignItems: 'center',
-              padding: '6px 16px',
-              background: '#faf8f2',
-              borderBottom: '1px solid #e0dad0',
-              flexShrink: 0,
-              zIndex: 35
-            }}>
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                background: 'rgba(0, 0, 0, 0.06)',
-                borderRadius: '100px',
-                padding: '3px',
-                width: '100%',
-                maxWidth: '340px',
-                height: '38px',
-                boxSizing: 'border-box',
-                gap: '3px'
-              }}>
-                <button
-                  type="button"
-                  onClick={() => setMobileProtokollTab('repertoire')}
-                  style={{
-                    flex: 1,
-                    height: '32px',
-                    borderRadius: '100px',
-                    border: 'none',
-                    background: mobileProtokollTab === 'repertoire' ? '#ffffff' : 'transparent',
-                    color: mobileProtokollTab === 'repertoire' ? '#0f172a' : '#64748b',
-                    fontWeight: 800,
-                    fontSize: '0.76rem',
-                    cursor: 'pointer',
-                    boxShadow: mobileProtokollTab === 'repertoire' ? '0 2px 6px rgba(0,0,0,0.12)' : 'none',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '5px',
-                    whiteSpace: 'nowrap',
-                    transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
-                  }}
-                >
-                  <BookOpen size={13} style={{ color: mobileProtokollTab === 'repertoire' ? '#34a853' : '#64748b' }} />
-                  <span>Lehrwerke & Songs</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setMobileProtokollTab('homework')}
-                  style={{
-                    flex: 1,
-                    height: '32px',
-                    borderRadius: '100px',
-                    border: 'none',
-                    background: mobileProtokollTab === 'homework' ? '#ffffff' : 'transparent',
-                    color: mobileProtokollTab === 'homework' ? '#0f172a' : '#64748b',
-                    fontWeight: 800,
-                    fontSize: '0.76rem',
-                    cursor: 'pointer',
-                    boxShadow: mobileProtokollTab === 'homework' ? '0 2px 6px rgba(0,0,0,0.12)' : 'none',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '5px',
-                    whiteSpace: 'nowrap',
-                    transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
-                  }}
-                >
-                  <Edit3 size={13} style={{ color: mobileProtokollTab === 'homework' ? '#ea4335' : '#64748b' }} />
-                  <span>Hausaufgabe</span>
-                </button>
-              </div>
-            </div>
-          )}
-
-          <div style={{
-            flex: isMobileView ? 'none' : '1 1 0%',
-            height: isMobileView ? 'auto' : '100%',
-            minHeight: '0',
-            maxHeight: isMobileView ? 'none' : '100%',
-            overflowY: isMobileView ? 'visible' : 'auto',
-            display: isMobileView ? (mobileProtokollTab === 'repertoire' ? 'flex' : 'none') : 'flex',
-            flexDirection: 'column',
-            justifyContent: 'flex-start',
-            gap: '16px',
-            background: useNotebookLayout ? '#faf8f2' : '#ffffff',
-            borderRadius: '0',
-            boxShadow: 'none',
-            borderRight: useNotebookLayout ? '1px dashed #e5e0d4' : '1px solid #e8e8ed',
-            position: 'relative',
-            padding: isMobileView ? '16px 16px calc(280px + env(safe-area-inset-bottom, 40px)) 16px' : '0px',
-            boxSizing: 'border-box'
-          }}>
-            
-            {useNotebookLayout && !isMobileView && (
-              <div style={{
-                position: 'absolute',
-                top: '20px',
-                bottom: '20px',
-                right: '8px',
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'space-around',
-                zIndex: 25
-              }}>
-                {Array.from({ length: 6 }).map((_, idx) => (
-                  <div key={idx} style={{
-                    width: '8px',
-                    height: '8px',
-                    borderRadius: '50%',
-                    background: '#121214',
-                    boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.8)'
-                  }} />
-                ))}
-              </div>
-            )}
-
-            {activeSubView === 'history' ? (
-              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '20px', animation: 'fadeIn 0.25s ease', overflowY: 'auto', padding: '24px' }}>
-                <div>
-                  <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#0f172a' }}>
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}><BookOpen size={18} style={{ color: '#34a853', verticalAlign: 'middle' }} /> Hausaufgaben-Archiv</span>
-                  </h3>
-                  <p style={{ margin: '3px 0 0 0', fontSize: '0.76rem', color: '#64748b', fontWeight: 650 }}>
-                    Hier findest du alle vergangenen, archivierten Hausaufgaben-Wochen.
-                  </p>
-                </div>
-                
-                <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px', paddingRight: '4px' }}>
-                  {(() => {
-                    const existingWeeks = progressItems
-                      .filter(item => item.updated_at)
-                      .map(item => getItemWeek(item))
-                      .filter(Boolean);
-
-                    let weeks: string[] = [];
-                    if (existingWeeks.length > 0) {
-                      const sortedExisting = [...existingWeeks].sort();
-                      const earliestWeek = sortedExisting[0];
-                      const currentWeek = getISOWeek();
-                      const latestExisting = sortedExisting[sortedExisting.length - 1];
-                      const endWeek = currentWeek > latestExisting ? currentWeek : latestExisting;
-                      weeks = getWeeksBetween(earliestWeek, endWeek);
-                    } else {
-                      weeks = [getISOWeek()];
-                    }
-                    
-                    if (weeks.length === 0) {
-                      return (
-                        <div style={{ padding: '24px', textAlign: 'center', background: '#f8fafc', borderRadius: '16px', border: '1px dashed #cbd5e1', color: '#64748b', fontSize: '0.8rem' }}>
-                          Keine vergangenen Hausaufgaben gefunden.
-                        </div>
-                      );
-                    }
-                    
-                    return weeks.map(wk => {
-                      const isSelected = selectedHistoryWeek === wk;
-                      const weekNum = wk.split('-W')[1] || '';
-                      
-                      // Count how many items were checked or active in this week
-                      const weekItems = progressItems.filter(item => item.updated_at && getItemWeek(item) === wk);
-                      const homeworkItemsCount = weekItems.filter(item => item.is_current_homework && !item.topic_name.startsWith('Hausaufgabe KW ')).length;
-                      const isCompact = homeworkItemsCount === 0;
-                      
-                      return (
-                        <div
-                          key={wk}
-                          onClick={() => setSelectedHistoryWeek(wk)}
-                          style={{
-                            background: isSelected ? '#f1f5f9' : 'white',
-                            border: isSelected ? '1.5px solid #34a853' : '1px solid #cbd5e1',
-                            borderRadius: '16px',
-                            padding: isCompact ? '10px 16px' : '16px',
-                            cursor: 'pointer',
-                            transition: 'all 0.15s ease',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: isCompact ? '0px' : '4px',
-                            boxShadow: isSelected ? '0 4px 12px rgba(19, 115, 51, 0.08)' : '0 2px 4px rgba(0,0,0,0.01)'
-                          }}
-                          className="hover-scale"
-                        >
-                          {/* Week header row */}
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '6px' }}>
-                            <span style={{ fontSize: '0.86rem', fontWeight: 900, color: isSelected ? '#34a853' : '#0f172a' }}>
-                              KW {weekNum}
-                            </span>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                              {(() => {
-                                const fb = getFeedbackForWeek(wk);
-                                if (!fb?.status) return null;
-                                const badges: Record<string, { bg: string; color: string; label: string }> = {
-                                  beherrscht: { bg: '#dcfce7', color: '#16a34a', label: '✓ Beherrscht' },
-                                  in_entwicklung: { bg: '#fefce8', color: '#ca8a04', label: '~ In Entwicklung' },
-                                  wiederholen: { bg: '#fee2e2', color: '#dc2626', label: '↩ Wiederholen' },
-                                };
-                                const badge = badges[fb.status];
-                                if (!badge) return null;
-                                return (
-                                  <span style={{ fontSize: '0.62rem', background: badge.bg, color: badge.color, padding: '2px 8px', borderRadius: '10px', fontWeight: 800, flexShrink: 0 }}>
-                                    {badge.label}
-                                  </span>
-                                );
-                              })()}
-                              <span style={{ fontSize: '0.68rem', background: isSelected ? '#34a853' : '#f1f5f9', color: isSelected ? 'white' : '#4b5563', padding: '2px 8px', borderRadius: '10px', fontWeight: 800 }}>
-                                {homeworkItemsCount} Aufgaben
-                              </span>
-                            </div>
-                          </div>
-                          {!isCompact && (
-                            <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 500 }}>
-                              Dokumentiert in Woche {weekNum}
-                            </span>
-                          )}
-
-                          {/* Inline Feedback Panel — only when selected and not readOnly */}
-                          {isSelected && !readOnly && (
-                            <div
-                              onClick={e => e.stopPropagation()}
-                              style={{ marginTop: '10px', padding: '14px', background: 'white', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '12px' }}
-                            >
-                              {/* Status */}
-                              <div>
-                                <span style={{ fontSize: '0.66rem', fontWeight: 850, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                                  Wie lief die Aufgabe?
-                                </span>
-                                <div style={{ display: 'flex', gap: '5px', marginTop: '6px' }}>
-                                  {([
-                                    { key: 'beherrscht', label: '✓ Beherrscht', bg: '#dcfce7', color: '#16a34a', border: '#86efac' },
-                                    { key: 'in_entwicklung', label: '~ In Entwicklung', bg: '#fefce8', color: '#ca8a04', border: '#fde68a' },
-                                    { key: 'wiederholen', label: '↩ Wiederholen', bg: '#fee2e2', color: '#dc2626', border: '#fecaca' },
-                                  ] as const).map(opt => (
-                                    <button
-                                      key={opt.key}
-                                      type="button"
-                                      onClick={() => setPendingFeedbackStatus(prev => prev === opt.key ? null : opt.key)}
-                                      style={{
-                                        flex: 1, padding: '6px 3px',
-                                        background: pendingFeedbackStatus === opt.key ? opt.bg : 'white',
-                                        border: `1.5px solid ${pendingFeedbackStatus === opt.key ? opt.border : '#e2e8f0'}`,
-                                        borderRadius: '10px', cursor: 'pointer', fontSize: '0.62rem', fontWeight: 800,
-                                        color: pendingFeedbackStatus === opt.key ? opt.color : '#64748b',
-                                        transition: 'all 0.15s ease'
-                                      }}
-                                    >{opt.label}</button>
-                                  ))}
-                                </div>
-                              </div>
-
-                              {/* Tags & Skill Categories */}
-                              <div>
-                                <span style={{ fontSize: '0.66rem', fontWeight: 850, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                                  Übe-Schwerpunkte & Förderbereiche
-                                </span>
-
-                                {/* 5 Universelle Musikalische Kern-Säulen */}
-                                <div style={{ marginTop: '6px' }}>
-                                  <span style={{ fontSize: '0.62rem', fontWeight: 700, color: '#64748b', display: 'block', marginBottom: '4px' }}>
-                                    Musikalische Kern-Dimensionen
-                                  </span>
-                                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
-                                    {SKILL_TAGS.map(tag => {
-                                      const active = pendingFeedbackTags.includes(tag.key);
-                                      const limitReached = !active && pendingFeedbackTags.length >= 2;
-                                      return (
-                                        <button
-                                          key={tag.key}
-                                          type="button"
-                                          onClick={() => setPendingFeedbackTags(prev => {
-                                            if (prev.includes(tag.key)) return prev.filter(t => t !== tag.key);
-                                            if (prev.length >= 2) return prev;
-                                            return [...prev, tag.key];
-                                          })}
-                                          style={{
-                                            padding: '4px 9px',
-                                            background: active ? '#fef2f2' : '#f8fafc',
-                                            border: `1.5px solid ${active ? '#fca5a5' : '#e2e8f0'}`,
-                                            borderRadius: '20px', cursor: 'pointer', fontSize: '0.66rem', fontWeight: 800,
-                                            color: active ? '#dc2626' : '#64748b', transition: 'all 0.15s ease',
-                                            opacity: limitReached ? 0.45 : 1
-                                          }}
-                                        >{tag.icon} {tag.label}</button>
-                                      );
-                                    })}
-                                    {customTags.map(tag => {
-                                      const active = pendingFeedbackTags.includes(tag);
-                                      const limitReached = !active && pendingFeedbackTags.length >= 2;
-                                      return (
-                                        <button
-                                          key={tag}
-                                          type="button"
-                                          onClick={() => setPendingFeedbackTags(prev => {
-                                            if (prev.includes(tag)) return prev.filter(t => t !== tag);
-                                            if (prev.length >= 2) return prev;
-                                            return [...prev, tag];
-                                          })}
-                                          style={{
-                                            padding: '4px 9px',
-                                            background: active ? '#fef2f2' : '#f8fafc',
-                                            border: `1.5px solid ${active ? '#fca5a5' : '#e2e8f0'}`,
-                                            borderRadius: '20px', cursor: 'pointer', fontSize: '0.66rem', fontWeight: 800,
-                                            color: active ? '#dc2626' : '#64748b', transition: 'all 0.15s ease',
-                                            opacity: limitReached ? 0.45 : 1
-                                          }}
-                                        >✏️ {tag}</button>
-                                      );
-                                    })}
-                                  </div>
-                                </div>
-
-                                <div style={{ fontSize: '0.66rem', color: '#64748b', marginTop: '8px', fontStyle: 'italic', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                  <span>💡</span>
-                                  <span style={{ fontWeight: 600 }}>Wähle maximal 2 Schwerpunkte aus, um den Schüler gezielt zu fördern.</span>
-                                </div>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '10px' }}>
-                                  <input
-                                    type="text"
-                                    placeholder="Eigene Schwierigkeit..."
-                                    value={newCustomTagInput}
-                                    onChange={e => setNewCustomTagInput(e.target.value)}
-                                    onKeyDown={e => {
-                                      if (e.key === 'Enter') {
-                                        e.preventDefault();
-                                        handleAddCustomTag();
-                                      }
-                                    }}
-                                    style={{
-                                      padding: '4px 10px',
-                                      fontSize: '0.66rem',
-                                      border: '1.5px solid #cbd5e1',
-                                      borderRadius: '20px',
-                                      background: '#f8fafc',
-                                      color: '#334155',
-                                      outline: 'none',
-                                      fontWeight: 650,
-                                      width: '140px'
-                                    }}
-                                  />
-                                  <button
-                                    type="button"
-                                    onClick={handleAddCustomTag}
-                                    style={{
-                                      background: '#34a853',
-                                      border: 'none',
-                                      borderRadius: '50%',
-                                      width: '22px',
-                                      height: '22px',
-                                      color: 'white',
-                                      cursor: 'pointer',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                      fontWeight: 900,
-                                      fontSize: '0.8rem'
-                                    }}
-                                  >
-                                    +
-                                  </button>
-                                </div>
-                              </div>
-
-                              {/* Save */}
-                              <button
-                                type="button"
-                                onClick={async () => {
-                                  setIsSavingFeedback(true);
-                                  await saveFeedback(wk, pendingFeedbackTags, pendingFeedbackStatus);
-                                  setIsSavingFeedback(false);
-                                }}
-                                disabled={isSavingFeedback}
-                                style={{
-                                  background: '#34a853', color: 'white', border: 'none', borderRadius: '10px',
-                                  padding: '9px', fontSize: '0.76rem', fontWeight: 800, cursor: 'pointer',
-                                  opacity: isSavingFeedback ? 0.7 : 1, transition: 'all 0.15s ease'
-                                }}
-                              >{isSavingFeedback ? 'Speichern...' : 'Bewertung speichern'}</button>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    });
-
-                  })()}
-                </div>
-
-                {/* Back button to active hub */}
-                <button
-                  type="button"
-                  onClick={() => setActiveSubView('hub')}
-                  style={{
-                    background: '#34a853',
-                    color: 'white',
-                    border: 'none',
-                    padding: '12px',
-                    borderRadius: '14px',
-                    fontSize: '0.8rem',
-                    fontWeight: 800,
-                    cursor: 'pointer',
-                    boxShadow: '0 4px 10px rgba(19, 115, 51, 0.2)',
-                    transition: 'all 0.15s ease',
-                    width: '100%',
-                    textAlign: 'center'
-                  }}
-                  className="hover-scale"
-                >
-                  Zurück zum aktuellen Tag
-                </button>
-              </div>
-            ) : activeSubView === 'lehrwerk' && activeLehrwerkId ? (
-              (() => {
-                const assignedBook = assignedLehrwerke.find(a => a.lehrwerkId === activeLehrwerkId);
-                let book = globalLehrwerke.find(g => g.id === activeLehrwerkId);
-                if (!book) {
-                  book = {
-                    id: activeLehrwerkId,
-                    title: assignedBook?.title || 'Eigenes Lehrwerk',
-                    totalPages: 50,
-                    total_pages: 50,
-                    emoji: '📚',
-                    color: '#34a853',
-                    is_custom: true
-                  };
-                }
-                const bookColor = getLehrwerkColor(book.title);
-                const pct = assignedBook ? Math.min(100, Math.round((Object.values(assignedBook.pageStates || {}).filter((p: any) => p.status === 'mastered').length / (book.totalPages || 50)) * 100)) : 0;
-                const pages = Array.from({ length: book.totalPages || 50 }, (_, i) => i + 1);
-                const currentVisibility = assignedBook?.visibility || 'private';
-
-                return (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', animation: 'fadeIn 0.25s ease', flex: 1, overflowY: 'auto', padding: '24px' }}>
-                    {/* Textbook Cover Card */}
-                    <div style={{
-                      background: 'white',
-                      border: '1px solid #cbd5e1',
-                      borderRadius: '24px',
-                      padding: '20px',
-                      display: 'flex',
-                      gap: '16px',
-                      alignItems: 'center',
-                      boxShadow: '0 4px 12px rgba(0,0,0,0.02)',
-                      flexWrap: 'wrap'
-                    }}>
-                      <div style={{
-                        width: '54px',
-                        height: '70px',
-                        background: bookColor ? `linear-gradient(135deg, ${bookColor.from}, ${bookColor.to})` : '#e2e8f0',
-                        borderRadius: '6px',
-                        boxShadow: '0 4px 10px rgba(0,0,0,0.15)',
-                        border: 'none',
-                        position: 'relative',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        flexShrink: 0
-                      }}>
-                        {bookColor && <BookOpen size={22} color={bookColor.text} />}
-                        <div style={{
-                          position: 'absolute',
-                          left: 0,
-                          top: 0,
-                          bottom: 0,
-                          width: '6px',
-                          background: 'rgba(0,0,0,0.08)',
-                          borderRight: '1px solid rgba(255,255,255,0.1)'
-                        }} />
-                      </div>
-                      <div style={{ flex: 1, minWidth: '220px' }}>
-                        {(() => {
-                          const isStudentCreated = Boolean(assignedBook?.isStudentCreated || assignedBook?.createdByRole === 'student' || book.created_by_role === 'student');
-                          const isTeacherAssigned = !isStudentCreated;
-                          const isStudentViewingTeacherBook = Boolean(readOnly && isTeacherAssigned);
-
-                          return (
-                            <>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '6px' }}>
-                                <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 900, color: '#0f172a' }}>
-                                  {book.title}
-                                </h4>
-                                {isStudentCreated ? (
-                                  <span style={{ color: '#d97706', fontSize: '0.72rem', fontWeight: 800, background: '#fffbeb', border: '1px solid #fef3c7', padding: '2px 8px', borderRadius: '10px' }}>
-                                    🙋 Vom Schüler angelegt
-                                  </span>
-                                ) : activeLehrwerkId.startsWith('custom-') || book.is_custom || assignedBook?.createdByRole === 'teacher' || book.created_by_teacher ? (
-                                  <span style={{ color: '#0284c7', fontSize: '0.72rem', fontWeight: 800, background: '#f0f9ff', border: '1px solid #e0f2fe', padding: '2px 8px', borderRadius: '10px' }}>
-                                    👨‍🏫 Vom Lehrer angelegt
-                                  </span>
-                                ) : (
-                                  <span style={{ color: '#16a34a', fontSize: '0.72rem', fontWeight: 800, background: '#f0fdf4', border: '1px solid #dcfce7', padding: '2px 8px', borderRadius: '10px' }}>
-                                    🎓 Vom Lehrer zugewiesen
-                                  </span>
-                                )}
-                              </div>
-
-                              {/* Expressive Apple Access Control Bar */}
-                              <div style={{
-                                margin: '8px 0 10px 0',
-                                padding: '6px 12px',
-                                background: '#f8fafc',
-                                border: '1.5px solid #e2e8f0',
-                                borderRadius: '16px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'space-between',
-                                flexWrap: 'wrap',
-                                gap: '8px'
-                              }}>
-                                <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#334155', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                  <span>🛡️</span> Sichtbarkeit & Rechte:
-                                </span>
-
-                                {isStudentViewingTeacherBook ? (
-                                  <div style={{
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    background: '#f1f5f9',
-                                    border: '1px solid #e2e8f0',
-                                    borderRadius: '10px',
-                                    padding: '4px 10px',
-                                    gap: '6px',
-                                    fontSize: '0.72rem',
-                                    fontWeight: 800,
-                                    color: '#334155'
-                                  }}>
-                                    <span>
-                                      {currentVisibility === 'private' ? '🔒 Nur für mich (Privat)' : currentVisibility === 'read' ? '👁️ Lehrer liest mit' : '🤝 Lehrer darf eintragen'}
-                                    </span>
-                                    <span style={{ fontSize: '0.65rem', color: '#047857', background: '#e6f4ea', padding: '1px 6px', borderRadius: '6px', fontWeight: 800 }}>
-                                      👨‍🏫 Vom Lehrer gesteuert
-                                    </span>
-                                  </div>
-                                ) : (
-                                  <div style={{
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    background: '#cbd5e1',
-                                    borderRadius: '11px',
-                                    padding: '2px',
-                                    gap: '2px'
-                                  }}>
-                                    <button
-                                      type="button"
-                                      onClick={() => updateLehrwerkVisibility(book.id, 'private')}
-                                      style={{
-                                        border: 'none',
-                                        background: currentVisibility === 'private' ? '#ffffff' : 'transparent',
-                                        color: currentVisibility === 'private' ? '#0f172a' : '#475569',
-                                        padding: '4px 10px',
-                                        borderRadius: '9px',
-                                        fontSize: '0.71rem',
-                                        fontWeight: 800,
-                                        cursor: 'pointer',
-                                        boxShadow: currentVisibility === 'private' ? '0 1px 4px rgba(0,0,0,0.1)' : 'none',
-                                        transition: 'all 0.15s ease',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '4px'
-                                      }}
-                                    >
-                                      🔒 Nur für mich (Privat)
-                                    </button>
-
-                                    <button
-                                      type="button"
-                                      onClick={() => updateLehrwerkVisibility(book.id, 'read')}
-                                      style={{
-                                        border: 'none',
-                                        background: currentVisibility === 'read' ? '#ffffff' : 'transparent',
-                                        color: currentVisibility === 'read' ? '#047857' : '#475569',
-                                        padding: '4px 10px',
-                                        borderRadius: '9px',
-                                        fontSize: '0.71rem',
-                                        fontWeight: 800,
-                                        cursor: 'pointer',
-                                        boxShadow: currentVisibility === 'read' ? '0 1px 4px rgba(0,0,0,0.1)' : 'none',
-                                        transition: 'all 0.15s ease',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '4px'
-                                      }}
-                                    >
-                                      👁️ Lehrer liest mit
-                                    </button>
-
-                                    <button
-                                      type="button"
-                                      onClick={() => updateLehrwerkVisibility(book.id, 'control')}
-                                      style={{
-                                        border: 'none',
-                                        background: currentVisibility === 'control' ? '#ffffff' : 'transparent',
-                                        color: currentVisibility === 'control' ? '#6d28d9' : '#475569',
-                                        padding: '4px 10px',
-                                        borderRadius: '9px',
-                                        fontSize: '0.71rem',
-                                        fontWeight: 800,
-                                        cursor: 'pointer',
-                                        boxShadow: currentVisibility === 'control' ? '0 1px 4px rgba(0,0,0,0.1)' : 'none',
-                                        transition: 'all 0.15s ease',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '4px'
-                                      }}
-                                    >
-                                      🤝 Lehrer darf eintragen
-                                    </button>
-                                  </div>
-                                )}
-                              </div>
-
-                              {book.author && (
-                                <p style={{ margin: '0 0 2px 0', fontSize: '0.76rem', color: '#64748b', fontWeight: 650 }}>
-                                  von {book.author}
-                                </p>
-                              )}
-                              <span style={{ fontSize: '0.74rem', color: '#475569', fontWeight: 800 }}>
-                                📖 {book.totalPages || 50} Seiten • {pct}% gemeistert
-                              </span>
-                              <div style={{ width: '100%', height: '6px', background: '#e8e8ed', borderRadius: '3px', marginTop: '6px', overflow: 'hidden' }}>
-                                <div style={{ width: `${pct}%`, height: '100%', background: 'linear-gradient(90deg, #34a853, #34a853)', transition: 'width 0.4s ease' }} />
-                              </div>
-                            </>
-                          );
-                        })()}
-                      </div>
-                    </div>
-
-                    {/* Brushes Panel for Textbooks - Protected for Teacher-assigned Books */}
-                    {(() => {
-                      const isStudentCreated = Boolean(assignedBook?.isStudentCreated || assignedBook?.createdByRole === 'student' || book.created_by_role === 'student');
-                      const isStudentViewingTeacherBook = Boolean(readOnly && !isStudentCreated);
-
-                      if (isStudentViewingTeacherBook) {
-                        const isFocusActive = activeBrush === 'STUDENT_FOCUS';
-                        return (
-                          <div style={{
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: '8px',
-                            background: 'white',
-                            borderRadius: '18px',
-                            padding: '12px 16px',
-                            border: '1px solid rgba(0, 0, 0, 0.08)',
-                            boxShadow: '0 4px 15px rgba(0,0,0,0.02)'
-                          }}>
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
-                              <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#4b5563', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                <span>🖌️</span> Dein Übe-Pinsel:
-                              </span>
-                              <button
-                                type="button"
-                                onClick={() => setActiveBrush(prev => prev === 'STUDENT_FOCUS' ? 'NONE' : 'STUDENT_FOCUS')}
-                                style={{
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: '8px',
-                                  padding: '6px 14px',
-                                  borderRadius: '999px',
-                                  background: isFocusActive ? '#f5f3ff' : '#ffffff',
-                                  border: isFocusActive ? '2px solid #8b5cf6' : '1.5px solid #cbd5e1',
-                                  color: isFocusActive ? '#6d28d9' : '#475569',
-                                  fontWeight: 800,
-                                  fontSize: '0.74rem',
-                                  cursor: 'pointer',
-                                  boxShadow: isFocusActive ? '0 0 12px rgba(139, 92, 246, 0.3)' : '0 1px 3px rgba(0,0,0,0.04)',
-                                  transition: 'all 0.15s ease'
-                                }}
-                                className="tactile-btn"
-                              >
-                                <span style={{
-                                  width: '12px',
-                                  height: '12px',
-                                  borderRadius: '50%',
-                                  background: '#8b5cf6',
-                                  display: 'inline-block',
-                                  boxShadow: '0 0 6px rgba(139, 92, 246, 0.6)'
-                                }} />
-                                <span>🟣 Mein Übe-Fokus (Max. 3)</span>
-                                {isFocusActive && <span style={{ color: '#8b5cf6', fontWeight: 900 }}>✓ Aktiv</span>}
-                              </button>
-                            </div>
-
-                            <div style={{ borderTop: '1px solid rgba(0, 0, 0, 0.05)', paddingTop: '8px', display: 'flex', gap: '14px', flexWrap: 'wrap' }}>
-                              <span style={{ fontSize: '0.68rem', color: '#71717a', fontWeight: 700 }}><span style={{ color: 'hsl(47, 85%, 84%)' }}>●</span> Gelb (Hausaufgabe)</span>
-                              <span style={{ fontSize: '0.68rem', color: '#71717a', fontWeight: 700 }}><span style={{ color: 'hsl(130, 65%, 82%)' }}>●</span> Grün (erledigt)</span>
-                              <span style={{ fontSize: '0.68rem', color: '#71717a', fontWeight: 700 }}><span style={{ color: 'hsl(355, 75%, 84%)' }}>●</span> Rot (unbearbeitet)</span>
-                              <span style={{ fontSize: '0.68rem', color: '#71717a', fontWeight: 700 }}><span style={{ color: '#8b5cf6' }}>🟣</span> Lila Ring (Dein Übe-Fokus)</span>
-                            </div>
-                          </div>
-                        );
-                      }
-
-                      return (
-                        <div style={{
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: '8px',
-                          background: 'white',
-                          borderRadius: '18px',
-                          padding: '12px 16px',
-                          border: '1px solid rgba(0, 0, 0, 0.08)',
-                          boxShadow: '0 4px 15px rgba(0,0,0,0.02)'
-                        }}>
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                            <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#4b5563', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                              <span>🖌️</span> Pinsel zum Einfärben:
-                            </span>
-                            <div style={{ display: 'flex', gap: '8px' }}>
-                              {[
-                                { mode: 'LOCKED', color: 'hsl(355, 75%, 84%)', label: 'rot = unbearbeitet' },
-                                { mode: 'HOMEWORK', color: 'hsl(47, 85%, 84%)', label: 'gelb = Hausaufgabe' },
-                                { mode: 'MASTERED', color: 'hsl(130, 65%, 82%)', label: 'grün = erledigt' }
-                              ].map(b => {
-                                const isActive = activeBrush === b.mode;
-                                return (
-                                  <button
-                                    key={b.mode}
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setActiveBrush(prev => prev === b.mode ? 'NONE' : b.mode as any);
-                                    }}
-                                    style={{
-                                      width: '28px',
-                                      height: '28px',
-                                      borderRadius: '50%',
-                                      background: b.color,
-                                      border: isActive ? '3px solid #0f172a' : '1.5px solid #cbd5e1',
-                                      cursor: 'pointer',
-                                      transition: 'all 0.15s ease',
-                                      transform: isActive ? 'scale(1.15)' : 'none',
-                                      outline: 'none'
-                                    }}
-                                    title={b.label}
-                                  />
-                                );
-                              })}
-                            </div>
-                          </div>
-                          <div style={{ borderTop: '1px solid rgba(0, 0, 0, 0.05)', paddingTop: '8px', display: 'flex', gap: '14px', flexWrap: 'wrap' }}>
-                            <span style={{ fontSize: '0.68rem', color: '#71717a', fontWeight: 700 }}><span style={{ color: 'hsl(355, 75%, 84%)' }}>●</span> Rot (unbearbeitet)</span>
-                            <span style={{ fontSize: '0.68rem', color: '#71717a', fontWeight: 700 }}><span style={{ color: 'hsl(47, 85%, 84%)' }}>●</span> Gelb (Hausaufgabe)</span>
-                            <span style={{ fontSize: '0.68rem', color: '#71717a', fontWeight: 700 }}><span style={{ color: 'hsl(130, 65%, 82%)' }}>●</span> Grün (erledigt)</span>
-                            <span style={{ fontSize: '0.68rem', color: '#71717a', fontWeight: 700 }}><span style={{ color: '#8b5cf6' }}>🟣</span> Lila Ring (Schüler-Fokus)</span>
-                          </div>
-                        </div>
-                      );
-                    })()}
-
-                    {/* Page Grid preview scroll for active textbook */}
-                    {assignedBook && (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', background: 'white', border: '1px solid #cbd5e1', borderRadius: '24px', padding: '16px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
-                          <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#7d7d82' }}>Seitenübersicht:</span>
-                          <button
-                            type="button"
-                            onClick={() => setShowAllPagesGrid(true)}
-                            style={{ background: 'transparent', border: 'none', color: '#34a853', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
-                            className="hover-scale"
-                          >
-                            Ganzes Lehrwerk anzeigen
-                          </button>
-                        </div>
-                        {pages.length > 60 && (
-                          <div style={{ display: 'flex', gap: '6px', marginBottom: '8px', flexWrap: 'wrap' }}>
-                            {Array.from({ length: Math.ceil(pages.length / 60) }).map((_, idx) => {
-                              const startPage = idx * 60 + 1;
-                              const endPage = Math.min((idx + 1) * 60, pages.length);
-                              const totalChunks = Math.ceil(pages.length / 60);
-                              const activeChunkIndex = Math.min(textbookPageChunkIndex, Math.max(0, totalChunks - 1));
-                              const isSelected = activeChunkIndex === idx;
-                              return (
-                                <button
-                                  key={idx}
-                                  type="button"
-                                  onClick={() => setPageChunk(idx)}
-                                  style={{
-                                    background: isSelected ? '#34a853' : '#f1f5f9',
-                                    color: isSelected ? 'white' : '#475569',
-                                    border: 'none',
-                                    padding: '6px 12px',
-                                    borderRadius: '12px',
-                                    fontSize: '0.74rem',
-                                    fontWeight: 800,
-                                    cursor: 'pointer',
-                                    transition: 'all 0.15s ease',
-                                    boxShadow: isSelected ? '0 2px 6px rgba(19, 115, 51, 0.2)' : 'none'
-                                  }}
-                                  className="hover-scale"
-                                >
-                                  {startPage}-{endPage}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        )}
-                        <div style={{
-                          display: 'grid',
-                          gridTemplateColumns: 'repeat(auto-fill, minmax(44px, 1fr))',
-                          gap: '8px',
-                          maxHeight: '320px',
-                          overflowY: 'auto',
-                          padding: '4px'
-                        }}>
-                          {(() => {
-                            const totalChunks = Math.ceil(pages.length / 60);
-                            const activeChunkIndex = Math.min(textbookPageChunkIndex, Math.max(0, totalChunks - 1));
-                            const displayedPages = pages.length > 60 ? pages.slice(activeChunkIndex * 60, (activeChunkIndex + 1) * 60) : pages;
-                            return displayedPages.map(num => {
-                              const pageState = assignedBook.pageStates[num] || { status: 'locked' };
-                              const globalPage = book.globalPageStates?.[num] === 'purple';
-                              const status = globalPage ? 'purple' : (pageState.status || 'locked');
-                              const isStudentFocus = Boolean(pageState?.studentFocus);
-
-                              let borderColor = 'hsl(355, 70%, 73%)';
-                              let bg = 'hsl(355, 80%, 94%)';
-                              let textColor = 'hsl(355, 80%, 30%)';
-
-                              if (status === 'homework') {
-                                borderColor = 'hsl(47, 80%, 68%)';
-                                bg = 'hsl(47, 90%, 93%)';
-                                textColor = 'hsl(47, 85%, 28%)';
-                              } else if (status === 'mastered') {
-                                borderColor = 'hsl(130, 60%, 70%)';
-                                bg = 'hsl(130, 70%, 93%)';
-                                textColor = 'hsl(130, 70%, 25%)';
-                              } else if (status === 'purple') {
-                                borderColor = 'hsl(255, 65%, 73%)';
-                                bg = 'hsl(255, 80%, 94%)';
-                                textColor = 'hsl(255, 75%, 32%)';
-                              }
-
-                              let solidActiveBg = 'hsl(355, 75%, 84%)';
-                              if (status === 'homework') solidActiveBg = 'hsl(47, 85%, 84%)';
-                              else if (status === 'mastered') solidActiveBg = 'hsl(130, 65%, 82%)';
-                              else if (status === 'purple') solidActiveBg = 'hsl(255, 75%, 84%)';
-
-                              const isPageActive = activePageNumber === num;
-
-                              return (
-                                <button
-                                  key={num}
-                                  type="button"
-                                  onClick={() => {
-                                    const isStudentCreated = Boolean(assignedBook?.isStudentCreated || assignedBook?.createdByRole === 'student' || book.created_by_role === 'student');
-                                    const isStudentViewingTeacherBook = Boolean(readOnly && !isStudentCreated);
-
-                                    if (activeBrush === 'STUDENT_FOCUS') {
-                                      toggleStudentFocusPage(activeLehrwerkId!, num);
-                                      selectTextbookPage(activeLehrwerkId!, num);
-                                      return;
-                                    }
-
-                                    if (activeBrush !== 'NONE' && !isStudentViewingTeacherBook) {
-                                      let targetStatus: 'IN_PROGRESS' | 'THEORY_DONE' | 'MASTERED' = 'IN_PROGRESS';
-                                      let targetHomework = false;
-
-                                      if (activeBrush === 'LOCKED') {
-                                        targetStatus = 'IN_PROGRESS';
-                                        targetHomework = false;
-                                      } else if (activeBrush === 'HOMEWORK') {
-                                        targetStatus = 'IN_PROGRESS';
-                                        targetHomework = true;
-                                      } else if (activeBrush === 'MASTERED') {
-                                        targetStatus = 'MASTERED';
-                                        targetHomework = false;
-                                      } else if (activeBrush === 'THEORY') {
-                                        targetStatus = 'THEORY_DONE';
-                                        targetHomework = false;
-                                      }
-
-                                      triggerDirectSave(activeLehrwerkId!, num, targetStatus, targetHomework);
-                                      selectTextbookPage(activeLehrwerkId!, num, targetStatus, targetHomework);
-                                      return;
-                                    }
-
-                                    const now = Date.now();
-                                    if (lastClickRef.current && lastClickRef.current.pageNum === num && (now - lastClickRef.current.timestamp) < 250) {
-                                      if (clickTimeoutRef.current) {
-                                        clearTimeout(clickTimeoutRef.current);
-                                        clickTimeoutRef.current = null;
-                                      }
-                                      lastClickRef.current = null;
-                                      if (!isStudentViewingTeacherBook) {
-                                        handlePageDoubleClick(activeLehrwerkId!, num);
-                                      } else {
-                                        selectTextbookPage(activeLehrwerkId!, num);
-                                      }
-                                    } else {
-                                      lastClickRef.current = { pageNum: num, timestamp: now };
-                                      if (clickTimeoutRef.current) {
-                                        clearTimeout(clickTimeoutRef.current);
-                                      }
-                                      clickTimeoutRef.current = setTimeout(() => {
-                                        clickTimeoutRef.current = null;
-                                        lastClickRef.current = null;
-                                        selectTextbookPage(activeLehrwerkId!, num);
-                                      }, 250);
-                                    }
-                                  }}
-                                  style={{
-                                    position: 'relative',
-                                    height: '44px',
-                                    borderRadius: '50%',
-                                    border: isPageActive 
-                                      ? `2.5px solid ${solidActiveBg}` 
-                                      : (isStudentFocus ? '2.5px solid #8b5cf6' : `2px solid ${borderColor}`),
-                                    background: isPageActive ? solidActiveBg : bg,
-                                    color: isPageActive ? 'white' : textColor,
-                                    fontWeight: 900,
-                                    fontSize: '0.88rem',
-                                    cursor: 'pointer',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    boxShadow: isStudentFocus 
-                                      ? (isPageActive ? '0 0 0 3px #8b5cf6, 0 4px 12px rgba(139, 92, 246, 0.4)' : '0 0 0 2px #8b5cf6, 0 2px 8px rgba(139, 92, 246, 0.35)')
-                                      : (isPageActive ? '0 4px 8px rgba(0,0,0,0.1)' : 'none'),
-                                    transform: isPageActive ? 'scale(1.08)' : 'none',
-                                    transition: 'all 0.15s ease'
-                                  }}
-                                >
-                                  <span>{num}</span>
-                                  {isStudentFocus && (
-                                    <span 
-                                      title="Schüler-Übefokus" 
-                                      style={{
-                                        position: 'absolute',
-                                        top: '-3px',
-                                        right: '-3px',
-                                        width: '12px',
-                                        height: '12px',
-                                        borderRadius: '50%',
-                                        background: '#8b5cf6',
-                                        border: '2px solid #ffffff',
-                                        boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
-                                        display: 'inline-block'
-                                      }}
-                                    />
-                                  )}
-                                </button>
-                              );
-                            });
-                          })()}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })()
-            ) : activeSubView === 'song' && selectedActiveSongId ? (
-              (() => {
-                const skill = activeSongSkills.find(s => s.id === selectedActiveSongId);
-                if (!skill) return null;
-                const songColor = getSongColor(skill.songs?.title || 'Song');
-                const progress = songProgressPercent;
-
-                return (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', animation: 'fadeIn 0.25s ease', flex: 1, overflowY: 'auto', padding: '24px' }}>
-                    {/* Song Cover Card */}
-                    <div style={{
-                      background: 'white',
-                      border: '1px solid #cbd5e1',
-                      borderRadius: '24px',
-                      padding: '20px',
-                      display: 'flex',
-                      gap: '16px',
-                      alignItems: 'center',
-                      boxShadow: '0 4px 12px rgba(0,0,0,0.02)'
-                    }}>
-                      {renderSongVinylCover(songColor, 'sm')}
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <h4 style={{ margin: '0 0 4px 0', fontSize: '0.95rem', fontWeight: 900, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                          {skill.songs?.title}
-                        </h4>
-                        <p style={{ margin: '0 0 2px 0', fontSize: '0.76rem', color: '#64748b', fontWeight: 650, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                          von {skill.songs?.artist}
-                        </p>
-                        <span style={{ fontSize: '0.74rem', color: '#475569', fontWeight: 800 }}>
-                          {readOnly && isMatchModeEnabled && !isMatchRevealed
-                            ? (studentRating !== null ? `Dein Tipp: ${studentRating}%` : 'Tipp noch offen 🎵')
-                            : (readOnly && isMatchRevealed ? `Stand: ${progress}%` : `${progress}%`)}
-                        </span>
-                        <div style={{ width: '100%', height: '7px', background: '#e8e8ed', borderRadius: '3.5px', marginTop: '6px', overflow: 'hidden' }}>
-                          <div style={{
-                            width: `${readOnly && isMatchModeEnabled && !isMatchRevealed ? (studentRating ?? 0) : progress}%`,
-                            height: '100%',
-                            background: (status === 'MASTERED' || skill.is_stage_ready || progress === 100)
-                              ? 'hsl(130, 65%, 82%)'
-                              : (readOnly && isMatchModeEnabled && !isMatchRevealed ? '#16a34a' : 'hsl(47, 85%, 84%)'),
-                            transition: 'width 0.4s ease'
-                          }} />
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Brushes Panel for Songs */}
-                    <div style={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '8px',
-                      background: 'white',
-                      borderRadius: '18px',
-                      padding: '12px 16px',
-                      border: '1px solid rgba(0, 0, 0, 0.08)',
-                      boxShadow: '0 4px 15px rgba(0,0,0,0.02)'
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#4b5563', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          <span>🎵</span> Songstatus:
-                        </span>
-                        <div style={{ display: 'flex', gap: '8px' }}>
-                          {[
-                            { mode: 'LOCKED', color: 'hsl(355, 75%, 84%)', label: 'Rot (keine Hausaufgabe)', getActive: () => status === 'IN_PROGRESS' && !isCurrentHomework, action: () => {
-                               setStatus('IN_PROGRESS');
-                               setIsCurrentHomework(false);
-                               setHasChanges(true);
-                               if (selectedActiveSongId) triggerDirectSongSave(selectedActiveSongId, 'IN_PROGRESS', false);
-                             } },
-                            { mode: 'HOMEWORK', color: 'hsl(47, 85%, 84%)', label: 'Gelb (Hausaufgabe)', getActive: () => status === 'IN_PROGRESS' && isCurrentHomework, action: () => {
-                               setStatus('IN_PROGRESS');
-                               setIsCurrentHomework(true);
-                               setHasChanges(true);
-                               if (selectedActiveSongId) triggerDirectSongSave(selectedActiveSongId, 'IN_PROGRESS', true);
-                             } },
-                            { mode: 'MASTERED', color: 'hsl(130, 65%, 82%)', label: 'Grün (erledigt)', getActive: () => status === 'MASTERED', action: () => {
-                               setStatus('MASTERED');
-                               setIsCurrentHomework(false);
-                               setHasChanges(true);
-                               if (selectedActiveSongId) triggerDirectSongSave(selectedActiveSongId, 'MASTERED', false);
-                             } }
-                          ].map(b => {
-                            const isActive = b.getActive();
-                            return (
-                              <button
-                                key={b.mode}
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  b.action();
-                                }}
-                                style={{
-                                  width: '28px',
-                                  height: '28px',
-                                  borderRadius: '50%',
-                                  background: b.color,
-                                  border: isActive ? '3px solid #0f172a' : '1.5px solid #cbd5e1',
-                                  cursor: 'pointer',
-                                  transition: 'all 0.15s ease',
-                                  transform: isActive ? 'scale(1.15)' : 'none',
-                                  outline: 'none'
-                                }}
-                                title={b.label}
-                              />
-                            );
-                          })}
-                        </div>
-                      </div>
-                      <div style={{ borderTop: '1px solid rgba(0, 0, 0, 0.05)', paddingTop: '8px', display: 'flex', gap: '14px', flexWrap: 'wrap' }}>
-                        <span style={{ fontSize: '0.68rem', color: '#71717a', fontWeight: 700 }}><span style={{ color: 'hsl(355, 75%, 84%)' }}>●</span> Rot (keine Hausaufgabe)</span>
-                        <span style={{ fontSize: '0.68rem', color: '#71717a', fontWeight: 700 }}><span style={{ color: 'hsl(47, 85%, 84%)' }}>●</span> Gelb (Hausaufgabe)</span>
-                        <span style={{ fontSize: '0.68rem', color: '#71717a', fontWeight: 700 }}><span style={{ color: 'hsl(130, 65%, 82%)' }}>●</span> Grün (erledigt)</span>
-                      </div>
-                    </div>
-
-                    {/* Collapsible Progress & Dual Match Widget */}
-                    <div style={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '14px',
-                      background: 'white',
-                      borderRadius: '20px',
-                      padding: '16px 18px',
-                      border: '1px solid rgba(0, 0, 0, 0.08)',
-                      boxShadow: '0 4px 15px rgba(0,0,0,0.02)',
-                      transition: 'all 0.3s ease',
-                      position: 'relative'
-                    }}>
-                      {/* Match Confetti Flash */}
-                      {showMatchConfetti && (
-                        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, pointerEvents: 'none', zIndex: 10 }}>
-                          <Confetti width={500} height={300} recycle={false} numberOfPieces={120} />
-                        </div>
-                      )}
-
-                      {/* Header row: Progress Title & Mode Controls */}
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <span style={{ fontSize: '0.86rem', fontWeight: 900, color: songProgressPercent === 100 ? '#34a853' : '#0f172a', transition: 'color 0.3s ease' }}>
-                            {readOnly && isMatchModeEnabled
-                              ? (lastMatchedTeacherPercent !== null ? `Lehrer-Stand: ${lastMatchedTeacherPercent}%` : 'Fortschritt (Wird im Unterricht gematcht)')
-                              : `Fortschritt: ${songProgressPercent}%`}
-                          </span>
-
-                          {/* Teacher's Match-Mode Toggle Pill */}
-                          {!readOnly && (
-                            <button
-                              type="button"
-                              onClick={handleToggleMatchMode}
-                              style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                                padding: '3px 8px',
-                                borderRadius: '99px',
-                                fontSize: '0.68rem',
-                                fontWeight: 800,
-                                border: isMatchModeEnabled ? '1px solid #bbf7d0' : '1px solid #e2e8f0',
-                                background: isMatchModeEnabled ? '#f0fdf4' : '#f8fafc',
-                                color: isMatchModeEnabled ? '#166534' : '#64748b',
-                                cursor: 'pointer',
-                                transition: 'all 0.15s ease'
-                              }}
-                              className="hover-scale"
-                              title={isMatchModeEnabled ? 'Match-Modus ist aktiv (Schüler schätzt heimlich mit)' : 'Match-Modus ist aus (Schüler sieht nur Read-Only)'}
-                            >
-                              <span>🎯 Match-Modus:</span>
-                              <span style={{ fontWeight: 900 }}>{isMatchModeEnabled ? 'Aktiv' : 'Aus'}</span>
-                            </button>
-                          )}
-                        </div>
-                        
-                        {songProgressPercent === 100 ? (
-                          <div style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '6px',
-                            color: '#eab308',
-                            fontSize: '0.84rem',
-                            fontWeight: 900,
-                            animation: 'fadeIn 0.3s ease'
-                          }}>
-                            <span>Song gemeistert</span>
-                            <Star size={16} fill="#eab308" color="#eab308" style={{ filter: 'drop-shadow(0 0 3px rgba(234, 179, 8, 0.5))' }} />
-                          </div>
-                        ) : (
-                          !readOnly && (
-                            <button
-                              type="button"
-                              onClick={() => setIsSubSlidersExpanded(!isSubSlidersExpanded)}
-                              style={{
-                                background: '#f1f5f9',
-                                border: 'none',
-                                color: '#4b5563',
-                                fontSize: '0.74rem',
-                                fontWeight: 800,
-                                cursor: 'pointer',
-                                padding: '6px 12px',
-                                borderRadius: '20px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                                transition: 'all 0.15s ease'
-                              }}
-                            >
-                              {isSubSlidersExpanded ? 'Details ausblenden ▲' : 'Details einblenden ▼'}
-                            </button>
-                          )
-                        )}
-                      </div>
-
-                      {/* TEACHER SLIDER (Master Rating) */}
-                      {!readOnly && (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                            <input
-                              type="range"
-                              min="0"
-                              max="100"
-                              value={songProgressPercent}
-                              onChange={(e) => {
-                                const val = parseInt(e.target.value, 10);
-                                setSongProgressPercent(val);
-                                setRhythmVal(val);
-                                setFingerVal(val);
-                                setExpressionVal(val);
-                                if (val === 100) {
-                                  setStatus('MASTERED');
-                                  setIsCurrentHomework(false);
-                                  setIsSubSlidersExpanded(false);
-                                } else if (status === 'MASTERED') {
-                                  setStatus('IN_PROGRESS');
-                                }
-                                setHasChanges(true);
-                                setActiveSongSkills(prev => prev.map(s => s.id === selectedActiveSongId ? { ...s, progress_percent: val, is_stage_ready: val === 100 } : s));
-                                localStorage.setItem(`song_skills_detail_${student.id}_${selectedActiveSongId}`, JSON.stringify({
-                                  rhythm: val,
-                                  finger: val,
-                                  expression: val
-                                }));
-                                triggerDebouncedAutoSave(300);
-                              }}
-                              style={{
-                                flex: 1,
-                                accentColor: songProgressPercent === 100 ? '#34a853' : (songProgressPercent >= 50 ? '#eab308' : '#64748b'),
-                                height: '9px',
-                                borderRadius: '4.5px',
-                                cursor: 'pointer',
-                                background: songProgressPercent === 100
-                                  ? `linear-gradient(to right, #34a853 0%, #34a853 100%)`
-                                  : (songProgressPercent >= 50
-                                    ? `linear-gradient(to right, #eab308 0%, #eab308 ${songProgressPercent}%, #e2e8f0 ${songProgressPercent}%, #e2e8f0 100%)`
-                                    : `linear-gradient(to right, #64748b 0%, #64748b ${songProgressPercent}%, #e2e8f0 ${songProgressPercent}%, #e2e8f0 100%)`),
-                                WebkitAppearance: 'none',
-                                outline: 'none',
-                                transition: 'all 0.3s ease'
-                              }}
-                            />
-                          </div>
-                        </div>
-                      )}
-
-                      {/* READ-ONLY FALLBACK (When Match-Modus is OFF for Student) */}
-                      {readOnly && !isMatchModeEnabled && (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                            <input
-                              type="range"
-                              min="0"
-                              max="100"
-                              disabled={true}
-                              value={songProgressPercent}
-                              style={{
-                                flex: 1,
-                                accentColor: songProgressPercent === 100 ? '#34a853' : (songProgressPercent >= 50 ? '#eab308' : '#64748b'),
-                                height: '10px',
-                                borderRadius: '5px',
-                                cursor: 'default',
-                                opacity: 0.85,
-                                background: songProgressPercent === 100
-                                  ? `linear-gradient(to right, #34a853 0%, #34a853 100%)`
-                                  : (songProgressPercent >= 50
-                                    ? `linear-gradient(to right, #eab308 0%, #eab308 ${songProgressPercent}%, #e2e8f0 ${songProgressPercent}%, #e2e8f0 100%)`
-                                    : `linear-gradient(to right, #64748b 0%, #64748b ${songProgressPercent}%, #e2e8f0 ${songProgressPercent}%, #e2e8f0 100%)`),
-                                WebkitAppearance: 'none',
-                                outline: 'none'
-                              }}
-                            />
-                          </div>
-                        </div>
-                      )}
-
-                      {/* STUDENT SELF-ASSESSMENT SLIDER & COMMIT BUTTON (When Match-Modus is ACTIVE for Student) */}
-                      {readOnly && isMatchModeEnabled && (() => {
-                        const currentPct = studentRating ?? 0;
-                        const getProgressFeeling = (pct: number) => {
-                          if (pct <= 25) return { icon: '🐌', text: 'Aller Anfang' };
-                          if (pct <= 50) return { icon: '🧩', text: 'Einzelne Teile klappen' };
-                          if (pct <= 75) return { icon: '⚡', text: 'Läuft fast flüssig' };
-                          return { icon: '🚀', text: 'Bühnenreif!' };
-                        };
-                        const feeling = getProgressFeeling(currentPct);
-
-                        return (
-                          <div style={{
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: '14px',
-                            background: '#f8fafc',
-                            padding: '16px',
-                            borderRadius: '18px',
-                            border: isStudentRatingCommitted ? '2px solid #86efac' : '2px solid #fcd34d',
-                            boxShadow: isStudentRatingCommitted ? '0 4px 14px rgba(34, 197, 94, 0.08)' : '0 4px 14px rgba(245, 158, 11, 0.08)',
-                            transition: 'all 0.2s ease'
-                          }}>
-                            {/* Top Header Row */}
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '6px' }}>
-                              <span style={{ fontSize: '0.86rem', fontWeight: 900, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                🎧 Wie gut klappt es schon:
-                                <span style={{ color: currentPct > 0 ? '#15803d' : '#64748b', fontWeight: 950, fontSize: '0.94rem' }}>
-                                  {currentPct}% • {feeling.icon} {feeling.text}
-                                </span>
-                              </span>
-                              <span style={{ fontSize: '0.68rem', color: '#15803d', background: '#dcfce7', padding: '2px 8px', borderRadius: '99px', fontWeight: 800 }}>
-                                🔒 Lehrer-Wertung verdeckt
-                              </span>
-                            </div>
-
-                            {/* Interactive Slider */}
-                            <input
-                              type="range"
-                              min="0"
-                              max="100"
-                              value={studentRating ?? 0}
-                              onChange={(e) => {
-                                const val = parseInt(e.target.value, 10);
-                                handleStudentRatingChange(val);
-                              }}
-                              style={{
-                                width: '100%',
-                                accentColor: '#16a34a',
-                                height: '14px',
-                                borderRadius: '7px',
-                                cursor: 'pointer',
-                                touchAction: 'manipulation',
-                                pointerEvents: 'auto',
-                                background: currentPct > 0
-                                  ? `linear-gradient(to right, #16a34a 0%, #16a34a ${currentPct}%, #e2e8f0 ${currentPct}%, #e2e8f0 100%)`
-                                  : '#e2e8f0',
-                                WebkitAppearance: 'none',
-                                outline: 'none',
-                                transition: 'all 0.15s ease'
-                              }}
-                            />
-
-                            {/* Action & Status Row: Lifecycle-Aware Child-Friendly Commit Button */}
-                            {(() => {
-                              const isFullyCompleted = matchHistory.length >= 3;
-                              const targetMatchNum = Math.min(matchHistory.length + 1, 3);
-                              const hasFreshStudentRating = Boolean(
-                                studentRating !== null &&
-                                studentRating !== undefined &&
-                                studentRatingUpdatedAt &&
-                                (!lastMatchedAt || new Date(studentRatingUpdatedAt).getTime() > new Date(lastMatchedAt).getTime())
-                              );
-
-                              return (
-                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                    {isFullyCompleted ? (
-                                      <span style={{
-                                        display: 'inline-flex',
-                                        alignItems: 'center',
-                                        gap: '5px',
-                                        background: '#dcfce7',
-                                        color: '#15803d',
-                                        padding: '5px 12px',
-                                        borderRadius: '99px',
-                                        fontSize: '0.74rem',
-                                        fontWeight: 850
-                                      }}>
-                                        <span>🏆 Alle 3 Meilensteine gemeistert!</span>
-                                      </span>
-                                    ) : (hasFreshStudentRating && isStudentRatingCommitted) ? (
-                                      <span style={{
-                                        display: 'inline-flex',
-                                        alignItems: 'center',
-                                        gap: '5px',
-                                        background: '#dcfce7',
-                                        color: '#15803d',
-                                        padding: '5px 12px',
-                                        borderRadius: '99px',
-                                        fontSize: '0.74rem',
-                                        fontWeight: 850
-                                      }}>
-                                        <Check size={14} strokeWidth={3} />
-                                        <span>Tipp für Match {targetMatchNum} ist sicher bei deiner Lehrkraft!</span>
-                                      </span>
-                                    ) : (
-                                      <span style={{
-                                        display: 'inline-flex',
-                                        alignItems: 'center',
-                                        gap: '4px',
-                                        background: matchHistory.length > 0 ? '#f0fdf4' : '#fffbeb',
-                                        color: matchHistory.length > 0 ? '#15803d' : '#b45309',
-                                        padding: '4px 10px',
-                                        borderRadius: '99px',
-                                        fontSize: '0.72rem',
-                                        fontWeight: 800,
-                                        border: `1px solid ${matchHistory.length > 0 ? '#bbf7d0' : '#fde68a'}`
-                                      }}>
-                                        <span>{matchHistory.length > 0 ? `🌱 Tipp für Match ${targetMatchNum} einstellen (${currentPct}%)` : '⚠️ 1. Tipp noch nicht abgeschickt'}</span>
-                                      </span>
-                                    )}
-                                  </div>
-
-                                  <button
-                                    type="button"
-                                    onClick={handleCommitStudentRating}
-                                    disabled={isFullyCompleted || (hasFreshStudentRating && isStudentRatingCommitted)}
-                                    style={{
-                                      border: 'none',
-                                      background: (isFullyCompleted || (hasFreshStudentRating && isStudentRatingCommitted))
-                                        ? '#e2e8f0'
-                                        : 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
-                                      color: (isFullyCompleted || (hasFreshStudentRating && isStudentRatingCommitted)) ? '#475569' : '#ffffff',
-                                      padding: '9px 20px',
-                                      borderRadius: '99px',
-                                      fontSize: '0.78rem',
-                                      fontWeight: 900,
-                                      cursor: (isFullyCompleted || (hasFreshStudentRating && isStudentRatingCommitted)) ? 'default' : 'pointer',
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      gap: '6px',
-                                      boxShadow: (isFullyCompleted || (hasFreshStudentRating && isStudentRatingCommitted)) ? 'none' : '0 3px 10px rgba(22, 163, 74, 0.35)',
-                                      transition: 'all 0.15s ease'
-                                    }}
-                                    className={(isFullyCompleted || (hasFreshStudentRating && isStudentRatingCommitted)) ? '' : 'hover-scale'}
-                                  >
-                                    {isFullyCompleted ? (
-                                      <span>✓ Alle Matches abgeschlossen</span>
-                                    ) : (hasFreshStudentRating && isStudentRatingCommitted) ? (
-                                      <>
-                                        <Check size={14} strokeWidth={3} />
-                                        <span>Tipp {targetMatchNum} eingeloggt ({studentRating}%)</span>
-                                      </>
-                                    ) : (
-                                      <>
-                                        <Lock size={14} />
-                                        <span>🔒 Tipp für Match {targetMatchNum} abschicken ({currentPct}%)</span>
-                                      </>
-                                    )}
-                                  </button>
-                                </div>
-                              );
-                            })()}
-
-                            {/* 3 VISUAL REWARD TIERS (Kid-Friendly & Gamified) */}
-                            <div style={{ marginTop: '4px' }}>
-                              <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#475569', marginBottom: '4px' }}>
-                                🎁 Belohnungs-Stufen für dein nächstes Match:
-                              </div>
-                              <div style={{
-                                display: 'grid',
-                                gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
-                                gap: '8px'
-                              }}>
-                                <div style={{
-                                  background: '#fefce8',
-                                  border: '1.5px solid #fde047',
-                                  borderRadius: '12px',
-                                  padding: '8px 10px',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '8px'
-                                }}>
-                                  <span style={{ fontSize: '1.2rem' }}>🎯</span>
-                                  <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                    <span style={{ fontSize: '0.72rem', fontWeight: 900, color: '#854d0e' }}>Volltreffer (±10%)</span>
-                                    <span style={{ fontSize: '0.66rem', fontWeight: 750, color: '#a16207' }}>+50 XP & Meister-Ohr</span>
-                                  </div>
-                                </div>
-
-                                <div style={{
-                                  background: '#f0f9ff',
-                                  border: '1.5px solid #bae6fd',
-                                  borderRadius: '12px',
-                                  padding: '8px 10px',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '8px'
-                                }}>
-                                  <span style={{ fontSize: '1.2rem' }}>✨</span>
-                                  <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                    <span style={{ fontSize: '0.72rem', fontWeight: 900, color: '#0369a1' }}>Super Gehör (±20%)</span>
-                                    <span style={{ fontSize: '0.66rem', fontWeight: 750, color: '#0284c7' }}>+25 XP</span>
-                                  </div>
-                                </div>
-
-                                <div style={{
-                                  background: '#faf5ff',
-                                  border: '1.5px solid #e9d5ff',
-                                  borderRadius: '12px',
-                                  padding: '8px 10px',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '8px'
-                                }}>
-                                  <span style={{ fontSize: '1.2rem' }}>🚀</span>
-                                  <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                    <span style={{ fontSize: '0.72rem', fontWeight: 900, color: '#7e22ce' }}>Weiter-Rocker (&gt;20%)</span>
-                                    <span style={{ fontSize: '0.66rem', fontWeight: 750, color: '#9333ea' }}>+5 XP Mut-Bonus</span>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })()}
-
-                      {/* 1. DUAL-BALKEN SHOWDOWN RACE BOX (Animated 1.2s Comparison) */}
-                      {showdownState && (
-                        <div style={{
-                          background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
-                          borderRadius: '20px',
-                          padding: '16px 20px',
-                          color: '#ffffff',
-                          margin: '8px 0',
-                          boxShadow: '0 10px 30px rgba(0,0,0,0.25)',
-                          border: '1.5px solid rgba(255,255,255,0.12)',
-                          animation: 'fadeIn 0.25s ease'
-                        }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', fontWeight: 900, color: '#38bdf8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                              <span>🏁 LIVE-MATCH SHOWDOWN</span>
-                            </div>
-                            {showdownState.isRunning ? (
-                              <span style={{ fontSize: '0.72rem', color: '#facc15', fontWeight: 800, animation: 'pulse 1s infinite' }}>
-                                ⚡ Showdown läuft...
-                              </span>
-                            ) : (
-                              <span style={{ fontSize: '0.74rem', fontWeight: 900, color: '#86efac', background: 'rgba(34,197,94,0.2)', padding: '2px 8px', borderRadius: '99px' }}>
-                                Δ {Math.abs(showdownState.teacherTarget - showdownState.studentTarget)}% Differenz
-                              </span>
-                            )}
-                          </div>
-
-                          {/* Top Bar: Lehrkraft */}
-                          <div style={{ marginBottom: '10px' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', fontWeight: 800, color: '#cbd5e1', marginBottom: '4px' }}>
-                              <span>👨‍🏫 Lehrkraft:</span>
-                              <span style={{ color: '#4ade80', fontWeight: 900, fontVariantNumeric: 'tabular-nums' }}>
-                                {Math.round(showdownState.currentTeacherVal)}%
-                              </span>
-                            </div>
-                            <div style={{ width: '100%', height: '12px', background: 'rgba(255,255,255,0.1)', borderRadius: '99px', overflow: 'hidden' }}>
-                              <div style={{
-                                width: `${showdownState.currentTeacherVal}%`,
-                                height: '100%',
-                                background: 'linear-gradient(90deg, #16a34a, #4ade80)',
-                                borderRadius: '99px',
-                                transition: showdownState.isRunning ? 'none' : 'width 0.2s ease',
-                                boxShadow: '0 0 10px rgba(74, 222, 128, 0.4)'
-                              }} />
-                            </div>
-                          </div>
-
-                          {/* Bottom Bar: Schüler */}
-                          <div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', fontWeight: 800, color: '#cbd5e1', marginBottom: '4px' }}>
-                              <span>👧 {readOnly ? 'Dein Tipp:' : 'Schüler-Tipp:'}</span>
-                              <span style={{ color: '#facc15', fontWeight: 900, fontVariantNumeric: 'tabular-nums' }}>
-                                {Math.round(showdownState.currentStudentVal)}%
-                              </span>
-                            </div>
-                            <div style={{ width: '100%', height: '12px', background: 'rgba(255,255,255,0.1)', borderRadius: '99px', overflow: 'hidden' }}>
-                              <div style={{
-                                width: `${showdownState.currentStudentVal}%`,
-                                height: '100%',
-                                background: 'linear-gradient(90deg, #eab308, #fde047)',
-                                borderRadius: '99px',
-                                transition: showdownState.isRunning ? 'none' : 'width 0.2s ease',
-                                boxShadow: '0 0 10px rgba(250, 204, 21, 0.4)'
-                              }} />
-                            </div>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* TEACHER MATCH STATUS & ACTION BAR (Apple-Grade Lifecycle-Aware Single-Line) */}
-                      {!readOnly && isMatchModeEnabled && (() => {
-                        const targetMatchNum = Math.min(matchHistory.length + 1, 3);
-                        const isFullyCompleted = matchHistory.length >= 3;
-                        const latestMatch = matchHistory.length > 0 ? matchHistory[matchHistory.length - 1] : null;
-                        const diff = (lastMatchedTeacherPercent !== null && lastMatchedStudentPercent !== null)
-                          ? Math.abs(lastMatchedTeacherPercent - lastMatchedStudentPercent)
-                          : (studentRating !== null ? Math.abs(songProgressPercent - studentRating) : null);
-
-                        const hasFreshStudentRating = Boolean(
-                          studentRating !== null &&
-                          studentRating !== undefined &&
-                          studentRatingUpdatedAt &&
-                          (!lastMatchedAt || new Date(studentRatingUpdatedAt).getTime() > new Date(lastMatchedAt).getTime())
-                        );
-
-                        const canExecuteMatch = !isFullyCompleted && hasFreshStudentRating && !showdownState?.isRunning;
-
-                        return (
-                          <div style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            background: '#f8fafc',
-                            padding: '10px 14px',
-                            borderRadius: '14px',
-                            border: canExecuteMatch ? '1.5px solid #bbf7d0' : '1px solid #e2e8f0',
-                            gap: '10px',
-                            flexWrap: 'wrap',
-                            marginTop: '2px'
-                          }}>
-                            {/* Left Side: Student Tip Status, Compact Result Pill & 3-Dot Milestone Tracker */}
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                              {isFullyCompleted ? (
-                                <span style={{
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: '4px',
-                                  background: '#dcfce7',
-                                  color: '#15803d',
-                                  padding: '4px 10px',
-                                  borderRadius: '99px',
-                                  fontWeight: 900,
-                                  fontSize: '0.74rem'
-                                }}>
-                                  <span>🏆 Song komplett gematcht (3/3)</span>
-                                </span>
-                              ) : hasFreshStudentRating ? (
-                                <>
-                                  <span style={{
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    gap: '4px',
-                                    background: '#dcfce7',
-                                    color: '#15803d',
-                                    padding: '4px 10px',
-                                    borderRadius: '99px',
-                                    fontWeight: 900,
-                                    fontSize: '0.74rem'
-                                  }}>
-                                    <Check size={13} strokeWidth={3} />
-                                    <span>Tipp {targetMatchNum} liegt bereit: {studentRating}%</span>
-                                  </span>
-                                </>
-                              ) : matchHistory.length > 0 ? (
-                                <>
-                                  {latestMatch && (
-                                    <span style={{
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      gap: '4px',
-                                      background: latestMatch.tier === 'tier1' ? '#fef3c7' : (latestMatch.tier === 'tier2' ? '#e0f2fe' : '#f3e8ff'),
-                                      color: latestMatch.tier === 'tier1' ? '#92400e' : (latestMatch.tier === 'tier2' ? '#075985' : '#6b21a8'),
-                                      border: `1px solid ${latestMatch.tier === 'tier1' ? '#fde68a' : (latestMatch.tier === 'tier2' ? '#bae6fd' : '#e9d5ff')}`,
-                                      padding: '4px 9px',
-                                      borderRadius: '99px',
-                                      fontWeight: 850,
-                                      fontSize: '0.72rem'
-                                    }}>
-                                      <span>{latestMatch.tier === 'tier1' ? '🎯' : (latestMatch.tier === 'tier2' ? '✨' : '🚀')}</span>
-                                      <span>
-                                        Match #{matchHistory.length} beendet
-                                        {diff !== null && ` (Δ ${diff}%)`} • +{latestMatch.xp_amount} XP
-                                      </span>
-                                    </span>
-                                  )}
-                                  <span style={{ fontWeight: 700, color: '#64748b', fontSize: '0.74rem' }}>
-                                    ⏳ Wartet auf Schüler-Tipp für Match {targetMatchNum}
-                                  </span>
-                                </>
-                              ) : (
-                                <span style={{ fontWeight: 700, color: '#64748b', fontSize: '0.74rem' }}>
-                                  ⏳ Schüler-Tipp steht noch aus (Match 1/3)
-                                </span>
-                              )}
-
-                              {/* Apple-Style 3-Dot Milestone Tracker */}
-                              <div style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '5px',
-                                background: '#ffffff',
-                                border: '1px solid #e2e8f0',
-                                padding: '4px 8px',
-                                borderRadius: '99px'
-                              }} title={`Match ${matchHistory.length} von 3 belegt`}>
-                                {[0, 1, 2].map((idx) => (
-                                  <div
-                                    key={idx}
-                                    style={{
-                                      width: '7px',
-                                      height: '7px',
-                                      borderRadius: '50%',
-                                      background: idx < matchHistory.length
-                                        ? '#16a34a'
-                                        : (idx === matchHistory.length && hasFreshStudentRating ? '#38bdf8' : '#cbd5e1')
-                                    }}
-                                  />
-                                ))}
-                                <span style={{ fontSize: '0.66rem', fontWeight: 800, color: '#64748b', marginLeft: '2px' }}>
-                                  {matchHistory.length}/3
-                                </span>
-                              </div>
-                            </div>
-
-                            {/* Right Side: Action Button */}
-                            <button
-                              type="button"
-                              onClick={handleCheckMatch}
-                              disabled={!canExecuteMatch}
-                              style={{
-                                border: 'none',
-                                background: canExecuteMatch
-                                  ? 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)'
-                                  : '#cbd5e1',
-                                color: canExecuteMatch ? '#ffffff' : '#64748b',
-                                padding: '7px 16px',
-                                borderRadius: '99px',
-                                fontSize: '0.76rem',
-                                fontWeight: 900,
-                                cursor: canExecuteMatch ? 'pointer' : 'not-allowed',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '6px',
-                                boxShadow: canExecuteMatch ? '0 2px 8px rgba(22, 163, 74, 0.3)' : 'none',
-                                transition: 'all 0.15s ease'
-                              }}
-                              className={canExecuteMatch ? 'hover-scale' : ''}
-                            >
-                              <Sparkles size={13} />
-                              <span>
-                                {isFullyCompleted
-                                  ? '🏆 3/3 Meilensteine belegt'
-                                  : (!hasFreshStudentRating && matchHistory.length > 0)
-                                    ? `⏳ Wartet auf Tipp ${targetMatchNum}`
-                                    : `🎯 Match ${targetMatchNum} prüfen`}
-                              </span>
-                            </button>
-                          </div>
-                        );
-                      })()}
-
-                      {/* Sub sliders (Rhythm, Finger, Expression) */}
-                      {isSubSlidersExpanded && (
-                        <div style={{
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: '14px',
-                          borderTop: '1px solid rgba(0, 0, 0, 0.08)',
-                          padding: '14px 0 0 0',
-                          marginTop: '10px',
-                          background: 'transparent',
-                          animation: 'fadeIn 0.2s ease'
-                        }}>
-                          {songProgressPercent < 100 && [
-                            { label: 'Rhythmus & Timing', value: rhythmVal, type: 'rhythm', color: '#16a34a' },
-                            { label: 'Finger & Technik', value: fingerVal, type: 'finger', color: '#0284c7' },
-                            { label: 'Ausdruck & Performance', value: expressionVal, type: 'expression', color: '#d97706' }
-                          ].map(sub => (
-                            <div key={sub.type} style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.73rem', fontWeight: 800, color: '#475569' }}>
-                                <span>{sub.label}</span>
-                                <span style={{ color: sub.color, fontWeight: 900 }}>{sub.value}%</span>
-                              </div>
-                              <input
-                                type="range"
-                                min="0"
-                                max="100"
-                                value={sub.value}
-                                onChange={(e) => {
-                                  const val = parseInt(e.target.value, 10);
-                                  let r = rhythmVal;
-                                  let f = fingerVal;
-                                  let eVal = expressionVal;
-                                  if (sub.type === 'rhythm') {
-                                    r = val;
-                                    setRhythmVal(val);
-                                  } else if (sub.type === 'finger') {
-                                    f = val;
-                                    setFingerVal(val);
-                                  } else if (sub.type === 'expression') {
-                                    eVal = val;
-                                    setExpressionVal(val);
-                                  }
-                                  setHasChanges(true);
-                                  const avg = Math.round((r + f + eVal) / 3);
-                                  setSongProgressPercent(avg);
-                                  if (avg < 100) {
-                                    if (status === 'MASTERED') setStatus('IN_PROGRESS');
-                                  } else {
-                                    setStatus('MASTERED');
-                                    setIsCurrentHomework(false);
-                                  }
-                                  setActiveSongSkills(prev => prev.map(s => s.id === selectedActiveSongId ? { ...s, progress_percent: avg, is_stage_ready: avg === 100 } : s));
-                                  localStorage.setItem(`song_skills_detail_${student.id}_${selectedActiveSongId}`, JSON.stringify({
-                                    rhythm: r,
-                                    finger: f,
-                                    expression: eVal
-                                  }));
-                                  triggerDebouncedAutoSave(300);
-                                }}
-                                style={{
-                                  width: '100%',
-                                  accentColor: sub.color,
-                                  height: '3.5px',
-                                  borderRadius: '2px',
-                                  cursor: 'pointer',
-                                  background: `linear-gradient(to right, ${sub.color} 0%, ${sub.color} ${sub.value}%, #e2e8f0 ${sub.value}%, #e2e8f0 100%)`,
-                                  WebkitAppearance: 'none',
-                                  outline: 'none',
-                                  padding: '6px 0'
-                                }}
-                              />
-                            </div>
-                          ))}
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setStatus('MASTERED');
-                              setIsCurrentHomework(false);
-                              setSongProgressPercent(100);
-                              setRhythmVal(100);
-                              setFingerVal(100);
-                              setExpressionVal(100);
-                              setIsSubSlidersExpanded(false);
-                              setHasChanges(true);
-                              setActiveSongSkills(prev => prev.map(s => s.id === selectedActiveSongId ? { ...s, progress_percent: 100, is_stage_ready: true } : s));
-                              localStorage.setItem(`song_skills_detail_${student.id}_${selectedActiveSongId}`, JSON.stringify({
-                                rhythm: 100,
-                                finger: 100,
-                                expression: 100
-                              }));
-
-                              if (selectedActiveSongId) {
-                                const skill = activeSongSkills.find(s => s.id === selectedActiveSongId);
-                                const songTitle = skill?.songs?.title || skill?.title || skill?.song_title || 'Unbenannter Song';
-                                const songArtist = skill?.songs?.artist || skill?.artist || '';
-                                const songTopic = songArtist ? `${songArtist} – ${songTitle}` : songTitle;
-                                awardSticker('song-master', songTopic);
-                              }
-                              triggerDebouncedAutoSave(100);
-                            }}
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              gap: '8px',
-                              background: '#f1f5f9',
-                              border: 'none',
-                              color: '#374151',
-                              fontSize: '0.8rem',
-                              fontWeight: 800,
-                              cursor: 'pointer',
-                              padding: '10px 16px',
-                              borderRadius: '20px',
-                              marginTop: '8px',
-                              width: 'fit-content',
-                              alignSelf: 'flex-end',
-                              boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
-                              transition: 'all 0.15s ease'
-                            }}
-                            className="hover-scale"
-                          >
-                            <span>{songProgressPercent === 100 ? 'Song gemeistert' : 'Song als gemeistert markieren'}</span>
-                            <Star size={16} fill="#facc15" color="#eab308" style={{ filter: 'drop-shadow(0 0 3px rgba(250, 204, 21, 0.6))' }} />
-                          </button>
-                        </div>
-                      )}
-
-                      {/* Claim Mastery Sticker Button */}
-                      {(() => {
-                        const skill = activeSongSkills.find(s => s.id === selectedActiveSongId);
-                        const songTitle = skill?.songs?.title || skill?.title || skill?.song_title || '';
-                        const songArtist = skill?.songs?.artist || skill?.artist || '';
-                        const songTopic = songArtist ? `${songArtist} – ${songTitle}` : songTitle;
-                        const songMasterInfo = collectedStickers['song-master'];
-                        const isSongMasterStickerAwarded = songTopic && songMasterInfo?.details.some(
-                          d => d.topic.toLowerCase().trim() === songTopic.toLowerCase().trim()
-                        );
-                        
-                        if ((songProgressPercent === 100 || status === 'MASTERED') && songTopic && !isSongMasterStickerAwarded) {
-                          return (
-                            <button
-                              type="button"
-                              onClick={() => awardSticker('song-master', songTopic)}
-                              style={{
-                                marginTop: '12px',
-                                width: '100%',
-                                background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-                                color: 'white',
-                                border: 'none',
-                                padding: '10px 16px',
-                                borderRadius: '20px',
-                                fontWeight: 'bold',
-                                fontSize: '0.82rem',
-                                cursor: 'pointer',
-                                boxShadow: '0 4px 15px rgba(245, 158, 11, 0.25)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                gap: '6px',
-                                transition: 'all 0.15s ease'
-                              }}
-                              className="hover-scale"
-                            >
-                              <span>🏆 Song-Master Sticker erhalten ({songTopic})</span>
-                            </button>
-                          );
-                        }
-                        return null;
-                      })()}
-                    </div>
-                  </div>
-                );
-              })()
-            ) : (
-              <>
-                {/* Hub-view inner scrollable area */}
-                <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: '16px', padding: '20px 24px', paddingBottom: '16px', overflowY: 'auto' }}>
-                
-                {hubTab === 'modules' ? (
-                  /* ========================================================================= */
-                  /* TAB 1: 🎧 MODULE (Kompaktes Apple Music / Spotify 7er-Raster)             */
-                  /* ========================================================================= */
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }} className="animation-fade-in">
-                    {(() => {
-                      const activeModulesCount = readOnly ? 4 : (uiLevel === 'junior' ? 3 : (uiLevel === 'teen' ? 5 : 6));
-
-                      return (
-                        <>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <div>
-                              <span style={{ fontSize: '0.82rem', fontWeight: 900, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                <Sliders size={15} style={{ color: '#34a853' }} />
-                                <span>Campus Studio Module</span>
-                              </span>
-                            </div>
-                            <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#15803d', background: '#e6f4ea', border: '1px solid #bbf7d0', padding: '2px 8px', borderRadius: '100px' }}>
-                              {activeModulesCount} Module aktiv
-                            </span>
-                          </div>
-
-                          <div style={{
-                            display: 'grid',
-                            gridTemplateColumns: 'repeat(3, 1fr)',
-                            gap: '14px 12px',
-                            padding: '4px 0 12px 0'
-                          }}>
-                            {/* 1. Protokoll (Ausgeblendet im Schüler-Hausaufgabenheft für alle Altersstufen, da rechts der Wochenplan liegt) */}
-                            {!readOnly && (
-                              <div
-                                onClick={() => {
-                                  setHubTab('protocol');
-                                }}
-                                style={{
-                                  background: '#ffffff',
-                                  border: '1.5px solid #e2e8f0',
-                                  borderRadius: '18px',
-                                  padding: '16px 8px 14px 8px',
-                                  display: 'flex',
-                                  flexDirection: 'column',
-                                  alignItems: 'center',
-                                  textAlign: 'center',
-                                  cursor: 'pointer',
-                                  boxShadow: '0 2px 8px -2px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02)',
-                                  transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
-                                }}
-                                className="hover-scale"
-                              >
-                                <div style={{
-                                  width: '72px',
-                                  height: '72px',
-                                  borderRadius: '18px',
-                                  background: 'linear-gradient(135deg, #10b981 0%, #047857 100%)',
-                                  boxShadow: '0 6px 14px -2px rgba(16, 185, 129, 0.40)',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  position: 'relative',
-                                  overflow: 'hidden',
-                                  border: '1px solid rgba(255, 255, 255, 0.25)'
-                                }}>
-                                  <BookOpen size={34} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />
-                                </div>
-                                <div style={{ marginTop: '10px', padding: '0 2px' }}>
-                                  <div style={{ fontSize: '0.92rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', lineHeight: '1.2' }}>
-                                    Protokoll
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-
-                            {/* 2. Loopstation (Ausgeblendet auf der Startseite im Schüler-Modus für alle Altersstufen) */}
-                            {!readOnly && uiLevel !== 'junior' && (
-                              <div
-                                onClick={() => {
-                                  setActiveModalTab('document');
-                                  setActiveViewMode('loopstation');
-                                  setActiveSubView('hub');
-                                }}
-                                style={{
-                                  background: '#ffffff',
-                                  border: '1.5px solid #e2e8f0',
-                                  borderRadius: '18px',
-                                  padding: '16px 8px 14px 8px',
-                                  display: 'flex',
-                                  flexDirection: 'column',
-                                  alignItems: 'center',
-                                  textAlign: 'center',
-                                  cursor: 'pointer',
-                                  boxShadow: '0 2px 8px -2px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02)',
-                                  transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
-                                }}
-                                className="hover-scale"
-                              >
-                                <div style={{
-                                  width: '72px',
-                                  height: '72px',
-                                  borderRadius: '18px',
-                                  background: 'linear-gradient(135deg, #f43f5e 0%, #be123c 100%)',
-                                  boxShadow: '0 6px 14px -2px rgba(244, 63, 94, 0.40)',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  position: 'relative',
-                                  overflow: 'hidden',
-                                  border: '1px solid rgba(255, 255, 255, 0.25)'
-                                }}>
-                                  <Sliders size={34} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />
-                                </div>
-                                <div style={{ marginTop: '10px', padding: '0 2px' }}>
-                                  <div style={{ fontSize: '0.92rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', lineHeight: '1.2' }}>
-                                    Loopstation
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-
-                            {/* 3. Übe-Begleiter (Für alle) */}
-                            <div
-                              onClick={() => {
-                                setActiveModalTab('document');
-                                setActiveViewMode('practice');
-                                setActiveSubView('hub');
-                              }}
-                              style={{
-                                background: '#ffffff',
-                                border: '1.5px solid #e2e8f0',
-                                borderRadius: '18px',
-                                padding: '16px 8px 14px 8px',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                alignItems: 'center',
-                                textAlign: 'center',
-                                cursor: 'pointer',
-                                boxShadow: '0 2px 8px -2px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02)',
-                                transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
-                              }}
-                              className="hover-scale"
-                            >
-                              <div style={{
-                                width: '72px',
-                                height: '72px',
-                                borderRadius: '18px',
-                                background: 'linear-gradient(135deg, #f59e0b 0%, #b45309 100%)',
-                                boxShadow: '0 6px 14px -2px rgba(245, 158, 11, 0.40)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                position: 'relative',
-                                overflow: 'hidden',
-                                border: '1px solid rgba(255, 255, 255, 0.25)'
-                              }}>
-                                <Clock size={34} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />
-                              </div>
-                              <div style={{ marginTop: '10px', padding: '0 2px' }}>
-                                <div style={{ fontSize: '0.92rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', lineHeight: '1.2' }}>
-                                  Übe-Begleiter
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* 4. Aufnahmen (Für alle) */}
-                            <div
-                              onClick={() => {
-                                setActiveModalTab('document');
-                                setActiveViewMode('recordings');
-                                setActiveSubView('hub');
-                              }}
-                              style={{
-                                background: '#ffffff',
-                                border: '1.5px solid #e2e8f0',
-                                borderRadius: '18px',
-                                padding: '16px 8px 14px 8px',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                alignItems: 'center',
-                                textAlign: 'center',
-                                cursor: 'pointer',
-                                boxShadow: '0 2px 8px -2px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02)',
-                                transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
-                              }}
-                              className="hover-scale"
-                            >
-                              <div style={{
-                                width: '72px',
-                                height: '72px',
-                                borderRadius: '18px',
-                                background: 'linear-gradient(135deg, #6366f1 0%, #4338ca 100%)',
-                                boxShadow: '0 6px 14px -2px rgba(99, 102, 241, 0.40)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                position: 'relative',
-                                overflow: 'hidden',
-                                border: '1px solid rgba(255, 255, 255, 0.25)'
-                              }}>
-                                <Mic size={34} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />
-                              </div>
-                              <div style={{ marginTop: '10px', padding: '0 2px' }}>
-                                <div style={{ fontSize: '0.92rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', lineHeight: '1.2' }}>
-                                  Aufnahmen
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* 5. Stimmgerät (Für alle) */}
-                            <div
-                              onClick={() => {
-                                setActiveModalTab('document');
-                                setActiveViewMode('tuner');
-                                setActiveSubView('hub');
-                              }}
-                              style={{
-                                background: '#ffffff',
-                                border: '1.5px solid #e2e8f0',
-                                borderRadius: '18px',
-                                padding: '16px 8px 14px 8px',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                alignItems: 'center',
-                                textAlign: 'center',
-                                cursor: 'pointer',
-                                boxShadow: '0 2px 8px -2px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02)',
-                                transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
-                              }}
-                              className="hover-scale"
-                            >
-                              <div style={{
-                                width: '72px',
-                                height: '72px',
-                                borderRadius: '18px',
-                                background: 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)',
-                                boxShadow: '0 6px 14px -2px rgba(6, 182, 212, 0.40)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                position: 'relative',
-                                overflow: 'hidden',
-                                border: '1px solid rgba(255, 255, 255, 0.25)'
-                              }}>
-                                <Radio size={34} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />
-                              </div>
-                              <div style={{ marginTop: '10px', padding: '0 2px' }}>
-                                <div style={{ fontSize: '0.92rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', lineHeight: '1.2' }}>
-                                  Stimmgerät
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* 6. Groove-Trainer (Für alle Altersstufen!) */}
-                            <div
-                              onClick={() => {
-                                setActiveModalTab('document');
-                                setActiveViewMode('groovetrainer' as any);
-                                setActiveSubView('hub');
-                              }}
-                              style={{
-                                background: '#ffffff',
-                                border: '1.5px solid #e2e8f0',
-                                borderRadius: '18px',
-                                padding: '16px 8px 14px 8px',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                alignItems: 'center',
-                                textAlign: 'center',
-                                cursor: 'pointer',
-                                boxShadow: '0 2px 8px -2px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02)',
-                                transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
-                              }}
-                              className="hover-scale"
-                            >
-                              <div style={{
-                                width: '72px',
-                                height: '72px',
-                                borderRadius: '18px',
-                                background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
-                                boxShadow: '0 6px 14px -2px rgba(249, 115, 22, 0.40)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                position: 'relative',
-                                overflow: 'hidden',
-                                border: '1px solid rgba(255, 255, 255, 0.3)'
-                              }}>
-                                <Radio size={34} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />
-                              </div>
-                              <div style={{ marginTop: '10px', padding: '0 2px' }}>
-                                <div style={{ fontSize: '0.92rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', lineHeight: '1.2' }}>
-                                  Groove-Trainer
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* 7. Skill-Radar (Ausgeblendet auf der Startseite im Schüler-Modus für alle Altersstufen) */}
-                            {!readOnly && uiLevel !== 'junior' && (
-                              <div
-                                onClick={() => {
-                                  setActiveModalTab('skillradar');
-                                }}
-                                style={{
-                                  background: '#ffffff',
-                                  border: '1.5px solid #e2e8f0',
-                                  borderRadius: '18px',
-                                  padding: '16px 8px 14px 8px',
-                                  display: 'flex',
-                                  flexDirection: 'column',
-                                  alignItems: 'center',
-                                  textAlign: 'center',
-                                  cursor: 'pointer',
-                                  boxShadow: '0 2px 8px -2px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02)',
-                                  transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
-                                }}
-                                className="hover-scale"
-                              >
-                                <div style={{
-                                  width: '72px',
-                                  height: '72px',
-                                  borderRadius: '18px',
-                                  background: 'linear-gradient(135deg, #d946ef 0%, #a21caf 100%)',
-                                  boxShadow: '0 6px 14px -2px rgba(217, 70, 239, 0.40)',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  position: 'relative',
-                                  overflow: 'hidden',
-                                  border: '1px solid rgba(255, 255, 255, 0.25)'
-                                }}>
-                                  <Activity size={34} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />
-                                </div>
-                                <div style={{ marginTop: '10px', padding: '0 2px' }}>
-                                  <div style={{ fontSize: '0.92rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', lineHeight: '1.2' }}>
-                                    Skill-Radar
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-
-                            {/* 8. Archiv (Ausgeblendet auf der Startseite im Schüler-Modus für alle Altersstufen) */}
-                            {!readOnly && uiLevel === 'pro' && (
-                              <div
-                                onClick={() => {
-                                  setActiveModalTab('document');
-                                  setActiveSubView('history');
-                                }}
-                                style={{
-                                  background: '#ffffff',
-                                  border: '1.5px solid #e2e8f0',
-                                  borderRadius: '18px',
-                                  padding: '16px 8px 14px 8px',
-                                  display: 'flex',
-                                  flexDirection: 'column',
-                                  alignItems: 'center',
-                                  textAlign: 'center',
-                                  cursor: 'pointer',
-                                  boxShadow: '0 2px 8px -2px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02)',
-                                  transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
-                                }}
-                                className="hover-scale"
-                              >
-                                <div style={{
-                                  width: '72px',
-                                  height: '72px',
-                                  borderRadius: '18px',
-                                  background: 'linear-gradient(135deg, #64748b 0%, #334155 100%)',
-                                  boxShadow: '0 6px 14px -2px rgba(100, 116, 139, 0.40)',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  position: 'relative',
-                                  overflow: 'hidden',
-                                  border: '1px solid rgba(255, 255, 255, 0.25)'
-                                }}>
-                                  <History size={34} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />
-                                </div>
-                                <div style={{ marginTop: '10px', padding: '0 2px' }}>
-                                  <div style={{ fontSize: '0.92rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', lineHeight: '1.2' }}>
-                                    Archiv
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        </>
-                      );
-                    })()}
-                  </div>
-                ) : (
-                  /* ========================================================================= */
-                  /* TAB 2: 📋 PROTOKOLL (Ausschließlich Lehrwerke & Songs)                    */
-                  /* ========================================================================= */
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }} className="animation-fade-in">
-                {/* 1. LEHRWERKE & ÜBUNGEN (Kompakt & minimalistisch, ca. 1/3) */}
-                <div>
-                  {/* Clean Apple-style Header Row with Quick-Add Action */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', position: 'relative' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <BookOpen size={16} style={{ color: '#34a853' }} />
-                      <h3 style={{ margin: 0, fontSize: '0.94rem', fontWeight: 900, color: '#000', letterSpacing: '-0.02em', textTransform: 'uppercase' }}>
-                        Lehrwerke & Übungen
-                      </h3>
-                    </div>
-
-                    {/* Kompakter Apple-Style Header Action Button */}
-                    <div style={{ position: 'relative' }}>
-                      <button
-                        type="button"
-                        onClick={() => setShowAssignDropdown(!showAssignDropdown)}
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '5px',
-                          background: '#f0fdf4',
-                          border: '1.5px solid #bbf7d0',
-                          color: '#15803d',
-                          padding: '4px 10px',
-                          borderRadius: '100px',
-                          fontSize: '0.72rem',
-                          fontWeight: 800,
-                          cursor: 'pointer',
-                          transition: 'all 0.15s ease'
-                        }}
-                        className="hover-scale"
-                      >
-                        <Plus size={12} strokeWidth={3} />
-                        <span>Lehrwerk hinzufügen</span>
-                      </button>
-
-                      {showAssignDropdown && (
-                        <div style={{
-                          position: 'absolute',
-                          right: 0,
-                          top: '32px',
-                          background: 'white',
-                          border: '1px solid #e8e8ed',
-                          borderRadius: '18px',
-                          boxShadow: '0 16px 36px rgba(0,0,0,0.16)',
-                          zIndex: 100,
-                          minWidth: '240px',
-                          padding: '8px',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: '4px'
-                        }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 8px', borderBottom: '1px solid #f1f5f9', marginBottom: '4px' }}>
-                            <span style={{ fontSize: '0.7rem', fontWeight: 900, color: '#64748b', textTransform: 'uppercase' }}>Aus Mediathek wählen</span>
-                            <button
-                              type="button"
-                              onClick={(e) => { e.stopPropagation(); setShowAssignDropdown(false); }}
-                              style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '2px' }}
-                            >
-                              <X size={13} />
-                            </button>
-                          </div>
-                          {globalLehrwerke
-                            .filter(g => {
-                              const isAssignedById = assignedLehrwerke.some(a => String(a.lehrwerkId) === String(g.id));
-                              const isAssignedByTitle = assignedLehrwerke.some(a => (a.bookTitle || a.lehrwerkTitle || '').trim().toLowerCase() === (g.title || '').trim().toLowerCase());
-                              return !isAssignedById && !isAssignedByTitle;
-                            })
-                            .filter((g, idx, arr) => arr.findIndex(x => (x.title || '').trim().toLowerCase() === (g.title || '').trim().toLowerCase()) === idx)
-                            .map(g => (
-                              <button
-                                key={g.id}
-                                type="button"
-                                onClick={() => {
-                                  handleAssignLehrwerk(g.id);
-                                  setShowAssignDropdown(false);
-                                }}
-                                style={{
-                                  border: 'none',
-                                  background: 'transparent',
-                                  padding: '8px 10px',
-                                  borderRadius: '10px',
-                                  fontSize: '0.78rem',
-                                  fontWeight: 700,
-                                  textAlign: 'left',
-                                  cursor: 'pointer',
-                                  color: '#000',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '8px',
-                                  transition: 'background 0.2s'
-                                }}
-                                onMouseEnter={(e) => e.currentTarget.style.background = '#f3f3f6'}
-                                onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
-                              >
-                                {(() => {
-                                  const bookColor = getLehrwerkColor(g.title);
-                                  return (
-                                    <div style={{
-                                      width: '18px',
-                                      height: '24px',
-                                      background: `linear-gradient(135deg, ${bookColor.from}, ${bookColor.to})`,
-                                      borderRadius: '3px',
-                                      boxShadow: '0 2px 4px rgba(0,0,0,0.12)',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                      flexShrink: 0
-                                    }}>
-                                      <BookOpen size={9} color={bookColor.text} />
-                                    </div>
-                                  );
-                                })()}
-                                <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{g.title}</span>
-                              </button>
-                            ))
-                          }
-                          {globalLehrwerke.filter(g => {
-                            const isAssignedById = assignedLehrwerke.some(a => String(a.lehrwerkId) === String(g.id));
-                            const isAssignedByTitle = assignedLehrwerke.some(a => (a.bookTitle || a.lehrwerkTitle || '').trim().toLowerCase() === (g.title || '').trim().toLowerCase());
-                            return !isAssignedById && !isAssignedByTitle;
-                          }).length === 0 && (
-                            <span style={{ fontSize: '0.72rem', color: '#7d7d82', padding: '6px 8px', textAlign: 'center', fontStyle: 'italic' }}>
-                              Alle Mediathek-Bücher zugewiesen
-                            </span>
-                          )}
-                          <div style={{ borderTop: '1px solid #e8e8ed', margin: '4px 0' }} />
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setShowCreateLehrwerkModal(true);
-                              setShowAssignDropdown(false);
-                            }}
-                            style={{
-                              border: 'none',
-                              background: '#34a853',
-                              color: 'white',
-                              padding: '8px 12px',
-                              borderRadius: '10px',
-                              fontSize: '0.75rem',
-                              fontWeight: 800,
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              gap: '6px',
-                              boxShadow: '0 2px 6px rgba(52, 168, 83, 0.2)'
-                            }}
-                            className="hover-scale-mini"
-                          >
-                            <Plus size={14} /> Eigenes Lehrwerk neu anlegen
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {showCreateLehrwerkModal && (
-                    <form onSubmit={handleCreateAndAssignLehrwerk} style={{
-                      background: '#f8fafc',
-                      border: '1.5px solid #e2e8f0',
-                      borderRadius: '16px',
-                      padding: '12px',
-                      marginBottom: '12px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '8px',
-                      boxShadow: '0 4px 14px rgba(0,0,0,0.04)'
-                    }} className="animation-slide-up">
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <div style={{ fontSize: '0.74rem', fontWeight: 900, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <BookOpen size={13} style={{ color: '#34a853' }} />
-                          <span>Eigenes Lehrwerk erstellen</span>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => setShowCreateLehrwerkModal(false)}
-                          style={{ background: 'transparent', border: 'none', color: '#64748b', cursor: 'pointer', padding: '2px' }}
-                        >
-                          <X size={13} />
-                        </button>
-                      </div>
-                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                        <input
-                          type="text"
-                          placeholder="Buchtitel (z.B. Mein Gitarrenbuch 2026)..."
-                          value={newLehrwerkTitle}
-                          onChange={(e) => setNewLehrwerkTitle(e.target.value)}
-                          style={{
-                            flex: 2,
-                            minWidth: '160px',
-                            padding: '6px 10px',
-                            borderRadius: '8px',
-                            border: '1px solid #cbd5e1',
-                            fontSize: '0.78rem',
-                            fontWeight: 600,
-                            outline: 'none'
-                          }}
-                          autoFocus
-                        />
-                        <input
-                          type="number"
-                          placeholder="Seiten (z.B. 50)"
-                          value={newLehrwerkPages}
-                          onChange={(e) => setNewLehrwerkPages(e.target.value)}
-                          style={{
-                            width: '80px',
-                            padding: '6px 10px',
-                            borderRadius: '8px',
-                            border: '1px solid #cbd5e1',
-                            fontSize: '0.78rem',
-                            fontWeight: 600,
-                            outline: 'none'
-                          }}
-                          min="1"
-                          max="500"
-                        />
-                        <button
-                          type="submit"
-                          disabled={newLehrwerkLoading || !newLehrwerkTitle.trim()}
-                          style={{
-                            background: '#34a853',
-                            color: 'white',
-                            border: 'none',
-                            padding: '6px 12px',
-                            borderRadius: '8px',
-                            fontSize: '0.75rem',
-                            fontWeight: 800,
-                            cursor: newLehrwerkTitle.trim() ? 'pointer' : 'not-allowed',
-                            opacity: newLehrwerkTitle.trim() ? 1 : 0.6,
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '4px'
-                          }}
-                        >
-                          {newLehrwerkLoading ? 'Erstelle...' : 'Speichern & Aktivieren'}
-                        </button>
-                      </div>
-                    </form>
-                  )}
-
-                  {/* Horizontal Scroll-Container - Kompakt & Minimalistisch */}
-                  <div 
-                    className="custom-horizontal-scrollbar"
-                    style={{
-                      display: 'flex',
-                      flexDirection: 'row',
-                      gap: '10px',
-                      overflowX: 'auto',
-                      paddingBottom: '8px',
-                      scrollSnapType: 'x mandatory',
-                      WebkitOverflowScrolling: 'touch',
-                      scrollbarWidth: 'thin',
-                      scrollbarColor: '#cbd5e1 #f8fafc'
-                    }}
-                  >
-                    {/* 1. Kompakte Quick-Add Card GANZ VORNE (LINKS) */}
-                    <div
-                      onClick={() => setShowAssignDropdown(!showAssignDropdown)}
-                      style={{
-                        flex: '0 0 auto',
-                        width: sortedAssignedLehrwerke.length === 0 ? '140px' : '122px',
-                        scrollSnapAlign: 'start',
-                        background: 'rgba(248, 250, 252, 0.7)',
-                        borderRadius: '18px',
-                        border: '1.5px dashed #cbd5e1',
-                        padding: '12px 8px',
-                        minHeight: '154px',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '8px',
-                        textAlign: 'center',
-                        transition: 'all 0.2s',
-                        boxSizing: 'border-box'
-                      }}
-                      className="hover-scale"
-                    >
-                      <div style={{
-                        width: '38px',
-                        height: '38px',
-                        borderRadius: '50%',
-                        background: '#ffffff',
-                        border: '1.5px solid #e2e8f0',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: '#34a853',
-                        boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
-                      }}>
-                        <Plus size={18} strokeWidth={2.5} />
-                      </div>
-                      <div>
-                        <div style={{ fontSize: '0.80rem', fontWeight: 900, color: '#0f172a' }}>Lehrwerk</div>
-                        <div style={{ fontSize: '0.67rem', fontWeight: 700, color: '#64748b', marginTop: '1px' }}>+ Hinzufügen</div>
-                      </div>
-                    </div>
-
-                    {sortedAssignedLehrwerke.map(assigned => {
-                      const book = globalLehrwerke.find(g => g.id === assigned.lehrwerkId) || {
-                        title: assigned.bookTitle || assigned.lehrwerkTitle || 'Lehrwerk',
-                        emoji: '📚',
-                        totalPages: assigned.totalPages || 50
-                      };
-                      const bookColor = getLehrwerkColor(book.title);
-                      const total = book.totalPages || 50;
-                      const worked = Object.values(assigned.pageStates || {}).filter((p: any) => p.status === 'mastered').length;
-                      const pct = Math.min(100, Math.round((worked / total) * 100));
-                      const isSelected = activeLehrwerkId === assigned.lehrwerkId && activeSubView === 'lehrwerk';
-
-                      return (
-                        <div
-                          key={assigned.lehrwerkId}
-                          onClick={() => selectTextbookPage(assigned.lehrwerkId, activePageNumber || 1)}
-                          style={{
-                            flex: '0 0 auto',
-                            width: '136px',
-                            scrollSnapAlign: 'start',
-                            background: '#ffffff',
-                            borderRadius: '18px',
-                            border: isSelected ? '2px solid #34a853' : '1px solid #e8e8ed',
-                            boxShadow: isSelected ? '0 6px 18px rgba(52, 168, 83, 0.16)' : '0 2px 8px rgba(0,0,0,0.03)',
-                            padding: '10px',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            justifyContent: 'space-between',
-                            gap: '8px',
-                            position: 'relative',
-                            transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
-                            boxSizing: 'border-box'
-                          }}
-                          className="hover-scale"
-                        >
-                          {/* Book Showcase Area with realistic 3D portrait book */}
-                          <div style={{
-                            width: '100%',
-                            height: '96px',
-                            background: 'linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%)',
-                            borderRadius: '12px',
-                            position: 'relative',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            overflow: 'hidden'
-                          }}>
-                            {/* Realistic Portrait Book */}
-                            <div style={{
-                              width: '58px',
-                              height: '78px',
-                              background: `linear-gradient(135deg, ${bookColor.from} 0%, ${bookColor.to} 100%)`,
-                              borderRadius: '4px 7px 7px 4px',
-                              boxShadow: '2px 4px 12px rgba(0,0,0,0.16), inset -1.5px 0 3px rgba(0,0,0,0.08)',
-                              position: 'relative',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              gap: '5px',
-                              padding: '5px'
-                            }}>
-                              {/* Spine groove on left */}
-                              <div style={{
-                                position: 'absolute',
-                                left: 0,
-                                top: 0,
-                                bottom: 0,
-                                width: '5px',
-                                background: 'rgba(0,0,0,0.18)',
-                                borderRight: '1px solid rgba(255,255,255,0.25)',
-                                borderRadius: '4px 0 0 4px'
-                              }} />
-
-                              {/* Realistic page edges on right */}
-                              <div style={{
-                                position: 'absolute',
-                                right: '-2.5px',
-                                top: '2.5px',
-                                bottom: '2.5px',
-                                width: '2.5px',
-                                background: '#ffffff',
-                                border: '1px solid #cbd5e1',
-                                borderRadius: '0 1.5px 1.5px 0'
-                              }} />
-
-                              {/* Book Icon Capsule */}
-                              <div style={{
-                                width: '26px',
-                                height: '26px',
-                                borderRadius: '50%',
-                                background: 'rgba(255, 255, 255, 0.25)',
-                                backdropFilter: 'blur(4px)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                boxShadow: '0 1px 4px rgba(0,0,0,0.08)'
-                              }}>
-                                <BookOpen size={13} color={bookColor.text || '#ffffff'} />
-                              </div>
-
-                              {/* Mini Book Title on Cover */}
-                              <span style={{
-                                fontSize: '0.56rem',
-                                fontWeight: 900,
-                                color: bookColor.text || '#ffffff',
-                                textAlign: 'center',
-                                lineHeight: 1.15,
-                                display: '-webkit-box',
-                                WebkitLineClamp: 2,
-                                WebkitBoxOrient: 'vertical',
-                                overflow: 'hidden',
-                                textShadow: '0 1px 2px rgba(0,0,0,0.15)'
-                              }}>
-                                {book.title}
-                              </span>
-                            </div>
-
-                            {/* Top-Right Pill: % gemeistert */}
-                            <div style={{
-                              position: 'absolute',
-                              top: '5px',
-                              right: '5px',
-                              background: pct > 0 ? '#34a853' : 'rgba(0,0,0,0.4)',
-                              backdropFilter: 'blur(6px)',
-                              color: '#ffffff',
-                              fontSize: '0.60rem',
-                              fontWeight: 900,
-                              padding: '2px 6px',
-                              borderRadius: '100px',
-                              boxShadow: '0 1px 4px rgba(0,0,0,0.15)',
-                              zIndex: 5
-                            }}>
-                              {pct}%
-                            </div>
-
-                            {/* Delete Button top left if removable */}
-                            {(!readOnly || assigned.lehrwerkId?.startsWith('custom-') || book.is_custom || assigned.isStudentCreated) && (
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleRemoveLehrwerk(assigned.lehrwerkId, e);
-                                }}
-                                style={{
-                                  position: 'absolute',
-                                  top: '5px',
-                                  left: '5px',
-                                  background: 'rgba(255, 255, 255, 0.92)',
-                                  border: 'none',
-                                  color: '#ef4444',
-                                  cursor: 'pointer',
-                                  width: '20px',
-                                  height: '20px',
-                                  borderRadius: '50%',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  boxShadow: '0 1px 4px rgba(0,0,0,0.12)',
-                                  transition: 'all 0.2s',
-                                  zIndex: 10
-                                }}
-                                title="Lehrwerk entfernen"
-                              >
-                                <X size={11} strokeWidth={2.5} />
-                              </button>
-                            )}
-                          </div>
-
-                          {/* Card Info Below */}
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                            <h4 style={{
-                              margin: 0,
-                              fontSize: '0.82rem',
-                              fontWeight: 900,
-                              color: '#0f172a',
-                              whiteSpace: 'nowrap',
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              fontFamily: "'Plus Jakarta Sans', sans-serif"
-                            }}>
-                              {book.title}
-                            </h4>
-
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.67rem', color: '#64748b', fontWeight: 700 }}>
-                              <span>{total} S.</span>
-                              <span style={{ color: worked > 0 ? '#34a853' : '#94a3b8', fontWeight: 800 }}>{worked} gem.</span>
-                            </div>
-
-                            {/* Subtle Progress Bar */}
-                            <div style={{ width: '100%', height: '3.5px', background: '#f1f5f9', borderRadius: '2px', overflow: 'hidden', marginTop: '3px' }}>
-                              <div style={{ width: `${pct}%`, height: '100%', background: '#34a853', transition: 'width 0.3s ease' }} />
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <div style={{ borderTop: '1px solid #f1f5f9', margin: '2px 0' }} />
-                
-                {/* 2. AKTIVE SONG-PROJEKTE (Nimmt ca. 2/3 des Raums ein, sortiert nach Fortschritt absteigend) */}
-                <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-                  {/* Header Row mit Quick-Add Button */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', position: 'relative' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <Music size={16} style={{ color: '#000' }} />
-                      <h3 style={{ margin: 0, fontSize: '0.94rem', fontWeight: 900, color: '#000', letterSpacing: '-0.02em', textTransform: 'uppercase' }}>
-                        Aktive Song-Projekte
-                      </h3>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => setShowCreateSongModal(!showCreateSongModal)}
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '5px',
-                        background: '#f0fdf4',
-                        border: '1.5px solid #bbf7d0',
-                        color: '#15803d',
-                        padding: '4px 10px',
-                        borderRadius: '100px',
-                        fontSize: '0.72rem',
-                        fontWeight: 800,
-                        cursor: 'pointer',
-                        transition: 'all 0.15s ease'
-                      }}
-                      className="hover-scale"
-                    >
-                      <Plus size={12} strokeWidth={3} />
-                      <span>Song anlegen</span>
-                    </button>
-                  </div>
-
-                  {(() => {
-                      const activeSongsRaw = (activeSongSkills || []).filter(skill =>
-                        !skill.is_stage_ready && (skill.progress_percent || 0) < 100 && skill.status !== 'MASTERED'
-                      );
-
-                      // Deduplicate active songs so each unique song is only listed once
-                      const uniqueActiveMap = new Map<string, any>();
-                      activeSongsRaw.forEach(skill => {
-                        const key = String(skill.song_id || skill.songs?.id || skill.songs?.title || skill.title || skill.id);
-                        const existing = uniqueActiveMap.get(key);
-                        if (!existing || (skill.progress_percent || 0) > (existing.progress_percent || 0)) {
-                          uniqueActiveMap.set(key, skill);
-                        }
-                      });
-
-                      // Sortierung: Höchster prozentualer Fortschritt oben, niedrigster unten
-                      const activeSongs = Array.from(uniqueActiveMap.values()).sort((a, b) => {
-                        const pA = a.is_stage_ready ? 100 : (a.progress_percent || 0);
-                        const pB = b.is_stage_ready ? 100 : (b.progress_percent || 0);
-                        if (pB !== pA) return pB - pA;
-                        const titleA = (a.songs?.title || a.title || a.song_title || '').toLowerCase();
-                        const titleB = (b.songs?.title || b.title || b.song_title || '').toLowerCase();
-                        return titleA.localeCompare(titleB);
-                      });
-
-                      if (activeSongs.length === 0) {
-                        return (
-                          <div
-                            onClick={() => setShowCreateSongModal(true)}
-                            style={{
-                              background: 'rgba(248, 250, 252, 0.7)',
-                              borderRadius: '16px',
-                              border: '2px dashed #cbd5e1',
-                              padding: '20px 16px',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              gap: '6px',
-                              textAlign: 'center',
-                              transition: 'all 0.2s',
-                              flex: 1
-                            }}
-                            className="hover-scale"
-                          >
-                            <div style={{
-                              width: '34px',
-                              height: '34px',
-                              borderRadius: '50%',
-                              background: '#ffffff',
-                              border: '1.5px solid #e2e8f0',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              color: '#34a853',
-                              boxShadow: '0 2px 6px rgba(0,0,0,0.04)'
-                            }}>
-                              <Plus size={16} strokeWidth={2.5} />
-                            </div>
-                            <div>
-                              <div style={{ fontSize: '0.80rem', fontWeight: 900, color: '#0f172a' }}>Noch kein aktives Song-Projekt</div>
-                              <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#64748b', marginTop: '2px' }}>+ Klicke hier, um deinen ersten Song anzulegen</div>
-                            </div>
-                          </div>
-                        );
-                      }
-
-                      return (
-                        <div style={{
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: '6px',
-                          flex: 1,
-                          overflowY: 'auto',
-                          paddingRight: '2px'
-                        }}>
-                          {activeSongs.map(skill => {
-                            const progress = skill.is_stage_ready ? 100 : (skill.progress_percent || 0);
-                            const songTitle = skill.songs?.title || skill.title || skill.song_title || 'Unbenannter Song';
-                            const songArtist = skill.songs?.artist || skill.artist || 'Song-Projekt';
-                            const songColor = getSongColor(songTitle);
-                            const isSelected = selectedActiveSongId === skill.id && activeSubView === 'song';
-
-                            return (
-                              <div
-                                key={skill.id}
-                                onClick={() => selectActiveSong(skill)}
-                                style={{
-                                  background: isSelected ? 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)' : '#ffffff',
-                                  borderRadius: '14px',
-                                  border: isSelected ? '1.5px solid #34a853' : '1px solid #e8e8ed',
-                                  boxShadow: isSelected ? '0 4px 14px rgba(52, 168, 83, 0.15)' : '0 2px 6px rgba(0,0,0,0.02)',
-                                  padding: '8px 12px',
-                                  cursor: 'pointer',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'space-between',
-                                  gap: '12px',
-                                  transition: 'all 0.16s ease'
-                                }}
-                                className="hover-scale"
-                              >
-                                {/* Left: Miniatur Cover & Typography */}
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
-                                  {/* 34x34 Miniatur Vinyl/Album Icon */}
-                                  <div style={{
-                                    width: '34px',
-                                    height: '34px',
-                                    borderRadius: '10px',
-                                    background: `linear-gradient(135deg, ${songColor.from}, ${songColor.to})`,
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    color: songColor.text || '#ffffff',
-                                    flexShrink: 0,
-                                    boxShadow: '0 2px 6px rgba(0,0,0,0.12)'
-                                  }}>
-                                    <Music size={15} strokeWidth={2.4} />
-                                  </div>
-
-                                  <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1 }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                      <span style={{
-                                        fontSize: '0.84rem',
-                                        fontWeight: 900,
-                                        color: '#0f172a',
-                                        whiteSpace: 'nowrap',
-                                        overflow: 'hidden',
-                                        textOverflow: 'ellipsis'
-                                      }}>
-                                        {songTitle}
-                                      </span>
-                                      {skill.songs?.teacher_id || skill.created_by_teacher ? (
-                                        <span style={{
-                                          fontSize: '0.58rem',
-                                          fontWeight: 850,
-                                          color: '#15803d',
-                                          background: '#dcfce7',
-                                          padding: '1px 5px',
-                                          borderRadius: '4px',
-                                          flexShrink: 0
-                                        }}>
-                                          Lehrer
-                                        </span>
-                                      ) : null}
-                                    </div>
-                                    <span style={{
-                                      fontSize: '0.68rem',
-                                      color: '#64748b',
-                                      fontWeight: 650,
-                                      whiteSpace: 'nowrap',
-                                      overflow: 'hidden',
-                                      textOverflow: 'ellipsis'
-                                    }}>
-                                      {songArtist}
-                                    </span>
-                                  </div>
-                                </div>
-
-                                {/* Right: Progress Pill & Delete Button */}
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-                                  {progressItems.some(item => isSongMatch(item, skill) && item.is_current_homework) && (
-                                    <span style={{
-                                      fontSize: '0.62rem',
-                                      fontWeight: 850,
-                                      color: '#b45309',
-                                      background: '#fef3c7',
-                                      border: '1px solid #fde68a',
-                                      padding: '2px 7px',
-                                      borderRadius: '6px',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      gap: '3px'
-                                    }}>
-                                      <span>📌</span>
-                                      <span>Hausaufgabe</span>
-                                    </span>
-                                  )}
-
-                                  <div style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '4px',
-                                    background: progress >= 100 ? '#dcfce7' : '#f1f5f9',
-                                    color: progress >= 100 ? '#15803d' : '#475569',
-                                    padding: '2px 8px',
-                                    borderRadius: '100px',
-                                    fontSize: '0.68rem',
-                                    fontWeight: 900,
-                                    border: progress >= 100 ? '1px solid #bbf7d0' : '1px solid #e2e8f0'
-                                  }}>
-                                    <span>{progress}%</span>
-                                  </div>
-
-                                  {!readOnly && (skill.songs?.teacher_id || skill.created_by_teacher) && (
-                                    <button
-                                      type="button"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleRemoveSong(skill.id, e);
-                                      }}
-                                      style={{
-                                        background: 'none',
-                                        border: 'none',
-                                        color: '#94a3b8',
-                                        cursor: 'pointer',
-                                        padding: '3px',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        borderRadius: '50%'
-                                      }}
-                                      className="hover-scale"
-                                      title="Song entfernen"
-                                    >
-                                      <X size={13} />
-                                    </button>
-                                  )}
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      );
-                    })()}
-                </div>
-
-                {/* SaaS Enterprise+ Song Selection & Creation Modal */}
-                {showCreateSongModal && (
-                  <div style={{
-                    position: 'fixed',
-                    top: 0, left: 0, right: 0, bottom: 0,
-                    background: 'rgba(15, 23, 42, 0.55)',
-                    backdropFilter: 'blur(8px)',
-                    zIndex: 1000,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    padding: '20px'
-                  }} onClick={() => setShowCreateSongModal(false)}>
-                    <div style={{
-                      background: '#ffffff',
-                      borderRadius: '24px',
-                      boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.3)',
-                      border: '1px solid rgba(0,0,0,0.08)',
-                      width: '100%',
-                      maxWidth: '480px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      overflow: 'hidden'
-                    }} onClick={(e) => e.stopPropagation()}>
-                      
-                      {/* Modal Header */}
-                      <div style={{
-                        padding: '18px 24px',
-                        borderBottom: '1px solid #f1f5f9',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        background: '#fafafa'
-                      }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          <div style={{
-                            width: '36px',
-                            height: '36px',
-                            borderRadius: '10px',
-                            background: 'rgba(52, 168, 83, 0.1)',
-                            color: '#34a853',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center'
-                          }}>
-                            <Music size={18} />
-                          </div>
-                          <div>
-                            <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 900, color: '#0f172a' }}>Song hinzufügen</h3>
-                            <p style={{ margin: 0, fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>Aus Schulkatalog wählen oder eigenen Song anlegen</p>
-                          </div>
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={() => setShowCreateSongModal(false)}
-                          style={{
-                            background: '#f1f5f9',
-                            border: 'none',
-                            borderRadius: '50%',
-                            width: '32px',
-                            height: '32px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            cursor: 'pointer',
-                            color: '#64748b'
-                          }}
-                        >
-                          <X size={16} />
-                        </button>
-                      </div>
-
-                      {/* Segmented Control / Tabs */}
-                      <div style={{ padding: '16px 24px 8px 24px' }}>
-                        <div style={{
-                          background: '#f1f5f9',
-                          borderRadius: '14px',
-                          padding: '4px',
-                          display: 'grid',
-                          gridTemplateColumns: '1fr 1fr',
-                          gap: '4px'
-                        }}>
-                          <button
-                            type="button"
-                            onClick={() => setSongModalTab('catalog')}
-                            style={{
-                              border: 'none',
-                              padding: '8px 12px',
-                              borderRadius: '10px',
-                              fontSize: '0.78rem',
-                              fontWeight: 850,
-                              cursor: 'pointer',
-                              background: songModalTab === 'catalog' ? '#ffffff' : 'transparent',
-                              color: songModalTab === 'catalog' ? '#0f172a' : '#64748b',
-                              boxShadow: songModalTab === 'catalog' ? '0 2px 8px rgba(0,0,0,0.06)' : 'none',
-                              transition: 'all 0.15s ease'
-                            }}
-                          >
-                            📚 Schulkatalog
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setSongModalTab('create')}
-                            style={{
-                              border: 'none',
-                              padding: '8px 12px',
-                              borderRadius: '10px',
-                              fontSize: '0.78rem',
-                              fontWeight: 850,
-                              cursor: 'pointer',
-                              background: songModalTab === 'create' ? '#ffffff' : 'transparent',
-                              color: songModalTab === 'create' ? '#0f172a' : '#64748b',
-                              boxShadow: songModalTab === 'create' ? '0 2px 8px rgba(0,0,0,0.06)' : 'none',
-                              transition: 'all 0.15s ease'
-                            }}
-                          >
-                            ✨ Neu erstellen
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Modal Body */}
-                      <div style={{ padding: '12px 24px 24px 24px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                        {songModalTab === 'catalog' ? (
-                          <>
-                            <div style={{ position: 'relative' }}>
-                              <Search size={16} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '12px' }} />
-                              <input
-                                type="text"
-                                placeholder="Song oder Künstler suchen..."
-                                value={songSearch}
-                                onChange={(e) => setSongSearch(e.target.value)}
-                                style={{
-                                  width: '100%',
-                                  padding: '10px 14px 10px 36px',
-                                  borderRadius: '12px',
-                                  border: '1.5px solid #e2e8f0',
-                                  fontSize: '0.85rem',
-                                  fontWeight: 600,
-                                  outline: 'none',
-                                  background: '#f8fafc',
-                                  boxSizing: 'border-box'
-                                }}
-                                autoFocus
-                              />
-                            </div>
-
-                            <div style={{
-                              maxHeight: '260px',
-                              overflowY: 'auto',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              gap: '6px',
-                              paddingRight: '4px'
-                            }}>
-                              {(() => {
-                                const filtered = songs.filter(s => {
-                                  const t = (s.title || '').toLowerCase().trim();
-                                  if (t === 'test' || t === 'test - test' || t === 'test-test') return false;
-                                  if (!songSearch.trim()) return true;
-                                  return (s.title || '').toLowerCase().includes(songSearch.toLowerCase()) || 
-                                         (s.artist || '').toLowerCase().includes(songSearch.toLowerCase());
-                                });
-
-                                if (filtered.length === 0) {
-                                  return (
-                                    <div style={{ padding: '30px 16px', textAlign: 'center', color: '#94a3b8', fontSize: '0.82rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
-                                      <span>Kein passender Song im Katalog gefunden.</span>
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          setNewSongTitle(songSearch);
-                                          setSongModalTab('create');
-                                        }}
-                                        style={{
-                                          background: '#e6f4ea',
-                                          color: '#34a853',
-                                          border: 'none',
-                                          padding: '6px 14px',
-                                          borderRadius: '10px',
-                                          fontSize: '0.75rem',
-                                          fontWeight: 850,
-                                          cursor: 'pointer'
-                                        }}
-                                      >
-                                        ✨ "{songSearch}" als neuen Song anlegen
-                                      </button>
-                                    </div>
-                                  );
-                                }
-
-                                return filtered.map((song) => (
-                                  <div
-                                    key={song.id}
-                                    onClick={() => {
-                                      handleAssignSongFromCatalog(song.id);
-                                      setShowCreateSongModal(false);
-                                      setSongSearch('');
-                                    }}
-                                    style={{
-                                      padding: '10px 14px',
-                                      borderRadius: '14px',
-                                      border: '1.5px solid #f1f5f9',
-                                      background: '#ffffff',
-                                      cursor: 'pointer',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'space-between',
-                                      transition: 'all 0.15s ease'
-                                    }}
-                                    className="hover-scale"
-                                  >
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                      <div style={{
-                                        width: '32px',
-                                        height: '32px',
-                                        borderRadius: '8px',
-                                        background: 'linear-gradient(135deg, #e2e8f0 0%, #cbd5e1 100%)',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        flexShrink: 0
-                                      }}>
-                                        <Music size={14} color="#475569" />
-                                      </div>
-                                      <div>
-                                        <div style={{ fontWeight: 900, fontSize: '0.85rem', color: '#0f172a' }}>{song.title}</div>
-                                        <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 650 }}>{song.artist || 'Unbekannter Künstler'}</div>
-                                      </div>
-                                    </div>
-
-                                    <button
-                                      type="button"
-                                      style={{
-                                        background: '#34a853',
-                                        color: 'white',
-                                        border: 'none',
-                                        padding: '6px 12px',
-                                        borderRadius: '10px',
-                                        fontSize: '0.72rem',
-                                        fontWeight: 900,
-                                        cursor: 'pointer'
-                                      }}
-                                    >
-                                      + Hinzufügen
-                                    </button>
-                                  </div>
-                                ));
-                              })()}
-                            </div>
-                          </>
-                        ) : (
-                          <form onSubmit={(e) => {
-                            handleCreateAndAssignSong(e);
-                            setShowCreateSongModal(false);
-                          }} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                              <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#334155' }}>Songtitel</label>
-                              <input
-                                type="text"
-                                placeholder="z. B. Wonderwall..."
-                                value={newSongTitle}
-                                onChange={(e) => setNewSongTitle(e.target.value)}
-                                style={{
-                                  width: '100%',
-                                  padding: '10px 14px',
-                                  borderRadius: '12px',
-                                  border: '1.5px solid #e2e8f0',
-                                  fontSize: '0.85rem',
-                                  fontWeight: 600,
-                                  outline: 'none',
-                                  background: '#f8fafc',
-                                  boxSizing: 'border-box'
-                                }}
-                                required
-                                autoFocus
-                              />
-                            </div>
-
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                              <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#334155' }}>Künstler / Band</label>
-                              <input
-                                type="text"
-                                placeholder="z. B. Oasis..."
-                                value={newSongArtist}
-                                onChange={(e) => setNewSongArtist(e.target.value)}
-                                style={{
-                                  width: '100%',
-                                  padding: '10px 14px',
-                                  borderRadius: '12px',
-                                  border: '1.5px solid #e2e8f0',
-                                  fontSize: '0.85rem',
-                                  fontWeight: 600,
-                                  outline: 'none',
-                                  background: '#f8fafc',
-                                  boxSizing: 'border-box'
-                                }}
-                                required
-                              />
-                            </div>
-
-                            <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
-                              <button
-                                type="button"
-                                onClick={() => setShowCreateSongModal(false)}
-                                style={{
-                                  flex: 1,
-                                  background: '#f1f5f9',
-                                  color: '#64748b',
-                                  border: 'none',
-                                  borderRadius: '12px',
-                                  padding: '10px',
-                                  fontSize: '0.8rem',
-                                  fontWeight: 800,
-                                  cursor: 'pointer'
-                                }}
-                              >
-                                Abbrechen
-                              </button>
-                              <button
-                                type="submit"
-                                style={{
-                                  flex: 2,
-                                  background: '#34a853',
-                                  color: 'white',
-                                  border: 'none',
-                                  borderRadius: '12px',
-                                  padding: '10px',
-                                  fontSize: '0.8rem',
-                                  fontWeight: 900,
-                                  cursor: 'pointer',
-                                  boxShadow: '0 4px 12px rgba(52, 168, 83, 0.25)'
-                                }}
-                              >
-                                ✨ Song erstellen & zuweisen
-                              </button>
-                            </div>
-                          </form>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>{/* close inner scrollable div */}
-
-          {/* Meisterwerke, Sticker-Album & Audio-Biografie Buttons - pinned at bottom (Trophy Dock) */}
-                <div style={{
-                  padding: isMobileOrSim ? '6px 10px calc(8px + env(safe-area-inset-bottom, 0px)) 10px' : '8px 16px 14px 16px',
-                  display: 'flex',
-                  gap: isMobileOrSim ? '6px' : '8px',
-                  borderTop: '1px solid #f1f5f9',
-                  background: '#ffffff',
-                  boxSizing: 'border-box',
-                  width: '100%'
-                }}>
-                  <button
-                    type="button"
-                    onClick={() => setActiveModalTab('logbook')}
-                    style={{
-                      flex: 1,
-                      minWidth: 0,
-                      padding: isMobileOrSim ? '8px 4px' : '10px 6px',
-                      borderRadius: '12px',
-                      border: 'none',
-                      background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
-                      color: 'white',
-                      fontWeight: 800,
-                      fontSize: isMobileOrSim ? '0.72rem' : '0.76rem',
-                      cursor: 'pointer',
-                      boxShadow: '0 3px 8px rgba(99, 102, 241, 0.25)',
-                      transition: 'all 0.15s ease',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: isMobileOrSim ? '4px' : '5px'
-                    }}
-                    className="hover-scale"
-                    title={isMobileOrSim ? 'Deine Meisterwerke' : undefined}
-                  >
-                    <Award size={isMobileOrSim ? 13 : 14} />
-                    <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {isMobileOrSim ? 'Meisterwerke' : 'Deine Meisterwerke'}
-                    </span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { setActiveModalTab('stickeralbum'); setActiveSubView('hub'); }}
-                    style={{
-                      flex: 1,
-                      minWidth: 0,
-                      padding: isMobileOrSim ? '8px 4px' : '10px 6px',
-                      borderRadius: '12px',
-                      border: 'none',
-                      background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-                      color: 'white',
-                      fontWeight: 800,
-                      fontSize: isMobileOrSim ? '0.72rem' : '0.76rem',
-                      cursor: 'pointer',
-                      boxShadow: '0 3px 8px rgba(217, 119, 6, 0.25)',
-                      transition: 'all 0.15s ease',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: isMobileOrSim ? '4px' : '5px'
-                    }}
-                    className="hover-scale"
-                    title={readOnly ? (isMobileOrSim ? 'Sticker-Album' : undefined) : (isMobileOrSim ? (uiLevel === 'junior' ? 'Sticker-Album' : uiLevel === 'teen' ? 'Badges & Trophäen' : 'Meilensteine') : undefined)}
-                  >
-                    <Star size={isMobileOrSim ? 13 : 14} fill="#fff" />
-                    <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {readOnly
-                        ? (isMobileOrSim ? 'Sticker' : 'Sticker-Album')
-                        : (isMobileOrSim 
-                            ? (uiLevel === 'junior' ? 'Sticker' : uiLevel === 'teen' ? 'Trophäen' : 'Meilensteine')
-                            : (uiLevel === 'junior' ? 'Sticker-Album' : uiLevel === 'teen' ? 'Badges & Trophäen' : 'Meilensteine'))}
-                    </span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { setActiveModalTab('audiobiography'); setActiveSubView('hub'); }}
-                    style={{
-                      flex: 1,
-                      minWidth: 0,
-                      padding: isMobileOrSim ? '8px 4px' : '10px 6px',
-                      borderRadius: '12px',
-                      border: 'none',
-                      background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)',
-                      color: 'white',
-                      fontWeight: 800,
-                      fontSize: isMobileOrSim ? '0.72rem' : '0.76rem',
-                      cursor: 'pointer',
-                      boxShadow: '0 3px 8px rgba(16, 185, 129, 0.25)',
-                      transition: 'all 0.15s ease',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: isMobileOrSim ? '4px' : '5px'
-                    }}
-                    className="hover-scale"
-                    title={isMobileOrSim ? 'Audio-Biografie (Tresor)' : undefined}
-                  >
-                    <Disc size={isMobileOrSim ? 13 : 14} />
-                    <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {isMobileOrSim ? 'Biografie' : 'Audio-Biografie'}
-                    </span>
-                  </button>
-                </div>
-              </>
-        )}
-      </div>
-
-        {useNotebookLayout && !isMobileView && (
-          <div style={{
-            width: '6px',
-            background: '#18181b',
-            position: 'relative',
-            zIndex: 30,
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'space-around',
-            alignItems: 'center',
-            padding: '20px 0',
-            alignSelf: 'stretch'
-          }}>
-            {Array.from({ length: 6 }).map((_, idx) => (
-              <div key={idx} style={{ position: 'relative', width: '100%', display: 'flex', justifyContent: 'center' }}>
-                <div style={{
-                  width: '40px',
-                  height: '4px',
-                  borderRadius: '2px',
-                  background: 'linear-gradient(180deg, #ffd54f 0%, #ff9100 100%)',
-                  boxShadow: '0 1px 2px rgba(0,0,0,0.25)',
-                  zIndex: 35,
-                  position: 'absolute',
-                  left: '-17px'
-                }} />
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* COLUMN 3: ✍️ DOKUMENTATION & HAUSAUFGABE (32%) */}
-          
-          <div style={{
-            flex: isMobileView ? 'none' : '1 1 0%',
-            width: 'auto',
-            maxWidth: 'none',
-            margin: '0',
-            height: isMobileView ? 'auto' : '100%',
-            minHeight: '0',
-            maxHeight: isMobileView ? 'none' : '100%',
-            padding: useNotebookLayout ? (isMobileView ? '16px 16px calc(280px + env(safe-area-inset-bottom, 40px)) 16px' : '24px 24px 24px 60px') : (isMobileView ? '16px 16px calc(280px + env(safe-area-inset-bottom, 40px)) 16px' : '24px'),
-            overflowY: isMobileView ? 'visible' : 'auto',
-            display: isMobileView ? (mobileProtokollTab === 'homework' ? 'flex' : 'none') : 'flex',
-            flexDirection: 'column',
-            justifyContent: 'flex-start',
-            gap: '20px',
-            background: useNotebookLayout ? 'white' : '#f8fafc',
-            backgroundImage: useNotebookLayout ? 'repeating-linear-gradient(white, white 27px, #e5e0d4 27px, #e5e0d4 28px)' : 'none',
-            borderLeft: useNotebookLayout ? 'none' : '1px solid #e4e4e7',
-            borderRadius: '0',
-            boxShadow: 'none',
-            position: 'relative',
-            boxSizing: 'border-box'
-          }}>
-            {useNotebookLayout && !isMobileView && (
-              <div style={{
-                position: 'absolute',
-                top: 0,
-                bottom: 0,
-                left: '42px',
-                width: '2px',
-                background: '#fca5a5',
-                zIndex: 10
-              }} />
-            )}
-            {useNotebookLayout && (
-              <div style={{
-                position: 'absolute',
-                top: '20px',
-                bottom: '20px',
-                left: '8px',
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'space-around',
-                zIndex: 25
-              }}>
-                {Array.from({ length: 6 }).map((_, idx) => (
-                  <div key={idx} style={{
-                    width: '8px',
-                    height: '8px',
-                    borderRadius: '50%',
-                    background: '#121214',
-                    boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.8)'
-                  }} />
-                ))}
-              </div>
-            )}
-
-            {activeSubView === 'history' ? (
-              (() => {
-                if (!selectedHistoryWeek) {
-                  return (
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#64748b', fontSize: '0.86rem', fontStyle: 'italic' }}>
-                      Wähle links eine Unterrichtswoche aus.
-                    </div>
-                  );
-                }
-
-                const weekNum = selectedHistoryWeek.split('-W')[1] || '';
-                const weekItems = progressItems.filter(item => 
-                  item.updated_at && getItemWeek(item) === selectedHistoryWeek
-                );
-
-                // Group page numbers by book title
-                const groupedLehrwerke: Record<string, { pages: number[] }> = {};
-                const otherHWs: any[] = [];
-                const allActive = weekItems.filter(item => 
-                  (item.is_current_homework || item.status === 'THEORY_DONE') && 
-                  !item.topic_name.startsWith('Hausaufgabe KW ')
-                );
-
-                allActive.forEach(item => {
-                  if (item.topic_name.includes(' - Seite ')) {
-                    const parts = item.topic_name.split(' - Seite ');
-                    const bookTitle = parts[0].trim();
-                    const pageNum = parseInt(parts[1], 10);
-                    if (!groupedLehrwerke[bookTitle]) {
-                      groupedLehrwerke[bookTitle] = { pages: [] };
-                    }
-                    if (!isNaN(pageNum) && !groupedLehrwerke[bookTitle].pages.includes(pageNum)) {
-                      groupedLehrwerke[bookTitle].pages.push(pageNum);
-                    }
-                  } else {
-                    otherHWs.push(item);
-                  }
-                });
-
-                // Sort pages for each textbook in ascending order
-                Object.keys(groupedLehrwerke).forEach(title => {
-                  groupedLehrwerke[title].pages.sort((a, b) => a - b);
-                });
-
-                // Extract unique non-empty homework notes
-                const uniqueHomeworkNotes: string[] = [];
-                weekItems.forEach(item => {
-                  if (item.homework_notes && item.homework_notes.trim() !== '') {
-                    try {
-                      const parsed = JSON.parse(item.homework_notes);
-                      if (Array.isArray(parsed)) {
-                        parsed.forEach((n: string) => {
-                          if (n.trim() !== '' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !uniqueHomeworkNotes.includes(n.trim())) {
-                            uniqueHomeworkNotes.push(n.trim());
-                          }
-                        });
-                      } else if (typeof parsed === 'string' && parsed.trim() !== '' && !parsed.startsWith('AUDIO:') && !parsed.startsWith('STICKER:') && !uniqueHomeworkNotes.includes(parsed.trim())) {
-                        uniqueHomeworkNotes.push(parsed.trim());
-                      }
-                    } catch (e) {
-                      const trimmed = item.homework_notes.trim();
-                      if (!trimmed.startsWith('AUDIO:') && !trimmed.startsWith('STICKER:') && !uniqueHomeworkNotes.includes(trimmed)) {
-                        uniqueHomeworkNotes.push(trimmed);
-                      }
-                    }
-                  }
-                });
-
-                // Extract teacher notes
-                const weekTeacherNotes = weekItems
-                  .map(item => item.teacher_notes)
-                  .filter(n => n && n.trim() !== '')
-                  .join('\n\n');
-
-                return (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', animation: 'fadeIn 0.25s ease', height: '100%' }}>
-                    <div>
-                      <span style={{ fontSize: '0.84rem', fontWeight: 900, color: '#09090b', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}><Calendar size={15} style={{ color: '#34a853', verticalAlign: 'middle', marginTop: '-2px' }} /> Details KW {weekNum}</span>
-                      </span>
-                      <p style={{ margin: '3px 0 0 0', fontSize: '0.76rem', color: '#71717a', fontWeight: 550, lineHeight: '1.3' }}>
-                        Hausaufgaben und Notizen aus dieser Woche (Schreibgeschützt).
-                      </p>
-                    </div>
-
-                    <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '16px', paddingRight: '4px' }}>
-                      {/* Active Homework Items Box */}
-                      <div style={{
-                        background: '#fffbeb',
-                        border: '1px solid #fef08a',
-                        borderRadius: '16px',
-                        padding: '14px 16px',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '12px',
-                        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.02)'
-                      }}>
-                        <span style={{ fontSize: '0.84rem', fontWeight: 800, color: '#18181b' }}>
-                          Hausaufgaben KW {weekNum}
-                        </span>
-
-                        {Object.keys(groupedLehrwerke).length === 0 && otherHWs.length === 0 ? (
-                          <span style={{ fontSize: '0.80rem', color: '#71717a', fontStyle: 'italic' }}>
-                            Keine Hausaufgaben erfasst.
-                          </span>
-                        ) : (
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                            {Object.entries(groupedLehrwerke).map(([title, info]) => (
-                              <div key={title} style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                <div style={{ 
-                                  fontSize: '0.96rem', 
-                                  color: '#09090b', 
-                                  fontWeight: 900,
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '6px'
-                                }}>
-                                  {(() => {
-                                    const bookColor = getLehrwerkColor(title);
-                                    return (
-                                      <div style={{
-                                        width: '16px',
-                                        height: '20px',
-                                        background: `linear-gradient(135deg, ${bookColor.from}, ${bookColor.to})`,
-                                        borderRadius: '3px',
-                                        border: 'none',
-                                        position: 'relative',
-                                        flexShrink: 0,
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center'
-                                      }}>
-                                        <BookOpen size={9} color={bookColor.text} />
-                                        <div style={{
-                                          position: 'absolute',
-                                          left: 0,
-                                          top: 0,
-                                          bottom: 0,
-                                          width: '2px',
-                                          background: 'rgba(0,0,0,0.08)',
-                                          borderRight: '1px solid rgba(255,255,255,0.05)'
-                                        }} />
-                                      </div>
-                                    );
-                                  })()}
-                                  <span>{title}</span> · <span style={{ color: '#4b5563', fontWeight: 700 }}>S. {info.pages.join(', ')}</span>
-                                </div>
-                                {(() => {
-                                  const bookObj = globalLehrwerke.find(b => b.title === title);
-                                  const assignedBook = bookObj ? assignedLehrwerke.find(a => a.lehrwerkId === bookObj.id) : null;
-                                  if (!assignedBook) return null;
-                                  
-                                  const pagesWithNotes = info.pages.filter((p: number) => {
-                                    const pState = assignedBook.pageStates?.[p];
-                                    if (pState && getCleanPageNotes(pState.homeworkNotes || pState.homework_notes) !== '') return true;
-                                    
-                                    const dbItem = weekItems.find(x => x.topic_name === `${title} - Seite ${p}`);
-                                    if (dbItem && getCleanPageNotes(dbItem.homework_notes) !== '') return true;
-                                    return false;
-                                  });
-                                  
-                                  if (pagesWithNotes.length === 0) return null;
-                                  
-                                  return (
-                                    <div style={{
-                                      display: 'flex',
-                                      flexDirection: 'column',
-                                      gap: '4px',
-                                      padding: '8px 12px',
-                                      background: '#ffffff',
-                                      border: '1px solid rgba(251, 191, 36, 0.15)',
-                                      borderRadius: '12px',
-                                      marginTop: '6px',
-                                      marginLeft: '22px',
-                                      boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.02)'
-                                    }}>
-                                      {pagesWithNotes.map((p: number) => {
-                                        const pState = assignedBook.pageStates?.[p];
-                                        let noteText = getCleanPageNotes(pState?.homeworkNotes || pState?.homework_notes);
-                                        
-                                        if (!noteText) {
-                                          const dbItem = weekItems.find(x => x.topic_name === `${title} - Seite ${p}`);
-                                          if (dbItem?.homework_notes) {
-                                            noteText = getCleanPageNotes(dbItem.homework_notes);
-                                          }
-                                        }
-                                        
-                                        return (
-                                          <div key={`p-note-${p}`} style={{ display: 'flex', gap: '6px', alignItems: 'flex-start', fontSize: '0.88rem', color: '#1e293b', lineHeight: 1.5 }}>
-                                            <span style={{ fontWeight: 800, color: '#b45309', flexShrink: 0 }}>S. {p}:</span>
-                                            <span style={{ fontWeight: 650, color: '#1e293b' }}>{noteText}</span>
-                                          </div>
-                                        );
-                                      })}
-                                    </div>
-                                  );
-                                })()}
-                              </div>
-                            ))}
-                            {otherHWs.length > 0 && (
-                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', borderTop: '1px solid rgba(251, 191, 36, 0.2)', paddingTop: '8px' }}>
-                                {otherHWs.map((item, idx) => (
-                                  <div key={idx} style={{
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    gap: '5px',
-                                    background: '#ffffff',
-                                    color: '#475569',
-                                    padding: '4px 10px',
-                                    borderRadius: '999px',
-                                    fontSize: '0.82rem',
-                                    fontWeight: 900,
-                                    border: '1px solid rgba(251, 191, 36, 0.3)',
-                                    boxShadow: '0 3px 8px rgba(0,0,0,0.03), 0 0 12px rgba(251, 191, 36, 0.32)'
-                                  }}>
-                                    <span>🎵 {item.topic_name}</span>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Homework notes */}
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                        <label style={{ fontSize: '0.84rem', fontWeight: 800, color: '#1e293b' }}>
-                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}><FileText size={15} style={{ color: '#34a853', verticalAlign: 'middle', marginTop: '-2px' }} /> Hausaufgaben-Bemerkungen</span>
-                        </label>
-                        <div style={{
-                          width: '100%', minHeight: '80px', padding: '12px 14px', borderRadius: '16px',
-                          border: '1px solid #e2e8f0', fontSize: '0.88rem', fontWeight: 550, lineHeight: 1.5, background: '#fafafa', color: '#0f172a',
-                          whiteSpace: 'pre-wrap'
-                        }}>
-                          {uniqueHomeworkNotes.join('\n\n') || 'Keine Bemerkungen hinterlegt.'}
-                        </div>
-                      </div>
-
-                      {/* Internal teacher notes */}
-                      {!readOnly && (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                          <label style={{ fontSize: '0.84rem', fontWeight: 800, color: '#1e293b' }}>
-                            🔒 Interne Notiz (nur für Lehrer)
-                          </label>
-                          <div style={{
-                            width: '100%', minHeight: '60px', padding: '12px 14px', borderRadius: '16px',
-                            border: '1px solid #e2e8f0', fontSize: '0.88rem', fontWeight: 550, lineHeight: 1.5, background: '#fafafa', color: '#0f172a',
-                            whiteSpace: 'pre-wrap'
-                          }}>
-                            {weekTeacherNotes || 'Keine internen Notizen.'}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })()
-            ) : activeSubView === 'lehrwerk' && activeLehrwerkId ? (
-              // textbook detail notebook view
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', animation: 'fadeIn 0.25s ease' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: '16px', flexWrap: 'wrap' }}>
-                  {(() => {
-                    const activeBookAssigned = assignedLehrwerke.find(a => a.lehrwerkId === activeLehrwerkId);
-                    const isCurrentPageStudentFocused = Boolean(activeBookAssigned?.pageStates?.[activePageNumber || -1]?.studentFocus);
-                    const isStudentCreated = Boolean(activeBookAssigned?.isStudentCreated || activeBookAssigned?.createdByRole === 'student');
-                    const isStudentViewingTeacherBook = Boolean(readOnly && !isStudentCreated);
-
-                    return (
-                      <>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0, flexWrap: 'wrap' }}>
-                          <div style={{
-                            width: '18px',
-                            height: '18px',
-                            borderRadius: '50%',
-                            background: status === 'MASTERED' ? 'hsl(130, 65%, 82%)' : (isCurrentHomework ? 'hsl(47, 85%, 84%)' : 'hsl(355, 75%, 84%)'),
-                            border: '1.5px solid rgba(0,0,0,0.1)',
-                            boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.05)',
-                            flexShrink: 0
-                          }} />
-                          <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#0f172a' }}>
-                            {activePageNumber ? `Seite ${activePageNumber}` : 'Keine Seite ausgewählt'}
-                          </h3>
-                          {isCurrentPageStudentFocused && (
-                            <span style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '4px',
-                              fontSize: '0.72rem',
-                              fontWeight: 800,
-                              color: '#6d28d9',
-                              background: '#f5f3ff',
-                              border: '1.5px solid #c4b5fd',
-                              padding: '2px 8px',
-                              borderRadius: '999px',
-                              boxShadow: '0 1px 3px rgba(109, 40, 217, 0.1)'
-                            }}>
-                              <span>🟣</span>
-                              <span>{readOnly ? 'Dein Übe-Fokus' : 'Schüler-Übefokus'}</span>
-                            </span>
-                          )}
-                        </div>
-
-                        {/* Right side controls: If student on teacher-assigned book, show focus toggle; otherwise teacher color buttons */}
-                        {isStudentViewingTeacherBook ? (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (activeLehrwerkId && activePageNumber) {
-                                toggleStudentFocusPage(activeLehrwerkId, activePageNumber);
-                              }
-                            }}
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '6px',
-                              padding: '5px 12px',
-                              borderRadius: '999px',
-                              background: isCurrentPageStudentFocused ? '#f5f3ff' : '#ffffff',
-                              border: isCurrentPageStudentFocused ? '2px solid #8b5cf6' : '1.5px solid #cbd5e1',
-                              color: isCurrentPageStudentFocused ? '#6d28d9' : '#475569',
-                              fontWeight: 800,
-                              fontSize: '0.72rem',
-                              cursor: 'pointer',
-                              boxShadow: isCurrentPageStudentFocused ? '0 0 10px rgba(139, 92, 246, 0.3)' : '0 1px 3px rgba(0,0,0,0.04)',
-                              transition: 'all 0.15s ease'
-                            }}
-                            className="tactile-btn"
-                            title={isCurrentPageStudentFocused ? "Übe-Fokus aufheben" : "Als Übe-Fokus markieren (Max. 3)"}
-                          >
-                            <span style={{
-                              width: '10px',
-                              height: '10px',
-                              borderRadius: '50%',
-                              background: '#8b5cf6',
-                              display: 'inline-block'
-                            }} />
-                            <span>{isCurrentPageStudentFocused ? '🟣 Im Übe-Fokus (Klick zum Entfernen)' : '🟣 Als Übe-Fokus markieren'}</span>
-                          </button>
-                        ) : (
-                          <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexShrink: 0 }}>
-                            {[
-                              { mode: 'LOCKED', color: '#fca5a5', label: 'Rot (keine Hausaufgabe)', getActive: () => status === 'IN_PROGRESS' && !isCurrentHomework, action: () => { setStatus('IN_PROGRESS'); setIsCurrentHomework(false); setHasChanges(true); if (activeLehrwerkId && activePageNumber) triggerDirectSave(activeLehrwerkId, activePageNumber, 'IN_PROGRESS', false); } },
-                              { mode: 'HOMEWORK', color: '#fde047', label: 'Gelb (Hausaufgabe)', getActive: () => status === 'IN_PROGRESS' && isCurrentHomework, action: () => { setStatus('IN_PROGRESS'); setIsCurrentHomework(true); setHasChanges(true); if (activeLehrwerkId && activePageNumber) triggerDirectSave(activeLehrwerkId, activePageNumber, 'IN_PROGRESS', true); } },
-                              { mode: 'MASTERED', color: '#86efac', label: 'Grün (erledigt)', getActive: () => status === 'MASTERED', action: () => { setStatus('MASTERED'); setIsCurrentHomework(false); setHasChanges(true); if (activeLehrwerkId && activePageNumber) triggerDirectSave(activeLehrwerkId, activePageNumber, 'MASTERED', false); } }
-                            ].map(b => {
-                              const isActive = b.getActive();
-                              return (
-                                <button
-                                  key={b.mode}
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    b.action();
-                                  }}
-                                  style={{
-                                    width: '28px',
-                                    height: '28px',
-                                    borderRadius: '50%',
-                                    background: b.color,
-                                    border: isActive ? '3px solid #0f172a' : '1.5px solid rgba(0,0,0,0.18)',
-                                    cursor: 'pointer',
-                                    transition: 'all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
-                                    transform: isActive ? 'scale(1.25)' : 'scale(1)',
-                                    outline: 'none',
-                                    boxShadow: isActive ? '0 4px 12px rgba(0,0,0,0.2)' : '0 2px 4px rgba(0,0,0,0.06)'
-                                  }}
-                                  title={b.label}
-                                />
-                              );
-                            })}
-                          </div>
-                        )}
-                      </>
-                    );
-                  })()}
-                </div>
-
-                {/* textbook page documentation form */}
-                <form onSubmit={(e) => handleSave(e, false)} style={{ display: 'flex', flexDirection: 'column', gap: '16px', paddingBottom: '80px' }}>
-                  {/* Teacher View: Homework & Notes Editor */}
-                  {!readOnly ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
-                        <label style={{ fontSize: '0.86rem', fontWeight: 900, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          📝 Hausaufgabe & Notiz für diese Seite:
-                        </label>
-                        <SpeechDictationButton
-                          onTranscript={(text) => {
-                            setPageHomeworkNotes(prev => {
-                              const trimmed = prev.trim();
-                              return trimmed ? `${trimmed}\n${text}` : text;
-                            });
-                            triggerDebouncedAutoSave();
-                          }}
-                          title="Diktieren"
-                        />
-                      </div>
-                      <textarea
-                        ref={(el) => { pageNotesTextareaRef.current = el; }}
-                        placeholder="Trage hier die Hausaufgabe oder Notizen für diese Seite ein..."
-                        value={pageHomeworkNotes}
-                        onInput={(e) => {
-                          const target = e.currentTarget;
-                          pageNotesSelectionRef.current = {
-                            start: target.selectionStart ?? target.value.length,
-                            end: target.selectionEnd ?? target.value.length
-                          };
-                        }}
-                        onSelect={(e) => {
-                          const target = e.currentTarget;
-                          pageNotesSelectionRef.current = {
-                            start: target.selectionStart ?? target.value.length,
-                            end: target.selectionEnd ?? target.value.length
-                          };
-                        }}
-                        onClick={(e) => {
-                          const target = e.currentTarget;
-                          pageNotesSelectionRef.current = {
-                            start: target.selectionStart ?? target.value.length,
-                            end: target.selectionEnd ?? target.value.length
-                          };
-                        }}
-                        onKeyUp={(e) => {
-                          const target = e.currentTarget;
-                          pageNotesSelectionRef.current = {
-                            start: target.selectionStart ?? target.value.length,
-                            end: target.selectionEnd ?? target.value.length
-                          };
-                        }}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          const target = e.currentTarget;
-                          pageNotesSelectionRef.current = {
-                            start: target.selectionStart ?? val.length,
-                            end: target.selectionEnd ?? val.length
-                          };
-                          setPageHomeworkNotes(val);
-                          triggerDebouncedAutoSave();
-                        }}
-                        style={{
-                          width: '100%',
-                          height: '95px',
-                          padding: '12px 14px',
-                          borderRadius: '16px',
-                          border: '1.5px solid #cbd5e1',
-                          fontSize: '0.94rem',
-                          fontWeight: 650,
-                          lineHeight: '1.55',
-                          outline: 'none',
-                          resize: 'none',
-                          background: '#fefdf8',
-                          color: '#1e293b',
-                          boxShadow: '0 2px 6px rgba(0,0,0,0.02), inset 0 2px 4px rgba(0,0,0,0.02)',
-                          transition: 'all 0.2s ease'
-                        }}
-                        onFocus={e => {
-                          e.currentTarget.style.borderColor = '#34a853';
-                          e.currentTarget.style.boxShadow = '0 0 0 3px rgba(19, 115, 51, 0.15)';
-                          const target = e.currentTarget;
-                          pageNotesSelectionRef.current = {
-                            start: target.selectionStart ?? target.value.length,
-                            end: target.selectionEnd ?? target.value.length
-                          };
-                        }}
-                        onBlur={e => {
-                          e.currentTarget.style.borderColor = '#cbd5e1';
-                          e.currentTarget.style.boxShadow = '0 2px 6px rgba(0,0,0,0.02), inset 0 2px 4px rgba(0,0,0,0.02)';
-                          const target = e.currentTarget;
-                          pageNotesSelectionRef.current = {
-                            start: target.selectionStart ?? target.value.length,
-                            end: target.selectionEnd ?? target.value.length
-                          };
-                        }}
-                      />
-                      
-                      {/* Didactic Quick-Tag Chips */}
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginTop: '4px' }}>
-                        {DIDACTIC_QUICK_TAGS.map((t) => {
-                          const isActive = pageHomeworkNotes.includes(t.tag);
-                          return (
-                            <button
-                              key={t.tag}
-                              type="button"
-                              onMouseDown={(e) => e.preventDefault()}
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                const { nextText, newCursorPos } = insertOrToggleTagInText(
-                                  pageHomeworkNotes,
-                                  t.tag,
-                                  pageNotesSelectionRef.current
-                                );
-                                setPageHomeworkNotes(nextText);
-                                pageNotesSelectionRef.current = { start: newCursorPos, end: newCursorPos };
-                                triggerDebouncedAutoSave();
-                                setTimeout(() => {
-                                  if (pageNotesTextareaRef.current) {
-                                    pageNotesTextareaRef.current.focus();
-                                    try { pageNotesTextareaRef.current.setSelectionRange(newCursorPos, newCursorPos); } catch {}
-                                  }
-                                }, 10);
-                              }}
-                              style={{
-                                background: isActive ? t.color : t.bg,
-                                color: isActive ? '#ffffff' : t.color,
-                                border: `1px solid ${isActive ? t.color : t.border}`,
-                                padding: '3px 8px',
-                                borderRadius: '100px',
-                                fontSize: '0.68rem',
-                                fontWeight: 800,
-                                cursor: 'pointer',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '3px',
-                                transition: 'all 0.15s'
-                              }}
-                              className="hover-scale-mini"
-                            >
-                              <Hash size={9} strokeWidth={2.5} />
-                              <span>{t.tag.replace(/^#/, '')}</span>
-                            </button>
-                          );
-                        })}
-                      </div>
-
-                      {/* Presets Grid */}
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '2px' }}>
-                        {[
-                          { label: '🎯 Ziel-Tempo', text: '🎯 Ziel-Tempo: Metronom schrittweise auf Ziel-Geschwindigkeit steigern.' },
-                          { label: '🐢 Langsam & sauber', text: '🐢 Langsam & sauber: Knifflige Takte isoliert im Schnecken-Tempo üben.' },
-                          { label: '🔂 3x fehlerfrei', text: '🔂 3x-Regel: Den Übergang 3 Mal hintereinander fehlerfrei wiederholen.' },
-                          { label: '🎵 Dynamik', text: '🎵 Dynamik: Auf präzisen Ausdruck und Laut-Leise-Kontraste achten.' }
-                        ].map((tpl, i) => (
-                          <button
-                            key={i}
-                            type="button"
-                            onClick={() => {
-                              const newNotes = pageHomeworkNotes ? `${pageHomeworkNotes}\n${tpl.text}` : tpl.text;
-                              setPageHomeworkNotes(newNotes);
-                              triggerDebouncedAutoSave();
-                            }}
-                            style={{
-                              background: '#f8fafc',
-                              color: '#334155',
-                              border: '1.5px solid #e2e8f0',
-                              padding: '5px 10px',
-                              borderRadius: '99px',
-                              fontSize: '0.70rem',
-                              fontWeight: 750,
-                              cursor: 'pointer',
-                              transition: 'all 0.15s'
-                            }}
-                            className="hover-scale"
-                          >
-                            {tpl.label}
-                          </button>
-                        ))}
-                      </div>
-
-                      {/* Display Student Note to Teacher if visible */}
-                      {studentNotes && !isStudentNotePrivate && (
-                        <div style={{
-                          marginTop: '12px',
-                          background: '#f0fdf4',
-                          border: '1.5px solid #86efac',
-                          borderRadius: '16px',
-                          padding: '12px 16px',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: '6px'
-                        }}>
-                          <div style={{ fontSize: '0.76rem', fontWeight: 900, color: '#166534', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <span>🧑‍🎓 Schüler-Übenotiz / Rückmeldung vom Schüler:</span>
-                          </div>
-                          <div style={{ fontSize: '0.84rem', fontWeight: 650, color: '#14532d', whiteSpace: 'pre-wrap' }}>
-                            {studentNotes}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    /* Student View: Read-Only Teacher Homework + Student Practice Notes & Tagebuch Widget */
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                      {(() => {
-                        const cleanTeacherNotes = getCleanTeacherHomeworkText(pageHomeworkNotes);
-                        if (!cleanTeacherNotes) return null;
-                        return (
-                          <div style={{
-                            background: '#fefdf8',
-                            border: '1.5px solid #fde68a',
-                            borderRadius: '16px',
-                            padding: '14px 16px',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: '6px'
-                          }}>
-                            <div style={{ fontSize: '0.76rem', fontWeight: 900, color: '#b45309', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                              <span>👨‍🏫 Hausaufgabe von deiner Lehrkraft:</span>
-                            </div>
-                            <div style={{ fontSize: '0.94rem', fontWeight: 650, color: '#1e293b', whiteSpace: 'pre-wrap', lineHeight: '1.55' }}>
-                              {cleanTeacherNotes}
-                            </div>
-                          </div>
-                        );
-                      })()}
-
-                      <div style={{
-                        background: '#f8fafc',
-                        border: '1.5px solid #cbd5e1',
-                        borderRadius: '20px',
-                        padding: '16px',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '12px'
-                      }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
-                          <label style={{ fontSize: '0.94rem', fontWeight: 900, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            🧑‍🎓 Meine Übe-Notizen & Fragen an den Lehrer:
-                          </label>
-
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                            <SpeechDictationButton
-                              onTranscript={(text) => {
-                                setStudentNotes(prev => {
-                                  const trimmed = prev.trim();
-                                  return trimmed ? `${trimmed}\n${text}` : text;
-                                });
-                              }}
-                              title="Diktieren"
-                            />
-
-                            <div style={{ display: 'flex', background: '#e2e8f0', borderRadius: '999px', padding: '2px' }}>
-                              <button
-                                type="button"
-                                onClick={() => setIsStudentNotePrivate(false)}
-                                style={{
-                                  padding: '4px 10px',
-                                  borderRadius: '999px',
-                                  fontSize: '0.7rem',
-                                  fontWeight: 800,
-                                  border: 'none',
-                                  cursor: 'pointer',
-                                  background: !isStudentNotePrivate ? '#ffffff' : 'transparent',
-                                  color: !isStudentNotePrivate ? '#059669' : '#64748b',
-                                  boxShadow: !isStudentNotePrivate ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '4px'
-                                }}
-                              >
-                                👁️ Für Lehrer sichtbar
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setIsStudentNotePrivate(true)}
-                                style={{
-                                  padding: '4px 10px',
-                                  borderRadius: '999px',
-                                  fontSize: '0.7rem',
-                                  fontWeight: 800,
-                                  border: 'none',
-                                  cursor: 'pointer',
-                                  background: isStudentNotePrivate ? '#ffffff' : 'transparent',
-                                  color: isStudentNotePrivate ? '#6366f1' : '#64748b',
-                                  boxShadow: isStudentNotePrivate ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '4px'
-                                }}
-                              >
-                                🔒 Privat (Nur für mich)
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-
-                        <textarea
-                          placeholder={isStudentNotePrivate ? "Trage hier deine privaten Übe-Notizen ein (nur für dich sichtbar)..." : "Schreibe hier Fragen oder Übe-Notizen für deine nächste Unterrichtsstunde..."}
-                          value={studentNotes}
-                          onChange={(e) => setStudentNotes(e.target.value)}
-                          style={{
-                            width: '100%',
-                            height: '110px',
-                            padding: '14px',
-                            borderRadius: '16px',
-                            border: '1.5px solid #cbd5e1',
-                            fontSize: '0.94rem',
-                            fontWeight: 650,
-                            lineHeight: '1.55',
-                            outline: 'none',
-                            resize: 'none',
-                            background: '#ffffff',
-                            color: '#1e293b',
-                            boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.02)',
-                            transition: 'all 0.2s ease'
-                          }}
-                        />
-
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                          <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            💡 Schnell-Textbausteine (Antippen zum Hinzufügen / Entfernen):
-                          </span>
-                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                            {[
-                              { 
-                                id: 'frage', 
-                                label: '❓ Frage im Unterricht', 
-                                prefix: '❓ Frage für die nächste Stunde:',
-                                getSnippet: () => '❓ Frage für die nächste Stunde: '
-                              },
-                              { 
-                                id: 'takt', 
-                                label: '🛑 Takt unklar', 
-                                prefix: '🛑 Takt',
-                                getSnippet: () => {
-                                  const takt = prompt("Welcher Takt ist noch unklar? (z. B. Takt 4)", "Takt 4");
-                                  return `🛑 ${takt || 'Takt 4'} bereitet mir noch Schwierigkeiten.`;
-                                }
-                              },
-                              { 
-                                id: 'fingersatz', 
-                                label: '🖐️ Fingersatz / Haltung', 
-                                prefix: '🖐️ Fingersatz',
-                                getSnippet: () => '🖐️ Fingersatz & Handhaltung fühlen sich noch ungewohnt an.'
-                              },
-                              { 
-                                id: 'bpm', 
-                                label: '🎯 Ziel-BPM erreicht', 
-                                prefix: '🎯 Geschafft: Ziel-Tempo auf',
-                                getSnippet: () => {
-                                  const bpm = prompt("Welches Tempo hast du erreicht? (BPM)", "120");
-                                  return `🎯 Geschafft: Ziel-Tempo auf ${bpm || '120'} BPM gesteigert!`;
-                                }
-                              },
-                              { 
-                                id: 'metronom', 
-                                label: '🥁 Mit Metronom geübt', 
-                                prefix: '🥁 Regelmäßig mit Metronom',
-                                getSnippet: () => '🥁 Regelmäßig mit Metronom & Begleit-Beat geübt.'
-                              },
-                              { 
-                                id: 'auswendig', 
-                                label: '⭐ Auswendig geübt', 
-                                prefix: '⭐ Kann den Abschnitt bereits auswendig',
-                                getSnippet: () => '⭐ Kann den Abschnitt bereits auswendig spielen.'
-                              }
-                            ].map((chip) => {
-                              const isActive = studentNotes.includes(chip.prefix);
-                              return (
-                                <button
-                                  key={chip.id}
-                                  type="button"
-                                  onClick={() => {
-                                    if (isActive) {
-                                      const lines = studentNotes.split('\n').filter(line => !line.includes(chip.prefix));
-                                      setStudentNotes(lines.join('\n').trim());
-                                    } else {
-                                      const snippet = chip.getSnippet();
-                                      setStudentNotes(prev => prev ? `${prev.trim()}\n${snippet}` : snippet);
-                                    }
-                                  }}
-                                  style={{
-                                    background: isActive ? '#e6f4ea' : '#ffffff',
-                                    color: isActive ? '#137333' : '#334155',
-                                    border: isActive ? '1.5px solid #34a853' : '1.5px solid #cbd5e1',
-                                    padding: '8px 14px',
-                                    borderRadius: '12px',
-                                    fontSize: '0.78rem',
-                                    fontWeight: 800,
-                                    cursor: 'pointer',
-                                    boxShadow: isActive ? '0 2px 6px rgba(52, 168, 83, 0.2)' : '0 1px 3px rgba(0,0,0,0.04)',
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    gap: '6px',
-                                    transition: 'all 0.15s ease'
-                                  }}
-                                  className="hover-scale"
-                                >
-                                  {isActive && <span style={{ color: '#34a853', fontWeight: 900 }}>✓</span>}
-                                  <span>{chip.label}</span>
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                    {!readOnly && (
-                      <div style={{
-                        marginTop: '12px',
-                        background: 'rgba(251, 191, 36, 0.05)',
-                        border: '1.5px dashed rgba(251, 191, 36, 0.3)',
-                        borderRadius: '16px',
-                        padding: '14px 16px',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '10px'
-                      }}>
-                        <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#b45309', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          <span>👁️ Live-Vorschau (im Hausaufgaben-Widget des Schülers):</span>
-                        </div>
-                        {(() => {
-                          const book = globalLehrwerke.find(b => b.id === activeLehrwerkId);
-                          const bookColor = getLehrwerkColor(book?.title || '');
-                          const assignedBook = assignedLehrwerke.find(a => a.lehrwerkId === activeLehrwerkId);
-                          const pageStates = assignedBook?.pageStates || {};
-
-                          // Collect all pages assigned as homework for this book
-                          const homeworkPagesSet = new Set<number>();
-                          Object.entries(pageStates).forEach(([pNumStr, pState]: [string, any]) => {
-                            if (pState?.status === 'homework' || pState?.isCurrentHomework) {
-                              const num = parseInt(pNumStr, 10);
-                              if (!isNaN(num)) homeworkPagesSet.add(num);
-                            }
-                          });
-
-                          // Include active page if marked as homework in current form state
-                          if (activePageNumber !== null && (isCurrentHomework || status === 'IN_PROGRESS')) {
-                            homeworkPagesSet.add(activePageNumber);
-                          }
-
-                          const homeworkPagesList = Array.from(homeworkPagesSet).sort((a, b) => a - b);
-                          const pagesToRender = homeworkPagesList.length > 0 ? homeworkPagesList : (activePageNumber !== null ? [activePageNumber] : [1]);
-                          const formattedPagesStr = formatPageNumbers(pagesToRender);
-
-                          return (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                              <div style={{ fontSize: '0.88rem', color: '#09090b', fontWeight: 900, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                <div style={{
-                                  width: '14px',
-                                  height: '18px',
-                                  background: `linear-gradient(135deg, ${bookColor.from}, ${bookColor.to})`,
-                                  borderRadius: '3px',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  flexShrink: 0
-                                }}>
-                                  <BookOpen size={8} color={bookColor.text} />
-                                </div>
-                                <span>{book?.title || 'Lehrwerk'}</span>
-                                {formattedPagesStr && (
-                                  <span style={{ color: '#4b5563', fontWeight: 700 }}>· {formattedPagesStr}</span>
-                                )}
-                              </div>
-
-                              <div style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '5px',
-                                background: '#ffffff',
-                                color: '#475569',
-                                padding: '4px 12px',
-                                borderRadius: '999px',
-                                fontSize: '0.74rem',
-                                fontWeight: 900,
-                                border: '1px solid rgba(251, 191, 36, 0.3)',
-                                boxShadow: '0 3px 8px rgba(0,0,0,0.03), 0 0 12px rgba(251, 191, 36, 0.2)',
-                                alignSelf: 'flex-start'
-                              }}>
-                                <span>📄 {formattedPagesStr ? formattedPagesStr : `S. ${activePageNumber}`}</span>
-                              </div>
-
-                              {/* Stacked notes for all homework pages in this book */}
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '2px' }}>
-                                {pagesToRender.map(pNum => {
-                                  let pageNoteText = '';
-                                  if (pNum === activePageNumber) {
-                                    pageNoteText = cleanNotesText(homeworkNotes);
-                                  } else {
-                                    const savedPageState = pageStates[pNum];
-                                    const rawSavedNote = savedPageState?.homeworkNotes || savedPageState?.notes || '';
-                                    pageNoteText = cleanNotesText(rawSavedNote);
-                                    
-                                    if (!pageNoteText) {
-                                      // Fallback search in progressItems
-                                      const matchProgress = progressItems.find(pi => pi.topic_name === `${book?.title} - Seite ${pNum}`);
-                                      if (matchProgress?.homework_notes) {
-                                        pageNoteText = cleanNotesText(matchProgress.homework_notes);
-                                      }
-                                    }
-                                  }
-
-                                  return (
-                                    <div key={pNum} style={{ 
-                                      display: 'flex', 
-                                      gap: '6px', 
-                                      alignItems: 'flex-start', 
-                                      fontSize: '0.75rem', 
-                                      color: '#475569', 
-                                      lineHeight: '1.4',
-                                      background: '#ffffff',
-                                      border: pNum === activePageNumber ? '1.5px solid rgba(251, 191, 36, 0.4)' : '1px solid rgba(251, 191, 36, 0.18)',
-                                      borderRadius: '12px',
-                                      padding: '8px 12px',
-                                      boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.02)'
-                                    }}>
-                                      <span style={{ fontWeight: 800, color: '#b45309', flexShrink: 0 }}>S. {pNum}:</span>
-                                      <span style={{ fontWeight: 650, color: pageNoteText ? '#1e293b' : '#94a3b8', fontStyle: pageNoteText ? 'normal' : 'italic', whiteSpace: 'pre-wrap' }}>
-                                        {pageNoteText ? renderTextWithDidacticBadges(pageNoteText) : 'Keine Hausaufgabe eingetragen'}
-                                      </span>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            </div>
-                          );
-                        })()}
-                      </div>
-                    )}
-
-                  {!readOnly && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
-                        <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1e293b' }}>
-                          🔒 Interne Notiz (nur für Lehrer)
-                        </label>
-                        <SpeechDictationButton
-                          onTranscript={(text) => {
-                            setTeacherNotes(prev => {
-                              const trimmed = prev.trim();
-                              return trimmed ? `${trimmed}\n${text}` : text;
-                            });
-                            triggerDebouncedAutoSave();
-                          }}
-                          title="Diktieren"
-                        />
-                      </div>
-                      <textarea
-                        placeholder="Interne Bemerkungen..."
-                        value={teacherNotes}
-                        onChange={(e) => {
-                          setTeacherNotes(e.target.value);
-                          triggerDebouncedAutoSave();
-                        }}
-                        style={{
-                          width: '100%', height: '50px', padding: '8px 12px', borderRadius: '12px',
-                          border: '1px solid #cbd5e1', fontSize: '0.78rem', fontWeight: 600, outline: 'none', resize: 'none', background: 'white'
-                        }}
-                      />
-                    </div>
-                  )}
-
-                  <div style={{ display: 'flex', gap: '12px', marginTop: '12px', paddingBottom: (isMobileView || isInsideSim || isFullscreen) ? '180px' : '48px' }}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        triggerImmediateAutoSave();
-                        setActiveSubView('hub');
-                        setActiveLehrwerkId(null);
-                        setActivePageNumber(null);
-                      }}
-                      style={{
-                        flex: 1, padding: '12px', borderRadius: '12px', border: '1px solid #cbd5e1',
-                        background: 'white', color: '#1e293b', fontWeight: 800, fontSize: '0.82rem', cursor: 'pointer',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
-                        boxShadow: '0 2px 6px rgba(0,0,0,0.04)'
-                      }}
-                      className="hover-scale"
-                    >
-                      <span>← Zurück zur Übersicht</span>
-                    </button>
-                  </div>
-                </form>
-              </div>
-            ) : activeSubView === 'song' && selectedActiveSongId ? (
-              // song detail notebook view
-              (() => {
-                const skill = activeSongSkills.find(s => s.id === selectedActiveSongId);
-                if (!skill) return null;
-
-                return (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '32px', animation: 'fadeIn 0.25s ease' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: '16px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flexWrap: 'wrap' }}>
-                          <div style={{
-                            width: '18px',
-                            height: '18px',
-                            borderRadius: '50%',
-                            background: status === 'MASTERED' ? 'hsl(130, 65%, 82%)' : (isCurrentHomework ? 'hsl(47, 85%, 84%)' : 'hsl(355, 75%, 84%)'),
-                            border: '1.5px solid rgba(0,0,0,0.1)',
-                            boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.05)',
-                            flexShrink: 0
-                          }} />
-                          <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#000' }}>
-                            {skill.songs?.artist ? `${skill.songs.artist} - ${skill.songs.title}` : (skill.songs?.title || 'Song Details')}
-                          </h3>
-                          <span style={{
-                            fontSize: '0.70rem',
-                            fontWeight: 800,
-                            color: '#10b981',
-                            background: '#ecfdf5',
-                            border: '1px solid #d1fae5',
-                            padding: '2px 8px',
-                            borderRadius: '999px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '4px',
-                            flexShrink: 0
-                          }}>
-                            <Check size={12} strokeWidth={2.5} />
-                            <span>Auto-Save aktiv</span>
-                          </span>
-                        </div>
-
-                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexShrink: 0 }}>
-                          {[
-                             { mode: 'LOCKED', color: 'hsl(355, 75%, 84%)', label: 'Rot (keine Hausaufgabe)', getActive: () => status === 'IN_PROGRESS' && !isCurrentHomework, action: () => { setStatus('IN_PROGRESS'); setIsCurrentHomework(false); setHasChanges(true); if (selectedActiveSongId) triggerDirectSongSave(selectedActiveSongId, 'IN_PROGRESS', false); } },
-                             { mode: 'HOMEWORK', color: 'hsl(47, 85%, 84%)', label: 'Gelb (Hausaufgabe)', getActive: () => status === 'IN_PROGRESS' && isCurrentHomework, action: () => { setStatus('IN_PROGRESS'); setIsCurrentHomework(true); setHasChanges(true); if (selectedActiveSongId) triggerDirectSongSave(selectedActiveSongId, 'IN_PROGRESS', true); } },
-                             { mode: 'MASTERED', color: 'hsl(130, 65%, 82%)', label: 'Grün (erledigt)', getActive: () => status === 'MASTERED', action: () => { setStatus('MASTERED'); setIsCurrentHomework(false); setHasChanges(true); if (selectedActiveSongId) triggerDirectSongSave(selectedActiveSongId, 'MASTERED', false); } }
-                           ].map(b => {
-                            const isActive = b.getActive();
-                            return (
-                              <button
-                                key={b.mode}
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  b.action();
-                                }}
-                                style={{
-                                  width: '24px',
-                                  height: '24px',
-                                  borderRadius: '50%',
-                                  background: b.color,
-                                  border: isActive ? '3.5px solid #0f172a' : '1px solid rgba(0,0,0,0.15)',
-                                  cursor: 'pointer',
-                                  transition: 'all 0.15s ease',
-                                  transform: isActive ? 'scale(1.1)' : 'none',
-                                  outline: 'none',
-                                  boxShadow: '0 2px 5px rgba(0,0,0,0.05)'
-                                }}
-                                title={b.label}
-                              />
-                            );
-                          })}
-                        </div>
-                      </div>
-                    </div>
-
-                    <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '20px', paddingBottom: '80px' }}>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
-                          <label style={{ fontSize: '0.86rem', fontWeight: 900, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            📝 Übungs-Fahrplan & Hausaufgabe:
-                          </label>
-                          <SpeechDictationButton
-                            onTranscript={(text) => {
-                              const newNotes = songHomeworkNotes ? `${songHomeworkNotes.trim()}\n${text}` : text;
-                              setSongHomeworkNotes(newNotes);
-                              setHasChanges(true);
-                              if (selectedActiveSongId) {
-                                try {
-                                  localStorage.setItem(`song_note_${student.id}_${selectedActiveSongId}`, newNotes);
-                                } catch (err) {}
-                                triggerDebouncedSongSave(newNotes);
-                              }
-                            }}
-                            title="Diktieren"
-                          />
-                        </div>
-                        <textarea
-                          ref={(el) => { songNotesTextareaRef.current = el; }}
-                          placeholder="Passagen, Anschlagstechniken oder Rhythmen eintragen..."
-                          value={songHomeworkNotes}
-                          onInput={(e) => {
-                            const target = e.currentTarget;
-                            songNotesSelectionRef.current = {
-                              start: target.selectionStart ?? target.value.length,
-                              end: target.selectionEnd ?? target.value.length
-                            };
-                          }}
-                          onSelect={(e) => {
-                            const target = e.currentTarget;
-                            songNotesSelectionRef.current = {
-                              start: target.selectionStart ?? target.value.length,
-                              end: target.selectionEnd ?? target.value.length
-                            };
-                          }}
-                          onClick={(e) => {
-                            const target = e.currentTarget;
-                            songNotesSelectionRef.current = {
-                              start: target.selectionStart ?? target.value.length,
-                              end: target.selectionEnd ?? target.value.length
-                            };
-                          }}
-                          onKeyUp={(e) => {
-                            const target = e.currentTarget;
-                            songNotesSelectionRef.current = {
-                              start: target.selectionStart ?? target.value.length,
-                              end: target.selectionEnd ?? target.value.length
-                            };
-                          }}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            const target = e.currentTarget;
-                            songNotesSelectionRef.current = {
-                              start: target.selectionStart ?? val.length,
-                              end: target.selectionEnd ?? val.length
-                            };
-                            setSongHomeworkNotes(val);
-                            setHasChanges(true);
-                            if (selectedActiveSongId) {
-                              try {
-                                localStorage.setItem(`song_note_${student.id}_${selectedActiveSongId}`, val);
-                              } catch (err) {}
-                              triggerDebouncedSongSave(val);
-                            }
-                          }}
-                          style={{
-                            width: '100%',
-                            height: '140px',
-                            padding: '16px',
-                            borderRadius: '20px',
-                            border: '1.5px solid #cbd5e1',
-                            fontSize: '0.94rem',
-                            fontWeight: 650,
-                            lineHeight: '1.55',
-                            outline: 'none',
-                            resize: 'none',
-                            background: '#fefdf8',
-                            color: '#1e293b',
-                            boxShadow: '0 2px 8px rgba(0,0,0,0.02), inset 0 2px 4px rgba(0,0,0,0.02)',
-                            transition: 'all 0.2s ease'
-                          }}
-                          onFocus={e => {
-                            e.currentTarget.style.borderColor = 'var(--primary-color, #34a853)';
-                            e.currentTarget.style.boxShadow = '0 0 0 3px rgba(52, 168, 83, 0.15)';
-                            const target = e.currentTarget;
-                            songNotesSelectionRef.current = {
-                              start: target.selectionStart ?? target.value.length,
-                              end: target.selectionEnd ?? target.value.length
-                            };
-                          }}
-                          onBlur={e => {
-                            e.currentTarget.style.borderColor = '#cbd5e1';
-                            e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.02), inset 0 2px 4px rgba(0,0,0,0.02)';
-                            const target = e.currentTarget;
-                            songNotesSelectionRef.current = {
-                              start: target.selectionStart ?? target.value.length,
-                              end: target.selectionEnd ?? target.value.length
-                            };
-                          }}
-                        />
-                        {/* Didactic Quick-Tag Chips */}
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginTop: '4px' }}>
-                          {DIDACTIC_QUICK_TAGS.map((t) => {
-                            const isActive = songHomeworkNotes.includes(t.tag);
-                            return (
-                              <button
-                                key={t.tag}
-                                type="button"
-                                onMouseDown={(e) => e.preventDefault()}
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                  const { nextText, newCursorPos } = insertOrToggleTagInText(
-                                    songHomeworkNotes,
-                                    t.tag,
-                                    songNotesSelectionRef.current
-                                  );
-                                  setSongHomeworkNotes(nextText);
-                                  songNotesSelectionRef.current = { start: newCursorPos, end: newCursorPos };
-                                  setHasChanges(true);
-                                  if (selectedActiveSongId) {
-                                    try {
-                                      localStorage.setItem(`song_note_${student.id}_${selectedActiveSongId}`, nextText);
-                                    } catch (err) {}
-                                    triggerDebouncedSongSave(nextText);
-                                  }
-                                  setTimeout(() => {
-                                    if (songNotesTextareaRef.current) {
-                                      songNotesTextareaRef.current.focus();
-                                      try { songNotesTextareaRef.current.setSelectionRange(newCursorPos, newCursorPos); } catch {}
-                                    }
-                                  }, 10);
-                                }}
-                                style={{
-                                  background: isActive ? t.color : t.bg,
-                                  color: isActive ? '#ffffff' : t.color,
-                                  border: `1px solid ${isActive ? t.color : t.border}`,
-                                  padding: '3px 8px',
-                                  borderRadius: '100px',
-                                  fontSize: '0.68rem',
-                                  fontWeight: 800,
-                                  cursor: 'pointer',
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: '3px',
-                                  transition: 'all 0.15s'
-                                }}
-                                className="hover-scale-mini"
-                              >
-                                <Hash size={9} strokeWidth={2.5} />
-                                <span>{t.tag.replace(/^#/, '')}</span>
-                              </button>
-                            );
-                          })}
-                        </div>
-
-                        {/* Schnell-Textbausteine */}
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '2px' }}>
-                          {[
-                            { label: '🐌 Schnecke', text: '• 🐌 Schnecken-Tempo: Schwierige Passage ganz langsam & präzise üben.' },
-                            { label: '🔂 Ritter-Drei', text: '• 🔂 Ritter-Drei: Kniffligen Übergang 3x hintereinander fehlerfrei spielen.' },
-                            { label: '🎵 Laut-Leise', text: '• 🎵 Dynamik: Auf deutliche Laut-Leise-Unterschiede achten.' },
-                            { label: '⏱️ 10-Min.', text: '• ⏱️ Fokus-Timer: 10 Minuten täglich konzentriert wiederholen.' }
-                          ].map((tpl, i) => (
-                            <button
-                              key={i}
-                              type="button"
-                              onClick={() => {
-                                const newNotes = songHomeworkNotes ? `${songHomeworkNotes}\n${tpl.text}` : tpl.text;
-                                setSongHomeworkNotes(newNotes);
-                                setStatus('IN_PROGRESS');
-                                setIsCurrentHomework(true);
-                                setHasChanges(true);
-                                if (selectedActiveSongId) {
-                                  try {
-                                    localStorage.setItem(`song_note_${student.id}_${selectedActiveSongId}`, newNotes);
-                                  } catch (err) {}
-                                  triggerDirectSongSave(selectedActiveSongId, 'IN_PROGRESS', true, newNotes, teacherNotes);
-                                }
-                              }}
-                              style={{
-                                background: '#f8fafc',
-                                color: '#334155',
-                                border: '1.5px solid #e2e8f0',
-                                padding: '6px 12px',
-                                borderRadius: '99px',
-                                fontSize: '0.72rem',
-                                fontWeight: 750,
-                                cursor: 'pointer',
-                                transition: 'all 0.15s'
-                              }}
-                              className="hover-scale"
-                            >
-                              {tpl.label}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-
-                      {!readOnly && (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
-                            <label style={{ fontSize: '0.86rem', fontWeight: 900, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                              🔒 Interne Notiz (nur für Lehrer):
-                            </label>
-                            <SpeechDictationButton
-                              onTranscript={(text) => {
-                                const newNotes = teacherNotes ? `${teacherNotes.trim()}\n${text}` : text;
-                                setTeacherNotes(newNotes);
-                                setHasChanges(true);
-                                if (selectedActiveSongId) {
-                                  try {
-                                    localStorage.setItem(`song_teacher_note_${student.id}_${selectedActiveSongId}`, newNotes);
-                                  } catch (err) {}
-                                  triggerDebouncedTeacherNoteSave(newNotes);
-                                } else {
-                                  triggerDebouncedAutoSave();
-                                }
-                              }}
-                              title="Diktieren"
-                            />
-                          </div>
-                          <textarea
-                            placeholder="Interne Bemerkungen..."
-                            value={teacherNotes}
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              setTeacherNotes(val);
-                              setHasChanges(true);
-                              if (selectedActiveSongId) {
-                                try {
-                                  localStorage.setItem(`song_teacher_note_${student.id}_${selectedActiveSongId}`, val);
-                                } catch (err) {}
-                                triggerDebouncedTeacherNoteSave(val);
-                              } else {
-                                triggerDebouncedAutoSave();
-                              }
-                            }}
-                            style={{
-                              width: '100%',
-                              height: '100px',
-                              padding: '16px',
-                              borderRadius: '20px',
-                              border: '1.5px solid #cbd5e1',
-                              fontSize: '0.88rem',
-                              fontWeight: 650,
-                              lineHeight: '1.5',
-                              outline: 'none',
-                              resize: 'none',
-                              background: '#fefdf8',
-                              color: '#1e293b',
-                              boxShadow: '0 2px 8px rgba(0,0,0,0.02), inset 0 2px 4px rgba(0,0,0,0.02)',
-                              transition: 'all 0.2s ease'
-                            }}
-                            onFocus={e => {
-                              e.currentTarget.style.borderColor = 'var(--primary-color, #34a853)';
-                              e.currentTarget.style.boxShadow = '0 0 0 3px rgba(52, 168, 83, 0.15)';
-                            }}
-                            onBlur={e => {
-                              e.currentTarget.style.borderColor = '#cbd5e1';
-                              e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.02), inset 0 2px 4px rgba(0,0,0,0.02)';
-                            }}
-                          />
-                        </div>
-                      )}
-
-                      {/* SCHÜLER TROPHÄEN- & MEILENSTEIN-PASS (Right Column Trophy Center for Apple Balance) */}
-                      {readOnly && (
-                        <div style={{
-                          background: '#ffffff',
-                          border: '1.5px solid #e2e8f0',
-                          borderRadius: '24px',
-                          padding: '18px 20px',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: '12px',
-                          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.03)'
-                        }}>
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                            <span style={{ fontSize: '0.84rem', fontWeight: 900, color: '#09090b', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                              <Sparkles size={16} style={{ color: '#f59e0b' }} />
-                              <span>Auszeichnungen & Meilenstein-Pass</span>
-                            </span>
-                            <span style={{ fontSize: '0.70rem', background: matchHistory.length >= 3 ? '#dcfce7' : '#f1f5f9', color: matchHistory.length >= 3 ? '#15803d' : '#475569', padding: '2px 8px', borderRadius: '99px', fontWeight: 850 }}>
-                              {matchHistory.length} von 3 Matches
-                            </span>
-                          </div>
-
-                          {/* Latest Hologram Sticker if at least 1 match exists */}
-                          {matchHistory.length > 0 && (() => {
-                            const latest = matchHistory[matchHistory.length - 1];
-                            return (
-                              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
-                                <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b' }}>
-                                  ✨ Dein neuester Sticker (Match #{matchHistory.length}):
-                                </div>
-                                <MeisterOhrSticker
-                                  matchedAt={latest.matched_at}
-                                  teacherPercent={latest.teacher_percent}
-                                  studentPercent={latest.student_percent}
-                                  xpAmount={latest.xp_amount}
-                                  isCompact={false}
-                                />
-                              </div>
-                            );
-                          })()}
-
-                          {/* 3 Horizontal Milestone Cards */}
-                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
-                            {[0, 1, 2].map((slotIdx) => {
-                              const entry = matchHistory[slotIdx];
-                              const slotNum = slotIdx + 1;
-                              if (entry) {
-                                const isGold = entry.tier === 'tier1';
-                                const isBlue = entry.tier === 'tier2';
-                                return (
-                                  <div key={slotIdx} style={{
-                                    background: isGold ? 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)' : (isBlue ? 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)' : 'linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%)'),
-                                    border: `1.5px solid ${isGold ? '#f59e0b' : (isBlue ? '#38bdf8' : '#c084fc')}`,
-                                    borderRadius: '14px',
-                                    padding: '10px',
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    gap: '4px',
-                                    boxShadow: '0 2px 6px rgba(0,0,0,0.04)'
-                                  }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                      <span style={{ fontSize: '0.66rem', fontWeight: 900, color: '#64748b' }}>
-                                        #{slotNum} Match
-                                      </span>
-                                      <span style={{ fontSize: '0.64rem', fontWeight: 750, color: '#94a3b8' }}>
-                                        {new Date(entry.matched_at).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })}
-                                      </span>
-                                    </div>
-
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.74rem', fontWeight: 900, color: '#0f172a' }}>
-                                      <span>{isGold ? '🎯' : (isBlue ? '✨' : '🚀')}</span>
-                                      <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                        {isGold ? 'Meister-Ohr' : (isBlue ? 'Super Gehör' : 'Weiter-Rocker')}
-                                      </span>
-                                    </div>
-
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '2px', fontSize: '0.68rem', color: '#475569' }}>
-                                      <span>L:{entry.teacher_percent}% • S:{entry.student_percent}%</span>
-                                      <span style={{ fontWeight: 900, color: '#16a34a', background: 'rgba(34,197,94,0.12)', padding: '1px 5px', borderRadius: '5px', fontSize: '0.64rem' }}>
-                                        +{entry.xp_amount} XP
-                                      </span>
-                                    </div>
-                                  </div>
-                                );
-                              } else {
-                                const isNextSlot = slotIdx === matchHistory.length;
-                                return (
-                                  <div key={slotIdx} style={{
-                                    border: isNextSlot ? '1.5px dashed #94a3b8' : '1.5px dashed #e2e8f0',
-                                    background: isNextSlot ? '#f8fafc' : '#ffffff',
-                                    borderRadius: '14px',
-                                    padding: '10px',
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    minHeight: '74px',
-                                    textAlign: 'center',
-                                    gap: '3px'
-                                  }}>
-                                    <span style={{ fontSize: '0.95rem', opacity: isNextSlot ? 1 : 0.4 }}>
-                                      {slotIdx === 0 ? '🌱' : (slotIdx === 1 ? '⚡' : '🏆')}
-                                    </span>
-                                    <span style={{ fontSize: '0.66rem', fontWeight: 800, color: isNextSlot ? '#475569' : '#94a3b8' }}>
-                                      {slotIdx === 0 ? '1. Match' : (slotIdx === 1 ? '2. Match' : '3. Finale')}
-                                    </span>
-                                    <span style={{ fontSize: '0.60rem', color: isNextSlot ? '#16a34a' : '#cbd5e1', fontWeight: 750 }}>
-                                      {isNextSlot ? 'Tipp abgeben 🔒' : 'Gesperrt'}
-                                    </span>
-                                  </div>
-                                );
-                              }
-                            })}
-                          </div>
-                        </div>
-                      )}
-
-                      <div style={{ display: 'flex', gap: '12px', marginTop: '8px', paddingBottom: (isMobileView || isInsideSim || isFullscreen || isMobileOrSim) ? '180px' : '48px' }}>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            handleBackToHub();
-                          }}
-                          style={{
-                            flex: 1,
-                            padding: '14px 20px',
-                            borderRadius: '16px',
-                            border: 'none',
-                            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                            color: '#ffffff',
-                            fontWeight: 800,
-                            fontSize: '0.88rem',
-                            cursor: 'pointer',
-                            boxShadow: '0 4px 14px rgba(16, 185, 129, 0.25)',
-                            transition: 'all 0.2s ease',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '8px'
-                          }}
-                          className="hover-scale"
-                        >
-                          <Check size={18} strokeWidth={2.5} />
-                          <span>Fertig & Schließen</span>
-                        </button>
-                      </div>
-                    </form>
-                  </div>
-                );
-              })()
-            ) : (
-              // GENERAL HUB VIEW (only homework Checklist + general notes textarea)
-              <>
-                {!readOnly && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-                    <div>
-                      <span style={{ fontSize: '0.82rem', fontWeight: 900, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <Edit3 size={15} style={{ color: '#0f172a' }} />
-                        <span>Eintrag & Hausaufgabe</span>
-                      </span>
-                    </div>
-                    <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#15803d', background: '#e6f4ea', border: '1px solid #bbf7d0', padding: '2px 8px', borderRadius: '100px' }}>
-                      Schüler-Vorschau
-                    </span>
-                  </div>
-                )}
-
-                {/* The Main Input Form Card */}
-                <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, gap: readOnly ? '0px' : '16px' }}>
-                  <div style={{
-                    flex: 1,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '16px'
-                  }}>
-                    <div style={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '16px'
-                    }}>
-                      {/* ========================================================================= */}
-                      {/* HERO CARD CONTENT (100% SSOT: Single Source of Truth for Voice & UI)     */}
-                      {/* ========================================================================= */}
-                      {(() => {
-                        const getTargetWeekIso = (offset: number): string => {
-                          if (offset === 0) return getISOWeek();
-                          const d = new Date();
-                          d.setDate(d.getDate() + (offset * 7));
-                          return getISOWeek(d);
-                        };
-
-                        const getWeekDateRange = (offset: number) => {
-                          const target = getSimulatedNow();
-                          target.setDate(target.getDate() + (offset * 7));
-
-                          const day = target.getDay();
-                          const diffToMonday = (day === 0 ? -6 : 1) - day;
-                          const monday = new Date(target);
-                          monday.setDate(target.getDate() + diffToMonday);
-
-                          const sunday = new Date(monday);
-                          sunday.setDate(monday.getDate() + 6);
-
-                          const startDay = monday.getDate();
-                          const endDay = sunday.getDate();
-                          const startMonth = monday.toLocaleDateString('de-DE', { month: 'short' }).replace('.', '');
-                          const endMonth = sunday.toLocaleDateString('de-DE', { month: 'short' }).replace('.', '');
-
-                          const dateSpan = startMonth === endMonth
-                            ? `${startDay}. – ${endDay}. ${startMonth}`
-                            : `${startDay}. ${startMonth} – ${endDay}. ${endMonth}`;
-
-                          let label = 'Diese Woche';
-                          if (offset === -1) label = 'Letzte Woche';
-                          else if (offset === 1) label = 'Nächste Woche';
-                          else if (offset < -1) label = `Vor ${Math.abs(offset)} Wochen`;
-                          else if (offset > 1) label = `In ${offset} Wochen`;
-
-                          return { dateSpan, label };
-                        };
-
-                        const viewingWeekIso = getTargetWeekIso(viewingWeekOffset);
-                        const viewingWeekNum = viewingWeekIso.split('-W')[1] || '';
-                        const weekRange = getWeekDateRange(viewingWeekOffset);
-                        const isPastWeek = viewingWeekOffset < 0;
-                        const isFutureWeek = viewingWeekOffset > 0;
-                        const isCurrentWeek = viewingWeekOffset === 0;
-
-                        // 1. Deduplicate progress items
-                        const uniqueItemsMap = new Map<string, any>();
-                        (progressItems || []).forEach(item => {
-                          const canonicalKey = getCanonicalSongKey(item);
-                          const normTitle = getNormalizedSongTitle(item).toLowerCase();
-                          const name = canonicalKey || normTitle || (item.topic_name || '').trim().toLowerCase();
-                          if (name && !uniqueItemsMap.has(name)) {
-                            uniqueItemsMap.set(name, item);
-                          }
-                        });
-                        const deduplicatedItems = Array.from(uniqueItemsMap.values());
-
-                        let lehrwerkeList: { title: string; pages: number[]; notes: string[] }[] = [];
-                        let otherHWs: any[] = [];
-                        let audioNotes: any[] = [];
-                        let homeworkNoteItems: string[] = [];
-
-                        if (isCurrentWeek) {
-                          // === LIVE DRAFT FOR CURRENT ACTIVE LESSON WEEK ===
-                          const activeHWs = deduplicatedItems.filter(item => {
-                            if (item.topic_name && item.topic_name.includes(' - Seite ')) {
-                              const parts = item.topic_name.split(' - Seite ');
-                              const bookTitle = parts[0].trim();
-                              const pageNum = parseInt(parts[1], 10);
-                              const book = globalLehrwerke.find(g => g.title === bookTitle);
-                              if (book) {
-                                const assignment = assignedLehrwerke.find(a => a.lehrwerkId === book.id);
-                                const pageState = assignment?.pageStates?.[pageNum];
-                                return pageState?.status === 'homework' || pageState?.isCurrentHomework;
-                              }
-                            }
-                            return Boolean(item.is_current_homework) && !item.topic_name?.startsWith('Hausaufgabe KW ');
-                          });
-
-                          const activeTheories = deduplicatedItems.filter(item => {
-                            if (item.topic_name && item.topic_name.includes(' - Seite ')) {
-                              const parts = item.topic_name.split(' - Seite ');
-                              const bookTitle = parts[0].trim();
-                              const pageNum = parseInt(parts[1], 10);
-                              const book = globalLehrwerke.find(g => g.title === bookTitle);
-                              if (book) {
-                                const assignment = assignedLehrwerke.find(a => a.lehrwerkId === book.id);
-                                const pageState = assignment?.pageStates?.[pageNum];
-                                return pageState?.status === 'purple';
-                              }
-                            }
-                            return item.status === 'THEORY_DONE' && 
-                                   item.updated_at && 
-                                   getISOWeek(item.updated_at) === viewingWeekIso &&
-                                   !item.topic_name?.startsWith('Hausaufgabe KW ');
-                          });
-
-                          const groupedLehrwerke: Record<string, { pages: number[]; notes: string[] }> = {};
-                          
-                          // Process assignedLehrwerke page states
-                          (assignedLehrwerke || []).forEach(assignment => {
-                            const book = globalLehrwerke.find(g => g.id === assignment.lehrwerkId);
-                            if (!book || !assignment.pageStates) return;
-                            
-                            Object.entries(assignment.pageStates).forEach(([pNumStr, pState]: [string, any]) => {
-                              if (pState?.status === 'homework' || pState?.isCurrentHomework) {
-                                const pageNum = parseInt(pNumStr, 10);
-                                if (!isNaN(pageNum)) {
-                                  if (!groupedLehrwerke[book.title]) {
-                                    groupedLehrwerke[book.title] = { pages: [], notes: [] };
-                                  }
-                                  if (!groupedLehrwerke[book.title].pages.includes(pageNum)) {
-                                    groupedLehrwerke[book.title].pages.push(pageNum);
-                                    const cleanNote = getCleanPageNotes(pState.homeworkNotes || pState.homework_notes);
-                                    if (cleanNote) {
-                                      groupedLehrwerke[book.title].notes.push(`Seite ${pageNum}: ${cleanNote}`);
-                                    }
-                                  }
-                                }
-                              }
-                            });
-                          });
-
-                          const allActive = [...activeHWs, ...activeTheories];
-                          allActive.forEach(item => {
-                            if (item.topic_name && item.topic_name.includes(' - Seite ')) {
-                              const parts = item.topic_name.split(' - Seite ');
-                              const bookTitle = parts[0].trim();
-                              const book = globalLehrwerke.find(g => g.title === bookTitle);
-                              const isBookAssigned = book && assignedLehrwerke.some(a => a.lehrwerkId === book.id);
-                              if (!isBookAssigned) return;
-
-                              const pageNum = parseInt(parts[1], 10);
-                              if (!groupedLehrwerke[bookTitle]) {
-                                groupedLehrwerke[bookTitle] = { pages: [], notes: [] };
-                              }
-                              if (!isNaN(pageNum) && !groupedLehrwerke[bookTitle].pages.includes(pageNum)) {
-                                groupedLehrwerke[bookTitle].pages.push(pageNum);
-                                if (item.homework_notes) {
-                                  const cleanNote = getCleanPageNotes(item.homework_notes);
-                                  if (cleanNote && !groupedLehrwerke[bookTitle].notes.includes(`Seite ${pageNum}: ${cleanNote}`)) {
-                                    groupedLehrwerke[bookTitle].notes.push(`Seite ${pageNum}: ${cleanNote}`);
-                                  }
-                                }
-                              }
-                            } else {
-                              const cleanTopic = getNormalizedSongTitle(item);
-                              const canKey = getCanonicalSongKey(item);
-                              if (cleanTopic && !otherHWs.some(existing => getCanonicalSongKey(existing) === canKey || getNormalizedSongTitle(existing) === cleanTopic)) {
-                                const cachedNote = localStorage.getItem(`song_note_${student.id}_${item.id}`) ||
-                                                   localStorage.getItem(`song_note_${student.id}_${item.song_id}`) ||
-                                                   item.homework_notes || '';
-                                otherHWs.push({
-                                  ...item,
-                                  homework_notes: cachedNote
-                                });
-                              }
-                            }
-                          });
-
-                          // Also check activeSongSkills with localStorage backup for instant sync
-                          (activeSongSkills || []).forEach(skill => {
-                            const isHwInLs = localStorage.getItem(`song_hw_${student.id}_${skill.id}`) === 'true' ||
-                                             localStorage.getItem(`song_hw_${student.id}_${skill.song_id}`) === 'true';
-                            if (isHwInLs) {
-                              const cleanTopic = getNormalizedSongTitle(skill);
-                              const canKey = getCanonicalSongKey(skill);
-                              const alreadyExists = otherHWs.some(existing => 
-                                getCanonicalSongKey(existing) === canKey || getNormalizedSongTitle(existing) === cleanTopic
-                              );
-                              if (!alreadyExists) {
-                                const songArtist = skill.songs?.artist || skill.artist || '';
-                                const songTitle = skill.songs?.title || skill.title || skill.song_title || 'Song';
-                                const songInstrument = skill.instrument ? ` (${skill.instrument})` : '';
-                                const fullTitle = songArtist ? `${songArtist} - ${songTitle}${songInstrument}` : `${songTitle}${songInstrument}`;
-                                const cachedNote = localStorage.getItem(`song_note_${student.id}_${skill.id}`) ||
-                                                   localStorage.getItem(`song_note_${student.id}_${skill.song_id}`) || '';
-                                otherHWs.push({
-                                  id: skill.id,
-                                  topic_name: fullTitle,
-                                  is_current_homework: true,
-                                  status: 'IN_PROGRESS',
-                                  homework_notes: cachedNote
-                                });
-                              }
-                            }
-                          });
-                          
-                          lehrwerkeList = Object.entries(groupedLehrwerke).map(([title, info]) => {
-                            info.pages.sort((a: number, b: number) => a - b);
-                            return { title, pages: info.pages, notes: info.notes };
-                          });
-
-                          audioNotes = (homeworkNotesList || [])
-                            .map((note, idx) => ({ note: typeof note === 'string' ? note : String(note || ''), idx }))
-                            .filter(item => item.note.includes("AUDIO:"))
-                            .map((item, index) => {
-                              const cleanStr = item.note.startsWith('[') ? item.note.replace(/[\[\]"]/g, '') : item.note;
-                              const parts = cleanStr.substring(cleanStr.indexOf('AUDIO:') + 6).split('|');
-                              return {
-                                url: parts[0]?.trim(),
-                                duration: parseInt(parts[1] || '0', 10),
-                                label: parts[3]?.trim() || `Play-Along #${index + 1}`,
-                                originalIdx: item.idx,
-                                idx: item.idx
-                              };
-                            })
-                            .filter(a => !!a.url);
-
-                          homeworkNoteItems = getHomeworkNoteItems(generalHomeworkNotes);
-                        } else {
-                          // === HISTORICAL OR FUTURE WEEK ARCHIVED SNAPSHOT ===
-                          const histWeekItem = (progressItems || []).find((item: any) => {
-                            return item.topic_name === `Hausaufgabe KW ${viewingWeekNum}` ||
-                                   (item.created_at && getISOWeek(item.created_at) === viewingWeekIso) ||
-                                   (item.updated_at && getISOWeek(item.updated_at) === viewingWeekIso && item.topic_name.startsWith('Hausaufgabe KW '));
-                          });
-
-                          if (histWeekItem && histWeekItem.homework_notes) {
-                            try {
-                              const parsedNotes = typeof histWeekItem.homework_notes === 'string' 
-                                ? JSON.parse(histWeekItem.homework_notes) 
-                                : histWeekItem.homework_notes;
-                              
-                              if (Array.isArray(parsedNotes)) {
-                                audioNotes = parsedNotes
-                                  .filter((n: string) => typeof n === 'string' && n.includes('AUDIO:'))
-                                  .map((cleanStr: string, index: number) => {
-                                    const parts = cleanStr.substring(cleanStr.indexOf('AUDIO:') + 6).split('|');
-                                    return {
-                                      url: parts[0]?.trim(),
-                                      duration: parseInt(parts[1] || '0', 10),
-                                      label: parts[3]?.trim() || `Play-Along #${index + 1}`,
-                                      originalIdx: index,
-                                      idx: index
-                                    };
-                                  })
-                                  .filter(a => !!a.url);
-
-                                homeworkNoteItems = parsedNotes
-                                  .filter((n: string) => {
-                                    if (typeof n !== 'string') return false;
-                                    const lower = n.toLowerCase();
-                                    return !n.startsWith('AUDIO:') && 
-                                           !n.startsWith('STICKER:') && 
-                                           !n.startsWith('LOOP:') &&
-                                           !lower.startsWith('latency:') && 
-                                           !lower.startsWith('latency_calibration:') && 
-                                           !n.startsWith('SYSTEM:') && 
-                                           !n.startsWith('FEEDBACK:') && 
-                                           !n.startsWith('STUDENT_NOTE_');
-                                  })
-                                  .map((s: string) => s.trim())
-                                  .filter(Boolean);
-                              } else if (typeof parsedNotes === 'string') {
-                                homeworkNoteItems = getHomeworkNoteItems(parsedNotes);
-                              }
-                            } catch (err) {
-                              homeworkNoteItems = getHomeworkNoteItems(histWeekItem.homework_notes);
-                            }
-                          }
-
-                          // Historical week Lehrwerke / Songs that were specifically active or updated in that week
-                          const weekProgressItems = (progressItems || []).filter((item: any) => {
-                            const itemWeek = (item.created_at && getISOWeek(item.created_at)) || 
-                                             (item.updated_at && getISOWeek(item.updated_at));
-                            return itemWeek === viewingWeekIso && !item.topic_name?.startsWith('Hausaufgabe KW ');
-                          });
-
-                          const groupedHistLehrwerke: Record<string, { pages: number[]; notes: string[] }> = {};
-                          weekProgressItems.forEach((item: any) => {
-                            if (item.topic_name && item.topic_name.includes(' - Seite ')) {
-                              const parts = item.topic_name.split(' - Seite ');
-                              const bookTitle = parts[0].trim();
-                              const pageNum = parseInt(parts[1], 10);
-                              if (!groupedHistLehrwerke[bookTitle]) {
-                                groupedHistLehrwerke[bookTitle] = { pages: [], notes: [] };
-                              }
-                              if (!isNaN(pageNum) && !groupedHistLehrwerke[bookTitle].pages.includes(pageNum)) {
-                                groupedHistLehrwerke[bookTitle].pages.push(pageNum);
-                                if (item.homework_notes) {
-                                  const cleanNote = getCleanPageNotes(item.homework_notes);
-                                  if (cleanNote) groupedHistLehrwerke[bookTitle].notes.push(`Seite ${pageNum}: ${cleanNote}`);
-                                }
-                              }
-                            } else if (item.topic_name) {
-                              const cleanTopic = getNormalizedSongTitle(item);
-                              if (cleanTopic && !otherHWs.some(existing => getNormalizedSongTitle(existing) === cleanTopic)) {
-                                otherHWs.push({
-                                  ...item,
-                                  homework_notes: getCleanPageNotes(item.homework_notes)
-                                });
-                              }
-                            }
-                          });
-
-                          lehrwerkeList = Object.entries(groupedHistLehrwerke).map(([title, info]) => {
-                            info.pages.sort((a: number, b: number) => a - b);
-                            return { title, pages: info.pages, notes: info.notes };
-                          });
-                        }
-
-                        const hasActiveItems = lehrwerkeList.length > 0 || otherHWs.length > 0 || audioNotes.length > 0 || homeworkNoteItems.length > 0;
-                        
-                        const currentHour = getSimulatedNow().getHours();
-                        const isSilentTime = currentHour >= 20 || currentHour < 7;
-
-                        return (
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                            {/* ========================================================================= */}
-                            {/* KÖRPER 1: DAS NOTENHEFT (Schüler-Bühne / Das fertige Ergebnis)            */}
-                            {/* ========================================================================= */}
-                            <div style={{
-                              background: '#ffffff',
-                              border: '1px solid rgba(0, 0, 0, 0.08)',
-                              borderRadius: '24px',
-                              padding: '20px 22px',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              gap: '14px',
-                              boxShadow: '0 8px 24px -4px rgba(0, 0, 0, 0.04), 0 2px 6px -1px rgba(0, 0, 0, 0.02)'
-                            }}>
-                              {/* 1. Pure Header Bar */}
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                  <button
-                                    type="button"
-                                    onClick={() => setViewingWeekOffset(prev => prev - 1)}
-                                    title="Vorherige Woche (KW)"
-                                    style={{
-                                      background: '#f8fafc',
-                                      border: '1px solid #e2e8f0',
-                                      borderRadius: '8px',
-                                      width: '26px',
-                                      height: '26px',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                      cursor: 'pointer',
-                                      color: '#334155',
-                                      transition: 'all 0.15s ease'
-                                    }}
-                                    className="hover-scale-mini"
-                                  >
-                                    <ChevronLeft size={14} strokeWidth={2.5} />
-                                  </button>
-
-                                  <span 
-                                    title={`Kalenderwoche ${viewingWeekNum} (ISO 8601)`}
-                                    style={{ fontSize: '0.90rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', padding: '0 4px', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
-                                  >
-                                    <span>{readOnly ? 'Hausaufgabe' : 'Schülervorschau'} • {weekRange.label}</span>
-                                    <span style={{ fontSize: '0.74rem', fontWeight: 650, color: '#64748b' }}>
-                                      ({weekRange.dateSpan})
-                                    </span>
-                                  </span>
-
-                                  <button
-                                    type="button"
-                                    onClick={() => setViewingWeekOffset(prev => Math.min(1, prev + 1))}
-                                    title="Nächste Woche"
-                                    style={{
-                                      background: '#f8fafc',
-                                      border: '1px solid #e2e8f0',
-                                      borderRadius: '8px',
-                                      width: '26px',
-                                      height: '26px',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                      cursor: 'pointer',
-                                      color: '#334155',
-                                      transition: 'all 0.15s ease'
-                                    }}
-                                    className="hover-scale-mini"
-                                  >
-                                    <ChevronRight size={14} strokeWidth={2.5} />
-                                  </button>
-
-                                  {viewingWeekOffset !== 0 && (
-                                    <button
-                                      type="button"
-                                      onClick={() => setViewingWeekOffset(0)}
-                                      style={{
-                                        background: '#f1f5f9',
-                                        border: '1px solid #e2e8f0',
-                                        color: '#0f172a',
-                                        borderRadius: '8px',
-                                        padding: '4px 9px',
-                                        fontSize: '0.76rem',
-                                        fontWeight: 800,
-                                        cursor: 'pointer',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '4px',
-                                        marginLeft: '4px'
-                                      }}
-                                      className="hover-scale-mini"
-                                      title="Zurück zur aktuellen Woche"
-                                    >
-                                      <RotateCcw size={11} />
-                                      <span>Heute</span>
-                                    </button>
-                                  )}
-                                </div>
-                              </div>
-
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                {/* ❓ Student Question Button / Teacher Live Status Pill */}
-                                {readOnly ? (
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      if (!isQuestionEditorOpen && parsedStudentQuestion.hasQuestion) {
-                                        setQuestionDraftText(parsedStudentQuestion.text);
-                                      }
-                                      setIsQuestionEditorOpen(prev => !prev);
-                                    }}
-                                    style={{
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      gap: '5px',
-                                      padding: '5px 12px',
-                                      borderRadius: '100px',
-                                      border: parsedStudentQuestion.hasQuestion ? '1px solid #fde047' : '1px solid #bbf7d0',
-                                      background: parsedStudentQuestion.hasQuestion ? '#fef9c3' : '#f0fdf4',
-                                      color: parsedStudentQuestion.hasQuestion ? '#854d0e' : '#15803d',
-                                      fontSize: '0.80rem',
-                                      fontWeight: 800,
-                                      cursor: 'pointer',
-                                      boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
-                                      transition: 'all 0.15s ease'
-                                    }}
-                                    className="hover-scale"
-                                    title={parsedStudentQuestion.hasQuestion ? "Deine Frage ansehen oder ändern" : `Frage an ${effectiveTeacherFullName} stellen`}
-                                  >
-                                    <HelpCircle size={13} strokeWidth={2.4} />
-                                    <span>{parsedStudentQuestion.hasQuestion ? '1 Frage notiert' : 'Frage an Lehrkraft'}</span>
-                                  </button>
-                                ) : (
-                                  <span style={{
-                                    fontSize: '0.76rem',
-                                    color: '#15803d',
-                                    background: '#dcfce7',
-                                    padding: '4px 10px',
-                                    borderRadius: '100px',
-                                    fontWeight: 850,
-                                    letterSpacing: '0.02em'
-                                  }}>
-                                    Live-Schülersicht
-                                  </span>
-                                )}
-
-                                {/* 🔊 Global TTS Audio Assistant Vorlese-Button (Apple Pill) */}
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    if (isTtsSpeaking && activeTtsKey === 'global_homework') {
-                                      handleStopSpeaking();
-                                    } else {
-                                      const speechPhrases = buildCompleteWeeklyHomeworkSpeechPhrases(
-                                        viewingWeekNum,
-                                        lehrwerkeList,
-                                        otherHWs.map(s => ({
-                                          title: s.topic_name?.replace(/\s*\([^)]*\)\s*$/, '') || '',
-                                          note: getCleanPageNotes(s.homework_notes)
-                                        })),
-                                        audioNotes,
-                                        generalHomeworkNotes
-                                      );
-                                      handleSpeakText(speechPhrases, 'global_homework');
-                                    }
-                                  }}
-                                  style={{
-                                    background: (isTtsSpeaking && activeTtsKey === 'global_homework') 
-                                      ? '#ef4444' 
-                                      : '#f8fafc',
-                                    border: '1px solid #e2e8f0',
-                                    color: (isTtsSpeaking && activeTtsKey === 'global_homework') ? '#ffffff' : '#0f172a',
-                                    borderRadius: '100px',
-                                    padding: '5px 12px',
-                                    fontSize: '0.80rem',
-                                    fontWeight: 750,
-                                    cursor: 'pointer',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '6px',
-                                    transition: 'all 0.15s ease'
-                                  }}
-                                  className="hover-scale"
-                                  title={isTtsSpeaking && activeTtsKey === 'global_homework' ? "Vorlesen stoppen" : "Gesamte Hausaufgabe vorlesen lassen"}
-                                >
-                                  {isTtsSpeaking && activeTtsKey === 'global_homework' ? (
-                                    <>
-                                      <VolumeX size={13} />
-                                      <span>Stopp</span>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <Volume2 size={13} color="#475569" />
-                                      <span>Vorlesen</span>
-                                    </>
-                                  )}
-                                </button>
-
-                                {/* ↗ Unified Share & Print Action Hub (Apple-Grade 2026 Master-Standard) */}
-                                <div ref={shareMenuRef} style={{ position: 'relative' }}>
-                                  <button
-                                    type="button"
-                                    onClick={() => setIsShareMenuOpen(prev => !prev)}
-                                    style={{
-                                      background: isShareMenuOpen ? '#ffffff' : '#f8fafc',
-                                      border: '1px solid #e2e8f0',
-                                      color: '#0f172a',
-                                      borderRadius: '100px',
-                                      padding: '5px 12px',
-                                      fontSize: '0.80rem',
-                                      fontWeight: 750,
-                                      cursor: 'pointer',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      gap: '5px',
-                                      transition: 'all 0.15s ease',
-                                      boxShadow: isShareMenuOpen ? '0 2px 8px rgba(0,0,0,0.06)' : 'none'
-                                    }}
-                                    className="hover-scale"
-                                    title="Hausaufgabe teilen, per E-Mail senden oder drucken"
-                                  >
-                                    <Share2 size={12} color="#475569" strokeWidth={2.2} />
-                                    <span>Teilen & Drucken</span>
-                                    <ChevronDown 
-                                      size={11} 
-                                      color="#64748b" 
-                                      style={{ 
-                                        transform: isShareMenuOpen ? 'rotate(180deg)' : 'none', 
-                                        transition: 'transform 0.18s cubic-bezier(0.16, 1, 0.3, 1)' 
-                                      }} 
-                                    />
-                                  </button>
-
-                                  {isShareMenuOpen && (
-                                    <div
-                                      style={{
-                                        position: 'absolute',
-                                        top: 'calc(100% + 6px)',
-                                        right: 0,
-                                        zIndex: 9999,
-                                        minWidth: '240px',
-                                        background: '#ffffff',
-                                        borderRadius: '16px',
-                                        border: '1px solid #e2e8f0',
-                                        boxShadow: '0 16px 36px -4px rgba(15, 23, 42, 0.16), 0 4px 12px rgba(0,0,0,0.05)',
-                                        padding: '6px',
-                                        display: 'flex',
-                                        flexDirection: 'column',
-                                        gap: '2px',
-                                        animation: 'fadeIn 0.15s ease'
-                                      }}
-                                    >
-                                      {/* 1. DIN A5 PDF Drucken */}
-                                      <button
-                                        type="button"
-                                        onClick={async () => {
-                                          setIsShareMenuOpen(false);
-                                          await handlePrintCurrentHomework();
-                                        }}
-                                        style={{
-                                          display: 'flex',
-                                          alignItems: 'center',
-                                          gap: '10px',
-                                          width: '100%',
-                                          padding: '8px 10px',
-                                          background: 'transparent',
-                                          border: 'none',
-                                          borderRadius: '10px',
-                                          cursor: 'pointer',
-                                          textAlign: 'left',
-                                          color: '#0f172a',
-                                          fontSize: '0.78rem',
-                                          fontWeight: 750,
-                                          transition: 'background 0.12s ease'
-                                        }}
-                                        className="hover-bg-slate"
-                                      >
-                                        <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: '#f0fdf4', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#16a34a', flexShrink: 0 }}>
-                                          <Printer size={14} strokeWidth={2.2} />
-                                        </div>
-                                        <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                          <span>DIN A5 PDF drucken</span>
-                                          <span style={{ fontSize: '0.65rem', fontWeight: 500, color: '#64748b' }}>Mit QR-Code für Notenständer</span>
-                                        </div>
-                                      </button>
-
-                                      {/* 2. Messenger / Text kopieren */}
-                                      <button
-                                        type="button"
-                                        onClick={handleShareMessenger}
-                                        style={{
-                                          display: 'flex',
-                                          alignItems: 'center',
-                                          gap: '10px',
-                                          width: '100%',
-                                          padding: '8px 10px',
-                                          background: 'transparent',
-                                          border: 'none',
-                                          borderRadius: '10px',
-                                          cursor: 'pointer',
-                                          textAlign: 'left',
-                                          color: '#0f172a',
-                                          fontSize: '0.78rem',
-                                          fontWeight: 750,
-                                          transition: 'background 0.12s ease'
-                                        }}
-                                        className="hover-bg-slate"
-                                      >
-                                        <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: '#f0fdf4', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#16a34a', flexShrink: 0 }}>
-                                          <Share2 size={14} strokeWidth={2.2} />
-                                        </div>
-                                        <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                          <span>Mit Familie teilen / Text kopieren</span>
-                                          <span style={{ fontSize: '0.65rem', fontWeight: 500, color: '#64748b' }}>Für Messenger, SMS oder Mail</span>
-                                        </div>
-                                      </button>
-
-                                      {/* 3. E-Mail */}
-                                      <button
-                                        type="button"
-                                        onClick={handleShareEmail}
-                                        style={{
-                                          display: 'flex',
-                                          alignItems: 'center',
-                                          gap: '10px',
-                                          width: '100%',
-                                          padding: '8px 10px',
-                                          background: 'transparent',
-                                          border: 'none',
-                                          borderRadius: '10px',
-                                          cursor: 'pointer',
-                                          textAlign: 'left',
-                                          color: '#0f172a',
-                                          fontSize: '0.78rem',
-                                          fontWeight: 750,
-                                          transition: 'background 0.12s ease'
-                                        }}
-                                        className="hover-bg-slate"
-                                      >
-                                        <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#475569', flexShrink: 0 }}>
-                                          <Mail size={14} strokeWidth={2.2} />
-                                        </div>
-                                        <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                          <span>Per E-Mail versenden</span>
-                                          <span style={{ fontSize: '0.65rem', fontWeight: 500, color: '#64748b' }}>Wochenplan als Nachricht</span>
-                                        </div>
-                                      </button>
-
-                                      {/* 4. Link & Text kopieren */}
-                                      <button
-                                        type="button"
-                                        onClick={handleCopyShareLink}
-                                        style={{
-                                          display: 'flex',
-                                          alignItems: 'center',
-                                          gap: '10px',
-                                          width: '100%',
-                                          padding: '8px 10px',
-                                          background: isLinkCopied ? '#f0fdf4' : 'transparent',
-                                          border: 'none',
-                                          borderRadius: '10px',
-                                          cursor: 'pointer',
-                                          textAlign: 'left',
-                                          color: isLinkCopied ? '#16a34a' : '#0f172a',
-                                          fontSize: '0.78rem',
-                                          fontWeight: 750,
-                                          transition: 'all 0.12s ease'
-                                        }}
-                                        className="hover-bg-slate"
-                                      >
-                                        <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: isLinkCopied ? '#dcfce7' : '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', color: isLinkCopied ? '#16a34a' : '#475569', flexShrink: 0 }}>
-                                          {isLinkCopied ? <Check size={14} strokeWidth={2.5} /> : <Copy size={14} strokeWidth={2.2} />}
-                                        </div>
-                                        <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                          <span>{isLinkCopied ? 'Kopiert!' : 'Text & Link kopieren'}</span>
-                                          <span style={{ fontSize: '0.65rem', fontWeight: 500, color: isLinkCopied ? '#16a34a' : '#64748b' }}>In Zwischenablage legen</span>
-                                        </div>
-                                      </button>
-
-                                      {/* 5. Optional Native System Share (AirDrop / OS Dialog) */}
-                                      {typeof navigator !== 'undefined' && 'share' in navigator && (
-                                        <button
-                                          type="button"
-                                          onClick={handleNativeShare}
-                                          style={{
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: '8px',
-                                            width: '100%',
-                                            padding: '7px 10px',
-                                            marginTop: '2px',
-                                            borderTop: '1px solid #f1f5f9',
-                                            background: 'transparent',
-                                            borderRadius: '8px',
-                                            border: 'none',
-                                            cursor: 'pointer',
-                                            textAlign: 'left',
-                                            color: '#64748b',
-                                            fontSize: '0.70rem',
-                                            fontWeight: 650,
-                                            transition: 'background 0.12s ease'
-                                          }}
-                                          className="hover-bg-slate"
-                                        >
-                                          <ExternalLink size={12} strokeWidth={2} />
-                                          <span>System-Menü / AirDrop öffnen…</span>
-                                        </button>
-                                      )}
-                                    </div>
-                                  )}
-                                </div>
-
-
-
-                                {(progressItems.some(item => item.is_current_homework) || generalHomeworkNotes.trim() !== '') && !readOnly && (
-                                  <button 
-                                    type="button" 
-                                    onClick={async () => {
-                                      await handleResetAllCurrentHomework();
-                                      setGeneralHomeworkNotes('');
-                                    }}
-                                    style={{ 
-                                      border: 'none', 
-                                      background: 'transparent', 
-                                      color: '#94a3b8', 
-                                      fontSize: '0.76rem', 
-                                      fontWeight: 750, 
-                                      cursor: 'pointer', 
-                                      padding: '4px 8px',
-                                      borderRadius: '6px',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      gap: '4px',
-                                      transition: 'all 0.15s ease'
-                                    }}
-                                    className="hover-scale-mini"
-                                    title="Hausaufgaben für diese Woche zurücksetzen"
-                                  >
-                                    <RotateCcw size={11} />
-                                    <span>Leeren</span>
-                                  </button>
-                                )}
-                              </div>
-                            </div>
-
-                            {/* 2. Silent Mode Banner (falls aktiv) */}
-                            {isSilentTime && (
-                              <div style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '6px',
-                                fontSize: '0.76rem',
-                                fontWeight: 650,
-                                color: '#64748b',
-                                padding: '3px 0'
-                              }}>
-                                <Moon size={12} color="#64748b" />
-                                <span>
-                                  {readOnly
-                                    ? 'Nachtruhe aktiv: Keine störenden Benachrichtigungen bis 07:00 Uhr.'
-                                    : 'Silent-Modus aktiv: Der Schüler erhält die Aufgabe morgen ab 07:00 Uhr.'}
-                                </span>
-                              </div>
-                            )}
-
-                            {/* 3. Schülervorschau-Bühne (Master Stage Box: Der gerahmte Wochen-Fahrplan) */}
-                            <div style={{
-                              minHeight: '140px',
-                              background: 'linear-gradient(180deg, #fcfdfe 0%, #f8fafc 100%)',
-                              border: '1px solid #f1f5f9',
-                              borderRadius: '18px',
-                              padding: '16px 18px',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              gap: '12px',
-                              boxShadow: 'inset 0 1px 3px rgba(0, 0, 0, 0.02)'
-                            }}>
-                              {!hasActiveItems ? (
-                                <div style={{
-                                  display: 'flex',
-                                  flexDirection: 'column',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  gap: '10px',
-                                  padding: '12px 4px',
-                                  textAlign: 'center'
-                                }}>
-                                  <div style={{
-                                    width: '38px',
-                                    height: '38px',
-                                    borderRadius: '12px',
-                                    background: '#ffffff',
-                                    border: '1px solid #e2e8f0',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    boxShadow: '0 2px 6px rgba(0,0,0,0.03)'
-                                  }}>
-                                    <BookOpen size={18} color="#64748b" strokeWidth={1.75} />
-                                  </div>
-
-                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', alignItems: 'center' }}>
-                                    <span style={{ fontSize: '0.88rem', color: '#0f172a', fontWeight: 850, letterSpacing: '-0.01em' }}>
-                                      {isPastWeek
-                                        ? `Keine Hausaufgaben für ${weekRange.label.toLowerCase()} (${weekRange.dateSpan}) archiviert`
-                                        : `Wochen-Fahrplan für ${weekRange.label.toLowerCase()} (${weekRange.dateSpan})`}
-                                    </span>
-                                    <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 550, maxWidth: '320px', lineHeight: 1.45 }}>
-                                      {isPastWeek
-                                        ? 'Unterrichtsfreie Zeit, Ferien oder keine Notizen hinterlegt.'
-                                        : 'Wähle links im Protokoll Lehrwerk-Seiten oder Songs aus, um die Hausaufgabe live zu füllen.'}
-                                    </span>
-                                  </div>
-
-                                  {/* Quick Direct Shortcuts */}
-                                  {!isPastWeek && !readOnly && (
-                                    <div style={{ display: 'flex', gap: '8px', marginTop: '4px', flexWrap: 'wrap', justifyContent: 'center' }}>
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          setActiveSubView('hub');
-                                          setActiveInputTab('free');
-                                        }}
-                                        style={{
-                                          background: '#ffffff',
-                                          border: '1px solid #e2e8f0',
-                                          color: '#334155',
-                                          fontSize: '0.72rem',
-                                          fontWeight: 750,
-                                          padding: '5px 12px',
-                                          borderRadius: '100px',
-                                          cursor: 'pointer',
-                                          display: 'flex',
-                                          alignItems: 'center',
-                                          gap: '5px',
-                                          boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
-                                          transition: 'all 0.15s ease'
-                                        }}
-                                        className="hover-scale"
-                                      >
-                                        <BookOpen size={12} color="#16a34a" />
-                                        <span>Lehrwerk aufschlagen</span>
-                                      </button>
-
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          setActiveSubView('hub');
-                                          setActiveInputTab('free');
-                                        }}
-                                        style={{
-                                          background: '#ffffff',
-                                          border: '1px solid #e2e8f0',
-                                          color: '#334155',
-                                          fontSize: '0.72rem',
-                                          fontWeight: 750,
-                                          padding: '5px 12px',
-                                          borderRadius: '100px',
-                                          cursor: 'pointer',
-                                          display: 'flex',
-                                          alignItems: 'center',
-                                          gap: '5px',
-                                          boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
-                                          transition: 'all 0.15s ease'
-                                        }}
-                                        className="hover-scale"
-                                      >
-                                        <Music size={12} color="#4f46e5" />
-                                        <span>Song zuweisen</span>
-                                      </button>
-                                    </div>
-                                  )}
-
-                                  {isPastWeek && (
-                                    <button
-                                      type="button"
-                                      onClick={() => setViewingWeekOffset(0)}
-                                      style={{
-                                        marginTop: '4px',
-                                        padding: '6px 14px',
-                                        borderRadius: '100px',
-                                        background: '#0f172a',
-                                        color: '#ffffff',
-                                        border: 'none',
-                                        fontSize: '0.74rem',
-                                        fontWeight: 800,
-                                        cursor: 'pointer'
-                                      }}
-                                      className="hover-scale"
-                                    >
-                                      Zurück zur aktuellen Woche
-                                    </button>
-                                  )}
-                                </div>
-                              ) : (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                                  {/* Stage Header */}
-                                  <div style={{
-                                    display: 'none',
-                                    alignItems: 'center',
-                                    justifyContent: 'space-between',
-                                    paddingBottom: '8px',
-                                    borderBottom: '1px solid rgba(0,0,0,0.05)',
-                                    gap: '8px',
-                                    flexWrap: 'wrap'
-                                  }}>
-                                    <span style={{
-                                      fontSize: '0.84rem',
-                                      fontWeight: 850,
-                                      color: '#64748b',
-                                      textTransform: 'uppercase',
-                                      letterSpacing: '0.04em',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      gap: '6px'
-                                    }}>
-                                      <BookOpen size={14} color="#64748b" />
-                                      <span>Wochen-Fahrplan • {weekRange.label.toUpperCase()}</span>
-                                      <span style={{ fontSize: '0.76rem', fontWeight: 650, color: '#94a3b8', textTransform: 'none', letterSpacing: '0' }}>
-                                        ({weekRange.dateSpan})
-                                      </span>
-                                    </span>
-                                    {readOnly ? (
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          if (!isQuestionEditorOpen && parsedStudentQuestion.hasQuestion) {
-                                            setQuestionDraftText(parsedStudentQuestion.text);
-                                          }
-                                          setIsQuestionEditorOpen(prev => !prev);
-                                        }}
-                                        style={{
-                                          display: 'inline-flex',
-                                          alignItems: 'center',
-                                          gap: '6px',
-                                          padding: '5px 12px',
-                                          minHeight: '32px',
-                                          borderRadius: '100px',
-                                          border: parsedStudentQuestion.hasQuestion ? '1px solid #fde047' : '1px solid #bbf7d0',
-                                          background: parsedStudentQuestion.hasQuestion ? '#fef9c3' : '#f0fdf4',
-                                          color: parsedStudentQuestion.hasQuestion ? '#854d0e' : '#15803d',
-                                          fontSize: '0.80rem',
-                                          fontWeight: 800,
-                                          cursor: 'pointer',
-                                          boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
-                                          transition: 'all 0.15s ease'
-                                        }}
-                                        className="hover-scale-mini"
-                                        title={parsedStudentQuestion.hasQuestion ? "Deine Frage ansehen oder ändern" : `Frage an ${effectiveTeacherFullName} stellen`}
-                                      >
-                                        <HelpCircle size={14} strokeWidth={2.4} />
-                                        <span>{parsedStudentQuestion.hasQuestion ? '1 Frage notiert' : 'Frage an Lehrkraft'}</span>
-                                      </button>
-                                    ) : (
-                                      <span style={{
-                                        fontSize: '0.78rem',
-                                        color: '#15803d',
-                                        background: '#dcfce7',
-                                        padding: '4px 10px',
-                                        borderRadius: '100px',
-                                        fontWeight: 850,
-                                        letterSpacing: '0.02em'
-                                      }}>
-                                        Live-Schülersicht
-                                      </span>
-                                    )}
-                                  </div>
-
-                                  {/* 💬 SCHÜLER-FRAGE FÜR DEN UNTERRICHT (KIDS GOLDSTANDARD) */}
-                                  {readOnly && isQuestionEditorOpen && (
-                                    <div style={{
-                                      background: '#ffffff',
-                                      border: '1.5px solid #eab308',
-                                      borderRadius: '18px',
-                                      padding: '14px',
-                                      boxShadow: '0 4px 16px rgba(234, 179, 8, 0.12)',
-                                      display: 'flex',
-                                      flexDirection: 'column',
-                                      gap: '12px'
-                                    }}>
-                                      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                          <div style={{
-                                            width: '32px',
-                                            height: '32px',
-                                            borderRadius: '10px',
-                                            background: '#dcfce7',
-                                            color: '#15803d',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            flexShrink: 0
-                                          }}>
-                                            <HelpCircle size={17} strokeWidth={2.4} />
-                                          </div>
-                                          <div>
-                                            <span style={{ fontSize: '0.94rem', fontWeight: 900, color: '#0f172a', display: 'block', lineHeight: 1.2 }}>
-                                              Frage an {effectiveTeacherFullName}
-                                            </span>
-                                            <p style={{ margin: '2px 0 0', fontSize: '0.76rem', color: '#64748b', fontWeight: 600 }}>
-                                              Deine Lehrkraft sieht deine Frage direkt zu Beginn der nächsten Stunde.
-                                            </p>
-                                          </div>
-                                        </div>
-                                        <button
-                                          type="button"
-                                          onClick={() => setIsQuestionEditorOpen(false)}
-                                          style={{
-                                            border: 'none',
-                                            background: 'transparent',
-                                            color: '#94a3b8',
-                                            cursor: 'pointer',
-                                            padding: '4px',
-                                            display: 'flex',
-                                            alignItems: 'center'
-                                          }}
-                                          title="Schließen"
-                                        >
-                                          <X size={16} />
-                                        </button>
-                                      </div>
-
-                                      <textarea
-                                        rows={3}
-                                        value={questionDraftText}
-                                        onChange={(e) => setQuestionDraftText(e.target.value)}
-                                        placeholder="z. B. Ich weiß bei Takt 8 nicht, wie ich zählen soll..."
-                                        style={{
-                                          width: '100%',
-                                          boxSizing: 'border-box',
-                                          borderRadius: '12px',
-                                          border: '1px solid #cbd5e1',
-                                          padding: '10px 12px',
-                                          fontSize: '16px',
-                                          lineHeight: 1.4,
-                                          fontFamily: 'inherit',
-                                          resize: 'none',
-                                          minHeight: '84px',
-                                          color: '#1e293b',
-                                          background: '#f8fafc',
-                                          outline: 'none'
-                                        }}
-                                      />
-
-                                      {/* 💡 Schnell-Tipp Ideen (vor den Action-Buttons platziert für perfekten UX-Flow) */}
-                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                                          <Lightbulb size={12} color="#15803d" strokeWidth={2.4} />
-                                          <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
-                                            Schnelle Ideen für deine Frage:
-                                          </span>
-                                        </div>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                                          {[
-                                            { label: 'Welcher Fingersatz?', icon: Hand, text: 'Welchen Fingersatz soll ich hier spielen?' },
-                                            { label: 'Welches Tempo?', icon: Timer, text: 'Welches Tempo soll ich beim Üben einstellen?' },
-                                            { label: 'Takt unklar', icon: Music, text: 'Ich verstehe diesen Takt noch nicht ganz.' },
-                                            { label: 'Zählen bei Pause', icon: RotateCcw, text: 'Wie zähle ich die Pause richtig mit?' }
-                                          ].map(item => {
-                                            const IconComp = item.icon;
-                                            return (
-                                              <button
-                                                key={item.label}
-                                                type="button"
-                                                onClick={() => {
-                                                  setQuestionDraftText(prev => {
-                                                    const trimmed = prev.trim();
-                                                    if (!trimmed) return item.text;
-                                                    if (trimmed.includes(item.text)) return prev;
-                                                    return `${trimmed} ${item.text}`;
-                                                  });
-                                                }}
-                                                style={{
-                                                  background: '#ffffff',
-                                                  border: '1px solid #cbd5e1',
-                                                  borderRadius: '100px',
-                                                  padding: '5px 11px',
-                                                  minHeight: '32px',
-                                                  fontSize: '0.80rem',
-                                                  fontWeight: 750,
-                                                  color: '#334155',
-                                                  cursor: 'pointer',
-                                                  display: 'inline-flex',
-                                                  alignItems: 'center',
-                                                  gap: '5px',
-                                                  boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
-                                                  transition: 'all 0.15s ease'
-                                                }}
-                                                className="hover-scale-mini"
-                                              >
-                                                <IconComp size={13} strokeWidth={2.2} color="#15803d" />
-                                                <span>{item.label}</span>
-                                              </button>
-                                            );
-                                          })}
-                                        </div>
-                                      </div>
-
-                                      {/* Action Buttons: Diktat links, Abbrechen & Merken rechts */}
-                                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap', paddingTop: '6px', borderTop: '1px solid #f1f5f9' }}>
-                                        <SpeechDictationButton
-                                          onTranscript={(text) => {
-                                            setQuestionDraftText(prev => prev.trim() ? `${prev.trim()} ${text}` : text);
-                                          }}
-                                          title="Frage einsprechen"
-                                          size="md"
-                                        />
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                          <button
-                                            type="button"
-                                            onClick={() => setIsQuestionEditorOpen(false)}
-                                            style={{
-                                              border: 'none',
-                                              background: '#f1f5f9',
-                                              color: '#475569',
-                                              fontSize: '0.82rem',
-                                              fontWeight: 800,
-                                              padding: '7px 14px',
-                                              minHeight: '36px',
-                                              borderRadius: '10px',
-                                              cursor: 'pointer'
-                                            }}
-                                            className="hover-scale-mini"
-                                          >
-                                            Abbrechen
-                                          </button>
-                                          <button
-                                            type="button"
-                                            disabled={isSavingQuestion || !questionDraftText.trim()}
-                                            onClick={() => handleSaveStudentQuestion(questionDraftText)}
-                                            style={{
-                                              border: 'none',
-                                              background: '#34a853',
-                                              color: '#ffffff',
-                                              fontSize: '0.84rem',
-                                              fontWeight: 800,
-                                              padding: '7px 16px',
-                                              minHeight: '36px',
-                                              borderRadius: '10px',
-                                              cursor: (!isSavingQuestion && questionDraftText.trim()) ? 'pointer' : 'not-allowed',
-                                              opacity: (!isSavingQuestion && questionDraftText.trim()) ? 1 : 0.5,
-                                              display: 'inline-flex',
-                                              alignItems: 'center',
-                                              gap: '6px',
-                                              boxShadow: '0 2px 6px rgba(52, 168, 83, 0.25)'
-                                            }}
-                                            className="hover-scale-mini"
-                                          >
-                                            <Check size={14} strokeWidth={2.4} />
-                                            <span>{isSavingQuestion ? 'Speichern...' : 'Frage merken'}</span>
-                                          </button>
-                                        </div>
-                                      </div>
-                                    </div>
-                                  )}
-
-                                  {readOnly && !isQuestionEditorOpen && parsedStudentQuestion.hasQuestion && (
-                                    <div style={{
-                                      background: '#fefce8',
-                                      border: '1px solid #fef08a',
-                                      borderRadius: '16px',
-                                      padding: '12px 14px',
-                                      boxShadow: '0 2px 6px rgba(234, 179, 8, 0.08)',
-                                      display: 'flex',
-                                      flexDirection: 'column',
-                                      gap: '8px'
-                                    }}>
-                                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
-                                          <HelpCircle size={14} color="#ca8a04" strokeWidth={2.4} />
-                                          <span style={{ fontSize: '0.80rem', fontWeight: 850, color: '#854d0e', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
-                                            Deine Frage für den Unterricht:
-                                          </span>
-                                        </div>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                          <button
-                                            type="button"
-                                            onClick={() => handleSpeakText(parsedStudentQuestion.text, 'student_q')}
-                                            title="Frage vorlesen"
-                                            style={{
-                                              border: 'none',
-                                              background: '#fef08a',
-                                              color: '#854d0e',
-                                              borderRadius: '6px',
-                                              padding: '4px 6px',
-                                              cursor: 'pointer',
-                                              display: 'flex',
-                                              alignItems: 'center'
-                                            }}
-                                          >
-                                            <Volume2 size={13} />
-                                          </button>
-                                          <button
-                                            type="button"
-                                            onClick={() => {
-                                              setQuestionDraftText(parsedStudentQuestion.text);
-                                              setIsQuestionEditorOpen(true);
-                                            }}
-                                            title="Frage bearbeiten"
-                                            style={{
-                                              border: 'none',
-                                              background: '#fef08a',
-                                              color: '#854d0e',
-                                              borderRadius: '6px',
-                                              padding: '4px 6px',
-                                              cursor: 'pointer',
-                                              display: 'flex',
-                                              alignItems: 'center'
-                                            }}
-                                          >
-                                            <Edit3 size={13} />
-                                          </button>
-                                          <button
-                                            type="button"
-                                            onClick={handleResolveStudentQuestion}
-                                            title="Frage löschen oder als erledigt markieren"
-                                            style={{
-                                              border: 'none',
-                                              background: '#fee2e2',
-                                              color: '#dc2626',
-                                              borderRadius: '6px',
-                                              padding: '4px 6px',
-                                              cursor: 'pointer',
-                                              display: 'flex',
-                                              alignItems: 'center'
-                                            }}
-                                          >
-                                            <Trash2 size={13} />
-                                          </button>
-                                        </div>
-                                      </div>
-                                      <div style={{
-                                        fontSize: '0.92rem',
-                                        fontWeight: 700,
-                                        color: '#1e293b',
-                                        lineHeight: 1.5,
-                                        paddingLeft: '2px'
-                                      }}>
-                                        „{parsedStudentQuestion.text}“
-                                      </div>
-                                      <div style={{ fontSize: '0.74rem', fontWeight: 650, color: '#a16207', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                                        <Sparkles size={11} color="#ca8a04" />
-                                        <span>{effectiveTeacherFullName} sieht diese Frage zu Beginn eurer nächsten Stunde!</span>
-                                      </div>
-                                    </div>
-                                  )}
-
-                                  {/* 🍎 LEHRKRAFT-BANNER: Prominenter Schülerfrage-Hinweis */}
-                                  {!readOnly && parsedStudentQuestion.hasQuestion && (
-                                    <div style={{
-                                      background: '#fffbeb',
-                                      border: '1.5px solid #fcd34d',
-                                      borderRadius: '16px',
-                                      padding: '12px 16px',
-                                      boxShadow: '0 3px 10px rgba(217, 119, 6, 0.08)',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'space-between',
-                                      gap: '12px',
-                                      flexWrap: 'wrap'
-                                    }}>
-                                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', minWidth: 0, flex: 1 }}>
-                                        <div style={{
-                                          width: '32px',
-                                          height: '32px',
-                                          borderRadius: '10px',
-                                          background: '#fef3c7',
-                                          color: '#d97706',
-                                          display: 'flex',
-                                          alignItems: 'center',
-                                          justifyContent: 'center',
-                                          flexShrink: 0
-                                        }}>
-                                          <HelpCircle size={18} strokeWidth={2.5} />
-                                        </div>
-                                        <div style={{ minWidth: 0, flex: 1 }}>
-                                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                                            <span style={{ fontSize: '0.80rem', fontWeight: 900, color: '#b45309', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
-                                              Schülerfrage von {student.first_name} {maskLastName(student.last_name)}
-                                            </span>
-                                            {parsedStudentQuestion.timestamp && (
-                                              <span style={{ fontSize: '0.66rem', color: '#92400e', opacity: 0.8 }}>
-                                                • {new Date(parsedStudentQuestion.timestamp).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
-                                              </span>
-                                            )}
-                                          </div>
-                                          <div style={{ fontSize: '0.94rem', fontWeight: 800, color: '#78350f', marginTop: '3px', lineHeight: 1.5 }}>
-                                            „{parsedStudentQuestion.text}“
-                                          </div>
-                                        </div>
-                                      </div>
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-                                        <button
-                                          type="button"
-                                          onClick={() => handleSpeakText(parsedStudentQuestion.text, 'teacher_view_student_q')}
-                                          title="Frage vorlesen"
-                                          style={{
-                                            border: '1px solid #fde68a',
-                                            background: '#ffffff',
-                                            color: '#b45309',
-                                            borderRadius: '8px',
-                                            padding: '6px 9px',
-                                            minHeight: '34px',
-                                            cursor: 'pointer',
-                                            display: 'flex',
-                                            alignItems: 'center'
-                                          }}
-                                        >
-                                          <Volume2 size={14} />
-                                        </button>
-                                        <button
-                                          type="button"
-                                          onClick={handleResolveStudentQuestion}
-                                          style={{
-                                            background: '#16a34a',
-                                            color: '#ffffff',
-                                            border: 'none',
-                                            padding: '6px 14px',
-                                            minHeight: '34px',
-                                            borderRadius: '100px',
-                                            fontSize: '0.82rem',
-                                            fontWeight: 850,
-                                            cursor: 'pointer',
-                                            display: 'inline-flex',
-                                            alignItems: 'center',
-                                            gap: '5px',
-                                            boxShadow: '0 2px 6px rgba(22, 163, 74, 0.25)'
-                                          }}
-                                          className="hover-scale-mini"
-                                          title="Als im Unterricht besprochen markieren"
-                                        >
-                                          <Check size={14} strokeWidth={2.5} />
-                                          <span>Im Unterricht besprochen</span>
-                                        </button>
-                                      </div>
-                                    </div>
-                                  )}
-
-                                  {/* Lehrwerke Books */}
-                                  {lehrwerkeList.map((item, idx) => {
-                                    const bookColor = getLehrwerkColor(item.title);
-                                    const bookObj = globalLehrwerke.find(b => b.title === item.title);
-                                    const assignedBook = bookObj ? assignedLehrwerke.find(a => a.lehrwerkId === bookObj.id) : null;
-                                    
-                                    const pagesWithNotes = assignedBook ? item.pages.filter((p: number) => {
-                                      const pState = assignedBook.pageStates?.[p];
-                                      if (pState && getCleanPageNotes(pState.homeworkNotes || pState.homework_notes) !== '') return true;
-                                      const dbItem = deduplicatedItems.find((x: any) => x.topic_name === `${item.title} - Seite ${p}`);
-                                      if (dbItem && getCleanPageNotes(dbItem.homework_notes) !== '') return true;
-                                      return false;
-                                    }) : [];
-
-                                    return (
-                                      <div key={`lw-${idx}`} style={{
-                                        display: 'flex',
-                                        flexDirection: 'column',
-                                        gap: '6px',
-                                        paddingBottom: idx < lehrwerkeList.length - 1 || otherHWs.length > 0 ? '10px' : '0',
-                                        borderBottom: idx < lehrwerkeList.length - 1 || otherHWs.length > 0 ? '1px solid rgba(0,0,0,0.06)' : 'none'
-                                      }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
-                                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
-                                            <div style={{
-                                              width: '26px',
-                                              height: '30px',
-                                              background: `linear-gradient(135deg, ${bookColor.from}, ${bookColor.to})`,
-                                              borderRadius: '6px',
-                                              flexShrink: 0,
-                                              display: 'flex',
-                                              alignItems: 'center',
-                                              justifyContent: 'center',
-                                              boxShadow: '0 2px 5px rgba(0,0,0,0.1)'
-                                            }}>
-                                              <BookOpen size={13} color={bookColor.text} />
-                                            </div>
-                                            <span style={{
-                                              fontSize: '0.96rem',
-                                              fontWeight: 850,
-                                              color: '#0f172a',
-                                              overflow: 'hidden',
-                                              textOverflow: 'ellipsis',
-                                              whiteSpace: 'nowrap'
-                                            }}>
-                                              {item.title}
-                                            </span>
-                                          </div>
-
-                                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
-                                            {readOnly ? (
-                                              /* Kompakte zusammenhängende Seiten-Pille für Schüler (z.B. S. 1–3) */
-                                              <span
-                                                aria-label={formatPageNumbersGerman(item.pages)}
-                                                title={formatPageNumbersGerman(item.pages)}
-                                                style={{
-                                                  fontSize: '0.82rem',
-                                                  fontWeight: 850,
-                                                  color: '#15803d',
-                                                  background: '#dcfce7',
-                                                  padding: '4px 11px',
-                                                  borderRadius: '99px',
-                                                  display: 'inline-flex',
-                                                  alignItems: 'center',
-                                                  letterSpacing: '-0.01em'
-                                                }}
-                                              >
-                                                {formatPageNumbers(item.pages)}
-                                              </span>
-                                            ) : (
-                                              /* Granular Page Badges for Teachers (mit Einzelseiten-Löschen) */
-                                              <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
-                                                {item.pages.map((p: number) => (
-                                                  <span key={`p-pill-${p}`} style={{
-                                                    fontSize: '0.80rem',
-                                                    fontWeight: 850,
-                                                    color: '#15803d',
-                                                    background: '#dcfce7',
-                                                    padding: '3px 8px',
-                                                    borderRadius: '99px',
-                                                    display: 'inline-flex',
-                                                    alignItems: 'center',
-                                                    gap: '4px'
-                                                  }}>
-                                                    S. {p}
-                                                    <button
-                                                      type="button"
-                                                      onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        handleRemoveSinglePageHomework(item.title, p);
-                                                      }}
-                                                      style={{
-                                                        border: 'none',
-                                                        background: 'none',
-                                                        color: '#15803d',
-                                                        cursor: 'pointer',
-                                                        fontSize: '0.70rem',
-                                                        fontWeight: 900,
-                                                        padding: '0',
-                                                        lineHeight: 1
-                                                      }}
-                                                      className="hover-scale-mini"
-                                                      title={`Seite ${p} aus Hausaufgaben entfernen`}
-                                                    >
-                                                      ✕
-                                                    </button>
-                                                  </span>
-                                                ))}
-                                              </div>
-                                            )}
-
-                                            {!readOnly && (
-                                              <button
-                                                type="button"
-                                                onClick={() => handleRemoveBookHomework(item.title)}
-                                                style={{
-                                                  border: 'none',
-                                                  background: 'rgba(239, 68, 68, 0.08)',
-                                                  color: '#dc2626',
-                                                  cursor: 'pointer',
-                                                  fontSize: '0.74rem',
-                                                  fontWeight: 800,
-                                                  padding: '4px 8px',
-                                                  borderRadius: '8px',
-                                                  marginLeft: '2px'
-                                                }}
-                                                className="hover-scale-mini"
-                                                title={`Gesamtes Buch "${item.title}" aus Hausaufgaben entfernen`}
-                                              >
-                                                ✕
-                                              </button>
-                                            )}
-                                          </div>
-                                        </div>
-
-                                        {/* Specific Page Notes (Frameless Editorial Flow + Micro TTS Speaker Pill) */}
-                                        {pagesWithNotes.map((p: number) => {
-                                          const pState = assignedBook?.pageStates?.[p];
-                                          let noteText = getCleanPageNotes(pState?.homeworkNotes || pState?.homework_notes);
-                                          if (!noteText) {
-                                            const dbItem = deduplicatedItems.find((x: any) => x.topic_name === `${item.title} - Seite ${p}`);
-                                            if (dbItem?.homework_notes) {
-                                              noteText = getCleanPageNotes(dbItem.homework_notes);
-                                            }
-                                          }
-                                          const isSpeakingThis = isTtsSpeaking && activeTtsKey === `book_note_${item.title}_${p}`;
-
-                                          const parsedAnn = parseStudentAnnotation(noteText, studentFirstName, isTeacherMode);
-                                          if (readOnly && parsedAnn.isSpecificToAnother) return null;
-
-                                          return (
-                                            <div key={`p-note-${p}`} style={{
-                                              display: 'flex',
-                                              alignItems: 'center',
-                                              justifyContent: 'space-between',
-                                              gap: '8px',
-                                              fontSize: '0.88rem',
-                                              lineHeight: 1.5,
-                                              padding: '5px 8px',
-                                              marginLeft: '32px',
-                                              borderRadius: '8px',
-                                              background: isSpeakingThis ? '#dcfce7' : (parsedAnn.isSpecificToCurrent ? '#f0fdf4' : 'transparent'),
-                                              border: parsedAnn.isSpecificToCurrent ? '1px solid #86efac' : 'none',
-                                              transition: 'all 0.15s ease'
-                                            }}>
-                                              <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', minWidth: 0 }}>
-                                                <span style={{ fontWeight: 850, color: '#e11d48', flexShrink: 0, fontSize: '0.88rem' }}>S. {p}:</span>
-                                                {parsedAnn.isSpecificToCurrent && (
-                                                  <span style={{
-                                                    display: 'inline-flex',
-                                                    alignItems: 'center',
-                                                    gap: '3px',
-                                                    background: '#dcfce7',
-                                                    color: '#15803d',
-                                                    border: '1px solid #86efac',
-                                                    borderRadius: '6px',
-                                                    padding: '2px 6px',
-                                                    fontSize: '0.72rem',
-                                                    fontWeight: 800,
-                                                    flexShrink: 0
-                                                  }}>
-                                                    <span>🎯</span>
-                                                    <span>Für dich</span>
-                                                  </span>
-                                                )}
-                                                {isTeacherMode && parsedAnn.targetStudentName && parsedAnn.targetStudentName !== 'Alle' && (
-                                                  <span style={{
-                                                    display: 'inline-flex',
-                                                    alignItems: 'center',
-                                                    gap: '3px',
-                                                    background: '#ede9fe',
-                                                    color: '#6d28d9',
-                                                    border: '1px solid #c4b5fd',
-                                                    borderRadius: '6px',
-                                                    padding: '2px 6px',
-                                                    fontSize: '0.72rem',
-                                                    fontWeight: 800,
-                                                    flexShrink: 0
-                                                  }}>
-                                                    <span>👤</span>
-                                                    <span>@{parsedAnn.targetStudentName}</span>
-                                                  </span>
-                                                )}
-                                                <span style={{ fontSize: '0.88rem', lineHeight: 1.5, fontWeight: parsedAnn.isSpecificToCurrent ? 650 : 550, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                                  {parsedAnn.cleanText}
-                                                </span>
-                                              </div>
-                                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
-                                                <button
-                                                  type="button"
-                                                  onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    handleSpeakText(`Seite ${p}: ${parsedAnn.cleanText}`, `book_note_${item.title}_${p}`);
-                                                  }}
-                                                  style={{
-                                                    border: 'none',
-                                                    background: isSpeakingThis ? '#bbf7d0' : 'none',
-                                                    color: isSpeakingThis ? '#15803d' : '#94a3b8',
-                                                    cursor: 'pointer',
-                                                    padding: '2px 4px',
-                                                    borderRadius: '4px',
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    transition: 'transform 0.15s ease'
-                                                  }}
-                                                  onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.2)'; }}
-                                                  onMouseLeave={(e) => { e.currentTarget.style.transform = 'none'; }}
-                                                  title="Notiz vorlesen"
-                                                >
-                                                  <Volume2 size={13} strokeWidth={2.4} />
-                                                </button>
-
-                                                {!readOnly && (
-                                                  <button
-                                                    type="button"
-                                                    onClick={() => handleDeletePageNote(item.title, p)}
-                                                    style={{
-                                                      border: 'none',
-                                                      background: 'none',
-                                                      color: '#94a3b8',
-                                                      cursor: 'pointer',
-                                                      fontSize: '0.70rem',
-                                                      fontWeight: 800,
-                                                      padding: '2px'
-                                                    }}
-                                                    className="hover-scale-mini"
-                                                    title="Notiz löschen"
-                                                  >
-                                                    ✕
-                                                  </button>
-                                                )}
-                                              </div>
-                                            </div>
-                                          );
-                                        })}
-                                      </div>
-                                    );
-                                  })}
-
-                                  {/* Songs List */}
-                                  {otherHWs.length > 0 && (
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                                      {otherHWs.map((item, idx) => {
-                                        const songNote = getCleanPageNotes(item.homework_notes);
-                                        const isSpeakingThisSong = isTtsSpeaking && activeTtsKey === `song_note_${idx}`;
-                                        return (
-                                          <div key={`song-hw-${idx}`} style={{
-                                            display: 'flex',
-                                            flexDirection: 'column',
-                                            gap: '6px',
-                                            paddingBottom: idx < otherHWs.length - 1 ? '10px' : '0',
-                                            borderBottom: idx < otherHWs.length - 1 ? '1px solid rgba(0,0,0,0.06)' : 'none'
-                                          }}>
-                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
-                                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
-                                                <div style={{
-                                                  width: '26px',
-                                                  height: '26px',
-                                                  borderRadius: '8px',
-                                                  background: 'linear-gradient(135deg, #e0e7ff, #c7d2fe)',
-                                                  display: 'flex',
-                                                  alignItems: 'center',
-                                                  justifyContent: 'center',
-                                                  color: '#4338ca',
-                                                  flexShrink: 0
-                                                }}>
-                                                  <Music size={13} strokeWidth={2.4} />
-                                                </div>
-                                                <span style={{
-                                                  fontSize: '0.96rem',
-                                                  fontWeight: 850,
-                                                  color: '#0f172a',
-                                                  overflow: 'hidden',
-                                                  textOverflow: 'ellipsis',
-                                                  whiteSpace: 'nowrap'
-                                                }}>
-                                                  {item.topic_name.replace(/\s*\([^)]*\)\s*$/, '')}
-                                                </span>
-                                              </div>
-
-                                              {!readOnly && (
-                                                <button
-                                                  type="button"
-                                                  onClick={() => handleRemoveSongHomework(item)}
-                                                  style={{
-                                                    border: 'none',
-                                                    background: 'rgba(239, 68, 68, 0.08)',
-                                                    color: '#dc2626',
-                                                    cursor: 'pointer',
-                                                    fontSize: '0.74rem',
-                                                    fontWeight: 800,
-                                                    padding: '4px 8px',
-                                                    borderRadius: '8px',
-                                                    flexShrink: 0
-                                                  }}
-                                                  className="hover-scale-mini"
-                                                  title="Song aus Hausaufgaben entfernen"
-                                                >
-                                                  ✕
-                                                </button>
-                                              )}
-                                            </div>
-
-                                            {/* Specific Song Practice Note (Frameless Editorial Flow + Micro TTS Speaker Pill) */}
-                                            {songNote ? (() => {
-                                              const parsedAnn = parseStudentAnnotation(songNote, studentFirstName, isTeacherMode);
-                                              if (readOnly && parsedAnn.isSpecificToAnother) return null;
-
-                                              return (
-                                                <div style={{
-                                                  display: 'flex',
-                                                  alignItems: 'center',
-                                                  justifyContent: 'space-between',
-                                                  gap: '8px',
-                                                  fontSize: '0.88rem',
-                                                  lineHeight: 1.5,
-                                                  padding: '5px 8px',
-                                                  marginLeft: '32px',
-                                                  borderRadius: '8px',
-                                                  background: isSpeakingThisSong ? '#e0e7ff' : (parsedAnn.isSpecificToCurrent ? '#f0fdf4' : 'transparent'),
-                                                  border: parsedAnn.isSpecificToCurrent ? '1px solid #86efac' : 'none',
-                                                  transition: 'all 0.15s ease'
-                                                }}>
-                                                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', minWidth: 0 }}>
-                                                    <span style={{ fontWeight: 850, color: '#4f46e5', flexShrink: 0, fontSize: '0.88rem' }}>📌 Fahrplan:</span>
-                                                    {parsedAnn.isSpecificToCurrent && (
-                                                      <span style={{
-                                                        display: 'inline-flex',
-                                                        alignItems: 'center',
-                                                        gap: '3px',
-                                                        background: '#dcfce7',
-                                                        color: '#15803d',
-                                                        border: '1px solid #86efac',
-                                                        borderRadius: '6px',
-                                                        padding: '2px 6px',
-                                                        fontSize: '0.72rem',
-                                                        fontWeight: 800,
-                                                        flexShrink: 0
-                                                      }}>
-                                                        <span>🎯</span>
-                                                        <span>Für dich</span>
-                                                      </span>
-                                                    )}
-                                                    {isTeacherMode && parsedAnn.targetStudentName && parsedAnn.targetStudentName !== 'Alle' && (
-                                                      <span style={{
-                                                        display: 'inline-flex',
-                                                        alignItems: 'center',
-                                                        gap: '3px',
-                                                        background: '#ede9fe',
-                                                        color: '#6d28d9',
-                                                        border: '1px solid #c4b5fd',
-                                                        borderRadius: '6px',
-                                                        padding: '2px 6px',
-                                                        fontSize: '0.72rem',
-                                                        fontWeight: 800,
-                                                        flexShrink: 0
-                                                      }}>
-                                                        <span>👤</span>
-                                                        <span>@{parsedAnn.targetStudentName}</span>
-                                                      </span>
-                                                    )}
-                                                    <span style={{ fontSize: '0.88rem', lineHeight: 1.5, fontWeight: parsedAnn.isSpecificToCurrent ? 650 : 550, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                                      {renderTextWithDidacticBadges(parsedAnn.cleanText)}
-                                                    </span>
-                                                  </div>
-                                                  <button
-                                                    type="button"
-                                                    onClick={(e) => {
-                                                      e.stopPropagation();
-                                                      handleSpeakText(`Fahrplan für ${item.topic_name.replace(/\s*\([^)]*\)\s*$/, '')}: ${parsedAnn.cleanText}`, `song_note_${idx}`);
-                                                    }}
-                                                    style={{
-                                                      border: 'none',
-                                                      background: isSpeakingThisSong ? '#c7d2fe' : 'none',
-                                                      color: isSpeakingThisSong ? '#4338ca' : '#94a3b8',
-                                                      cursor: 'pointer',
-                                                      padding: '2px 4px',
-                                                      borderRadius: '4px',
-                                                      display: 'flex',
-                                                      alignItems: 'center',
-                                                      flexShrink: 0,
-                                                      transition: 'transform 0.15s ease'
-                                                    }}
-                                                    onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.2)'; }}
-                                                    onMouseLeave={(e) => { e.currentTarget.style.transform = 'none'; }}
-                                                    title="Fahrplan vorlesen"
-                                                  >
-                                                    <Volume2 size={13} strokeWidth={2.4} />
-                                                  </button>
-                                                </div>
-                                              );
-                                            })() : null}
-                                          </div>
-                                        );
-                                      })}
-                                    </div>
-                                  )}
-
-                                  {/* Audio Badges in Live Preview */}
-                                  {audioNotes.length > 0 && (
-                                    <div style={{ paddingTop: '2px' }}>
-                                      <AudioTrackCarousel
-                                        tracks={audioNotes}
-                                        onDelete={!readOnly ? handleDeleteNote : undefined}
-                                        readOnly={readOnly}
-                                      />
-                                    </div>
-                                  )}
-
-                                  {/* Individual Schnelltext / Notes Items in Schülervorschau Stage Box */}
-                                  {homeworkNoteItems.length > 0 && (
-                                    <div style={{
-                                      display: 'flex',
-                                      flexDirection: 'column',
-                                      gap: '6px',
-                                      paddingTop: (lehrwerkeList.length > 0 || otherHWs.length > 0 || audioNotes.length > 0) ? '6px' : '0',
-                                      borderTop: (lehrwerkeList.length > 0 || otherHWs.length > 0 || audioNotes.length > 0) ? '1px dashed #e2e8f0' : 'none'
-                                    }}>
-                                      {homeworkNoteItems
-                                        .filter(item => {
-                                          if (!item || typeof item !== 'string') return false;
-                                          const lower = item.toLowerCase();
-                                          if (lower.startsWith('latency:') || lower.startsWith('latency_calibration:') || item.startsWith('SYSTEM:') || item.startsWith('STICKER:') || item.startsWith('AUDIO:') || item.startsWith('LOOP:')) return false;
-
-                                          // 👥 DUO & GRUPPENUNTERRICHT: If in student mode (readOnly), filter out notes explicitly targeted to a different student
-                                          if (readOnly) {
-                                            const parsedAnn = parseStudentAnnotation(item, studentFirstName, false);
-                                            if (parsedAnn.isSpecificToAnother) {
-                                              return false;
-                                            }
-                                          }
-
-                                          return !selectedCategoryFilter || item.toLowerCase().includes(selectedCategoryFilter.toLowerCase());
-                                        })
-                                        .map((noteItem, nIdx) => {
-                                          const isSpeakingThisNote = isTtsSpeaking && activeTtsKey === `general_note_${nIdx}`;
-                                          const parsedAnn = parseStudentAnnotation(noteItem, studentFirstName, isTeacherMode);
-                                          const currentTag = DIDACTIC_QUICK_TAGS.find(t => noteItem.includes(t.tag));
-                                          const cleanNoteText = currentTag 
-                                            ? parsedAnn.cleanText.replace(new RegExp(`\\s*${currentTag.tag.replace('#', '\\#')}`, 'g'), '').trim() 
-                                            : parsedAnn.cleanText;
-                                          const isPickerOpen = activeTagPickerRowIndex === nIdx;
-
-                                          return (
-                                            <div
-                                              key={`hw-note-row-${nIdx}`}
-                                              style={{
-                                                position: 'relative',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'space-between',
-                                                gap: '10px',
-                                                padding: '8px 12px',
-                                                borderRadius: '10px',
-                                                background: isSpeakingThisNote ? '#dcfce7' : (parsedAnn.isSpecificToCurrent ? '#f0fdf4' : '#ffffff'),
-                                                border: parsedAnn.isSpecificToCurrent ? '1px solid #86efac' : '1px solid #e2e8f0',
-                                                boxShadow: parsedAnn.isSpecificToCurrent ? '0 2px 6px rgba(34, 197, 94, 0.08)' : '0 1px 2px rgba(0,0,0,0.02)',
-                                                transition: 'all 0.15s ease'
-                                              }}
-                                            >
-                                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
-                                                <FileText size={14} style={{ color: '#16a34a', flexShrink: 0 }} />
-                                                
-                                                {/* Personal Badge if targeted to current student */}
-                                                {parsedAnn.isSpecificToCurrent && (
-                                                  <span style={{
-                                                    display: 'inline-flex',
-                                                    alignItems: 'center',
-                                                    gap: '3px',
-                                                    background: '#dcfce7',
-                                                    color: '#15803d',
-                                                    border: '1px solid #86efac',
-                                                    borderRadius: '8px',
-                                                    padding: '2px 7px',
-                                                    fontSize: '0.72rem',
-                                                    fontWeight: 800,
-                                                    flexShrink: 0
-                                                  }}>
-                                                    <span>🎯</span>
-                                                    <span>Für dich ({studentFirstName})</span>
-                                                  </span>
-                                                )}
-
-                                                {/* Teacher view badge if note has specific student tag */}
-                                                {isTeacherMode && parsedAnn.targetStudentName && parsedAnn.targetStudentName !== 'Alle' && (
-                                                  <span style={{
-                                                    display: 'inline-flex',
-                                                    alignItems: 'center',
-                                                    gap: '3px',
-                                                    background: '#ede9fe',
-                                                    color: '#6d28d9',
-                                                    border: '1px solid #c4b5fd',
-                                                    borderRadius: '8px',
-                                                    padding: '2px 7px',
-                                                    fontSize: '0.72rem',
-                                                    fontWeight: 800,
-                                                    flexShrink: 0
-                                                  }}>
-                                                    <span>👤</span>
-                                                    <span>@{parsedAnn.targetStudentName}</span>
-                                                  </span>
-                                                )}
-
-                                                {/* Group badge if @Alle */}
-                                                {parsedAnn.targetStudentName === 'Alle' && (
-                                                  <span style={{
-                                                    display: 'inline-flex',
-                                                    alignItems: 'center',
-                                                    gap: '3px',
-                                                    background: '#f1f5f9',
-                                                    color: '#475569',
-                                                    border: '1px solid #cbd5e1',
-                                                    borderRadius: '8px',
-                                                    padding: '2px 7px',
-                                                    fontSize: '0.72rem',
-                                                    fontWeight: 800,
-                                                    flexShrink: 0
-                                                  }}>
-                                                    <span>👥</span>
-                                                    <span>@Alle</span>
-                                                  </span>
-                                                )}
-
-                                                <span style={{
-                                                  color: '#1e293b',
-                                                  fontWeight: parsedAnn.isSpecificToCurrent ? 750 : 650,
-                                                  fontSize: '0.88rem',
-                                                  lineHeight: 1.5,
-                                                  overflow: 'hidden',
-                                                  textOverflow: 'ellipsis',
-                                                  whiteSpace: 'nowrap'
-                                                }}>
-                                                  {cleanNoteText}
-                                                </span>
-                                              </div>
-
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
-                                              {/* Contextual Inline Tag Picker / Badge */}
-                                              {!readOnly ? (
-                                                <div style={{ position: 'relative' }}>
-                                                  <button
-                                                    type="button"
-                                                    onClick={(e) => {
-                                                      e.stopPropagation();
-                                                      setActiveTagPickerRowIndex(isPickerOpen ? null : nIdx);
-                                                    }}
-                                                    style={{
-                                                      border: currentTag ? `1px solid ${currentTag.border}` : '1px dashed #cbd5e1',
-                                                      background: currentTag ? currentTag.bg : '#f8fafc',
-                                                      color: currentTag ? currentTag.color : '#64748b',
-                                                      fontSize: '0.72rem',
-                                                      fontWeight: 800,
-                                                      padding: '3px 9px',
-                                                      borderRadius: '100px',
-                                                      cursor: 'pointer',
-                                                      display: 'inline-flex',
-                                                      alignItems: 'center',
-                                                      gap: '3px',
-                                                      transition: 'all 0.15s ease'
-                                                    }}
-                                                    className="hover-scale-mini"
-                                                    title={currentTag ? `Tag: ${currentTag.tag} (Klicken zum Ändern)` : 'Didaktischen Tag zuweisen'}
-                                                  >
-                                                    {currentTag ? (
-                                                      <>
-                                                        <Hash size={8} strokeWidth={2.8} />
-                                                        <span>{currentTag.tag.replace(/^#/, '')}</span>
-                                                        <ChevronDown size={9} strokeWidth={2.5} style={{ opacity: 0.7 }} />
-                                                      </>
-                                                    ) : (
-                                                      <>
-                                                        <Plus size={9} strokeWidth={2.8} />
-                                                        <span>Tag</span>
-                                                      </>
-                                                    )}
-                                                  </button>
-
-                                                  {/* Floating Apple Glassmorphism Popover */}
-                                                  {isPickerOpen && (
-                                                    <>
-                                                      <div
-                                                        onClick={(e) => {
-                                                          e.stopPropagation();
-                                                          setActiveTagPickerRowIndex(null);
-                                                        }}
-                                                        style={{ position: 'fixed', inset: 0, zIndex: 999 }}
-                                                      />
-                                                      <div
-                                                        onClick={(e) => e.stopPropagation()}
-                                                        style={{
-                                                          position: 'absolute',
-                                                          right: 0,
-                                                          top: '100%',
-                                                          marginTop: '4px',
-                                                          background: '#ffffff',
-                                                          border: '1px solid #e2e8f0',
-                                                          borderRadius: '12px',
-                                                          boxShadow: '0 10px 25px -5px rgba(0,0,0,0.15), 0 4px 6px -2px rgba(0,0,0,0.05)',
-                                                          padding: '8px',
-                                                          zIndex: 1000,
-                                                          display: 'flex',
-                                                          flexDirection: 'column',
-                                                          gap: '4px',
-                                                          minWidth: '180px'
-                                                        }}
-                                                      >
-                                                        <div style={{ fontSize: '0.62rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.04em', padding: '2px 4px' }}>
-                                                          Schwerpunkt wählen:
-                                                        </div>
-                                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px' }}>
-                                                          {DIDACTIC_QUICK_TAGS.map(t => {
-                                                            const isSelected = currentTag?.tag === t.tag;
-                                                            return (
-                                                              <button
-                                                                key={t.tag}
-                                                                type="button"
-                                                                onClick={() => handleSetRowTag(nIdx, isSelected ? null : t.tag)}
-                                                                style={{
-                                                                  background: isSelected ? t.color : t.bg,
-                                                                  color: isSelected ? '#ffffff' : t.color,
-                                                                  border: `1px solid ${isSelected ? t.color : t.border}`,
-                                                                  borderRadius: '8px',
-                                                                  padding: '4px 6px',
-                                                                  fontSize: '0.68rem',
-                                                                  fontWeight: 800,
-                                                                  cursor: 'pointer',
-                                                                  display: 'flex',
-                                                                  alignItems: 'center',
-                                                                  gap: '4px',
-                                                                  justifyContent: 'flex-start',
-                                                                  transition: 'all 0.15s ease'
-                                                                }}
-                                                                className="hover-scale-mini"
-                                                              >
-                                                                <Hash size={8} strokeWidth={2.8} />
-                                                                <span>{t.tag.replace(/^#/, '')}</span>
-                                                              </button>
-                                                            );
-                                                          })}
-                                                        </div>
-                                                        {currentTag && (
-                                                          <button
-                                                            type="button"
-                                                            onClick={() => handleSetRowTag(nIdx, null)}
-                                                            style={{
-                                                              border: 'none',
-                                                              background: '#fef2f2',
-                                                              color: '#dc2626',
-                                                              borderRadius: '6px',
-                                                              padding: '4px',
-                                                              fontSize: '0.66rem',
-                                                              fontWeight: 750,
-                                                              cursor: 'pointer',
-                                                              marginTop: '4px',
-                                                              display: 'flex',
-                                                              alignItems: 'center',
-                                                              justifyContent: 'center',
-                                                              gap: '4px'
-                                                            }}
-                                                          >
-                                                            <Trash2 size={10} />
-                                                            <span>Tag entfernen</span>
-                                                          </button>
-                                                        )}
-                                                      </div>
-                                                    </>
-                                                  )}
-                                                </div>
-                                              ) : (
-                                                currentTag && (
-                                                  <span
-                                                    style={{
-                                                      background: currentTag.bg,
-                                                      color: currentTag.color,
-                                                      border: `1px solid ${currentTag.border}`,
-                                                      fontSize: '0.66rem',
-                                                      fontWeight: 800,
-                                                      padding: '2px 7px',
-                                                      borderRadius: '100px',
-                                                      display: 'inline-flex',
-                                                      alignItems: 'center',
-                                                      gap: '3px'
-                                                    }}
-                                                  >
-                                                    <Hash size={8} strokeWidth={2.8} />
-                                                    <span>{currentTag.tag.replace(/^#/, '')}</span>
-                                                  </span>
-                                                )
-                                              )}
-
-                                              {/* Micro TTS Speaker Pill */}
-                                              <button
-                                                type="button"
-                                                onClick={(e) => {
-                                                  e.stopPropagation();
-                                                  handleSpeakText(cleanNoteText, `general_note_${nIdx}`);
-                                                }}
-                                                style={{
-                                                  border: 'none',
-                                                  background: isSpeakingThisNote ? '#bbf7d0' : 'none',
-                                                  color: isSpeakingThisNote ? '#15803d' : '#94a3b8',
-                                                  cursor: 'pointer',
-                                                  padding: '2px 4px',
-                                                  borderRadius: '4px',
-                                                  display: 'flex',
-                                                  alignItems: 'center',
-                                                  transition: 'transform 0.15s ease'
-                                                }}
-                                                onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.2)'; }}
-                                                onMouseLeave={(e) => { e.currentTarget.style.transform = 'none'; }}
-                                                title="Diesen Baustein vorlesen"
-                                              >
-                                                <Volume2 size={12} strokeWidth={2.4} />
-                                              </button>
-
-                                              {/* Individual Delete Button */}
-                                              {!readOnly && (
-                                                <button
-                                                  type="button"
-                                                  onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    handleDeleteSingleNoteItem(nIdx);
-                                                  }}
-                                                  style={{
-                                                    border: 'none',
-                                                    background: 'rgba(239, 68, 68, 0.08)',
-                                                    color: '#dc2626',
-                                                    cursor: 'pointer',
-                                                    fontSize: '0.68rem',
-                                                    fontWeight: 800,
-                                                    padding: '3px 6px',
-                                                    borderRadius: '6px',
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    lineHeight: 1
-                                                  }}
-                                                  className="hover-scale-mini"
-                                                  title="Diesen Baustein entfernen"
-                                                >
-                                                  ✕
-                                                </button>
-                                              )}
-                                            </div>
-                                          </div>
-                                        );
-                                      })}
-                                    </div>
-                                  )}
-
-                                  {/* Smart Ghost-Slots if only notes or partial content exist */}
-                                  {lehrwerkeList.length === 0 && otherHWs.length === 0 && !readOnly && (
-                                    <div style={{
-                                      display: 'flex',
-                                      gap: '8px',
-                                      paddingTop: '6px',
-                                      borderTop: '1px dashed #e2e8f0',
-                                      justifyContent: 'center',
-                                      flexWrap: 'wrap'
-                                    }}>
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          setActiveSubView('hub');
-                                          setHubTab('protocol');
-                                          if (isMobileView) {
-                                            setMobileProtokollTab('repertoire');
-                                          }
-                                        }}
-                                        style={{
-                                          background: 'transparent',
-                                          border: '1px dashed #cbd5e1',
-                                          color: '#64748b',
-                                          fontSize: '0.78rem',
-                                          fontWeight: 750,
-                                          padding: '5px 12px',
-                                          borderRadius: '100px',
-                                          cursor: 'pointer',
-                                          display: 'flex',
-                                          alignItems: 'center',
-                                          gap: '5px',
-                                          transition: 'all 0.15s ease'
-                                        }}
-                                        className="hover-scale-mini"
-                                      >
-                                        <Plus size={11} />
-                                        <span>Lehrwerk oder Song anhängen</span>
-                                      </button>
-                                    </div>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                          {/* KÖRPER 1 SCHLUSS */}
-
-                            {/* ========================================================================= */}
-                            {/* KÖRPER 2: DAS PLAY-ALONG STUDIO (Akustik-Werkzeugbank)                    */}
-                            {/* ========================================================================= */}
-                            {!readOnly && (
-                              <div style={{
-                                background: '#f8fafc',
-                                border: '1px solid #e2e8f0',
-                                borderRadius: '18px',
-                                padding: '14px 18px',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                gap: '10px',
-                                boxShadow: '0 1px 3px rgba(0, 0, 0, 0.02)'
-                              }}>
-                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' }}>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                    <div style={{
-                                      width: '24px',
-                                      height: '24px',
-                                      borderRadius: '7px',
-                                      background: '#0f172a',
-                                      color: '#ffffff',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                      flexShrink: 0
-                                    }}>
-                                      <Mic size={13} strokeWidth={2.4} />
-                                    </div>
-                                    <span style={{ fontSize: '0.78rem', fontWeight: 850, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                                      Play-Along & Audio-Aufnahme
-                                    </span>
-                                  </div>
-                                  <span style={{ fontSize: '0.70rem', color: '#64748b', fontWeight: 650 }}>
-                                    {hasTresorStorage ? 'Tresor aktiv (bis 7 Min.)' : 'Direktaufnahme (bis 60s)'}
-                                  </span>
-                                </div>
-
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                                  {playAlongCountInRemaining !== null ? (
-                                    <button
-                                      type="button"
-                                      onClick={cancelPlayAlongCountIn}
-                                      style={{
-                                        background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-                                        color: '#ffffff',
-                                        border: 'none',
-                                        padding: '8px 16px',
-                                        minHeight: '38px',
-                                        borderRadius: '100px',
-                                        fontSize: '0.80rem',
-                                        fontWeight: 900,
-                                        cursor: 'pointer',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '6px',
-                                        boxShadow: '0 0 12px rgba(245, 158, 11, 0.4)',
-                                        flexShrink: 0
-                                      }}
-                                      title="Einzähler abbrechen"
-                                    >
-                                      <Timer size={14} />
-                                      <span>Einzählen: {playAlongCountInRemaining} (Stopp)</span>
-                                    </button>
-                                  ) : !isRecordingAudio ? (
-                                    <button
-                                      type="button"
-                                      onClick={handleStartPlayAlongRecording}
-                                      disabled={isUploadingAudio}
-                                      style={{
-                                        background: '#0f172a',
-                                        color: '#ffffff',
-                                        border: 'none',
-                                        padding: '8px 16px',
-                                        minHeight: '38px',
-                                        borderRadius: '100px',
-                                        fontSize: '0.80rem',
-                                        fontWeight: 800,
-                                        cursor: 'pointer',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '6px',
-                                        boxShadow: '0 2px 6px rgba(0,0,0,0.12)',
-                                        flexShrink: 0
-                                      }}
-                                      className="hover-scale"
-                                    >
-                                      <Mic size={14} />
-                                      <span>Aufnahme</span>
-                                    </button>
-                                  ) : (
-                                    <button
-                                      type="button"
-                                      onClick={() => stopRecordingAudio()}
-                                      style={{
-                                        background: '#ef4444',
-                                        color: '#ffffff',
-                                        border: 'none',
-                                        padding: '8px 16px',
-                                        minHeight: '38px',
-                                        borderRadius: '100px',
-                                        fontSize: '0.80rem',
-                                        fontWeight: 800,
-                                        cursor: 'pointer',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '6px',
-                                        boxShadow: '0 0 12px rgba(239, 68, 68, 0.4)',
-                                        flexShrink: 0
-                                      }}
-                                    >
-                                      <Square size={13} fill="#ffffff" />
-                                      <span>Stopp ({hasTresorStorage ? `${formatRecordTime(audioDuration)} / 7:00` : `${audioDuration}s / 60s`})</span>
-                                    </button>
-                                  )}
-
-                                  {!isRecordingAudio && playAlongCountInRemaining === null && (
-                                    <>
-                                      {/* ⏱️ 4er Einzähler Toggle Pill */}
-                                      <button
-                                        type="button"
-                                        onClick={() => setIsCountInEnabled(!isCountInEnabled)}
-                                        style={{
-                                          background: isCountInEnabled ? '#ecfdf5' : '#ffffff',
-                                          color: isCountInEnabled ? '#15803d' : '#64748b',
-                                          border: isCountInEnabled ? '1.5px solid #86efac' : '1px solid #cbd5e1',
-                                          padding: '0 11px',
-                                          height: '38px',
-                                          borderRadius: '100px',
-                                          fontSize: '0.74rem',
-                                          fontWeight: 800,
-                                          cursor: 'pointer',
-                                          display: 'flex',
-                                          alignItems: 'center',
-                                          gap: '5px',
-                                          flexShrink: 0,
-                                          transition: 'all 0.15s ease'
-                                        }}
-                                        title={isCountInEnabled ? '4-Beat Einzähler aktiv (Klick zum Deaktivieren)' : 'Einzähler inaktiv (Klick zum Aktivieren)'}
-                                      >
-                                        <Timer size={13} strokeWidth={isCountInEnabled ? 2.5 : 2} />
-                                        <span>4er Einzähler</span>
-                                      </button>
-
-                                      {/* ⏱️ Metronom & BPM Pill Button with Flyout */}
-                                      <div style={{ position: 'relative', flexShrink: 0 }}>
-                                        <button
-                                          type="button"
-                                          onClick={() => setShowPlayAlongMetronomePopup(!showPlayAlongMetronomePopup)}
-                                          style={{
-                                            background: isRecordingMetronomeActive ? '#ecfdf5' : '#ffffff',
-                                            color: isRecordingMetronomeActive ? '#15803d' : '#64748b',
-                                            border: isRecordingMetronomeActive ? '1.5px solid #86efac' : '1px solid #cbd5e1',
-                                            padding: '0 11px',
-                                            height: '38px',
-                                            borderRadius: '100px',
-                                            fontSize: '0.74rem',
-                                            fontWeight: 800,
-                                            cursor: 'pointer',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: '5px',
-                                            boxShadow: isRecordingMetronomeActive ? '0 2px 6px rgba(22, 163, 74, 0.15)' : 'none',
-                                            transition: 'all 0.15s ease'
-                                          }}
-                                          title="Klick & Tempo (BPM) einstellen"
-                                        >
-                                          <MechanicalMetronomeIcon size={14} color={isRecordingMetronomeActive ? '#15803d' : '#64748b'} strokeWidth={isRecordingMetronomeActive ? 2.5 : 2} />
-                                          <span>{recordingBpm} BPM</span>
-                                          <ChevronDown size={12} strokeWidth={2.5} style={{ transform: showPlayAlongMetronomePopup ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s ease' }} />
-                                        </button>
-
-                                        {/* Popover Flyout */}
-                                        {showPlayAlongMetronomePopup && (
-                                          <div style={{
-                                            position: 'absolute',
-                                            bottom: 'calc(100% + 8px)',
-                                            left: 0,
-                                            background: '#ffffff',
-                                            borderRadius: '16px',
-                                            border: '1.5px solid #e2e8f0',
-                                            boxShadow: '0 12px 30px rgba(0, 0, 0, 0.15), 0 2px 6px rgba(0,0,0,0.05)',
-                                            padding: '12px 14px',
-                                            width: '230px',
-                                            zIndex: 100,
-                                            display: 'flex',
-                                            flexDirection: 'column',
-                                            gap: '10px'
-                                          }}>
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                              <span style={{ fontSize: '0.80rem', fontWeight: 900, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                                                <MechanicalMetronomeIcon size={15} color="#16a34a" strokeWidth={2.2} />
-                                                <span>Klick & Tempo</span>
-                                              </span>
-                                              <button
-                                                type="button"
-                                                onClick={() => setShowPlayAlongMetronomePopup(false)}
-                                                style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '2px' }}
-                                              >
-                                                <X size={14} />
-                                              </button>
-                                            </div>
-
-                                            <button
-                                              type="button"
-                                              onClick={() => {
-                                                const next = !isRecordingMetronomeActive;
-                                                setIsRecordingMetronomeActive(next);
-                                                if (next) playMetronomeTick(true);
-                                              }}
-                                              style={{
-                                                width: '100%',
-                                                background: isRecordingMetronomeActive ? '#16a34a' : '#f1f5f9',
-                                                color: isRecordingMetronomeActive ? '#ffffff' : '#475569',
-                                                border: 'none',
-                                                borderRadius: '10px',
-                                                padding: '7px 10px',
-                                                fontSize: '0.75rem',
-                                                fontWeight: 850,
-                                                cursor: 'pointer',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'center',
-                                                gap: '6px',
-                                                boxShadow: isRecordingMetronomeActive ? '0 2px 8px rgba(22, 163, 74, 0.25)' : 'none'
-                                              }}
-                                              className="hover-scale-mini"
-                                            >
-                                              <span>{isRecordingMetronomeActive ? '✓ Klick bei Aufnahme AN' : 'Klick bei Aufnahme einschalten'}</span>
-                                            </button>
-
-                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.72rem', fontWeight: 800, color: '#475569' }}>
-                                                <span>Tempo</span>
-                                                <span style={{ color: '#16a34a', fontWeight: 900 }}>{recordingBpm} BPM</span>
-                                              </div>
-                                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                                <button
-                                                  type="button"
-                                                  onClick={() => setRecordingBpm(b => Math.max(40, b - 5))}
-                                                  style={{ background: '#f1f5f9', border: 'none', borderRadius: '6px', width: '24px', height: '24px', fontWeight: 900, cursor: 'pointer' }}
-                                                >-</button>
-                                                <input
-                                                  type="range"
-                                                  min="40"
-                                                  max="240"
-                                                  value={recordingBpm}
-                                                  onChange={(e) => setRecordingBpm(parseInt(e.target.value, 10))}
-                                                  style={{ flex: 1, accentColor: '#16a34a', cursor: 'pointer' }}
-                                                />
-                                                <button
-                                                  type="button"
-                                                  onClick={() => setRecordingBpm(b => Math.min(240, b + 5))}
-                                                  style={{ background: '#f1f5f9', border: 'none', borderRadius: '6px', width: '24px', height: '24px', fontWeight: 900, cursor: 'pointer' }}
-                                                >+</button>
-                                              </div>
-                                            </div>
-
-                                            <button
-                                              type="button"
-                                              onClick={() => playMetronomeTick(true)}
-                                              style={{
-                                                background: '#f8fafc',
-                                                border: '1px solid #e2e8f0',
-                                                borderRadius: '8px',
-                                                padding: '5px 8px',
-                                                fontSize: '0.70rem',
-                                                fontWeight: 750,
-                                                color: '#64748b',
-                                                cursor: 'pointer'
-                                              }}
-                                            >
-                                              🔊 Klick kurz testen
-                                            </button>
-                                          </div>
-                                        )}
-                                      </div>
-                                    </>
-                                  )}
-
-                                  {playAlongCountInRemaining !== null ? (
-                                    <div style={{
-                                      flex: 1,
-                                      fontSize: '0.78rem',
-                                      color: '#d97706',
-                                      fontWeight: 750,
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      gap: '8px',
-                                      paddingLeft: '4px'
-                                    }}>
-                                      <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#f59e0b', animation: 'pulse 0.5s infinite' }} />
-                                      <span>Einzähler läuft ({recordingBpm} BPM)... Aufnahme startet bei 1.</span>
-                                    </div>
-                                  ) : !isRecordingAudio ? (
-                                    <input
-                                      type="text"
-                                      placeholder="Titel der Begleitspur (optional, z. B. Play-Along Tempo 70)..."
-                                      value={audioLabel}
-                                      onChange={(e) => setAudioLabel(e.target.value)}
-                                      onKeyDown={(e) => {
-                                        if (e.key === 'Enter') {
-                                          e.preventDefault();
-                                          handleStartPlayAlongRecording();
-                                        }
-                                      }}
-                                      style={{
-                                        flex: 1,
-                                        minWidth: '130px',
-                                        fontSize: '0.82rem',
-                                        padding: '8px 12px',
-                                        minHeight: '38px',
-                                        borderRadius: '10px',
-                                        border: '1px solid #e2e8f0',
-                                        background: '#ffffff',
-                                        color: '#0f172a',
-                                        outline: 'none',
-                                        boxSizing: 'border-box'
-                                      }}
-                                    />
-                                  ) : (
-                                    <div style={{
-                                      flex: 1,
-                                      fontSize: '0.78rem',
-                                      color: '#dc2626',
-                                      fontWeight: 750,
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      gap: '8px',
-                                      paddingLeft: '4px'
-                                    }}>
-                                      <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#ef4444', animation: 'pulse 1s infinite' }} />
-                                      <span>Audioaufnahme läuft... {isRecordingMetronomeActive ? `(Klick: ${recordingBpm} BPM)` : 'Sprich oder spiele dein Instrument.'}</span>
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                            )}
-
-                            {/* ========================================================================= */}
-                            {/* KÖRPER 3: DIE HAUSAUFGABEN-REDAKTION (Text- & Redaktions-Werkbank)        */}
-                            {/* ========================================================================= */}
-                            {!readOnly && (() => {
-                              const toolboxViewingWeekIso = (() => {
-                                if (viewingWeekOffset === 0) return getISOWeek();
-                                const d = new Date();
-                                d.setDate(d.getDate() + (viewingWeekOffset * 7));
-                                return getISOWeek(d);
-                              })();
-                              const toolboxViewingWeekNum = toolboxViewingWeekIso.split('-W')[1] || '';
-
-                              const getViewingNotesForCurrentOffset = (): string => {
-                                if (viewingWeekOffset === 0) {
-                                  return generalHomeworkNotes;
-                                }
-                                const histWeekItem = (progressItems || []).find((item: any) => {
-                                  return item.topic_name === `Hausaufgabe KW ${toolboxViewingWeekNum}` ||
-                                         (item.created_at && getISOWeek(item.created_at) === toolboxViewingWeekIso) ||
-                                         (item.updated_at && getISOWeek(item.updated_at) === toolboxViewingWeekIso && item.topic_name.startsWith('Hausaufgabe KW '));
-                                });
-
-                                if (!histWeekItem || !histWeekItem.homework_notes) return '';
-                                try {
-                                  const parsed = typeof histWeekItem.homework_notes === 'string'
-                                    ? JSON.parse(histWeekItem.homework_notes)
-                                    : histWeekItem.homework_notes;
-                                  if (Array.isArray(parsed)) {
-                                    return parsed
-                                      .filter((n: string) => typeof n === 'string' && !isInternalMetadataNote(n))
-                                      .join('\n')
-                                      .trim();
-                                  } else if (typeof parsed === 'string') {
-                                    return parsed.split('\n').filter((s: string) => !isInternalMetadataNote(s)).join('\n').trim();
-                                  }
-                                } catch (e) {
-                                  return cleanNotesText(histWeekItem.homework_notes);
-                                }
-                                return '';
-                              };
-
-                              const activeViewingStudentNotes = getViewingNotesForCurrentOffset();
-
-                              return (
-                                <div style={{
-                                  background: activeNoteTarget === 'student' ? '#ffffff' : '#fffbeb',
-                                  border: activeNoteTarget === 'student' ? '1px solid #e2e8f0' : '1.5px solid #fcd34d',
-                                  borderRadius: '20px',
-                                  boxShadow: '0 4px 20px -2px rgba(0, 0, 0, 0.04)',
-                                  overflow: 'hidden',
-                                  display: 'flex',
-                                  flexDirection: 'column',
-                                  transition: 'all 0.2s ease'
-                                }}>
-                                  {/* 1. Redaktions-Kopf: Switcher & Diktieren */}
-                                  <div style={{
-                                    padding: '12px 16px',
-                                    background: activeNoteTarget === 'student' ? '#fafafa' : '#fef3c7',
-                                    borderBottom: '1px solid rgba(0,0,0,0.06)',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'space-between',
-                                    gap: '8px',
-                                    flexWrap: 'wrap'
-                                  }}>
-                                    {/* Apple Segmented Switcher */}
-                                    <div style={{
-                                      display: 'flex',
-                                      background: '#f1f5f9',
-                                      border: '1px solid #e2e8f0',
-                                      padding: '3px',
-                                      borderRadius: '10px',
-                                      gap: '3px'
-                                    }}>
-                                      <button
-                                        type="button"
-                                        onClick={() => setActiveNoteTarget('student')}
-                                        style={{
-                                          border: 'none',
-                                          background: activeNoteTarget === 'student' ? '#ffffff' : 'transparent',
-                                          color: activeNoteTarget === 'student' ? '#15803d' : '#64748b',
-                                          fontWeight: activeNoteTarget === 'student' ? 850 : 650,
-                                          fontSize: '0.80rem',
-                                          padding: '5px 12px',
-                                          borderRadius: '8px',
-                                          cursor: 'pointer',
-                                          boxShadow: activeNoteTarget === 'student' ? '0 1px 3px rgba(0,0,0,0.06)' : 'none',
-                                          display: 'flex',
-                                          alignItems: 'center',
-                                          gap: '6px',
-                                          transition: 'all 0.15s ease'
-                                        }}
-                                      >
-                                        <BookOpen size={13} />
-                                        <span>Hausaufgaben-Bemerkung</span>
-                                        {activeViewingStudentNotes.trim() && (
-                                          <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#34a853' }} />
-                                        )}
-                                      </button>
-
-                                      <button
-                                        type="button"
-                                        onClick={() => setActiveNoteTarget('teacher')}
-                                        style={{
-                                          border: 'none',
-                                          background: activeNoteTarget === 'teacher' ? '#ffffff' : 'transparent',
-                                          color: activeNoteTarget === 'teacher' ? '#92400e' : '#64748b',
-                                          fontWeight: activeNoteTarget === 'teacher' ? 850 : 650,
-                                          fontSize: '0.80rem',
-                                          padding: '5px 12px',
-                                          borderRadius: '8px',
-                                          cursor: 'pointer',
-                                          boxShadow: activeNoteTarget === 'teacher' ? '0 1px 3px rgba(0,0,0,0.06)' : 'none',
-                                          display: 'flex',
-                                          alignItems: 'center',
-                                          gap: '6px',
-                                          transition: 'all 0.15s ease'
-                                        }}
-                                      >
-                                        <Lock size={12} />
-                                        <span>Interne Notiz (Nur Lehrer)</span>
-                                        {teacherNotes.trim() && (
-                                          <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#b45309' }} />
-                                        )}
-                                      </button>
-                                    </div>
-
-                                    {/* Diktier-Button */}
-                                    <SpeechDictationButton
-                                      onTranscript={(text) => {
-                                        if (activeNoteTarget === 'student') {
-                                          const current = latestGeneralHomeworkNotesRef.current !== undefined
-                                            ? latestGeneralHomeworkNotesRef.current
-                                            : generalHomeworkNotes;
-                                          const trimmed = current.trim();
-                                          const next = trimmed ? `${trimmed}\n${text}` : text;
-                                          latestGeneralHomeworkNotesRef.current = next;
-                                          setGeneralHomeworkNotes(next);
-                                          try { localStorage.setItem(`campus_homework_notes_${student.id}`, next); } catch {}
-                                        } else {
-                                          const current = latestTeacherNotesRef.current !== undefined
-                                            ? latestTeacherNotesRef.current
-                                            : teacherNotes;
-                                          const trimmed = current.trim();
-                                          const next = trimmed ? `${trimmed}\n${text}` : text;
-                                          latestTeacherNotesRef.current = next;
-                                          setTeacherNotes(next);
-                                          try { localStorage.setItem(`campus_teacher_notes_${student.id}`, next); } catch {}
-                                        }
-                                        triggerDebouncedAutoSave(350);
-                                      }}
-                                      title="Diktieren"
-                                    />
-                                  </div>
-
-                                  {/* Notice Pill when in historical or future week */}
-                                  {viewingWeekOffset !== 0 && activeNoteTarget === 'student' && (
-                                    <div style={{
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'space-between',
-                                      background: viewingWeekOffset < 0 ? '#f8fafc' : '#f0fdf4',
-                                      borderBottom: `1px solid ${viewingWeekOffset < 0 ? '#e2e8f0' : '#bbf7d0'}`,
-                                      padding: '6px 16px',
-                                      fontSize: '0.74rem',
-                                      fontWeight: 650,
-                                      color: viewingWeekOffset < 0 ? '#475569' : '#166534'
-                                    }}>
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                        <span>{viewingWeekOffset < 0 ? '📅' : '🚀'}</span>
-                                        <span>
-                                          {viewingWeekOffset < 0
-                                            ? `Archivierte Woche (KW ${toolboxViewingWeekNum})`
-                                            : `Planungs-Vorschau (KW ${toolboxViewingWeekNum})`}
-                                        </span>
-                                      </div>
-                                      <button
-                                        type="button"
-                                        onClick={() => setViewingWeekOffset(0)}
-                                        style={{
-                                          background: 'none',
-                                          border: 'none',
-                                          color: viewingWeekOffset < 0 ? '#2563eb' : '#16a34a',
-                                          fontWeight: 800,
-                                          fontSize: '0.72rem',
-                                          cursor: 'pointer',
-                                          padding: 0
-                                        }}
-                                      >
-                                        ➔ Zur aktuellen Woche
-                                      </button>
-                                    </div>
-                                  )}
-
-                                  {/* Duo/Gruppen-Zuweisung: NUR wenn effectiveGroupStudents.length > 1 */}
-                                  {activeNoteTarget === 'student' && viewingWeekOffset === 0 && effectiveGroupStudents.length > 1 && (
-                                    <div style={{
-                                      padding: '10px 16px 2px 16px',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      gap: '6px',
-                                      flexWrap: 'wrap'
-                                    }}>
-                                      <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#64748b' }}>
-                                        Duo/Gruppen-Zuweisung:
-                                      </span>
-                                      {effectiveGroupStudents.map((grpStud, gIdx) => {
-                                        const gName = (grpStud?.first_name || (grpStud as any)?.name?.split(' ')[0] || '').trim();
-                                        if (!gName) return null;
-                                        const isCurrentStudent = gName.toLowerCase() === studentFirstName.toLowerCase();
-                                        return (
-                                          <button
-                                            key={`group-tag-btn-${gIdx}-${gName}`}
-                                            type="button"
-                                            onClick={() => {
-                                              const tagToInsert = `@${gName}: `;
-                                              const currentText = generalHomeworkNotes || '';
-                                              const cursor = studentNotesSelectionRef.current?.start ?? currentText.length;
-                                              const nextText = currentText.slice(0, cursor) + (currentText.length > 0 && !currentText.endsWith('\n') ? '\n' : '') + tagToInsert + currentText.slice(cursor);
-                                              latestGeneralHomeworkNotesRef.current = nextText;
-                                              setGeneralHomeworkNotes(nextText);
-                                              const noteLines = nextText.split('\n').map(s => s.trim()).filter(s => s.length > 0 && !isInternalMetadataNote(s));
-                                              setHomeworkNotesList(noteLines);
-                                              try { localStorage.setItem(`campus_homework_notes_${student.id}`, JSON.stringify(noteLines)); } catch {}
-                                              triggerDebouncedAutoSave(350);
-                                              setTimeout(() => {
-                                                if (studentNotesTextareaRef.current) {
-                                                  studentNotesTextareaRef.current.focus();
-                                                  const pos = cursor + tagToInsert.length + 1;
-                                                  studentNotesTextareaRef.current.setSelectionRange(pos, pos);
-                                                }
-                                              }, 20);
-                                            }}
-                                            style={{
-                                              background: isCurrentStudent ? '#e6f4ea' : '#ede9fe',
-                                              border: isCurrentStudent ? '1px solid rgba(52, 168, 83, 0.4)' : '1px solid rgba(139, 92, 246, 0.4)',
-                                              borderRadius: '6px',
-                                              padding: '3px 8px',
-                                              fontSize: '0.72rem',
-                                              fontWeight: 800,
-                                              color: isCurrentStudent ? '#15803d' : '#6d28d9',
-                                              cursor: 'pointer',
-                                              display: 'inline-flex',
-                                              alignItems: 'center',
-                                              gap: '4px',
-                                              transition: 'all 0.15s'
-                                            }}
-                                            className="hover-scale-mini"
-                                            title={`@${gName} zur Hausaufgabe zuweisen`}
-                                          >
-                                            + @{gName}
-                                          </button>
-                                        );
-                                      })}
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          const tagToInsert = '@Alle: ';
-                                          const currentText = generalHomeworkNotes || '';
-                                          const cursor = studentNotesSelectionRef.current?.start ?? currentText.length;
-                                          const nextText = currentText.slice(0, cursor) + (currentText.length > 0 && !currentText.endsWith('\n') ? '\n' : '') + tagToInsert + currentText.slice(cursor);
-                                          latestGeneralHomeworkNotesRef.current = nextText;
-                                          setGeneralHomeworkNotes(nextText);
-                                          const noteLines = nextText.split('\n').map(s => s.trim()).filter(s => s.length > 0 && !isInternalMetadataNote(s));
-                                          setHomeworkNotesList(noteLines);
-                                          try { localStorage.setItem(`campus_homework_notes_${student.id}`, JSON.stringify(noteLines)); } catch {}
-                                          triggerDebouncedAutoSave(350);
-                                          setTimeout(() => {
-                                            if (studentNotesTextareaRef.current) {
-                                              studentNotesTextareaRef.current.focus();
-                                              const pos = cursor + tagToInsert.length + 1;
-                                              studentNotesTextareaRef.current.setSelectionRange(pos, pos);
-                                            }
-                                          }, 20);
-                                        }}
-                                        style={{
-                                          background: '#f1f5f9',
-                                          border: '1px solid #cbd5e1',
-                                          borderRadius: '6px',
-                                          padding: '3px 8px',
-                                          fontSize: '0.72rem',
-                                          fontWeight: 800,
-                                          color: '#475569',
-                                          cursor: 'pointer',
-                                          display: 'inline-flex',
-                                          alignItems: 'center',
-                                          gap: '4px',
-                                          transition: 'all 0.15s'
-                                        }}
-                                        className="hover-scale-mini"
-                                      >
-                                        + @Alle
-                                      </button>
-                                    </div>
-                                  )}
-
-                                  {/* 2. Textarea Bereich */}
-                                  <div style={{ padding: '12px 16px' }}>
-                                    {activeNoteTarget === 'student' ? (
-                                      <textarea
-                                        ref={studentNotesTextareaRef}
-                                        placeholder={viewingWeekOffset === 0
-                                          ? "Trage hier Notizen, Hausaufgaben oder den Wochen-Fahrplan ein..."
-                                          : (viewingWeekOffset < 0
-                                            ? `Keine Notizen in KW ${toolboxViewingWeekNum} archiviert.`
-                                            : `Noch keine Notizen für KW ${toolboxViewingWeekNum} geplant.`)}
-                                        value={activeViewingStudentNotes}
-                                        onInput={(e) => {
-                                          adjustTextareaHeight(e.currentTarget);
-                                          studentNotesSelectionRef.current = {
-                                            start: e.currentTarget.selectionStart ?? e.currentTarget.value.length,
-                                            end: e.currentTarget.selectionEnd ?? e.currentTarget.value.length
-                                          };
-                                        }}
-                                        onSelect={(e) => {
-                                          const target = e.currentTarget;
-                                          studentNotesSelectionRef.current = {
-                                            start: target.selectionStart ?? target.value.length,
-                                            end: target.selectionEnd ?? target.value.length
-                                          };
-                                        }}
-                                        onClick={(e) => {
-                                          const target = e.currentTarget;
-                                          studentNotesSelectionRef.current = {
-                                            start: target.selectionStart ?? target.value.length,
-                                            end: target.selectionEnd ?? target.value.length
-                                          };
-                                        }}
-                                        onKeyUp={(e) => {
-                                          const target = e.currentTarget;
-                                          studentNotesSelectionRef.current = {
-                                            start: target.selectionStart ?? target.value.length,
-                                            end: target.selectionEnd ?? target.value.length
-                                          };
-                                        }}
-                                        onChange={(e) => {
-                                          const val = e.target.value;
-                                          const target = e.currentTarget;
-                                          adjustTextareaHeight(target);
-                                          studentNotesSelectionRef.current = {
-                                            start: target.selectionStart ?? val.length,
-                                            end: target.selectionEnd ?? val.length
-                                          };
-                                          if (viewingWeekOffset === 0) {
-                                            latestGeneralHomeworkNotesRef.current = val;
-                                            setGeneralHomeworkNotes(val);
-                                            const specialNotes = (homeworkNotesList || []).filter(n => typeof n === 'string' && isInternalMetadataNote(n));
-                                            const noteLines = val.split('\n').map(s => s.trim()).filter(s => s.length > 0 && !isInternalMetadataNote(s));
-                                            const combined = [...specialNotes, ...noteLines];
-                                            setHomeworkNotesList(combined);
-                                            try { localStorage.setItem(`campus_homework_notes_${student.id}`, JSON.stringify(combined)); } catch {}
-                                            triggerDebouncedAutoSave(350);
-                                          }
-                                        }}
-                                        onFocus={(e) => {
-                                          setIsNotesFocused(true);
-                                          adjustTextareaHeight(e.currentTarget);
-                                          const target = e.currentTarget;
-                                          studentNotesSelectionRef.current = {
-                                            start: target.selectionStart ?? target.value.length,
-                                            end: target.selectionEnd ?? target.value.length
-                                          };
-                                        }}
-                                        onBlur={(e) => {
-                                          const target = e.currentTarget;
-                                          studentNotesSelectionRef.current = {
-                                            start: target.selectionStart ?? target.value.length,
-                                            end: target.selectionEnd ?? target.value.length
-                                          };
-                                          triggerImmediateAutoSave();
-                                          if (!activeViewingStudentNotes.trim()) setIsNotesFocused(false);
-                                        }}
-                                        style={{
-                                          width: '100%',
-                                          minHeight: '84px',
-                                          height: 'auto',
-                                          padding: '0',
-                                          border: 'none',
-                                          fontSize: '0.94rem',
-                                          fontWeight: 550,
-                                          lineHeight: 1.55,
-                                          outline: 'none',
-                                          resize: 'none',
-                                          overflow: 'hidden',
-                                          background: 'transparent',
-                                          color: '#0f172a',
-                                          boxSizing: 'border-box',
-                                          display: 'block'
-                                        }}
-                                      />
-                                    ) : (
-                                      <textarea
-                                        ref={teacherNotesTextareaRef}
-                                        placeholder="Vertrauliche Notizen zum Schüler (nur für dich sichtbar)..."
-                                        value={teacherNotes}
-                                        onInput={(e) => {
-                                          adjustTextareaHeight(e.currentTarget);
-                                        }}
-                                        onChange={(e) => {
-                                          const val = e.target.value;
-                                          adjustTextareaHeight(e.currentTarget);
-                                          latestTeacherNotesRef.current = val;
-                                          setTeacherNotes(val);
-                                          try { localStorage.setItem(`campus_teacher_notes_${student.id}`, val); } catch {}
-                                          triggerDebouncedAutoSave(350);
-                                        }}
-                                        onBlur={() => triggerImmediateAutoSave()}
-                                        style={{
-                                          width: '100%',
-                                          minHeight: '84px',
-                                          height: 'auto',
-                                          padding: '0',
-                                          border: 'none',
-                                          fontSize: '0.94rem',
-                                          fontWeight: 550,
-                                          lineHeight: 1.55,
-                                          outline: 'none',
-                                          resize: 'none',
-                                          overflow: 'hidden',
-                                          background: 'transparent',
-                                          color: '#78350f',
-                                          boxSizing: 'border-box',
-                                          display: 'block'
-                                        }}
-                                      />
-                                    )}
-                                  </div>
-
-                                  {/* 3. Vorlagen-Dock: Nahtlos im Fuß der Redaktionskarte verankert */}
-                                  {activeNoteTarget === 'student' && (
-                                    <div style={{
-                                      padding: '10px 16px',
-                                      background: '#f8fafc',
-                                      borderTop: '1px solid #f1f5f9',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      gap: '6px',
-                                      overflowX: 'auto'
-                                    }} className="hide-scrollbar">
-                                      <span style={{ fontSize: '0.70rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.04em', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                        <Sparkles size={11} color="#94a3b8" />
-                                        <span>Vorlagen:</span>
-                                      </span>
-                                      {PRESET_CHIPS.map((chip, cIdx) => {
-                                        const isActive = chip.isBpm 
-                                          ? activeViewingStudentNotes.toLowerCase().includes('bpm')
-                                          : activeViewingStudentNotes.includes(chip.text);
-
-                                        return (
-                                          <button
-                                            key={`chip-${cIdx}`}
-                                            type="button"
-                                            onMouseDown={(e) => e.preventDefault()}
-                                            onClick={(e) => handleTogglePresetChip(chip, e)}
-                                            style={{
-                                              flexShrink: 0,
-                                              background: isActive ? '#f0fdf4' : '#ffffff',
-                                              color: isActive ? '#166534' : '#475569',
-                                              border: `1px solid ${isActive ? '#86efac' : '#e2e8f0'}`,
-                                              padding: '4px 11px',
-                                              borderRadius: '100px',
-                                              fontSize: '0.74rem',
-                                              fontWeight: isActive ? 800 : 650,
-                                              cursor: 'pointer',
-                                              boxShadow: isActive ? '0 1px 3px rgba(22, 101, 52, 0.12)' : '0 1px 2px rgba(0,0,0,0.03)',
-                                              transition: 'all 0.15s ease',
-                                              display: 'inline-flex',
-                                              alignItems: 'center',
-                                              gap: '4px'
-                                            }}
-                                            className="hover-scale-mini"
-                                            title={chip.text}
-                                          >
-                                            {isActive && <Check size={11} color="#166534" strokeWidth={3} />}
-                                            <span>{chip.label}</span>
-                                          </button>
-                                        );
-                                      })}
-                                    </div>
-                                  )}
-                                </div>
-                              );
-                            })()}
-                            </div>
-                          );
-                        })()}
-                    </div>
-                  </div>
-                  {/* Clean Bottom Spacing */}
-                  <div style={{ paddingBottom: (isMobileView || isInsideSim || isFullscreen) ? '24px' : '8px' }} />
-                </form>
-              </>
-            )}
-          </div>
-        </>
+            <MeisterwerkDocumentTab
+              DIDACTIC_QUICK_TAGS={DIDACTIC_QUICK_TAGS}
+              PRESET_CHIPS={PRESET_CHIPS}
+              activeBrush={activeBrush}
+              activeLehrwerkId={activeLehrwerkId}
+              activeNoteTarget={activeNoteTarget}
+              activePageNumber={activePageNumber}
+              activeSongSkills={activeSongSkills}
+              activeSubView={activeSubView}
+              activeTagPickerRowIndex={activeTagPickerRowIndex}
+              activeTtsKey={activeTtsKey}
+              adjustTextareaHeight={adjustTextareaHeight}
+              assignedLehrwerke={assignedLehrwerke}
+              audioDuration={audioDuration}
+              audioLabel={audioLabel}
+              awardSticker={awardSticker}
+              buildCompleteWeeklyHomeworkSpeechPhrases={buildCompleteWeeklyHomeworkSpeechPhrases}
+              cancelPlayAlongCountIn={cancelPlayAlongCountIn}
+              clickTimeoutRef={clickTimeoutRef}
+              collectedStickers={collectedStickers}
+              customTags={customTags}
+              effectiveGroupStudents={effectiveGroupStudents}
+              effectiveTeacherFullName={effectiveTeacherFullName}
+              expressionVal={expressionVal}
+              fingerVal={fingerVal}
+              formatRecordTime={formatRecordTime}
+              generalHomeworkNotes={generalHomeworkNotes}
+              getCanonicalSongKey={getCanonicalSongKey}
+              getFeedbackForWeek={getFeedbackForWeek}
+              getHomeworkNoteItems={getHomeworkNoteItems}
+              getISOWeek={getISOWeek}
+              getItemWeek={getItemWeek}
+              getLehrwerkColor={getLehrwerkColor}
+              getNormalizedSongTitle={getNormalizedSongTitle}
+              getSongColor={getSongColor}
+              getTargetWeekIso={getTargetWeekIso}
+              getWeekDateRange={getWeekDateRange}
+              getWeeksBetween={getWeeksBetween}
+              globalLehrwerke={globalLehrwerke}
+              handleAddCustomTag={handleAddCustomTag}
+              handleAssignLehrwerk={handleAssignLehrwerk}
+              handleAssignSongFromCatalog={handleAssignSongFromCatalog}
+              handleBackToHub={handleBackToHub}
+              handleCheckMatch={handleCheckMatch}
+              handleCommitStudentRating={handleCommitStudentRating}
+              handleCopyShareLink={handleCopyShareLink}
+              handleCreateAndAssignLehrwerk={handleCreateAndAssignLehrwerk}
+              handleCreateAndAssignSong={handleCreateAndAssignSong}
+              handleDeleteNote={handleDeleteNote}
+              handleDeletePageNote={handleDeletePageNote}
+              handleDeleteSingleNoteItem={handleDeleteSingleNoteItem}
+              handlePageDoubleClick={handlePageDoubleClick}
+              handleRemoveLehrwerk={handleRemoveLehrwerk}
+              handleRemoveSong={handleRemoveSong}
+              handleResetAllCurrentHomework={handleResetAllCurrentHomework}
+              handleResolveStudentQuestion={handleResolveStudentQuestion}
+              handleSave={handleSave}
+              handleSaveStudentQuestion={handleSaveStudentQuestion}
+              handleSetRowTag={handleSetRowTag}
+              handleShareEmail={handleShareEmail}
+              handleSpeakText={handleSpeakText}
+              handleStartPlayAlongRecording={handleStartPlayAlongRecording}
+              handleStopSpeaking={handleStopSpeaking}
+              handleStudentRatingChange={handleStudentRatingChange}
+              handleToggleMatchMode={handleToggleMatchMode}
+              handleTogglePresetChip={handleTogglePresetChip}
+              hasTresorStorage={hasTresorStorage}
+              homeworkNotes={homeworkNotes}
+              homeworkNotesList={homeworkNotesList}
+              hubTab={hubTab}
+              insertOrToggleTagInText={insertOrToggleTagInText}
+              isCountInEnabled={isCountInEnabled}
+              isCurrentHomework={isCurrentHomework}
+              isFullscreen={isFullscreen}
+              isInsideSim={isInsideSim}
+              isLinkCopied={isLinkCopied}
+              isMatchModeEnabled={isMatchModeEnabled}
+              isMatchRevealed={isMatchRevealed}
+              isMobileOrSim={isMobileOrSim}
+              isMobileView={isMobileView}
+              isQuestionEditorOpen={isQuestionEditorOpen}
+              isRecordingAudio={isRecordingAudio}
+              isRecordingMetronomeActive={isRecordingMetronomeActive}
+              isSavingFeedback={isSavingFeedback}
+              isSavingQuestion={isSavingQuestion}
+              isShareMenuOpen={isShareMenuOpen}
+              isSongMatch={isSongMatch}
+              isStudentNotePrivate={isStudentNotePrivate}
+              isStudentRatingCommitted={isStudentRatingCommitted}
+              isSubSlidersExpanded={isSubSlidersExpanded}
+              isTeacherMode={isTeacherMode}
+              isTeacherTools={isTeacherTools}
+              isTtsSpeaking={isTtsSpeaking}
+              isUploadingAudio={isUploadingAudio}
+              lastClickRef={lastClickRef}
+              lastMatchedAt={lastMatchedAt}
+              lastMatchedStudentPercent={lastMatchedStudentPercent}
+              lastMatchedTeacherPercent={lastMatchedTeacherPercent}
+              latestGeneralHomeworkNotesRef={latestGeneralHomeworkNotesRef}
+              latestTeacherNotesRef={latestTeacherNotesRef}
+              matchHistory={matchHistory}
+              mobileProtokollTab={mobileProtokollTab}
+              newCustomTagInput={newCustomTagInput}
+              newLehrwerkLoading={newLehrwerkLoading}
+              newLehrwerkPages={newLehrwerkPages}
+              newLehrwerkTitle={newLehrwerkTitle}
+              newSongArtist={newSongArtist}
+              newSongTitle={newSongTitle}
+              pageHomeworkNotes={pageHomeworkNotes}
+              pageNotesSelectionRef={pageNotesSelectionRef}
+              pageNotesTextareaRef={pageNotesTextareaRef}
+              parsedStudentQuestion={parsedStudentQuestion}
+              pendingFeedbackStatus={pendingFeedbackStatus}
+              pendingFeedbackTags={pendingFeedbackTags}
+              playAlongCountInRemaining={playAlongCountInRemaining}
+              playMetronomeTick={playMetronomeTick}
+              progressItems={progressItems}
+              questionDraftText={questionDraftText}
+              readOnly={readOnly}
+              recordingBpm={recordingBpm}
+              renderSongVinylCover={renderSongVinylCover}
+              renderTextWithDidacticBadges={renderTextWithDidacticBadges}
+              rhythmVal={rhythmVal}
+              saveFeedback={saveFeedback}
+              schoolId={studentSchoolId}
+              selectActiveSong={selectActiveSong}
+              selectTextbookPage={selectTextbookPage}
+              selectedActiveSongId={selectedActiveSongId}
+              selectedCategoryFilter={selectedCategoryFilter}
+              selectedHistoryWeek={selectedHistoryWeek}
+              setActiveBrush={setActiveBrush}
+              setActiveInputTab={setActiveInputTab}
+              setActiveLehrwerkId={setActiveLehrwerkId}
+              setActiveModalTab={setActiveModalTab}
+              setActiveNoteTarget={setActiveNoteTarget}
+              setActivePageNumber={setActivePageNumber}
+              setActiveSongSkills={setActiveSongSkills}
+              setActiveSubView={setActiveSubView}
+              setActiveTagPickerRowIndex={setActiveTagPickerRowIndex}
+              setActiveViewMode={setActiveViewMode}
+              setAudioLabel={setAudioLabel}
+              setExpressionVal={setExpressionVal}
+              setFingerVal={setFingerVal}
+              setGeneralHomeworkNotes={setGeneralHomeworkNotes}
+              setHasChanges={setHasChanges}
+              setHomeworkNotesList={setHomeworkNotesList}
+              setHubTab={setHubTab}
+              setIsCountInEnabled={setIsCountInEnabled}
+              setIsCurrentHomework={setIsCurrentHomework}
+              setIsNotesFocused={setIsNotesFocused}
+              setIsQuestionEditorOpen={setIsQuestionEditorOpen}
+              setIsRecordingMetronomeActive={setIsRecordingMetronomeActive}
+              setIsSavingFeedback={setIsSavingFeedback}
+              setIsShareMenuOpen={setIsShareMenuOpen}
+              setIsStudentNotePrivate={setIsStudentNotePrivate}
+              setIsSubSlidersExpanded={setIsSubSlidersExpanded}
+              setIsTransferModalOpen={setIsTransferModalOpen}
+              setMobileProtokollTab={setMobileProtokollTab}
+              setNewCustomTagInput={setNewCustomTagInput}
+              setNewLehrwerkPages={setNewLehrwerkPages}
+              setNewLehrwerkTitle={setNewLehrwerkTitle}
+              setNewSongArtist={setNewSongArtist}
+              setNewSongTitle={setNewSongTitle}
+              setPageChunk={setPageChunk}
+              setPageHomeworkNotes={setPageHomeworkNotes}
+              setPendingFeedbackStatus={setPendingFeedbackStatus}
+              setPendingFeedbackTags={setPendingFeedbackTags}
+              setQuestionDraftText={setQuestionDraftText}
+              setRecordingBpm={setRecordingBpm}
+              setRhythmVal={setRhythmVal}
+              setSelectedHistoryWeek={setSelectedHistoryWeek}
+              setShowAllPagesGrid={setShowAllPagesGrid}
+              setShowAssignDropdown={setShowAssignDropdown}
+              setShowCreateLehrwerkModal={setShowCreateLehrwerkModal}
+              setShowCreateSongModal={setShowCreateSongModal}
+              setShowPlayAlongMetronomePopup={setShowPlayAlongMetronomePopup}
+              setSongHomeworkNotes={setSongHomeworkNotes}
+              setSongModalTab={setSongModalTab}
+              setSongProgressPercent={setSongProgressPercent}
+              setSongSearch={setSongSearch}
+              setStatus={setStatus}
+              setStudentNotes={setStudentNotes}
+              setTeacherNotes={setTeacherNotes}
+              setViewingWeekOffset={setViewingWeekOffset}
+              shareMenuRef={shareMenuRef}
+              showAssignDropdown={showAssignDropdown}
+              showCreateLehrwerkModal={showCreateLehrwerkModal}
+              showCreateSongModal={showCreateSongModal}
+              showMatchConfetti={showMatchConfetti}
+              showPlayAlongMetronomePopup={showPlayAlongMetronomePopup}
+              showdownState={showdownState}
+              songHomeworkNotes={songHomeworkNotes}
+              songModalTab={songModalTab}
+              songNotesSelectionRef={songNotesSelectionRef}
+              songNotesTextareaRef={songNotesTextareaRef}
+              songProgressPercent={songProgressPercent}
+              songSearch={songSearch}
+              songs={songs}
+              sortedAssignedLehrwerke={sortedAssignedLehrwerke}
+              status={status}
+              stopRecordingAudio={stopRecordingAudio}
+              student={student}
+              studentFirstName={studentFirstName}
+              studentNotes={studentNotes}
+              studentNotesSelectionRef={studentNotesSelectionRef}
+              studentNotesTextareaRef={studentNotesTextareaRef}
+              studentRating={studentRating}
+              studentRatingUpdatedAt={studentRatingUpdatedAt}
+              teacherId={teacherId}
+              teacherNotes={teacherNotes}
+              teacherNotesTextareaRef={teacherNotesTextareaRef}
+              textbookPageChunkIndex={textbookPageChunkIndex}
+              toggleStudentFocusPage={toggleStudentFocusPage}
+              topicName={topicName}
+              triggerDebouncedAutoSave={triggerDebouncedAutoSave}
+              triggerDebouncedSongSave={triggerDebouncedSongSave}
+              triggerDebouncedTeacherNoteSave={triggerDebouncedTeacherNoteSave}
+              triggerDirectSave={triggerDirectSave}
+              triggerDirectSongSave={triggerDirectSongSave}
+              triggerImmediateAutoSave={triggerImmediateAutoSave}
+              uiLevel={uiLevel}
+              updateLehrwerkVisibility={updateLehrwerkVisibility}
+              useNotebookLayout={useNotebookLayout}
+              viewingWeekOffset={viewingWeekOffset}
+            />
       ) : activeModalTab === 'stickeralbum' ? (
-        /* STICKER SAMMELALBUM VIEW - 3D PANINI SAMMELALBUM (SENIOR DESIGNER LEVEL) */
-        <div style={{
-          flex: 1,
-          width: '100%',
-          padding: isMobileOrSim ? '20px 16px calc(280px + env(safe-area-inset-bottom, 40px)) 16px' : '28px 32px',
-          overflowY: 'auto',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '24px',
-          background: 'linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%)',
-          borderRadius: '0',
-          position: 'relative',
-          boxSizing: 'border-box'
-        }}>
-          {/* Keyframe animations */}
-          <style dangerouslySetInnerHTML={{__html: `
-            @keyframes holoShimmer {
-              0% { background-position: 0% 0%; }
-              50% { background-position: 100% 100%; }
-              100% { background-position: 0% 0%; }
-            }
-            @keyframes stickerGlow {
-              0%, 100% { box-shadow: 0 0 15px rgba(52, 168, 83, 0.25); }
-              50% { box-shadow: 0 0 28px rgba(52, 168, 83, 0.5); }
-            }
-            @keyframes peelIn {
-              0% { transform: scale(0.7) rotate(-6deg); opacity: 0; }
-              70% { transform: scale(1.04) rotate(2deg); }
-              100% { transform: scale(1) rotate(0deg); opacity: 1; }
-            }
-            .panini-sticker-card {
-              transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.2s ease, border-color 0.2s ease;
-              transform-style: preserve-3d;
-            }
-            .panini-sticker-card:hover {
-              transform: translateY(-4px);
-            }
-            .holo-foil-overlay {
-              background: linear-gradient(135deg, 
-                rgba(255, 0, 128, 0.25) 0%, 
-                rgba(0, 255, 255, 0.25) 25%, 
-                rgba(255, 255, 0, 0.25) 50%, 
-                rgba(0, 255, 128, 0.25) 75%, 
-                rgba(255, 0, 255, 0.25) 100%
-              );
-              background-size: 300% 300%;
-              mix-blend-mode: color-dodge;
-              animation: holoShimmer 4s ease infinite;
-            }
-            .panini-row-grid {
-              display: grid;
-              grid-template-columns: repeat(4, 1fr);
-              gap: 16px;
-              width: 100%;
-            }
-            @media (max-width: 1100px) {
-              .panini-row-grid {
-                grid-template-columns: repeat(2, 1fr);
-                gap: 14px;
-              }
-            }
-            @media (max-width: 580px) {
-              .panini-row-grid {
-                grid-template-columns: repeat(2, 1fr);
-                gap: 10px;
-              }
-            }
-          `}} />
-
-
-          {/* SIMULATOR TOGGLE BAR (Dev Mode Only) */}
-          {!readOnly && isDevEnvironment() && (
-            <div style={{
-              background: 'white',
-              borderRadius: '16px',
-              padding: '10px 18px',
-              border: '1.5px solid #e2e8f0',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: '12px',
-              boxShadow: '0 2px 6px rgba(0,0,0,0.02)',
-              zIndex: 20,
-              flexShrink: 0
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Sliders size={14} color="#64748b" />
-                <span style={{ fontSize: '0.76rem', fontWeight: 800, color: '#334155' }}>
-                  Entwickler-Modus (Simulation)
-                </span>
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '0.72rem', fontWeight: 700, color: '#64748b' }}>
-                  <input
-                    type="checkbox"
-                    checked={isDevSimulationActive}
-                    onChange={(e) => setIsDevSimulationActive(e.target.checked)}
-                    style={{ cursor: 'pointer', width: '14px', height: '14px', accentColor: '#34a853' }}
-                  />
-                  <span>Klick-Vergabe simulieren</span>
-                </label>
-
-                <button
-                  type="button"
-                  onClick={simulateMultiYearProgress}
-                  style={{
-                    background: 'linear-gradient(135deg, #facc15 0%, #eab308 100%)',
-                    border: '1px solid #ca8a04',
-                    color: '#0f172a',
-                    fontSize: '0.72rem',
-                    fontWeight: 900,
-                    cursor: 'pointer',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    padding: '4px 10px',
-                    borderRadius: '10px',
-                    boxShadow: '0 2px 4px rgba(234, 179, 8, 0.25)',
-                    transition: 'all 0.15s ease'
-                  }}
-                  className="hover-scale"
-                >
-                  <span>🎓 3 Schuljahre simulieren</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={resetStickerAlbum}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    color: '#ef4444',
-                    fontSize: '0.72rem',
-                    fontWeight: 800,
-                    cursor: 'pointer',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    padding: '4px 8px',
-                    borderRadius: '6px',
-                    transition: 'background 0.1s'
-                  }}
-                  onMouseEnter={(e) => e.currentTarget.style.background = '#fef2f2'}
-                  onMouseLeave={(e) => e.currentTarget.style.background = 'none'}
-                >
-                  <RotateCcw size={12} color="#ef4444" />
-                  Album leeren
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* ALBUM HEADER & PROGRESS TRACKER HERO BANNER (APPLE SQUIRCLE WHITE STAGE) */}
-          {(() => {
-            const activeStickerSource = collectedStickers;
-            const totalCount = ALL_STICKERS.length;
-            const collectedCount = ALL_STICKERS.filter(st => (activeStickerSource[st.id]?.count || 0) > 0).length;
-            const percentage = Math.round((collectedCount / totalCount) * 100);
-
-            let rankTitle = '🌱 Rookie-Sammler';
-            if (percentage >= 100) rankTitle = '👑 Master Collector';
-            else if (percentage >= 75) rankTitle = '🔥 Sammel-Legende';
-            else if (percentage >= 50) rankTitle = '⚡ Groove-Profi';
-            else if (percentage >= 25) rankTitle = '🎵 Vinyl-Jäger';
-
-            return (
-              <div style={{
-                background: '#ffffff',
-                borderRadius: '20px',
-                padding: isMobileOrSim ? '16px 18px' : '20px 26px',
-                color: '#0f172a',
-                boxShadow: '0 8px 24px -4px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.02)',
-                position: 'relative',
-                overflow: 'hidden',
-                border: '1px solid #e2e8f0',
-                flexShrink: 0,
-                width: '100%',
-                boxSizing: 'border-box'
-              }}>
-                {/* Subtle soft green aura */}
-                <div style={{
-                  position: 'absolute',
-                  top: '-40px',
-                  right: '-40px',
-                  width: '220px',
-                  height: '220px',
-                  background: 'radial-gradient(circle, rgba(52, 168, 83, 0.08) 0%, transparent 70%)',
-                  pointerEvents: 'none',
-                  borderRadius: '50%'
-                }} />
-
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', position: 'relative', zIndex: 2 }}>
-                  <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px', flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: '1.4rem' }}>🏆</span>
-                      <h2 style={{ margin: 0, fontSize: '1.35rem', fontWeight: 900, letterSpacing: '-0.4px', color: '#0f172a' }}>
-                        Sticker Sammelalbum
-                      </h2>
-                      <span style={{
-                        background: '#e6f4ea',
-                        border: '1px solid #a7f3d0',
-                        color: '#137333',
-                        fontSize: '0.72rem',
-                        fontWeight: 800,
-                        padding: '3px 10px',
-                        borderRadius: '20px',
-                        letterSpacing: '0.02em'
-                      }}>
-                        {rankTitle}
-                      </span>
-                      {renderSchoolYearSelector()}
-                    </div>
-                    <p style={{ margin: 0, fontSize: '0.82rem', color: '#64748b', fontWeight: 600, maxWidth: '520px', lineHeight: '1.4' }}>
-                      Sammle XP, erstelle Streaks & meistere Songs, um alle haptischen Sammel-Sticker für dein Musik-Album freizuschalten.
-                    </p>
-                  </div>
-
-                  {/* Score pill */}
-                  <div style={{
-                    background: '#f8fafc',
-                    border: '1px solid #e2e8f0',
-                    borderRadius: '16px',
-                    padding: '10px 18px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'flex-end',
-                    gap: '2px',
-                    flexShrink: 0
-                  }}>
-                    <span style={{ fontSize: '0.64rem', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 800, color: '#64748b' }}>
-                      Sammelfortschritt
-                    </span>
-                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '5px' }}>
-                      <strong style={{ fontSize: '1.45rem', fontWeight: 900, color: '#0f172a', lineHeight: 1 }}>
-                        {collectedCount}
-                      </strong>
-                      <span style={{ fontSize: '0.86rem', color: '#64748b', fontWeight: 700 }}>
-                        / {totalCount} Sticker ({percentage}%)
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Progress bar */}
-                <div style={{ marginTop: '14px', position: 'relative', zIndex: 2 }}>
-                  <div style={{ width: '100%', height: '8px', background: '#f1f5f9', borderRadius: '10px', overflow: 'hidden' }}>
-                    <div style={{
-                      width: `${percentage}%`,
-                      height: '100%',
-                      background: 'linear-gradient(90deg, #34a853 0%, #4ade80 100%)',
-                      borderRadius: '10px',
-                      transition: 'width 0.6s cubic-bezier(0.34, 1.56, 0.64, 1)'
-                    }} />
-                  </div>
-                </div>
-              </div>
-            );
-          })()}
-
-          {/* XP LEGENDE TOGGLEABLE PANEL */}
-          <div style={{
-            background: 'white',
-            borderRadius: '16px',
-            border: '1px solid #e2e8f0',
-            overflow: 'hidden',
-            boxShadow: '0 2px 6px rgba(0,0,0,0.02)',
-            flexShrink: 0
-          }}>
-            <div 
-              onClick={() => setIsXpLegendOpen(!isXpLegendOpen)}
-              style={{
-                padding: '12px 18px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                cursor: 'pointer',
-                background: isXpLegendOpen ? '#f8fafc' : 'white',
-                transition: 'background 0.15s'
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <span style={{ fontSize: '1.1rem' }}>🎮</span>
-                <strong style={{ fontSize: '0.84rem', fontWeight: 800, color: '#1e293b' }}>
-                  XP-Legende & Punkte-Guide
-                </strong>
-                <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>
-                  (Wie du Punkte & Sticker sammelst)
-                </span>
-              </div>
-              <ChevronRight 
-                size={16} 
-                color="#64748b" 
-                style={{ 
-                  transform: isXpLegendOpen ? 'rotate(90deg)' : 'rotate(0deg)',
-                  transition: 'transform 0.2s ease'
-                }} 
-              />
-            </div>
-
-            {isXpLegendOpen && (
-              <div style={{
-                padding: '14px 18px 18px 18px',
-                borderTop: '1px solid #e2e8f0',
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-                gap: '12px',
-                animation: 'fadeIn 0.2s ease-out'
-              }}>
-                <div style={{ background: '#f8fafc', padding: '12px 14px', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
-                  <span style={{ fontSize: '1.3rem' }}>⏱️</span>
-                  <div>
-                    <strong style={{ fontSize: '0.78rem', display: 'block', color: '#1e293b' }}>Übe-Fokus</strong>
-                    <span style={{ fontSize: '0.72rem', color: '#64748b', lineHeight: '1.3' }}>Pro absolvierte Minute Übezeit erhältst du <strong>1 XP</strong>.</span>
-                  </div>
-                </div>
-                <div style={{ background: '#f8fafc', padding: '12px 14px', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
-                  <span style={{ fontSize: '1.3rem' }}>🎯</span>
-                  <div>
-                    <strong style={{ fontSize: '0.78rem', display: 'block', color: '#1e293b' }}>Tägliches Fokus-Ziel</strong>
-                    <span style={{ fontSize: '0.72rem', color: '#64748b', lineHeight: '1.3' }}>Tägliches Fokus-Ziel erreicht = <strong>+10 XP</strong> Bonus <em>(z.B. 3m Timer + 1m Extra = 4 XP Übezeit + 10 XP Bonus = 14 XP total)</em>.</span>
-                  </div>
-                </div>
-                <div style={{ background: '#f8fafc', padding: '12px 14px', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
-                  <span style={{ fontSize: '1.3rem' }}>🏆</span>
-                  <div>
-                    <strong style={{ fontSize: '0.78rem', display: 'block', color: '#1e293b' }}>Song meistern</strong>
-                    <span style={{ fontSize: '0.72rem', color: '#64748b', lineHeight: '1.3' }}>Lied auf 100% oder Stage-Ready = <strong>+50 XP</strong> Bonus.</span>
-                  </div>
-                </div>
-                <div style={{ background: '#f8fafc', padding: '12px 14px', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
-                  <span style={{ fontSize: '1.3rem' }}>🔥</span>
-                  <div>
-                    <strong style={{ fontSize: '0.78rem', display: 'block', color: '#1e293b' }}>Streak-Bonus</strong>
-                    <span style={{ fontSize: '0.72rem', color: '#64748b', lineHeight: '1.3' }}>Disziplin-Bonus: 7 Tage = <strong>+25 XP</strong>, 14 Tage = <strong>+50 XP</strong>, 30 Tage = <strong>+100 XP</strong>.</span>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* CATEGORIES FILTER BAR TABS */}
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            overflowX: 'auto',
-            padding: '2px 2px 4px 2px',
-            flexShrink: 0,
-            minHeight: '44px'
-          }}>
-            {[
-              { id: 'all', label: `Alle (${ALL_STICKERS.length})` },
-              { id: 'ueben', label: '⏱️ Übe-Fleiß' },
-              { id: 'xp', label: '⭐ XP & Stufen' },
-              { id: 'streaks', label: '🔥 Streaks' },
-              { id: 'songs', label: '🎵 Repertoire' },
-              { id: 'spezial', label: '🏆 Spezial' }
-            ].map(tab => {
-              const isActive = stickerCategoryFilter === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  type="button"
-                  onClick={() => setStickerCategoryFilter(tab.id as any)}
-                  style={{
-                    background: isActive ? '#0f172a' : '#ffffff',
-                    color: isActive ? '#ffffff' : '#475569',
-                    border: isActive ? '1.5px solid #0f172a' : '1.5px solid #e2e8f0',
-                    borderRadius: '20px',
-                    padding: '8px 16px',
-                    fontSize: '0.76rem',
-                    fontWeight: 800,
-                    cursor: 'pointer',
-                    whiteSpace: 'nowrap',
-                    flexShrink: 0,
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    boxShadow: isActive ? '0 4px 12px rgba(15, 23, 42, 0.12)' : '0 1px 3px rgba(0,0,0,0.02)',
-                    transition: 'all 0.15s ease'
-                  }}
-                  className="hover-scale"
-                >
-                  {tab.label}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* 3D PANINI STICKER ALBUM ROWS (GENAU 4 STICKER PRO REIHE • JEDE KATEGORIE EINE REIHE) */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '28px', width: '100%' }}>
-            {[
-              { id: 'ueben', title: 'Übe-Fleiß & Zeiterfolge', icon: '⏱️', desc: 'Fokussierte Übezeit am Instrument sammeln' },
-              { id: 'xp', title: 'XP & Meilensteine', icon: '⭐', desc: 'Erfahrungspunkte durch Unterricht und Fleiß aufbauen' },
-              { id: 'streaks', title: 'Übe-Streaks & Kontinuität', icon: '🔥', desc: 'Tägliche Spielroutine und Beständigkeit meistern' },
-              { id: 'songs', title: 'Repertoire & Meisterwerke', icon: '🎵', desc: 'Songs bühnenreif erlernen und Repertoire erweitern' },
-              { id: 'spezial', title: 'Spezial-Auszeichnungen & Bühnenreife', icon: '🏆', desc: 'Live-Auftritte, Kreativität und besondere Leistungen' }
-            ]
-              .filter(cat => stickerCategoryFilter === 'all' || cat.id === stickerCategoryFilter)
-              .map(cat => {
-                const categoryStickers = ALL_STICKERS.filter(st => st.category === cat.id);
-                const activeStickerSource = collectedStickers;
-                const catCollectedCount = categoryStickers.filter(st => (activeStickerSource[st.id]?.count || 0) > 0).length;
-                const isCatComplete = catCollectedCount === categoryStickers.length;
-
-                return (
-                  <div key={cat.id} style={{ display: 'flex', flexDirection: 'column', gap: '12px', width: '100%' }}>
-                    {/* Category Header Row */}
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      flexWrap: 'wrap',
-                      gap: '8px',
-                      padding: '0 4px'
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ fontSize: '1.2rem' }}>{cat.icon}</span>
-                        <h3 style={{ margin: 0, fontSize: '0.96rem', fontWeight: 900, color: '#0f172a' }}>
-                          {cat.title}
-                        </h3>
-                        <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 600, display: isMobileOrSim ? 'none' : 'inline' }}>
-                          • {cat.desc}
-                        </span>
-                      </div>
-
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span style={{
-                          background: isCatComplete ? '#e6f4ea' : '#f1f5f9',
-                          border: isCatComplete ? '1px solid #a7f3d0' : '1px solid #e2e8f0',
-                          color: isCatComplete ? '#137333' : '#64748b',
-                          fontSize: '0.68rem',
-                          fontWeight: 800,
-                          padding: '3px 9px',
-                          borderRadius: '12px'
-                        }}>
-                          {catCollectedCount} / {categoryStickers.length} gesammelt {isCatComplete ? '✓' : ''}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* 4-Column Grid for this category row */}
-                    <div className="panini-row-grid">
-                      {categoryStickers.map(st => {
-                        const info = activeStickerSource[st.id] || { count: 0, details: [] };
-                        const isCollected = info.count > 0;
-                        const isLegendary = st.rarity === 'legendary';
-                        const isEpic = st.rarity === 'epic';
-                        const isRare = st.rarity === 'rare';
-
-                        return (
-                          <div
-                            key={st.id}
-                            className="panini-sticker-card"
-                            onClick={() => {
-                              if (!readOnly && isDevSimulationActive) {
-                                awardSticker(st.id, "Simulation");
-                              } else {
-                                setSelectedPreviewSticker(st);
-                              }
-                            }}
-                            style={{
-                              background: isCollected ? '#ffffff' : '#f8fafc',
-                              border: isCollected 
-                                ? (isLegendary ? '2px solid #eab308' : isEpic ? '2px solid #af52de' : isRare ? '2px solid #3b82f6' : '2px solid #34a853') 
-                                : '1.5px dashed #cbd5e1',
-                              borderRadius: '20px',
-                              padding: '18px 14px 14px 14px',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              alignItems: 'center',
-                              textAlign: 'center',
-                              gap: '10px',
-                              position: 'relative',
-                              boxShadow: isCollected 
-                                ? (isLegendary ? '0 8px 24px -4px rgba(234, 179, 8, 0.22), 0 1px 3px rgba(0,0,0,0.02)' : '0 6px 18px -4px rgba(0,0,0,0.06), 0 1px 3px rgba(0,0,0,0.02)') 
-                                : 'inset 0 1px 4px rgba(0,0,0,0.02)',
-                              cursor: 'pointer',
-                              boxSizing: 'border-box',
-                              minHeight: '260px',
-                              justifyContent: 'space-between'
-                            }}
-                          >
-                            {/* Holographic foil overlay for legendary/epic stickers */}
-                            {isCollected && (isLegendary || isEpic) && (
-                              <div 
-                                className="holo-foil-overlay" 
-                                style={{
-                                  position: 'absolute',
-                                  inset: 0,
-                                  borderRadius: '18px',
-                                  pointerEvents: 'none',
-                                  opacity: isLegendary ? 0.35 : 0.2,
-                                  zIndex: 1
-                                }} 
-                              />
-                            )}
-
-                            {/* Manual Award Button for Teachers ONLY */}
-                            {!readOnly && st.id !== 'song-master' && !st.auto && (
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  const context = prompt(`Beschreibung für den Sticker "${st.title}" eingeben (z.B. Name des Auftritts):`);
-                                  if (context !== null) {
-                                    awardSticker(st.id, context || undefined);
-                                  }
-                                }}
-                                style={{
-                                  position: 'absolute',
-                                  top: '12px',
-                                  left: '12px',
-                                  width: '26px',
-                                  height: '26px',
-                                  borderRadius: '50%',
-                                  background: st.color,
-                                  color: 'white',
-                                  border: 'none',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  cursor: 'pointer',
-                                  boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
-                                  zIndex: 10,
-                                  fontWeight: 'bold',
-                                  fontSize: '0.9rem'
-                                }}
-                                title="Sticker manuell vergeben (Nur für Lehrer)"
-                                className="hover-scale"
-                              >
-                                +
-                              </button>
-                            )}
-
-                            {/* Rarity Pill Badge */}
-                            <div style={{
-                              position: 'absolute',
-                              top: '12px',
-                              right: '12px',
-                              zIndex: 5,
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '4px'
-                            }}>
-                              {isCollected && st.multi && info.count > 1 && (
-                                <span style={{
-                                  background: st.color,
-                                  color: 'white',
-                                  fontWeight: 900,
-                                  fontSize: '0.66rem',
-                                  padding: '2px 6px',
-                                  borderRadius: '10px',
-                                  boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-                                }}>
-                                  x{info.count}
-                                </span>
-                              )}
-
-                              <span style={{
-                                background: isCollected 
-                                  ? (isLegendary ? '#fef3c7' : isEpic ? '#f3e8ff' : isRare ? '#eff6ff' : '#e6f4ea') 
-                                  : '#f1f5f9',
-                                color: isCollected 
-                                  ? (isLegendary ? '#b45309' : isEpic ? '#7e22ce' : isRare ? '#1d4ed8' : '#137333') 
-                                  : '#94a3b8',
-                                border: isCollected 
-                                  ? (isLegendary ? '1px solid #fde68a' : isEpic ? '1px solid #e9d5ff' : isRare ? '1px solid #bfdbfe' : '1px solid #a7f3d0') 
-                                  : '1px solid #e2e8f0',
-                                fontSize: '0.62rem',
-                                fontWeight: 800,
-                                padding: '2px 7px',
-                                borderRadius: '8px',
-                                letterSpacing: '0.02em',
-                                textTransform: 'uppercase'
-                              }}>
-                                {st.rarityLabel || 'Standard'}
-                              </span>
-                            </div>
-
-                            {/* Top info section: Graphic Badge */}
-                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', gap: '8px', marginTop: '10px' }}>
-                              {/* BALANCED DIE-CUT STICKER GRAPHIC (100px Diameter) */}
-                              <div style={{
-                                width: '100px',
-                                height: '100px',
-                                borderRadius: '50%',
-                                background: isCollected ? st.bg : '#f1f5f9',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                position: 'relative',
-                                border: isCollected ? '3.5px solid #ffffff' : '1.5px dashed #cbd5e1',
-                                boxShadow: isCollected 
-                                  ? '0 6px 16px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(0,0,0,0.04)' 
-                                  : 'inset 0 2px 4px rgba(0,0,0,0.03)',
-                                transition: 'all 0.25s ease',
-                                zIndex: 2
-                              }}>
-                                <div style={{
-                                  position: 'relative',
-                                  width: '100%',
-                                  height: '100%',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  borderRadius: '50%',
-                                  overflow: 'hidden'
-                                }}>
-                                  {/* Emoji Fallback */}
-                                  <span style={{ 
-                                    fontSize: isCollected ? '2.7rem' : '2.4rem', 
-                                    zIndex: 1, 
-                                    filter: isCollected ? 'none' : 'grayscale(100%) opacity(0.3)',
-                                    userSelect: 'none'
-                                  }}>
-                                    {st.emoji}
-                                  </span>
-
-                                  {/* High-Res PNG Image */}
-                                  <img 
-                                    src={`/stickers/${st.id}.png?v=1`} 
-                                    alt={st.title} 
-                                    loading="eager"
-                                    decoding="async"
-                                    style={{ 
-                                      position: 'absolute',
-                                      inset: 0,
-                                      width: '100%', 
-                                      height: '100%', 
-                                      objectFit: 'cover',
-                                      borderRadius: '50%',
-                                      zIndex: 2,
-                                      filter: isCollected ? 'drop-shadow(0 2px 6px rgba(0,0,0,0.1))' : 'grayscale(100%) opacity(0.3) blur(1px)',
-                                      transition: 'opacity 0.2s ease-in-out'
-                                    }}
-                                    onError={(e) => {
-                                      e.currentTarget.style.opacity = '0';
-                                    }}
-                                  />
-                                </div>
-
-                                {!isCollected && (
-                                  <div style={{
-                                    position: 'absolute',
-                                    inset: 0,
-                                    borderRadius: '50%',
-                                    background: 'rgba(241, 245, 249, 0.75)',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    color: '#94a3b8',
-                                    fontSize: '1.2rem'
-                                  }}>
-                                    🔒
-                                  </div>
-                                )}
-                              </div>
-
-                              {/* STICKER TITLE & DESCRIPTION */}
-                              <div style={{ position: 'relative', zIndex: 2, width: '100%' }}>
-                                <h4 style={{ 
-                                  margin: '0 0 3px 0', 
-                                  fontSize: '0.9rem', 
-                                  fontWeight: 900, 
-                                  color: isCollected ? '#0f172a' : '#64748b' 
-                                }}>
-                                  {st.title}
-                                </h4>
-                                <p style={{ 
-                                  margin: 0, 
-                                  fontSize: '0.72rem', 
-                                  color: isCollected ? '#64748b' : '#94a3b8', 
-                                  fontWeight: 600, 
-                                  lineHeight: '1.3' 
-                                }}>
-                                  {st.desc}
-                                </p>
-                              </div>
-                            </div>
-
-                            {/* Bottom status / history preview */}
-                            <div style={{ width: '100%', zIndex: 2, paddingTop: '6px' }}>
-                              {isCollected ? (
-                                <div style={{
-                                  width: '100%',
-                                  borderTop: '1px solid #f1f5f9',
-                                  paddingTop: '6px',
-                                  display: 'flex',
-                                  justifyContent: 'space-between',
-                                  alignItems: 'center',
-                                  fontSize: '0.66rem',
-                                  color: '#34a853',
-                                  fontWeight: 750
-                                }}>
-                                  <span>✓ Freigeschaltet</span>
-                                  <span style={{ color: '#94a3b8', fontWeight: 600 }}>
-                                    {st.multi ? `${info.count}x` : (info.details[0]?.date || 'Aktiv')}
-                                  </span>
-                                </div>
-                              ) : (
-                                <div style={{
-                                  width: '100%',
-                                  borderTop: '1px solid #f1f5f9',
-                                  paddingTop: '6px',
-                                  display: 'flex',
-                                  justifyContent: 'center',
-                                  alignItems: 'center',
-                                  fontSize: '0.66rem',
-                                  color: '#94a3b8',
-                                  fontWeight: 600
-                                }}>
-                                  <span>🔒 Noch gesperrt</span>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                );
-              })}
-          </div>
-
-          {/* BRAND NEW 3D PANINI INSPECTOR & DETAIL MODAL (REPLACING SPOTIFY-WRAPPED) */}
-          {selectedPreviewSticker && (() => {
-            const st = selectedPreviewSticker;
-            const info = collectedStickers[st.id] || { count: 0, details: [] };
-            const isCollected = info.count > 0;
-            const details = info.details || [];
-            
-            const activeIdx = (selectedStickerDetailIdx !== null && selectedStickerDetailIdx >= 0 && selectedStickerDetailIdx < details.length)
-              ? selectedStickerDetailIdx
-              : (details.length > 0 ? details.length - 1 : 0);
-
-            const activeDetail = details[activeIdx];
-            const activeTopic = activeDetail?.topic || details.slice(-1)[0]?.topic;
-            const displayDate = activeDetail?.date || info.details?.[0]?.date || new Date().toLocaleDateString('de-DE');
-            const displayTopic = activeTopic || 'Herausforderung gemeistert';
-            const isLegendary = st.rarity === 'legendary';
-            const isEpic = st.rarity === 'epic';
-
-            return (
-              <div 
-                style={{
-                  position: 'fixed',
-                  inset: 0,
-                  background: 'rgba(15, 23, 42, 0.88)',
-                  backdropFilter: 'blur(16px)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  zIndex: 10000,
-                  padding: '20px',
-                  animation: 'fadeIn 0.25s ease-out'
-                }} 
-                onClick={() => setSelectedPreviewSticker(null)}
-              >
-                {/* 3D PANINI COLLECTOR'S CARD */}
-                <div 
-                  style={{
-                    width: '100%',
-                    maxWidth: '440px',
-                    background: 'linear-gradient(145deg, #1e293b 0%, #0f172a 100%)',
-                    borderRadius: '32px',
-                    border: isLegendary 
-                      ? '2.5px solid #eab308' 
-                      : isEpic 
-                      ? '2.5px solid #af52de' 
-                      : '2px solid rgba(255, 255, 255, 0.12)',
-                    boxShadow: isLegendary
-                      ? '0 25px 60px -12px rgba(234, 179, 8, 0.35)'
-                      : '0 25px 50px -12px rgba(0, 0, 0, 0.6)',
-                    padding: '32px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    gap: '20px',
-                    color: 'white',
-                    position: 'relative',
-                    overflow: 'hidden',
-                    animation: 'peelIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1)'
-                  }}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  {/* Holographic foil overlay inside card modal */}
-                  {(isLegendary || isEpic) && (
-                    <div 
-                      className="holo-foil-overlay" 
-                      style={{
-                        position: 'absolute',
-                        inset: 0,
-                        borderRadius: '30px',
-                        pointerEvents: 'none',
-                        opacity: isLegendary ? 0.3 : 0.15
-                      }} 
-                    />
-                  )}
-
-                  {/* Close button */}
-                  <button
-                    onClick={() => setSelectedPreviewSticker(null)}
-                    style={{
-                      position: 'absolute',
-                      top: '20px',
-                      right: '20px',
-                      background: 'rgba(255,255,255,0.08)',
-                      border: 'none',
-                      borderRadius: '50%',
-                      width: '36px',
-                      height: '36px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      cursor: 'pointer',
-                      color: '#94a3b8',
-                      transition: 'all 0.15s',
-                      zIndex: 10
-                    }}
-                    className="hover-scale"
-                  >
-                    <X size={18} />
-                  </button>
-
-                  {/* Header Badge & Rarity Tag with Schuljahr Stamp */}
-                  <div style={{ textAlign: 'center', marginTop: '4px', zIndex: 2 }}>
-                    <span style={{ 
-                      fontSize: '0.72rem', 
-                      fontWeight: 900, 
-                      textTransform: 'uppercase', 
-                      letterSpacing: '0.12em', 
-                      color: isLegendary ? '#facc15' : isEpic ? '#c084fc' : st.color || '#34a853',
-                      background: 'rgba(255,255,255,0.06)',
-                      padding: '4px 14px',
-                      borderRadius: '100px',
-                      border: '1px solid rgba(255,255,255,0.1)',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '6px'
-                    }}>
-                      <Star size={12} fill="currentColor" /> {st.rarityLabel || 'Standard'} • Schuljahr {getSchoolYearString(displayDate)}
-                    </span>
-                    <h3 style={{ fontSize: '1.65rem', fontWeight: 900, margin: '10px 0 0 0', letterSpacing: '-0.5px', color: '#ffffff' }}>
-                      {st.title}
-                    </h3>
-                  </div>
-
-                  {/* XXL STICKER DISPLAY IMAGE (170px) */}
-                  <div style={{
-                    width: '170px',
-                    height: '170px',
-                    borderRadius: '50%',
-                    background: isCollected ? st.bg : 'rgba(255,255,255,0.05)',
-                    border: '5px solid #ffffff',
-                    boxShadow: isCollected 
-                      ? `0 12px 30px ${st.color}50, 0 0 0 2px rgba(255,255,255,0.8)` 
-                      : '0 8px 20px rgba(0,0,0,0.3)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    overflow: 'hidden',
-                    position: 'relative',
-                    zIndex: 2,
-                    margin: '8px 0'
-                  }}>
-                    <img 
-                      src={`/stickers/${st.id}.png?v=1`} 
-                      alt={st.title} 
-                      style={{ 
-                        width: '100%', 
-                        height: '100%', 
-                        objectFit: 'cover',
-                        filter: isCollected ? 'none' : 'grayscale(80%) opacity(0.75)'
-                      }}
-                      onError={(e) => {
-                        e.currentTarget.style.display = 'none';
-                        const parent = e.currentTarget.parentElement;
-                        if (parent) {
-                          const span = document.createElement('span');
-                          span.style.fontSize = '4.5rem';
-                          span.innerText = st.emoji;
-                          span.style.filter = isCollected ? 'none' : 'grayscale(80%) opacity(0.5)';
-                          parent.appendChild(span);
-                        }
-                      }}
-                    />
-                    {!isCollected && (
-                      <div style={{
-                        position: 'absolute',
-                        inset: 0,
-                        background: 'rgba(15, 23, 42, 0.35)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        pointerEvents: 'none'
-                      }}>
-                        <Lock size={36} color="#facc15" style={{ filter: 'drop-shadow(0 4px 10px rgba(0,0,0,0.6))' }} />
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Student Name & Instrument Badge */}
-                  <div style={{ textAlign: 'center', width: '100%', zIndex: 2, marginTop: '-4px' }}>
-                    <h2 style={{ fontSize: '1.5rem', fontWeight: 900, color: '#ffffff', margin: 0, letterSpacing: '-0.02em' }}>
-                      {actualStudentName}
-                    </h2>
-                    {studentInstrument && (
-                      <span style={{ fontSize: '0.74rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.1em', marginTop: '4px', display: 'block' }}>
-                        {studentInstrument}
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Song Master Interpret & Title Badge (Clean, Non-overloaded Meisterwerk Dedication) */}
-                  {(st.category === 'songs' || st.id === 'song-master' || activeTopic) && (
-                    <div style={{
-                      width: '100%',
-                      textAlign: 'center',
-                      margin: '4px 0 0 0',
-                      zIndex: 2
-                    }}>
-                      <div style={{ fontSize: '0.68rem', fontWeight: 900, color: '#facc15', textTransform: 'uppercase', letterSpacing: '0.1em', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
-                        <Music size={12} color="#facc15" /> Gemeistertes Werk
-                      </div>
-                      {(() => {
-                        const topicStr = activeTopic || (details[0]?.topic) || (isCollected ? 'Song gemeistert' : '');
-                        if (!topicStr) return null;
-                        
-                        if (topicStr.includes(' - ')) {
-                          const parts = topicStr.split(' - ');
-                          const artist = parts[0].trim();
-                          const songTitle = parts.slice(1).join(' - ').trim();
-                          return (
-                            <div style={{ fontSize: '1.25rem', fontWeight: 950, color: '#ffffff', marginTop: '2px', wordBreak: 'break-word', letterSpacing: '-0.02em' }}>
-                              <span style={{ color: '#facc15' }}>{artist}</span>
-                              <span style={{ opacity: 0.45, margin: '0 6px', fontWeight: 400 }}>–</span>
-                              <span>{songTitle}</span>
-                            </div>
-                          );
-                        }
-                        return (
-                          <div style={{ fontSize: '1.25rem', fontWeight: 950, color: '#ffffff', marginTop: '2px', wordBreak: 'break-word', letterSpacing: '-0.02em' }}>
-                            {topicStr}
-                          </div>
-                        );
-                      })()}
-                    </div>
-                  )}
-
-                  {/* Multi-song Sleek Chip Selector (Modern Glass Pills instead of heavy select box) */}
-                  {details.length > 1 && (
-                    <div style={{
-                      width: '100%',
-                      margin: '4px 0 0 0',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      gap: '5px',
-                      zIndex: 3
-                    }}>
-                      <span style={{ fontSize: '0.65rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                        {details.length} Songs im Repertoire (Klick zum Wechseln):
-                      </span>
-                      <div style={{
-                        display: 'flex',
-                        flexWrap: 'wrap',
-                        justifyContent: 'center',
-                        gap: '6px',
-                        maxWidth: '100%'
-                      }}>
-                        {details.map((d: any, idx: number) => {
-                          const isSel = idx === activeIdx;
-                          return (
-                            <button
-                              key={idx}
-                              type="button"
-                              onClick={() => setSelectedStickerDetailIdx(idx)}
-                              style={{
-                                background: isSel ? 'rgba(250, 204, 21, 0.22)' : 'rgba(255, 255, 255, 0.06)',
-                                border: isSel ? '1.5px solid #facc15' : '1px solid rgba(255, 255, 255, 0.12)',
-                                color: isSel ? '#facc15' : '#e2e8f0',
-                                borderRadius: '100px',
-                                padding: '4px 12px',
-                                fontSize: '0.74rem',
-                                fontWeight: isSel ? 900 : 700,
-                                cursor: 'pointer',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '5px',
-                                transition: 'all 0.15s ease',
-                                boxShadow: isSel ? '0 2px 8px rgba(250, 204, 21, 0.25)' : 'none'
-                              }}
-                              className="hover-scale"
-                            >
-                              <span>🎵</span>
-                              <span style={{ maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                {d.topic}
-                              </span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Open, Borderless Description Flow */}
-                  <div style={{ 
-                    width: '100%', 
-                    textAlign: 'center', 
-                    padding: '8px 12px', 
-                    zIndex: 2,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '6px'
-                  }}>
-                    <p style={{ fontSize: '0.94rem', color: '#f8fafc', margin: 0, lineHeight: '1.45', fontWeight: 700 }}>
-                      {st.desc}
-                    </p>
-                    {st.equiv && (
-                      <p style={{
-                        fontSize: '0.84rem',
-                        fontWeight: 650,
-                        color: '#38bdf8',
-                        margin: 0,
-                        lineHeight: '1.4'
-                      }}>
-                        {st.equiv}
-                      </p>
-                    )}
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginTop: '6px' }}>
-                      <span style={{ 
-                        fontSize: '0.74rem', 
-                        color: isCollected ? '#4ade80' : '#94a3b8', 
-                        fontWeight: 800,
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '4px'
-                      }}>
-                        {isCollected ? (
-                          <>
-                            <Check size={13} color="#4ade80" /> Freigeschaltet ({info.count}x gesammelt)
-                          </>
-                        ) : (
-                          <>
-                            <Lock size={12} color="#94a3b8" /> {info.progressText || 'Noch nicht freigeschaltet'}
-                          </>
-                        )}
-                      </span>
-                      <span style={{ color: 'rgba(255,255,255,0.2)' }}>•</span>
-                      <span style={{ fontSize: '0.74rem', color: '#34a853', fontWeight: 900 }}>
-                        campus-groovelab.de
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Collection Timeline Details */}
-                  {isCollected && details.length > 0 && (
-                    <div style={{ 
-                      width: '100%', 
-                      display: 'flex', 
-                      flexDirection: 'column', 
-                      gap: '8px', 
-                      maxHeight: '130px', 
-                      overflowY: 'auto',
-                      background: 'rgba(0,0,0,0.25)',
-                      padding: '12px 16px',
-                      borderRadius: '16px',
-                      border: '1px solid rgba(255,255,255,0.08)',
-                      zIndex: 2
-                    }}>
-                      <span style={{ fontSize: '0.66rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                        Erhalten am (Klick zum Auswählen):
-                      </span>
-                      {details.map((dt: any, dIdx: number) => (
-                        <div 
-                          key={dIdx} 
-                          onClick={() => setSelectedStickerDetailIdx(dIdx)}
-                          style={{ 
-                            display: 'flex', 
-                            justifyContent: 'space-between', 
-                            alignItems: 'center',
-                            fontSize: '0.74rem', 
-                            color: dIdx === activeIdx ? '#facc15' : '#cbd5e1', 
-                            fontWeight: dIdx === activeIdx ? 900 : 600,
-                            background: dIdx === activeIdx ? 'rgba(250, 204, 21, 0.18)' : 'transparent',
-                            border: dIdx === activeIdx ? '1px solid rgba(250, 204, 21, 0.5)' : '1px solid transparent',
-                            padding: '6px 10px',
-                            borderRadius: '10px',
-                            cursor: 'pointer',
-                            transition: 'all 0.15s ease'
-                          }}
-                          className="hover-scale"
-                        >
-                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '220px' }}>
-                            {dIdx === activeIdx ? '✓ ' : ''}{dt.topic}
-                          </span>
-                          <span style={{ color: dIdx === activeIdx ? '#facc15' : '#94a3b8' }}>{dt.date}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Actions */}
-                  <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '10px', zIndex: 2, marginTop: '4px' }}>
-                    {isCollected && (
-                      <button
-                        type="button"
-                        onClick={() => shareCard(st, activeTopic)}
-                        style={{
-                          width: '100%',
-                          background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '16px',
-                          padding: '14px',
-                          fontSize: '0.9rem',
-                          fontWeight: 900,
-                          cursor: 'pointer',
-                          boxShadow: '0 6px 20px rgba(245, 158, 11, 0.35)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '8px',
-                          transition: 'all 0.15s'
-                        }}
-                        className="hover-scale"
-                      >
-                        <Download size={18} />
-                        <span>Sticker als JPG herunterladen</span>
-                      </button>
-                    )}
-
-                    {st.id !== 'song-master' && !st.auto && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const context = prompt(`Beschreibung für den Sticker "${st.title}" eingeben (z.B. Name des Auftritts):`);
-                          if (context !== null) {
-                            awardSticker(st.id, context || undefined);
-                            setSelectedPreviewSticker(null);
-                          }
-                        }}
-                        style={{
-                          width: '100%',
-                          background: st.color || '#34a853',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '16px',
-                          padding: '12px',
-                          fontSize: '0.82rem',
-                          fontWeight: 900,
-                          cursor: 'pointer',
-                          boxShadow: '0 4px 15px rgba(0,0,0,0.3)',
-                          transition: 'all 0.15s'
-                        }}
-                        className="hover-scale"
-                      >
-                        + Sticker jetzt vergeben
-                      </button>
-                    )}
-
-                    <button
-                      type="button"
-                      onClick={() => setSelectedPreviewSticker(null)}
-                      style={{
-                        width: '100%',
-                        background: 'rgba(255, 255, 255, 0.06)',
-                        color: '#94a3b8',
-                        border: '1px solid rgba(255, 255, 255, 0.1)',
-                        borderRadius: '16px',
-                        padding: '12px',
-                        fontSize: '0.82rem',
-                        fontWeight: 800,
-                        cursor: 'pointer',
-                        transition: 'all 0.15s'
-                      }}
-                      className="hover-scale"
-                    >
-                      Schließen
-                    </button>
-                  </div>
-                </div>
-              </div>
-            );
-          })()}
-
-          {/* STICKER AWARD CELEBRATION ANIMATION POPUP */}
-          {awardedStickerToAnimate && (
-            <div style={{
-              position: 'fixed',
-              inset: 0,
-              background: 'rgba(15, 23, 42, 0.92)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 20000,
-              animation: 'fadeIn 0.25s ease-out'
-            }}>
-              <Confetti recycle={false} numberOfPieces={300} />
-              <div 
-                style={{
-                  background: 'white',
-                  borderRadius: '32px',
-                  padding: '40px',
-                  textAlign: 'center',
-                  maxWidth: '420px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  gap: '24px',
-                  boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)',
-                  animation: 'scaleIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1)'
-                }}
-              >
-                <span style={{ fontSize: '0.8rem', fontWeight: 900, textTransform: 'uppercase', color: '#34a853', letterSpacing: '0.1em' }}>
-                  Sticker freigeschaltet!
-                </span>
-                <div style={{
-                  width: '160px',
-                  height: '160px',
-                  borderRadius: '50%',
-                  background: awardedStickerToAnimate.bg,
-                  border: `6px solid ${awardedStickerToAnimate.color}`,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  boxShadow: `0 12px 30px ${awardedStickerToAnimate.bg}`,
-                  overflow: 'hidden',
-                  animation: 'spinStickerAward 0.8s cubic-bezier(0.34, 1.56, 0.64, 1)'
-                }}>
-                  <img 
-                    src={`/stickers/${awardedStickerToAnimate.id}.png?v=1`} 
-                    alt={awardedStickerToAnimate.title} 
-                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                    onError={(e) => {
-                      e.currentTarget.style.display = 'none';
-                      const parent = e.currentTarget.parentElement;
-                      if (parent) {
-                        const span = document.createElement('span');
-                        span.style.fontSize = '4.5rem';
-                        span.innerText = awardedStickerToAnimate.emoji;
-                        parent.appendChild(span);
-                      }
-                    }}
-                  />
-                </div>
-                <div>
-                  <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#0f172a', margin: '0 0 4px 0' }}>
-                    {awardedStickerToAnimate.title}
-                  </h2>
-                  {(awardedStickerToAnimate.category === 'songs' || awardedStickerToAnimate.id === 'song-master' || topicName) && (
-                    <div style={{ textAlign: 'center', margin: '4px 0 8px 0' }}>
-                      <div style={{ fontSize: '0.72rem', fontWeight: 900, color: '#d97706', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
-                        <Music size={12} /> Interpret &amp; Songtitel
-                      </div>
-                      <div style={{ fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', marginTop: '2px' }}>
-                        {topicName || 'Song gemeistert'}
-                      </div>
-                    </div>
-                  )}
-                  <p style={{ fontSize: '0.88rem', color: '#475569', fontWeight: 650, margin: 0, lineHeight: 1.35 }}>
-                    {awardedStickerToAnimate.desc}
-                  </p>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', width: '100%' }}>
-                  <button
-                    type="button"
-                    onClick={() => downloadShareCard(awardedStickerToAnimate, topicName)}
-                    style={{
-                      background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '16px',
-                      padding: '14px 24px',
-                      fontWeight: 900,
-                      fontSize: '0.92rem',
-                      cursor: 'pointer',
-                      boxShadow: '0 6px 18px rgba(245, 158, 11, 0.35)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '8px',
-                      transition: 'all 0.15s'
-                    }}
-                    className="hover-scale"
-                  >
-                    <Download size={18} />
-                    <span>Sticker als JPG herunterladen</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setAwardedStickerToAnimate(null)}
-                    style={{
-                      background: 'linear-gradient(135deg, #34a853 0%, #2e7d32 100%)',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '16px',
-                      padding: '12px 24px',
-                      fontWeight: 900,
-                      fontSize: '0.92rem',
-                      cursor: 'pointer',
-                      boxShadow: '0 4px 12px rgba(52, 168, 83, 0.25)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '8px',
-                      transition: 'all 0.15s'
-                    }}
-                    className="hover-scale"
-                  >
-                    <BookOpen size={18} />
-                    <span>In mein Album kleben</span>
-                  </button>
-                </div>
-              </div>
-              <style dangerouslySetInnerHTML={{__html: `
-                @keyframes spinStickerAward {
-                  from { transform: scale(0) rotate(-180deg); }
-                  to { transform: scale(1) rotate(0deg); }
-                }
-              `}} />
-            </div>
-          )}
-
-
-        </div>
+        <MeisterwerkStickerAlbumTab
+          isMobileOrSim={isMobileOrSim}
+          readOnly={readOnly}
+          isDevSimulationActive={isDevSimulationActive}
+          setIsDevSimulationActive={setIsDevSimulationActive}
+          simulateMultiYearProgress={simulateMultiYearProgress}
+          resetStickerAlbum={resetStickerAlbum}
+          collectedStickers={collectedStickers}
+          renderSchoolYearSelector={renderSchoolYearSelector}
+          awardSticker={awardSticker}
+          awardedStickerToAnimate={awardedStickerToAnimate}
+          setAwardedStickerToAnimate={setAwardedStickerToAnimate}
+          downloadShareCard={downloadShareCard}
+          topicName={topicName}
+          actualStudentName={actualStudentName}
+          studentInstrument={studentInstrument}
+          shareCard={shareCard}
+        />
       ) : activeModalTab === 'audiobiography' ? (
         /* AUDIO-BIOGRAFIE VIEW (AKUSTISCHES STAMMBAUCH & MEILENSTEINE) */
         <React.Suspense fallback={<div style={{ padding: '60px', textAlign: 'center', color: '#64748b' }}>Lade Audio-Biografie...</div>}>
@@ -20405,628 +9016,34 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         </React.Suspense>
       ) : (
         /* COLUMN 4: 🏆 MEISTERWERKE & LOGBUCH (Full Width in Swiss Modernist Style) */
-        <div style={{
-          flex: 1,
-          padding: isMobileOrSim ? '20px 16px 100px 16px' : (useNotebookLayout ? '32px 32px 80px 60px' : '32px 32px 80px 32px'),
-          overflowY: 'auto',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '24px',
-          background: useNotebookLayout ? '#faf8f2' : '#f8fafc',
-          backgroundImage: useNotebookLayout ? 'repeating-linear-gradient(#faf8f2, #faf8f2 27px, #e5e0d4 27px, #e5e0d4 28px)' : 'none',
-          borderRadius: useNotebookLayout ? '0 0 20px 20px' : '0',
-          boxShadow: useNotebookLayout ? '0 10px 30px rgba(0,0,0,0.15)' : 'none',
-          position: 'relative'
-        }}>
-          {useNotebookLayout && (
-            <div style={{
-              position: 'absolute',
-              top: 0,
-              bottom: 0,
-              left: '42px',
-              width: '2px',
-              background: '#fca5a5',
-              zIndex: 10
-            }} />
-          )}
-          {useNotebookLayout && (
-            <div style={{
-              position: 'absolute',
-              top: '20px',
-              bottom: '20px',
-              left: '8px',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'space-around',
-              zIndex: 25
-            }}>
-              {Array.from({ length: 6 }).map((_, idx) => (
-                <div key={idx} style={{
-                  width: '8px',
-                  height: '8px',
-                  borderRadius: '50%',
-                  background: '#121214',
-                  boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.8)'
-                }} />
-              ))}
-            </div>
-          )}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
-            <span style={{ fontSize: '1.25rem' }}>🏆</span>
-            <span style={{
-              fontSize: '1rem',
-              fontWeight: 900,
-              color: '#0f172a',
-              textTransform: 'uppercase',
-              letterSpacing: '0.05em',
-              fontFamily: '"Helvetica Neue", Helvetica, Inter, Arial, sans-serif'
-            }}>
-              Deine Meisterwerke
-            </span>
-          </div>
-
-          {(() => {
-            const masteredBooksList: any[] = [];
-            assignedLehrwerke.forEach(assigned => {
-              const book = globalLehrwerke.find(g => g.id === assigned.lehrwerkId);
-              if (book) {
-                const masteredPages: number[] = [];
-                Object.entries(assigned.pageStates || {}).forEach(([pStr, state]: [string, any]) => {
-                  if (state.status === 'mastered') {
-                    const pNum = parseInt(pStr, 10);
-                    if (!isNaN(pNum)) masteredPages.push(pNum);
-                  }
-                });
-                if (masteredPages.length > 0) {
-                  masteredBooksList.push({
-                    title: book.title,
-                    emoji: book.emoji,
-                    pages: masteredPages.sort((a, b) => a - b)
-                  });
-                }
-              }
-            });
-
-            const resolveMasteredSongAudio = (songId?: string, title?: string, key?: string): string | undefined => {
-              const normKey = (key || title || '').toLowerCase().trim();
-              const normTitle = (title || '').toLowerCase().trim();
-
-              // 1. Direct Local Cache by Song ID
-              if (songId) {
-                const cachedById = localStorage.getItem(`campus_mastered_audio_${student.id}_${songId}`);
-                if (cachedById) return cachedById;
-              }
-
-              // 2. Direct Local Cache by Title Key
-              if (normKey) {
-                const cachedByKey = localStorage.getItem(`campus_mastered_audio_${student.id}_${normKey}`);
-                if (cachedByKey) return cachedByKey;
-              }
-
-              // 3. From activeSongSkills
-              const matchSkill = (activeSongSkills || []).find(s => {
-                const sTitle = (s.songs?.title || s.title || s.song_title || '').toLowerCase().trim();
-                return (songId && s.id === songId) || (normKey && sTitle === normKey) || (normTitle && sTitle === normTitle);
-              });
-              if (matchSkill && ((matchSkill as any).recording_url || (matchSkill as any).audio_url)) {
-                return (matchSkill as any).recording_url || (matchSkill as any).audio_url;
-              }
-
-              // 4. From progressItems (recording_url column only)
-              const matchProg = (progressItems || []).find((p: any) => {
-                const pText = (p.topic_name || p.title || '').toLowerCase().trim();
-                const matches = (normKey && pText === normKey) || (normTitle && pText === normTitle) || (songId && p.id === songId);
-                return matches && (p as any).recording_url;
-              });
-              if (matchProg && (matchProg as any).recording_url) {
-                return (matchProg as any).recording_url;
-              }
-
-              return undefined;
-            };
-
-            const playMasteredAudio = async (url: string) => {
-              try {
-                if (activeAudioPlayerRef.current) {
-                  activeAudioPlayerRef.current.pause();
-                  activeAudioPlayerRef.current = null;
-                  if (playingAudioUrl === url) {
-                    setPlayingAudioUrl(null);
-                    return;
-                  }
-                }
-                let playUrl = url;
-                if (url.startsWith('campus_blob_') || url.startsWith('campus_audio_')) {
-                  const raw = await getBlob(url);
-                  if (raw) {
-                    const finalBlob = raw instanceof Blob ? raw : new Blob([raw], { type: 'audio/webm' });
-                    playUrl = URL.createObjectURL(finalBlob);
-                  }
-                }
-                const audio = new Audio(playUrl);
-                activeAudioPlayerRef.current = audio;
-                setPlayingAudioUrl(url);
-                audio.onended = () => {
-                  setPlayingAudioUrl(null);
-                  activeAudioPlayerRef.current = null;
-                };
-                audio.onerror = (err) => {
-                  console.warn('[playMasteredAudio] Play error:', err);
-                  setPlayingAudioUrl(null);
-                  activeAudioPlayerRef.current = null;
-                };
-                await audio.play();
-              } catch (err) {
-                console.warn('[playMasteredAudio] Playback notice:', err);
-                setPlayingAudioUrl(null);
-              }
-            };
-
-            const handleDeleteMasteredAudio = async (skillItem: any) => {
-              try {
-                const audioUrl = skillItem.audioUrl;
-                const songId = skillItem.id;
-                const title = skillItem.title;
-                const artist = skillItem.artist;
-                const normKey = `${artist || ''} - ${title || ''}`.toLowerCase().trim();
-                const cleanTitleKey = (title || '').toLowerCase().trim();
-
-                // 1. Clear LocalStorage
-                if (student?.id) {
-                  if (songId) {
-                    localStorage.removeItem(`campus_mastered_audio_${student.id}_${songId}`);
-                  }
-                  if (normKey) {
-                    localStorage.removeItem(`campus_mastered_audio_${student.id}_${normKey}`);
-                  }
-                  if (cleanTitleKey) {
-                    localStorage.removeItem(`campus_mastered_audio_${student.id}_${cleanTitleKey}`);
-                  }
-                }
-
-                // 2. Remove from Supabase Storage if remote
-                if (audioUrl && audioUrl.startsWith('http')) {
-                  const marker = '/storage/v1/object/public/campus-assets/';
-                  const markerIndex = audioUrl.indexOf(marker);
-                  if (markerIndex !== -1) {
-                    const filePath = audioUrl.substring(markerIndex + marker.length);
-                    supabase.storage.from('campus-assets').remove([filePath]).catch(() => {});
-                  }
-                }
-
-                // 3. Remove from IndexedDB if local blob
-                if (audioUrl && (audioUrl.startsWith('campus_blob_') || audioUrl.startsWith('campus_audio_'))) {
-                  deleteBlob(audioUrl).catch(() => {});
-                }
-
-                // 4. Update React State
-                setActiveSongSkills(prev => (prev || []).map(s => {
-                  const sTitle = (s.songs?.title || s.title || s.song_title || '').toLowerCase().trim();
-                  if ((songId && s.id === songId) || (cleanTitleKey && sTitle === cleanTitleKey) || (normKey && sTitle.includes(cleanTitleKey))) {
-                    return { ...s, recording_url: null, audio_url: null };
-                  }
-                  return s;
-                }));
-
-                setProgressItems(prev => (prev || []).map(p => {
-                  const pTitle = ((p as any).topic_name || (p as any).title || '').toLowerCase().trim();
-                  if ((songId && p.id === songId) || (cleanTitleKey && pTitle === cleanTitleKey) || (normKey && pTitle.includes(cleanTitleKey))) {
-                    return { ...p, recording_url: null };
-                  }
-                  return p;
-                }));
-
-                // 5. Update Supabase database
-                if (songId && !String(songId).startsWith('temp-')) {
-                  supabase.from('user_song_skills').update({ recording_url: null }).eq('id', songId).then(() => {});
-                  supabase.from('progress_matrix').update({ recording_url: null }).eq('id', songId).then(() => {});
-                }
-                if (student?.id && title) {
-                  supabase.from('progress_matrix').update({ recording_url: null }).eq('student_id', student.id).ilike('topic_name', `%${title}%`).then(() => {});
-                }
-
-                notifyHomeworkChange();
-              } catch (err) {
-                console.error('Error deleting mastered audio:', err);
-              }
-            };
-
-            const masteredSongsMap = new Map<string, any>();
-
-            // 1. From activeSongSkills
-            (activeSongSkills || []).forEach(skill => {
-              if (skill.is_stage_ready || skill.progress_percent === 100 || skill.status === 'MASTERED') {
-                const title = skill.songs?.title || skill.title || skill.song_title;
-                const artist = skill.songs?.artist || skill.artist || 'Unbekannt';
-                if (title) {
-                  const key = title.toLowerCase().trim();
-                  const skillAudio = (skill as any)?.audio_url || (skill as any)?.recording_url || resolveMasteredSongAudio(skill.id, title, key);
-                  masteredSongsMap.set(key, {
-                    title,
-                    artist,
-                    instrument: skill.instrument || student?.instrument || 'Campus',
-                    id: skill.id,
-                    audioUrl: skillAudio,
-                    masteredDate: skill.updated_at || skill.created_at
-                  });
-                }
-              }
-            });
-
-            // 2. From progressItems
-            (progressItems || []).forEach((item: any) => {
-              const rawTopic = (item.topic_name || item.title || '').trim();
-              if (!rawTopic || rawTopic.includes(' - Seite ') || rawTopic.startsWith('Hausaufgabe KW ') || rawTopic.toLowerCase() === 'test' || rawTopic.toLowerCase() === 'test - test' || rawTopic.toLowerCase() === 'test-test') return;
-              if (item.status === 'MASTERED' || (item.progress_percent || 0) === 100) {
-                const cleanT = rawTopic.replace(/\s*\([^)]*\)\s*$/, '').trim();
-                const key = cleanT.toLowerCase();
-                if (!masteredSongsMap.has(key)) {
-                  let artist = 'Unbekannt';
-                  let title = cleanT;
-                  if (cleanT.includes(' - ')) {
-                    const parts = cleanT.split(' - ');
-                    artist = parts[0].trim();
-                    title = parts.slice(1).join(' - ').trim();
-                  }
-                  const itemAudio = (item as any).recording_url || resolveMasteredSongAudio(item.id, title, key);
-                  masteredSongsMap.set(key, {
-                    title,
-                    artist,
-                    instrument: item.instrument || student?.instrument || 'Campus',
-                    id: item.id,
-                    audioUrl: itemAudio,
-                    masteredDate: item.updated_at || item.created_at
-                  });
-                }
-              }
-            });
-
-            const masteredSongs = Array.from(masteredSongsMap.values());
-
-            const hasMastered = masteredBooksList.length > 0 || masteredSongs.length > 0;
-
-            if (!hasMastered) {
-              return (
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', margin: '40px auto 0 auto', maxWidth: '600px' }}>
-                  <div style={{
-                    padding: '60px 24px',
-                    textAlign: 'center',
-                    border: useNotebookLayout ? '2px dashed #32483e' : '2px dashed #cbd5e1',
-                    borderRadius: '24px',
-                    color: useNotebookLayout ? '#8fa399' : '#475569',
-                    fontSize: '0.95rem',
-                    fontWeight: 600,
-                    background: useNotebookLayout ? 'rgba(0,0,0,0.1)' : 'white',
-                    width: '100%'
-                  }}>
-                    Noch keine Meisterwerke eingetragen. Auf geht's! 🚀
-                  </div>
-
-                  {/* Audio-Tresor Retro-Kassette Promo Banner */}
-                  <div style={{
-                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                    borderRadius: '20px',
-                    padding: '18px 22px',
-                    color: 'white',
-                    width: '100%',
-                    boxShadow: '0 8px 22px rgba(16, 185, 129, 0.2)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '12px'
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                      <span style={{ fontSize: '26px' }}>📼</span>
-                      <div>
-                        <div style={{ fontWeight: 900, fontSize: '0.92rem', letterSpacing: '-0.01em' }}>
-                          Meisterwerk Audio-Tresor (Retro-Kassette 📼)
-                        </div>
-                        <div style={{ fontSize: '0.78rem', opacity: 0.95, marginTop: '3px', lineHeight: 1.4 }}>
-                          Sobald deine Musikschule ein Tresor-Paket gebucht hat, wird jede gemeisterte Aufnahme auf einer digitalen <strong>Retro-Kassette mit Spulen-Animation, Datumsstempel &amp; Beschriftung</strong> dauerhaft für dich und deine Eltern archiviert!
-                        </div>
-                      </div>
-                    </div>
-
-                    <div style={{ display: 'flex', gap: '10px', fontSize: '0.72rem', background: 'rgba(255,255,255,0.15)', padding: '8px 14px', borderRadius: '12px', backdropFilter: 'blur(4px)' }}>
-                      <span>🔒 <strong>DSGVO-konform:</strong> Lückenlose Speicherung deiner musikalischen Meilensteine – ohne private Kamerafotos!</span>
-                    </div>
-                  </div>
-                </div>
-              );
-            }
-
-            return (
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: '1fr 1fr',
-                gap: '24px',
-                width: '100%',
-                marginTop: '16px'
-              }}>
-                {/* Spalte 1: Songs */}
-                <div style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '16px'
-                }}>
-                  <h3 style={{
-                    fontSize: '1rem',
-                    fontWeight: 800,
-                    color: useNotebookLayout ? '#34a853' : '#475569',
-                    borderBottom: useNotebookLayout ? '2px solid #32483e' : '2px solid #e2e8f0',
-                    paddingBottom: '8px',
-                    margin: 0,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px'
-                  }}>
-                    <span>🎵</span> Songs
-                  </h3>
-                  
-                  {masteredSongs.length === 0 ? (
-                    <div style={{
-                      padding: '30px 16px',
-                      textAlign: 'center',
-                      border: useNotebookLayout ? '1px dashed #32483e' : '1px dashed #cbd5e1',
-                      borderRadius: '16px',
-                      color: useNotebookLayout ? '#8fa399' : '#64748b',
-                      fontSize: '0.82rem',
-                      background: useNotebookLayout ? 'rgba(0,0,0,0.1)' : '#f8fafc'
-                    }}>
-                      Noch keine Meisterwerk-Songs vorhanden.
-                    </div>
-                  ) : (
-                    masteredSongs.map((skill, idx) => {
-                      const songColor = getSongColor(skill.title || 'Song');
-                      const isThisRecording = isRecordingAudio && (activeRecordingSongId === skill.id || selectedActiveSongId === skill.id || recordingTargetRef.current.songId === skill.id);
-                      return (
-                        <div 
-                          key={`m-song-${idx}`} 
-                          style={{
-                            background: '#ffffff',
-                            border: '1px solid #e2e8f0',
-                            borderRadius: '16px',
-                            padding: '12px 16px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            gap: '12px',
-                            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.03)',
-                            minHeight: '64px',
-                            boxSizing: 'border-box'
-                          }}
-                        >
-                          {/* Left: Vinyl Cover + Title */}
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0, flex: 1 }}>
-                            {renderSongVinylCover(songColor, 'sm')}
-                            <div style={{
-                              fontSize: '0.90rem',
-                              color: '#0f172a',
-                              fontWeight: 900,
-                              letterSpacing: '-0.02em',
-                              fontFamily: '"Helvetica Neue", Helvetica, Inter, Arial, sans-serif',
-                              whiteSpace: 'nowrap',
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis'
-                            }}>
-                              {skill.artist} - {skill.title}
-                            </div>
-                          </div>
-
-                          {/* Right: Buttons [ Aufnahme ] [ 🏅 Gold-Urkunde ] [ 🏆 Meisterwerk ] */}
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-                            {/* 🎙️ 1. Aufnahme Button */}
-                            {isThisRecording ? (
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  stopRecordingAudio();
-                                }}
-                                style={{
-                                  background: '#fef2f2',
-                                  color: '#dc2626',
-                                  border: '1.5px solid #f87171',
-                                  borderRadius: '10px',
-                                  padding: '6px 12px',
-                                  fontSize: '0.72rem',
-                                  fontWeight: 800,
-                                  cursor: 'pointer',
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: '6px',
-                                  boxShadow: '0 2px 8px rgba(220, 38, 38, 0.25)'
-                                }}
-                                title="Aufnahme stoppen & im Meisterwerk archivieren"
-                              >
-                                <Square size={12} fill="#dc2626" />
-                                <span>Stopp ({Math.floor(audioDuration / 60)}:{String(Math.floor(audioDuration % 60)).padStart(2, '0')})</span>
-                              </button>
-                            ) : skill.audioUrl ? (
-                              <MasterworkAudioCapsule
-                                url={skill.audioUrl}
-                                songTitle={`${skill.artist} - ${skill.title}`}
-                                onDelete={!readOnly ? () => handleDeleteMasteredAudio(skill) : undefined}
-                              />
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  startRecordingAudio(skill.id, `${skill.artist} - ${skill.title}`, true);
-                                }}
-                                style={{
-                                  background: '#f0fdf4',
-                                  color: '#166534',
-                                  border: '1px solid #bbf7d0',
-                                  borderRadius: '10px',
-                                  padding: '6px 11px',
-                                  fontSize: '0.72rem',
-                                  fontWeight: 800,
-                                  cursor: 'pointer',
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: '5px',
-                                  boxShadow: '0 1px 4px rgba(22, 101, 52, 0.08)'
-                                }}
-                                title="100% Meisterwerk-Aufnahme im Unterricht starten"
-                              >
-                                <Mic size={13} />
-                                <span>Aufnahme</span>
-                              </button>
-                            )}
-
-                            {/* 🏅 2. Gold-Urkunde Button */}
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setCertModalSong({
-                                  studentName: student?.first_name ? `${student.first_name} ${student.last_name || ''}`.trim() : (student?.name || 'Musikschüler'),
-                                  songTitle: skill.title,
-                                  instrument: skill.instrument || student?.instrument || 'Instrument',
-                                  schoolName: resolvedSchoolName || 'Campus-Groovelab Musikschule',
-                                  teacherName: (student as any)?.teacher_name ? formatTeacherFullName((student as any).teacher_name) : 'Deine Lehrkraft',
-                                  masteredDate: skill.masteredDate || new Date().toISOString(),
-                                  certificateId: `MW-${new Date().getFullYear()}-${skill.id ? String(skill.id).substring(0, 6).toUpperCase() : '100'}`
-                                });
-                              }}
-                              style={{
-                                background: '#fef3c7',
-                                color: '#92400e',
-                                border: '1px solid #fde68a',
-                                borderRadius: '10px',
-                                padding: '6px 12px',
-                                fontSize: '0.74rem',
-                                fontWeight: 800,
-                                cursor: 'pointer',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '5px',
-                                boxShadow: '0 2px 6px rgba(202, 138, 4, 0.15)'
-                              }}
-                              title="Offizielle Meisterwerk-Goldurkunde öffnen"
-                            >
-                              <Award size={14} color="#ca8a04" />
-                              <span>Gold-Urkunde</span>
-                            </button>
-
-                            {/* 🏆 3. Meisterwerk Badge */}
-                            <span style={{
-                              fontSize: '0.72rem',
-                              background: '#dcfce7',
-                              color: '#15803d',
-                              padding: '6px 11px',
-                              borderRadius: '10px',
-                              fontWeight: 800,
-                              border: '1px solid #bbf7d0',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '5px',
-                              boxShadow: '0 1px 4px rgba(21, 128, 61, 0.08)'
-                            }}>
-                              <span>🏆</span>
-                              <span>Meisterwerk</span>
-                            </span>
-                          </div>
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-
-                {/* Spalte 2: Lehrwerke */}
-                <div style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '16px'
-                }}>
-                  <h3 style={{
-                    fontSize: '1rem',
-                    fontWeight: 800,
-                    color: useNotebookLayout ? '#34a853' : '#475569',
-                    borderBottom: useNotebookLayout ? '2px solid #32483e' : '2px solid #e2e8f0',
-                    paddingBottom: '8px',
-                    margin: 0,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px'
-                  }}>
-                    <span>📖</span> Lehrwerke
-                  </h3>
-
-                  {masteredBooksList.length === 0 ? (
-                    <div style={{
-                      padding: '30px 16px',
-                      textAlign: 'center',
-                      border: useNotebookLayout ? '1px dashed #32483e' : '1px dashed #cbd5e1',
-                      borderRadius: '16px',
-                      color: useNotebookLayout ? '#8fa399' : '#64748b',
-                      fontSize: '0.82rem',
-                      background: useNotebookLayout ? 'rgba(0,0,0,0.1)' : '#f8fafc'
-                    }}>
-                      Noch keine Meisterwerk-Lehrwerke vorhanden.
-                    </div>
-                  ) : (
-                    masteredBooksList.map((item, idx) => {
-                      const bookColor = getLehrwerkColor(item.title);
-                      return (
-                        <div key={`m-lw-${idx}`} style={{
-                          background: 'white',
-                          border: '1px solid #e2e8f0',
-                          borderRadius: '20px',
-                          padding: '12px 18px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '14px',
-                          boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
-                        }}>
-                          {/* Gradient cover book */}
-                          <div style={{
-                            width: '34px',
-                            height: '44px',
-                            background: `linear-gradient(135deg, ${bookColor.from}, ${bookColor.to})`,
-                            borderRadius: '4px',
-                            position: 'relative',
-                            boxShadow: '0 3px 6px rgba(0,0,0,0.15)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            flexShrink: 0
-                          }}>
-                            <BookOpen size={16} color={bookColor.text} />
-                            <div style={{
-                              position: 'absolute',
-                              left: 0,
-                              top: 0,
-                              bottom: 0,
-                              width: '3px',
-                              background: 'rgba(0,0,0,0.12)',
-                              borderRight: '1px solid rgba(255,255,255,0.08)'
-                            }} />
-                          </div>
-
-                          {/* Content in a single line */}
-                          <div style={{
-                            fontSize: '0.86rem',
-                            color: '#0f172a',
-                            fontWeight: 900,
-                            letterSpacing: '-0.02em',
-                            fontFamily: '"Helvetica Neue", Helvetica, Inter, Arial, sans-serif',
-                            whiteSpace: 'nowrap',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis'
-                          }}>
-                            {item.title} - <span style={{ color: '#475569', fontWeight: 700 }}>S. {item.pages.join(', ')}</span>
-                          </div>
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-              </div>
-            );
-          })()}
-        </div>
+        <MeisterwerkLogbuchTab
+          isMobileOrSim={isMobileOrSim}
+          useNotebookLayout={useNotebookLayout}
+          student={student}
+          assignedLehrwerke={assignedLehrwerke}
+          globalLehrwerke={globalLehrwerke}
+          activeSongSkills={activeSongSkills}
+          setActiveSongSkills={setActiveSongSkills}
+          progressItems={progressItems}
+          setProgressItems={setProgressItems}
+          activeAudioPlayerRef={activeAudioPlayerRef}
+          playingAudioUrl={playingAudioUrl}
+          setPlayingAudioUrl={setPlayingAudioUrl}
+          notifyHomeworkChange={notifyHomeworkChange}
+          getSongColor={getSongColor}
+          renderSongVinylCover={renderSongVinylCover}
+          isRecordingAudio={isRecordingAudio}
+          activeRecordingSongId={activeRecordingSongId}
+          selectedActiveSongId={selectedActiveSongId}
+          recordingTargetRef={recordingTargetRef}
+          stopRecordingAudio={stopRecordingAudio}
+          startRecordingAudio={startRecordingAudio}
+          audioDuration={audioDuration}
+          readOnly={readOnly}
+          getLehrwerkColor={getLehrwerkColor}
+          setCertModalSong={setCertModalSong}
+          resolvedSchoolName={resolvedSchoolName}
+        />
       )}
       
       {/* Apple-style Backdrop Blur Overlay for All Pages Grid */}
@@ -21534,6 +9551,34 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             </div>
           </div>
         )}
+
+        {/* Floating Recording Saved Celebration Banner */}
+        {recordingSavedToast && (
+          <div
+            style={{
+              position: 'fixed',
+              bottom: '28px',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              zIndex: 9999999,
+              background: 'linear-gradient(135deg, #15803d 0%, #16a34a 100%)',
+              color: '#ffffff',
+              padding: '12px 24px',
+              borderRadius: '100px',
+              boxShadow: '0 12px 36px rgba(22, 163, 74, 0.4), 0 4px 12px rgba(0,0,0,0.18)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              fontSize: '0.94rem',
+              fontWeight: 900,
+              letterSpacing: '-0.01em',
+              pointerEvents: 'none',
+              animation: 'fade-in 0.25s ease-out'
+            }}
+          >
+            <span>{recordingSavedToast}</span>
+          </div>
+        )}
       </div>
     );
 
@@ -21592,6 +9637,24 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
               />
             </React.Suspense>
           )}
+          {isTransferModalOpen && (
+            <HomeworkTransferModal
+              isOpen={isTransferModalOpen}
+              onClose={() => setIsTransferModalOpen(false)}
+              targetWeekNum={getTargetWeekIso(viewingWeekOffset).split('-W')[1] || ''}
+              targetWeekIso={getTargetWeekIso(viewingWeekOffset)}
+              targetDateSpan={getWeekDateRange(viewingWeekOffset).dateSpan}
+              sourceWeekNum={(() => {
+                const prevTarget = getSimulatedNow();
+                prevTarget.setDate(prevTarget.getDate() + ((viewingWeekOffset - 1) * 7));
+                return getISOWeek(prevTarget).split('-W')[1] || '';
+              })()}
+              sourceLehrwerke={sourceTransferData.sourceLW}
+              sourceSongs={sourceTransferData.sourceS}
+              sourceAudios={sourceTransferData.sourceA}
+              onExecuteTransfer={handleExecuteBatchTransfer}
+            />
+          )}
         </>
       );
     }
@@ -21641,1099 +9704,26 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             />
           </React.Suspense>
         )}
+        {isTransferModalOpen && (
+          <HomeworkTransferModal
+            isOpen={isTransferModalOpen}
+            onClose={() => setIsTransferModalOpen(false)}
+            targetWeekNum={getTargetWeekIso(viewingWeekOffset).split('-W')[1] || ''}
+            targetWeekIso={getTargetWeekIso(viewingWeekOffset)}
+            targetDateSpan={getWeekDateRange(viewingWeekOffset).dateSpan}
+            sourceWeekNum={(() => {
+              const prevTarget = getSimulatedNow();
+              prevTarget.setDate(prevTarget.getDate() + ((viewingWeekOffset - 1) * 7));
+              return getISOWeek(prevTarget).split('-W')[1] || '';
+            })()}
+            sourceLehrwerke={sourceTransferData.sourceLW}
+            sourceSongs={sourceTransferData.sourceS}
+            sourceAudios={sourceTransferData.sourceA}
+            onExecuteTransfer={handleExecuteBatchTransfer}
+          />
+        )}
       </>
     );
   };
 
-
-
-const CassetteIcon: React.FC<{ isPlaying: boolean; color?: string }> = ({ isPlaying, color = 'currentColor' }) => {
-  return (
-    <svg 
-      viewBox="0 0 24 24" 
-      width="20" 
-      height="20" 
-      fill="none" 
-      stroke={color} 
-      strokeWidth="1.5" 
-      strokeLinecap="round" 
-      strokeLinejoin="round"
-      style={{
-        display: 'block',
-        flexShrink: 0
-      }}
-    >
-      {/* Outer Cassette Shell */}
-      <rect x="2" y="3" width="20" height="14" rx="2" strokeWidth="1.8" />
-      {/* Bottom Trapezoid (exposed tape run) */}
-      <path d="M6 17 L7.5 20.5 L16.5 20.5 L18 17" strokeWidth="1.5" />
-      {/* Center label sticker area */}
-      <rect x="4.5" y="5.5" width="15" height="9" rx="1" strokeWidth="1.2" opacity="0.85" />
-      {/* The clear plastic window in the middle */}
-      <rect x="7.5" y="7.5" width="9" height="5" rx="0.5" strokeWidth="1" opacity="0.8" />
-      {/* Left rotating reel */}
-      <g style={{ transformOrigin: '10px 10px', animation: isPlaying ? 'spin-clockwise 3s linear infinite' : 'none' }}>
-        <circle cx="10" cy="10" r="1.8" strokeWidth="1.2" />
-        <path d="M10 8.2 L10 11.8 M8.2 10 L11.8 10" strokeWidth="1" />
-      </g>
-      {/* Right rotating reel */}
-      <g style={{ transformOrigin: '14px 10px', animation: isPlaying ? 'spin-clockwise 3s linear infinite' : 'none' }}>
-        <circle cx="14" cy="10" r="1.8" strokeWidth="1.2" />
-        <path d="M14 8.2 L14 11.8 M12.2 10 L15.8 10" strokeWidth="1" />
-      </g>
-      {/* Small details: screw holes in corners */}
-      <circle cx="3.5" cy="4.5" r="0.4" fill={color} stroke="none" opacity="0.6" />
-      <circle cx="20.5" cy="4.5" r="0.4" fill={color} stroke="none" opacity="0.6" />
-      <circle cx="3.5" cy="15.5" r="0.4" fill={color} stroke="none" opacity="0.6" />
-      <circle cx="20.5" cy="15.5" r="0.4" fill={color} stroke="none" opacity="0.6" />
-      {/* Tape rolls inside window */}
-      <circle cx="10" cy="10" r="3" strokeWidth="0.8" strokeDasharray="1 1" opacity="0.45" />
-      <circle cx="14" cy="10" r="2.8" strokeWidth="0.8" strokeDasharray="1 1" opacity="0.45" />
-    </svg>
-  );
-};
-
-// Lightweight WebAudio beep helper for 4-beat count-in
-const playCountInBeep = (isAccent: boolean) => {
-  try {
-    const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-    if (!AudioCtx) return;
-    const ctx = new AudioCtx();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(isAccent ? 960 : 640, ctx.currentTime);
-    gain.gain.setValueAtTime(0.28, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.1);
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start();
-    osc.stop(ctx.currentTime + 0.12);
-  } catch {
-    // silent fallback
-  }
-};
-
-interface MasterworkAudioCapsuleProps {
-  url: string;
-  songTitle: string;
-  onDelete?: () => void;
-}
-
-const MasterworkAudioCapsule: React.FC<MasterworkAudioCapsuleProps> = ({
-  url,
-  songTitle,
-  onDelete
-}) => {
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [duration, setDuration] = useState<number>(0);
-  const [currentTime, setCurrentTime] = useState<number>(0);
-  const [resolvedUrl, setResolvedUrl] = useState<string>(url);
-  const audioRef = React.useRef<HTMLAudioElement | null>(null);
-  const playerIdRef = React.useRef<string>(`mw_capsule_${Math.random().toString(36).substring(2, 9)}_${Date.now()}`);
-
-  const notifyGlobalPlay = () => {
-    window.dispatchEvent(new CustomEvent('campus-global-audio-play', { detail: { playerId: playerIdRef.current } }));
-  };
-
-  useEffect(() => {
-    const handleOtherPlay = (e: any) => {
-      if (e?.detail?.playerId && e.detail.playerId !== playerIdRef.current) {
-        if (audioRef.current && !audioRef.current.paused) {
-          audioRef.current.pause();
-        }
-        setIsPlaying(false);
-      }
-    };
-    window.addEventListener('campus-global-audio-play', handleOtherPlay);
-    return () => window.removeEventListener('campus-global-audio-play', handleOtherPlay);
-  }, []);
-
-  useEffect(() => {
-    let active = true;
-    let createdBlobUrl: string | null = null;
-
-    if (url.startsWith('campus_blob_') || url.startsWith('campus_audio_')) {
-      getBlob(url).then((raw: any) => {
-        if (active && raw) {
-          const finalBlob = raw instanceof Blob ? raw : new Blob([raw], { type: 'audio/webm' });
-          createdBlobUrl = URL.createObjectURL(finalBlob);
-          setResolvedUrl(createdBlobUrl);
-        }
-      }).catch((err: any) => console.warn('[MasterworkAudioCapsule] Blob load note:', err));
-    } else {
-      setResolvedUrl(url);
-    }
-
-    return () => {
-      active = false;
-      if (createdBlobUrl) URL.revokeObjectURL(createdBlobUrl);
-    };
-  }, [url]);
-
-  useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio) return;
-
-    const handleLoaded = () => {
-      if (audio.duration && isFinite(audio.duration)) {
-        setDuration(Math.round(audio.duration));
-      }
-    };
-    const handleTimeUpdate = () => {
-      setCurrentTime(audio.currentTime);
-    };
-    const handleEnded = () => {
-      setIsPlaying(false);
-      setCurrentTime(0);
-    };
-
-    if (audio.duration && isFinite(audio.duration)) {
-      setDuration(Math.round(audio.duration));
-    }
-
-    audio.addEventListener('loadedmetadata', handleLoaded);
-    audio.addEventListener('timeupdate', handleTimeUpdate);
-    audio.addEventListener('ended', handleEnded);
-    return () => {
-      audio.removeEventListener('loadedmetadata', handleLoaded);
-      audio.removeEventListener('timeupdate', handleTimeUpdate);
-      audio.removeEventListener('ended', handleEnded);
-    };
-  }, [resolvedUrl]);
-
-  const togglePlay = (e?: React.MouseEvent) => {
-    if (e) e.stopPropagation();
-    if (!audioRef.current) return;
-    if (isPlaying) {
-      audioRef.current.pause();
-      setIsPlaying(false);
-    } else {
-      notifyGlobalPlay();
-      audioRef.current.play().then(() => setIsPlaying(true)).catch(err => console.warn('[MasterworkAudioCapsule] Play err:', err));
-    }
-  };
-
-  const formatTime = (secs: number) => {
-    const m = Math.floor(secs / 60);
-    const s = Math.floor(secs % 60);
-    return `${m}:${s < 10 ? '0' : ''}${s}`;
-  };
-
-  const progressRatio = duration > 0 ? currentTime / duration : 0;
-  const waveformHeights = [25, 55, 80, 45, 90, 70, 40, 85, 95, 60, 45, 80, 100, 65, 45, 30];
-
-  return (
-    <div
-      onClick={(e) => e.stopPropagation()}
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: '8px',
-        background: isPlaying ? '#f0f9ff' : '#f8fafc',
-        border: isPlaying ? '1px solid #7dd3fc' : '1px solid #e2e8f0',
-        borderRadius: '10px',
-        padding: '4px 8px 4px 6px',
-        boxShadow: isPlaying ? '0 2px 8px rgba(14, 165, 233, 0.18)' : '0 1px 3px rgba(0, 0, 0, 0.02)',
-        transition: 'all 0.15s ease',
-        boxSizing: 'border-box'
-      }}
-    >
-      <audio ref={audioRef} src={resolvedUrl} />
-
-      {/* Play / Pause Circular Button */}
-      <button
-        type="button"
-        onClick={togglePlay}
-        style={{
-          width: '28px',
-          height: '28px',
-          borderRadius: '50%',
-          background: isPlaying ? '#0284c7' : 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
-          color: '#ffffff',
-          border: 'none',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          flexShrink: 0,
-          boxShadow: isPlaying ? '0 0 8px rgba(2, 132, 199, 0.45)' : '0 1px 4px rgba(2, 132, 199, 0.25)',
-          transition: 'all 0.15s ease'
-        }}
-        className="hover-scale-mini"
-        title={isPlaying ? 'Pause' : 'Meisterwerk-Aufnahme abspielen'}
-      >
-        {isPlaying ? (
-          <svg viewBox="0 0 24 24" width="11" height="11" fill="currentColor">
-            <rect x="6" y="5" width="4" height="14" rx="1.5" />
-            <rect x="14" y="5" width="4" height="14" rx="1.5" />
-          </svg>
-        ) : (
-          <svg viewBox="0 0 24 24" width="11" height="11" fill="currentColor" style={{ marginLeft: '1.5px' }}>
-            <path d="M8 5v14l11-7z" />
-          </svg>
-        )}
-      </button>
-
-      {/* Time display */}
-      <span style={{
-        fontSize: '0.68rem',
-        fontWeight: 800,
-        color: isPlaying ? '#0369a1' : '#64748b',
-        fontVariantNumeric: 'tabular-nums',
-        minWidth: '55px'
-      }}>
-        {formatTime(currentTime)} / {formatTime(duration)}
-      </span>
-
-      {/* Interactive Scrubbable Waveform Visualizer */}
-      <div
-        onClick={(e) => {
-          e.stopPropagation();
-          const rect = e.currentTarget.getBoundingClientRect();
-          const clickX = e.clientX - rect.left;
-          const newRatio = Math.max(0, Math.min(1, clickX / rect.width));
-          const newTime = newRatio * (duration || 0);
-          setCurrentTime(newTime);
-          if (audioRef.current) audioRef.current.currentTime = newTime;
-        }}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '2px',
-          height: '18px',
-          width: '90px',
-          cursor: 'pointer',
-          padding: '2px 4px',
-          background: isPlaying ? '#e0f2fe' : '#f1f5f9',
-          borderRadius: '6px',
-          border: isPlaying ? '1px solid #bae6fd' : '1px solid #e2e8f0'
-        }}
-        title="In der Aufnahme springen (Tippen/Klicken)"
-      >
-        {waveformHeights.map((h, i) => {
-          const barRatio = i / waveformHeights.length;
-          const isFilled = barRatio <= progressRatio;
-          return (
-            <div
-              key={i}
-              style={{
-                flex: 1,
-                minWidth: '2px',
-                height: `${Math.max(20, h)}%`,
-                borderRadius: '1px',
-                background: isFilled ? (isPlaying ? '#0284c7' : '#0369a1') : '#cbd5e1',
-                transition: 'background 0.1s ease'
-              }}
-            />
-          );
-        })}
-      </div>
-
-      {/* Delete Recording Button */}
-      {onDelete && (
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onDelete();
-          }}
-          style={{
-            border: '1px solid #fecdd3',
-            background: '#fff1f2',
-            color: '#dc2626',
-            cursor: 'pointer',
-            height: '24px',
-            width: '24px',
-            borderRadius: '6px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            flexShrink: 0,
-            transition: 'all 0.15s ease'
-          }}
-          className="hover-scale-mini"
-          title="Meisterwerk-Aufnahme löschen"
-        >
-          <Trash2 size={12} strokeWidth={2.2} />
-        </button>
-      )}
-    </div>
-  );
-};
-
-const InlineAudioPlayer: React.FC<{ 
-  url: string; 
-  label: string; 
-  onDelete?: () => void; 
-  duration?: number;
-  themeColor?: string;
-  themeBg?: string;
-  badge?: string;
-  badgeTitle?: string;
-  badgeBg?: string;
-  badgeColor?: string;
-  onBadgeClick?: () => void;
-  date?: string;
-  isFavorite?: boolean;
-  onToggleFavorite?: () => void;
-  onSaveEdited?: (result: { url: string; duration: number; label: string; mode: 'overwrite' | 'duplicate' }) => void;
-}> = ({ 
-  url, 
-  label, 
-  onDelete, 
-  duration: initialDuration,
-  themeColor = '#34a853',
-  themeBg = '#e6f4ea',
-  badge,
-  badgeTitle,
-  badgeBg = '#f1f5f9',
-  badgeColor = '#475569',
-  onBadgeClick,
-  date,
-  isFavorite,
-  onToggleFavorite,
-  onSaveEdited
-}) => {
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [duration, setDuration] = useState<number>(initialDuration || 0);
-  const [currentTime, setCurrentTime] = useState<number>(0);
-  const [playbackRate, setPlaybackRate] = useState(1);
-  const [isLooping, setIsLooping] = useState(false);
-  const [countInActive, setCountInActive] = useState(false);
-  const [countInStep, setCountInStep] = useState<number | null>(null);
-  const [isEditorOpen, setIsEditorOpen] = useState(false);
-  const [resolvedUrl, setResolvedUrl] = useState<string>(url);
-  const audioRef = React.useRef<HTMLAudioElement | null>(null);
-  const countInTimerRef = React.useRef<any>(null);
-  const playerIdRef = React.useRef<string>(`player_${Math.random().toString(36).substring(2, 9)}_${Date.now()}`);
-  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' ? window.innerWidth < 768 : false);
-
-  useEffect(() => {
-    const handleResize = () => setIsMobile(typeof window !== 'undefined' ? window.innerWidth < 768 : false);
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
-  const notifyGlobalPlay = () => {
-    window.dispatchEvent(new CustomEvent('campus-global-audio-play', { detail: { playerId: playerIdRef.current } }));
-  };
-
-  // 🎧 Global Single-Audio Manager: Stop if any other player on the page starts
-  useEffect(() => {
-    const handleOtherPlay = (e: any) => {
-      if (e?.detail?.playerId && e.detail.playerId !== playerIdRef.current) {
-        if (countInTimerRef.current) {
-          clearTimeout(countInTimerRef.current);
-          countInTimerRef.current = null;
-          setCountInStep(null);
-        }
-        if (audioRef.current && !audioRef.current.paused) {
-          audioRef.current.pause();
-        }
-        setIsPlaying(false);
-      }
-    };
-
-    window.addEventListener('campus-global-audio-play', handleOtherPlay);
-    return () => window.removeEventListener('campus-global-audio-play', handleOtherPlay);
-  }, []);
-
-  useEffect(() => {
-    let active = true;
-    let createdBlobUrl: string | null = null;
-
-    if (url.startsWith('campus_blob_') || url.startsWith('campus_audio_')) {
-      getBlob(url).then(raw => {
-        if (active && raw) {
-          const finalBlob = raw instanceof Blob ? raw : new Blob([raw], { type: 'audio/webm' });
-          createdBlobUrl = URL.createObjectURL(finalBlob);
-          setResolvedUrl(createdBlobUrl);
-        }
-      }).catch(err => console.warn('[InlineAudioPlayer] Blob load note:', err));
-    } else {
-      setResolvedUrl(url);
-    }
-
-    return () => {
-      active = false;
-      if (createdBlobUrl) URL.revokeObjectURL(createdBlobUrl);
-      if (countInTimerRef.current) clearTimeout(countInTimerRef.current);
-    };
-  }, [url]);
-
-  // 🔁 Seamless Gapless Native Loop
-  useEffect(() => {
-    if (audioRef.current) {
-      audioRef.current.loop = isLooping;
-    }
-  }, [isLooping]);
-
-  const togglePlay = (e?: React.MouseEvent) => {
-    if (e) e.stopPropagation();
-    if (countInTimerRef.current) {
-      clearTimeout(countInTimerRef.current);
-      countInTimerRef.current = null;
-      setCountInStep(null);
-      return;
-    }
-    if (!audioRef.current) return;
-    if (isPlaying) {
-      audioRef.current.pause();
-      setIsPlaying(false);
-    } else {
-      notifyGlobalPlay();
-      if (countInActive) {
-        let step = 4;
-        setCountInStep(step);
-        playCountInBeep(true);
-
-        const runCount = () => {
-          step -= 1;
-          if (step > 0) {
-            setCountInStep(step);
-            playCountInBeep(false);
-            countInTimerRef.current = setTimeout(runCount, 550);
-          } else {
-            setCountInStep(null);
-            countInTimerRef.current = null;
-            if (audioRef.current) {
-              audioRef.current.loop = isLooping;
-              audioRef.current.play().then(() => setIsPlaying(true)).catch(err => console.warn('[InlineAudioPlayer] Play error:', err));
-            }
-          }
-        };
-        countInTimerRef.current = setTimeout(runCount, 550);
-      } else {
-        audioRef.current.loop = isLooping;
-        audioRef.current.play().then(() => setIsPlaying(true)).catch(err => console.warn('[InlineAudioPlayer] Play error:', err));
-      }
-    }
-  };
-
-  useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio) return;
-    const handleLoadedMetadata = () => {
-      if (audio.duration && isFinite(audio.duration)) {
-        setDuration(Math.round(audio.duration));
-      }
-    };
-    const handleTimeUpdate = () => {
-      setCurrentTime(audio.currentTime);
-    };
-    const handleEnded = () => {
-      if (!isLooping) {
-        setIsPlaying(false);
-        setCurrentTime(0);
-      }
-    };
-
-    if (audio.duration && isFinite(audio.duration)) {
-      setDuration(Math.round(audio.duration));
-    }
-
-    audio.loop = isLooping;
-    audio.addEventListener('loadedmetadata', handleLoadedMetadata);
-    audio.addEventListener('timeupdate', handleTimeUpdate);
-    audio.addEventListener('ended', handleEnded);
-    return () => {
-      audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
-      audio.removeEventListener('timeupdate', handleTimeUpdate);
-      audio.removeEventListener('ended', handleEnded);
-    };
-  }, [resolvedUrl, isLooping]);
-
-  useEffect(() => {
-    if (audioRef.current) {
-      audioRef.current.playbackRate = playbackRate;
-      (audioRef.current as any).preservesPitch = true;
-    }
-  }, [playbackRate]);
-
-  const formatTime = (secs: number) => {
-    const m = Math.floor(secs / 60);
-    const s = Math.floor(secs % 60);
-    return `${m}:${s < 10 ? '0' : ''}${s}`;
-  };
-
-  // 24 dynamic waveform bar heights for organic audio visualization
-  const waveformHeights = [35, 65, 30, 85, 55, 95, 70, 45, 80, 100, 60, 90, 75, 45, 80, 50, 70, 85, 40, 90, 60, 75, 45, 30];
-  const progressRatio = duration > 0 ? currentTime / duration : 0;
-  const isActiveOrPlaying = isPlaying || currentTime > 0;
-
-  const formattedDate = (() => {
-    if (!date) return '';
-    try {
-      const d = new Date(date);
-      if (isNaN(d.getTime())) return '';
-      return d.toLocaleDateString('de-DE', { day: '2-digit', month: 'short' });
-    } catch {
-      return '';
-    }
-  })();
-
-  const cleanTitle = label && label.trim() !== '' ? label.trim() : 'Aufnahme';
-
-  return (
-    <div style={{
-      background: isPlaying ? '#f0fdf4' : '#ffffff',
-      borderRadius: '16px',
-      border: isPlaying ? `1.5px solid ${themeColor}` : '1.5px solid #e2e8f0',
-      padding: isMobile ? '12px 14px' : '8px 14px',
-      width: '100%',
-      boxShadow: isPlaying ? `0 4px 16px ${themeColor}20, 0 1px 3px rgba(0,0,0,0.03)` : '0 1px 4px rgba(0,0,0,0.02)',
-      display: 'flex',
-      flexDirection: 'column',
-      gap: '8px',
-      boxSizing: 'border-box',
-      position: 'relative',
-      transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
-      minHeight: '50px'
-    }}>
-      <audio ref={audioRef} src={resolvedUrl} />
-
-      {/* Primary Top Row */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%' }}>
-        {/* Left: Play / Pause Circular Button */}
-        <button
-          type="button"
-          onClick={(e) => togglePlay(e)}
-          style={{
-            width: isMobile ? '38px' : '34px',
-            height: isMobile ? '38px' : '34px',
-            borderRadius: '50%',
-            background: countInStep !== null 
-              ? '#f59e0b'
-              : (isPlaying ? themeColor : `linear-gradient(135deg, ${themeColor} 0%, ${themeColor}ee 100%)`),
-            color: '#ffffff',
-            border: 'none',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            flexShrink: 0,
-            boxShadow: isPlaying ? `0 0 10px ${themeColor}55` : `0 2px 6px ${themeColor}33`,
-            transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
-            fontSize: countInStep !== null ? '0.86rem' : undefined,
-            fontWeight: 900
-          }}
-          className="hover-scale"
-          title={countInStep !== null ? `Einzähler: ${countInStep}` : (isPlaying ? 'Pause' : 'Abspielen')}
-        >
-          {countInStep !== null ? (
-            <span>{countInStep}</span>
-          ) : isPlaying ? (
-            <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
-              <rect x="6" y="5" width="4" height="14" rx="1.5" />
-              <rect x="14" y="5" width="4" height="14" rx="1.5" />
-            </svg>
-          ) : (
-            <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" style={{ marginLeft: '2px' }}>
-              <path d="M8 5v14l11-7z" />
-            </svg>
-          )}
-        </button>
-
-        {/* Middle: Title & Metadata */}
-        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '2px' }}>
-          <span style={{
-            fontSize: '0.86rem',
-            fontWeight: 850,
-            color: '#0f172a',
-            lineHeight: 1.2,
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap'
-          }}>
-            {cleanTitle}
-          </span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.68rem', color: '#64748b', fontWeight: 650, whiteSpace: 'nowrap' }}>
-            {formattedDate && <span>{formattedDate}</span>}
-            {formattedDate && <span>•</span>}
-            <span style={{ fontVariantNumeric: 'tabular-nums' }}>
-              {isActiveOrPlaying ? `${formatTime(currentTime)} / ${formatTime(duration)}` : `${formatTime(duration)} min`}
-            </span>
-          </div>
-        </div>
-
-        {/* Right Area: Favorite + Badge + Delete */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0, marginLeft: 'auto' }}>
-          {/* ⭐ Star / Favorite Button */}
-          {onToggleFavorite && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onToggleFavorite();
-              }}
-              style={{
-                background: isFavorite ? '#fef3c7' : '#f8fafc',
-                border: isFavorite ? '1.2px solid #f59e0b' : '1px solid #cbd5e1',
-                color: isFavorite ? '#d97706' : '#94a3b8',
-                borderRadius: '8px',
-                padding: '5px 7px',
-                fontSize: '0.64rem',
-                fontWeight: 800,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                height: '30px',
-                boxSizing: 'border-box',
-                transition: 'all 0.15s ease'
-              }}
-              className="hover-scale-mini"
-              title={isFavorite ? "Aus Favoriten entfernen" : "Zu Favoriten hinzufügen"}
-            >
-              <Star size={13} strokeWidth={isFavorite ? 2.6 : 2} fill={isFavorite ? "#f59e0b" : "none"} color={isFavorite ? "#d97706" : "#94a3b8"} />
-            </button>
-          )}
-
-          {/* Status Badge (1-Click Toggle) */}
-          {badge && (
-            <span 
-              onClick={onBadgeClick ? (e) => { e.stopPropagation(); onBadgeClick(); } : undefined}
-              style={{
-                fontSize: '0.66rem',
-                fontWeight: 800,
-                background: badgeBg,
-                color: badgeColor,
-                padding: '4px 8px',
-                borderRadius: '100px',
-                whiteSpace: 'nowrap',
-                display: 'inline-flex',
-                alignItems: 'center',
-                cursor: onBadgeClick ? 'pointer' : 'default',
-                userSelect: 'none',
-                height: '30px',
-                boxSizing: 'border-box',
-                transition: 'all 0.15s ease'
-              }}
-              className={onBadgeClick ? 'hover-scale-mini' : ''}
-              title={badgeTitle || (onBadgeClick ? 'Klicken zum Umschalten (Privat / Für Lehrkraft freigeben)' : undefined)}
-            >
-              {badge}
-            </span>
-          )}
-
-          {/* Delete Button */}
-          {onDelete && (
-            <button
-              type="button"
-              onClick={onDelete}
-              style={{
-                background: '#fff1f2',
-                border: '1px solid #fecdd3',
-                color: '#e11d48',
-                cursor: 'pointer',
-                width: '30px',
-                height: '30px',
-                borderRadius: '8px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexShrink: 0,
-                transition: 'all 0.15s ease'
-              }}
-              className="hover-scale"
-              title="Aufnahme löschen"
-            >
-              <Trash2 size={13} strokeWidth={2} />
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Secondary Bottom Toolbar (Full width scrubbable waveform when playing OR 4 action pills when paused) */}
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '6px',
-        width: '100%',
-        paddingTop: '2px',
-        borderTop: isPlaying ? '1px dashed rgba(22, 163, 74, 0.2)' : '1px dashed #f1f5f9'
-      }}>
-        {isPlaying ? (
-          /* Live Scrubbable Waveform Track */
-          <>
-            <div 
-              onClick={(e) => {
-                const rect = e.currentTarget.getBoundingClientRect();
-                const clickX = e.clientX - rect.left;
-                const newRatio = Math.max(0, Math.min(1, clickX / rect.width));
-                const newTime = newRatio * (duration || 0);
-                setCurrentTime(newTime);
-                if (audioRef.current) audioRef.current.currentTime = newTime;
-              }}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '2px',
-                height: '24px',
-                flex: 1,
-                cursor: 'pointer',
-                padding: '2px 6px',
-                background: '#f8fafc',
-                borderRadius: '8px',
-                border: '1px solid #e2e8f0'
-              }}
-              title="Klicken zum Spulen"
-            >
-              {waveformHeights.map((h, i) => {
-                const barRatio = i / waveformHeights.length;
-                const isFilled = barRatio <= progressRatio;
-                return (
-                  <div
-                    key={i}
-                    style={{
-                      flex: 1,
-                      height: `${h}%`,
-                      minHeight: '3px',
-                      borderRadius: '1.5px',
-                      background: isFilled ? themeColor : '#cbd5e1',
-                      transition: 'background 0.08s ease'
-                    }}
-                  />
-                );
-              })}
-            </div>
-
-            {/* Quick Loop Pill */}
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                setIsLooping(!isLooping);
-              }}
-              style={{
-                background: isLooping ? '#dcfce7' : '#f8fafc',
-                border: isLooping ? '1.2px solid #16a34a' : '1px solid #cbd5e1',
-                color: isLooping ? '#15803d' : '#64748b',
-                borderRadius: '8px',
-                padding: '4px 8px',
-                fontSize: '0.66rem',
-                fontWeight: 800,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                height: '28px',
-                boxSizing: 'border-box'
-              }}
-              className="hover-scale-mini"
-              title={isLooping ? 'Loop aktiv' : 'Loop aktivieren'}
-            >
-              <Repeat size={12} strokeWidth={isLooping ? 2.6 : 2} />
-              <span>Loop</span>
-            </button>
-
-            {/* Quick Speed Pill */}
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                const rates = [1, 0.85, 0.75, 0.5];
-                const nextRate = rates[(rates.indexOf(playbackRate) + 1) % rates.length];
-                setPlaybackRate(nextRate);
-              }}
-              style={{
-                background: playbackRate !== 1 ? '#eff6ff' : '#f8fafc',
-                border: playbackRate !== 1 ? '1.2px solid #bfdbfe' : '1px solid #cbd5e1',
-                color: playbackRate !== 1 ? '#2563eb' : '#64748b',
-                borderRadius: '8px',
-                padding: '4px 8px',
-                fontSize: '0.66rem',
-                fontWeight: 800,
-                cursor: 'pointer',
-                height: '28px',
-                boxSizing: 'border-box'
-              }}
-              className="hover-scale-mini"
-              title={
-                playbackRate === 1
-                  ? 'Originaltempo (100%)'
-                  : playbackRate === 0.85
-                  ? 'Übetempo (85%)'
-                  : playbackRate === 0.75
-                  ? 'Übetempo (75%)'
-                  : 'Halbes Tempo (50%)'
-              }
-            >
-              {Math.round(playbackRate * 100)}%
-            </button>
-          </>
-        ) : (
-          /* Paused Mode: 4 Action Utility Pills */
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', width: '100%', overflowX: 'auto', padding: '2px 0' }}>
-            {/* 🔁 Loop Button */}
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                setIsLooping(!isLooping);
-              }}
-              style={{
-                background: isLooping ? '#dcfce7' : '#f8fafc',
-                border: isLooping ? '1.2px solid #16a34a' : '1px solid #cbd5e1',
-                color: isLooping ? '#15803d' : '#64748b',
-                borderRadius: '8px',
-                padding: '4px 8px',
-                fontSize: '0.66rem',
-                fontWeight: 800,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                height: '28px',
-                boxSizing: 'border-box'
-              }}
-              className="hover-scale-mini"
-              title={isLooping ? 'Loop aktiv (Endlos-Schleife)' : 'Loop aktivieren (Endlos-Schleife für Play-Alongs)'}
-            >
-              <Repeat size={12} strokeWidth={isLooping ? 2.6 : 2} />
-              <span>Loop</span>
-            </button>
-
-            {/* ⏱️ 4-Beat Count-In Button */}
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                setCountInActive(!countInActive);
-              }}
-              style={{
-                background: countInActive ? '#dcfce7' : '#f8fafc',
-                border: countInActive ? '1.2px solid #16a34a' : '1px solid #cbd5e1',
-                color: countInActive ? '#15803d' : '#64748b',
-                borderRadius: '8px',
-                padding: '4px 8px',
-                fontSize: '0.66rem',
-                fontWeight: 850,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '3px',
-                height: '28px',
-                boxSizing: 'border-box'
-              }}
-              className="hover-scale-mini"
-              title={countInActive ? '4-Beat Einzähler aktiv' : '4-Beat Einzähler vor Abspielen aktivieren'}
-            >
-              <Timer size={12} strokeWidth={countInActive ? 2.4 : 2} />
-              <span>4er Klick</span>
-            </button>
-
-            {/* 🚀 Speed Rate Button */}
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                const rates = [1, 0.85, 0.75, 0.5];
-                const nextRate = rates[(rates.indexOf(playbackRate) + 1) % rates.length];
-                setPlaybackRate(nextRate);
-              }}
-              style={{
-                background: playbackRate !== 1 ? '#eff6ff' : '#f8fafc',
-                border: playbackRate !== 1 ? '1.2px solid #bfdbfe' : '1px solid #cbd5e1',
-                color: playbackRate !== 1 ? '#2563eb' : '#64748b',
-                borderRadius: '8px',
-                padding: '4px 8px',
-                fontSize: '0.66rem',
-                fontWeight: 800,
-                cursor: 'pointer',
-                height: '28px',
-                boxSizing: 'border-box'
-              }}
-              className="hover-scale-mini"
-              title={
-                playbackRate === 1
-                  ? 'Originaltempo (100%)'
-                  : playbackRate === 0.85
-                  ? 'Übetempo (85%)'
-                  : playbackRate === 0.75
-                  ? 'Übetempo (75%)'
-                  : 'Halbes Tempo (50%)'
-              }
-            >
-              Tempo {Math.round(playbackRate * 100)}%
-            </button>
-
-            {/* ✂️ Studio Editor Button */}
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                setIsEditorOpen(true);
-              }}
-              style={{
-                background: '#f8fafc',
-                border: '1px solid #cbd5e1',
-                color: '#6366f1',
-                borderRadius: '8px',
-                padding: '4px 8px',
-                fontSize: '0.66rem',
-                fontWeight: 800,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                height: '28px',
-                boxSizing: 'border-box'
-              }}
-              className="hover-scale-mini"
-              title="Aufnahme zuschneiden & Pitch verändern"
-            >
-              <Scissors size={12} strokeWidth={2.2} />
-              <span>Studio</span>
-            </button>
-          </div>
-        )}
-      </div>
-
-      {/* Studio Waveform & Pitch Editor Modal */}
-      {isEditorOpen && (
-        <React.Suspense fallback={null}>
-          <AudioEditorModal
-            isOpen={isEditorOpen}
-            onClose={() => setIsEditorOpen(false)}
-            audioUrl={resolvedUrl}
-            initialLabel={cleanTitle}
-            initialDuration={duration}
-            onSave={(res) => {
-              if (onSaveEdited) {
-                onSaveEdited(res);
-              }
-              setIsEditorOpen(false);
-            }}
-          />
-        </React.Suspense>
-      )}
-    </div>
-  );
-};
-
-const RetroCassettePlayer: React.FC<{ 
-  url: string; 
-  duration: number; 
-  index: number; 
-  label?: string; 
-  onDelete?: () => void;
-  visibility?: 'private' | 'shared_with_teacher';
-  onToggleVisibility?: () => void;
-  onShareToPlaylist?: () => void;
-  isStudentView?: boolean;
-}> = ({ url, duration, index, label, onDelete, visibility, onToggleVisibility, onShareToPlaylist, isStudentView }) => {
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', width: '100%', maxWidth: '320px', gap: '8px' }}>
-      <InlineAudioPlayer 
-        url={url} 
-        label={label || `Play-Along #${index + 1}`} 
-        onDelete={onDelete}
-        duration={duration}
-      />
-
-      {/* Student Action Toolbar: Privacy Toggle & Audio-Biografie Share */}
-      {isStudentView && (
-        <div style={{
-          display: 'flex',
-          gap: '6px',
-          padding: '6px 8px',
-          background: '#ffffff',
-          borderRadius: '12px',
-          border: '1px solid #e2e8f0',
-          boxShadow: '0 2px 6px rgba(0,0,0,0.03)',
-          alignItems: 'center',
-          justifyContent: 'space-between'
-        }}>
-          {/* Privacy Toggle Button */}
-          {onToggleVisibility && (
-            <button
-              type="button"
-              onClick={onToggleVisibility}
-              title={visibility === 'shared_with_teacher' 
-                ? 'Für Lehrer freigegeben (Klicken zum Privatschalten)' 
-                : 'Privat (Klicken, um für Lehrer freizugeben)'}
-              style={{
-                background: visibility === 'shared_with_teacher' ? '#e6f4ea' : '#f1f5f9',
-                color: visibility === 'shared_with_teacher' ? '#16a34a' : '#475569',
-                border: visibility === 'shared_with_teacher' ? '1px solid #bbf7d0' : '1px solid #cbd5e1',
-                borderRadius: '8px',
-                padding: '5px 8px',
-                fontSize: '0.68rem',
-                fontWeight: 800,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                flex: 1,
-                justifyContent: 'center',
-                transition: 'all 0.15s ease'
-              }}
-            >
-              {visibility === 'shared_with_teacher' ? (
-                <>
-                  <Unlock size={12} />
-                  <span>🎓 Für Lehrer sichtbar</span>
-                </>
-              ) : (
-                <>
-                  <Lock size={12} />
-                  <span>🔒 Privat (Nur für dich)</span>
-                </>
-              )}
-            </button>
-          )}
-
-          {/* Share to Audio-Biografie Button */}
-          {onShareToPlaylist && (
-            <button
-              type="button"
-              onClick={onShareToPlaylist}
-              title="Zu einer Playlist in der Audio-Biografie hinzufügen"
-              style={{
-                background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
-                color: '#ffffff',
-                border: 'none',
-                borderRadius: '8px',
-                padding: '5px 8px',
-                fontSize: '0.68rem',
-                fontWeight: 850,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                boxShadow: '0 2px 5px rgba(99, 102, 241, 0.25)',
-                transition: 'all 0.15s ease'
-              }}
-              className="hover-scale-mini"
-            >
-              <Share2 size={12} />
-              <span>💽 Playlist</span>
-            </button>
-          )}
-        </div>
-      )}
-
-      {/* Teacher View: Indicator that this is a shared student recording */}
-      {!isStudentView && visibility === 'shared_with_teacher' && (
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: '5px',
-          fontSize: '0.68rem',
-          fontWeight: 800,
-          color: '#16a34a',
-          background: '#e6f4ea',
-          padding: '4px 8px',
-          borderRadius: '8px',
-          border: '1px solid #bbf7d0'
-        }}>
-          <Check size={12} />
-          <span>Vom Schüler für dich freigegeben</span>
-        </div>
-      )}
-    </div>
-  );
-};
+export default MeisterwerkDocumentationModal;

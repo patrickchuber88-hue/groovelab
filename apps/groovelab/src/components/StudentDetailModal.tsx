@@ -4623,7 +4623,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
                       <span style={{ color: student.parent_allow_audio !== false ? '#22c55e' : '#ef4444', fontWeight: 800 }}>
                         {student.parent_allow_audio !== false ? '✓' : '✕'}
                       </span>
-                      <span>Audio-Aufnahmen &amp; Loopstation (§ 31 UrhG)</span>
+                      <span>Audio-Aufnahmen &amp; Loopstation (§ 73 UrhG)</span>
                     </div>
                   </div>
                 </div>
@@ -5304,6 +5304,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
           onClose={() => setShowTageskompassModal(false)}
           teacherId={currentTeacherId}
           initialViewMode="document"
+          uiLevel={(student as any)?.campus_ui_level || 'pro'}
           isTeacherTools={false}
           hasTresorStorage={checkIsAudioTresorActive(student)}
         />

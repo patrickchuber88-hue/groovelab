@@ -54,7 +54,7 @@ export const MaintenanceTab: React.FC<MaintenanceTabProps> = ({
   const [vacuumingStorage, setVacuumingStorage] = useState(false);
 
   const handlePruneInactiveStudents = async () => {
-    if (!confirm('Möchtest du alle Schülerprofile, die seit mehr als 60 Tagen inaktiv waren, automatisch deaktivieren? (Spart Musikschulen Bereitstellungsgebühren)')) {
+    if (!confirm('Möchtest du alle monatlich abgerechneten Schülerprofile ohne Login seit > 60 Tagen auf Basis-Bereitstellung (0,09 € / Mo.) zurücksetzen? (Spart Musikschulen Bereitstellungsgebühren; Accounts & QR-Landingpage bleiben zu 100% erhalten)')) {
       return;
     }
     try {
@@ -62,10 +62,10 @@ export const MaintenanceTab: React.FC<MaintenanceTabProps> = ({
       const { data, error } = await supabase.rpc('prune_inactive_students_bulk', { p_school_id: null });
       if (error) throw error;
       const count = (data as any)?.deactivated_count ?? 0;
-      setSaveSuccessToast(`Karteileichen-Bereinigung erfolgreich: ${count} inaktive Schülerprofile deaktiviert.`);
+      setSaveSuccessToast(`Inaktivitäts-Sparmodus erfolgreich: ${count} Profile auf Basis-Bereitstellung (0,09 €) umgestellt. Schülerdaten & QR-Landingpages bleiben 100% erhalten.`);
       setTimeout(() => setSaveSuccessToast(null), 4500);
     } catch (err: any) {
-      alert('Fehler bei der Schüler-Bereinigung: ' + err.message);
+      alert('Fehler beim Inaktivitäts-Sparmodus: ' + err.message);
     } finally {
       setPruningStudents(false);
     }
@@ -3243,15 +3243,15 @@ export const MaintenanceTab: React.FC<MaintenanceTabProps> = ({
                     </span>
                   </div>
                   <span style={{ fontSize: '0.70rem', fontWeight: 900, padding: '2px 8px', borderRadius: '100px', background: '#fff7ed', color: '#ea580c' }}>
-                    Fair-Play Prune
+                    Fair-Play Sparmodus
                   </span>
                 </div>
 
                 <div style={{ fontSize: '1.45rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em' }}>
-                  60-Tage Inaktivitäts-Pruning
+                  60-Tage Inaktivitäts-Sparmodus
                 </div>
                 <p style={{ margin: '4px 0 0 0', fontSize: '0.78rem', color: '#64748b' }}>
-                  Deaktiviert Schülerprofile ohne Login seit &gt; 60 Tagen, um Musikschulen Bereitstellungskosten zu sparen.
+                  Setzt monatlich abgerechnete Schülerprofile ohne Login seit &gt; 60 Tagen auf Basis-Bereitstellung (0,09 €) zurück. Schülerzugänge, Stundenpläne und QR-Landingpages bleiben 100 % aktiv.
                 </p>
               </div>
 
@@ -3277,7 +3277,7 @@ export const MaintenanceTab: React.FC<MaintenanceTabProps> = ({
                 className="hover-scale-mini"
               >
                 {pruningStudents ? <RefreshCw size={14} className="animate-spin" /> : <Clock size={14} />}
-                <span>{pruningStudents ? 'Prüfe & Deaktiviere...' : 'Karteileichen bereinigen (> 60 Tage)'}</span>
+                <span>{pruningStudents ? 'Prüfe & Schalte um...' : 'Inaktivitäts-Sparmodus aktivieren (> 60 Tage)'}</span>
               </button>
             </div>
 

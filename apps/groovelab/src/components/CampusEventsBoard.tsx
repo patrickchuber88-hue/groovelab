@@ -38,6 +38,7 @@ import {
   CalendarX,
   Send,
   Landmark,
+  RotateCcw,
   Star,
   History,
   DoorClosed,
@@ -53,6 +54,7 @@ import {
 } from 'lucide-react';
 import { downloadCsvFile } from '../utils/csvHelper';
 import { formatSingleStudentAnonymized, formatGroupStudentsAnonymized, formatCombinedStudentNames, getGroupTypeLabel, formatTeacherFullName, formatDisplaySubjectOrInstrument, isInvalidInstrument, maskLastName } from '../utils/nameHelper';
+import { CampusAppointmentShoutboxModal } from './CampusAppointmentShoutboxModal';
 
 interface CampusEventsBoardProps {
   userId: string;
@@ -4343,7 +4345,6 @@ export function CampusEventsBoard({
         const shortDay = occDate.toLocaleDateString("de-DE", { weekday: "short" });
         const shortDate = occDate.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "2-digit" });
         const timeLabel = (occ.start_time || "16:30").slice(0, 5);
-        const notificationMessage = `Der Ausfall für diesen Termin wurde zurückgenommen. Der Termin findet regulär statt:\n${shortDay} ${shortDate} um ${timeLabel} Uhr. (${occ.date})`;
 
         // Determine actor display name
         let actorName = isTeacherActor ? 'Deine Lehrkraft' : (isStudentActor ? 'Ein Schüler' : 'Die Schulleitung');
@@ -4356,15 +4357,25 @@ export function CampusEventsBoard({
               .maybeSingle();
             if (userData) {
               if (userData.role === 'teacher') {
-                actorName = `${userData.first_name} ${userData.last_name}`;
+                actorName = `${userData.first_name} ${userData.last_name} (Lehrkraft)`;
               } else if (userData.role === 'student') {
-                actorName = `${userData.first_name} ${maskLastName(userData.last_name, true)}`;
+                const isPinAuthed = skipPinCheck || checkIsParentUnlocked();
+                actorName = isPinAuthed 
+                  ? `${userData.first_name} ${maskLastName(userData.last_name, true)} (Eltern-PIN autorisiert)`
+                  : `${userData.first_name} ${maskLastName(userData.last_name, true)}`;
               } else {
-                actorName = `${userData.first_name} ${userData.last_name} (Verwaltung)`;
+                actorName = `${userData.first_name} ${userData.last_name} (Schulleitung / Verwaltung)`;
               }
             }
           } catch (e) {}
         }
+
+        const now = new Date();
+        const execDateStr = now.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
+        const execTimeStr = now.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
+        const execTimestampStr = `${execDateStr} um ${execTimeStr} Uhr`;
+
+        const notificationMessage = `🔄 Termin reaktiviert: Dein Unterrichtstermin am ${shortDay} ${shortDate} um ${timeLabel} Uhr findet regulär statt.\n🕒 Reaktiviert am: ${execTimestampStr} durch ${actorName}.`;
 
         // Inform ALL students involved in the lesson
         for (const sId of uniqueStudentIds) {
@@ -4422,7 +4433,7 @@ export function CampusEventsBoard({
             await supabase.from('notifications').insert({
               user_id: teacherId,
               title: 'Termin reaktiviert 🔄',
-              message: `✅ Reaktiviert: ${actorName} hat den Termin am ${shortDay} ${shortDate} um ${timeLabel} Uhr wieder reaktiviert.`,
+              message: `✅ Reaktiviert: ${actorName} hat den Termin am ${shortDay} ${shortDate} um ${timeLabel} Uhr wieder reaktiviert (Eingang: ${execTimestampStr}).`,
               metadata: { occurrence_id: targetOccId, type: 'cancellation_reset' }
             });
 
@@ -4430,7 +4441,7 @@ export function CampusEventsBoard({
               body: {
                 userId: teacherId,
                 title: 'Termin reaktiviert 🔄',
-                body: `✅ Reaktiviert: ${actorName} hat den Termin am ${shortDay} ${shortDate} um ${timeLabel} Uhr wieder reaktiviert.`
+                body: `✅ Reaktiviert: ${actorName} hat den Termin am ${shortDay} ${shortDate} um ${timeLabel} Uhr wieder reaktiviert (Eingang: ${execTimestampStr}).`
               }
             });
           } catch (pushErr) {
@@ -4557,17 +4568,47 @@ export function CampusEventsBoard({
         console.warn('Could not create system alert:', alertErr);
       }
 
-      // Send a chat message informing about the cancellation
+      // Send an audit-proof system chat message informing about the cancellation
       try {
         const studentId = occ.student_id;
         const recipientId = role === 'student' ? occ.teacher_id : occ.student_id;
         if (studentId && recipientId) {
-          const cancelMsg = `❌ Dieser Termin wurde abgesagt.`;
+          const now = new Date();
+          const execDateStr = now.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
+          const execTimeStr = now.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
+          const execTimestampStr = `${execDateStr} um ${execTimeStr} Uhr`;
+
+          let actorName = role === 'teacher' ? 'Deine Lehrkraft' : (role === 'student' ? 'Ein Schüler' : 'Die Schulleitung');
+          if (userId) {
+            try {
+              const { data: userData } = await supabase
+                .from('users')
+                .select('first_name, last_name, role')
+                .eq('id', userId)
+                .maybeSingle();
+              if (userData) {
+                if (userData.role === 'teacher') {
+                  actorName = `${userData.first_name} ${userData.last_name} (Lehrkraft)`;
+                } else if (userData.role === 'student') {
+                  const isPinAuthed = skipPinCheck || checkIsParentUnlocked();
+                  actorName = isPinAuthed 
+                    ? `${userData.first_name} ${maskLastName(userData.last_name, true)} (Eltern-PIN autorisiert)`
+                    : `${userData.first_name} ${maskLastName(userData.last_name, true)}`;
+                } else {
+                  actorName = `${userData.first_name} ${userData.last_name} (Schulleitung / Verwaltung)`;
+                }
+              }
+            } catch (e) {}
+          }
+
+          const cancelMsg = `❌ Termin abgesagt: Der Unterrichtstermin am ${formattedDate} um ${occ.start_time?.substring(0, 5)} Uhr fällt aus.\n🕒 Abgesagt am: ${execTimestampStr} durch ${actorName}.`;
           await supabase.from('campus_direct_messages').insert({
             sender_id: userId,
             recipient_id: recipientId,
             content: cancelMsg,
-            occurrence_id: occ.id
+            occurrence_id: occ.id,
+            is_system: true,
+            message_type: 'reschedule_notification'
           });
         }
       } catch (msgErr) {
@@ -13923,763 +13964,29 @@ export function CampusEventsBoard({
       })()}
 
       {/* 1:1 Shoutbox Overlay Modal */}
-      {activeChatOcc && (() => {
-        const studentName = activeChatOcc.student?.first_name || 'Schüler';
-        const teacherName = formatTeacherFullName(activeChatOcc.teacher);
-        const titleText = `1:1 Shoutbox: ${role === 'student' ? teacherName : studentName}`;
-        
-        let isFrozen = false;
-        try {
-          const timePart = activeChatOcc.start_time.includes(':') ? activeChatOcc.start_time : `${activeChatOcc.start_time}:00`;
-          const lessonDateTime = new Date(`${activeChatOcc.date}T${timePart}`);
-          isFrozen = Date.now() > lessonDateTime.getTime() + 48 * 60 * 60 * 1000;
-        } catch (e) {}
-
-        const isCanceled = activeChatOcc.status === 'canceled_by_student' || activeChatOcc.status === 'cancelled' || activeChatOcc.status === 'teacher_sick' || activeChatOcc.status === 'canceled_by_teacher_sick';
-
-        return (
-          <div
-            onClick={() => setActiveChatOcc(null)}
-            style={{
-              position: 'fixed',
-              inset: 0,
-              zIndex: 1100,
-              background: 'rgba(15,23,42,0.65)',
-              backdropFilter: 'blur(8px)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              padding: '24px',
-              animation: 'fadeIn 0.15s ease'
-            }}
-          >
-            <div
-              onClick={e => e.stopPropagation()}
-              style={{
-                background: '#ffffff',
-                borderRadius: '28px',
-                width: '100%',
-                maxWidth: '500px',
-                boxShadow: '0 32px 80px rgba(0,0,0,0.25)',
-                overflow: 'hidden',
-                display: 'flex',
-                flexDirection: 'column',
-                position: 'relative',
-                maxHeight: '85vh',
-                fontFamily: "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
-              }}
-            >
-              {/* Header */}
-              <div style={{
-                background: `linear-gradient(135deg, ${brandColor || '#34a853'} 0%, #34a853 100%)`,
-                padding: '22px 24px',
-                color: '#ffffff',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                transition: 'all 0.2s ease'
-              }}>
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                    <h3 style={{ 
-                      margin: 0, 
-                      fontSize: '1.38rem', 
-                      fontWeight: 950, 
-                      letterSpacing: '-0.02em',
-                      color: '#ffffff', 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      gap: '8px' 
-                    }}>
-                      <MessageSquare size={22} color="#ffffff" />
-                      <span>{titleText}</span>
-                    </h3>
-                  </div>
-                  <p style={{ 
-                    margin: '6px 0 10px 0', 
-                    color: 'rgba(255, 255, 255, 0.95)', 
-                    fontSize: '0.94rem', 
-                    fontWeight: 650,
-                    lineHeight: 1.4
-                  }}>
-                    Termin am {new Date(activeChatOcc.date).toLocaleDateString('de-DE')} um {activeChatOcc.start_time.substring(0, 5)} Uhr
-                  </p>
-                  
-                  {/* Badges */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                    <span style={{
-                      padding: '6px 14px',
-                      borderRadius: '100px',
-                      background: isCanceled ? '#fee2e2' : 'rgba(255, 255, 255, 0.22)',
-                      color: isCanceled ? '#dc2626' : '#ffffff',
-                      fontSize: '0.85rem',
-                      fontWeight: 900,
-                      backdropFilter: 'blur(6px)',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      border: isCanceled ? '1px solid #fca5a5' : '1px solid rgba(255, 255, 255, 0.3)'
-                    }}>
-                      <span>{isCanceled ? '✕ Termin abgesagt' : '✓ Regulärer Termin'}</span>
-                    </span>
-
-                    <span style={{
-                      padding: '6px 14px',
-                      borderRadius: '100px',
-                      background: 'rgba(255, 255, 255, 0.22)',
-                      color: '#ffffff',
-                      fontSize: '0.84rem',
-                      fontWeight: 850,
-                      backdropFilter: 'blur(6px)',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      border: '1px solid rgba(255, 255, 255, 0.3)'
-                    }}>
-                      <ShieldCheck size={15} color="#ffffff" />
-                      <span>DSGVO-konform • TLS 1.3 &amp; AES-256</span>
-                    </span>
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => setActiveChatOcc(null)}
-                  style={{
-                    border: 'none',
-                    background: 'rgba(255, 255, 255, 0.22)',
-                    borderRadius: '50%',
-                    width: '36px',
-                    height: '36px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    cursor: 'pointer',
-                    color: '#ffffff',
-                    transition: 'all 0.2s',
-                    alignSelf: 'flex-start'
-                  }}
-                  onMouseEnter={e => e.currentTarget.style.opacity = '0.8'}
-                  onMouseLeave={e => e.currentTarget.style.opacity = '1'}
-                >
-                  <X size={20} />
-                </button>
-              </div>
-
-              {/* Cancelled Alert Banner with In-Chat Reactivation */}
-              {isCanceled && (
-                <div style={{
-                  margin: '12px 20px 0 20px',
-                  padding: '10px 16px',
-                  borderRadius: '14px',
-                  background: '#fef2f2',
-                  border: '1.5px dashed #fca5a5',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  gap: '10px'
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ fontSize: '1.1rem' }}>⚠️</span>
-                    <div>
-                      <div style={{ fontSize: '0.86rem', fontWeight: 900, color: '#991b1b' }}>Termin ist abgesagt</div>
-                      <div style={{ fontSize: '0.74rem', color: '#b91c1c', fontWeight: 650 }}>Absage kann hier direkt rückgängig gemacht werden.</div>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const executeReactivation = async (unlocked: boolean) => {
-                        await handleUndoCancel(activeChatOcc, unlocked);
-                        if (activeChatOcc) {
-                          setActiveChatOcc(prev => prev ? { ...prev, status: 'scheduled' } : null);
-                          const otherUserId = role === 'student' ? (activeChatOcc.teacher_id || (activeChatOcc.teacher as any)?.id) : activeChatOcc.student_id;
-                          const sId = activeChatOcc.schedule_id || activeChatOcc.schedule?.id;
-                          setTimeout(() => {
-                            if (otherUserId) fetchChat(otherUserId, activeChatOcc.id, activeChatOcc.date, sId);
-                          }, 300);
-                        }
-                      };
-
-                      if (role === 'student' && !isAbsenceAllowed) {
-                        setPinGatePendingAction(() => () => executeReactivation(true));
-                        setPinGateInput('');
-                        setPinGateError('');
-                        setShowPinGateModal(true);
-                        return;
-                      }
-                      executeReactivation(false);
-                    }}
-                    style={{
-                      background: '#15803d',
-                      color: '#ffffff',
-                      border: 'none',
-                      borderRadius: '100px',
-                      padding: '6px 14px',
-                      fontSize: '0.80rem',
-                      fontWeight: 900,
-                      cursor: 'pointer',
-                      whiteSpace: 'nowrap',
-                      boxShadow: '0 2px 6px rgba(21,128,61,0.2)'
-                    }}
-                  >
-                    Reaktivieren
-                  </button>
-                </div>
-              )}
-
-              {/* Messages Viewport */}
-              <div style={{
-                flex: 1,
-                overflowY: 'auto',
-                padding: '24px',
-                background: '#fafbfc',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '12px',
-                minHeight: '280px',
-                maxHeight: '400px'
-              }} className="custom-scrollbar">
-                {isFrozen && (
-                  <div style={{ background: '#fef2f2', border: '1px solid #fee2f2', color: '#991b1b', padding: '8px 12px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'center', textAlign: 'center' }}>
-                    🔒 Shoutbox eingefroren (Schreibschutz nach 48h aktiv)
-                  </div>
-                )}
-                {chatMessages.length === 0 ? (
-                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#64748b', fontSize: '0.82rem', textAlign: 'center', padding: '24px 16px', gap: '8px', background: 'rgba(255,255,255,0.7)', border: '1.5px dashed #cbd5e1', borderRadius: '16px', margin: 'auto 0' }}>
-                    <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: '#e6f4ea', color: '#34a853', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '4px' }}>
-                      <Calendar size={20} />
-                    </div>
-                    <h5 style={{ margin: 0, fontSize: '0.88rem', fontWeight: 800, color: '#0f172a' }}>
-                      Termingekoppelter Schulchat
-                    </h5>
-                    <p style={{ margin: 0, fontSize: '0.74rem', color: '#64748b', lineHeight: 1.4, maxWidth: '240px' }}>
-                      Geschützte Direktnachrichten für diesen Unterrichtstermin – DSGVO- &amp; datenschutzkonform.
-                    </p>
-                  </div>
-                ) : (
-                  chatMessages.map((msg, idx) => {
-                    const isMe = msg.sender_id === userId;
-                    const cleanContent = String(msg.content || '').replace(/^\[Termin[^\]]+\]\s*/i, '').trim();
-
-                    // Deterministic Sender Name Computation based on msg.sender_id and participants
-                    let senderName = '';
-                    if (!isMe) {
-                      const teacherId = activeChatOcc.teacher_id || (activeChatOcc.teacher as any)?.id;
-                      const studentId = activeChatOcc.student_id || (activeChatOcc.student as any)?.id;
-
-                      const studentObj = (activeChatOcc.student || (activeChatOcc as any).student_user || studentUser);
-                      const studentDisplayName = studentObj
-                        ? formatSingleStudentAnonymized(studentObj.first_name || (typeof studentObj === 'string' ? studentObj : ''), studentObj.last_name, studentObj.id)
-                        : 'Schüler';
-
-                      const teacherObj = (activeChatOcc.teacher || currentTeacherProfile);
-                      const teacherDisplayName = formatTeacherFullName(teacherObj) || 'Lehrkraft';
-
-                      const isStudentRole = (role as string) === 'student';
-                      if (msg.sender_id === studentId || (!isStudentRole && msg.sender_id !== teacherId)) {
-                        senderName = studentDisplayName;
-                      } else if (msg.sender_id === teacherId || isStudentRole) {
-                        senderName = teacherDisplayName;
-                      } else {
-                        senderName = isStudentRole ? teacherDisplayName : studentDisplayName;
-                      }
-                    }
-
-                    const isStudentSender = senderName && senderName !== formatTeacherFullName(activeChatOcc.teacher || currentTeacherProfile);
-
-                    const isCancellation = msg.message_type === 'reschedule_notification' || 
-                                           (msg.content && (msg.content.includes('❌') || msg.content.includes('fällt aus') || msg.content.includes('Termin abgesagt') || msg.content.includes('wurde abgesagt')));
-                    const isReactivation = msg.message_type === 'cancellation_reset' || 
-                                           (msg.content && (msg.content.includes('🔄') || msg.content.includes('reaktiviert') || msg.content.includes('zurückgenommen') || msg.content.includes('regulär statt')));
-
-                    if (isReactivation) {
-                      return (
-                        <div key={msg.id || idx} style={{ alignSelf: 'center', width: '100%', maxWidth: '94%', margin: '6px 0' }}>
-                          <div style={{
-                            background: '#f0fdf4',
-                            border: '1.5px solid #86efac',
-                            borderRadius: '18px',
-                            padding: '12px 18px',
-                            boxShadow: '0 2px 8px rgba(34, 197, 94, 0.08)',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: '6px'
-                          }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: '#dcfce7', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                                <span style={{ fontSize: '0.95rem' }}>🔄</span>
-                              </div>
-                              <span style={{ fontSize: '0.86rem', fontWeight: 900, color: '#15803d', letterSpacing: '-0.01em' }}>
-                                Termin reaktiviert
-                              </span>
-                              <span style={{ marginLeft: 'auto', fontSize: '0.72rem', color: '#16a34a', fontWeight: 700 }}>
-                                {new Date(msg.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}
-                              </span>
-                            </div>
-                            <div style={{ fontSize: '0.92rem', color: '#166534', fontWeight: 650, lineHeight: 1.45, wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>
-                              {cleanContent}
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    }
-
-                    if (isCancellation) {
-                      return (
-                        <div key={msg.id || idx} style={{ alignSelf: 'center', width: '100%', maxWidth: '94%', margin: '6px 0' }}>
-                          <div style={{
-                            background: '#fef2f2',
-                            border: '1.5px dashed #fca5a5',
-                            borderRadius: '18px',
-                            padding: '12px 18px',
-                            boxShadow: '0 2px 8px rgba(239, 68, 68, 0.06)',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: '6px'
-                          }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: '#fee2e2', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                                <span style={{ fontSize: '0.95rem' }}>❌</span>
-                              </div>
-                              <span style={{ fontSize: '0.86rem', fontWeight: 900, color: '#991b1b', letterSpacing: '-0.01em' }}>
-                                Termin abgesagt
-                              </span>
-                              <span style={{ marginLeft: 'auto', fontSize: '0.72rem', color: '#b91c1c', fontWeight: 700 }}>
-                                {new Date(msg.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}
-                              </span>
-                            </div>
-                            <div style={{ fontSize: '0.92rem', color: '#991b1b', fontWeight: 650, lineHeight: 1.45, wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>
-                              {cleanContent}
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    }
-
-                    return (
-                      <div key={msg.id || idx} style={{
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignSelf: isMe ? 'flex-end' : 'flex-start',
-                        maxWidth: '82%',
-                        alignItems: isMe ? 'flex-end' : 'flex-start',
-                        gap: '2px'
-                      }}>
-                        {!isMe && senderName && (
-                          <span style={{ 
-                            fontSize: '0.82rem', 
-                            fontWeight: 800, 
-                            color: isStudentSender ? '#2563eb' : '#34a853', 
-                            marginBottom: '2px', 
-                            marginLeft: '6px' 
-                          }}>
-                            {senderName}
-                          </span>
-                        )}
-                        <div style={{
-                          background: isMe ? '#e6f4ea' : '#ffffff',
-                          color: '#0f172a',
-                          padding: '12px 16px',
-                          borderRadius: isMe ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
-                          fontSize: '0.98rem',
-                          lineHeight: 1.45,
-                          wordBreak: 'break-word',
-                          border: isMe ? '1px solid #bbf7d0' : '1px solid #e2e8f0',
-                          boxShadow: '0 2px 6px rgba(0,0,0,0.04)'
-                        }}>
-                          {cleanContent}
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '3px', marginTop: '6px' }}>
-                            <span style={{ fontSize: '0.76rem', color: isMe ? '#15803d' : '#64748b', fontWeight: 650 }}>
-                              {new Date(msg.created_at).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })}, {new Date(msg.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}
-                            </span>
-                            {isMe && <CheckCheck size={14} color="#15803d" style={{ marginLeft: '2px' }} />}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-                <div ref={chatMessagesEndRef} />
-              </div>
-
-              {/* Music Pedagogical Quick Reply Chips */}
-              {!isFrozen && (
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  overflowX: 'auto',
-                  padding: '12px 20px 6px 20px',
-                  background: '#fafbfc',
-                  borderTop: '1px solid #f1f5f9',
-                  scrollbarWidth: 'none',
-                  msOverflowStyle: 'none'
-                }}>
-                  {/* Reaktivieren Quick Action Chip when Cancelled */}
-                  {isCanceled && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const executeReactivation = async (unlocked: boolean) => {
-                          await handleUndoCancel(activeChatOcc, unlocked);
-                          if (activeChatOcc) {
-                            setActiveChatOcc(prev => prev ? { ...prev, status: 'scheduled' } : null);
-                            const otherUserId = role === 'student' ? (activeChatOcc.teacher_id || (activeChatOcc.teacher as any)?.id) : activeChatOcc.student_id;
-                            const sId = activeChatOcc.schedule_id || activeChatOcc.schedule?.id;
-                            setTimeout(() => {
-                              if (otherUserId) fetchChat(otherUserId, activeChatOcc.id, activeChatOcc.date, sId);
-                            }, 300);
-                          }
-                        };
-
-                        if (role === 'student' && !isAbsenceAllowed) {
-                          setPinGatePendingAction(() => () => executeReactivation(true));
-                          setPinGateInput('');
-                          setPinGateError('');
-                          setShowPinGateModal(true);
-                          return;
-                        }
-                        executeReactivation(false);
-                      }}
-                      style={{
-                        padding: '6px 14px',
-                        borderRadius: '100px',
-                        background: '#f0fdf4',
-                        border: '1.5px solid #86efac',
-                        color: '#15803d',
-                        fontSize: '0.88rem',
-                        fontWeight: 850,
-                        whiteSpace: 'nowrap',
-                        cursor: 'pointer',
-                        boxShadow: '0 1px 3px rgba(34, 197, 94, 0.12)',
-                        flexShrink: 0,
-                        minHeight: '38px',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '4px'
-                      }}
-                      className="hover-scale"
-                    >
-                      🔄 Termin reaktivieren
-                    </button>
-                  )}
-
-                  {/* 1-Click Direct Emoji Reaction Buttons */}
-                  <div style={{ display: 'flex', gap: '4px', paddingRight: '6px', borderRight: '1px solid #e2e8f0' }}>
-                    {['👍', '🎵', '👏', '🙏'].map((emoji, idx) => (
-                      <button
-                        key={`event-emoji-${idx}`}
-                        type="button"
-                        onClick={() => {
-                          if (role === 'student' && !isChatAllowed && !checkIsParentUnlocked()) {
-                            setPinGatePendingAction(() => () => sendDirectChatMessage(emoji));
-                            setPinGateInput('');
-                            setPinGateError('');
-                            setShowPinGateModal(true);
-                            return;
-                          }
-                          sendDirectChatMessage(emoji);
-                        }}
-                        style={{
-                          padding: '6px 12px',
-                          borderRadius: '100px',
-                          background: '#ffffff',
-                          border: '1px solid #e2e8f0',
-                          fontSize: '0.98rem',
-                          cursor: 'pointer',
-                          boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-                          flexShrink: 0,
-                          minHeight: '38px',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          justifyContent: 'center'
-                        }}
-                        className="hover-scale"
-                        title={`Schnell-Reaktion ${emoji} senden`}
-                      >
-                        {emoji}
-                      </button>
-                    ))}
-                  </div>
-
-                  {/* Role-Specific Authentic Text Phrases */}
-                  {(role === 'student' ? [
-                    { label: 'Vielen Dank!', text: 'Vielen Dank!' },
-                    { label: 'Alles klar, danke!', text: 'Alles klar, danke!' },
-                    { label: 'Termin passt!', text: 'Der Termin passt für mich!' },
-                    { label: 'Bin gleich da', text: 'Ich bin gleich da!' },
-                    { label: 'Werde fleißig üben', text: 'Danke, ich werde fleißig üben!' }
-                  ] : [
-                    { label: 'Super, danke!', text: 'Super, danke!' },
-                    { label: 'Passt perfekt!', text: 'Passt perfekt, bis dann!' },
-                    { label: 'Termin geht klar', text: 'Der Termin geht klar, ist eingetragen!' },
-                    { label: '5 Min später', text: 'Ich verspäte mich leider um ca. 5 Minuten.' },
-                    { label: 'Bis zum Unterricht!', text: 'Wir sehen uns beim Unterricht!' }
-                  ]).map((phrase, idx) => (
-                    <button
-                      key={`event-phrase-${idx}`}
-                      type="button"
-                      onClick={() => {
-                        if (role === 'student' && !isChatAllowed && !checkIsParentUnlocked()) {
-                          setPinGatePendingAction(() => () => setChatTypedMessage(phrase.text));
-                          setPinGateInput('');
-                          setPinGateError('');
-                          setShowPinGateModal(true);
-                          return;
-                        }
-                        setChatTypedMessage(phrase.text);
-                      }}
-                      style={{
-                        padding: '6px 14px',
-                        borderRadius: '100px',
-                        background: '#ffffff',
-                        border: '1px solid #bbf7d0',
-                        color: '#15803d',
-                        fontSize: '0.88rem',
-                        fontWeight: 800,
-                        whiteSpace: 'nowrap',
-                        cursor: 'pointer',
-                        boxShadow: '0 1px 3px rgba(52, 168, 83, 0.08)',
-                        flexShrink: 0,
-                        minHeight: '38px',
-                        display: 'inline-flex',
-                        alignItems: 'center'
-                      }}
-                      className="hover-scale"
-                    >
-                      {phrase.label}
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              {/* Chat Protection Lock Banner */}
-              {role === 'student' && !isChatAllowed && !checkIsParentUnlocked() && (
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '10px 16px',
-                  margin: '8px 20px 0 20px',
-                  borderRadius: '14px',
-                  background: '#eff6ff',
-                  border: '1px solid #bfdbfe',
-                  color: '#1e40af',
-                  fontSize: '0.88rem',
-                  fontWeight: 700
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Lock size={16} color="#2563eb" />
-                    <span>Antworten durch Eltern geschützt (Lesen frei)</span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setPinGatePendingAction(() => () => {});
-                      setPinGateInput('');
-                      setPinGateError('');
-                      setShowPinGateModal(true);
-                    }}
-                    style={{
-                      background: '#2563eb',
-                      color: '#ffffff',
-                      border: 'none',
-                      borderRadius: '100px',
-                      padding: '6px 14px',
-                      fontSize: '0.82rem',
-                      fontWeight: 850,
-                      cursor: 'pointer'
-                    }}
-                    className="hover-scale"
-                  >
-                    Mit Eltern-PIN freischalten
-                  </button>
-                </div>
-              )}
-
-               {(() => {
-                 const isNoRecipient = role === 'student' ? !activeChatOcc.teacher_id : !activeChatOcc.student_id;
-                 const isChatLocked = role === 'student' && !isChatAllowed && !checkIsParentUnlocked();
-                 const isDisabled = isFrozen || isNoRecipient;
-                 const isCanceled = activeChatOcc.status === 'canceled_by_student' || activeChatOcc.status === 'cancelled' || activeChatOcc.status === 'teacher_sick' || activeChatOcc.status === 'canceled_by_teacher_sick';
-                 const placeholderText = isFrozen 
-                   ? "Eingefroren..." 
-                   : isNoRecipient 
-                     ? "Kein Chat-Teilnehmer..." 
-                     : isChatLocked
-                       ? "🔒 Antworten durch Eltern geschützt..."
-                       : "Nachricht schreiben...";
-                 return (
-                   <form onSubmit={(e) => {
-                     e.preventDefault();
-                     if (isChatLocked) {
-                       setPinGatePendingAction(() => () => {});
-                       setPinGateInput('');
-                       setPinGateError('');
-                       setShowPinGateModal(true);
-                       return;
-                     }
-                     handleSendChatMessage(e);
-                   }} style={{
-                     padding: '16px 20px',
-                     borderTop: '1px solid #f1f5f9',
-                     background: '#fafbfc',
-                     display: 'flex',
-                     alignItems: 'center',
-                     gap: '10px'
-                   }}>
-                     <input
-                       type="text"
-                       placeholder={placeholderText}
-                       disabled={isDisabled}
-                       value={chatTypedMessage}
-                       onClick={() => {
-                         if (isChatLocked) {
-                           setPinGatePendingAction(() => () => {});
-                           setPinGateInput('');
-                           setPinGateError('');
-                           setShowPinGateModal(true);
-                         }
-                       }}
-                       onChange={e => {
-                         if (isChatLocked) {
-                           setPinGatePendingAction(() => () => {});
-                           setPinGateInput('');
-                           setPinGateError('');
-                           setShowPinGateModal(true);
-                           return;
-                         }
-                         setChatTypedMessage(e.target.value);
-                       }}
-                       style={{
-                         flex: 1,
-                         padding: '12px 20px',
-                         minHeight: '48px',
-                         borderRadius: '100px',
-                         border: isChatLocked ? '1.5px dashed #93c5fd' : '1.5px solid #cbd5e1',
-                         background: isDisabled ? '#f1f5f9' : isChatLocked ? '#f8fafc' : '#ffffff',
-                         fontSize: '0.98rem',
-                         outline: 'none',
-                         color: '#1e293b',
-                         boxShadow: 'none',
-                         transition: 'all 0.2s',
-                         cursor: isChatLocked ? 'pointer' : 'text'
-                       }}
-                     />
-                      {isCanceled ? (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const executeReactivation = async (unlocked: boolean) => {
-                              await handleUndoCancel(activeChatOcc, unlocked);
-                              if (activeChatOcc) {
-                                setActiveChatOcc(prev => prev ? { ...prev, status: 'scheduled' } : null);
-                                const otherUserId = role === 'student' ? (activeChatOcc.teacher_id || (activeChatOcc.teacher as any)?.id) : activeChatOcc.student_id;
-                                const sId = activeChatOcc.schedule_id || activeChatOcc.schedule?.id;
-                                setTimeout(() => {
-                                  if (otherUserId) fetchChat(otherUserId, activeChatOcc.id, activeChatOcc.date, sId);
-                                }, 300);
-                              }
-                            };
-
-                            if (role === "student" && !isAbsenceAllowed) {
-                              setPinGatePendingAction(() => () => executeReactivation(true));
-                              setPinGateInput("");
-                              setPinGateError("");
-                              setShowPinGateModal(true);
-                              return;
-                            }
-                            executeReactivation(false);
-                          }}
-                          style={{
-                            background: "#f0fdf4",
-                            color: "#15803d",
-                            border: "1.5px solid #86efac",
-                            borderRadius: "100px",
-                            padding: "10px 18px",
-                            minHeight: "46px",
-                            fontSize: "0.88rem",
-                            fontWeight: 850,
-                            cursor: "pointer",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            transition: "all 0.2s",
-                            flexShrink: 0
-                          }}
-                        >
-                          🔄 Reaktivieren
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (role === "student" && !isAbsenceAllowed) {
-                              setPinGatePendingAction(() => () => {
-                                handleCancelOccurrence(activeChatOcc, true);
-                                setActiveChatOcc(null);
-                              });
-                              setPinGateInput("");
-                              setPinGateError("");
-                              setShowPinGateModal(true);
-                              return;
-                            }
-                            handleCancelOccurrence(activeChatOcc, false);
-                            setActiveChatOcc(null);
-                          }}
-                          style={{
-                           background: '#ef4444',
-                           color: '#ffffff',
-                           border: 'none',
-                           borderRadius: '100px',
-                           padding: '10px 18px',
-                           minHeight: '46px',
-                           fontSize: '0.88rem',
-                           fontWeight: 850,
-                           cursor: 'pointer',
-                           display: 'flex',
-                           alignItems: 'center',
-                           justifyContent: 'center',
-                           transition: 'all 0.2s',
-                           flexShrink: 0
-                         }}
-                         onMouseEnter={e => e.currentTarget.style.background = '#dc2626'}
-                         onMouseLeave={e => e.currentTarget.style.background = '#ef4444'}
-                       >
-                         Absagen
-                       </button>
-                     )}
-                     <button
-                       type="submit"
-                       disabled={isDisabled || !chatTypedMessage.trim()}
-                       style={{
-                         background: isDisabled || !chatTypedMessage.trim() ? '#dbe3ea' : '#34a853',
-                         color: '#ffffff',
-                         border: 'none',
-                         borderRadius: '50%',
-                         width: '46px',
-                         height: '46px',
-                         display: 'flex',
-                         alignItems: 'center',
-                         justifyContent: 'center',
-                         cursor: isDisabled || !chatTypedMessage.trim() ? 'not-allowed' : 'pointer',
-                         boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
-                         flexShrink: 0,
-                         transition: 'all 0.2s'
-                       }}
-                       className={!isDisabled && chatTypedMessage.trim() ? 'hover-scale' : ''}
-                       title="Nachricht senden"
-                     >
-                       <Send size={18} color="#ffffff" style={{ marginLeft: '-2px' }} />
-                     </button>
-                   </form>
-                 );
-               })()}
-            </div>
-          </div>
-        );
-      })()}
+      {activeChatOcc && (
+        <CampusAppointmentShoutboxModal
+          isOpen={Boolean(activeChatOcc)}
+          onClose={() => setActiveChatOcc(null)}
+          occurrence={activeChatOcc}
+          currentUserId={userId}
+          currentUserRole={role}
+          currentUserProfile={studentUser || { id: userId, role }}
+          isParentUnlocked={checkIsParentUnlocked()}
+          onRequestPinGate={(action) => {
+            setPinGatePendingAction(() => action);
+            setShowPinGateModal(true);
+          }}
+          onStatusChange={(newStatus, updatedOcc) => {
+            if (activeChatOcc) {
+              setActiveChatOcc(prev => prev ? ({ ...prev, status: newStatus, ...updatedOcc }) : null);
+            }
+            if (typeof fetchLessons === "function") {
+              fetchLessons();
+            }
+          }}
+        />
+      )}
       
       {/* Master PIN Gate Modal for Absagen & Chat Unlock */}
       {showPinGateModal && (

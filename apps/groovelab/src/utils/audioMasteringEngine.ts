@@ -39,6 +39,7 @@
 export const TARGET_STUDIO_LUFS = -14.0;
 export const TARGET_PURE_RAW_LUFS = -14.5;
 export const TARGET_PEAK_DBTP = -1.0;
+export const MAX_PURE_RAW_LIMITER_GR_DB = 3.5; // Maximum limiter peak reduction allowed in Pure RAW (preserves dynamic integrity)
 
 export type MasteringProfile = 
   | 'acoustic_audiophile' 
@@ -54,6 +55,7 @@ export interface MasteringOptions {
   profile?: MasteringProfile;
   targetLufs?: number;             // Default: TARGET_STUDIO_LUFS (-14.0 LUFS)
   targetPeakDb?: number;           // Default: TARGET_PEAK_DBTP (-1.0 dBTP)
+  maxLimiterGrDb?: number;         // Default: MAX_PURE_RAW_LIMITER_GR_DB (3.5 dB)
   isDrumPadMode?: boolean;         // Default: false
   applyAutoGainStage?: boolean;    // Default: true
   applyAmbientDenoise?: boolean;   // Default: true
@@ -419,13 +421,16 @@ export function calculateBufferPeak4x(audioBuffer: AudioBuffer): number {
 }
 
 /**
- * 🌟 2-Stage Master Lookahead Soft-Clipper & True-Peak Ceiling Guard
+ * 🌟 2-Stage Master Lookahead Soft-Clipper & True-Peak Ceiling Guard (C2-Continuous)
  * Catches transient overshoot spikes locally with soft-knee saturation,
  * PREVENTING any global volume drop so that the track stays loud and punchy!
+ * Mathematical curve: C2 continuous hyperbolic tangent knee transition.
+ * 100% linear and bit-pure below kneeStart (~ -1.9 dBFS), zero piecewise jump or harmonic kink.
  */
 export function applyFastLookaheadSoftClipper(audioBuffer: AudioBuffer, targetPeakDb = TARGET_PEAK_DBTP): void {
   const thresholdLinear = Math.pow(10, targetPeakDb / 20); // ~0.891 for -1.0 dBTP
-  const kneeStart = thresholdLinear * 0.75;               // ~0.668
+  const kneeStart = thresholdLinear * 0.90;               // ~0.802 (-1.91 dBFS) - 100% transparent linear pass-through!
+  const range = thresholdLinear - kneeStart;
   const numChannels = audioBuffer.numberOfChannels;
   const length = audioBuffer.length;
 
@@ -437,15 +442,10 @@ export function applyFastLookaheadSoftClipper(audioBuffer: AudioBuffer, targetPe
 
       if (absVal > kneeStart) {
         const sign = val < 0 ? -1 : 1;
-        if (absVal >= thresholdLinear) {
-          const excess = absVal - kneeStart;
-          const range = thresholdLinear - kneeStart;
-          data[i] = sign * (kneeStart + range * Math.tanh(excess / range));
-        } else {
-          const t = (absVal - kneeStart) / (thresholdLinear - kneeStart);
-          const compressed = kneeStart + (thresholdLinear - kneeStart) * (t - (t * t * t) / 3) * (3 / 2);
-          data[i] = sign * Math.min(thresholdLinear * 0.999, compressed);
-        }
+        const excess = absVal - kneeStart;
+        // Seamless C2-continuous tanh saturation:
+        // Value at kneeStart is kneeStart, slope is 1.0, asymptote is strictly thresholdLinear
+        data[i] = sign * Math.min(thresholdLinear * 0.9999, kneeStart + range * Math.tanh(excess / range));
       }
     }
   }
@@ -539,19 +539,37 @@ export function ensureCenteredStereoAudioBuffer(ctx: BaseAudioContext, inputBuff
   const inL = inputBuffer.getChannelData(0);
   const inR = inputBuffer.getChannelData(1);
 
-  let rmsL = 0;
-  let rmsR = 0;
-  const checkLen = Math.min(length, Math.floor(sampleRate * 2));
+  // 🌟 Full-Buffer Acoustic Scan: Inspect 100% of buffer (or interleaved across length)
+  let sumSqL = 0;
+  let sumSqR = 0;
+  let peakL = 0;
+  let peakR = 0;
+  let dotProd = 0;
+  const step = length > 192000 ? 2 : 1; // 48kHz * 4s = 192000. Under 4s check every sample, above step by 2
+  let sampleCount = 0;
 
-  for (let i = 0; i < checkLen; i += 4) {
-    rmsL += inL[i] * inL[i];
-    rmsR += inR[i] * inR[i];
+  for (let i = 0; i < length; i += step) {
+    const sL = inL[i];
+    const sR = inR[i];
+    const absL = Math.abs(sL);
+    const absR = Math.abs(sR);
+    if (absL > peakL) peakL = absL;
+    if (absR > peakR) peakR = absR;
+
+    sumSqL += sL * sL;
+    sumSqR += sR * sR;
+    dotProd += sL * sR;
+    sampleCount++;
   }
-  rmsL = Math.sqrt(rmsL / Math.max(1, checkLen / 4));
-  rmsR = Math.sqrt(rmsR / Math.max(1, checkLen / 4));
 
-  const isRightDeadOrFaint = (rmsR < 1e-4 && rmsL > 1e-3) || (rmsL > 1e-3 && rmsL > rmsR * 2.2);
-  const isLeftDeadOrFaint = (rmsL < 1e-4 && rmsR > 1e-3) || (rmsR > 1e-3 && rmsR > rmsL * 2.2);
+  const rmsL = Math.sqrt(sumSqL / Math.max(1, sampleCount));
+  const rmsR = Math.sqrt(sumSqR / Math.max(1, sampleCount));
+  const normDenom = Math.sqrt(sumSqL * sumSqR) + 1e-12;
+  const correlation = dotProd / normDenom; // -1.0 to +1.0
+
+  // 1. Detect dead or faint single channel (e.g. Input 1 of USB audio interface)
+  const isRightDeadOrFaint = (rmsR < 1e-4 && rmsL >= 1e-4) || (peakR < 0.005 && peakL >= 0.02) || (rmsL > 1e-3 && rmsL > rmsR * 1.8);
+  const isLeftDeadOrFaint = (rmsL < 1e-4 && rmsR >= 1e-4) || (peakL < 0.005 && peakR >= 0.02) || (rmsR > 1e-3 && rmsR > rmsL * 1.8);
 
   if (isRightDeadOrFaint) {
     outL.set(inL);
@@ -559,7 +577,15 @@ export function ensureCenteredStereoAudioBuffer(ctx: BaseAudioContext, inputBuff
   } else if (isLeftDeadOrFaint) {
     outL.set(inR);
     outR.set(inR);
+  } else if (correlation > 0.80 || Math.abs(rmsL - rmsR) > 0.005) {
+    // 2. High mono correlation or acoustic level imbalance: sum to 100% centered dual-mono
+    for (let i = 0; i < length; i++) {
+      const centerSample = (inL[i] + inR[i]) * 0.5;
+      outL[i] = centerSample;
+      outR[i] = centerSample;
+    }
   } else {
+    // 3. Wide balanced stereo mix: preserve stereo separation
     outL.set(inL);
     outR.set(inR);
   }
@@ -678,6 +704,7 @@ export function processPureRawAudioBuffer(
   options?: {
     targetLufs?: number;
     targetPeakDb?: number;
+    maxLimiterGrDb?: number;
     isLoop?: boolean;
   }
 ): AudioBuffer {
@@ -688,6 +715,7 @@ export function processPureRawAudioBuffer(
 
   const targetLufs = options?.targetLufs ?? TARGET_PURE_RAW_LUFS; // Default: -14.5 LUFS
   const targetPeakDb = options?.targetPeakDb ?? TARGET_PEAK_DBTP;  // Default: -1.0 dBTP
+  const maxLimiterGrDb = options?.maxLimiterGrDb ?? MAX_PURE_RAW_LIMITER_GR_DB; // Default: 3.5 dB
   const isLoop = options?.isLoop ?? false;
 
   // 1. 15 Hz Subsonic DC-Offset Blocker (IIR Filter across all channels)
@@ -719,11 +747,31 @@ export function processPureRawAudioBuffer(
     }
   }
 
-  // 3. EBU R128 Integrated Loudness Normalization to TARGET_PURE_RAW_LUFS (-14.5 LUFS)
+  // 3. EBU R128 Dual-Constraint Loudness Normalization to TARGET_PURE_RAW_LUFS (-14.5 LUFS)
+  // Condition 1: Target -14.5 LUFS
+  // Condition 2: Max Limiter Gain Reduction (default 3.5 dB) to preserve 100% natural dynamics & transient punch
   const currentLufs = calculateIntegratedLufs(audioBuffer);
   if (currentLufs > -65 && currentLufs < 5) {
+    // Measure true sample peak across all channels after subsonic filtering
+    let maxAbsSample = 0;
+    for (let c = 0; c < numChannels; c++) {
+      const data = audioBuffer.getChannelData(c);
+      for (let i = 0; i < length; i++) {
+        const absVal = Math.abs(data[i]);
+        if (absVal > maxAbsSample) {
+          maxAbsSample = absVal;
+        }
+      }
+    }
+    const currentPeakDb = maxAbsSample > 0 ? 20 * Math.log10(maxAbsSample) : -100;
+
+    // Loudness delta required to reach target LUFS
     const lufsDeltaDb = targetLufs - currentLufs;
-    const clampedDeltaDb = Math.min(18.0, Math.max(-28.0, lufsDeltaDb));
+
+    // Dual-Constraint Ceiling: Clamp gain boost so projected peak does not exceed targetPeakDb + maxLimiterGrDb
+    const maxAllowedGainDb = (targetPeakDb - currentPeakDb) + maxLimiterGrDb;
+    const effectiveGainDb = Math.min(lufsDeltaDb, maxAllowedGainDb);
+    const clampedDeltaDb = Math.min(18.0, Math.max(-28.0, effectiveGainDb));
     const linearGain = Math.pow(10, clampedDeltaDb / 20);
 
     for (let c = 0; c < numChannels; c++) {
@@ -748,6 +796,7 @@ export async function processPureRawBlob(
   options?: {
     targetLufs?: number;
     targetPeakDb?: number;
+    maxLimiterGrDb?: number;
     isLoop?: boolean;
   }
 ): Promise<{
@@ -775,8 +824,11 @@ export async function processPureRawBlob(
   processPureRawAudioBuffer(decodedBuffer, {
     targetLufs,
     targetPeakDb: options?.targetPeakDb ?? TARGET_PEAK_DBTP,
+    maxLimiterGrDb: options?.maxLimiterGrDb ?? MAX_PURE_RAW_LIMITER_GR_DB,
     isLoop: options?.isLoop ?? false
   });
+
+  const finalLufs = Math.round(calculateIntegratedLufs(decodedBuffer) * 10) / 10;
 
   const wavBlob = audioBufferToWavBlob(decodedBuffer, {
     title: 'Campus-Groovelab Pure RAW Audio',
@@ -789,7 +841,7 @@ export async function processPureRawBlob(
     processedUrl,
     durationSec: Math.round(decodedBuffer.duration * 10) / 10,
     originalLufs,
-    finalLufs: targetLufs
+    finalLufs
   };
 }
 
@@ -1014,11 +1066,25 @@ export async function processStudioMasteringAudioBuffer(
 
   // =========================================================================
   // 6. EBU R128 INTEGRATED LOUDNESS NORMALIZATION (TARGET_STUDIO_LUFS: -14.0)
+  // Dual-Constraint Dynamic Staging: protects extreme transients from over-limiting
   // =========================================================================
   const targetLufs = options.targetLufs ?? TARGET_STUDIO_LUFS;
+  const maxLimiterGrDb = options.maxLimiterGrDb ?? MAX_PURE_RAW_LIMITER_GR_DB;
   const currentRenderedLufs = calculateIntegratedLufs(renderedBuffer);
   const lufsDeltaDb = targetLufs - currentRenderedLufs;
-  const linearLufsGain = Math.pow(10, lufsDeltaDb / 20);
+
+  let maxAbsSample = 0;
+  for (let c = 0; c < renderedBuffer.numberOfChannels; c++) {
+    const data = renderedBuffer.getChannelData(c);
+    for (let i = 0; i < data.length; i++) {
+      const absVal = Math.abs(data[i]);
+      if (absVal > maxAbsSample) maxAbsSample = absVal;
+    }
+  }
+  const currentPeakDb = maxAbsSample > 0 ? 20 * Math.log10(maxAbsSample) : -100;
+  const maxAllowedGainDb = ((options.targetPeakDb ?? TARGET_PEAK_DBTP) - currentPeakDb) + maxLimiterGrDb;
+  const effectiveGainDb = Math.min(lufsDeltaDb, maxAllowedGainDb);
+  const linearLufsGain = Math.pow(10, effectiveGainDb / 20);
 
   for (let c = 0; c < renderedBuffer.numberOfChannels; c++) {
     const data = renderedBuffer.getChannelData(c);

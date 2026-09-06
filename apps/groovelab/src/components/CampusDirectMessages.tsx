@@ -9,15 +9,16 @@ import {
   ArrowLeft, 
   Check, 
   Clock, 
-  Inbox,
-  Plus,
-  X,
-  Calendar,
-  ShieldCheck,
-  Lock,
-  Sparkles,
-  CheckCheck,
-  ChevronDown
+  Inbox, 
+  Plus, 
+  X, 
+  Calendar, 
+  ShieldCheck, 
+  Lock, 
+  Sparkles, 
+  CheckCheck, 
+  ChevronDown,
+  RotateCcw
 } from 'lucide-react';
 import { formatTeacherFullName, formatSingleStudentAnonymized } from '../utils/nameHelper';
 
@@ -130,6 +131,92 @@ const AppleSystemNotificationCard: React.FC<AppleSystemNotificationCardProps> = 
   const [actionDoneStatus, setActionDoneStatus] = useState<'confirmed' | 'rejected' | null>(null);
 
   const content: string = msg.content || '';
+  const cleanContent = String(content || '').replace(/^\[Termin[^\]]+\]\s*/i, '').trim();
+
+  const isReactivation = msg.message_type === 'cancellation_reset' ||
+    (content && (content.includes('🔄') || content.includes('zurückgesetzt') || content.includes('wiederhergestellt') || content.includes('reaktiviert') || content.includes('zurückgenommen') || content.includes('regulär statt')));
+
+  const isCancellation = msg.message_type === 'reschedule_notification' ||
+    (content && (content.includes('❌') || content.includes('Termin abgesagt') || content.includes('fällt aus') || content.includes('abgesagt') || content.includes('storniert') || content.includes('wurde abgesagt')));
+
+  // 1. Reaktivierungs-Eventkarte (Audit-Proof, 100% identisch mit Shoutbox-Modal)
+  if (isReactivation) {
+    return (
+      <div style={{ alignSelf: 'center', width: '100%', maxWidth: '96%', margin: '4px 0' }}>
+        <div style={{
+          background: '#f0fdf4',
+          border: '1.5px solid #86efac',
+          borderRadius: '18px',
+          padding: '12px 18px',
+          boxShadow: '0 2px 8px rgba(34, 197, 94, 0.08)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '6px'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: '#dcfce7', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <RotateCcw size={14} color="#15803d" strokeWidth={2.5} />
+            </div>
+            <span style={{ fontSize: '0.86rem', fontWeight: 900, color: '#15803d', letterSpacing: '-0.01em' }}>
+              Termin reaktiviert
+            </span>
+            <span style={{ marginLeft: 'auto', fontSize: '0.72rem', color: '#16a34a', fontWeight: 700 }}>
+              {new Date(msg.created_at).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })}, {new Date(msg.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Uhr
+            </span>
+          </div>
+          <div style={{ fontSize: '0.92rem', color: '#166534', fontWeight: 650, lineHeight: 1.45, wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>
+            {cleanContent}
+            {!cleanContent.includes('Reaktiviert am') && (
+              <div style={{ marginTop: '6px', fontSize: '0.76rem', color: '#166534', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <Clock size={11} color="#166534" />
+                <span>Reaktiviert am {new Date(msg.created_at).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })} um {new Date(msg.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Uhr</span>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 2. Stornierungs-/Absage-Eventkarte (Audit-Proof, 100% identisch mit Shoutbox-Modal)
+  if (isCancellation) {
+    return (
+      <div style={{ alignSelf: 'center', width: '100%', maxWidth: '96%', margin: '4px 0' }}>
+        <div style={{
+          background: '#fef2f2',
+          border: '1.5px dashed #fca5a5',
+          borderRadius: '18px',
+          padding: '12px 18px',
+          boxShadow: '0 2px 8px rgba(239, 68, 68, 0.06)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '6px'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: '#fee2e2', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <X size={14} color="#dc2626" strokeWidth={2.5} />
+            </div>
+            <span style={{ fontSize: '0.86rem', fontWeight: 900, color: '#991b1b', letterSpacing: '-0.01em' }}>
+              Termin abgesagt
+            </span>
+            <span style={{ marginLeft: 'auto', fontSize: '0.72rem', color: '#b91c1c', fontWeight: 700 }}>
+              {new Date(msg.created_at).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })}, {new Date(msg.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Uhr
+            </span>
+          </div>
+          <div style={{ fontSize: '0.92rem', color: '#991b1b', fontWeight: 650, lineHeight: 1.45, wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>
+            {cleanContent}
+            {!cleanContent.includes('Abgemeldet am') && !cleanContent.includes('Abgesagt am') && (
+              <div style={{ marginTop: '6px', fontSize: '0.76rem', color: '#b91c1c', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <Clock size={11} color="#b91c1c" />
+                <span>Abgemeldet am {new Date(msg.created_at).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })} um {new Date(msg.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Uhr</span>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const dateStr = new Date(msg.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) + 
     ', ' + new Date(msg.created_at).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
 
@@ -175,22 +262,9 @@ const AppleSystemNotificationCard: React.FC<AppleSystemNotificationCardProps> = 
       newTime = rightRaw;
     }
     oldTime = leftRaw;
-  } else if (content.includes('zurückgesetzt') || content.includes('wiederhergestellt') || content.includes('reaktiviert') || content.includes('zurückgenommen')) {
-    title = 'Termin zurückgesetzt';
-    badgeText = 'Termin regulär';
-    note = content
-      .replace(/Der verschobene oder abgesagte Termin wurde auf den regulären (Stamm-)?Termin zurückgesetzt:?/i, '')
-      .replace(/Der verschobene Termin wurde auf den regulären (Stamm-)?Termin zurückgesetzt:?/i, '')
-      .replace(/Der Ausfall für diesen Termin wurde zurückgenommen:?/i, '')
-      .replace(/Der Ausfall wurde zurückgenommen:?/i, '')
-      .trim();
   } else if (content.includes('abgelehnt')) {
     title = 'Verschiebung abgelehnt';
     badgeText = 'Abgelehnt';
-    note = content.replace(/❌/g, '').trim();
-  } else if (content.includes('storniert') || content.includes('abgesagt')) {
-    title = 'Termin abgesagt';
-    badgeText = 'Abgesagt';
     note = content.replace(/❌/g, '').trim();
   } else if (content.includes('bestätigt')) {
     title = 'Termin bestätigt';
@@ -337,7 +411,7 @@ const AppleSystemNotificationCard: React.FC<AppleSystemNotificationCardProps> = 
             </div>
           </div>
         ) : (
-          <p style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 500, margin: 0, lineHeight: 1.4 }}>
+          <p style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 500, margin: 0, lineHeight: 1.5, whiteSpace: 'pre-line' }}>
             {note}
           </p>
         )}
@@ -467,7 +541,7 @@ export function CampusDirectMessages({
   const [typedMessage, setTypedMessage] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [filterType, setFilterType] = useState<'all' | 'unread'>('all');
-  const [activeSubTab, setActiveSubTab] = useState<string>('general');
+  const [activeSubTab, setActiveSubTab] = useState<string>('all');
   const [assignedStudents, setAssignedStudents] = useState<any[]>([]);
   const checkIsMobile = () => {
     if (typeof window === 'undefined') return false;
@@ -789,12 +863,14 @@ export function CampusDirectMessages({
 
   const isSystemMessage = (msg: any) => {
     if (!msg) return false;
-    if (msg.is_system || msg.message_type === 'reschedule_notification' || msg.message_type === 'system') return true;
+    if (msg.is_system || msg.message_type === 'reschedule_notification' || msg.message_type === 'cancellation_reset' || msg.message_type === 'system') return true;
     const content = String(msg.content || '').trim();
     const lower = content.toLowerCase();
     
     // System notification patterns generated by the engine
     if (
+      lower.includes('termin reaktiviert') ||
+      lower.includes('reaktiviert') ||
       lower.includes('termin wurde verschoben') ||
       lower.includes('termin wurde auf den regulären') ||
       lower.includes('termin zurückgesetzt') ||
@@ -1080,6 +1156,37 @@ export function CampusDirectMessages({
     return null;
   };
 
+  // Helper to get occurrence context label for a message (date, day of week, time)
+  const getMessageOccurrenceContext = (msg: any): { date: string; label: string; occurrence?: any } | null => {
+    if (!msg) return null;
+    const occId = msg.occurrence_id ? String(msg.occurrence_id) : null;
+    const extDate = extractOccurrenceDateFromMessage(msg);
+    if (!occId && !extDate) return null;
+
+    const matchOcc = (studentOccurrences || []).find(o => 
+      (occId && String(o.id) === occId) || 
+      (extDate && o.date === extDate)
+    );
+
+    const effectiveDate = matchOcc?.date || extDate;
+    if (!effectiveDate) return null;
+
+    try {
+      const d = parseLocalDate(effectiveDate);
+      if (isNaN(d.getTime())) return null;
+      const dayName = d.toLocaleDateString('de-DE', { weekday: 'short' });
+      const formattedDate = d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
+      const timeStr = matchOcc?.start_time ? matchOcc.start_time.slice(0, 5) : null;
+      return {
+        date: effectiveDate,
+        label: `${dayName} ${formattedDate}${timeStr ? ` • ${timeStr} Uhr` : ''}`,
+        occurrence: matchOcc
+      };
+    } catch (e) {
+      return null;
+    }
+  };
+
   // 2. Dynamic Date-Based Occurrence Tabs with Active & Archive Lifecycle
   const todayStr = useMemo(() => new Date().toISOString().split('T')[0], []);
   const [isArchiveOpen, setIsArchiveOpen] = useState(false);
@@ -1136,7 +1243,7 @@ export function CampusDirectMessages({
     // 1. Process known student occurrences
     (studentOccurrences || []).forEach(occ => {
       if (!occ || !occ.date) return;
-      if (occ.status === 'rescheduled_away' || occ.status === 'canceled_by_student' || occ.status === 'deleted') return;
+      if (occ.status === 'rescheduled_away' || occ.status === 'deleted') return;
       addOrUpdateSlot(occ.date, occ.start_time ? occ.start_time.slice(0, 5) : null, occ);
     });
 
@@ -1224,49 +1331,122 @@ export function CampusDirectMessages({
     return activeThreadMessages.filter(m => !m.occurrence_id && !isSystemMessage(m) && !extractOccurrenceDateFromMessage(m));
   }, [activeThreadMessages]);
 
-  // 4. Smart Auto-Tab Selection Priority when switching students
+  // Count of genuine human messages across the entire thread (strictly human dialogues)
+  const humanMessagesCount = useMemo(() => {
+    return activeThreadMessages.filter(m => !isSystemMessage(m)).length;
+  }, [activeThreadMessages]);
+
+  // 4. Smart Auto-Tab Selection when switching students: Always default to 'all' (Unified Feed)
   useEffect(() => {
     if (!selectedRecipient) return;
-
-    // Priority 1: Upcoming occurrence tab with unread messages
-    const unreadOccTab = upcomingOccurrenceTabs.find(tab => tab.unreadCount > 0);
-    if (unreadOccTab) {
-      setActiveSubTab(unreadOccTab.id);
-      return;
-    }
-
-    // Priority 2: General tab with unread messages
-    const unreadGeneral = generalMessages.filter(m => m.sender_id === selectedRecipient.id && m.recipient_id === user.id && !m.is_read && !isSystemMessage(m)).length;
-    if (unreadGeneral > 0) {
-      setActiveSubTab('general');
-      return;
-    }
-
-    // Priority 3: Next upcoming appointment tab if available, otherwise 'general'
-    if (upcomingOccurrenceTabs.length > 0) {
-      setActiveSubTab(upcomingOccurrenceTabs[0].id);
-    } else {
-      setActiveSubTab('general');
-    }
+    setActiveSubTab('all');
   }, [selectedRecipient?.id]);
 
-  // 5. Messages displayed in the chat area for currently active sub-tab
+  // 5. Messages displayed in the chat area for currently active sub-tab (Unified Timeline)
   const displayedMessages = useMemo(() => {
-    if (activeSubTab === 'general') {
-      return generalMessages;
+    if (activeSubTab === 'all' || activeSubTab === 'general') {
+      // Tab "Alle": MUST be clean and strictly contain human dialogues (including appointment-tied human chat messages),
+      // filtering out all automated machine system events!
+      return activeThreadMessages.filter(m => !isSystemMessage(m));
     }
     const selectedOccTab = allOccurrenceTabs.find(tab => 
       tab.id === activeSubTab || 
       (tab.allIds && tab.allIds.includes(activeSubTab)) ||
       tab.date === activeSubTab
     );
-    return selectedOccTab ? selectedOccTab.messages : generalMessages;
-  }, [activeSubTab, generalMessages, allOccurrenceTabs]);
+    if (!selectedOccTab) return activeThreadMessages.filter(m => !isSystemMessage(m));
+
+    const rawMsgs = selectedOccTab.messages || [];
+    const occObj = selectedOccTab.occurrence || selectedOccTab;
+    const occStatus = String(occObj?.status || 'scheduled').toLowerCase();
+    const isOccCancelled = ['cancelled', 'canceled_by_student', 'canceled', 'teacher_sick', 'canceled_by_teacher_sick'].includes(occStatus);
+
+    // Check for cancellations and reactivations
+    const lastCancelIdx = rawMsgs.reduce((lastIdx: number, m: any, idx: number) => {
+      const isCancel = m.message_type === 'reschedule_notification' ||
+        (m.content && (m.content.includes('❌') || m.content.includes('Termin abgesagt') || m.content.includes('fällt aus') || m.content.includes('abgesagt') || m.content.includes('storniert') || m.content.includes('wurde abgesagt')));
+      return isCancel ? idx : lastIdx;
+    }, -1);
+
+    const hasReactivationAfterCancel = lastCancelIdx !== -1 && rawMsgs.slice(lastCancelIdx + 1).some((m: any) => {
+      return m.message_type === 'cancellation_reset' ||
+        (m.content && (m.content.includes('🔄') || m.content.includes('reaktiviert') || m.content.includes('zurückgenommen') || m.content.includes('regulär statt') || m.content.includes('zurückgesetzt')));
+    });
+
+    // If appointment is active (!isOccCancelled) but has an unresolved cancellation in history:
+    if (!isOccCancelled && lastCancelIdx !== -1 && !hasReactivationAfterCancel) {
+      const cancelMsg = rawMsgs[lastCancelIdx];
+      const cancelTime = new Date(cancelMsg.created_at).getTime();
+
+      let reactivateIso = occObj?.updated_at || occObj?.created_at;
+      if (reactivateIso) {
+        const occTime = new Date(reactivateIso).getTime();
+        if (isNaN(occTime) || occTime <= cancelTime) {
+          reactivateIso = new Date(cancelTime + 30 * 1000).toISOString();
+        }
+      } else {
+        reactivateIso = new Date(cancelTime + 30 * 1000).toISOString();
+      }
+
+      const syntheticReactivationMsg = {
+        id: `synthetic-reactivate-${selectedOccTab.id}`,
+        sender_id: user.role === 'teacher' ? user.id : (selectedRecipient?.id || user.id),
+        recipient_id: user.role === 'teacher' ? (selectedRecipient?.id || user.id) : user.id,
+        content: `[Termin ${selectedOccTab.label}] 🔄 Termin reaktiviert: Der Unterricht findet planmäßig statt.`,
+        message_type: 'cancellation_reset',
+        created_at: reactivateIso,
+        occurrence_id: selectedOccTab.id,
+        is_read: true,
+        is_system: true,
+        is_synthetic: true
+      };
+
+      const listCopy = [...rawMsgs];
+      listCopy.splice(lastCancelIdx + 1, 0, syntheticReactivationMsg);
+      return listCopy.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+    }
+
+    return rawMsgs;
+  }, [activeSubTab, activeThreadMessages, allOccurrenceTabs, user.role, user.id, selectedRecipient?.id]);
+
+  // Asynchronous Self-Healing: Persist missing reactivation audit record to PostgreSQL if absent
+  useEffect(() => {
+    if (!selectedRecipient || !user) return;
+    const syntheticMsg = displayedMessages.find((m: any) => m.is_synthetic && m.message_type === 'cancellation_reset');
+    if (syntheticMsg) {
+      const persistMissingAudit = async () => {
+        try {
+          const { data: existing } = await supabase
+            .from('campus_direct_messages')
+            .select('id')
+            .eq('message_type', 'cancellation_reset')
+            .eq('occurrence_id', syntheticMsg.occurrence_id)
+            .limit(1);
+
+          if (!existing || existing.length === 0) {
+            await supabase.from('campus_direct_messages').insert({
+              sender_id: syntheticMsg.sender_id,
+              recipient_id: syntheticMsg.recipient_id,
+              content: syntheticMsg.content,
+              message_type: 'cancellation_reset',
+              occurrence_id: syntheticMsg.occurrence_id,
+              is_read: true,
+              created_at: syntheticMsg.created_at
+            });
+            console.log('[CampusDirectMessages] Audit Self-Healing: Persisted missing cancellation_reset event to DB.');
+          }
+        } catch (err) {
+          console.warn('[CampusDirectMessages] Could not persist self-healing audit message:', err);
+        }
+      };
+      persistMissingAudit();
+    }
+  }, [displayedMessages, selectedRecipient, user]);
 
   const sendDirectQuickMessage = async (content: string) => {
     if (!content.trim() || !selectedRecipient) return;
     
-    if (activeSubTab !== 'general' && activeSubTab !== 'system') {
+    if (activeSubTab !== 'all' && activeSubTab !== 'general' && activeSubTab !== 'system') {
       const targetOccTab = allOccurrenceTabs.find(tab => tab.id === activeSubTab || (tab.allIds && tab.allIds.includes(activeSubTab)));
       if (targetOccTab) {
         await supabase.from('campus_direct_messages').insert({
@@ -1655,19 +1835,19 @@ export function CampusDirectMessages({
                 minWidth: 0,
                 paddingRight: '6px'
               }}>
-                {/* Tab 1: Allgemein (Ausschließlich persönliche, menschliche Nachrichten) */}
+                {/* Tab 1: Alle (Vollständige chronologische Hybrid-Timeline) */}
                 <button
                   type="button"
                   onClick={() => {
-                    setActiveSubTab('general');
+                    setActiveSubTab('all');
                     setIsArchiveOpen(false);
                   }}
                   style={{
                     padding: '6px 14px',
                     borderRadius: '100px',
                     border: 'none',
-                    background: activeSubTab === 'general' ? '#34a853' : '#f1f5f9',
-                    color: activeSubTab === 'general' ? 'white' : '#64748b',
+                    background: (activeSubTab === 'all' || activeSubTab === 'general') ? '#34a853' : '#f1f5f9',
+                    color: (activeSubTab === 'all' || activeSubTab === 'general') ? 'white' : '#64748b',
                     fontSize: '0.78rem',
                     fontWeight: 800,
                     cursor: 'pointer',
@@ -1677,12 +1857,12 @@ export function CampusDirectMessages({
                     whiteSpace: 'nowrap',
                     transition: 'all 0.2s',
                     flexShrink: 0,
-                    boxShadow: activeSubTab === 'general' ? '0 2px 6px rgba(52,168,83,0.2)' : 'none'
+                    boxShadow: (activeSubTab === 'all' || activeSubTab === 'general') ? '0 2px 6px rgba(52,168,83,0.2)' : 'none'
                   }}
                   className="hover-scale"
                 >
                   <MessageSquare size={13} />
-                  <span>Allgemein ({generalMessages.length})</span>
+                  <span>Alle ({humanMessagesCount})</span>
                 </button>
 
                 {/* Dynamic Date-Based Upcoming Appointment Tabs */}
@@ -1857,7 +2037,7 @@ export function CampusDirectMessages({
               background: '#fafbfc'
             }} className="custom-scrollbar">
               {/* Apple Senior App Designer - Glassmorphic Calendar Event Card */}
-              {activeSubTab !== 'general' && (() => {
+              {activeSubTab !== 'all' && activeSubTab !== 'general' && (() => {
                 const currentTab = activeOccurrenceTabs.find(t => t.id === activeSubTab || (t.allIds && t.allIds.includes(activeSubTab)));
                 if (!currentTab) return null;
                 const occDate = parseLocalDate(currentTab.date);
@@ -1974,48 +2154,51 @@ export function CampusDirectMessages({
                             1:1 Termin-Shoutbox
                           </span>
                           {(() => {
-                            const systemMessages = (currentTab.messages || []).filter((m: any) => isSystemMessage(m));
-                            const latestSystemMsg = systemMessages.length > 0 ? systemMessages[systemMessages.length - 1] : null;
-                            const latestIsReset = latestSystemMsg && (
-                              (latestSystemMsg.content || '').includes('zurückgesetzt') || 
-                              (latestSystemMsg.content || '').includes('wiederhergestellt') || 
-                              (latestSystemMsg.content || '').includes('reaktiviert') ||
-                              (latestSystemMsg.content || '').includes('zurückgenommen')
+                            const occStatus = String(occObj?.status || 'scheduled').toLowerCase();
+                            const isCurrentlyCancelled = ['cancelled', 'canceled_by_student', 'canceled', 'teacher_sick', 'canceled_by_teacher_sick'].includes(occStatus);
+                            
+                            const isReactivated = !isCurrentlyCancelled && (
+                              (currentTab.messages || []).some((m: any) => 
+                                m.message_type === 'cancellation_reset' || 
+                                (m.content && (m.content.includes('reaktiviert') || m.content.includes('zurückgenommen') || m.content.includes('regulär statt') || m.content.includes('zurückgesetzt')))
+                              ) ||
+                              displayedMessages.some((m: any) => m.message_type === 'cancellation_reset')
                             );
-                            const isCurrentlyCancelled = occObj?.status === 'cancelled' || occObj?.status === 'canceled' || occObj?.status === 'canceled_by_student';
-                            const showCancelledBadge = isCurrentlyCancelled || (latestSystemMsg && ((latestSystemMsg.content || '').includes('abgesagt') || (latestSystemMsg.content || '').includes('fällt aus')) && !latestIsReset);
 
-                            let badgeLabel = 'Anstehender Unterricht';
+                            let badgeLabel = 'Planmäßiger Unterricht';
                             let badgeBg = '#dcfce7';
                             let badgeColor = '#15803d';
                             let badgeBorder = '1px solid #bbf7d0';
 
-                            if (stammterminText) {
-                              badgeLabel = '🔄 Termin verschoben';
-                              badgeBg = '#e6f4ea';
-                              badgeColor = '#15803d';
-                              badgeBorder = '1px solid #bbf7d0';
-                            } else if (showCancelledBadge) {
+                            if (isCurrentlyCancelled) {
                               badgeLabel = '❌ Termin abgesagt';
                               badgeBg = '#fef2f2';
                               badgeColor = '#991b1b';
                               badgeBorder = '1px solid #fecaca';
-                            } else if (latestIsReset) {
-                              badgeLabel = '🔄 Termin zurückgesetzt';
-                              badgeBg = '#e6f4ea';
+                            } else if (isReactivated) {
+                              badgeLabel = '🔄 Termin reaktiviert (Planmäßig)';
+                              badgeBg = '#dcfce7';
                               badgeColor = '#15803d';
-                              badgeBorder = '1px solid #bbf7d0';
+                              badgeBorder = '1px solid #86efac';
+                            } else if (stammterminText) {
+                              badgeLabel = '🔄 Termin verschoben';
+                              badgeBg = '#fef3c7';
+                              badgeColor = '#b45309';
+                              badgeBorder = '1px solid #fde68a';
                             }
 
                             return (
                               <span style={{
-                                fontSize: '0.65rem',
+                                fontSize: '0.68rem',
                                 background: badgeBg,
                                 color: badgeColor,
-                                padding: '2px 8px',
+                                padding: '3px 10px',
                                 borderRadius: '100px',
-                                fontWeight: 800,
-                                border: badgeBorder
+                                fontWeight: 850,
+                                border: badgeBorder,
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px'
                               }}>
                                 {badgeLabel}
                               </span>
@@ -2138,9 +2321,20 @@ export function CampusDirectMessages({
                   const isSys = isSystemMessage(msg);
 
                   if (isSys) {
+                    // System messages must NEVER be rendered in the 'all' / 'general' human dialogue stream!
+                    if (activeSubTab === 'all' || activeSubTab === 'general') {
+                      return null;
+                    }
+
                     const currentOccTab = activeOccurrenceTabs.find(t => t.id === activeSubTab || (t.allIds && t.allIds.includes(activeSubTab)) || t.date === activeSubTab);
                     const laterSysMsg = displayedMessages.slice(idx + 1).find(m => isSystemMessage(m));
                     const isSuperseded = Boolean(laterSysMsg);
+
+                    // Find matching occurrence even in 'all' view
+                    const matchedOcc = currentOccTab?.occurrence || (studentOccurrences || []).find(o => 
+                      (msg.occurrence_id && String(o.id) === String(msg.occurrence_id)) || 
+                      (extractOccurrenceDateFromMessage(msg) && o.date === extractOccurrenceDateFromMessage(msg))
+                    );
 
                     return (
                       <AppleSystemNotificationCard 
@@ -2149,7 +2343,7 @@ export function CampusDirectMessages({
                         selectedRecipient={selectedRecipient}
                         onSendMessage={onSendMessage}
                         isSuperseded={isSuperseded}
-                        currentOcc={currentOccTab?.occurrence}
+                        currentOcc={matchedOcc}
                       />
                     );
                   }
@@ -2245,18 +2439,43 @@ export function CampusDirectMessages({
                             </div>
                           )}
 
+                          {/* Appointment context tag pill if in 'all' view */}
+                          {(activeSubTab === 'all' || activeSubTab === 'general') && (() => {
+                            const msgCtx = getMessageOccurrenceContext(msg);
+                            if (!msgCtx || isContinuation) return null;
+                            return (
+                              <div style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                fontSize: '0.66rem',
+                                fontWeight: 750,
+                                color: '#15803d',
+                                background: '#f0fdf4',
+                                border: '1px solid #bbf7d0',
+                                borderRadius: '100px',
+                                padding: '2px 9px',
+                                marginBottom: '4px',
+                                alignSelf: isSelf ? 'flex-end' : 'flex-start',
+                                boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
+                              }}>
+                                <Calendar size={10} color="#15803d" />
+                                <span>{msgCtx.label}</span>
+                              </div>
+                            );
+                          })()}
+
                           <div 
                             style={{
-                              padding: '9px 14px 7px 14px',
+                              padding: '11px 16px 8px 16px',
                               borderRadius: isSelf 
                                 ? (isContinuation ? '18px 6px 6px 18px' : '18px 18px 4px 18px')
                                 : (isContinuation ? '6px 18px 18px 6px' : '18px 18px 18px 4px'),
-                              background: isSelf ? '#34a853' : '#ffffff',
+                              background: isSelf ? 'linear-gradient(135deg, #15803d 0%, #16a34a 100%)' : '#ffffff',
                               color: isSelf ? '#ffffff' : '#0f172a',
-                              boxShadow: isSelf ? '0 2px 8px rgba(52, 168, 83, 0.2)' : '0 2px 8px rgba(0,0,0,0.04)',
+                              boxShadow: isSelf ? '0 2px 8px rgba(21, 128, 61, 0.22)' : '0 2px 6px rgba(0,0,0,0.04)',
                               border: isSelf ? 'none' : '1px solid #e2e8f0',
-                              fontSize: '0.9rem',
-                              fontWeight: 500,
+                              fontSize: '0.95rem',
                               lineHeight: '1.45',
                               wordBreak: 'break-word',
                               whiteSpace: 'pre-wrap'
@@ -2270,16 +2489,16 @@ export function CampusDirectMessages({
                               alignItems: 'center',
                               justifyContent: 'flex-end',
                               gap: '4px',
-                              fontSize: '0.64rem',
-                              fontWeight: 600,
-                              color: isSelf ? 'rgba(255, 255, 255, 0.78)' : '#94a3b8',
-                              marginTop: '4px',
+                              fontSize: '0.72rem',
+                              fontWeight: 650,
+                              color: isSelf ? 'rgba(255, 255, 255, 0.85)' : '#64748b',
+                              marginTop: '6px',
                               lineHeight: 1
                             }}>
                               <span>{timeStr}</span>
                               {isSelf && (
                                 <div style={{ display: 'inline-flex', alignItems: 'center' }}>
-                                  <CheckCheck size={13} color={msg.is_read ? '#ffffff' : 'rgba(255, 255, 255, 0.7)'} />
+                                  <CheckCheck size={14} color="#ffffff" style={{ opacity: msg.is_read ? 1 : 0.75 }} />
                                 </div>
                               )}
                             </div>
@@ -2335,88 +2554,63 @@ export function CampusDirectMessages({
               </div>
             ) : (
               <div style={{ borderTop: '1px solid #f1f5f9', background: '#f8fafc', padding: isMobile ? '8px 12px 12px 12px' : '12px 24px' }}>
-                {/* Quick Replies Pill Bar: 1-Click Emoji Reactions + Role-Specific Natural German Phrases */}
+                {/* Quick Replies Pill Bar: Vetted Micro-Chips Suite (100% Harmonized & Neutral) */}
                 {(() => {
-                  const emojiReactions = ['👍', '🎵', '👏', '🙏'];
-                  const isUserTeacher = user?.role?.toLowerCase() === 'teacher' || user?.role?.toLowerCase() === 'admin';
-                  const textPhrases = isUserTeacher ? [
-                    { label: 'Super, danke!', text: 'Super, danke!' },
-                    { label: 'Passt perfekt!', text: 'Passt perfekt, bis dann!' },
-                    { label: 'Termin geht klar', text: 'Der Termin geht klar, ist eingetragen!' },
-                    { label: '5 Min später', text: 'Ich verspäte mich leider um ca. 5 Minuten.' },
-                    { label: 'Bis zum Unterricht!', text: 'Wir sehen uns beim Unterricht!' }
+                  const isUserTeacher = user?.role?.toLowerCase() === 'teacher' || user?.role?.toLowerCase() === 'admin' || user?.role?.toLowerCase() === 'secretary';
+                  const vettedQuickChips = isUserTeacher ? [
+                    { label: '👍 Gesehen & notiert', text: 'Gesehen und notiert, vielen Dank für die Rückmeldung!' },
+                    { label: '🎵 Noten & Instrument dabei?', text: 'Bitte an das Notenheft und das Instrument für den Unterricht denken.' },
+                    { label: '⏱️ 5 Min. später vor Ort', text: 'Ich bin gleich da, verzögert sich um ca. 5 Minuten.' },
+                    { label: '🌱 Keine Sorge, alles gut!', text: 'Keine Sorge, alles in bester Ordnung!' }
                   ] : [
-                    { label: 'Vielen Dank!', text: 'Vielen Dank!' },
-                    { label: 'Alles klar, danke!', text: 'Alles klar, danke!' },
-                    { label: 'Termin passt!', text: 'Der Termin passt für mich!' },
-                    { label: 'Bin gleich da', text: 'Ich bin gleich da!' },
-                    { label: 'Werde fleißig üben', text: 'Danke, ich werde fleißig üben!' }
+                    { label: '👍 Gesehen & danke!', text: 'Gesehen und vielen Dank für die Information!' },
+                    { label: '⏱️ Bin ca. 5 Min. später da', text: 'Ich verspäte mich leider um ca. 5 Minuten, bin aber gleich da!' },
+                    { label: '🎵 Noten & Instrument dabei', text: 'Notenheft und Instrument sind eingepackt, alles bereit!' },
+                    { label: '🙏 Danke für das Verständnis!', text: 'Vielen Dank für das Verständnis und die Geduld!' }
                   ];
 
                   return (
                     <div style={{
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '6px',
+                      gap: '8px',
                       overflowX: 'auto',
                       paddingBottom: '8px',
                       scrollbarWidth: 'none',
                       msOverflowStyle: 'none'
                     }}>
-                      {/* 1-Click Direct Emoji Reaction Buttons */}
-                      <div style={{ display: 'flex', gap: '4px', paddingRight: '6px', borderRight: '1px solid #e2e8f0' }}>
-                        {emojiReactions.map((emoji, idx) => (
-                          <button
-                            key={`emoji-${idx}`}
-                            type="button"
-                            onClick={() => sendDirectQuickMessage(emoji)}
-                            style={{
-                              padding: '4px 9px',
-                              borderRadius: '100px',
-                              background: '#ffffff',
-                              border: '1px solid #e2e8f0',
-                              fontSize: '0.88rem',
-                              cursor: 'pointer',
-                              boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-                              flexShrink: 0
-                            }}
-                            className="hover-scale"
-                            title={`Schnell-Reaktion ${emoji} senden`}
-                          >
-                            {emoji}
-                          </button>
-                        ))}
-                      </div>
-
-                      {/* Role-Specific Authentic Text Phrases */}
-                      {textPhrases.map((phrase, idx) => (
+                      {vettedQuickChips.map((chip, idx) => (
                         <button
-                          key={`phrase-${idx}`}
+                          key={`chip-${idx}`}
                           type="button"
-                          onClick={() => setTypedMessage(phrase.text)}
+                          onClick={() => setTypedMessage(chip.text)}
                           style={{
-                            padding: '5px 12px',
+                            padding: '6px 14px',
                             borderRadius: '100px',
                             background: '#ffffff',
                             border: '1px solid #bbf7d0',
                             color: '#15803d',
-                            fontSize: '0.75rem',
+                            fontSize: '0.78rem',
                             fontWeight: 700,
                             whiteSpace: 'nowrap',
                             cursor: 'pointer',
                             boxShadow: '0 1px 3px rgba(52, 168, 83, 0.08)',
-                            flexShrink: 0
+                            flexShrink: 0,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '5px',
+                            transition: 'all 0.15s ease'
                           }}
                           className="hover-scale"
                         >
-                          {phrase.label}
+                          <span>{chip.label}</span>
                         </button>
                       ))}
                     </div>
                   );
                 })()}
 
-                {/* Right to Disconnect / Ruhezeit-Hinweis (Arbeitszeit- & Lehrkräfte-Schutz) */}
+                {/* Right to Disconnect / Ruhezeit-Hinweis (Arbeitszeit- & Lehrkräfte-Schutz gem. § 5 ArbZG) */}
                 {(() => {
                   const now = new Date();
                   const day = now.getDay();
@@ -2448,44 +2642,61 @@ export function CampusDirectMessages({
                   return null;
                 })()}
 
-                <form onSubmit={handleSend} style={{ display: 'flex', gap: '10px', width: '100%' }}>
+                {/* Apple HIG In-Field Send Composer */}
+                <form onSubmit={handleSend} style={{ display: 'flex', width: '100%', position: 'relative', alignItems: 'center' }}>
                   <input 
                     type="text" 
                     placeholder="Deine Nachricht..."
                     value={typedMessage}
                     onChange={e => setTypedMessage(e.target.value)}
                     style={{
-                      flex: 1,
-                      padding: '12px 18px',
-                      borderRadius: '16px',
-                      border: '1px solid #e2e8f0',
-                      background: 'white',
-                      fontSize: '0.9rem',
-                      fontWeight: 600,
+                      width: '100%',
+                      padding: '11px 48px 11px 18px',
+                      minHeight: '44px',
+                      borderRadius: '100px',
+                      border: '1.5px solid #e2e8f0',
+                      background: '#ffffff',
+                      fontSize: '0.90rem',
                       outline: 'none',
-                      boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.02)'
+                      fontWeight: 550,
+                      color: '#0f172a',
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+                      transition: 'border-color 0.15s, box-shadow 0.15s',
+                      boxSizing: 'border-box'
+                    }}
+                    onFocus={e => {
+                      e.target.style.borderColor = '#15803d';
+                      e.target.style.boxShadow = '0 0 0 3px rgba(21, 128, 61, 0.15)';
+                    }}
+                    onBlur={e => {
+                      e.target.style.borderColor = '#e2e8f0';
+                      e.target.style.boxShadow = '0 1px 3px rgba(0,0,0,0.02)';
                     }}
                   />
                   <button
                     type="submit"
+                    disabled={!typedMessage.trim()}
+                    aria-label="Nachricht senden"
                     style={{
-                      background: '#34a853',
-                      color: 'white',
+                      position: 'absolute',
+                      right: '6px',
                       border: 'none',
-                      width: '44px',
-                      height: '44px',
-                      borderRadius: '16px',
+                      background: !typedMessage.trim() ? '#f1f5f9' : 'linear-gradient(135deg, #15803d 0%, #16a34a 100%)',
+                      color: !typedMessage.trim() ? '#94a3b8' : '#ffffff',
+                      borderRadius: '50%',
+                      width: '32px',
+                      height: '32px',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      cursor: 'pointer',
-                      boxShadow: '0 4px 12px rgba(52, 168, 83, 0.25)',
-                      transition: 'all 0.2s',
+                      cursor: !typedMessage.trim() ? 'not-allowed' : 'pointer',
+                      transition: 'all 0.15s ease',
+                      boxShadow: !typedMessage.trim() ? 'none' : '0 2px 6px rgba(21, 128, 61, 0.25)',
                       flexShrink: 0
                     }}
-                    className="hover-scale"
+                    className={typedMessage.trim() ? 'hover-scale' : ''}
                   >
-                    <Send size={18} />
+                    <Send size={15} strokeWidth={2.4} />
                   </button>
                 </form>
               </div>

@@ -17,8 +17,9 @@ import {
   BookOpen
 } from 'lucide-react';
 import { generateConsentPDF, generateDSBCompliancePDF } from '../utils/pdfGenerator';
-import { FeedbackHubModal } from './feedback/FeedbackHubModal';
-import { HelpCenterModal } from './help/HelpCenterModal';
+
+const FeedbackHubModal = React.lazy(() => import('./feedback/FeedbackHubModal').then(m => ({ default: m.FeedbackHubModal })));
+const HelpCenterModal = React.lazy(() => import('./help/HelpCenterModal').then(m => ({ default: m.HelpCenterModal })));
 
 interface CampusSetupScreenProps {
   school: any;
@@ -930,29 +931,37 @@ export function CampusSetupScreen({
       )}
 
       {/* Ideenschmiede & Feedback Modal */}
-      <FeedbackHubModal
-        isOpen={isFeedbackModalOpen}
-        onClose={() => setIsFeedbackModalOpen(false)}
-        userRole={admin?.role || 'teacher'}
-        userId={admin?.id || admin?.userId}
-        userName={`${admin?.first_name || ''} ${admin?.last_name || ''}`.trim() || 'Lehrkraft'}
-        schoolId={effectiveSchool?.id || admin?.school_id}
-        schoolName={effectiveSchool?.name || ''}
-        activePlatform="campus"
-      />
+      <React.Suspense fallback={null}>
+        {isFeedbackModalOpen && (
+          <FeedbackHubModal
+            isOpen={isFeedbackModalOpen}
+            onClose={() => setIsFeedbackModalOpen(false)}
+            userRole={admin?.role || 'teacher'}
+            userId={admin?.id || admin?.userId}
+            userName={`${admin?.first_name || ''} ${admin?.last_name || ''}`.trim() || 'Lehrkraft'}
+            schoolId={effectiveSchool?.id || admin?.school_id}
+            schoolName={effectiveSchool?.name || ''}
+            activePlatform="campus"
+          />
+        )}
+      </React.Suspense>
 
       {/* Leitfäden & Akademie Modal */}
-      <HelpCenterModal
-        isOpen={isHelpCenterOpen}
-        onClose={() => setIsHelpCenterOpen(false)}
-        userRole="admin"
-        activePlatform="campus"
-        schoolName={effectiveSchool?.name || schoolName || ''}
-        onOpenFeedbackHub={() => {
-          setIsHelpCenterOpen(false);
-          setIsFeedbackModalOpen(true);
-        }}
-      />
+      <React.Suspense fallback={null}>
+        {isHelpCenterOpen && (
+          <HelpCenterModal
+            isOpen={isHelpCenterOpen}
+            onClose={() => setIsHelpCenterOpen(false)}
+            userRole="admin"
+            activePlatform="campus"
+            schoolName={effectiveSchool?.name || schoolName || ''}
+            onOpenFeedbackHub={() => {
+              setIsHelpCenterOpen(false);
+              setIsFeedbackModalOpen(true);
+            }}
+          />
+        )}
+      </React.Suspense>
     </div>
   );
 }

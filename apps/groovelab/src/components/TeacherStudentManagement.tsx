@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import { Users, Plus, Copy, Check, UserCheck, Smartphone, Globe, Music, Trash2, AlertCircle } from 'lucide-react';
 import { ConfirmDeleteStudentModal, StudentToDelete } from './ConfirmDeleteStudentModal';
 import { deleteStudentFully } from '../utils/studentDeletionService';
+import { getStudentDisplayName } from '../utils/userDisplayName';
 
 interface Student {
   id: string;
@@ -213,7 +214,7 @@ export function TeacherStudentManagement({ teacherId, schoolId, maxStudents }: T
   const handleDeleteStudent = (student: Student) => {
     setDeleteStudentModalData({
       id: student.id,
-      name: `${student.first_name || ''} ${student.last_name || ''}`.trim() || 'Schüler',
+      name: getStudentDisplayName(student),
       instrument: student.instrument,
       isCampusActive: student.is_campus_active,
       isGroovelabActive: student.is_groovelab_active
@@ -383,7 +384,7 @@ export function TeacherStudentManagement({ teacherId, schoolId, maxStudents }: T
                     </div>
                     <div className="min-w-0">
                       <span className="block font-bold text-slate-800 text-base truncate" style={{ minWidth: 0 }}>
-                        {student.first_name} {student.last_name ? (student.last_name.endsWith('.') ? student.last_name : student.last_name.charAt(0).toUpperCase() + '.') : ''}
+                        {getStudentDisplayName(student)}
                       </span>
                       <div className="flex items-center gap-2.5 mt-1.5 flex-wrap">
                         <span className="text-xs font-bold text-slate-400 uppercase tracking-wider bg-slate-50 border border-slate-100 px-2 py-0.5 rounded-md">

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ShieldCheck, Download, Search, FileText, Lock, CheckCircle2, ChevronDown, RefreshCw, X, Copy, Check, Filter, Clock, Printer, Building, FileCheck, CheckSquare, Sparkles } from 'lucide-react';
 import { generateStudentGdprDataTakeout, downloadGdprJsonArchive } from '../utils/gdprDataTakeout';
+import { generateDpoComplianceDossierPDF } from '../utils/dpoComplianceDossierGenerator';
 
 interface DpoAuditPortalProps {
   onClose?: () => void;
@@ -96,7 +97,7 @@ export function DpoAuditPortal({ onClose, schoolName = 'Stadtmusikschule', schoo
       timestamp: '10.08.2026, 15:10:05 MESZ',
       actorRole: 'SYSTEM',
       actorName: 'Auto-Inactivation Bot',
-      action: 'Profil inaktiviert nach 60 Tagen Nicht-Anmeldung (Kosten- & Daten-Stopp)',
+      action: 'Fair-Play Sparmodus: Profil nach 60 Tagen Inaktivität auf Basis-Bereitstellung (0,09 €) umgestellt (Kostenschutz)',
       category: 'USER_LIFECYCLE',
       target: 'Schüler-Profil ID #7201',
       status: 'VERIFIED_WORM',
@@ -811,13 +812,13 @@ export function DpoAuditPortal({ onClose, schoolName = 'Stadtmusikschule', schoo
                     gap: '14px'
                   }}>
                     <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <RefreshCw size={18} color="#1d4ed8" /> Art. 17 DSGVO Auto-Löschkonzept
+                      <RefreshCw size={18} color="#1d4ed8" /> Art. 17 DSGVO Auto-Löschkonzept (DIN 66398)
                     </h4>
                     <p style={{ margin: 0, fontSize: '0.8rem', color: '#475569', lineHeight: 1.55 }}>
-                      Wenn ein Schüler länger als 2 Monate inaktiv ist, wird das Profil automatisch wieder inaktiviert. Nach Ausscheiden erfolgt die vollständige Löschung nach Ablauf der Fristen.
+                      Nach 60 Tagen Inaktivität schaltet die Plattform Profile fair-play-konform auf Basis-Bereitstellung (0,09 €) um (Kostenschutz). Meisterwerke bleiben als Bildungsbiografie für die gesamte Vertragslaufzeit erhalten. Physische Datenlöschung erfolgt 30 Tage nach Exmatrikulation.
                     </p>
                     <span style={{ fontSize: '0.74rem', color: '#047857', fontWeight: 800, marginTop: 'auto' }}>
-                      ✓ Auto-Purge Bot Aktiv
+                      ✓ DIN 66398 Auto-Purge Janitor Aktiv
                     </span>
                   </div>
                 </div>
@@ -853,7 +854,12 @@ export function DpoAuditPortal({ onClose, schoolName = 'Stadtmusikschule', schoo
                 </div>
 
                 <button
-                  onClick={() => window.print()}
+                  onClick={() => generateDpoComplianceDossierPDF({
+                    schoolName: cleanSchoolName,
+                    schoolAddress,
+                    schoolSigneeName,
+                    schoolId: school?.id
+                  })}
                   style={{
                     background: '#0f172a',
                     color: '#ffffff',
@@ -871,7 +877,7 @@ export function DpoAuditPortal({ onClose, schoolName = 'Stadtmusikschule', schoo
                   }}
                   className="hover-scale no-print"
                 >
-                  <Printer size={16} /> DSB-Dossier drucken / PDF
+                  <Download size={16} /> Offizielles DSB-Dossier (PDF)
                 </button>
               </div>
 
@@ -1012,10 +1018,11 @@ export function DpoAuditPortal({ onClose, schoolName = 'Stadtmusikschule', schoo
 
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px' }}>
                     {[
-                      { lk: 'LK 1: Session & Cache', frist: 'Sofort / Session-Ende', desc: 'JWE-Cookies verfallen nach Inaktivität; RAM-Zeroization beim Logout.' },
-                      { lk: 'LK 2: Audio-Aufnahmen', frist: 'Sofort bei Nutzeraktion', desc: 'Physische Löschung aus dem Cloud-Storage ohne Zwischenspeicherung.' },
-                      { lk: 'LK 3: Schüler-Profile', frist: '60 Tage Inaktivität / 30 Tage Exmatrikulation', desc: 'Automatischer Inaktivitäts-Stopp; vollständige Löschung nach Schuljahresende.' },
-                      { lk: 'LK 4: Rechnungsbelege (B2B)', frist: '10 Jahre (§ 147 AO)', desc: 'Gilt ausschließlich für Sammelrechnungen der Musikschule (keine Schülerdaten).' }
+                      { lk: 'LK 1: Session & Temporärdaten', frist: 'Sofort / Session-Ende', desc: 'Sichere JWE-Cookies verfallen; vollständige RAM-Zeroization beim Beenden der Browsersitzung.' },
+                      { lk: 'LK 2: Didaktische Audio-Dateien', frist: 'Laufendes Schuljahr (bis 31.08.)', desc: 'Hausaufgaben- & Loop-Audios bleiben das gesamte Schuljahr erhalten (inkl. MP3-Jahres-Export); sofort bei Nutzerlöschung.' },
+                      { lk: 'LK 3: Abrechnungsstatus (Fair-Play)', frist: '60 Tage Inaktivität', desc: 'Automatischer Sparmodus-Wechsel auf Basis-Bereitstellung (0,09 €). Kein Datenverlust: QR-Landingpage & Stundenplan bleiben 100% aktiv.' },
+                      { lk: 'LK 4: Bildungsbiografie & Meisterwerke', frist: 'Dauer des Ausbildungsverhältnisses', desc: 'Mehrjährige Speicherung gemeisterter Stücke & Jahres-Badges (reine Metadaten gem. Art. 6 Abs. 1 lit. b DSGVO); Löschung 30 Tage nach Exmatrikulation.' },
+                      { lk: 'LK 5: Rechnungsbelege (B2B)', frist: '10 Jahre (§ 147 AO)', desc: 'Gilt ausschließlich für Sammelrechnungen der Musikschule (strikt getrennt, 0% Schüler-Klarnamen auf Belegen).' }
                     ].map((item, i) => (
                       <div key={i} style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '14px', padding: '14px' }}>
                         <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#0f172a' }}>{item.lk}</div>
@@ -1064,6 +1071,39 @@ export function DpoAuditPortal({ onClose, schoolName = 'Stadtmusikschule', schoo
                         Campus-Groovelab unterliegt keinem Zugriff durch außereuropäische Behörden (kein US-CLOUD-Act, kein FISA 702). Die Plattform wird ausschließlich von einem deutschen Einzelunternehmen betrieben und in nach ISO 27001 auditierten Rechenzentren der Hetzner Online GmbH in Deutschland gehostet.
                       </p>
                     </div>
+                  </div>
+                </div>
+
+                {/* 5. Personalrats- & Mitbestimmungs-Dossier (§ 87 BetrVG / LPersVG) */}
+                <div style={{
+                  background: '#ffffff',
+                  border: '1px solid rgba(226, 232, 240, 0.8)',
+                  borderRadius: '24px',
+                  padding: '28px',
+                  boxShadow: '0 8px 24px rgba(15, 23, 42, 0.03)'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+                    <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#ecfdf5', color: '#059669', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <FileCheck size={20} />
+                    </div>
+                    <div>
+                      <h4 style={{ margin: 0, fontSize: '1.02rem', fontWeight: 900, color: '#0f172a' }}>
+                        5. Personalrats- &amp; Mitbestimmungs-Freigabeerklärung (§ 87 BetrVG / LPersVG)
+                      </h4>
+                      <span style={{ fontSize: '0.74rem', color: '#64748b' }}>Negativattest zur Vorlage beim Betriebs- bzw. Personalrat kommunaler Träger</span>
+                    </div>
+                  </div>
+
+                  <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '18px', fontSize: '0.78rem', lineHeight: 1.6, color: '#334155' }}>
+                    <strong style={{ color: '#0f172a', display: 'block', marginBottom: '8px' }}>
+                      Rechtliche Bestätigung zur Mitbestimmungsfreiheit didaktischer Werkzeuge:
+                    </strong>
+                    <ul style={{ margin: 0, paddingLeft: '20px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <li><strong>Keine Verhaltens- und Leistungskontrolle (§ 87 Abs. 1 Nr. 6 BetrVG / § 75 BPersVG):</strong> Es findet keine Auswertung, Messung oder Aggregation von Klickzahlen, Online-Zeiten, Reaktionsgeschwindigkeiten im Chat oder Erledigungsfristen für Lehrkräfte statt.</li>
+                      <li><strong>Keine Arbeitszeiterfassung (ArbZG-Abgrenzung):</strong> Die Plattform fungiert als reines didaktisches Dispositionsmittel („Kreidetafel-Doktrin“). Sie enthält keine Stempeluhr und erfasst keine Arbeitszeiten der Lehrkräfte.</li>
+                      <li><strong>Herrenberg-Autonomie (BSG B 12 R 3/20 R):</strong> Raum- und Terminzuweisungen stellen unverbindliche didaktische Abstimmungsvorschläge dar; es erfolgt keine arbeitgeberseitige Weisung oder Direktion.</li>
+                      <li><strong>Recht auf Nichterreichbarkeit (§ 5 ArbSchG):</strong> Mitteilungen sind asynchron. Lehrkräfte sind nicht verpflichtet, außerhalb des Fachunterrichts Nachrichten abzurufen.</li>
+                    </ul>
                   </div>
                 </div>
 
@@ -1215,13 +1255,13 @@ export function DpoAuditPortal({ onClose, schoolName = 'Stadtmusikschule', schoo
                 </div>
 
                 <div>
-                  <h4 style={{ margin: '0 0 4px 0', fontSize: '0.9rem', fontWeight: 900, color: '#0f172a' }}>§ 5 Unterstützungspflichten &amp; Meldung von Datenschutzverletzungen</h4>
-                  <p style={{ margin: 0 }}>Der Auftragnehmer unterstützt den Auftraggeber bei der Erfüllung von Betroffenenrechten (Art. 15–22 DSGVO) sowie bei der Einhaltung der Pflichten nach Art. 32 bis 36 DSGVO. Verletzungen des Schutzes personenbezogener Daten werden dem Auftraggeber unverzüglich gemeldet (Art. 33 DSGVO).</p>
+                  <h4 style={{ margin: '0 0 4px 0', fontSize: '0.9rem', fontWeight: 900, color: '#0f172a' }}>§ 5 Unterstützungspflichten &amp; 24h-Meldung von Datenschutzverletzungen (Art. 33 DSGVO)</h4>
+                  <p style={{ margin: 0 }}>Der Auftragnehmer unterstützt den Auftraggeber bei der Erfüllung von Betroffenenrechten (Art. 15–22 DSGVO) sowie bei der Einhaltung der Pflichten nach Art. 32 bis 36 DSGVO. Verletzungen des Schutzes personenbezogener Daten werden dem Auftraggeber unverzüglich, spätestens binnen <strong>24 bis 48 Stunden</strong> nach Bekanntwerden gemeldet, um die 72-Stunden-Meldepflicht nach Art. 33 DSGVO zu wahren.</p>
                 </div>
 
                 <div>
-                  <h4 style={{ margin: '0 0 4px 0', fontSize: '0.9rem', fontWeight: 900, color: '#0f172a' }}>§ 6 Beendigung, Datenlöschung &amp; Kontrollrechte (Art. 17 &amp; Art. 28 Abs. 3 lit. g, h DSGVO)</h4>
-                  <p style={{ margin: 0 }}>Nach Beendigung der Leistung oder nach Aufforderung löscht oder ruft der Auftragnehmer alle im Auftrag verarbeiteten Daten vollständig und datenschutzkonform ab. Dem Auftraggeber werden die erforderlichen Informationen zum Nachweis der Einhaltung dieser Vereinbarung sowie für Überprüfungen (Audits) bereitgestellt.</p>
+                  <h4 style={{ margin: '0 0 4px 0', fontSize: '0.9rem', fontWeight: 900, color: '#0f172a' }}>§ 6 Beendigung, Datenlöschung &amp; Kontrollrechte kommunaler Träger (Art. 17 &amp; Art. 28 Abs. 3 lit. g, h DSGVO)</h4>
+                  <p style={{ margin: 0 }}>Nach Beendigung der Leistung oder nach Aufforderung löscht oder ruft der Auftragnehmer alle im Auftrag verarbeiteten Daten vollständig und datenschutzkonform ab. Der Auftraggeber – einschließlich städtischer Datenschutzbeauftragter kommunaler Träger – hat das Recht, sich durch Nachweise, Audit-Berichte und im begründeten Einzelfall durch Vor-Ort-Inspektionen (mit 14 Werktagen Vorankündigung) von der Einhaltung der TOMs zu überzeugen.</p>
                 </div>
               </div>
 

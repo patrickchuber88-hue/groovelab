@@ -3769,6 +3769,17 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
   });
 
   useEffect(() => {
+    // Zero-Trust: Purge stale master admin and workspace bypass state when viewing LoginScreen
+    try {
+      sessionStorage.removeItem('groovelab_is_master_admin');
+      localStorage.removeItem('groovelab_is_master_admin');
+      sessionStorage.removeItem('groovelab_active_workspace');
+      localStorage.removeItem('groovelab_active_workspace');
+      sessionStorage.removeItem('groovelab_support_ghost');
+    } catch (e) {}
+  }, []);
+
+  useEffect(() => {
     if (!isLocalhost) return;
 
     const loadSchoolUsers = async () => {
@@ -7045,6 +7056,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 sessionStorage.setItem('groovelab_is_master_admin', 'true');
                 sessionStorage.setItem('groovelab_active_workspace', 'master_admin');
                 sessionStorage.setItem('groovelab_active_platform', 'campus');
+                sessionStorage.setItem('campus_active_tab', 'briefing');
                 sessionStorage.setItem('groovelab_user_id', targetId);
                 localStorage.setItem('groovelab_is_master_admin', 'true');
                 localStorage.setItem('groovelab_active_workspace', 'master_admin');
@@ -7091,14 +7103,16 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                   role: 'admin',
                   school_id: '53e83805-1d5a-4ed8-988e-1fb0b8200b9c'
                 };
-                console.log('[Bypass] Logging in as Verwaltung:', targetUser.name);
+                console.log('[Bypass] Logging in as Verwaltung / Schulleitung:', targetUser.name);
                 await registerClientSessionLease({ id: targetUser.id, role: targetUser.role }, targetUser.school_id || '53e83805-1d5a-4ed8-988e-1fb0b8200b9c').catch(() => {});
                 sessionStorage.removeItem('groovelab_is_master_admin');
                 localStorage.removeItem('groovelab_is_master_admin');
                 sessionStorage.removeItem('groovelab_support_ghost');
-                sessionStorage.setItem('groovelab_active_workspace', targetUser.role === 'secretary' ? 'secretary' : 'admin');
+                sessionStorage.setItem('groovelab_active_workspace', 'secretary');
+                localStorage.setItem('groovelab_active_workspace', 'secretary');
                 sessionStorage.setItem('groovelab_active_platform', 'campus');
                 sessionStorage.setItem('campus_active_tab', 'briefing');
+                sessionStorage.setItem('groovelab_secretary_subtab', 'briefing');
                 sessionStorage.setItem('groovelab_user_id', targetUser.id);
                 sessionStorage.removeItem('groovelab_qr_token');
                 localStorage.removeItem('groovelab_last_qr_token');
@@ -7147,6 +7161,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 localStorage.removeItem('groovelab_is_master_admin');
                 sessionStorage.removeItem('groovelab_support_ghost');
                 sessionStorage.setItem('groovelab_active_workspace', 'teacher');
+                localStorage.setItem('groovelab_active_workspace', 'teacher');
                 sessionStorage.setItem('groovelab_active_platform', 'campus');
                 sessionStorage.setItem('campus_active_tab', 'briefing');
                 sessionStorage.setItem('groovelab_user_id', targetUser.id);
@@ -7197,6 +7212,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 localStorage.removeItem('groovelab_is_master_admin');
                 sessionStorage.removeItem('groovelab_support_ghost');
                 sessionStorage.setItem('groovelab_active_workspace', 'student');
+                localStorage.setItem('groovelab_active_workspace', 'student');
                 sessionStorage.setItem('groovelab_active_platform', 'campus');
                 sessionStorage.setItem('campus_active_tab', 'briefing');
                 sessionStorage.setItem('groovelab_active_tab', 'briefing');

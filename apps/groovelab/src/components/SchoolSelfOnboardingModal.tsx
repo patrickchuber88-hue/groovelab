@@ -10,6 +10,7 @@ import {
 import { isWebAuthnSupported, registerUserBiometrics } from '../utils/webauthn';
 import { inlineAllImagesInElement } from './IDBadgeCard';
 import { LegalTextModal } from './LegalTextModal';
+import { AVVModal } from './AVVModal';
 import { LEGAL_MASTER_WORDING } from '../constants/legalMasterWording';
 import { isSubdomainReserved } from '../constants/reservedSubdomains';
 import { sanitizeSchoolName, sanitizeAddress, sanitizePersonName } from '../utils/inputSanitizer';
@@ -29,6 +30,7 @@ export const SchoolSelfOnboardingModal: React.FC<SchoolSelfOnboardingModalProps>
   const [copiedPin, setCopiedPin] = useState<boolean>(false);
   const [copiedLink, setCopiedLink] = useState<boolean>(false);
   const [showLegalModal, setShowLegalModal] = useState<boolean>(false);
+  const [showAvvModal, setShowAvvModal] = useState<boolean>(false);
   const [legalModalTab, setLegalModalTab] = useState<'terms' | 'privacy' | 'impressum' | 'cancellation'>('terms');
 
   // Step 1: Ultra-Lean Core Fields & DACH Country
@@ -716,12 +718,11 @@ export const SchoolSelfOnboardingModal: React.FC<SchoolSelfOnboardingModalProps>
                 sowie die{' '}
                 <span
                   onClick={() => {
-                    setLegalModalTab('terms');
-                    setShowLegalModal(true);
+                    setShowAvvModal(true);
                   }}
                   style={{ color: '#15803d', textDecoration: 'underline', cursor: 'pointer', fontWeight: 750 }}
                 >
-                  Vereinbarung zur Auftragsverarbeitung (AVV nach Art. 28 DSGVO)
+                  Vereinbarung zur Auftragsverarbeitung (AVV nach Art. 28 DSGVO / Art. 9 nDSG)
                 </span>.
               </div>
             </form>
@@ -959,11 +960,22 @@ export const SchoolSelfOnboardingModal: React.FC<SchoolSelfOnboardingModalProps>
         </div>
       </div>
 
-      {/* Embedded Legal Modal (AGB & AVV) */}
+      {/* Embedded Legal Modal (AGB & DSE) */}
       <LegalTextModal
         isOpen={showLegalModal}
         onClose={() => setShowLegalModal(false)}
         initialTab={legalModalTab}
+      />
+
+      {/* Dedicated AVV Modal (Art. 28 DSGVO / Art. 9 nDSG) */}
+      <AVVModal
+        isOpen={showAvvModal}
+        onClose={() => setShowAvvModal(false)}
+        school={{
+          name: schoolName.trim() || 'Musikschule / Bildungseinrichtung',
+          address: street && city ? `${street} ${houseNumber}, ${cleanZip} ${city}` : undefined,
+          avv_signee_name: firstName && lastName ? `${firstName} ${lastName}` : undefined
+        }}
       />
     </div>
   );

@@ -62,7 +62,10 @@ export const LEGAL_MASTER_WORDING = {
     b2bContractNature: 'Software-as-a-Service (SaaS)-Mietvertrag gemäß § 535 ff. BGB (DE) / §§ 1090 ff. ABGB (AT) / Art. 253 ff. OR (CH) über schlüsselfertige Cloud-Infrastruktur.',
     pedagogicalAddonDisclaimer: 'Campus-Groovelab ist ein didaktisches Zusatzwerkzeug zur Unterstützung des Fachunterrichts und häuslichen Übens. Die Plattform ersetzt kein amtliches Schulverwaltungssystem.',
     emergencyFallbackDisclaimer: 'Bei technischen Störungen oder Ausfällen läuft der Schulbetrieb uneingeschränkt über herkömmliche Wege (Telefon, E-Mail) weiter (Ausschluss von Unterrichtsausfall-Haftung).',
-    kleinunternehmerUStG19: 'In DE gemäß § 19 UStG bzw. in AT gemäß § 6 Abs. 1 Z 27 UStG 1994 umsatzsteuerbefreit (Kleinunternehmerregelung). In der Schweiz gilt Leistungsort Schweiz (nicht im Inland steuerbar gem. Art. 8 Abs. 1 MWSTG).'
+    kleinunternehmerUStG19: 'In DE gemäß § 19 UStG bzw. in AT gemäß § 6 Abs. 1 Z 27 UStG 1994 umsatzsteuerbefreit (Kleinunternehmerregelung). In der Schweiz gilt Leistungsort Schweiz (nicht im Inland steuerbar gem. Art. 8 Abs. 1 MWSTG).',
+    screenlessPractice: 'Didaktisches Prinzip des bildschirmfreien Übens (Screenless Practice): Im Modus „Von Eltern geführt“ verbleibt das Endgerät bei den Erziehungsberechtigten. Übezeiten am akustischen Instrument werden per 1-Klick-Quittierung verbucht, um Kinder (insbesondere 6–9 Jahre) vor verfrühter Bildschirmzeit zu schützen (einheitliche elterliche Freigabe bis 16 Jahre in DE, AT und CH).',
+    herrenbergCompliance: 'Autonomie von Honorarlehrkräften (BSG B 12 R 3/20 R): Stundenplan- und Raumfunktionen stellen unverbindliche Dispositionsvorschläge dar. Die Plattform übt keine Weisungs- oder Kontrollfunktion aus, führt keine automatisierte Leistungs- oder Verhaltenskontrolle (§ 87 BetrVG / BPersVG) durch und wahrt das Recht auf Nichterreichbarkeit (§ 5 ArbSchG).',
+    pureMetadataDoctrine: 'Reine Metadaten-Architektur, Verwertungsgesellschaften-Klarstellung & Notice-and-Takedown (§ 60a UrhG DE / § 42f UrhG AT / Art. 19 URG CH / Art. 6 & 16 DSA): Die Plattform speichert und hostet keine geschützten Noten-PDFs oder Notensätze, sondern verarbeitet ausschließlich freie bibliografische Metadaten sowie lizenzierte Links zu externen Medien- (Spotify, YouTube) und autorisierten Notenpartnern (Tomplay). Keine eigene Vergütungspflicht gegenüber GEMA, AKM oder SUISA.'
   },
 
   // 5. Tier-1 Enterprise+ Sicherheits- & Kryptographie-Standards (Banking Goldstandard)
@@ -81,5 +84,15 @@ export const LEGAL_MASTER_WORDING = {
     voiceBiometricsExclusion: 'Reines didaktisches Audio-Streaming ohne biometrische Stimm-, Sprecher- oder Verhaltensmusteranalysen (Art. 9 DSGVO / Art. 6 nDSG).',
     hostingInfrastructure: 'Ausschließliches Hosting in ISO 27001-zertifizierten deutschen Rechenzentren (Hetzner Online GmbH, Falkenstein/Vogtland & Nürnberg, Deutschland) mit stündlichen verschlüsselten Backups.',
     indexedDbAudioVault: 'Lokaler IndexedDB Audio-Tresor (groovelab_audio_vault) für 0ms Offline-Playback und bandbreitenfreie Proberaumnutzung.'
+  },
+
+  // 6. DIN 66398 Löschkonzept & 2-Stufen-Statusarchitektur
+  din66398Retention: {
+    title: 'Kommunales Löschkonzept nach DIN 66398 & Art. 17 DSGVO',
+    stage1Active: 'Aktiv (0,49 € / Mo.): Vollständiges Schüler-Dashboard, Fokus-Timer, Meisterwerk-Protokoll, Audio-Loopstation & Schulkommunikation.',
+    stage2Passive: 'Passiv / Basis-Bereitstellung (0,09 € / Mo.): Minimaler Zugriff auf Stundenplan, Raumzuweisung und QR-Landingpage. Identität & Daten bleiben 100% erhalten.',
+    fairPlayInactivityRule: 'Bei mehr als 60 Tagen Inaktivität ohne Login wird das Profil fair-play-konform auf Basis-Bereitstellung (0,09 €) umgestellt (automatischer Kostenschutz für Musikschulen).',
+    educationalPortfolioRule: 'Didaktische Bildungsbiografie & Meisterwerk-Dokumentation (reine Metadaten gem. Art. 6 Abs. 1 lit. b DSGVO) bleiben über Schuljahre hinweg (mehrjährig) kumulativ erhalten. Physische Datenlöschung erfolgt erst 30 Tage nach formeller Exmatrikulation.',
+    audioSchoolYearRetention: 'Didaktische Audio-Aufnahmen (Hausaufgaben & Loopstation) bleiben das gesamte Schuljahr (bis 31.08.) erhalten und können vor dem jährlichen Speicher-Janitor als MP3/ZIP exportiert werden.'
   }
 } as const;

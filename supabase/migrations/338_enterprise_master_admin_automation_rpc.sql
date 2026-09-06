@@ -25,18 +25,20 @@ BEGIN
     END IF;
 
     -- Update inactive student records (inactive for more than 60 days)
+    -- Crucial: is_active stays TRUE so authentication via Ausweis-PIN/QR-Token is NOT broken!
     WITH updated_rows AS (
         UPDATE public.users_raw
         SET is_campus_active = FALSE,
-            is_groovelab_active = FALSE,
-            is_active = FALSE
+            is_groovelab_active = FALSE
         WHERE role = 'student'
           AND (
               last_seen < NOW() - INTERVAL '60 days'
               OR (last_seen IS NULL AND created_at < NOW() - INTERVAL '60 days')
           )
-          AND (is_campus_active = TRUE OR is_groovelab_active = TRUE OR is_active = TRUE)
+          AND (is_campus_active = TRUE OR is_groovelab_active = TRUE)
           AND (p_school_id IS NULL OR school_id = p_school_id)
+          AND COALESCE(student_billing_payment_method, '') NOT IN ('annual', 'bank_transfer_annual', 'schuljahr_komplett', 'school_annual')
+          AND COALESCE(exempt_from_direct_billing, FALSE) = FALSE
         RETURNING id
     )
     SELECT COUNT(*) INTO v_count FROM updated_rows;

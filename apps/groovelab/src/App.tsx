@@ -892,18 +892,61 @@ function GroupedSongCard({ songGroup, onUpdateProgress, onSubmitForApproval, isB
                   </div>
                 </div>
 
-                {/* Cloud Link Buttons */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  {songGroup.guitar_pro_url && (
+                {/* Media & Tomplay Links */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  {songGroup.media_link && (
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        window.open(songGroup.guitar_pro_url, '_blank');
+                        window.open(songGroup.media_link, '_blank', 'noopener,noreferrer');
                       }}
-                      className="cloud-link-btn gp-btn"
+                      className="cloud-link-btn"
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '8px 14px',
+                        borderRadius: '12px',
+                        background: '#f1f5f9',
+                        color: '#0f172a',
+                        border: '1px solid #e2e8f0',
+                        fontSize: '0.82rem',
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                        transition: 'all 0.2s'
+                      }}
+                      title="Externer Streaming-Dienst (Spotify / YouTube)"
                     >
-                      <Music size={15} className="icon-main" style={{ strokeWidth: 2.5 }} />
-                      GP
+                      <Play size={14} style={{ fill: '#0f172a' }} />
+                      <span>Song anhören</span>
+                      <ExternalLink size={12} style={{ opacity: 0.6 }} />
+                    </button>
+                  )}
+                  {songGroup.tomplay_url && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        window.open(songGroup.tomplay_url, '_blank', 'noopener,noreferrer');
+                      }}
+                      className="cloud-link-btn"
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '8px 14px',
+                        borderRadius: '12px',
+                        background: '#eff6ff',
+                        color: '#2563eb',
+                        border: '1px solid #bfdbfe',
+                        fontSize: '0.82rem',
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                        transition: 'all 0.2s'
+                      }}
+                      title="Tomplay (Interaktive Noten)"
+                    >
+                      <Music size={14} style={{ strokeWidth: 2.5 }} />
+                      <span>Tomplay Noten</span>
                       <ExternalLink size={12} style={{ opacity: 0.6 }} />
                     </button>
                   )}
@@ -1652,104 +1695,6 @@ function App() {
     enabled: Boolean(currentView === 'dashboard')
   });
 
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const handleMouseOver = (e: MouseEvent) => {
-      let target = e.target as HTMLElement | null;
-      while (target && target !== document.body) {
-        const tagName = target.tagName?.toLowerCase();
-        const isButton = tagName === 'button' || target.getAttribute('role') === 'button' || target.style.cursor === 'pointer' || tagName === 'a';
-        if (isButton && !target.hasAttribute('title')) {
-          const text = target.innerText?.trim();
-          const ariaLabel = target.getAttribute('aria-label');
-          const desc = ariaLabel || text;
-
-          let tooltip = '';
-          if (desc) {
-            const descLower = desc.toLowerCase();
-            if (descLower.includes('speichern') || descLower.includes('save')) {
-              tooltip = 'Änderungen speichern und sichern';
-            } else if (descLower.includes('abbrechen') || descLower.includes('cancel')) {
-              tooltip = 'Vorgang abbrechen und Änderungen verwerfen';
-            } else if (descLower.includes('schließen') || descLower.includes('close') || descLower === 'x') {
-              tooltip = 'Dieses Fenster schließen';
-            } else if (descLower.includes('löschen') || descLower.includes('delete') || descLower.includes('entfernen')) {
-              tooltip = 'Diesen Eintrag unwiderruflich löschen';
-            } else if (descLower.includes('bearbeiten') || descLower.includes('edit')) {
-              tooltip = 'Diesen Eintrag bearbeiten';
-            } else if (descLower.includes('hinzufügen') || descLower.includes('neu') || descLower === '+') {
-              tooltip = 'Einen neuen Eintrag hinzufügen';
-            } else if (descLower.includes('abmelden') || descLower.includes('logout') || descLower.includes('ausloggen')) {
-              tooltip = 'Sicher vom System abmelden';
-            } else if (descLower.includes('profil')) {
-              tooltip = 'Benutzerprofil anzeigen und bearbeiten';
-            } else if (descLower.includes('einstellungen') || descLower.includes('settings')) {
-              tooltip = 'Systemeinstellungen öffnen';
-            } else if (descLower.includes('aktualisieren') || descLower.includes('refresh') || descLower.includes('neu laden')) {
-              tooltip = 'Daten neu laden und aktualisieren';
-            } else if (descLower.includes('suchen') || descLower.includes('search')) {
-              tooltip = 'Suche ausführen';
-            } else if (descLower.includes('stundenplan einreichen') || descLower.includes('einreichen')) {
-              tooltip = 'Diesen Stundenplan offiziell zur Prüfung einreichen';
-            } else if (descLower.includes('abwesend') || descLower.includes('ausfall') || descLower.includes('terminabsage') || descLower.includes('krankmelden') || descLower.includes('krank')) {
-              tooltip = 'Termine für den Abwesenheitszeitraum absagen';
-            } else if (descLower.includes('raumzuteilung') || descLower.includes('räume zuteilen')) {
-              tooltip = 'Räume für die heutigen Termine zuteilen';
-            } else if (descLower.includes('zurück')) {
-              tooltip = 'Zur vorherigen Ansicht zurückkehren';
-            } else if (descLower.includes('weiter')) {
-              tooltip = 'Zur nächsten Ansicht fortfahren';
-            } else if (descLower.includes('senden') || descLower.includes('abschicken')) {
-              tooltip = 'Nachricht oder Daten absenden';
-            } else if (descLower.includes('chat') || descLower.includes('nachricht')) {
-              tooltip = 'Chat-Nachrichten anzeigen';
-            } else if (descLower.includes('bestätigen') || descLower.includes('freigeben') || descLower.includes('akzeptieren')) {
-              tooltip = 'Aktion bestätigen und freigeben';
-            }
-          }
-
-          if (!tooltip) {
-            const svg = target.querySelector('svg');
-            if (svg) {
-              if (svg.classList.contains('lucide-trash') || svg.classList.contains('lucide-trash2')) {
-                tooltip = 'Diesen Eintrag löschen';
-              } else if (svg.classList.contains('lucide-pencil') || svg.classList.contains('lucide-edit')) {
-                tooltip = 'Diesen Eintrag bearbeiten';
-              } else if (svg.classList.contains('lucide-plus') || svg.classList.contains('lucide-plus-circle')) {
-                tooltip = 'Einen neuen Eintrag hinzufügen';
-              } else if (svg.classList.contains('lucide-x') || svg.classList.contains('lucide-x-circle')) {
-                tooltip = 'Schließen';
-              } else if (svg.classList.contains('lucide-settings')) {
-                tooltip = 'Einstellungen öffnen';
-              } else if (svg.classList.contains('lucide-chevron-left')) {
-                tooltip = 'Zurück / Vorherige Seite';
-              } else if (svg.classList.contains('lucide-chevron-right')) {
-                tooltip = 'Weiter / Nächste Seite';
-              } else if (svg.classList.contains('lucide-calendar')) {
-                tooltip = 'Kalender öffnen';
-              } else if (svg.classList.contains('lucide-user')) {
-                tooltip = 'Profil anzeigen';
-              } else if (svg.classList.contains('lucide-logout')) {
-                tooltip = 'Abmelden';
-              }
-            }
-          }
-
-          if (!tooltip && desc && desc.length < 50) {
-            tooltip = `${desc} ausführen`;
-          }
-
-          if (tooltip) {
-            target.setAttribute('title', tooltip);
-          }
-        }
-        target = target.parentElement;
-      }
-    };
-
-    document.body.addEventListener('mouseover', handleMouseOver);
-    return () => document.body.removeEventListener('mouseover', handleMouseOver);
-  }, []);
 
   const qrPathMatch = location.pathname.match(/^\/qr\/([^/?#]+)/);
 
@@ -4151,12 +4096,22 @@ function App() {
       }
 
       if (isInitial) {
-        const isMasterSessionFlag = typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_is_master_admin') === 'true' || localStorage.getItem('groovelab_is_master_admin') === 'true') : false;
-        const isMasterWorkspace = typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_active_workspace') === 'master_admin' || localStorage.getItem('groovelab_active_workspace') === 'master_admin') : false;
-        const isMasterAdmin = Boolean(userData.is_master_admin === true && (isMasterSessionFlag || isMasterWorkspace));
+        const activeWs = typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_active_workspace') || localStorage.getItem('groovelab_active_workspace')) : null;
+        const isMasterSessionFlag = typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_is_master_admin') === 'true') : false;
+        const isMasterWorkspace = activeWs === 'master_admin';
+        
+        // Zero-Trust Master Admin Guard:
+        // A user (e.g. Severin L.) can be both is_master_admin: true AND school admin (role: 'admin').
+        // Master Admin Leitstand must ONLY be activated if explicitly selected via workspace 'master_admin'
+        // and session flag, and never when a school workspace ('secretary', 'admin', 'teacher', 'student') is active.
+        const isMasterAdmin = Boolean(
+          userData.is_master_admin === true &&
+          isMasterWorkspace &&
+          isMasterSessionFlag
+        );
 
         const isTeacher = userData.role?.toLowerCase() === 'teacher';
-        const isSecretary = userData.role?.toLowerCase() === 'secretary';
+        const isSecretary = userData.role?.toLowerCase() === 'secretary' || userData.role?.toLowerCase() === 'admin';
 
         if (isMasterAdmin) {
           sessionStorage.setItem('groovelab_is_master_admin', 'true');
@@ -4166,6 +4121,10 @@ function App() {
           sessionStorage.setItem('groovelab_active_platform', 'campus');
           setActivePlatform('campus');
         } else if (isStudent) {
+          sessionStorage.removeItem('groovelab_is_master_admin');
+          localStorage.removeItem('groovelab_is_master_admin');
+          sessionStorage.setItem('groovelab_active_workspace', 'student');
+          localStorage.setItem('groovelab_active_workspace', 'student');
           const startPlat = allowedPlatform;
           setActivePlatform(startPlat);
           sessionStorage.setItem('groovelab_active_platform', startPlat);
@@ -4177,6 +4136,10 @@ function App() {
           setActiveStudentTab(startTab);
           sessionStorage.setItem(storageKey, startTab);
         } else if (isTeacher) {
+          sessionStorage.removeItem('groovelab_is_master_admin');
+          localStorage.removeItem('groovelab_is_master_admin');
+          sessionStorage.setItem('groovelab_active_workspace', 'teacher');
+          localStorage.setItem('groovelab_active_workspace', 'teacher');
           const startPlat = allowedPlatform;
           setActivePlatform(startPlat);
           sessionStorage.setItem('groovelab_active_platform', startPlat);
@@ -4188,10 +4151,13 @@ function App() {
           setActiveStudentTab(startTab);
           sessionStorage.setItem(storageKey, startTab);
         } else if (isSecretary) {
+          sessionStorage.removeItem('groovelab_is_master_admin');
+          localStorage.removeItem('groovelab_is_master_admin');
           const startPlat = allowedPlatform;
           setActivePlatform(startPlat);
           sessionStorage.setItem('groovelab_active_platform', startPlat);
           sessionStorage.setItem('groovelab_active_workspace', 'secretary');
+          localStorage.setItem('groovelab_active_workspace', 'secretary');
           
           const storedSubtab = sessionStorage.getItem('groovelab_secretary_subtab');
           sessionStorage.setItem('groovelab_secretary_subtab', storedSubtab || 'briefing');
@@ -4492,10 +4458,6 @@ function App() {
             part_number: p.part_number || 1,
             is_stage_ready: !!p.is_stage_ready, is_favorite: !!p.is_favorite, locked: !p.is_stage_ready,
             is_pending_approval: !!p.is_pending_approval, media_link: song.media_link, tomplay_url: song.tomplay_url, instrumentation: song.instrumentation,
-            pdf_folder_url: song.pdf_folder_url, guitar_pro_url: song.guitar_pro_url,
-            pdf_guitar_url: song.pdf_guitar_url, pdf_bass_url: song.pdf_bass_url,
-            pdf_drums_url: song.pdf_drums_url, pdf_keys_url: song.pdf_keys_url,
-            pdf_vocals_url: song.pdf_vocals_url,
             playalong_url: song.playalong_url
           };
       }).filter(Boolean);
@@ -4526,10 +4488,6 @@ function App() {
               progress: 100, instrument: 'Vocals', difficulty_level: bs.difficulty_level || 'original',
               is_stage_ready: true, is_favorite: false, locked: false, is_pending_approval: false,
               media_link: s.media_link, tomplay_url: s.tomplay_url, instrumentation: s.instrumentation,
-              pdf_folder_url: s.pdf_folder_url, guitar_pro_url: s.guitar_pro_url,
-              pdf_guitar_url: s.pdf_guitar_url, pdf_bass_url: s.pdf_bass_url,
-              pdf_drums_url: s.pdf_drums_url, pdf_keys_url: s.pdf_keys_url,
-              pdf_vocals_url: s.pdf_vocals_url,
               playalong_url: s.playalong_url
             });
             addedSongIds.add(s.id);
@@ -4570,10 +4528,6 @@ function App() {
                 progress: 100, instrument: 'Vocals', difficulty_level: 'original',
                 is_stage_ready: true, is_favorite: false, locked: false, is_pending_approval: false,
                 media_link: bSong.media_link, tomplay_url: bSong.tomplay_url, instrumentation: bSong.instrumentation,
-                pdf_folder_url: bSong.pdf_folder_url, guitar_pro_url: bSong.guitar_pro_url,
-                pdf_guitar_url: bSong.pdf_guitar_url, pdf_bass_url: bSong.pdf_bass_url,
-                pdf_drums_url: bSong.pdf_drums_url, pdf_keys_url: bSong.pdf_keys_url,
-                pdf_vocals_url: bSong.pdf_vocals_url,
                 playalong_url: bSong.playalong_url
               });
             }
@@ -6884,6 +6838,9 @@ function App() {
       sessionStorage.removeItem('campus_active_tab');
       sessionStorage.removeItem('groovelab_active_platform');
       sessionStorage.removeItem('groovelab_active_workspace');
+      localStorage.removeItem('groovelab_active_workspace');
+      sessionStorage.removeItem('groovelab_is_master_admin');
+      localStorage.removeItem('groovelab_is_master_admin');
       sessionStorage.removeItem('groovelab_secretary_subtab');
       sessionStorage.removeItem('gl_active_session_lease_id');
       localStorage.removeItem('gl_active_session_lease_id');
@@ -6922,6 +6879,9 @@ function App() {
     sessionStorage.removeItem('groovelab_active_tab');
     sessionStorage.removeItem('campus_active_tab');
     sessionStorage.removeItem('groovelab_active_workspace');
+    localStorage.removeItem('groovelab_active_workspace');
+    sessionStorage.removeItem('groovelab_is_master_admin');
+    localStorage.removeItem('groovelab_is_master_admin');
     sessionStorage.removeItem('groovelab_secretary_subtab');
     sessionStorage.removeItem('gl_active_session_lease_id');
     localStorage.removeItem('gl_active_session_lease_id');
@@ -6962,28 +6922,32 @@ function App() {
       }
     }
 
-    const existingWorkspace = typeof window !== 'undefined' ? sessionStorage.getItem('groovelab_active_workspace') : null;
+    const existingWorkspace = typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_active_workspace') || localStorage.getItem('groovelab_active_workspace')) : null;
     const currentRole = userToLogin?.role?.toLowerCase() || 'teacher';
     const isMasterAdmin = Boolean(
       (userToLogin?.is_master_admin === true) &&
-      (sessionStorage.getItem('groovelab_is_master_admin') === 'true' || existingWorkspace === 'master_admin')
+      (sessionStorage.getItem('groovelab_is_master_admin') === 'true') &&
+      (existingWorkspace === 'master_admin')
     );
 
     if (isMasterAdmin) {
       sessionStorage.setItem('groovelab_active_workspace', 'master_admin');
+      localStorage.setItem('groovelab_active_workspace', 'master_admin');
       sessionStorage.setItem('groovelab_is_master_admin', 'true');
+      localStorage.setItem('groovelab_is_master_admin', 'true');
     } else {
       sessionStorage.removeItem('groovelab_is_master_admin');
       localStorage.removeItem('groovelab_is_master_admin');
       if (currentRole === 'admin' || currentRole === 'secretary') {
         sessionStorage.setItem('groovelab_active_workspace', 'secretary');
-        if (currentRole === 'secretary') {
-          sessionStorage.setItem('groovelab_secretary_subtab', 'briefing');
-        }
+        localStorage.setItem('groovelab_active_workspace', 'secretary');
+        sessionStorage.setItem('groovelab_secretary_subtab', 'briefing');
       } else if (currentRole === 'student') {
         sessionStorage.setItem('groovelab_active_workspace', 'student');
+        localStorage.setItem('groovelab_active_workspace', 'student');
       } else {
         sessionStorage.setItem('groovelab_active_workspace', 'teacher');
+        localStorage.setItem('groovelab_active_workspace', 'teacher');
       }
     }
 
@@ -7072,6 +7036,8 @@ function App() {
       localStorage.setItem('groovelab_is_master_admin', 'true');
       sessionStorage.setItem('campus_active_tab', 'briefing');
     } else if (userToLogin?.role === 'student') {
+      sessionStorage.setItem('groovelab_active_workspace', 'student');
+      localStorage.setItem('groovelab_active_workspace', 'student');
       if (selectedPlat === 'groovelab') {
         sessionStorage.setItem('groovelab_active_tab', 'live');
       } else {
@@ -7079,6 +7045,8 @@ function App() {
         sessionStorage.setItem('groovelab_active_tab', 'briefing');
       }
     } else if (userToLogin?.role === 'teacher') {
+      sessionStorage.setItem('groovelab_active_workspace', 'teacher');
+      localStorage.setItem('groovelab_active_workspace', 'teacher');
       if (selectedPlat === 'groovelab') {
         sessionStorage.setItem('groovelab_active_tab', 'live');
       } else {
@@ -7087,6 +7055,7 @@ function App() {
       }
     } else if (userToLogin?.role === 'secretary' || userToLogin?.role === 'admin') {
       sessionStorage.setItem('groovelab_active_workspace', 'secretary');
+      localStorage.setItem('groovelab_active_workspace', 'secretary');
       sessionStorage.setItem('groovelab_secretary_subtab', 'briefing');
       sessionStorage.setItem('campus_active_tab', 'briefing');
     } else {
@@ -7473,10 +7442,10 @@ function App() {
   // 2. Session was explicitly authenticated via Master-Admin login / Leitstand bypass (sessionStorage.getItem('groovelab_is_master_admin') === 'true')
   // 3. Active workspace is 'master_admin' (never 'teacher', 'secretary', 'admin', 'student')
   // 4. User is not in support-ghost session mode
-  const isMasterSessionExplicit = typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_is_master_admin') === 'true' || localStorage.getItem('groovelab_is_master_admin') === 'true') : false;
+  const isMasterSessionExplicit = typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_is_master_admin') === 'true') : false;
   const isMasterAdminSession = Boolean(
     user?.is_master_admin === true &&
-    (currentActiveWorkspace === 'master_admin' || (!currentActiveWorkspace && isMasterSessionExplicit)) &&
+    currentActiveWorkspace === 'master_admin' &&
     isMasterSessionExplicit
   ) && !(isGhostParam && ghostSchoolId);
 
@@ -8076,6 +8045,8 @@ function App() {
         if (typeof window !== 'undefined') {
           sessionStorage.setItem('groovelab_active_workspace', 'teacher');
           localStorage.setItem('groovelab_active_workspace', 'teacher');
+          sessionStorage.removeItem('groovelab_is_master_admin');
+          localStorage.removeItem('groovelab_is_master_admin');
           sessionStorage.setItem('groovelab_active_platform', targetPlatform);
           localStorage.setItem('groovelab_active_platform', targetPlatform);
         }
@@ -8095,6 +8066,8 @@ function App() {
         if (typeof window !== 'undefined') {
           sessionStorage.setItem('groovelab_active_workspace', 'secretary');
           localStorage.setItem('groovelab_active_workspace', 'secretary');
+          sessionStorage.removeItem('groovelab_is_master_admin');
+          localStorage.removeItem('groovelab_is_master_admin');
           sessionStorage.setItem('groovelab_active_platform', 'campus');
           localStorage.setItem('groovelab_active_platform', 'campus');
           sessionStorage.setItem('campus_active_tab', 'briefing');
@@ -8286,13 +8259,6 @@ function App() {
         artist: skill.artist || 'Unbekannter Künstler',
         media_link: skill.media_link,
         tomplay_url: skill.tomplay_url,
-        pdf_folder_url: skill.pdf_folder_url,
-        guitar_pro_url: skill.guitar_pro_url,
-        pdf_guitar_url: skill.pdf_guitar_url,
-        pdf_bass_url: skill.pdf_bass_url,
-        pdf_drums_url: skill.pdf_drums_url,
-        pdf_keys_url: skill.pdf_keys_url,
-        pdf_vocals_url: skill.pdf_vocals_url,
         playalong_url: skill.playalong_url,
         instrumentation: skill.instrumentation,
         isBandReady: wallMatch?.isComplete || false,
@@ -10879,7 +10845,7 @@ function App() {
         {/* Student Campus Dashboard Tabs (Kept mounted for instant platform switching) */}
         {user.role?.toLowerCase() === 'student' && (
           <div style={{ 
-            display: (activePlatform === 'campus' || (activePlatform === 'groovelab' && activeStudentTab !== 'profile')) ? 'block' : 'none',
+            display: ((activePlatform === 'campus' || (activePlatform === 'groovelab' && activeStudentTab !== 'profile')) && activeStudentTab !== 'messages') ? 'block' : 'none',
             width: '100%'
           }}>
             <ErrorBoundary>

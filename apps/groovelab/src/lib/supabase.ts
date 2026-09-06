@@ -55,8 +55,8 @@ const customFetch = async (input: RequestInfo | URL, init?: RequestInit): Promis
     clientInfo += `;session_token=${sessionToken}`;
   }
   
-  let qrToken = sessionStorage.getItem('groovelab_qr_token');
-  if (!qrToken && typeof window !== 'undefined') {
+  let qrToken = typeof window !== 'undefined' ? sessionStorage.getItem('groovelab_qr_token') : null;
+  if (!qrToken && typeof window !== 'undefined' && (window.location.pathname.startsWith('/onboarding') || window.location.pathname.startsWith('/qr'))) {
     const onboardingMatch = window.location.pathname.match(/^\/onboarding\/([^/?#]+)/);
     const qrMatch = window.location.pathname.match(/^\/qr\/([^/?#]+)/);
     if (onboardingMatch) {
@@ -69,8 +69,8 @@ const customFetch = async (input: RequestInfo | URL, init?: RequestInit): Promis
     clientInfo += `;qr_token=${qrToken}`;
   }
 
-  let kioskToken = localStorage.getItem('groovelab_kiosk_token');
-  if (!kioskToken && typeof window !== 'undefined') {
+  let kioskToken = typeof window !== 'undefined' ? localStorage.getItem('groovelab_kiosk_token') : null;
+  if (!kioskToken && typeof window !== 'undefined' && window.location.pathname.startsWith('/device-onboarding')) {
     const deviceMatch = window.location.pathname.match(/^\/device-onboarding\/([^/?#]+)/);
     if (deviceMatch) {
       kioskToken = deviceMatch[1];
@@ -83,7 +83,7 @@ const customFetch = async (input: RequestInfo | URL, init?: RequestInit): Promis
   // Extract invite school id and token from URL params if present
   let inviteSchoolId = null;
   let inviteToken = null;
-  if (typeof window !== 'undefined') {
+  if (typeof window !== 'undefined' && window.location.search && (window.location.search.includes('invite') || window.location.search.includes('token'))) {
     const urlParams = new URLSearchParams(window.location.search);
     inviteSchoolId = urlParams.get('invite_school_id');
     inviteToken = urlParams.get('token');

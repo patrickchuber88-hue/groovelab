@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Eye, Power, GripVertical, Minus, Sparkles, ShieldCheck, Lock, Activity, UserCheck, ChevronDown } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { formatUserDisplayName } from '../../utils/userDisplayName';
 
 interface GhostSupportCapsuleProps {
   schoolName?: string;
@@ -34,7 +35,7 @@ export const GhostSupportCapsule: React.FC<GhostSupportCapsuleProps> = ({
         if (data && data.length > 0) {
           const list = data.map(d => ({
             id: d.id,
-            name: `${d.first_name || ''} ${d.last_name ? (d.role === 'student' ? d.last_name[0] + '.' : d.last_name) : ''}`.trim() || 'Nutzer',
+            name: formatUserDisplayName(d, d.role),
             role: d.role,
             instrument: d.instrument
           }));

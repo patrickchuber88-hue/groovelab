@@ -271,21 +271,26 @@ export const MasterPricingProvider: React.FC<{ children: React.ReactNode }> = ({
   useEffect(() => {
     fetchMasterPricing();
 
-    // Subscribe to realtime changes on master_billing_settings
-    const channel = supabase
-      .channel('public:master_billing_settings')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'master_billing_settings' },
-        () => {
+    // Tier-1 Goldstandard: Zero-WebSocket Stammdaten-Architektur
+    // Horizontale Invalidation per window-Event oder cross-tab Storage-Event, falls im Master Cockpit Tarife gespeichert werden
+    const handlePricingUpdate = () => {
+      fetchMasterPricing();
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('cg_master_pricing_updated', handlePricingUpdate);
+      const handleStorage = (e: StorageEvent) => {
+        if (e.key === 'cg_master_pricing_version') {
           fetchMasterPricing();
         }
-      )
-      .subscribe();
+      };
+      window.addEventListener('storage', handleStorage);
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
+      return () => {
+        window.removeEventListener('cg_master_pricing_updated', handlePricingUpdate);
+        window.removeEventListener('storage', handleStorage);
+      };
+    }
   }, [currency]);
 
   return (

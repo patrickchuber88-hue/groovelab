@@ -104,8 +104,8 @@ export const StudentToolboxModal: React.FC<StudentToolboxModalProps> = ({
                   Live Studio
                 </span>
               </div>
-              <p style={{ margin: 0, fontSize: '0.76rem', color: '#64748b', fontWeight: 600 }}>
-                Rhythmus-Trainer & chromatisches Stimmgerät für dein tägliches Üben
+              <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748b', fontWeight: 650 }}>
+                Wähle dein Tempo und starte den Beat!
               </p>
             </div>
           </div>

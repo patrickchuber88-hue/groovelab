@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, CheckCircle2, ShieldCheck, Download, FileText, Printer } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { generateEnterpriseSecurityWhitepaperPDF } from '../utils/securityWhitepaperGenerator';
+import { generateDpoComplianceDossierPDF } from '../utils/dpoComplianceDossierGenerator';
 
 interface AVVModalProps {
   isOpen: boolean;
@@ -260,6 +261,34 @@ export const AVVModal: React.FC<AVVModalProps> = ({ isOpen, onClose, school, onA
 
             <button
               type="button"
+              onClick={() => generateDpoComplianceDossierPDF({
+                schoolName: school?.name || school?.school_name,
+                schoolAddress: school?.address || school?.city,
+                schoolSigneeName: signeeName || school?.avv_signee_name,
+                schoolId: targetSchoolId
+              })}
+              title="Offizielles Behörden-Datenschutz-Dossier (VVT, DSFA, TOMs) als PDF herunterladen"
+              style={{
+                background: '#ffffff',
+                border: '1px solid #cbd5e1',
+                borderRadius: '10px',
+                padding: '6px 12px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                fontSize: '0.78rem',
+                fontWeight: 800,
+                color: '#0f172a',
+                cursor: 'pointer',
+                transition: 'all 0.15s'
+              }}
+            >
+              <Download size={14} color="#1d4ed8" />
+              Behörden-Dossier (PDF)
+            </button>
+
+            <button
+              type="button"
               onClick={() => window.print()}
               title="Auftragsverarbeitungsvertrag als PDF speichern oder drucken"
               style={{
@@ -340,20 +369,23 @@ export const AVVModal: React.FC<AVVModalProps> = ({ isOpen, onClose, school, onA
           </div>
 
           <h4 style={{ fontSize: '0.88rem', fontWeight: 800, marginTop: '14px', color: '#0f172a' }}>
-            § 1 Gegenstand, Art &amp; Zweck der Verarbeitung (Art. 28 Abs. 3 lit. a DSGVO)
+            § 1 Gegenstand, Art &amp; Zweck der Verarbeitung, Kreidetafel-Doktrin &amp; Reine Metadaten (Art. 28 Abs. 3 lit. a DSGVO)
           </h4>
           <p style={{ margin: '4px 0 12px 0' }}>
-            Der Auftragnehmer erbringt für den Auftraggeber die Bereitstellung der webbasierten SaaS-Schulmanagement- und Übungsplattform <strong>Campus-Groovelab</strong>. Die Verarbeitung personenbezogener Daten erfolgt ausschließlich im Rahmen dieses Vertrags und auf dokumentierte Weisung des Auftraggebers.
+            (1) Der Auftragnehmer erbringt für den Auftraggeber die Bereitstellung der webbasierten SaaS-Schulmanagement- und Übungsplattform <strong>Campus-Groovelab</strong>. Die Verarbeitung personenbezogener Daten erfolgt ausschließlich im Rahmen dieses Vertrags und auf dokumentierte Weisung des Auftraggebers.<br />
+            (2) <strong>Didaktisches Arbeitsmittel („Kreidetafel-Doktrin“) &amp; Ausschluss von Arbeitnehmerkontrolle:</strong> Die Plattform dient als rein didaktisch-organisatorisches Hilfsmittel zur Begleitung des Musikunterrichts. Eine automatisierte Überwachung, Anwesenheitskontrolle oder Leistungs- und Verhaltenskontrolle (§ 87 Abs. 1 Nr. 6 BetrVG / BPersVG) von Lehrkräften oder Honorarkräften findet nicht statt. Raum- und Stundenplanfunktionen stellen unverbindliche didaktische Dispositionsvorschläge dar.<br />
+            (3) <strong>Reine Metadaten-Architektur:</strong> Im Rahmen der Mediathek und Repertoire-Verwaltung werden keinerlei urheberrechtlich geschützte Noten-PDFs oder Notensätze gehostet oder verarbeitet, sondern ausschließlich freie bibliografische Metadaten (Titel, Interpret, Besetzung, Lehrwerk, Seitenzahlen) sowie autorisierte externe Verlinkungen (z. B. Spotify, YouTube, Tomplay).
           </p>
 
           <h4 style={{ fontSize: '0.88rem', fontWeight: 800, marginTop: '14px', color: '#0f172a' }}>
             § 2 Kategorien betroffener Personen &amp; Datenarten (Art. 28 Abs. 3 S. 1 DSGVO)
           </h4>
           <p style={{ margin: '4px 0 6px 0' }}>
-            <strong>1. Kreis der betroffenen Personen:</strong> Schülerinnen und Schüler, Erziehungsberechtigte, Lehrkräfte sowie Verwaltungs- und Schulleitungspersonal des Auftraggebers.
+            <strong>1. Kreis der betroffenen Personen:</strong> Schülerinnen und Schüler (Mindestalter 6 Jahre; bildschirmfreies Üben „Screenless Practice“ für 6–9 Jahre im Elternmodus; einheitliche elterliche Freigabe bis 16 Jahre plattformweit in DE, AT und CH), Erziehungsberechtigte, Lehrkräfte sowie Verwaltungs- und Schulleitungspersonal des Auftraggebers.
           </p>
           <p style={{ margin: '0 0 12px 0' }}>
-            <strong>2. Kategorien personenbezogener Daten:</strong> Schulstammdaten, Benutzernamen (Vorname, Nachname; im regulären Unterrichtsbetrieb standardmäßig pseudonymisiert/maskiert auf Vorname + 1. Buchstabe des Nachnamens), Rollen- und Berechtigungsstufen, Stundenplan-, Raum- und Terminbelegungsdaten sowie freiwillige Übungsaufnahmen. <em>Ausdrücklich ausgeschlossen: Es werden zu keinem Zeitpunkt Bank-, SEPA-, Kreditkartendaten oder E-Mail-Adressen von minderjährigen Schülern erfasst oder verarbeitet.</em>
+            <strong>2. Kategorien personenbezogener Daten:</strong> Schulstammdaten, Benutzernamen (Vorname, Nachname; im regulären Unterrichtsbetrieb standardmäßig pseudonymisiert/maskiert auf Vorname + 1. Buchstabe des Nachnamens zum Schutz von Minderjährigen; Lehrkräfte werden zur eindeutigen Zuordnung mit vollständigem Namen geführt), Rollen- und Berechtigungsstufen, Stundenplan-, Raum- und Terminbelegungsdaten sowie freiwillige didaktische Instrumental-Übungsaufnahmen. Hierbei wird die rechtlich erforderliche Grund-Einwilligung zur Schülerprofil-Bereitstellung (Art. 8 DSGVO) strikt von der freiwilligen Einwilligung in die Speicherung von Instrumentalaufnahmen (§ 73 UrhG) entkoppelt.<br />
+            <em>Ausdrücklich ausgeschlossen: Es werden zu keinem Zeitpunkt Bank-, SEPA-, Kreditkartendaten oder private E-Mail-Adressen von Schülern, Eltern, Lehrkräften oder Sekretariatsmitarbeitern erfasst oder verarbeitet (Zero-Mail-Architektur). Einzig für den Schulleitungs-Account (B2B-Vertragspartner) wird eine offizielle Schul- bzw. Organisations-E-Mail-Adresse zur Vertragsabwicklung und Notfall-Authentifizierung hinterlegt.</em>
           </p>
 
           <h4 style={{ fontSize: '0.88rem', fontWeight: 800, marginTop: '14px', color: '#0f172a' }}>
@@ -395,21 +427,27 @@ export const AVVModal: React.FC<AVVModalProps> = ({ isOpen, onClose, school, onA
             4. <strong>Kryptografische Absicherung &amp; Passkeys:</strong> <strong>BSI- und OWASP-konformes PBKDF2 Zero-Knowledge Hashing (100.000 SHA-512 / SHA-256 Runden)</strong>, <strong>FIDO2 / WebAuthn Hardware-Passkeys mit Klon-Schutz</strong> und clientseitige <strong>AES-256-GCM Hardware-Vaults (Web Crypto API)</strong> für Offline-Caches.
             <br />
             5. <strong>Revisionssicherheit &amp; Backups:</strong> Manipulationssicheres <strong>SHA-512 / SHA-256 Merkle-Chain Audit-Ledger</strong> (GoBD-konform) sowie <strong>stündlich verschlüsselte Backups</strong> auf unabhängigen Datenträgern mit Desaster-Recovery-RTO &lt; 15 Minuten.
+            <br />
+            6. <strong>IndexedDB Audio-Tresor &amp; Hardware-Sicherheit:</strong> Lokaler, hardware-geschützter Speicher (<code style={{ background: '#f1f5f9', padding: '1px 5px', borderRadius: '4px' }}>groovelab_audio_vault</code>) für 0ms Offline-Playback in schallisolierten Räumen; automatische Abschaltung von Mikrofon-Tracks (<code style={{ background: '#f1f5f9', padding: '1px 5px', borderRadius: '4px' }}>MediaStreamTrack.stop()</code>) beim Verlassen der Übeoberfläche.
+            <br />
+            7. <strong>Ausschluss von Stimmbiometrie &amp; Kinderschutz-Cap:</strong> Reines didaktisches Playback ohne biometrische Stimm- oder Sprecherprofilierung (Art. 9 DSGVO); Plausibilitäts-Cap für bildschirmfreie Übeeingaben auf maximal 60 Minuten pro Tag.
           </p>
 
 
           <h4 style={{ fontSize: '0.88rem', fontWeight: 800, marginTop: '14px', color: '#0f172a' }}>
-            § 6 Unterstützungspflichten, Betroffenenrechte &amp; Meldewesen (Art. 15–22 &amp; 33 DSGVO)
+            § 6 Unterstützungspflichten, Betroffenenrechte, Meldewesen &amp; Kontrollrechte kommunaler Träger (Art. 15–22, 28 Abs. 3 lit. h &amp; 33 DSGVO)
           </h4>
           <p style={{ margin: '4px 0 12px 0' }}>
-            Der Auftragnehmer unterstützt den Auftraggeber mit geeigneten technischen und organisatorischen Maßnahmen bei der Erfüllung von Betroffenenrechten (Auskunft, Berichtigung, Löschung, Einschränkung) sowie bei der unverzüglichen Meldung von Verletzungen des Schutzes personenbezogener Daten an Aufsichtsbehörden.
+            (1) <strong>Betroffenenrechte:</strong> Der Auftragnehmer unterstützt den Auftraggeber mit geeigneten technischen und organisatorischen Maßnahmen (u. a. über das integrierte DSB- &amp; Audit-Portal) bei der Erfüllung der Betroffenenrechte nach Art. 15 bis 22 DSGVO.<br />
+            (2) <strong>Meldung von Datenschutzverletzungen binnen 24–48 Stunden (Art. 33 DSGVO):</strong> Der Auftragnehmer unterrichtet den Auftraggeber unverzüglich, spätestens jedoch innerhalb von <strong>24 bis maximal 48 Stunden</strong> nach Bekanntwerden, über jede Verletzung des Schutzes personenbezogener Daten auf den Servern der Plattform, um dem Auftraggeber die Einhaltung seiner gesetzlichen 72-Stunden-Meldepflicht nach Art. 33 Abs. 1 DSGVO zu ermöglichen.<br />
+            (3) <strong>Kontroll- &amp; Inspektionsrechte (Schulträger-Dualismus nach Art. 28 Abs. 3 lit. h DSGVO):</strong> Der Auftraggeber – einschließlich der behördlichen Datenschutzbeauftragten kreisfreier Städte, Landkreise oder kommunaler Schulverbände – hat das Recht, sich vor Beginn der Verarbeitung und sodann regelmäßig von der Einhaltung der TOMs zu überzeugen. Der Auftragnehmer stellt hierzu alle Nachweise, ISO 27001-Zertifikate und Audit-Berichte zur Verfügung. Soweit im Einzelfall eine Vor-Ort-Inspektion sachlich geboten ist, wird diese nach angemessener Vorankündigung (in der Regel mindestens 14 Werktage) während der üblichen Betriebszeiten unter Wahrung von Betriebs- und Geschäftsgeheimnissen Dritter ermöglicht.
           </p>
 
           <h4 style={{ fontSize: '0.88rem', fontWeight: 800, marginTop: '14px', color: '#0f172a' }}>
-            § 7 Beendigung, physische Datenlöschung &amp; Nachweispflichten (Art. 17 &amp; 28 DSGVO)
+            § 7 Beendigung, physische Datenlöschung &amp; DIN 66398 Löschkonzept (Art. 17 &amp; 28 DSGVO)
           </h4>
           <p style={{ margin: '4px 0 12px 0' }}>
-            Nach Beendigung der Leistungserbringung werden alle im Auftrag verarbeiteten personenbezogenen Daten unwiderruflich und physisch aus den Datenbanken und Cloud-Speichern gelöscht, sofern keine gesetzlichen Aufbewahrungspflichten entgegenstehen. Der Auftraggeber erhält alle erforderlichen Nachweise zur Einhaltung der Pflichten nach Art. 28 DSGVO.
+            Die Speicherung und Löschung erfolgt nach dem strukturierten Kommunalen Löschkonzept (DIN 66398 / 5 Klassen): Temporäre Session-Daten verfallen sofort, didaktische Audio-Aufnahmen verbleiben für die Dauer des laufenden Schuljahres (mit Export-Möglichkeit) und werden zum 31.08. bereinigt, inaktive Schülerprofile wechseln nach 60 Tagen zum Budgetschutz der Musikschule in die Basis-Bereitstellung (0,09 €; Zugänge bleiben erhalten), und die Bildungsbiografie (Meisterwerke) wird nach Beendigung des Ausbildungsverhältnisses bzw. 30 Tage nach formeller Exmatrikulation physisch und unwiderruflich gelöscht. Der Auftraggeber erhält alle erforderlichen Nachweise zur Einhaltung der Pflichten nach Art. 28 DSGVO.
           </p>
         </div>
 

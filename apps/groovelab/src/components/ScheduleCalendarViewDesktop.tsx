@@ -1611,14 +1611,19 @@ export function ScheduleCalendarViewDesktop({
             const wasCancelled = originalOcc ? ['cancelled', 'canceled_by_student'].includes(originalOcc.status) : false;
             const isReset = (wasCancelled && !isNowCancelled) || (timeActuallyChanged && change.date === origDateStr && change.start_time.substring(0, 5) === origTimeStr.substring(0, 5) && !isNowCancelled);
 
+            const now = new Date();
+            const execDateStr = now.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+            const execTimeStr = now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+            const execTimestampStr = `${execDateStr} um ${execTimeStr} Uhr`;
+
             if (isNowCancelled && !wasCancelled) {
               const shortOrigDay = origDayLabel.substring(0, 2) + '.';
               const shortOrigDate = `${String(origDate.getDate()).padStart(2, '0')}.${String(origDate.getMonth() + 1).padStart(2, '0')}.${String(origDate.getFullYear()).substring(2, 4)}`;
-              notificationMessage = `Dein Unterrichtstermin am ${shortOrigDay} ${shortOrigDate} um ${origTimeLabel} Uhr fällt aus.`;
+              notificationMessage = `❌ Terminabsage: Dein Unterrichtstermin am ${shortOrigDay} ${shortOrigDate} um ${origTimeLabel} Uhr fällt aus.\n🕒 Abgesagt am: ${execTimestampStr} durch Lehrkraft.`;
             } else if (isReset) {
               const shortNewDay = newDayLabel.substring(0, 2) + '.';
               const shortNewDate = `${String(newDate.getDate()).padStart(2, '0')}.${String(newDate.getMonth() + 1).padStart(2, '0')}.${String(newDate.getFullYear()).substring(2, 4)}`;
-              notificationMessage = `Der Ausfall für diesen Termin wurde zurückgenommen. Der Termin findet regulär statt:\n${shortNewDay} ${shortNewDate} um ${newTimeLabel} Uhr.`;
+              notificationMessage = `🔄 Termin reaktiviert: Dein Unterrichtstermin am ${shortNewDay} ${shortNewDate} um ${newTimeLabel} Uhr findet regulär statt.\n🕒 Reaktiviert am: ${execTimestampStr} durch Lehrkraft.`;
             } else if (timeActuallyChanged && !isNowCancelled) {
               const shortOrigDay = origDayLabel.substring(0, 2) + '.';
               const shortOrigDate = `${String(origDate.getDate()).padStart(2, '0')}.${String(origDate.getMonth() + 1).padStart(2, '0')}.${String(origDate.getFullYear()).substring(2, 4)}`;
@@ -8085,6 +8090,7 @@ return (
                   }
                 }} 
                 teacherId={userId}
+                uiLevel={docStudent?.campus_ui_level || 'pro'}
                 hasTresorStorage={checkIsAudioTresorActive(docStudent)}
               />
             )}

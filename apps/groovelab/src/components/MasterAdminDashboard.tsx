@@ -1709,6 +1709,11 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
 
       await fetchSchoolsAndStats();
       await fetchBillingSettings();
+      await masterPricing.refetchPricing();
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('cg_master_pricing_updated'));
+        localStorage.setItem('cg_master_pricing_version', Date.now().toString());
+      }
       setSaveSuccessToast('System-Preise & Tarife erfolgreich gespeichert!');
       setTimeout(() => setSaveSuccessToast(null), 4000);
     } catch (err: any) {
@@ -2213,6 +2218,11 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
       setSaveSuccessToast('Bankverbindung, Betreiber-Stammdaten & USt-Status erfolgreich in der Cloud gespeichert!');
       setTimeout(() => setSaveSuccessToast(null), 4000);
       await fetchBillingSettings();
+      await masterPricing.refetchPricing();
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('cg_master_pricing_updated'));
+        localStorage.setItem('cg_master_pricing_version', Date.now().toString());
+      }
     } catch (err: any) {
       console.error('Save billing settings error:', err);
       alert('Fehler beim Speichern der Bank- und Betreiberdaten: ' + (err?.message || err));

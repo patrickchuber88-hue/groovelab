@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase';
+import { validateMediaBlob } from './mediaSecurityValidator';
 
 /**
  * Enterprise+ Audio Storage Helper
@@ -96,6 +97,20 @@ export async function uploadAudioWithIntegrityVerification(
 ): Promise<AudioUploadIntegrityResult> {
   const checksum = await computeBlobSha256(blob);
   const sizeBytes = blob.size;
+
+  // 🛡️ Enterprise Magic-Byte & Anti-Malware Ingestion Validation
+  const validation = await validateMediaBlob(blob, 'audio', contentType);
+  if (!validation.isValid) {
+    console.error('[AudioStorageHelper] Media Security Ingestion Blocked:', validation.reason);
+    return {
+      success: false,
+      filePath,
+      checksumSha256: checksum,
+      sizeBytes,
+      publicUrl: '',
+      error: new Error(validation.reason || 'Sicherheitswarnung: Ungültige oder manipulierte Mediendatei abgewiesen.')
+    };
+  }
 
   try {
     const { error } = await supabase.storage.from(bucket).upload(filePath, blob, {
@@ -363,4 +378,33 @@ export async function computeSchoolStorageUsedBytes(schoolId: string, knownUserI
   }
 
   return maxDiscoveredBytes;
+}
+
+/**
+ * Tier-1 SaaS Enterprise+ Storage Path Generator
+ * Enforces pure UUID/hash names for uploaded assets in Supabase Storage.
+ * Strips all personal information (names, special characters, whitespace).
+ * 
+ * Path schema:
+ * schools/${schoolId}/${context}/${uniqueId}.${extension}
+ * or
+ * ${context}/${uniqueId}.${extension} (if schoolId not provided)
+ */
+export function generateAnonymizedStoragePath(
+  schoolId: string | null | undefined,
+  context: 'recordings' | 'audio_biography' | 'loops' | 'feed-attachments' | 'audio' | 'avatars' | string,
+  uniqueId: string,
+  extension: string = 'webm'
+): string {
+  // Sanitize context and extension (alphanumeric, dashes, underscores only)
+  const cleanContext = context.replace(/[^a-zA-Z0-9_-]/g, '') || 'audio';
+  const cleanExt = extension.replace(/^\./, '').replace(/[^a-zA-Z0-9]/g, '') || 'webm';
+  
+  // Sanitize uniqueId: ensure only UUID, timestamp, or safe hash characters
+  const cleanId = uniqueId.replace(/[^a-zA-Z0-9_-]/g, '') || `${Date.now()}`;
+  
+  const cleanSchoolId = schoolId ? schoolId.replace(/[^a-zA-Z0-9_-]/g, '') : null;
+  const schoolPrefix = cleanSchoolId ? `schools/${cleanSchoolId}/` : '';
+
+  return `${schoolPrefix}${cleanContext}/${cleanId}.${cleanExt}`;
 }

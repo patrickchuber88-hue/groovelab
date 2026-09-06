@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Play, Pause, Repeat, Headphones, Timer } from 'lucide-react';
 import { getBlob } from '../../utils/blobStorage';
 import { AudioTrackItem } from '../AudioTrackCarousel';
+import { formatHarmonizedAudioTitle } from '../../utils/audioNamingHelper';
 
 export interface ZenPlayAlongDockProps {
   tracks: AudioTrackItem[];
@@ -531,7 +532,7 @@ export const ZenPlayAlongDock: React.FC<ZenPlayAlongDockProps> = ({
               whiteSpace: 'nowrap'
             }}>
               {tracks.length > 1 ? `Spur ${activeIndex + 1}: ` : ''}
-              {currentTrack.label || `Aufnahme #${activeIndex + 1}`}
+              {formatHarmonizedAudioTitle(currentTrack, tracks, true)}
             </span>
           </div>
 
