@@ -1,6 +1,5 @@
 import { useState, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
-import { getDistanceFromLatLonInM } from '../utils/geo';
 import { RoomRecord, StationRecord } from '../repositories/roomRepository';
 import { UserProfile, SchoolRecord } from '../repositories/userRepository';
 
@@ -109,73 +108,10 @@ export function useTeacherPresence({
     }
   }, [userId, selectedRoomId, stations, onSessionChange, onLocationModeChange, onDataRefresh]);
 
-  const verifyGeofenceAndCheckin = useCallback((schoolData?: SchoolRecord | null) => {
-    const isLocalhost = typeof window !== 'undefined' && (
-      window.location.hostname === 'localhost' || 
-      window.location.hostname === '127.0.0.1' ||
-      window.location.hostname.endsWith('.local') ||
-      /^192\.168\./.test(window.location.hostname) ||
-      /^10\./.test(window.location.hostname)
-    );
-
-    const hasGeofenceBypass = !!(schoolData?.opening_hours?.geofence_bypass);
-    if (isLocalhost || hasGeofenceBypass) {
-      performDirectTeacherCheckin();
-      return;
-    }
-
-    setCheckingInStatus('locating');
-    setGeoErrorMsg('');
-
-    if (!navigator.geolocation) {
-      setCheckingInStatus('error');
-      setGeoErrorMsg('Geolocation wird von deinem Browser nicht unterstützt.');
-      return;
-    }
-
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        setCheckingInStatus('verifying');
-        const currentPos = {
-          lat: position.coords.latitude,
-          lng: position.coords.longitude
-        };
-
-        let isWithinAnyRoom = false;
-        if (rooms && rooms.length > 0) {
-          for (const room of rooms) {
-            const points = Array.isArray(room.geofence_points) ? room.geofence_points : [];
-            const allCoords = [...points];
-            if (room.latitude && room.longitude) {
-              allCoords.push({ lat: room.latitude, lng: room.longitude });
-            }
-
-            for (const pt of allCoords) {
-              if (pt && pt.lat && pt.lng) {
-                const dist = getDistanceFromLatLonInM(currentPos.lat, currentPos.lng, Number(pt.lat), Number(pt.lng));
-                if (dist < 100) {
-                  isWithinAnyRoom = true;
-                  break;
-                }
-              }
-            }
-            if (isWithinAnyRoom) break;
-          }
-        }
-
-        if (isWithinAnyRoom) {
-          performDirectTeacherCheckin();
-        } else {
-          setCheckingInStatus('error');
-          setGeoErrorMsg('Du befindest dich anscheinend nicht vor Ort in der Musikschule.');
-        }
-      },
-      () => {
-        setCheckingInStatus('error');
-        setGeoErrorMsg('Standortzugriff wurde verweigert oder ist nicht verfügbar.');
-      }
-    );
-  }, [rooms, performDirectTeacherCheckin]);
+  const verifyGeofenceAndCheckin = useCallback((_schoolData?: SchoolRecord | null) => {
+    // ⚡ Enterprise+ Tier-1 Privacy: Zero geolocation tracking for teachers (§ 87 BetrVG / DSGVO Art. 5)
+    performDirectTeacherCheckin();
+  }, [performDirectTeacherCheckin]);
 
   return {
     checkingInStatus,

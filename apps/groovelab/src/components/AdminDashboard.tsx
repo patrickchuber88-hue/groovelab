@@ -6168,6 +6168,69 @@ function DeviceSetupScreen({
   const [copiedKioskLink, setCopiedKioskLink] = useState(false);
   const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false);
   const [isHelpCenterOpen, setIsHelpCenterOpen] = useState(false);
+  const [kioskPin, setKioskPin] = useState<string>(effectiveSchool?.groovelab_kiosk_pin || '1234');
+  const [showKioskPin, setShowKioskPin] = useState(false);
+  const [isSavingKioskPin, setIsSavingKioskPin] = useState(false);
+  const [kioskPinSavedFeedback, setKioskPinSavedFeedback] = useState(false);
+
+  useEffect(() => {
+    if (effectiveSchool?.id) {
+      const fetchPin = async () => {
+        try {
+          const { data, error } = await supabase.rpc('get_groovelab_kiosk_pin', { p_school_id: effectiveSchool.id });
+          if (!error && data) {
+            setKioskPin(data);
+          } else if (effectiveSchool?.groovelab_kiosk_pin) {
+            setKioskPin(effectiveSchool.groovelab_kiosk_pin);
+          }
+        } catch {
+          if (effectiveSchool?.groovelab_kiosk_pin) {
+            setKioskPin(effectiveSchool.groovelab_kiosk_pin);
+          }
+        }
+      };
+      fetchPin();
+    }
+  }, [effectiveSchool?.id]);
+
+  const handleSaveKioskPin = async (customPin?: string) => {
+    const pinToSave = (customPin !== undefined ? customPin : kioskPin).trim();
+    if (!/^[0-9]{4}$/.test(pinToSave)) {
+      alert('Der Terminal-PIN muss genau 4 Ziffern (0000-9999) enthalten.');
+      return;
+    }
+    if (!effectiveSchool?.id) {
+      alert('Fehler: Keine Schul-ID gefunden.');
+      return;
+    }
+    setIsSavingKioskPin(true);
+    try {
+      const { error: rpcErr } = await supabase.rpc('set_groovelab_kiosk_pin', {
+        p_school_id: effectiveSchool.id,
+        p_pin: pinToSave
+      });
+      if (rpcErr) {
+        const { error: updateErr } = await supabase
+          .from('schools')
+          .update({ groovelab_kiosk_pin: pinToSave })
+          .eq('id', effectiveSchool.id);
+        if (updateErr) throw updateErr;
+      }
+      setKioskPin(pinToSave);
+      setKioskPinSavedFeedback(true);
+      setTimeout(() => setKioskPinSavedFeedback(false), 2500);
+      if (onUpdate) onUpdate();
+    } catch (err: any) {
+      alert('Fehler beim Speichern des Terminal-PINs: ' + (err.message || err));
+    } finally {
+      setIsSavingKioskPin(false);
+    }
+  };
+
+  const handleGenerateRandomPin = () => {
+    const newPin = Math.floor(1000 + Math.random() * 9000).toString();
+    setKioskPin(newPin);
+  };
 
   useEffect(() => {
     if (rooms.length > 0 && !selectedRoomId) {
@@ -7173,6 +7236,128 @@ function DeviceSetupScreen({
               {/* TAB 3: KIOSK GERÄTE & STATIONS SETUP */}
               {activeGrooveSettingsModal === 'devices' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                  {/* GrooveLab Terminal Setup PIN Card */}
+                  <div style={{ 
+                    background: '#fefce8', 
+                    border: '1.5px solid #fef08a', 
+                    borderRadius: '18px', 
+                    padding: '20px', 
+                    display: 'flex', 
+                    flexDirection: 'column', 
+                    gap: '14px'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
+                      <div>
+                        <h4 style={{ fontSize: '0.94rem', fontWeight: 900, color: '#854d0e', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <Lock size={18} color="#854d0e" /> GrooveLab Terminal-Einrichtungs-PIN (4 Ziffern)
+                        </h4>
+                        <p style={{ fontSize: '0.78rem', color: '#a16207', margin: '4px 0 0 0', fontWeight: 550, lineHeight: 1.4, maxWidth: '620px' }}>
+                          Dieser 4-stellige PIN autorisiert neue Schüler-Terminals und iPads im Bandraum. Er schützt vor unbefugten Stations-Kopplungen durch Schüler von außerhalb. Bereits gekoppelte iPads bleiben bei einer PIN-Änderung unterbrechungsfrei aktiv.
+                        </p>
+                      </div>
+                      {kioskPinSavedFeedback && (
+                        <div style={{ background: '#dcfce7', border: '1px solid #86efac', color: '#166534', padding: '6px 12px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <Check size={14} /> PIN erfolgreich gespeichert!
+                        </div>
+                      )}
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                      <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                        <input 
+                          type={showKioskPin ? "text" : "password"}
+                          maxLength={4}
+                          value={kioskPin}
+                          onChange={(e) => {
+                            const val = e.target.value.replace(/\D/g, '').slice(0, 4);
+                            setKioskPin(val);
+                          }}
+                          placeholder="1234"
+                          style={{ 
+                            width: '130px', 
+                            padding: '10px 14px', 
+                            borderRadius: '10px', 
+                            border: '1.5px solid #fef08a', 
+                            background: '#ffffff',
+                            color: '#854d0e',
+                            fontSize: '1.1rem',
+                            fontWeight: 900,
+                            letterSpacing: '0.3em',
+                            textAlign: 'center',
+                            fontFamily: 'monospace',
+                            outline: 'none'
+                          }} 
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowKioskPin(!showKioskPin)}
+                          style={{
+                            position: 'absolute',
+                            right: '8px',
+                            background: 'transparent',
+                            border: 'none',
+                            color: '#a16207',
+                            cursor: 'pointer',
+                            padding: '4px',
+                            display: 'flex',
+                            alignItems: 'center'
+                          }}
+                          title={showKioskPin ? "PIN verbergen" : "PIN anzeigen"}
+                        >
+                          {showKioskPin ? <EyeOff size={16} /> : <Eye size={16} />}
+                        </button>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={handleGenerateRandomPin}
+                        style={{
+                          background: '#ffffff',
+                          color: '#854d0e',
+                          border: '1px solid #fef08a',
+                          borderRadius: '10px',
+                          padding: '10px 14px',
+                          fontSize: '0.78rem',
+                          fontWeight: 800,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          transition: 'all 0.15s'
+                        }}
+                        className="hover-scale"
+                      >
+                        <RefreshCw size={14} /> Neu auswürfeln
+                      </button>
+
+                      <button
+                        type="button"
+                        disabled={isSavingKioskPin || kioskPin.length !== 4}
+                        onClick={() => handleSaveKioskPin()}
+                        style={{
+                          background: '#eab308',
+                          color: '#0f172a',
+                          border: 'none',
+                          borderRadius: '10px',
+                          padding: '10px 18px',
+                          fontSize: '0.78rem',
+                          fontWeight: 900,
+                          cursor: isSavingKioskPin || kioskPin.length !== 4 ? 'not-allowed' : 'pointer',
+                          opacity: isSavingKioskPin || kioskPin.length !== 4 ? 0.6 : 1,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          boxShadow: '0 4px 10px rgba(234,179,8,0.2)',
+                          transition: 'all 0.15s'
+                        }}
+                        className="hover-scale"
+                      >
+                        {isSavingKioskPin ? <RefreshCw size={14} className="animate-spin" /> : <Check size={14} />}
+                        {isSavingKioskPin ? 'Speichern…' : 'PIN speichern'}
+                      </button>
+                    </div>
+                  </div>
+
                   {/* GrooveLab Kiosk Device Onboarding Link section */}
                   {effectiveSchool?.groovelab_kiosk_token && (
                     <div style={{ 

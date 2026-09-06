@@ -10,6 +10,7 @@ export interface DbSchool {
   limits_enabled?: boolean;
   max_students?: number;
   groovelab_kiosk_token?: string;
+  groovelab_kiosk_pin?: string;
 }
 
 export interface DbUser {

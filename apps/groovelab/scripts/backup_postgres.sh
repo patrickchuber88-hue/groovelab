@@ -13,10 +13,10 @@ CHECKSUM_FILE="${ENCRYPTED_FILE}.sha256"
 RETENTION_DAYS=30
 
 # Database Configuration (Overrides via ENV)
-DB_HOST="${DB_HOST:-aws-0-eu-central-1.pooler.supabase.com}"
-DB_PORT="${DB_PORT:-6543}"
+DB_HOST="${DB_HOST:-127.0.0.1}"
+DB_PORT="${DB_PORT:-5432}"
 DB_NAME="${DB_NAME:-postgres}"
-DB_USER="${DB_USER:-postgres.tlnstkwffrbljmdtuyot}"
+DB_USER="${DB_USER:-postgres}"
 ENCRYPTION_PASSPHRASE="${BACKUP_ENCRYPTION_KEY:-campus_groovelab_disaster_recovery_secure_salt_2026}"
 
 mkdir -p "${BACKUP_DIR}"

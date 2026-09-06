@@ -35,10 +35,10 @@ openssl enc -d -aes-256-cbc -pbkdf2 -iter 100000 -in "${ENCRYPTED_FILE}" -pass "
 
 echo "📦 Restoring database schema and records..."
 if command -v psql &> /dev/null; then
-    DB_HOST="${DB_HOST:-aws-0-eu-central-1.pooler.supabase.com}"
-    DB_PORT="${DB_PORT:-6543}"
+    DB_HOST="${DB_HOST:-127.0.0.1}"
+    DB_PORT="${DB_PORT:-5432}"
     DB_NAME="${DB_NAME:-postgres}"
-    DB_USER="${DB_USER:-postgres.tlnstkwffrbljmdtuyot}"
+    DB_USER="${DB_USER:-postgres}"
     PGPASSWORD="${DB_PASSWORD:-}" psql -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USER}" -d "${DB_NAME}" -f "${RESTORE_TMP}"
     echo "✅ Database restored successfully!"
 else

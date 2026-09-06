@@ -6,7 +6,7 @@ import {
   RotateCcw, Volume2, Moon, QrCode, X, Eye, EyeOff, Zap, Music, Library, School,
   Calendar, CalendarX, Check, CheckCircle, Target, Pencil, User, Mail, Phone, Users,
   Shield, Settings, Bell, FileText, AlertTriangle, ShieldCheck, CheckCheck, Mic, Download,
-  Key, Delete, Sliders, Compass, Lightbulb, Copy, Fingerprint
+  Key, Delete, Sliders, Compass, Lightbulb, Copy, Fingerprint, Headphones
 } from 'lucide-react';
 import { formatTeacherFullName } from '../../../utils/nameHelper';
 import { CampusGroovelabText } from '../../CampusGroovelabBrand';
@@ -505,25 +505,31 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
 
                                   const recKey = generateParentRecoveryKey();
                                   try {
-                                    const { data: rpcRes, error: rpcErr } = await supabase.rpc('set_parent_pin', {
-                                      p_student_id: studentId,
-                                      p_new_pin: nextVal
-                                    });
-
-                                    if (rpcErr || rpcRes !== true) {
-                                      throw new Error(rpcErr?.message || 'Serverfehler beim Speichern.');
-                                    }
-
+                                    let rpcSuccess = false;
                                     try {
-                                      await supabase.from('users').update({ recovery_key: recKey }).eq('id', studentId);
-                                    } catch (err) {}
+                                      const { data: rpcRes, error: rpcErr } = await supabase.rpc('set_parent_pin_with_recovery_key', {
+                                        p_student_id: studentId,
+                                        p_new_pin: nextVal,
+                                        p_recovery_key: recKey
+                                      });
+                                      if (!rpcErr && rpcRes === true) rpcSuccess = true;
+                                    } catch (e) {}
+
+                                    if (!rpcSuccess) {
+                                      const { data: fbRes, error: fbErr } = await supabase.rpc('set_parent_pin', {
+                                        p_student_id: studentId,
+                                        p_new_pin: nextVal
+                                      });
+                                      if (fbErr || fbRes !== true) {
+                                        throw new Error(fbErr?.message || 'Serverfehler beim Speichern der Eltern-PIN.');
+                                      }
+                                    }
                                     
                                     if (studentUser) {
                                       (studentUser as any).has_parent_pin = true;
-                                      (studentUser as any).recovery_key = recKey;
                                     }
 
-                                    sessionStorage.setItem(`groovelab_parent_session_${studentId}`, String(Date.now() + 15 * 60 * 1000));
+                                    sessionStorage.setItem(`groovelab_parent_session_${studentId}`, String(Date.now() + 180 * 1000));
                                     sessionStorage.setItem(`groovelab_parent_unlocked_${studentId}`, 'true');
                                     sessionStorage.setItem('groovelab_parent_unlocked_global', 'true');
                                     window.dispatchEvent(new CustomEvent('groovelab_parent_mode_changed', { detail: true }));
@@ -1061,6 +1067,16 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                       const curLeaderboard = draftAllowLeaderboard !== null ? draftAllowLeaderboard : ((studentUser as any)?.parent_allow_leaderboard !== undefined && (studentUser as any)?.parent_allow_leaderboard !== null ? Boolean((studentUser as any)?.parent_allow_leaderboard) : (studentId && typeof window !== 'undefined' && localStorage.getItem(`groovelab_parent_allow_leaderboard_${studentId}`) !== null ? localStorage.getItem(`groovelab_parent_allow_leaderboard_${studentId}`) === 'true' : (currentLvlKey !== 'junior')));
                       const curProposals = draftAllowProposals !== null ? draftAllowProposals : ((studentUser as any)?.parent_allow_proposals !== undefined && (studentUser as any)?.parent_allow_proposals !== null ? Boolean((studentUser as any)?.parent_allow_proposals) : (studentId && typeof window !== 'undefined' && localStorage.getItem(`groovelab_parent_allow_proposals_${studentId}`) !== null ? localStorage.getItem(`groovelab_parent_allow_proposals_${studentId}`) === 'true' : (draftBoardOverrides.mediathek ?? (currentLvlKey !== 'junior'))));
                       const curAudio = draftAllowAudio !== null ? draftAllowAudio : ((studentUser as any)?.parent_allow_audio !== undefined && (studentUser as any)?.parent_allow_audio !== null ? Boolean((studentUser as any)?.parent_allow_audio) : (studentId && typeof window !== 'undefined' && localStorage.getItem(`groovelab_parent_allow_audio_${studentId}`) !== null ? localStorage.getItem(`groovelab_parent_allow_audio_${studentId}`) === 'true' : (draftBoardOverrides.recordings ?? true)));
+                      const curTeacherAudio = (studentUser as any)?.parent_permissions?.allow_teacher_audio !== undefined
+                        ? Boolean((studentUser as any)?.parent_permissions?.allow_teacher_audio)
+                        : (studentId && typeof window !== 'undefined' && localStorage.getItem(`groovelab_parent_allow_teacher_audio_${studentId}`) !== null
+                            ? localStorage.getItem(`groovelab_parent_allow_teacher_audio_${studentId}`) === 'true'
+                            : true);
+                      const curStudentAudio = (studentUser as any)?.parent_permissions?.allow_student_audio !== undefined
+                        ? Boolean((studentUser as any)?.parent_permissions?.allow_student_audio)
+                        : (studentId && typeof window !== 'undefined' && localStorage.getItem(`groovelab_parent_allow_student_audio_${studentId}`) !== null
+                            ? localStorage.getItem(`groovelab_parent_allow_student_audio_${studentId}`) === 'true'
+                            : curAudio);
                       const curTts = draftAllowTts !== null ? draftAllowTts : ((studentUser as any)?.parent_allow_tts !== undefined && (studentUser as any)?.parent_allow_tts !== null ? Boolean((studentUser as any)?.parent_allow_tts) : (studentId && typeof window !== 'undefined' && localStorage.getItem(`groovelab_parent_allow_tts_${studentId}`) !== null ? localStorage.getItem(`groovelab_parent_allow_tts_${studentId}`) === 'true' : (currentLvlKey === 'junior')));
 
                       const isDeviating = 
@@ -1706,18 +1722,53 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                               <div style={{ paddingRight: '12px', textAlign: 'left' }}>
                                 <div style={{ fontSize: '0.86rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                                   <Mic size={16} color="#0284c7" style={{ flexShrink: 0 }} />
-                                  <span>Mikrofon &amp; Eigene Song-Aufnahmen</span>
+                                  <span>Mikrofon &amp; Eigene Song-Aufnahmen des Schülers</span>
                                   {hlAudio.badge}
                                 </div>
                                 <div style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 500, lineHeight: 1.35, marginTop: '2px' }}>
-                                  Erlaubt deinem Kind, eigene Übe-Aufnahmen und Sprachmemos mit dem Mikrofon aufzuzeichnen (Aufnahmen der Lehrkraft bleiben immer abspielbar). Inkl. Hardware-Schutz (Stopp bei Tab-Wechsel) und 30-Tage-Löschfrist.
+                                  Erlaubt deinem Kind, eigene Übe-Aufnahmen, Loopstation-Spuren und Sprachmemos mit dem Mikrofon aufzuzeichnen. Inkl. Hardware-Schutz (Stopp bei Tab-Wechsel) und 30-Tage-Löschfrist.
                                 </div>
                               </div>
                               <input
                                 type="checkbox"
-                                checked={curAudio}
-                                onChange={(e) => applyAndSaveParentControls({ allowAudio: e.target.checked, boardOverrides: { recordings: e.target.checked } })}
+                                checked={curStudentAudio && curAudio}
+                                onChange={(e) => applyAndSaveParentControls({ 
+                                  allowAudio: e.target.checked, 
+                                  allowStudentAudio: e.target.checked, 
+                                  boardOverrides: { recordings: e.target.checked } 
+                                })}
                                 style={{ width: '20px', height: '20px', accentColor: '#0284c7', cursor: 'pointer' }}
+                              />
+                            </label>
+
+                            {/* Toggle 4b: Unterrichts-Aufnahmen durch die Lehrkraft (§ 73 UrhG / Art. 6 DSGVO) */}
+                            <label style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              padding: '14px 16px',
+                              borderRadius: '16px',
+                              cursor: 'pointer',
+                              background: '#f8fafc',
+                              border: '1px solid #e2e8f0'
+                            }}>
+                              <div style={{ paddingRight: '12px', textAlign: 'left' }}>
+                                <div style={{ fontSize: '0.86rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                  <Headphones size={16} color="#34a853" style={{ flexShrink: 0 }} />
+                                  <span>Didaktische Audio-Memos der Lehrkraft</span>
+                                  <span style={{ fontSize: '0.66rem', fontWeight: 800, padding: '2px 7px', borderRadius: '6px', background: '#dcfce7', color: '#15803d' }}>
+                                    § 73 UrhG konform
+                                  </span>
+                                </div>
+                                <div style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 500, lineHeight: 1.35, marginTop: '2px' }}>
+                                  Erlaubt der Lehrkraft, im Unterricht Übe-Hilfen, Play-Alongs und Vorspiele direkt zur Hausaufgabe aufzunehmen. Aufnahmen bleiben im Schülerprofil bilateral abrufbar.
+                                </div>
+                              </div>
+                              <input
+                                type="checkbox"
+                                checked={curTeacherAudio}
+                                onChange={(e) => applyAndSaveParentControls({ allowTeacherAudio: e.target.checked })}
+                                style={{ width: '20px', height: '20px', accentColor: '#34a853', cursor: 'pointer' }}
                               />
                             </label>
 

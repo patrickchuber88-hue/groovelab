@@ -2,6 +2,7 @@ import React, { useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Printer, Award, Sparkles, Music, ShieldCheck, Download, Loader2, Share2, Check } from 'lucide-react';
 import { toPng } from 'html-to-image';
+import { formatStudentPureFirstName } from '../../utils/nameHelper';
 
 export interface MeisterwerkCertificateProps {
   studentName: string;
@@ -34,9 +35,11 @@ export const MeisterwerkCertificateModal: React.FC<MeisterwerkCertificateProps> 
 
   const effectiveCertId = certificateId || `MW-${new Date().getFullYear()}-${Math.random().toString(36).substring(2, 7).toUpperCase()}-100`;
 
+  const sanitizedStudentName = formatStudentPureFirstName(studentName, 'Musik-Schüler');
+
   const handleShareMasterpiece = async () => {
     const shareTitle = `🏆 Meisterwerk-Urkunde: ${songTitle}`;
-    const shareText = `🎵 ${studentName} hat das musikalische Meisterwerk »${songTitle}« (${instrument}) mit Bravour an der ${schoolName} gemeistert!`;
+    const shareText = `🎵 ${sanitizedStudentName} hat das musikalische Meisterwerk »${songTitle}« (${instrument}) mit Bravour an der ${schoolName} gemeistert!`;
     const shareUrl = typeof window !== 'undefined' ? window.location.href : '';
 
     if (typeof navigator !== 'undefined' && (navigator as any).share) {
@@ -105,7 +108,7 @@ export const MeisterwerkCertificateModal: React.FC<MeisterwerkCertificateProps> 
 
       pdf.addImage(dataUrl, 'PNG', posX, posY, renderWidth, renderHeight, undefined, 'FAST');
       
-      const cleanStudent = studentName.replace(/\s+/g, '_');
+      const cleanStudent = sanitizedStudentName.replace(/\s+/g, '_');
       const cleanSong = songTitle.replace(/\s+/g, '_');
       pdf.save(`Meisterwerk_Urkunde_${cleanStudent}_${cleanSong}.pdf`);
     } catch (err) {
@@ -361,7 +364,7 @@ export const MeisterwerkCertificateModal: React.FC<MeisterwerkCertificateProps> 
               padding: '0 24px 6px 24px',
               display: 'inline-block'
             }}>
-              {studentName}
+              {sanitizedStudentName}
             </div>
 
             {/* Achievement Text */}

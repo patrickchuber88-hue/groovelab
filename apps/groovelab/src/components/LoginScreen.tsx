@@ -585,7 +585,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
   const [showAgb, setShowAgb] = useState(false);
   const [showParentAgb, setShowParentAgb] = useState(false);
   const [showImpressum, setShowImpressum] = useState(false);
-  const [legalModalTab, setLegalModalTab] = useState<'impressum' | 'privacy' | 'terms' | null>(null);
+  const [legalModalTab, setLegalModalTab] = useState<'impressum' | 'privacy' | 'terms' | 'cancellation' | null>(null);
   const [showDpoPortalModal, setShowDpoPortalModal] = useState(false);
   const [firstNameFocused, setFirstNameFocused] = useState(false);
   const [lastNameFocused, setLastNameFocused] = useState(false);
@@ -753,6 +753,68 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
   const [coupledStationName, setCoupledStationName] = useState<string | null>(null);
   const [coupledStationColor, setCoupledStationColor] = useState<string | null>(null);
   const [showKioskScanner, setShowKioskScanner] = useState(false);
+
+  // GrooveLab In-Page Kiosk Setup PIN Gatekeeper
+  const [loginKioskPinUnlocked, setLoginKioskPinUnlocked] = useState(false);
+  const [loginKioskPinInput, setLoginKioskPinInput] = useState('');
+  const [loginKioskPinError, setLoginKioskPinError] = useState<string | null>(null);
+  const [loginKioskPinVerifying, setLoginKioskPinVerifying] = useState(false);
+  const [loginKioskCooldown, setLoginKioskCooldown] = useState(0);
+  const [loginKioskAttempts, setLoginKioskAttempts] = useState(0);
+
+  useEffect(() => {
+    let timer: any;
+    if (loginKioskCooldown > 0) {
+      timer = setInterval(() => {
+        setLoginKioskCooldown(prev => Math.max(0, prev - 1));
+      }, 1000);
+    }
+    return () => clearInterval(timer);
+  }, [loginKioskCooldown]);
+
+  const handleVerifyLoginKioskPin = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (loginKioskPinVerifying || loginKioskCooldown > 0) return;
+    if (loginKioskPinInput.length !== 4) {
+      setLoginKioskPinError('Bitte 4 Ziffern eingeben.');
+      return;
+    }
+
+    try {
+      setLoginKioskPinVerifying(true);
+      setLoginKioskPinError(null);
+      const targetSchoolId = schoolData?.id || (typeof window !== 'undefined' ? localStorage.getItem('groovelab_school_id') : null) || '11111111-1111-1111-1111-111111111111';
+      const { data: isValid, error: rpcErr } = await supabase.rpc('verify_kiosk_setup_pin', {
+        p_school_id: targetSchoolId,
+        p_pin: loginKioskPinInput
+      });
+
+      if (rpcErr) {
+        console.error('[Login] Kiosk PIN verification error:', rpcErr);
+      }
+
+      if (isValid === true) {
+        setLoginKioskPinUnlocked(true);
+        setLoginKioskAttempts(0);
+        setLoginKioskPinError(null);
+      } else {
+        const nextAttempts = loginKioskAttempts + 1;
+        setLoginKioskAttempts(nextAttempts);
+        setLoginKioskPinInput('');
+        if (nextAttempts >= 5) {
+          setLoginKioskCooldown(60);
+          setLoginKioskPinError('Zu viele Fehlversuche. Bitte 60 Sekunden warten.');
+        } else {
+          setLoginKioskPinError(`Falscher PIN. Noch ${5 - nextAttempts} Versuch(e).`);
+        }
+      }
+    } catch (err: any) {
+      console.error('[Login] Kiosk PIN verification exception:', err);
+      setLoginKioskPinError('Verbindungsfehler bei der PIN-Prüfung.');
+    } finally {
+      setLoginKioskPinVerifying(false);
+    }
+  };
 
   // Parents Onboarding & Magic Link States
   const [parentFirstName, setParentFirstName] = useState(() => {
@@ -2312,23 +2374,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
     fetchKioskData();
   }, [schoolData, isGroovelabKiosk]);
 
-  // Pre-emptively request geolocation when GrooveLab Kiosk mode is active (ONLY on Login screen, NEVER during registration)
-  useEffect(() => {
-    if (!inviteSchoolId && isGroovelabKiosk && navigator.geolocation) {
-      console.log('[Geofence] Pre-emptively fetching location to acquire permission...');
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-          setUserPos(coords);
-          console.log('[Geofence] Pre-emptive location fetch successful:', coords);
-        },
-        (err) => {
-          console.warn('[Geofence] Pre-emptive location fetch failed or denied:', err);
-        },
-        { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 }
-      );
-    }
-  }, [isGroovelabKiosk, inviteSchoolId]);
+  // ⚡ Enterprise+ Tier-1 Privacy: Zero geolocation tracking on Login (§ 87 BetrVG / Art. 5 & 8 DSGVO)
 
 
   const handleKeypadPress = (val: string, type: 'setup' | 'verify') => {
@@ -3263,83 +3309,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                        !!(schoolData?.opening_hours?.geofence_bypass) || 
                        !!(userSchool?.opening_hours?.geofence_bypass);
 
-      // Geolocation is strictly restricted to GrooveLab Kiosk mode (yellow background)
-      if (isGroovelabKiosk) {
-        const isLocalhost = typeof window !== 'undefined' && (
-          window.location.hostname === 'localhost' || 
-          window.location.hostname === '127.0.0.1' ||
-          window.location.hostname.endsWith('.local') ||
-          /^192\.168\./.test(window.location.hostname) ||
-          /^10\./.test(window.location.hostname) ||
-          /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(window.location.hostname)
-        );
-
-        if (isLocalhost || isBypass) {
-          isWithinAnyRoom = true;
-          console.log('[Login] Geofence check bypassed (localhost or database bypass active) in PIN login.');
-          setGeoDebug({
-            isWithinAnyRoom: true,
-            userPos: null,
-            schoolCoords: effectiveSchool ? { lat: effectiveSchool.latitude, lng: effectiveSchool.longitude } : null,
-            distToSchool: 0,
-            withinHours: true
-          });
-        } else {
-          isWithinAnyRoom = false;
-          let currentPos = userPos;
-          if (!currentPos && navigator.geolocation) {
-            try {
-              currentPos = await new Promise<{lat: number, lng: number}>((resolve, reject) => {
-                navigator.geolocation.getCurrentPosition(
-                  (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-                  (err) => reject(err),
-                  { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
-                );
-              });
-              setUserPos(currentPos);
-            } catch (e) {
-              console.warn('[Login] Geolocation fetch failed during PIN login:', e);
-            }
-          }
-
-          if (currentPos) {
-            const activePlatform = localStorage.getItem('groovelab_active_platform') || 'groovelab';
-            let roomsQuery = supabase.from('rooms').select('*').eq('school_id', user.school_id);
-            if (activePlatform === 'campus') {
-              roomsQuery = roomsQuery.eq('is_campus_active', true);
-            } else {
-              roomsQuery = roomsQuery.eq('is_groovelab_active', true);
-            }
-            const { data: rooms } = await roomsQuery.order('sort_order', { ascending: true });
-            if (rooms) {
-              for (const room of rooms) {
-                const points = Array.isArray(room.geofence_points) ? room.geofence_points : [];
-                const allCoords = [...points];
-                if (room.latitude && room.longitude) allCoords.push({ lat: room.latitude, lng: room.longitude });
-                
-                for (const pt of allCoords) {
-                  if (pt && pt.lat && pt.lng) {
-                    const dist = getDistanceFromLatLonInM(currentPos.lat, currentPos.lng, Number(pt.lat), Number(pt.lng));
-                    if (dist < 100) { 
-                      isWithinAnyRoom = true;
-                      break;
-                    }
-                  }
-                }
-                if (isWithinAnyRoom) break;
-              }
-            }
-
-            if (!isWithinAnyRoom && effectiveSchool?.latitude && effectiveSchool?.longitude) {
-              const distToSchool = getDistanceFromLatLonInM(currentPos.lat, currentPos.lng, Number(effectiveSchool.latitude), Number(effectiveSchool.longitude));
-              const radius = effectiveSchool.geofence_radius_meters || 150;
-              if (distToSchool < radius) {
-                isWithinAnyRoom = true;
-              }
-            }
-          }
-        }
-      }
+      // ⚡ Enterprise+ Tier-1 Privacy: Physical Station-Coupling replaces Geolocation (§ 87 BetrVG / DSGVO Art. 5 & 8)
+      isWithinAnyRoom = true;
       // Intercept login for PIN setup or verification if it's an Ausweis ID login
       const isQrLogin = cleanPin.startsWith('t_') || (cleanPin.includes('-') && cleanPin.length > 20);
       if (!isQrLogin) {
@@ -3604,96 +3575,9 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(window.location.hostname)
       );
 
-      // Geolocation is strictly restricted to GrooveLab Kiosk mode (yellow background)
-      if (isGroovelabKiosk) {
-        if (isLocalhost || isBypass) {
-          isWithinAnyRoom = true;
-          console.log('[Login] Geofence check bypassed (localhost or database bypass active).');
-          setGeoDebug({
-            isWithinAnyRoom: true,
-            userPos: null,
-            schoolCoords: effectiveSchool ? { lat: effectiveSchool.latitude, lng: effectiveSchool.longitude } : null,
-            distToSchool: 0,
-            withinHours: true
-          });
-        } else {
-          isWithinAnyRoom = false;
-          console.log('[Login] Geofence check active. Fetching current location...');
-          
-          let currentPos = userPos;
-          if (!currentPos && navigator.geolocation) {
-            try {
-              currentPos = await new Promise<{lat: number, lng: number}>((resolve, reject) => {
-                navigator.geolocation.getCurrentPosition(
-                  (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-                  (err) => reject(err),
-                  { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
-                );
-              });
-              setUserPos(currentPos);
-            } catch (e) {
-              console.warn('[Login] Geolocation fetch during scan failed:', e);
-            }
-          }
-
-          if (currentPos) {
-            // 1. Check Rooms (Multi-Point)
-            const activePlatform = localStorage.getItem('groovelab_active_platform') || 'groovelab';
-            let roomsQuery = supabase.from('rooms').select('*').eq('school_id', user.school_id);
-            if (activePlatform === 'campus') {
-              roomsQuery = roomsQuery.eq('is_campus_active', true);
-            } else {
-              roomsQuery = roomsQuery.eq('is_groovelab_active', true);
-            }
-            const { data: rooms } = await roomsQuery.order('sort_order', { ascending: true });
-            if (rooms) {
-              for (const room of rooms) {
-                const points = Array.isArray(room.geofence_points) ? room.geofence_points : [];
-                const allCoords = [...points];
-                if (room.latitude && room.longitude) allCoords.push({ lat: room.latitude, lng: room.longitude });
-                
-                for (const pt of allCoords) {
-                  if (pt && pt.lat && pt.lng) {
-                    const dist = getDistanceFromLatLonInM(currentPos.lat, currentPos.lng, Number(pt.lat), Number(pt.lng));
-                    if (dist < 100) { 
-                      isWithinAnyRoom = true;
-                      break;
-                    }
-                  }
-                }
-                if (isWithinAnyRoom) break;
-              }
-            }
-
-            // 2. School Fallback (Single Point + Radius)
-            if (!isWithinAnyRoom && effectiveSchool?.latitude && effectiveSchool?.longitude) {
-              const distToSchool = getDistanceFromLatLonInM(
-                currentPos.lat, currentPos.lng, 
-                Number(effectiveSchool.latitude), Number(effectiveSchool.longitude)
-              );
-              const radius = effectiveSchool.geofence_radius_meters || 150;
-              if (distToSchool < radius) {
-                isWithinAnyRoom = true;
-              }
-            }
-          } else {
-            console.warn('[Login] Geofence check failed because user position could not be acquired.');
-          }
-
-          setGeoDebug({
-            isWithinAnyRoom,
-            userPos: currentPos,
-            schoolCoords: effectiveSchool ? { lat: effectiveSchool.latitude, lng: effectiveSchool.longitude } : null,
-            distToSchool: (currentPos && effectiveSchool?.latitude && effectiveSchool?.longitude)
-              ? Math.round(getDistanceFromLatLonInM(currentPos.lat, currentPos.lng, Number(effectiveSchool.latitude), Number(effectiveSchool.longitude)))
-              : null,
-            withinHours: true
-          });
-        }
-      } else {
-        console.log('[Login] Geofence check bypassed.');
-        setGeoDebug(null);
-      }
+      // ⚡ Enterprise+ Tier-1 Privacy: Physical Station-Coupling replaces Geolocation (§ 87 BetrVG / DSGVO Art. 5 & 8)
+      isWithinAnyRoom = true;
+      setGeoDebug(null);
 
       console.log(`[Login] Scan successful. Geofence match: ${isWithinAnyRoom}`);
       
@@ -5561,31 +5445,9 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           <div style={{ marginTop: '20px', width: '100%' }}>
             <button 
               onClick={() => {
-                if (navigator.geolocation) {
-                  setLoadingLocation(true);
-                  navigator.geolocation.getCurrentPosition(
-                    (pos) => {
-                      const currentPos = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-                      setUserPos(currentPos);
-                      console.log('[Kiosk] Geolocation success:', currentPos);
-                      setLoadingLocation(false);
-                      setIsGroovelabKiosk(true);
-                      setIsCameraActive(true);
-                    },
-                    (err) => {
-                      console.warn('[Kiosk] Geolocation failed:', err);
-                      setLoadingLocation(false);
-                      setIsGroovelabKiosk(true); // Fallback: still show kiosk rooms
-                      setIsCameraActive(true);
-                    },
-                    { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 }
-                  );
-                } else {
-                  setIsGroovelabKiosk(true);
-                  setIsCameraActive(true);
-                }
+                setIsGroovelabKiosk(true);
+                setIsCameraActive(true);
               }}
-              disabled={loadingLocation}
               style={{
                 width: '100%',
                 display: 'flex',
@@ -5680,29 +5542,99 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             <div style={{ fontSize: '11px', fontWeight: 800, color: 'rgba(0, 0, 0, 0.6)', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Tablet size={14} style={{ color: '#78350f' }} /> GrooveLab Kiosk aktivieren
             </div>
-            
-            {kioskRooms.length > 0 ? (
+
+            {!loginKioskPinUnlocked ? (
+              <form onSubmit={handleVerifyLoginKioskPin} style={{ display: 'flex', flexDirection: 'column', gap: '10px', alignItems: 'center', background: 'rgba(255, 255, 255, 0.5)', padding: '16px', borderRadius: '16px', border: '1px solid rgba(234, 179, 8, 0.3)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: 800, color: '#78350f' }}>
+                  <Lock size={14} /> Terminal-Einrichtung PIN-geschützt
+                </div>
+                <p style={{ fontSize: '11px', color: '#854d0e', margin: 0, textAlign: 'center', lineHeight: 1.3 }}>
+                  Gib den 4-stelligen Schul-PIN ein, um dieses Gerät einem Raum und einer Station zuzuweisen.
+                </p>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '4px' }}>
+                  <input
+                    type="password"
+                    maxLength={4}
+                    value={loginKioskPinInput}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/\D/g, '').slice(0, 4);
+                      setLoginKioskPinInput(val);
+                      if (val.length === 4) {
+                        setTimeout(() => {
+                          const targetSchoolId = schoolData?.id || (typeof window !== 'undefined' ? localStorage.getItem('groovelab_school_id') : null) || '11111111-1111-1111-1111-111111111111';
+                          supabase.rpc('verify_kiosk_setup_pin', {
+                            p_school_id: targetSchoolId,
+                            p_pin: val
+                          }).then(({ data: ok }) => {
+                            if (ok === true) {
+                              setLoginKioskPinUnlocked(true);
+                              setLoginKioskAttempts(0);
+                              setLoginKioskPinError(null);
+                            } else {
+                              setLoginKioskPinError('Falscher PIN.');
+                              setLoginKioskPinInput('');
+                            }
+                          });
+                        }, 100);
+                      }
+                    }}
+                    placeholder="••••"
+                    disabled={loginKioskCooldown > 0 || loginKioskPinVerifying}
+                    style={{
+                      width: '90px',
+                      padding: '8px 12px',
+                      borderRadius: '10px',
+                      border: '1.5px solid #eab308',
+                      background: '#ffffff',
+                      color: '#0f172a',
+                      fontSize: '16px',
+                      fontWeight: 900,
+                      letterSpacing: '0.25em',
+                      textAlign: 'center',
+                      outline: 'none'
+                    }}
+                  />
+                  <button
+                    type="submit"
+                    disabled={loginKioskPinInput.length !== 4 || loginKioskPinVerifying || loginKioskCooldown > 0}
+                    style={{
+                      padding: '8px 14px',
+                      borderRadius: '10px',
+                      border: 'none',
+                      background: '#eab308',
+                      color: '#0f172a',
+                      fontSize: '11px',
+                      fontWeight: 800,
+                      cursor: loginKioskPinInput.length !== 4 || loginKioskPinVerifying || loginKioskCooldown > 0 ? 'not-allowed' : 'pointer',
+                      opacity: loginKioskPinInput.length !== 4 || loginKioskPinVerifying || loginKioskCooldown > 0 ? 0.5 : 1
+                    }}
+                  >
+                    {loginKioskPinVerifying ? '…' : 'Freischalten'}
+                  </button>
+                </div>
+                {loginKioskPinError && (
+                  <div style={{ color: '#ef4444', fontSize: '11px', fontWeight: 700 }}>
+                    {loginKioskPinError}
+                  </div>
+                )}
+                {loginKioskCooldown > 0 && (
+                  <div style={{ color: '#b45309', fontSize: '11px', fontWeight: 700 }}>
+                    Wartezeit: {loginKioskCooldown}s
+                  </div>
+                )}
+              </form>
+            ) : (
               <>
-                {/* Room Selector */}
-                <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px' }}>
+                {kioskRooms.length > 0 ? (
+                  <>
+                    {/* Room Selector */}
+                    <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px' }}>
                   {kioskRooms.map((room, idx) => (
                     <button
                       key={room.id}
                       type="button"
                       onClick={() => {
                         setKioskSelectedRoomId(room.id);
-                        // Trigger GPS request pre-emptively on user click gesture!
-                        if (navigator.geolocation) {
-                          navigator.geolocation.getCurrentPosition(
-                            (pos) => {
-                              const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-                              setUserPos(coords);
-                              console.log('[GPS Room Click] Cached coords:', coords);
-                            },
-                            (err) => console.warn('[GPS Room Click] Failed:', err),
-                            { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 }
-                          );
-                        }
                       }}
                       style={{
                         padding: '8px 14px',
@@ -5822,19 +5754,6 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                               alert('Kopplung fehlgeschlagen: ' + err.message);
                               setSelectedKioskStationId(null);
                             }
-                            
-                            // Trigger GPS request pre-emptively on user click gesture!
-                            if (navigator.geolocation) {
-                              navigator.geolocation.getCurrentPosition(
-                                (pos) => {
-                                  const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-                                  setUserPos(coords);
-                                  console.log('[GPS Station Click] Cached coords:', coords);
-                                },
-                                (err) => console.warn('[GPS Station Click] Failed:', err),
-                                { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 }
-                              );
-                            }
                           } else {
                             localStorage.removeItem('groovelab_kiosk_token');
                             localStorage.removeItem('groovelab_station_id');
@@ -5909,6 +5828,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 </p>
               </div>
             )}
+          </>
+        )}
             
             <button 
               type="button" 
@@ -7279,6 +7200,15 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           onMouseOut={(e) => { e.currentTarget.style.color = isGroovelabKiosk ? '#854d0e' : '#4ade80'; }}
         >
           AGB
+        </span>
+        <span style={{ opacity: 0.4 }}>•</span>
+        <span 
+          onClick={() => setLegalModalTab('cancellation')} 
+          style={{ cursor: 'pointer', transition: 'color 0.2s' }} 
+          onMouseOver={(e) => { e.currentTarget.style.color = isGroovelabKiosk ? '#713f12' : '#ffffff'; }}
+          onMouseOut={(e) => { e.currentTarget.style.color = isGroovelabKiosk ? '#854d0e' : '#4ade80'; }}
+        >
+          Widerruf
         </span>
         <span style={{ opacity: 0.4 }}>•</span>
         <span 

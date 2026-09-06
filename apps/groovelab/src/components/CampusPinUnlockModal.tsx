@@ -183,7 +183,7 @@ export const CampusPinUnlockModal: React.FC<CampusPinUnlockModalProps> = ({
         if (isMatch) {
           if (isParentMatch) {
             sessionStorage.setItem(`groovelab_parent_unlocked_${user.id}`, 'true');
-            sessionStorage.setItem(`groovelab_parent_session_${user.id}`, String(Date.now() + 15 * 60 * 1000));
+            sessionStorage.setItem(`groovelab_parent_session_${user.id}`, String(Date.now() + 180 * 1000));
           }
           onUnlock();
         } else {

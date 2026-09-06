@@ -17,6 +17,7 @@ export const LEGAL_MASTER_WORDING = {
     noLicenseFeeDisclaimer: 'Keine gesonderten Lizenzkaufgebühren. Berechnet wird ausschließlich die gemietete Cloud- und Hosting-Infrastruktur.',
     noLicenseFeeShort: 'Keine Lizenzkaufgebühren (0,00 €)',
     slogan: 'Transparentes Cloud-Hosting statt teurer Software-Lizenzen',
+    unifiedSaasContract: 'Software-as-a-Service (SaaS)-Bereitstellung nach § 535 BGB: Bereitstellung der Software ohne Lizenzkaufgebühr (0,00 € Einrichtungsgebühr), Abrechnung erfolgt rein über die modulare Cloud-Infrastruktur.'
   },
 
   // 2. Modulare Buchung & Cloud-Hosting
@@ -65,6 +66,9 @@ export const LEGAL_MASTER_WORDING = {
     kleinunternehmerUStG19: 'In DE gemäß § 19 UStG bzw. in AT gemäß § 6 Abs. 1 Z 27 UStG 1994 umsatzsteuerbefreit (Kleinunternehmerregelung). In der Schweiz gilt Leistungsort Schweiz (nicht im Inland steuerbar gem. Art. 8 Abs. 1 MWSTG).',
     screenlessPractice: 'Didaktisches Prinzip des bildschirmfreien Übens (Screenless Practice): Im Modus „Von Eltern geführt“ verbleibt das Endgerät bei den Erziehungsberechtigten. Übezeiten am akustischen Instrument werden per 1-Klick-Quittierung verbucht, um Kinder (insbesondere 6–9 Jahre) vor verfrühter Bildschirmzeit zu schützen (einheitliche elterliche Freigabe bis 16 Jahre in DE, AT und CH).',
     herrenbergCompliance: 'Autonomie von Honorarlehrkräften (BSG B 12 R 3/20 R): Stundenplan- und Raumfunktionen stellen unverbindliche Dispositionsvorschläge dar. Die Plattform übt keine Weisungs- oder Kontrollfunktion aus, führt keine automatisierte Leistungs- oder Verhaltenskontrolle (§ 87 BetrVG / BPersVG) durch und wahrt das Recht auf Nichterreichbarkeit (§ 5 ArbSchG).',
+    staffCouncilNonSurveillance: 'Ausschluss von Leistungs- und Verhaltenskontrolle (§ 87 Abs. 1 Nr. 6 BetrVG / LPVG): Die Plattform erfasst, vergleicht und aggregiert keine Daten zur Überwachung des Verhaltens oder der Arbeitsleistung von Lehrkräften. Schulleitungen und Administratoren haben keinen Zugriff auf individuelle Frequenz- oder Leistungsauswertungen.',
+    b2bMediationAndArbitration: 'Vorgerichtliche Streitbeilegung & Schlichtung (B2B): Bei Streitigkeiten aus oder im Zusammenhang mit diesem Vertrag verpflichten sich die Parteien, vor Beschreitung des ordentlichen Rechtswegs ein strukturiertes Schlichtungsverfahren nach der Schlichtungsordnung der zuständigen Industrie- und Handelskammer (IHK) durchzuführen.',
+    privateByDefaultLeaderboards: 'Schutz vor Bloßstellung & Peer-Druck (Private by Default): Übe-Fortschritte, Streaks und XP verbleiben standardmäßig strikt privat beim einzelnen Schüler. Klassen- oder schulweite Vergleiche sind standardmäßig deaktiviert und erfordern die bewusste Freigabe durch die Erziehungsberechtigten.',
     pureMetadataDoctrine: 'Reine Metadaten-Architektur, Verwertungsgesellschaften-Klarstellung & Notice-and-Takedown (§ 60a UrhG DE / § 42f UrhG AT / Art. 19 URG CH / Art. 6 & 16 DSA): Die Plattform speichert und hostet keine geschützten Noten-PDFs oder Notensätze, sondern verarbeitet ausschließlich freie bibliografische Metadaten sowie lizenzierte Links zu externen Medien- (Spotify, YouTube) und autorisierten Notenpartnern (Tomplay). Keine eigene Vergütungspflicht gegenüber GEMA, AKM oder SUISA.'
   },
 
@@ -82,7 +86,7 @@ export const LEGAL_MASTER_WORDING = {
     fido2HardwareProtection: 'FIDO2 / WebAuthn Hardware Passkeys mit kryptografischem Signatur-Zähler zum Schutz vor Klon-Angriffen.',
     dataMinimization: 'Kompromisslose DSGVO-Datenminimierung: Keine Speicherung von SEPA-, Bank- oder Kreditkartendaten, keine E-Mail-Adressen Minderjähriger, automatische Nachnamensmaskierung.',
     voiceBiometricsExclusion: 'Reines didaktisches Audio-Streaming ohne biometrische Stimm-, Sprecher- oder Verhaltensmusteranalysen (Art. 9 DSGVO / Art. 6 nDSG).',
-    hostingInfrastructure: 'Ausschließliches Hosting in ISO 27001-zertifizierten deutschen Rechenzentren (Hetzner Online GmbH, Falkenstein/Vogtland & Nürnberg, Deutschland) mit stündlichen verschlüsselten Backups.',
+    hostingInfrastructure: 'Ausschließliches Hosting in ISO 27001-zertifizierten deutschen Rechenzentren (Hetzner Online GmbH, Falkenstein/Vogtland & Nürnberg, Deutschland) mit stündlichen verschlüsselten Backups. 100% frei von US-Cloudservern, vollständige Immunität gegen US CLOUD Act und FISA 702 (Schrems II konform).',
     indexedDbAudioVault: 'Lokaler IndexedDB Audio-Tresor (groovelab_audio_vault) für 0ms Offline-Playback und bandbreitenfreie Proberaumnutzung.'
   },
 
@@ -93,6 +97,6 @@ export const LEGAL_MASTER_WORDING = {
     stage2Passive: 'Passiv / Basis-Bereitstellung (0,09 € / Mo.): Minimaler Zugriff auf Stundenplan, Raumzuweisung und QR-Landingpage. Identität & Daten bleiben 100% erhalten.',
     fairPlayInactivityRule: 'Bei mehr als 60 Tagen Inaktivität ohne Login wird das Profil fair-play-konform auf Basis-Bereitstellung (0,09 €) umgestellt (automatischer Kostenschutz für Musikschulen).',
     educationalPortfolioRule: 'Didaktische Bildungsbiografie & Meisterwerk-Dokumentation (reine Metadaten gem. Art. 6 Abs. 1 lit. b DSGVO) bleiben über Schuljahre hinweg (mehrjährig) kumulativ erhalten. Physische Datenlöschung erfolgt erst 30 Tage nach formeller Exmatrikulation.',
-    audioSchoolYearRetention: 'Didaktische Audio-Aufnahmen (Hausaufgaben & Loopstation) bleiben das gesamte Schuljahr (bis 31.08.) erhalten und können vor dem jährlichen Speicher-Janitor als MP3/ZIP exportiert werden.'
+    audioSchoolYearRetention: 'Didaktische Audio-Aufnahmen (Hausaufgaben, Übe-Studio & Loopstation) dienen der Dokumentation des individuellen Lernfortschritts über das Ausbildungsjahr (pädagogisches Jahres-Portfolio). Sie verbleiben bis zum Ende des jeweiligen Schuljahres (30. September inklusive Karenzzeit) im geschützten deutschen Cloud-Speicher. Eltern und Lehrkräfte besitzen jederzeitige 1-Klick-Selbstlöschautonomie.'
   }
 } as const;

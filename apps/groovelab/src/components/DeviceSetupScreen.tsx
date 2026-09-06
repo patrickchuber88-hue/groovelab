@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { Music, Tablet, X, ShieldCheck, FileText } from 'lucide-react';
+import { Music, Tablet, X, ShieldCheck, FileText, Lock } from 'lucide-react';
 import { generateConsentPDF } from '../utils/pdfGenerator';
 
 interface DeviceSetupScreenProps {
@@ -29,6 +29,21 @@ export function DeviceSetupScreen({
   const [selectedRoomId, setSelectedRoomId] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Target school ID for terminal pairing
+  const [targetSchoolIdState, setTargetSchoolIdState] = useState<string>(
+    school?.id || (typeof window !== 'undefined' ? localStorage.getItem('groovelab_school_id') : null) || '11111111-1111-1111-1111-111111111111'
+  );
+
+  // GrooveLab Terminal-Setup PIN Gatekeeper State
+  const [isPinUnlocked, setIsPinUnlocked] = useState<boolean>(() => {
+    return !!admin || (typeof window !== 'undefined' && sessionStorage.getItem('groovelab_setup_unlocked') === 'true');
+  });
+  const [pinInput, setPinInput] = useState('');
+  const [pinError, setPinError] = useState<string | null>(null);
+  const [pinVerifying, setPinVerifying] = useState(false);
+  const [cooldownRemaining, setCooldownRemaining] = useState(0);
+  const [failedAttempts, setFailedAttempts] = useState(0);
 
   // Secret Master Admin click combo state
   const [logoClicks, setLogoClicks] = useState(0);
@@ -77,6 +92,72 @@ export function DeviceSetupScreen({
       setLoginError(err.message);
     } finally {
       setAdminLoginLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    let timer: any;
+    if (cooldownRemaining > 0) {
+      timer = setInterval(() => {
+        setCooldownRemaining(prev => Math.max(0, prev - 1));
+      }, 1000);
+    }
+    return () => clearInterval(timer);
+  }, [cooldownRemaining]);
+
+  const handleKeypadPress = (val: string) => {
+    if (pinVerifying || cooldownRemaining > 0) return;
+    setPinError(null);
+    if (val === 'back') {
+      setPinInput(prev => prev.slice(0, -1));
+    } else if (val === 'clear') {
+      setPinInput('');
+    } else if (pinInput.length < 4) {
+      const next = pinInput + val;
+      setPinInput(next);
+      if (next.length === 4) {
+        verifyPin(next);
+      }
+    }
+  };
+
+  const verifyPin = async (pinToTest: string) => {
+    try {
+      setPinVerifying(true);
+      setPinError(null);
+
+      const schoolIdToUse = targetSchoolIdState || localStorage.getItem('groovelab_school_id') || '11111111-1111-1111-1111-111111111111';
+
+      const { data: isValid, error: rpcErr } = await supabase.rpc('verify_kiosk_setup_pin', {
+        p_school_id: schoolIdToUse,
+        p_pin: pinToTest
+      });
+
+      if (rpcErr) {
+        console.error('[Setup] PIN verification RPC error:', rpcErr);
+      }
+
+      if (isValid === true) {
+        setIsPinUnlocked(true);
+        sessionStorage.setItem('groovelab_setup_unlocked', 'true');
+        setFailedAttempts(0);
+        setPinError(null);
+      } else {
+        const nextAttempts = failedAttempts + 1;
+        setFailedAttempts(nextAttempts);
+        setPinInput('');
+        if (nextAttempts >= 5) {
+          setCooldownRemaining(60);
+          setPinError('Zu viele Fehlversuche. Bitte warte 60 Sekunden.');
+        } else {
+          setPinError(`Falscher Terminal-PIN. Noch ${5 - nextAttempts} Versuch(e).`);
+        }
+      }
+    } catch (err: any) {
+      console.error('[Setup] Verification failed:', err);
+      setPinError('Verbindungsfehler bei der PIN-Prüfung.');
+    } finally {
+      setPinVerifying(false);
     }
   };
 
@@ -164,6 +245,7 @@ export function DeviceSetupScreen({
 
       // Persist the resolved school ID to localStorage for stability
       localStorage.setItem('groovelab_school_id', targetSchoolId);
+      setTargetSchoolIdState(targetSchoolId);
 
       const activePlatform = localStorage.getItem('groovelab_active_platform') || 'groovelab';
       let roomsQuery = supabase.from('rooms').select('*').order('sort_order', { ascending: true });
@@ -253,10 +335,53 @@ export function DeviceSetupScreen({
       await supabase.from('sessions').update({ check_out_time: new Date().toISOString() }).eq('id', busySession.id);
     }
 
+    const targetStation = stations.find(s => s.id === stationId);
+    const targetRoomId = targetStation?.room_id || selectedRoomId;
+    
+    // Ensure kiosk record and groovelab_kiosk_token are linked
+    try {
+      const isUuid = (str: any) => typeof str === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+      const generatedSecretToken = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : (Date.now() + '-0000-4000-8000-' + Math.floor(Math.random()*1e12).toString(16).padStart(12, '0'));
+
+      const { data: existingKiosk } = isUuid(stationId) ? await supabase
+        .from('kiosks')
+        .select('*')
+        .eq('station_id', stationId)
+        .limit(1)
+        .maybeSingle() : { data: null };
+
+      let kioskRecord = existingKiosk;
+      if (!kioskRecord && isUuid(stationId)) {
+        const { data: insertedRows } = await supabase
+          .from('kiosks')
+          .insert({
+            school_id: targetSchoolIdState || '11111111-1111-1111-1111-111111111111',
+            name: targetStation?.name || 'iPad Kiosk',
+            secret_token: generatedSecretToken,
+            room_id: isUuid(targetRoomId) ? targetRoomId : null,
+            station_id: stationId
+          })
+          .select();
+        if (insertedRows && insertedRows[0]) {
+          kioskRecord = insertedRows[0];
+        }
+      }
+
+      if (kioskRecord?.secret_token) {
+        localStorage.setItem('groovelab_kiosk_token', kioskRecord.secret_token);
+      }
+      if (targetRoomId) {
+        localStorage.setItem('groovelab_kiosk_room_id', targetRoomId);
+      }
+    } catch (e) {
+      console.warn('[Setup] Could not link kiosk token:', e);
+    }
+
     sessionStorage.removeItem('groovelab_user_id');
     localStorage.removeItem('groovelab_user_id');
     localStorage.removeItem('groovelab_location_mode');
     localStorage.setItem('groovelab_station_id', stationId);
+    localStorage.setItem('groovelab_active_platform', 'groovelab');
     
     // Clean up URL parameters by redirecting to base path
     const newUrl = window.location.origin + window.location.pathname;
@@ -347,7 +472,191 @@ export function DeviceSetupScreen({
         )}
         
         {setupTab === 'device' ? (
-          <>
+          !isPinUnlocked ? (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '16px 0' }}>
+              <div style={{
+                width: '60px',
+                height: '60px',
+                borderRadius: '20px',
+                background: '#fefce8',
+                border: '1.5px solid #fef08a',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#854d0e',
+                marginBottom: '16px',
+                boxShadow: '0 8px 20px rgba(234, 179, 8, 0.15)'
+              }}>
+                <Lock size={28} />
+              </div>
+
+              <h2 style={{ fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', margin: '0 0 6px 0' }}>
+                Terminal-Einrichtung gesperrt
+              </h2>
+              <p style={{ fontSize: '0.84rem', color: '#64748b', fontWeight: 600, maxWidth: '380px', margin: '0 0 20px 0', lineHeight: 1.4 }}>
+                Bitte gib den 4-stelligen Schul-PIN ein, um dieses iPad als Schüler-Terminal im Bandraum zuzuweisen.
+              </p>
+
+              {/* 4 PIN Indicators */}
+              <div style={{ display: 'flex', gap: '16px', justifyContent: 'center', marginBottom: '20px' }}>
+                {[0, 1, 2, 3].map(idx => {
+                  const isFilled = pinInput.length > idx;
+                  return (
+                    <div
+                      key={idx}
+                      style={{
+                        width: '20px',
+                        height: '20px',
+                        borderRadius: '50%',
+                        background: isFilled ? '#eab308' : '#f1f5f9',
+                        border: isFilled ? '2px solid #ca8a04' : '2px solid #cbd5e1',
+                        transform: isFilled ? 'scale(1.15)' : 'scale(1)',
+                        transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)',
+                        boxShadow: isFilled ? '0 2px 8px rgba(234, 179, 8, 0.35)' : 'none'
+                      }}
+                    />
+                  );
+                })}
+              </div>
+
+              {/* Error Message */}
+              {pinError && (
+                <div style={{
+                  background: '#fef2f2',
+                  border: '1px solid #fecaca',
+                  color: '#ef4444',
+                  padding: '10px 18px',
+                  borderRadius: '12px',
+                  fontSize: '0.82rem',
+                  fontWeight: 700,
+                  marginBottom: '18px',
+                  maxWidth: '320px',
+                  textAlign: 'center'
+                }}>
+                  {pinError}
+                </div>
+              )}
+
+              {/* Cooldown Message */}
+              {cooldownRemaining > 0 && (
+                <div style={{
+                  background: '#fffbeb',
+                  border: '1px solid #fde68a',
+                  color: '#b45309',
+                  padding: '10px 18px',
+                  borderRadius: '12px',
+                  fontSize: '0.82rem',
+                  fontWeight: 700,
+                  marginBottom: '18px',
+                  maxWidth: '320px',
+                  textAlign: 'center'
+                }}>
+                  Sperre aktiv: Bitte warte noch {cooldownRemaining}s
+                </div>
+              )}
+
+              {/* Keypad */}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(3, 1fr)',
+                gap: '12px',
+                maxWidth: '280px',
+                width: '100%',
+                margin: '0 auto'
+              }}>
+                {['1', '2', '3', '4', '5', '6', '7', '8', '9', 'clear', '0', 'back'].map(key => {
+                  if (key === 'clear') {
+                    return (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => handleKeypadPress('clear')}
+                        disabled={cooldownRemaining > 0 || pinVerifying || pinInput.length === 0}
+                        style={{
+                          height: '56px',
+                          borderRadius: '16px',
+                          border: '1px solid #e2e8f0',
+                          background: '#f8fafc',
+                          color: '#64748b',
+                          fontSize: '0.82rem',
+                          fontWeight: 800,
+                          cursor: cooldownRemaining > 0 || pinVerifying || pinInput.length === 0 ? 'not-allowed' : 'pointer',
+                          opacity: cooldownRemaining > 0 || pinVerifying || pinInput.length === 0 ? 0.4 : 1,
+                          transition: 'all 0.1s'
+                        }}
+                        className="hover-scale"
+                      >
+                        C
+                      </button>
+                    );
+                  }
+                  if (key === 'back') {
+                    return (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => handleKeypadPress('back')}
+                        disabled={cooldownRemaining > 0 || pinVerifying || pinInput.length === 0}
+                        style={{
+                          height: '56px',
+                          borderRadius: '16px',
+                          border: '1px solid #e2e8f0',
+                          background: '#f8fafc',
+                          color: '#64748b',
+                          fontSize: '1rem',
+                          fontWeight: 800,
+                          cursor: cooldownRemaining > 0 || pinVerifying || pinInput.length === 0 ? 'not-allowed' : 'pointer',
+                          opacity: cooldownRemaining > 0 || pinVerifying || pinInput.length === 0 ? 0.4 : 1,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          transition: 'all 0.1s'
+                        }}
+                        className="hover-scale"
+                      >
+                        ⌫
+                      </button>
+                    );
+                  }
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => handleKeypadPress(key)}
+                      disabled={cooldownRemaining > 0 || pinVerifying}
+                      style={{
+                        height: '56px',
+                        borderRadius: '16px',
+                        border: '1.5px solid #e2e8f0',
+                        background: '#ffffff',
+                        color: '#0f172a',
+                        fontSize: '1.4rem',
+                        fontWeight: 800,
+                        cursor: cooldownRemaining > 0 || pinVerifying ? 'not-allowed' : 'pointer',
+                        opacity: cooldownRemaining > 0 ? 0.4 : 1,
+                        boxShadow: '0 2px 6px rgba(0,0,0,0.03)',
+                        transition: 'all 0.1s'
+                      }}
+                      className="hover-scale"
+                    >
+                      {key}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div style={{ marginTop: '24px', fontSize: '0.74rem', color: '#94a3b8', fontWeight: 600 }}>
+                Den 4-stelligen PIN findest du im Admin-Dashboard unter <em>Einstellungen &gt; Kiosk-Geräte</em>.
+              </div>
+
+              <div style={{ borderTop: '1px solid #f1f5f9', marginTop: '24px', paddingTop: '16px', width: '100%' }}>
+                <button onClick={handleSkip} style={{ background: 'transparent', border: 'none', color: '#64748b', fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer' }}>
+                  Setup überspringen (nur Home-Mode)
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
             <div style={{ textAlign: 'left' }}>
           <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '8px', display: 'block' }}>Raum auswählen</label>
           <div style={{ display: 'inline-flex', gap: '6px', background: '#f1f5f9', padding: '5px', borderRadius: '14px', flexWrap: 'wrap' }}>
@@ -742,7 +1051,7 @@ export function DeviceSetupScreen({
           </button>
         </div>
       </>
-    ) : (
+    )) : (
       <>
         {/* Datenschutz & AVV tab content for GrooveLab settings */}
         <div style={{ 

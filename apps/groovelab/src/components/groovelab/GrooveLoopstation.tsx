@@ -708,6 +708,10 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
   }, []);
 
   const runAutoCalibrationSequence = async () => {
+    if (student?.parent_allow_audio === false || (student as any)?.parent_permissions?.allow_student_audio === false) {
+      alert("Audioaufnahmen wurden von den Erziehungsberechtigten für dieses Schülerprofil deaktiviert.");
+      return;
+    }
     setIsCalibratingLatency(true);
     setCalibrationPhaseState('ambient');
     setCalibrationClickCount(0);
@@ -1704,6 +1708,10 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
   };
 
   const startAutoSequence = async () => {
+    if (student?.parent_allow_audio === false || (student as any)?.parent_permissions?.allow_student_audio === false) {
+      alert("Audioaufnahmen wurden von den Erziehungsberechtigten für dieses Schülerprofil deaktiviert.");
+      return;
+    }
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       alert("Audio-Aufnahme wird von Ihrem Browser oder in diesem Sicherheitskontext nicht unterstützt.");
       return;
@@ -2494,6 +2502,10 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
   };
 
   const startRecording = async (trackId: number) => {
+    if (student?.parent_allow_audio === false || (student as any)?.parent_permissions?.allow_student_audio === false) {
+      alert("Audioaufnahmen wurden von den Erziehungsberechtigten für dieses Schülerprofil deaktiviert.");
+      return;
+    }
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       alert("Audio-Aufnahme wird von Ihrem Browser oder in diesem Sicherheitskontext nicht unterstützt.");
       return;

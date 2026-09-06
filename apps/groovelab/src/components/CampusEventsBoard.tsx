@@ -479,7 +479,7 @@ export function CampusEventsBoard({
       let isMatch = false;
 
       if (userId) {
-        // 1. Primary: Server-Side verify_parent_pin RPC
+        // 1. Primary: Server-Side verify_parent_pin RPC (Fail-Closed, zero student PIN fallback)
         try {
           const { data: parentOk } = await supabase.rpc('verify_parent_pin', {
             student_id: userId,
@@ -487,22 +487,12 @@ export function CampusEventsBoard({
           });
           if (parentOk === true) isMatch = true;
         } catch (e) {}
-
-        // 2. Fallback: Server-Side verify_personal_pin RPC
-        if (!isMatch) {
-          try {
-            const { data: personalOk } = await supabase.rpc('verify_personal_pin', {
-              user_uuid: userId,
-              input_pin: cleanInput
-            });
-            if (personalOk === true) isMatch = true;
-          } catch (e) {}
-        }
       }
 
       if (isMatch) {
         sessionStorage.setItem('groovelab_parent_unlocked_global', 'true');
         sessionStorage.setItem(`groovelab_parent_unlocked_${userId}`, 'true');
+        sessionStorage.setItem(`groovelab_parent_session_${userId}`, String(Date.now() + 180 * 1000));
         setShowPinGateModal(false);
         setPinGateInput('');
         setPinGateError('');

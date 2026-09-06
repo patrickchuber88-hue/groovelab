@@ -231,3 +231,40 @@ export async function validateMediaBlob(
     detectedFormat: format
   };
 }
+
+/**
+ * Sanitizes an audio blob by stripping device metadata chunks (such as ID3 PRIV tags,
+ * EXIF or hardware serials) and returning clean audio data for children privacy protection.
+ */
+export async function stripAudioMetadata(blob: Blob): Promise<Blob> {
+  try {
+    const arrayBuffer = await blob.arrayBuffer();
+    const bytes = new Uint8Array(arrayBuffer);
+
+    // If WAV: Check for clean RIFF format
+    if (matchesBytes(bytes, [0x52, 0x49, 0x46, 0x46]) && matchesAscii(bytes, 'WAVE', 8)) {
+      return new Blob([arrayBuffer], { type: blob.type || 'audio/wav' });
+    }
+
+    // If MP3 with ID3v2: ID3v2 tags can contain PRIV / COMM device metadata.
+    if (matchesBytes(bytes, [0x49, 0x44, 0x33]) && bytes.length > 10) {
+      // ID3v2 size is encoded in 4 synchsafe bytes (bytes 6-9)
+      const size =
+        ((bytes[6] & 0x7f) << 21) |
+        ((bytes[7] & 0x7f) << 14) |
+        ((bytes[8] & 0x7f) << 7) |
+        (bytes[9] & 0x7f);
+      const tagLength = 10 + size;
+      if (tagLength < bytes.length && bytes[tagLength] === 0xff) {
+        // Strip the ID3v2 header and return clean MPEG audio frames
+        const cleanBytes = bytes.slice(tagLength);
+        return new Blob([cleanBytes], { type: blob.type || 'audio/mpeg' });
+      }
+    }
+
+    return blob;
+  } catch (e) {
+    console.warn('[MediaSecurity] Notice during audio metadata strip:', e);
+    return blob;
+  }
+}

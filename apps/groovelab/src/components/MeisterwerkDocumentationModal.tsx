@@ -250,9 +250,10 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   const actualStudentName = useMemo(() => {
     const fName = (student.first_name || '').trim();
     if (!fName) return 'Musiker';
+    if (readOnly) return fName; // 🛡️ Zero-Knowledge for students: strictly pure first name
     const lInitial = student.last_name ? ' ' + student.last_name.trim().charAt(0) + '.' : '';
     return `${fName}${lInitial}`;
-  }, [student.first_name, student.last_name]);
+  }, [readOnly, student.first_name, student.last_name]);
 
   const getSchoolYearString = (dateInput?: string | Date) => {
     let d = new Date();
@@ -2077,11 +2078,24 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     if (isStudentActor) {
       const studentIdVal = (student as any)?.id;
       const localAudioKey = studentIdVal && typeof window !== 'undefined' ? localStorage.getItem(`groovelab_parent_allow_audio_${studentIdVal}`) : null;
+      const localStudentAudioKey = studentIdVal && typeof window !== 'undefined' ? localStorage.getItem(`groovelab_parent_allow_student_audio_${studentIdVal}`) : null;
       const isAudioAllowed = (student as any)?.parent_allow_audio !== false && 
+        ((student as any)?.parent_permissions?.allow_student_audio !== false) &&
         (localAudioKey !== null ? localAudioKey !== 'false' : true) &&
+        (localStudentAudioKey !== null ? localStudentAudioKey !== 'false' : true) &&
         (typeof window !== 'undefined' ? localStorage.getItem('campus_board_override_recordings') !== 'false' && localStorage.getItem('campus_allow_audio') !== 'false' : true);
       if (!isAudioAllowed) {
-        alert('Die Aufnahme-Funktion ist im Eltern-Kontrollzentrum aktuell deaktiviert.');
+        alert('Die Aufnahme-Funktion für Schüler ist im Eltern-Kontrollzentrum aktuell deaktiviert.');
+        return;
+      }
+    } else {
+      // 🛡️ Didaktische Audio-Memos der Lehrkraft (§ 73 UrhG / Art. 6 DSGVO)
+      const studentIdVal = (student as any)?.id;
+      const localTeacherAudioKey = studentIdVal && typeof window !== 'undefined' ? localStorage.getItem(`groovelab_parent_allow_teacher_audio_${studentIdVal}`) : null;
+      const isTeacherAudioAllowed = ((student as any)?.parent_permissions?.allow_teacher_audio !== false) &&
+        (localTeacherAudioKey !== null ? localTeacherAudioKey !== 'false' : true);
+      if (!isTeacherAudioAllowed) {
+        alert('Die Erziehungsberechtigten haben didaktische Audio-Aufnahmen durch die Lehrkraft (§ 73 UrhG) im Eltern-Kontrollzentrum deaktiviert.');
         return;
       }
     }
@@ -7616,7 +7630,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     const finalTeacher = formatTeacherFullName(rawTeacher);
     const finalSchool = sName || 'Campus-Groovelab Musikschule';
     const finalInstrument = (student as any)?.instrument || (student as any)?.instrument_name || 'Gitarre';
-    const stName = `${student.first_name || ''} ${student.last_name ? student.last_name.trim().charAt(0) + '.' : ''}`.trim() || 'Schüler/in';
+    const stName = readOnly
+      ? (student.first_name || 'Schüler/in').trim()
+      : `${student.first_name || ''} ${student.last_name ? student.last_name.trim().charAt(0) + '.' : ''}`.trim() || 'Schüler/in';
     const stFirstName = (student.first_name || (student as any)?.name?.split(' ')[0] || 'Schüler').trim();
     const targetToken = (student as any)?.qr_token || (student as any)?.ausweis_nummer || student?.id;
     const appUrl = `https://app.campus-groovelab.de/qr/${targetToken}`;

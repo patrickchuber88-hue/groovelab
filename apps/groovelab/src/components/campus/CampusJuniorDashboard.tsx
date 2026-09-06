@@ -9,6 +9,7 @@ import { SimpleVoiceRecorder } from './SimpleVoiceRecorder';
 import { cleanHomeworkNotesText } from '../../utils/nameHelper';
 import { DEFAULT_FOKUS_LEVELS, getEngineEffectiveLevel } from '../../utils/studentProgressEngine';
 import { getAvatarLevelFrameStyle } from '../StudioAvatar';
+import { getSecureAudioUrl } from '../../utils/audioStorageHelper';
 
 interface CampusJuniorDashboardProps {
   studentUser: any;
@@ -140,7 +141,7 @@ export const CampusJuniorDashboard: React.FC<CampusJuniorDashboardProps> = ({
     setTimerSecondsLeft(selectedPresetMinutes * 60);
   };
 
-  const togglePlayAudio = (url: string) => {
+  const togglePlayAudio = async (url: string) => {
     if (playingAudioUrl === url && audioElement) {
       audioElement.pause();
       setPlayingAudioUrl(null);
@@ -149,7 +150,8 @@ export const CampusJuniorDashboard: React.FC<CampusJuniorDashboardProps> = ({
     if (audioElement) {
       audioElement.pause();
     }
-    const audio = new Audio(url);
+    const secureUrl = await getSecureAudioUrl(url, 'campus-assets', 300);
+    const audio = new Audio(secureUrl);
     audio.play();
     audio.onended = () => setPlayingAudioUrl(null);
     setAudioElement(audio);

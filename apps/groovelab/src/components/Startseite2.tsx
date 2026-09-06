@@ -2118,6 +2118,7 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
             <span style={{ cursor: 'pointer' }} onClick={() => scrollToSection('pricing')}>Preise</span>
             <span style={{ cursor: 'pointer', fontWeight: 700 }} onClick={() => setActiveDocument('terms')}>AGB</span>
             <span style={{ cursor: 'pointer', fontWeight: 700 }} onClick={() => setActiveDocument('privacy')}>Datenschutz</span>
+            <span style={{ cursor: 'pointer', fontWeight: 700 }} onClick={() => setActiveDocument('cancellation' as any)}>Widerruf</span>
             <span style={{ cursor: 'pointer', fontWeight: 700 }} onClick={() => setActiveDocument('impressum' as any)}>Impressum</span>
           </div>
         </div>

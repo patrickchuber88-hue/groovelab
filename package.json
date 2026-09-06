@@ -14,6 +14,8 @@
     "security:diff": "npm run security:diff -w apps/groovelab",
     "test:billing": "npm run test:billing -w apps/groovelab",
     "typecheck": "tsc -p apps/groovelab/tsconfig.json --noEmit",
+    "gate": "npm run security:check && npm run security:secrets && npm run typecheck && npm run test:billing",
+    "verify:enterprise": "npm run gate",
     "check:budget": "node scripts/check-bundle-budget.js"
   },
   "dependencies": {

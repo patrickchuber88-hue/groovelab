@@ -32,6 +32,31 @@
     2. *Kein Thema mitgegeben*: Antworte mit einer einzigen, direkten Frage nach dem konkreten Thema/Ziel, um die Experten-Rolle und die Ziel-Parameter unmittelbar passgenau einzusetzen.
   - **Inhaltliche Leitplanken**: Reine Software-Architektur, Bounded Contexts, System-Invarianten, deterministischer 4-Phasen-Ablauf (1. Exploration -> 2. Planung -> 3. Implementierung -> 4. Verifikation) und strukturiertes Status-Reporting. Keine domänenspezifischen Vorab-Festlegungen.
 
+## ⚡ Hermetisches Vibe Coding & Enterprise Quality Gate
+- **Hermetischer Master-Prompt**: Bei KI-gestützten Feature-Erweiterungen und Refactorings ist zwingend der Prompt aus `.agents/prompts/VIBE_CODING_MASTER_PROMPT.md` zu verwenden. Der Prompt bindet die KI an strikte Bounded Contexts, verbietet unkontrollierte Dateimodifikationen außerhalb des Scopes und schützt alle OWASP ASVS Level 3 Axiome.
+- **Enterprise Quality Gate (`npm run gate`)**: Vor dem Abschluss jeder Arbeitsaufgabe und vor jedem Git-Commit MUSS zwingend das vereinheitlichte Qualitäts-Gate ausgeführt werden:
+  ```bash
+  npm run gate
+  ```
+  *(oder `npm run verify:enterprise`)*. Dieses Gate führt synchron den Security Drift Guard (0 Violations), den Secret-Scanner (0 Leaks), den TypeScript Typechecker (`tsc --noEmit`) und die FinOps Invariant Tests (`runBillingInvariantTests.ts`) aus. Ein Task gilt erst als erfolgreich, wenn dieses Gate mit Exit-Code 0 abschließt.
+
+## 🏛️ Monolith Goldstandard Guardian & Positive Intervention Directive
+- **Automatische Wächter- & Veredelungsrolle**: Bei jeder Prompt-Ausführung übernimmt der Agent automatisch die Rolle des *Principal Monolith Architecture Guardians*. Alle im Rahmen des Prompts angefassten, erweiterten oder neu erzeugten Dateien werden aktiv auf Konformität mit dem Monolith-Goldstandard von Campus-Groovelab geprüft.
+- **Konstruktiv-Positive Intervention**: Werden Architektur-Mängel, fehlende oder unvollständige Typisierungen, Logik-/UI-Verflechtungen, Code-Duplikate oder Bounded-Context-Verletzungen erkannt, greift der Agent konstruktiv ein und hebt den Code chirurgisch, typ-sicher und rückwärtskompatibel auf den Goldstandard an.
+- **Chirurgisches Scoping (Legacy-Schutz)**: Die Veredelung konzentriert sich pragmatisch und zielgerichtet auf die im jeweiligen Prompt bearbeiteten Funktionen, Komponenten und Datenflüsse. Unberührter Bestandscode im Rest der Datei bleibt stabil, um unnötigen Code-Churn und Regressionsrisiken zu vermeiden.
+- **Unantastbare Goldstandard-Axiome**:
+  1. *Bounded Contexts & Modul-Isolation*: Strikte Trennung zwischen Campus (grün), GrooveLab (gelb) und Admin (rot). Keine unkontrollierten Quereffekte.
+  2. *Single Source of Truth & Zero Duplication*: Keine Schatten-Zustände, redundanten Hilfsfunktionen oder doppelten Typdefinitionen.
+  3. *Strict TypeScript*: 100 % typisiert. Absolutes Verbot von `any`, `@ts-ignore` oder unechten Type-Casts.
+  4. *Zero-Trust & Server-RPCs*: Autorisierungs-, PIN- und sensible Datenprüfungen erfolgen ausnahmslos serverseitig über autoritative RPCs.
+  5. *Desktop Layout Immunity*: Bestehende Desktop-Grid-Layouts und Navigationselemente sind unantastbar. Responsive Anpassungen bleiben strikt auf Mobile (`<= 768px`) beschränkt.
+  6. *Proportions- & Typografie-Harmonie*: UI-Elemente folgen dem etablierten Goldstandard (Apple Squircle Radien, monochrome Icons, Plus Jakarta Sans Typografie).
+- **Kompaktes Reporting (Bedarfsgesteuert)**:
+  - Wurde aktiv eingegriffen und veredelt: Ausgabe eines kurzen Abschnitts `### 🏛️ Monolith Goldstandard Delta` (Präzise Vorher/Nachher-Stichpunkte).
+  - War bereits alles konform: Ein dezenter Vermerk (`🏛️ Monolith Goldstandard: Konform`) genügt.
+- **Verifikations-Abschluss**: Jede Veredelung muss zwingend mit `npm run gate` verifiziert werden (Exit-Code 0).
+
+
 ## Platform Naming
 - Always refer to the platform as **Campus-Groovelab** in all UI elements, user communications, messages, and document descriptions.
 - Ensure the spelling is precisely "Campus-Groovelab" (with a double 'o' in "Groovelab").

@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabase';
-import { validateMediaBlob } from './mediaSecurityValidator';
+import { validateMediaBlob, stripAudioMetadata } from './mediaSecurityValidator';
 
 /**
  * Enterprise+ Audio Storage Helper
@@ -13,31 +13,44 @@ const signedUrlCache = new Map<string, { url: string; expiresAt: number }>();
 export async function getSecureAudioUrl(
   filePath: string,
   bucket: string = 'campus-assets',
-  expiresInSeconds: number = 900 // 15 minutes
+  expiresInSeconds: number = 300 // 5 minutes TTL for JIT signed audio streaming (UrhG § 19a compliance)
 ): Promise<string> {
   if (!filePath) return '';
 
-  // If already a full external URL, return directly
-  if (filePath.startsWith('http://') || filePath.startsWith('https://') || filePath.startsWith('blob:')) {
+  let actualBucket = bucket;
+  let relativePath = filePath;
+
+  // 🛡️ UrhG § 19a & Private Bucket Support:
+  // If the path is a full Supabase storage public or signed URL, extract bucket and object path
+  if (filePath.includes('/storage/v1/object/public/') || filePath.includes('/storage/v1/object/sign/')) {
+    const match = filePath.match(/\/storage\/v1\/object\/(?:public|sign)\/([^/?#]+)\/([^?#]+)/);
+    if (match) {
+      actualBucket = decodeURIComponent(match[1]);
+      relativePath = decodeURIComponent(match[2]);
+    }
+  } else if (filePath.startsWith('blob:')) {
+    return filePath;
+  } else if (filePath.startsWith('http://') || filePath.startsWith('https://')) {
+    // Other external third-party URL
     return filePath;
   }
 
-  const cacheKey = `${bucket}:${filePath}`;
+  const cacheKey = `${actualBucket}:${relativePath}`;
   const now = Date.now();
 
   if (signedUrlCache.has(cacheKey)) {
     const entry = signedUrlCache.get(cacheKey)!;
-    // Return cached if at least 60 seconds remain before expiration
-    if (entry.expiresAt - now > 60 * 1000) {
+    // Return cached if at least 30 seconds remain before expiration
+    if (entry.expiresAt - now > 30 * 1000) {
       return entry.url;
     }
   }
 
   try {
-    // 1. Try creating a signed private URL
+    // 1. Generate short-lived HMAC Pre-Signed URL for private audio streaming
     const { data: signedData, error: signErr } = await supabase.storage
-      .from(bucket)
-      .createSignedUrl(filePath, expiresInSeconds);
+      .from(actualBucket)
+      .createSignedUrl(relativePath, expiresInSeconds);
 
     if (!signErr && signedData?.signedUrl) {
       signedUrlCache.set(cacheKey, {
@@ -47,13 +60,12 @@ export async function getSecureAudioUrl(
       return signedData.signedUrl;
     }
 
-    // 2. Fallback to public URL if bucket is public or signed url failed
-    const { data: pubData } = supabase.storage.from(bucket).getPublicUrl(filePath);
+    // 2. Fallback to public URL only if signed url fails
+    const { data: pubData } = supabase.storage.from(actualBucket).getPublicUrl(relativePath);
     return pubData?.publicUrl || filePath;
   } catch (err) {
-    console.warn('[AudioStorageHelper] Error generating secure URL, falling back to public:', err);
-    const { data: pubData } = supabase.storage.from(bucket).getPublicUrl(filePath);
-    return pubData?.publicUrl || filePath;
+    console.warn('[AudioStorageHelper] Error generating secure signed URL, returning fallback:', err);
+    return filePath;
   }
 }
 
@@ -95,11 +107,13 @@ export async function uploadAudioWithIntegrityVerification(
   bucket: string = 'campus-assets',
   contentType: string = 'audio/webm'
 ): Promise<AudioUploadIntegrityResult> {
-  const checksum = await computeBlobSha256(blob);
-  const sizeBytes = blob.size;
+  // 🛡️ Enterprise Child Privacy: Strip device metadata / hardware fingerprints
+  const sanitizedBlob = await stripAudioMetadata(blob);
+  const checksum = await computeBlobSha256(sanitizedBlob);
+  const sizeBytes = sanitizedBlob.size;
 
   // 🛡️ Enterprise Magic-Byte & Anti-Malware Ingestion Validation
-  const validation = await validateMediaBlob(blob, 'audio', contentType);
+  const validation = await validateMediaBlob(sanitizedBlob, 'audio', contentType);
   if (!validation.isValid) {
     console.error('[AudioStorageHelper] Media Security Ingestion Blocked:', validation.reason);
     return {
@@ -113,7 +127,7 @@ export async function uploadAudioWithIntegrityVerification(
   }
 
   try {
-    const { error } = await supabase.storage.from(bucket).upload(filePath, blob, {
+    const { error } = await supabase.storage.from(bucket).upload(filePath, sanitizedBlob, {
       contentType,
       upsert: true,
       cacheControl: 'private, max-age=3600',

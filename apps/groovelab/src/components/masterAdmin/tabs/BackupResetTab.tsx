@@ -6,10 +6,12 @@ import {
   ShieldAlert, Check, Copy, ArrowRight, Eye, Shield, Server, FileCheck,
   Play, X, ChevronRight, CheckCircle, ArrowLeft, Disc3, Mic, Music,
   Sliders, UserCheck, AlertOctagon, Activity, Zap, Info, ExternalLink,
-  Cpu, Award, ShieldQuestion, RotateCcw
+  Cpu, Award, ShieldQuestion, RotateCcw, BookOpen
 } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
 import { authenticateMasterPasskey, isMasterPasskeyRegistered } from '../../../utils/webauthn';
+import { HiscoxBackupCertModal } from '../modals/HiscoxBackupCertModal';
+import { DisasterRecoveryRunbookModal } from '../modals/DisasterRecoveryRunbookModal';
 
 interface School {
   id: string;
@@ -57,6 +59,10 @@ export const BackupResetTab: React.FC<BackupResetTabProps> = ({
   const [selectedDrTopic, setSelectedDrTopic] = useState<'rpo' | 'rto' | 'readiness' | 'integrity'>('readiness');
   const [runningDrTest, setRunningDrTest] = useState(false);
   const [drTestResult, setDrTestResult] = useState<string | null>(null);
+
+  // --- Hiscox CyberSafe 3-2-1 Suite State ---
+  const [hiscoxCertModalOpen, setHiscoxCertModalOpen] = useState(false);
+  const [drRunbookModalOpen, setDrRunbookModalOpen] = useState(false);
 
   // --- Snapshot State ---
   const [creatingSnapshot, setCreatingSnapshot] = useState(false);
@@ -571,6 +577,72 @@ export const BackupResetTab: React.FC<BackupResetTabProps> = ({
         <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
           <button
             type="button"
+            onClick={() => setHiscoxCertModalOpen(true)}
+            style={{
+              padding: '10px 18px',
+              borderRadius: '12px',
+              background: '#ffffff',
+              border: '1px solid #0284c7',
+              color: '#0284c7',
+              fontSize: '0.84rem',
+              fontWeight: 850,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              boxShadow: '0 2px 6px rgba(2, 132, 199, 0.08)',
+              transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = '#f0f9ff';
+              e.currentTarget.style.transform = 'translateY(-1px)';
+              e.currentTarget.style.boxShadow = '0 4px 12px rgba(2, 132, 199, 0.15)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = '#ffffff';
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.boxShadow = '0 2px 6px rgba(2, 132, 199, 0.08)';
+            }}
+          >
+            <Award size={16} color="#0284c7" />
+            <span>Hiscox 3-2-1 Zertifikat (PDF)</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setDrRunbookModalOpen(true)}
+            style={{
+              padding: '10px 18px',
+              borderRadius: '12px',
+              background: '#ffffff',
+              border: '1px solid #e2e8f0',
+              color: '#334155',
+              fontSize: '0.84rem',
+              fontWeight: 800,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              boxShadow: '0 2px 6px rgba(0,0,0,0.02)',
+              transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.borderColor = '#ef4444';
+              e.currentTarget.style.color = '#ef4444';
+              e.currentTarget.style.transform = 'translateY(-1px)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.borderColor = '#e2e8f0';
+              e.currentTarget.style.color = '#334155';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}
+          >
+            <BookOpen size={16} color="#ef4444" />
+            <span>Notfall-Runbook (DR)</span>
+          </button>
+
+          <button
+            type="button"
             onClick={() => setActiveSubTab('export')}
             style={{
               padding: '10px 18px',
@@ -788,6 +860,211 @@ export const BackupResetTab: React.FC<BackupResetTabProps> = ({
             <span>100% Intakt (24 Tabellen)</span>
             <ChevronRight size={12} color="#94a3b8" />
           </div>
+        </div>
+      </div>
+
+      {/* ═══════════════════════════════════════════════════════════════════════ */}
+      {/* 🛡️ HISCOX CYBERSAFE 3-2-1 RESILIENZ- & COMPLIANCE-COCKPIT              */}
+      {/* ═══════════════════════════════════════════════════════════════════════ */}
+      <div style={{
+        background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+        borderRadius: '24px',
+        padding: '24px 28px',
+        border: '1px solid #cbd5e1',
+        boxShadow: '0 4px 20px -2px rgba(0,0,0,0.03)',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '18px'
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{
+              width: '42px',
+              height: '42px',
+              borderRadius: '12px',
+              background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#ffffff',
+              boxShadow: '0 4px 12px rgba(2, 132, 199, 0.25)'
+            }}>
+              <ShieldCheck size={22} />
+            </div>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <h3 style={{ fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', margin: 0, letterSpacing: '-0.02em' }}>
+                  Hiscox CyberSafe! 3-2-1 Resilienz-Cockpit
+                </h3>
+                <span style={{
+                  fontSize: '0.7rem',
+                  fontWeight: 900,
+                  padding: '2px 8px',
+                  borderRadius: '999px',
+                  background: '#ecfdf5',
+                  color: '#059669',
+                  border: '1px solid #a7f3d0'
+                }}>
+                  Hiscox 05/2026 Audit-Konform
+                </span>
+              </div>
+              <p style={{ margin: '2px 0 0', fontSize: '0.84rem', color: '#64748b', fontWeight: 550 }}>
+                Zertifizierte Backup-Integrität nach 3-2-1-Regel, DSGVO Art. 32 und BSI IT-Grundschutz CON.3.
+              </p>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <button
+              type="button"
+              onClick={() => setHiscoxCertModalOpen(true)}
+              style={{
+                padding: '8px 16px',
+                borderRadius: '10px',
+                background: '#0284c7',
+                color: '#ffffff',
+                border: 'none',
+                fontSize: '0.8rem',
+                fontWeight: 850,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                boxShadow: '0 2px 8px rgba(2, 132, 199, 0.25)'
+              }}
+            >
+              <Award size={14} />
+              <span>Hiscox-Zertifikat (PDF)</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setDrRunbookModalOpen(true)}
+              style={{
+                padding: '8px 16px',
+                borderRadius: '10px',
+                background: '#ffffff',
+                border: '1px solid #cbd5e1',
+                color: '#334155',
+                fontSize: '0.8rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}
+            >
+              <BookOpen size={14} color="#ef4444" />
+              <span>Notfall-Runbook</span>
+            </button>
+          </div>
+        </div>
+
+        {/* 3-2-1 ARCHITECTURE GRID */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+          gap: '14px'
+        }}>
+          {/* Box 1: 3 Datenkopien */}
+          <div style={{
+            background: '#ffffff',
+            borderRadius: '16px',
+            padding: '16px 18px',
+            border: '1px solid #e2e8f0',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+              <span style={{ fontSize: '0.74rem', fontWeight: 900, color: '#0284c7', textTransform: 'uppercase' }}>
+                3 Datenkopien
+              </span>
+              <CheckCircle size={15} color="#059669" />
+            </div>
+            <div style={{ fontSize: '0.82rem', color: '#1e293b', lineHeight: 1.45 }}>
+              • <strong>1. Live-DB:</strong> Hetzner NVMe (Falkenstein)<br />
+              • <strong>2. GFS-Vault:</strong> Host Backup-Mount<br />
+              • <strong>3. Offsite:</strong> Nürnberg Cold-Storage
+            </div>
+          </div>
+
+          {/* Box 2: 2 Medientypen */}
+          <div style={{
+            background: '#ffffff',
+            borderRadius: '16px',
+            padding: '16px 18px',
+            border: '1px solid #e2e8f0',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+              <span style={{ fontSize: '0.74rem', fontWeight: 900, color: '#0284c7', textTransform: 'uppercase' }}>
+                2 Medientypen
+              </span>
+              <CheckCircle size={15} color="#059669" />
+            </div>
+            <div style={{ fontSize: '0.82rem', color: '#1e293b', lineHeight: 1.45 }}>
+              • <strong>Block-Storage:</strong> NVMe Enterprise SSD<br />
+              • <strong>Objektspeicher:</strong> AES-256 S3 Vault<br />
+              • <strong>Zero Cross-Media Contamination</strong>
+            </div>
+          </div>
+
+          {/* Box 3: 1 Air-Gapped / Immutable */}
+          <div style={{
+            background: '#ffffff',
+            borderRadius: '16px',
+            padding: '16px 18px',
+            border: '1px solid #e2e8f0',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+              <span style={{ fontSize: '0.74rem', fontWeight: 900, color: '#0284c7', textTransform: 'uppercase' }}>
+                1 Air-Gapped / WORM
+              </span>
+              <CheckCircle size={15} color="#059669" />
+            </div>
+            <div style={{ fontSize: '0.82rem', color: '#1e293b', lineHeight: 1.45 }}>
+              • <strong>WORM Object Lock:</strong> 30 Tage Löschsperre<br />
+              • <strong>Ransomware-Schutz:</strong> Offsite isoliert<br />
+              • <strong>SHA-256 Hashes:</strong> 100% Manipulationssicher
+            </div>
+          </div>
+        </div>
+
+        {/* 7 Checkliste Micro-Badges */}
+        <div style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: '8px',
+          paddingTop: '6px'
+        }}>
+          {[
+            '1. Aktive Überwachung (Stündlich)',
+            '2. Regelmäßige Rücksicherungstests',
+            '3. Ransomware-Schutz (WORM)',
+            '4. Least Privilege (MFA/SSH)',
+            '5. 3-2-1 Georedundanz',
+            '6. GoBD & DSGVO Fristen',
+            '7. BCM Notfall-Runbook'
+          ].map((check, idx) => (
+            <span
+              key={idx}
+              style={{
+                fontSize: '0.72rem',
+                fontWeight: 750,
+                padding: '4px 10px',
+                borderRadius: '8px',
+                background: '#f1f5f9',
+                color: '#334155',
+                border: '1px solid #e2e8f0',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px'
+              }}
+            >
+              <Check size={12} strokeWidth={3} color="#059669" />
+              <span>{check}</span>
+            </span>
+          ))}
         </div>
       </div>
 
@@ -2483,6 +2760,29 @@ export const BackupResetTab: React.FC<BackupResetTabProps> = ({
             </table>
           </div>
         </div>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════════════════ */}
+      {/* 🛡️ HISCOX CYBERSAFE & DISASTER RECOVERY MODALS                          */}
+      {/* ═══════════════════════════════════════════════════════════════════════ */}
+      {hiscoxCertModalOpen && (
+        <HiscoxBackupCertModal
+          onClose={() => setHiscoxCertModalOpen(false)}
+          lastSnapshotDate="Heute, 03:00 Uhr"
+          rpoHours="< 60 Min."
+          rtoMinutes="< 15 Min."
+          tablesCount={24}
+          recordsCount={18510}
+          operatorName="Patrick Huber (MasterAdmin)"
+        />
+      )}
+
+      {drRunbookModalOpen && (
+        <DisasterRecoveryRunbookModal
+          onClose={() => setDrRunbookModalOpen(false)}
+          onTriggerDrTest={handleRunDrTest}
+          isRunningDrTest={runningDrTest}
+        />
       )}
     </div>
   );

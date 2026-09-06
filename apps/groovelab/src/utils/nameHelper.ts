@@ -58,6 +58,27 @@ export function maskLastName(
 }
 
 /**
+ * Zero-Knowledge Student Pure First Name Formatter (OWASP ASVS Level 3 / DSGVO Art. 25)
+ * Strictly guarantees that NEVER an initial letter or last name is appended.
+ * Used across the student dashboard where "Vorname + N." is strictly forbidden.
+ */
+export function formatStudentPureFirstName(
+  firstName?: string | null,
+  fallback: string = 'Schüler'
+): string {
+  const first = String(firstName || '').replace(/^Unterricht:\s*/i, '').trim();
+  if (!first || ['schüler', 'student', 'pause', 'vacant', 'unbekannt'].includes(first.toLowerCase())) {
+    return fallback;
+  }
+  if (first.includes('&') || first.includes(',') || /\b(and|und)\b/i.test(first)) {
+    const tokens = first.split(/&|,|\bund\b|\band\b/i).map(s => s.trim()).filter(Boolean);
+    return tokens.map(t => t.split(/\s+/)[0]).filter(Boolean).join(' & ') || fallback;
+  }
+  const parts = first.split(/\s+/);
+  return parts[0] || fallback;
+}
+
+/**
  * Format a single student name anonymized: "Vorname N."
  * Handles fallback ID and privacy mode.
  */
@@ -65,7 +86,8 @@ export function formatSingleStudentAnonymized(
   firstName?: string | null,
   lastName?: string | null,
   fallbackId?: string | null,
-  privacyMode: boolean = true
+  privacyMode: boolean = true,
+  pureFirstNameOnly: boolean = false
 ): string {
   const first = String(firstName || '').replace(/^Unterricht:\s*/i, '').trim();
   if (!first || ['schüler', 'student', 'pause', 'vacant', 'unbekannt'].includes(first.toLowerCase())) {
@@ -79,6 +101,11 @@ export function formatSingleStudentAnonymized(
 
   const parts = first.split(/\s+/);
   const fName = parts[0];
+
+  if (pureFirstNameOnly) {
+    return fName;
+  }
+
   const lName = parts.slice(1).join(' ') || (lastName || '').trim();
 
   let initial = '';

@@ -16,7 +16,7 @@ import {
   ShieldCheck
 } from 'lucide-react';
 import { StudioAvatar } from './StudioAvatar';
-import { formatSingleStudentAnonymized, formatTeacherFullName } from '../utils/nameHelper';
+import { formatSingleStudentAnonymized, formatTeacherFullName, formatStudentPureFirstName } from '../utils/nameHelper';
 
 interface GrooveLabMessagesBoardProps {
   user: any;
@@ -115,7 +115,10 @@ export default function GrooveLabMessagesBoard({
         } else if (ann.sender || ann.users) {
           const senderObj = ann.sender || ann.users;
           const isStaff = (senderObj.role || '').toLowerCase() === 'teacher' || (senderObj.role || '').toLowerCase() === 'admin';
-          senderDisplayName = isStaff ? formatTeacherFullName(senderObj) : formatSingleStudentAnonymized(senderObj.first_name, senderObj.last_name, senderObj.id);
+          const isStudentViewer = (typeof window !== 'undefined' && sessionStorage.getItem('groovelab_active_workspace') === 'student') || user?.role === 'student';
+          senderDisplayName = isStaff 
+            ? formatTeacherFullName(senderObj) 
+            : (isStudentViewer ? formatStudentPureFirstName(senderObj.first_name) : formatSingleStudentAnonymized(senderObj.first_name, senderObj.last_name, senderObj.id));
         }
 
         combined.push({
@@ -146,7 +149,10 @@ export default function GrooveLabMessagesBoard({
       } else if (msg.sender || msg.users) {
         const senderObj = msg.sender || msg.users;
         const isStaff = (senderObj.role || '').toLowerCase() === 'teacher' || (senderObj.role || '').toLowerCase() === 'admin';
-        senderDisplayName = isStaff ? formatTeacherFullName(senderObj) : formatSingleStudentAnonymized(senderObj.first_name, senderObj.last_name, senderObj.id);
+        const isStudentViewer = (typeof window !== 'undefined' && sessionStorage.getItem('groovelab_active_workspace') === 'student') || user?.role === 'student';
+        senderDisplayName = isStaff 
+          ? formatTeacherFullName(senderObj) 
+          : (isStudentViewer ? formatStudentPureFirstName(senderObj.first_name) : formatSingleStudentAnonymized(senderObj.first_name, senderObj.last_name, senderObj.id));
       }
 
       combined.push({
@@ -699,7 +705,8 @@ export default function GrooveLabMessagesBoard({
 
                       return activeGrooveLabStudents.map(u => {
                         const isSel = selectedTargetIds.includes(u.id);
-                        const displayName = formatSingleStudentAnonymized(u.first_name, u.last_name, u.id);
+                        const isStudentViewer = (typeof window !== 'undefined' && sessionStorage.getItem('groovelab_active_workspace') === 'student') || user?.role === 'student';
+                        const displayName = isStudentViewer ? formatStudentPureFirstName(u.first_name) : formatSingleStudentAnonymized(u.first_name, u.last_name, u.id);
                         return (
                           <button
                             key={u.id}

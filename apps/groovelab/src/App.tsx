@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, lazy, Suspense } from 'react';
-import { Music, AlertCircle, Play, Pause, ArrowDown, ArrowRight, Library, Shield, ShieldCheck, FileText, LogOut, Award, Users, User, Monitor, Tablet, X, Camera, Clock, QrCode, Plus, ExternalLink, BarChart, Star, Box, Settings, Lock, Pencil, Trash2, Zap, RotateCcw, Check, CheckCircle, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Search, Mic, Calendar, PlayCircle, Youtube, Megaphone, Mail, School, GraduationCap, Trophy, Compass, MapPin, RefreshCw, Repeat, BookOpen, Info, Disc, Building } from 'lucide-react';
+import { Music, AlertCircle, Play, Pause, ArrowDown, ArrowRight, Library, Shield, ShieldCheck, FileText, LogOut, Award, Users, User, Monitor, Tablet, X, Camera, Clock, QrCode, Plus, ExternalLink, BarChart, Star, Box, Settings, Lock, Key, Pencil, Trash2, Zap, RotateCcw, Check, CheckCircle, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Search, Mic, Calendar, PlayCircle, Youtube, Megaphone, Mail, School, GraduationCap, Trophy, Compass, MapPin, RefreshCw, Repeat, BookOpen, Info, Disc, Building } from 'lucide-react';
 import { useWindowSize } from 'react-use';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase, supabaseUrl, supabaseAnonKey } from './lib/supabase';
@@ -9,6 +9,7 @@ import { StudioAvatar, getInstrumentAvatarUrl, getDefaultMusicianAvatarUrl, rend
 import { reportClientError, initGlobalErrorListeners } from './lib/errorTelemetry';
 import { isDevEnvironment } from './utils/tenantUrlHelper';
 import { CampusGroovelabBrand, CampusGroovelabText, CampusGroovelabLogo } from './components/CampusGroovelabBrand';
+import { scrubSharedDeviceCache } from './utils/sharedDeviceScrubber';
 
 // Initialize global error interception
 initGlobalErrorListeners();
@@ -45,9 +46,14 @@ const SharedAudioBiographyPage = lazy(() => import('./components/campus/SharedAu
 const HelpCenterModal = lazy(() => import('./components/help/HelpCenterModal').then(m => ({ default: m.HelpCenterModal })));
 const TrialInfoModal = lazy(() => import('./components/TrialInfoModal').then(m => ({ default: m.TrialInfoModal })));
 const AdminSecuritySuiteModal = lazy(() => import('./components/AdminSecuritySuiteModal').then(m => ({ default: m.AdminSecuritySuiteModal })));
+const QuarterlyAccessReportModal = lazy(() => import('./components/ui/QuarterlyAccessReportModal').then(m => ({ default: m.QuarterlyAccessReportModal })));
 
 
 import { MobileBottomNav } from './components/ui/MobileBottomNav';
+import { ErrorBoundary } from './components/ui/ErrorBoundary';
+import { GroupedSongCard } from './components/GroupedSongCard';
+import { generateRandomBandName } from './utils/bandNameGenerator';
+import { APP_INSTRUMENT_ICONS, APP_INSTRUMENT_COLORS, brandColor } from './constants/instruments';
 import ConfettiModal from './components/ConfettiModal';
 import { normalizeInstrument, renderInstrumentIcon } from './utils/instruments';
 import { getDistanceFromLatLonInM } from './utils/geo';
@@ -144,101 +150,9 @@ const safeReplaceState = (data: any, unused: string, url?: string | URL | null) 
   }
 };
 
-const APP_INSTRUMENT_ICONS: Record<string, any> = { 
-  "Gitarre": renderInstrumentIcon("Gitarre"), 
-  "Guitar": renderInstrumentIcon("Guitar"), 
-  "E-Gitarre": renderInstrumentIcon("E-Gitarre"),
-  "Bass": renderInstrumentIcon("Bass"), 
-  "E-Bass": renderInstrumentIcon("E-Bass"), 
-  "Drums": renderInstrumentIcon("Drums"), 
-  "E-Drums": renderInstrumentIcon("E-Drums"), 
-  "Vocals": renderInstrumentIcon("Vocals"), 
-  "Gesang": renderInstrumentIcon("Gesang"),
-  "Piano / Keys": renderInstrumentIcon("Keys"), 
-  "Piano": renderInstrumentIcon("Piano"), 
-  "E-Piano": renderInstrumentIcon("E-Piano"), 
-  "Keys": renderInstrumentIcon("Keys"),
-  "Musik": "🎼"
-};
-const APP_INSTRUMENT_COLORS: Record<string, string> = { 
-  "Guitar": "#ef4444", "E-Gitarre": "#ef4444",
-  "Bass": "#eab308", "E-Bass": "#eab308", 
-  "Drums": "#3b82f6", "E-Drums": "#3b82f6", 
-  "Vocals": "#34a853", 
-  "Piano": "#a855f7", "E-Piano": "#a855f7", "Keys": "#a855f7" 
-};
-const brandColor = "#f59e0b"; // Orange (matched with legend)
-
-
 const showMissionsFeature = false;
 const showEnsemblesFeature = false;
 
-// --- Band Name Generator Words ---
-const BAND_ADJECTIVES_EN = [
-  "Electric", "Sonic", "Neon", "Atomic", "Static", "Magnetic", "Pulse", "Kinetic", "Turbo", "Hyper",
-  "Cosmic", "Lunar", "Solar", "Stellar", "Midnight", "Aurora", "Thunder", "Storm", "Crystal", "Frozen",
-  "Golden", "Velvet", "Silver", "Wild", "Mystic", "Royal", "Infinite", "Eternal", "Fearless", "Savage",
-  "Groovy", "Funky", "Echo", "Reverb", "Loud", "Deep", "Raw", "Broken", "Blazing", "Drifting",
-  "Vibrant", "Quantum", "Astral", "Retro", "Stealth", "Heavy", "Acoustic", "Chilled", "Fierce", "Radiant",
-  "Sublime", "Dynamic", "Slick", "Epic", "Primal", "Liquid", "Shining", "Sparkling", "Virtual", "Glow",
-  "Glitch", "Vintage", "Solaris", "Radioactive", "Gravity", "Techno", "Melodic", "Harmonic", "Synth", "Phantom",
-  "Shadow", "Rogue", "Ghostly", "Crying", "Howling", "Smiling", "Flying", "Silent", "Whispering", "Endless",
-  "Amplified", "Distorted", "Screaming", "Thundering", "Raging", "Fallen", "Rising", "Ignited", "Burning", "Flashing",
-  "Ablaze", "Furious", "Rebellious", "Wicked", "Ripped", "Cracked", "Spiraled", "Twisted", "Haunted", "Blessed"
-];
-const BAND_NOUNS_EN = [
-  "Rhythm", "Sound", "Vibe", "Beat", "Pulse", "Wave", "Groove", "Theory", "Symphony", "Note",
-  "Collective", "Crew", "Squad", "Gang", "Tribe", "Pack", "Union", "Alliance", "Force", "League",
-  "Studio", "Lab", "Stage", "Arena", "Chamber", "Vault", "Signal", "Circuit", "Grid", "Portal",
-  "Flow", "Soul", "Vision", "Quest", "Flash", "Dream", "Mission", "Code", "Spark", "Surge",
-  "Engine", "Network", "Dimension", "System", "Legacy", "Station", "Horizon", "Infinity", "Focus", "Frequency",
-  "Impact", "Rebel", "Spirit", "Legend", "Ghost", "Genius", "Rider", "Junction", "Engineers", "Project",
-  "Vanguard", "Patriots", "Nomads", "Monsters", "Aliens", "Robots", "Cyborgs", "Wolves", "Shadows", "Astronauts",
-  "Pilots", "Giants", "Wizards", "Knights", "Kings", "Queens", "Lords", "Masters", "Outlaws", "Glitchers",
-  "Riot", "Noise", "Feedback", "Friction", "Fever", "Echoes", "Screams", "Chords", "Melodies", "Anthems",
-  "Riff", "Solo", "Beatbox", "Synthesizer", "Vinyl", "Records", "Basses", "Drums", "Guitars", "Vocals",
-  "Runners", "Chasers", "Seekers", "Hunters", "Finders", "Keepers", "Breakers", "Shakers", "Makers", "Gamers",
-  "Hackers", "Coders", "Agents", "Spies", "Scouts", "Rangers", "Guards", "Warriors", "Phantoms", "Spectres",
-  "Demons", "Angels", "Dragons", "Beasts", "Hawks", "Eagles", "Ravens", "Falcons", "Panthers", "Cats",
-  "Sharks", "Vipers", "Snakes", "Spiders", "Scorpions", "Monkeys", "Gorillas", "Bears", "Foxes", "Coyotes"
-];
-const BAND_ADJECTIVES_DE = [
-  "Laute", "Starke", "Freie", "Wilde", "Coole", "Echte", "Neue", "Große", "Junge", "Heiße",
-  "Kreative", "Magische", "Bunte", "Fette", "Schnelle", "Sanfte", "Kluge", "Helle", "Dunkle", "Fitte",
-  "Mutige", "Leise", "Zahme", "Freche", "Schlaue", "Schöne", "Kleine", "Fröhliche", "Heitere", "Erste",
-  "Beste", "Süße", "Feine", "Reine", "Stille", "Blinde", "Goldene", "Silberne", "Rotierende", "Fliegende",
-  "Singende", "Springende", "Tanzende", "Spielende", "Glückliche", "Stolze", "Schrille", "Fetzige", "Warme", "Kalte",
-  "Schwere", "Finstere", "Glühende", "Tosende", "Bebende", "Flüssige", "Heimliche", "Scharfe", "Wache", "Rebellische",
-  "Zornige", "Uralte", "Geheime", "Heilige", "Fremde", "Lustige", "Düstere", "Schlaflose", "Ruhelose", "Gefährliche",
-  "Unzahme", "Flüchtige", "Riesige", "Winzige", "Grelle", "Verzauberte", "Verlorene", "Versteckte", "Lautlose", "Heißblütige",
-  "Kaltblütige", "Eisige", "Feurige", "Wässrige", "Luftige", "Erdige", "Kosmische", "Galaktische", "Astrale", "Sonnige",
-  "Schattige", "Geisterhafte", "Traumhafte", "Zauberhafte", "Wunderbare", "Sonderbare", "Unglaubliche", "Fabelhafte", "Tapfere", "Furchtlose"
-];
-const BAND_NOUNS_DE = [
-  "Klänge", "Bands", "Wege", "Kräfte", "Geister", "Wellen", "Feuer", "Lichter", "Räume", "Träume",
-  "Schulen", "Helden", "Rebellen", "Rhythmen", "Stimmen", "Töne", "Spieler", "Meister", "Macher", "Freunde",
-  "Sounds", "Songs", "Künstler", "Löwen", "Tiger", "Wölfe", "Vögel", "Sterne", "Monde", "Sonnen",
-  "Blitze", "Wolken", "Welten", "Spuren", "Farben", "Schritte", "Herzen", "Lieder", "Saiten", "Tasten",
-  "Trommeln", "Gitarren", "Bässe", "Pfeile", "Funken", "Stürme", "Winde", "Inseln", "Berge", "Täler",
-  "Riffs", "Gitarristen", "Drummer", "Sänger", "Stürmer", "Sieger", "Gewinner", "Kämpfer", "Reiter", "Jäger",
-  "Sucher", "Entdecker", "Forscher", "Erfinder", "Baumeister", "Magier", "Hexer", "Ritter", "Könige", "Fürsten",
-  "Herrscher", "Götter", "Riesen", "Zwerge", "Drachen", "Monster", "Aliens", "Roboter", "Cyborgs", "Piraten",
-  "Banditen", "Outlaws", "Spione", "Agenten", "Wächter", "Krieger", "Schatten", "Phantome", "Gespenster", "Wunder",
-  "Rätsel", "Geheimnisse", "Legenden", "Mythen", "Geschichten", "Märchen", "Visionen", "Wirbelstürme", "Orkane", "Vulkane"
-];
-
-const generateRandomBandName = (lang?: 'de' | 'en') => {
-  const useGerman = lang ? (lang === 'de') : (Math.random() < 0.3);
-  if (useGerman) {
-    const adj = BAND_ADJECTIVES_DE[Math.floor(Math.random() * BAND_ADJECTIVES_DE.length)];
-    const noun = BAND_NOUNS_DE[Math.floor(Math.random() * BAND_NOUNS_DE.length)];
-    return `${adj} ${noun}`;
-  } else {
-    const adj = BAND_ADJECTIVES_EN[Math.floor(Math.random() * BAND_ADJECTIVES_EN.length)];
-    const noun = BAND_NOUNS_EN[Math.floor(Math.random() * BAND_NOUNS_EN.length)];
-    return `${adj} ${noun}`;
-  }
-};
 
 const getRoleColor = (role: string, stationName?: string, stationColor?: string) => {
   const r = role?.toLowerCase();
@@ -361,911 +275,7 @@ interface WallSong {
   level: string;
 }
 
-// --- Defensive Error Boundary ---
-class ErrorBoundary extends React.Component<{ children: React.ReactNode, fallback?: React.ReactNode }, { hasError: boolean, error: any }> {
-  constructor(props: any) {
-    super(props);
-    this.state = { hasError: false, error: null };
-  }
 
-  static getDerivedStateFromError(error: any) {
-    return { hasError: true, error };
-  }
-
-  componentDidCatch(error: any, errorInfo: any) {
-    console.error("Dashboard ErrorBoundary caught an error:", error, errorInfo);
-    
-    // Report silently to centralized telemetry
-    reportClientError(error, {
-      componentStack: errorInfo?.componentStack,
-      severity: 'CRITICAL',
-      context: 'ErrorBoundary.componentDidCatch'
-    });
-    
-    // Auto-recover from dynamic module script/chunk loading errors
-    const errorMessage = String(error?.message || error || "");
-    const isChunkError = 
-      errorMessage.includes("Importing a module script failed") ||
-      errorMessage.includes("Failed to fetch dynamically imported module") ||
-      errorMessage.includes("chunk") ||
-      errorMessage.includes("loading-error") ||
-      errorMessage.includes("dynamically imported");
-
-    if (isChunkError) {
-      const isLocalhost = typeof window !== 'undefined' && (
-        window.location.hostname === 'localhost' || 
-        window.location.hostname === '127.0.0.1' ||
-        window.location.hostname.endsWith('.local')
-      );
-      if (isLocalhost) {
-        console.warn('[ErrorBoundary] Chunk loading error in development mode. Auto-reload skipped to prevent refresh loop.');
-        return;
-      }
-
-      const lastReload = sessionStorage.getItem("last_chunk_error_reload");
-      const now = Date.now();
-      
-      // Auto-reload to load the fresh code bundle if we haven't reloaded in the last 60 seconds
-      if (!lastReload || now - parseInt(lastReload) > 60000) {
-        sessionStorage.setItem("last_chunk_error_reload", String(now));
-        console.warn("Dynamic chunk loading failure detected. Triggering automatic hard reload to fetch the latest application bundle...");
-        
-        // Append a cache-busting parameter and reload
-        const url = new URL(window.location.href);
-        url.searchParams.set("reload_cb", String(now));
-        window.location.href = url.toString();
-      }
-    }
-  }
-
-  render() {
-    if (this.state.hasError) {
-      const errorMessage = String(this.state.error?.message || this.state.error || "");
-      const isChunkError = 
-        errorMessage.includes("Importing a module script failed") ||
-        errorMessage.includes("Failed to fetch dynamically imported module") ||
-        errorMessage.includes("chunk") ||
-        errorMessage.includes("loading-error") ||
-        errorMessage.includes("dynamically imported");
-
-      if (isChunkError) {
-        return <DashboardLoader />;
-      }
-
-      return this.props.fallback || (
-        <div className="glass-panel animation-slide-up" style={{ 
-          padding: '60px 40px', 
-          textAlign: 'center', 
-          margin: '40px auto', 
-          maxWidth: '600px',
-          background: 'white',
-          borderRadius: '32px',
-          boxShadow: '0 20px 50px rgba(0,0,0,0.05)'
-        }}>
-          <div style={{ fontSize: '4rem', marginBottom: '24px' }}>🎸</div>
-          <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#1e293b', marginBottom: '12px' }}>Hoppla! Ein kleiner "Saitenriss"...</h2>
-          <p style={{ color: '#64748b', fontSize: '1.1rem', lineHeight: 1.6, marginBottom: '20px' }}>
-            Beim Laden dieses Bereichs ist ein Fehler aufgetreten. Keine Sorge, deine Daten sind sicher!
-          </p>
-          {this.state.error && (
-            <pre style={{
-              background: '#f8fafc',
-              color: '#ef4444',
-              padding: '16px',
-              borderRadius: '12px',
-              textAlign: 'left',
-              fontSize: '0.8rem',
-              overflowX: 'auto',
-              marginBottom: '24px',
-              fontFamily: 'monospace',
-              border: '1px solid #cbd5e1'
-            }}>
-              {this.state.error.message || String(this.state.error)}
-              {this.state.error.stack && `\n\n${this.state.error.stack.split('\n').slice(0, 4).join('\n')}`}
-            </pre>
-          )}
-          <button 
-            onClick={() => {
-              // Perform a hard cache-busting reload
-              const url = new URL(window.location.href);
-              url.searchParams.set("reload_manual", String(Date.now()));
-              window.location.href = url.toString();
-            }}
-            style={{ 
-              padding: '16px 32px', 
-              background: 'var(--primary-color)', 
-              color: 'white', 
-              border: 'none', 
-              borderRadius: '16px', 
-              fontWeight: 800, 
-              fontSize: '1rem',
-              cursor: 'pointer',
-              boxShadow: '0 10px 20px rgba(245, 158, 11, 0.2)',
-              transition: 'transform 0.2s'
-            }}
-            onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
-            onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
-          >
-            Dashboard neu laden
-          </button>
-        </div>
-      );
-    }
-    return this.props.children;
-  }
-}
-
-function GroupedSongCard({ songGroup, onUpdateProgress, onSubmitForApproval, isBandReady, onDelete, userBands = [], userId, isExpanded, onToggle, onOpenPdfViewer }: any) {
-  const { width } = useWindowSize();
-  const isMobile = width < 768;
-  const [activeDifficulty, setActiveDifficulty] = useState('starter'); // 'starter' | 'original'
-  const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
-  const [isChallengeHovered, setIsChallengeHovered] = useState(false);
-  const [isDragging, setIsDragging] = useState(false);
-
-  
-  const currentLevelSkills = songGroup.skills.filter((s: any) => s.difficulty_level === activeDifficulty);
-
-  // Find the band this song belongs to (Finalized Band or Pending Proposal)
-  const matchingBand = (songGroup.isBandSong || true) ? userBands.find((b: any) => 
-    b.band_songs?.some((bs: any) => bs.song_id === songGroup.song_id) ||
-    b.songs?.id === songGroup.song_id ||
-    (b.status === 'proposal' && b.song_id === songGroup.song_id)
-  ) : null;
-
-  // Generate all required slots based on song instrumentation
-  const instrumentation = songGroup.instrumentation || {};
-  const slots: any[] = [];
-  
-  // Normalize instrumentation keys to prevent duplicates like "Guitar" and "E-Gitarre"
-  const normalizedInst: Record<string, number> = {};
-  Object.entries(instrumentation).forEach(([inst, count]) => {
-    let key = inst;
-    const lower = inst.toLowerCase();
-    // Use consistent naming as seen in the editor
-    if (lower === 'guitar' || lower === 'e-gitarre') key = 'E-Gitarre';
-    else if (lower === 'bass' || lower === 'e-bass') key = 'E-Bass';
-    else if (lower === 'drums' || lower === 'e-drums') key = 'E-Drums';
-    else if (lower === 'piano' || lower === 'keys' || lower === 'e-piano') key = 'E-Piano';
-    else if (lower === 'vocals' || lower === 'gesang') key = 'Vocals';
-    
-    // Take the maximum count if multiple names map to the same key (defensive)
-    normalizedInst[key] = Math.max(normalizedInst[key] || 0, count as number);
-  });
-
-  Object.entries(normalizedInst).forEach(([inst, count]) => {
-    if (inst.toLowerCase().includes('vocals') || inst.toLowerCase().includes('gesang')) return;
-    for (let i = 1; i <= (count as number); i++) {
-      slots.push({ instrument: inst, partNumber: i });
-    }
-  });
-
-  if (slots.length === 0) {
-    const uniqueInsts = Array.from(new Set(songGroup.skills.map((s: any) => s.instrument)));
-    uniqueInsts.forEach((inst: any) => {
-       if (!inst.toLowerCase().includes('vocals')) slots.push({ instrument: inst, partNumber: 1 });
-    });
-  }
-
-  const getBaseInst = (name: string) => {
-    const n = name.toLowerCase();
-    if (n.includes('gitarre') || n.includes('guitar')) return 'Guitar';
-    if (n.includes('drums') || n.includes('schlagzeug')) return 'Drums';
-    if (n.includes('piano') || n.includes('keys')) return 'Piano';
-    if (n.includes('bass')) return 'Bass';
-    return name;
-  };
-
-  slots.sort((a, b) => {
-    const orderMap: Record<string, number> = { 'Guitar': 1, 'Drums': 2, 'Piano': 3, 'Bass': 4 };
-    const idxA = orderMap[getBaseInst(a.instrument)] || 99;
-    const idxB = orderMap[getBaseInst(b.instrument)] || 99;
-    if (idxA !== idxB) return idxA - idxB;
-    return a.partNumber - b.partNumber;
-  });
-
-  const displaySkills = slots.map(slot => {
-    const existing = currentLevelSkills.find((s: any) => {
-      const sInst = (s.instrument || '').toLowerCase();
-      const tInst = slot.instrument.toLowerCase();
-      const isMatch = sInst === tInst || 
-             (sInst === 'guitar' && tInst === 'e-gitarre') || (sInst === 'e-gitarre' && tInst === 'guitar') ||
-             (sInst === 'bass' && tInst === 'e-bass') || (sInst === 'e-bass' && tInst === 'bass') ||
-             (sInst === 'drums' && tInst === 'e-drums') || (sInst === 'e-drums' && tInst === 'drums') ||
-             (sInst === 'piano' && tInst === 'e-piano') || (sInst === 'e-piano' && tInst === 'piano') || (sInst === 'keys' && tInst === 'e-piano');
-      
-      return isMatch && (s.part_number || 1) === slot.partNumber;
-    });
-    const result = existing ? { ...existing } : {
-      id: `mock::${songGroup.song_id}::${slot.instrument}::${slot.partNumber}::${activeDifficulty}`,
-      song_id: songGroup.song_id,
-      instrument: slot.instrument,
-      part_number: slot.partNumber,
-      difficulty_level: activeDifficulty,
-      progress: 0,
-      is_stage_ready: false,
-      is_pending_approval: false,
-      isMock: true
-    };
-    if (!result.part_number) {
-      result.part_number = slot.partNumber;
-    }
-    return result;
-  });
-
-  const getSkillLabel = (s: any) => {
-    const instrumentation = songGroup?.instrumentation || {};
-    const reqCount = instrumentation[s.instrument] || 0;
-    if (reqCount > 1) {
-      return `${s.instrument} ${s.part_number || 1}`;
-    }
-    const totalWithSameInst = displaySkills.filter((x: any) => x.instrument === s.instrument).length;
-    if (totalWithSameInst > 1) {
-      return `${s.instrument} ${s.part_number || 1}`;
-    }
-    return s.instrument;
-  };
-
-  const [activeSlotId, setActiveSlotId] = useState(() => {
-    const pending = displaySkills.find((s: any) => s?.is_pending_approval);
-    if (pending) return pending.id;
-
-    // Smart Match: If the user plays an instrument in the band, select that instrument slot by default!
-    const userBandInst = matchingBand?.myInstrument;
-    if (userBandInst) {
-      const matchedSlot = displaySkills.find((s: any) => {
-        const sBase = getBaseInst(s.instrument);
-        const uBase = getBaseInst(userBandInst);
-        if (sBase === uBase) {
-          // Match parts (e.g. "E-Gitarre 2" -> part 2)
-          const partMatch = userBandInst.match(/\d+/);
-          const userPartNum = partMatch ? parseInt(partMatch[0]) : 1;
-          return (s.part_number || 1) === userPartNum;
-        }
-        return false;
-      });
-      if (matchedSlot) return matchedSlot.id;
-      
-      const baseMatchedSlot = displaySkills.find((s: any) => getBaseInst(s.instrument) === getBaseInst(userBandInst));
-      if (baseMatchedSlot) return baseMatchedSlot.id;
-    }
-
-    return displaySkills[0]?.id || '';
-  });
-
-  useEffect(() => {
-    // If current activeSlotId is not in the new displaySkills (common on difficulty switch)
-    if (!displaySkills.find((s: any) => s?.id === activeSlotId)) {
-      // Find the previous skill to know which instrument/part we were on
-      let prevInst = '';
-      let prevPart = 1;
-
-      if (activeSlotId.startsWith('mock::')) {
-        const parts = activeSlotId.split('::');
-        prevInst = parts[2];   // instrument
-        prevPart = parseInt(parts[3]) || 1; // partNumber
-      } else {
-        const prevSkill = songGroup.skills.find((s: any) => s.id === activeSlotId);
-        if (prevSkill) {
-          prevInst = prevSkill.instrument;
-          prevPart = prevSkill.part_number || 1;
-        }
-      }
-      
-      if (prevInst) {
-         // Try to find same instrument and part in the new list
-         const match = displaySkills.find((s: any) => 
-            s.instrument === prevInst && 
-            (s.part_number || 1) === prevPart
-         );
-         if (match) {
-           setActiveSlotId(match.id);
-           return;
-         }
-      }
-
-      // Fallback: stay on first instrument
-      setActiveSlotId(displaySkills[0]?.id || '');
-    }
-  }, [activeDifficulty, displaySkills]);
-
-  const activeSkill = displaySkills.find((s: any) => s?.id === activeSlotId) || (() => {
-    if (activeSlotId && activeSlotId.startsWith('mock::')) {
-      const parts = activeSlotId.split('::');
-      const inst = parts[2];
-      const partNum = parseInt(parts[3]) || 1;
-      return displaySkills.find((s: any) => s.instrument === inst && (s.part_number || 1) === partNum);
-    }
-    return null;
-  })() || displaySkills[0] || { progress: 0 };
-
-  const [localProgress, setLocalProgress] = useState(activeSkill.progress);
-  useEffect(() => {
-    if (!isDragging) {
-      setLocalProgress(activeSkill.progress);
-    }
-  }, [activeSkill.id, activeSkill.progress, isDragging]);
-
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '12px' : '32px', marginBottom: '16px', position: 'relative' }}>
-      <div 
-        onClick={onToggle}
-
-        className={`glass-panel animation-slide-up ${isBandReady ? 'band-ready' : ''} ${activeSkill.progress >= 90 && !activeSkill.is_stage_ready ? 'challenge-glow' : ''}`} 
-        style={{ 
-          padding: isExpanded ? (isMobile ? '20px' : '32px') : (isMobile ? '14px 16px' : '20px 24px'), 
-          position: 'relative', 
-          overflow: 'visible', 
-          borderRadius: isMobile ? '20px' : '28px', 
-          display: 'flex', 
-          flexDirection: 'column',
-          flex: 1,
-          background: 'white', 
-          borderLeft: `${isMobile ? '5px' : '8px'} solid ${isBandReady ? '#f59e0b' : (APP_INSTRUMENT_COLORS[activeSkill.instrument] || '#cbd5e1')}`,
-          boxShadow: activeSkill.progress >= 90 && !activeSkill.is_stage_ready ? `0 0 30px ${brandColor}22` : '0 10px 30px rgba(0,0,0,0.02)',
-          transition: 'all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
-          cursor: 'pointer'
-        }}
-      >
-        {songGroup.isBandSong && (
-          <div style={{ 
-            position: 'absolute', 
-            top: '-10px', 
-            right: isMobile ? '16px' : '60px', 
-            background: 'linear-gradient(135deg, #f59e0b, #d97706)', 
-            color: 'white', 
-            fontSize: '0.65rem', 
-            fontWeight: 900, 
-            padding: '4px 12px', 
-            borderRadius: '100px', 
-            textTransform: 'uppercase', 
-            letterSpacing: '0.1em', 
-            display: 'flex', 
-            alignItems: 'center', 
-            gap: '6px', 
-            boxShadow: '0 8px 16px rgba(245, 158, 11, 0.4)', 
-            zIndex: 20,
-            border: '2px solid white'
-          }}>
-            <Users size={12} fill="white" /> Band Song
-          </div>
-        )}
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '16px' : '32px', width: '100%', flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', width: isMobile ? '100%' : '320px', flexShrink: 0 }}>
-            <div 
-              onClick={(e) => { 
-                e.stopPropagation(); 
-                if (songGroup.tomplay_url || songGroup.media_link) window.open(songGroup.tomplay_url || songGroup.media_link, '_blank'); 
-              }}
-              style={{ 
-                width: isMobile ? '44px' : '52px', height: isMobile ? '44px' : '52px', borderRadius: isMobile ? '12px' : '16px', 
-                background: (songGroup.tomplay_url || songGroup.media_link) ? 'linear-gradient(135deg, #f8fafc, #f1f5f9)' : '#f8fafc', 
-                color: (songGroup.tomplay_url || songGroup.media_link) ? brandColor : '#cbd5e1', 
-                display: 'flex', alignItems: 'center', justifyContent: 'center', 
-                cursor: (songGroup.tomplay_url || songGroup.media_link) ? 'pointer' : 'default', 
-                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)', 
-                flexShrink: 0,
-                boxShadow: (songGroup.tomplay_url || songGroup.media_link) ? '0 4px 12px rgba(0,0,0,0.05)' : 'none',
-                border: '1px solid #f1f5f9'
-              }}
-              className={(songGroup.tomplay_url || songGroup.media_link) ? "hover-scale" : ""}
-            >
-              <Music size={isMobile ? 20 : 24} />
-            </div>
-            
-            <div style={{ overflow: 'hidden', minWidth: 0, flex: 1 }}>
-              <div style={{ fontSize: isMobile ? '0.7rem' : '0.75rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.12em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginBottom: '2px' }}>
-                {songGroup.artist}
-              </div>
-              <div style={{ fontSize: isMobile ? '1.05rem' : '1.25rem', fontWeight: 900, color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.1 }}>
-                {songGroup.title}
-              </div>
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', width: isMobile ? '100%' : 'auto' }}>
-              {displaySkills.map((s: any) => (
-                <div 
-                  key={s.id} 
-                  onClick={(e) => { e.stopPropagation(); setActiveSlotId(s.id); if (!isExpanded) onToggle(); }}
-                  style={{ 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    gap: '6px', 
-                    padding: s.id === activeSlotId ? '5.5px 11.5px' : '6px 12px',
-                    background: s.id === activeSlotId 
-                      ? '#ffffff' 
-                      : (s.progress > 0 ? APP_INSTRUMENT_COLORS[s.instrument] + '10' : '#f8fafc'),
-                    borderRadius: '12px',
-                    border: s.id === activeSlotId 
-                      ? `1.5px solid ${APP_INSTRUMENT_COLORS[s.instrument] || brandColor}` 
-                      : '1px solid ' + (s.progress > 0 ? APP_INSTRUMENT_COLORS[s.instrument] + '20' : '#f1f5f9'),
-                    opacity: s.id === activeSlotId ? 1 : (s.progress > 0 ? 0.9 : 0.35),
-                    transition: 'all 0.2s ease-in-out',
-                    cursor: 'pointer'
-                  }}
-                  title={getSkillLabel(s) + ' (' + s.progress + '%)'}
-                >
-                  <span style={{ fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '2px' }}>
-                    {APP_INSTRUMENT_ICONS[s.instrument] || '🎸'}
-                    {displaySkills.filter((x: any) => x.instrument === s.instrument).length > 1 && (
-                      <span style={{ 
-                        fontSize: '0.65rem', 
-                        fontWeight: 900, 
-                        opacity: 0.9, 
-                        color: (s.id === activeSlotId || s.progress > 0) ? (APP_INSTRUMENT_COLORS[s.instrument] || brandColor) : '#94a3b8' 
-                      }}>{s.part_number || 1}</span>
-                    )}
-                  </span>
-                  <span style={{ 
-                    fontSize: '0.75rem', 
-                    fontWeight: 900, 
-                    color: (s.id === activeSlotId || s.progress > 0) ? (APP_INSTRUMENT_COLORS[s.instrument] || brandColor) : '#94a3b8' 
-                  }}>
-                    {s.id === activeSlotId ? localProgress : s.progress}%
-                  </span>
-                </div>
-              ))}
-            </div>
-
-          <div style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            gap: isMobile ? '16px' : '32px', 
-            flexShrink: 0, 
-            paddingLeft: isMobile ? 0 : '20px', 
-            borderLeft: (!isMobile && width > 1000) ? '1px solid #f1f5f9' : 'none', 
-            marginLeft: isMobile ? 0 : 'auto',
-            width: isMobile ? '100%' : 'auto',
-            justifyContent: isMobile ? 'space-between' : 'flex-start',
-            borderTop: isMobile ? '1px solid #f1f5f9' : 'none',
-            paddingTop: isMobile ? '12px' : 0,
-            marginTop: isMobile ? '4px' : 0
-          }}>
-            <div style={{ textAlign: isMobile ? 'left' : 'right', minWidth: isMobile ? 'auto' : '100px' }}>
-              <div style={{ fontSize: '0.7rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Gesamt</div>
-              <div style={{ fontSize: isMobile ? '1.5rem' : '1.75rem', fontWeight: 950, color: localProgress >= 100 ? '#34a853' : (APP_INSTRUMENT_COLORS[activeSkill.instrument] || brandColor), lineHeight: 1 }}>
-                {localProgress}%
-              </div>
-            </div>
-            
-            <button 
-              onClick={(e) => { e.stopPropagation(); onToggle(); }} 
-              style={{ 
-                width: isMobile ? '36px' : '44px', height: isMobile ? '36px' : '44px', borderRadius: isMobile ? '10px' : '14px', 
-                background: isExpanded ? '#1e293b' : '#f8fafc', 
-                border: 'none', 
-                color: isExpanded ? 'white' : '#64748b', 
-                display: 'flex', alignItems: 'center', justifyContent: 'center', 
-                cursor: 'pointer', transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)', 
-                transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
-                boxShadow: isExpanded ? '0 8px 16px rgba(0,0,0,0.15)' : 'none',
-                flexShrink: 0
-              }}
-            >
-              <ChevronDown size={isMobile ? 20 : 24} />
-            </button>
-          </div>
-        </div>
-
-        <div style={{ 
-          maxHeight: isExpanded ? '1000px' : '0', 
-          opacity: isExpanded ? 1 : 0, 
-          overflow: 'hidden', 
-          transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)', 
-          marginTop: isExpanded ? '32px' : '0', 
-          paddingTop: isExpanded ? '32px' : '0', 
-          borderTop: isExpanded ? '2px solid #f8fafc' : 'none' 
-        }}>
-          <div style={{ display: 'flex', gap: isMobile ? '20px' : '48px', alignItems: 'flex-start', flexWrap: 'wrap' }} onClick={(e) => e.stopPropagation()}>
-            
-            <div style={{ flex: isMobile ? '1 1 100%' : 2, minWidth: '300px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '24px', marginBottom: '24px', flexWrap: 'wrap' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                  <div style={{ fontSize: '0.9rem', fontWeight: 900, color: '#1e293b' }}>Schwierigkeitsgrad:</div>
-                  <div style={{ display: 'flex', background: '#f1f5f9', borderRadius: '14px', padding: '5px' }}>
-                    <button 
-                      onClick={(e) => { e.stopPropagation(); setActiveDifficulty('starter'); }} 
-                      style={{ 
-                        background: activeDifficulty === 'starter' ? 'white' : 'transparent', 
-                        color: activeDifficulty === 'starter' ? '#34a853' : '#64748b', 
-                        border: 'none', padding: '8px 20px', borderRadius: '10px', fontSize: '0.85rem', fontWeight: 800, cursor: 'pointer', 
-                        boxShadow: activeDifficulty === 'starter' ? '0 4px 12px rgba(0,0,0,0.05)' : 'none',
-                        transition: 'all 0.3s'
-                      }}
-                    >
-                      Starter
-                    </button>
-                    <button 
-                      onClick={(e) => { e.stopPropagation(); setActiveDifficulty('original'); }} 
-                      style={{ 
-                        background: activeDifficulty === 'original' ? 'white' : 'transparent', 
-                        color: activeDifficulty === 'original' ? '#f59e0b' : '#64748b', 
-                        border: 'none', padding: '8px 20px', borderRadius: '10px', fontSize: '0.85rem', fontWeight: 800, cursor: 'pointer', 
-                        boxShadow: activeDifficulty === 'original' ? '0 4px 12px rgba(0,0,0,0.05)' : 'none',
-                        transition: 'all 0.3s'
-                      }}
-                    >
-                      Pro
-                    </button>
-                  </div>
-                </div>
-
-                {/* Media & Tomplay Links */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  {songGroup.media_link && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        window.open(songGroup.media_link, '_blank', 'noopener,noreferrer');
-                      }}
-                      className="cloud-link-btn"
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        padding: '8px 14px',
-                        borderRadius: '12px',
-                        background: '#f1f5f9',
-                        color: '#0f172a',
-                        border: '1px solid #e2e8f0',
-                        fontSize: '0.82rem',
-                        fontWeight: 800,
-                        cursor: 'pointer',
-                        transition: 'all 0.2s'
-                      }}
-                      title="Externer Streaming-Dienst (Spotify / YouTube)"
-                    >
-                      <Play size={14} style={{ fill: '#0f172a' }} />
-                      <span>Song anhören</span>
-                      <ExternalLink size={12} style={{ opacity: 0.6 }} />
-                    </button>
-                  )}
-                  {songGroup.tomplay_url && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        window.open(songGroup.tomplay_url, '_blank', 'noopener,noreferrer');
-                      }}
-                      className="cloud-link-btn"
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        padding: '8px 14px',
-                        borderRadius: '12px',
-                        background: '#eff6ff',
-                        color: '#2563eb',
-                        border: '1px solid #bfdbfe',
-                        fontSize: '0.82rem',
-                        fontWeight: 800,
-                        cursor: 'pointer',
-                        transition: 'all 0.2s'
-                      }}
-                      title="Tomplay (Interaktive Noten)"
-                    >
-                      <Music size={14} style={{ strokeWidth: 2.5 }} />
-                      <span>Tomplay Noten</span>
-                      <ExternalLink size={12} style={{ opacity: 0.6 }} />
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {activeSkill.is_pending_approval ? (
-                <div style={{ background: 'linear-gradient(135deg, #fefce8, #fef9c3)', color: '#ca8a04', padding: '24px', borderRadius: '24px', display: 'flex', alignItems: 'center', gap: '20px', border: '1px solid #fde047' }}>
-                  <div style={{ width: '48px', height: '48px', borderRadius: '14px', background: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
-                    <Clock size={28} />
-                  </div>
-                  <div>
-                    <div style={{ fontWeight: 900, fontSize: '1.1rem' }}>Wartet auf Bestätigung</div>
-                    <div style={{ fontSize: '0.9rem', fontWeight: 600, opacity: 0.8 }}>Dein Lehrer schaut sich deine Performance gerade an.</div>
-                  </div>
-                </div>
-              ) : activeSkill.is_stage_ready ? (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-                  <div style={{ 
-                    width: '64px', height: '64px', borderRadius: '20px', 
-                    background: 'white', border: '1px solid #f1f5f9',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', 
-                    fontSize: '2rem', boxShadow: '0 8px 20px rgba(0,0,0,0.05)',
-                    flexShrink: 0
-                  }}>
-                    {APP_INSTRUMENT_ICONS[activeSkill.instrument]}
-                  </div>
-                  <div style={{ background: 'linear-gradient(135deg, #e6f4ea, #e6f4ea)', color: '#34a853', padding: '24px', borderRadius: '24px', flex: 1, display: 'flex', alignItems: 'center', gap: '20px', border: '1px solid #e6f4ea' }}>
-                    <div style={{ width: '48px', height: '48px', borderRadius: '14px', background: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
-                      <Award size={28} />
-                    </div>
-                    <div>
-                      <div style={{ fontWeight: 900, fontSize: '1.1rem' }}>{getSkillLabel(activeSkill)} Meisterleistung!</div>
-                      <div style={{ fontSize: '0.9rem', fontWeight: 600, opacity: 0.8 }}>Du hast dieses Instrument zu 100% gemeistert.</div>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div style={{ padding: '24px 0' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px', fontSize: '0.9rem', fontWeight: 900, color: '#64748b', textTransform: 'uppercase' }}>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                       <span style={{ fontSize: '1.2rem' }}>{APP_INSTRUMENT_ICONS[activeSkill.instrument]}</span>
-                       {getSkillLabel(activeSkill)} Training
-                    </span>
-                    <span style={{ color: APP_INSTRUMENT_COLORS[activeSkill.instrument] || brandColor }}>{localProgress}%</span>
-                  </div>
-                  
-                  <div style={{ position: 'relative', width: '100%', height: '40px', display: 'flex', alignItems: 'center' }}>
-                    <div style={{ position: 'absolute', width: '100%', height: '12px', background: '#f1f5f9', borderRadius: '6px' }}></div>
-                    
-                    <div style={{ 
-                      position: 'absolute', 
-                      height: '12px', 
-                      width: `${localProgress}%`, 
-                      background: APP_INSTRUMENT_COLORS[activeSkill.instrument] || brandColor, 
-                      borderRadius: '6px', 
-                      transition: 'width 0.2s ease-out' 
-                    }}></div>
-                    
-                    <input 
-                      type="range" 
-                      min="0" max="90" step="5"
-                      value={localProgress} 
-                      onPointerDown={(e) => { e.stopPropagation(); setIsDragging(true); }}
-                      onClick={(e) => e.stopPropagation()}
-                      onChange={(e) => {
-                        const val = parseInt(e.target.value);
-                        setLocalProgress(val);
-                      }}
-                      onPointerUp={(e) => {
-                        setIsDragging(false);
-                        const finalVal = parseInt(e.currentTarget.value);
-                        setLocalProgress(finalVal);
-                        onUpdateProgress(activeSkill.id, finalVal, { 
-                          songId: activeSkill.song_id, 
-                          instrument: activeSkill.instrument, 
-                          difficulty: activeSkill.difficulty_level,
-                          partNumber: activeSkill.part_number || 1
-                        });
-                      }}
-                      onPointerCancel={(e) => {
-                        setIsDragging(false);
-                        const finalVal = parseInt(e.currentTarget.value);
-                        setLocalProgress(finalVal);
-                        onUpdateProgress(activeSkill.id, finalVal, { 
-                          songId: activeSkill.song_id, 
-                          instrument: activeSkill.instrument, 
-                          difficulty: activeSkill.difficulty_level,
-                          partNumber: activeSkill.part_number || 1
-                        });
-                      }}
-                      style={{ 
-                        width: '100%', 
-                        height: '40px', 
-                        appearance: 'none', 
-                        background: 'transparent', 
-                        cursor: 'pointer', 
-                        position: 'relative', 
-                        zIndex: 10,
-                        margin: 0,
-                        color: APP_INSTRUMENT_COLORS[activeSkill.instrument] || brandColor
-                      }} 
-                      className="custom-range-slider"
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '16px', minWidth: '200px', paddingTop: isMobile ? '12px' : '40px' }}>
-              {!activeSkill.is_pending_approval && !activeSkill.is_stage_ready && localProgress >= 90 && (
-                <button 
-                  
-                  
-                  onClick={() => onSubmitForApproval({ ...activeSkill, progress: localProgress })} 
-                  style={{ 
-                    width: '100%', padding: '18px', borderRadius: '20px', 
-                    background: isChallengeHovered ? '#000000' : brandColor, 
-                    color: 'white', border: 'none', 
-                    fontWeight: 900, fontSize: '1rem', cursor: 'pointer', 
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', 
-                    boxShadow: isChallengeHovered ? `0 15px 30px rgba(0,0,0,0.3)` : `0 12px 24px ${brandColor}44`,
-                    transform: isChallengeHovered ? 'translateY(-2px)' : 'none',
-                    transition: 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
-                  }} 
-                >
-                  <Zap size={22} fill="white" /> CHALLENGE STARTEN
-                </button>
-              )}
-            </div>
-          </div>
-
-          {songGroup.isBandSong && matchingBand && (() => {
-            const required = songGroup.instrumentation || {};
-            
-            // --- PRO CODER: ALIAS-AWARE OCCUPANCY CHECK ---
-            const normalize = (name: string) => {
-              const n = (name || '').toLowerCase().trim();
-              if (n === 'guitar' || n === 'e-gitarre') return 'E-Gitarre';
-              if (n === 'bass' || n === 'e-bass') return 'E-Bass';
-              if (n === 'drums' || n === 'e-drums' || n === 'schlagzeug') return 'E-Drums';
-              if (n === 'piano' || n === 'keys' || n === 'e-piano') return 'E-Piano';
-              if (n === 'vocals' || n === 'gesang') return 'Vocals';
-              return name;
-            };
-
-            const filled: Record<string, number> = {};
-            matchingBand.band_members?.forEach((m: any) => {
-              const norm = normalize(m.instrument);
-              filled[norm] = (filled[norm] || 0) + 1;
-            });
-            
-            const missing: string[] = [];
-            let isFullyStaffed = true;
-            
-            const bandSong = matchingBand.band_songs?.find((bs: any) => bs.song_id === songGroup.song_id);
-            const isSongActive = 
-              (matchingBand.songs?.id === songGroup.song_id) || 
-              (bandSong?.status === 'active');
-
-            if (isSongActive) {
-              isFullyStaffed = true;
-            } else {
-              const order = ['E-Gitarre', 'E-Drums', 'E-Piano', 'E-Bass'];
-              order.forEach(targetInst => {
-                const matchingEntries = Object.entries(required).filter(([inst]) => {
-                  const norm = normalize(inst);
-                  const normTarget = normalize(targetInst);
-                  return norm === normTarget;
-                });
-
-                matchingEntries.forEach(([inst, count]) => {
-                  const normTarget = normalize(inst);
-                  if (normTarget === 'Vocals') return;
-                  
-                  const needed = count as number;
-                  const current = filled[normTarget] || 0;
-                  if (current < needed) {
-                    isFullyStaffed = false;
-                    for(let i=0; i < (needed-current); i++) missing.push(inst);
-                  }
-                });
-              });
-            }
-
-            return (
-              <div style={{ marginTop: '32px', padding: '24px', background: isFullyStaffed ? 'linear-gradient(135deg, #f8fafc, #f1f5f9)' : '#f8fafc', borderRadius: '24px', border: isFullyStaffed ? '2px solid #eab308' : '1px solid #e2e8f0' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <div style={{ color: '#ec4899' }}><Users size={20} /></div>
-                    <div style={{ fontSize: '0.9rem', fontWeight: 900, color: '#1e293b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                      Band-Belegung: <span style={{ color: '#ec4899' }}>{matchingBand.name}</span>
-                    </div>
-                  </div>
-                  
-                  {isFullyStaffed ? (
-                    <div style={{ background: 'linear-gradient(135deg, #eab308, #ca8a04)', color: 'white', padding: '6px 14px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 950, display: 'flex', alignItems: 'center', gap: '6px', boxShadow: '0 4px 12px rgba(234, 179, 8, 0.3)' }}>
-                      <Star size={14} fill="white" /> VOLLSTÄNDIG
-                    </div>
-                  ) : (
-                    <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8' }}>
-                      {missing.length} Platz {missing.length === 1 ? 'frei' : 'frei'}
-                    </div>
-                  )}
-                </div>
-                
-                <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                  {(() => {
-                    const grouped: Record<string, any> = {};
-                    (matchingBand.band_members || []).forEach((m: any) => {
-                      const u = Array.isArray(m.users) ? m.users[0] : m.users;
-                      const uid = u?.id || m.external_name || m.user_id;
-                      if (!uid) return;
-                      if (!grouped[uid]) {
-                        grouped[uid] = { ...m, user: u, instruments: [m.instrument] };
-                      } else {
-                        if (!grouped[uid].instruments.includes(m.instrument)) {
-                          grouped[uid].instruments.push(m.instrument);
-                        }
-                      }
-                    });
-
-                    return Object.values(grouped).map((member: any, idx: number) => {
-                      const u = member.user;
-                      const nonVocals = member.instruments.filter((inst: string) => !inst.toLowerCase().includes('vocals') && !inst.toLowerCase().includes('gesang'));
-                      const displayInst = nonVocals.length > 0 ? nonVocals[0] : member.instruments[0];
-
-                      return (
-                        <div key={`mem-${idx}`} style={{ 
-                          display: 'flex', alignItems: 'center', gap: '10px', 
-                          background: 'white', padding: '8px 14px', borderRadius: '16px', 
-                          border: member.user_id === userId ? '1.5px solid #ef4444' : '1px solid #f1f5f9',
-                          boxShadow: member.user_id === userId ? '0 4px 12px rgba(239, 68, 68, 0.15)' : '0 2px 6px rgba(0,0,0,0.02)' 
-                        }}>
-                          <div style={{ width: '38px', height: '38px', borderRadius: '50%', overflow: 'hidden', background: '#f1f5f9', flexShrink: 0 }}>
-                            {member.user_id ? (
-                               <StudioAvatar src={u?.photo_url} user={u} />
-                            ) : (
-                               <div style={{ width: '100%', height: '100%', background: '#1e293b', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.85rem', fontWeight: 900 }}>{member.external_name?.[0] || 'E'}</div>
-                            )}
-                          </div>
-                          <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#1e293b' }}>
-                            {APP_INSTRUMENT_ICONS[displayInst] || '🎸'} {member.user_id ? (u?.first_name || 'Mitglied') : member.external_name}
-                          </div>
-                        </div>
-                      );
-                    });
-                  })()}
-                  
-                  {missing.map((inst, idx) => (
-                    <div key={`miss-${idx}`} style={{ 
-                      display: 'flex', alignItems: 'center', gap: '10px', 
-                      background: 'rgba(0,0,0,0.02)', padding: '8px 14px', borderRadius: '16px', 
-                      border: '1px dashed #cbd5e1', opacity: 0.6
-                    }}>
-                      <div style={{ width: '38px', height: '38px', borderRadius: '50%', background: '#f1f5f9', border: '1px dashed #cbd5e1', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.1rem', flexShrink: 0 }}>
-                        ?
-                      </div>
-                      <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#94a3b8' }}>
-                        {APP_INSTRUMENT_ICONS[inst] || '🎸'} Gesucht
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            );
-          })()}
-        </div>
-      </div>
-
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-        {isConfirmingDelete ? (
-          <div style={{ display: 'flex', gap: '8px', animation: 'scaleIn 0.2s' }}>
-             <button 
-              onClick={() => onDelete(songGroup.song_id)}
-              style={{ 
-                width: '52px', height: '52px', borderRadius: '18px', 
-                background: '#f43f5e', border: 'none', color: 'white', 
-                display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer'
-              }}
-              title="Endgültig löschen"
-            >
-              <Check size={24} strokeWidth={3} />
-            </button>
-            <button 
-              onClick={() => setIsConfirmingDelete(false)}
-              style={{ 
-                width: '52px', height: '52px', borderRadius: '18px', 
-                background: '#94a3b8', border: 'none', color: 'white', 
-                display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer'
-              }}
-              title="Abbrechen"
-            >
-              <X size={24} strokeWidth={3} />
-            </button>
-          </div>
-        ) : (
-          <button 
-            onClick={() => setIsConfirmingDelete(true)}
-            style={{ 
-              width: '52px', height: '52px', borderRadius: '18px', 
-              background: '#fff1f2', 
-              border: '1px solid #ffe4e6', 
-              color: '#f43f5e', 
-              display: 'flex', alignItems: 'center', justifyContent: 'center', 
-              cursor: 'pointer', transition: 'all 0.2s',
-              flexShrink: 0,
-              boxShadow: '0 4px 12px rgba(244, 63, 94, 0.1)'
-            }}
-            className="hover-scale"
-            title="Arrangement entfernen"
-          >
-            <Trash2 size={24} />
-          </button>
-        )}
-      </div>
-    </div>
-  );
-}
 
 if (typeof window !== 'undefined') {
   // Purge legacy shared credentials from localStorage to enforce per-tab isolation
@@ -1636,8 +646,10 @@ function App() {
 
   // Declarative definition of renderLegalModals to ensure availability across all routes/landing pages
   const renderLegalModals = () => {
-    const isLegalOpen = showPrivacy || showAgb || showImpressum;
-    const initialTab: 'privacy' | 'terms' | 'impressum' = showPrivacy ? 'privacy' : (showAgb ? 'terms' : 'impressum');
+    const isLegalOpen = showPrivacy || showAgb || showImpressum || showCancellation;
+    const initialTab: 'privacy' | 'terms' | 'impressum' | 'cancellation' = showPrivacy 
+      ? 'privacy' 
+      : (showAgb ? 'terms' : (showCancellation ? 'cancellation' : 'impressum'));
 
     return (
       <LegalTextModal 
@@ -1647,6 +659,7 @@ function App() {
           setShowPrivacy(false);
           setShowAgb(false);
           setShowImpressum(false);
+          setShowCancellation(false);
         }}
       />
     );
@@ -1689,10 +702,28 @@ function App() {
     return cleanup;
   }, []);
 
-  // Inactivity auto-lockout (30 minutes of idle time)
+  const [isScreenLockedByInactivity, setIsScreenLockedByInactivity] = useState(false);
+  const [showQuarterlyAccessReportModal, setShowQuarterlyAccessReportModal] = useState(false);
+
+  // 🛡️ Universal 45-Minute Inactivity Idle Privacy-Lock (Hiscox CyberSafe / BSI APP.3.1)
   useInactivityTimeout({
-    timeoutMs: 30 * 60 * 1000,
-    enabled: Boolean(currentView === 'dashboard')
+    timeoutMs: 45 * 60 * 1000,
+    enabled: Boolean(currentView === 'dashboard' && !isScreenLockedByInactivity),
+    onTimeout: () => {
+      console.warn('[Inactivity] 45 minutes idle reached. Activating Privacy Screen Lock...');
+      // Privilege Downgrade: If in admin mode, auto-downgrade to teacher if user has teacher role
+      try {
+        const storedUserStr = sessionStorage.getItem('groovelab_cached_user');
+        if (storedUserStr) {
+          const parsed = JSON.parse(storedUserStr);
+          if (parsed?.role === 'admin' && Array.isArray(parsed?.roles) && parsed.roles.includes('teacher')) {
+            console.log('[Inactivity] Downgrading active role from admin to teacher (Least Privilege)...');
+            sessionStorage.setItem('groovelab_active_workspace', 'teacher');
+          }
+        }
+      } catch (e) {}
+      setIsScreenLockedByInactivity(true);
+    }
   });
 
 
@@ -1966,6 +997,7 @@ function App() {
   const [showPrivacy, setShowPrivacy] = useState(false);
   const [showAgb, setShowAgb] = useState(false);
   const [showImpressum, setShowImpressum] = useState(false);
+  const [showCancellation, setShowCancellation] = useState(false);
   const [showPilotAgreementModal, setShowPilotAgreementModal] = useState(false);
   const [showTrialInfoModal, setShowTrialInfoModal] = useState(false);
   const [stationIdFromStorage, setStationIdFromStorage] = useState(() => typeof window !== 'undefined' ? localStorage.getItem('groovelab_station_id') : null);
@@ -2354,7 +1386,9 @@ function App() {
 
       if (typeof window !== 'undefined') {
         if (nextVal) {
-          sessionStorage.setItem('groovelab_cached_user', JSON.stringify(nextVal));
+          // 🛡️ Zero-Knowledge: Never persist student last_name in sessionStorage
+          const userToCache = nextVal.role === 'student' ? { ...nextVal, last_name: null } : nextVal;
+          sessionStorage.setItem('groovelab_cached_user', JSON.stringify(userToCache));
           if (nextVal.id) {
             sessionStorage.setItem('groovelab_user_id', nextVal.id);
           }
@@ -2472,6 +1506,27 @@ function App() {
         localStorage.removeItem('groovelab_ghost_auth_token');
       }
 
+      // 🛡️ Ghost-Support 120-Minute Time-Box Enforcer (Hiscox CyberSafe / OWASP ASVS Level 3)
+      const MAX_GHOST_SESSION_MS = 120 * 60 * 1000;
+      const ghostStartedAtStr = sessionStorage.getItem('groovelab_ghost_started_at');
+      const now = Date.now();
+      if (!ghostStartedAtStr) {
+        sessionStorage.setItem('groovelab_ghost_started_at', String(now));
+      } else {
+        const startedAt = parseInt(ghostStartedAtStr, 10);
+        if (!isNaN(startedAt) && (now - startedAt > MAX_GHOST_SESSION_MS)) {
+          console.warn('[Security] Ghost-Support session TTL expired (>120min). Revoking access.');
+          sessionStorage.removeItem('groovelab_support_ghost');
+          sessionStorage.removeItem('groovelab_ghost_started_at');
+          sessionStorage.removeItem('groovelab_ghost_school_id');
+          sessionStorage.removeItem('groovelab_ghost_impersonated_user_id');
+          sessionStorage.removeItem('groovelab_ghost_active_role');
+          sessionStorage.removeItem('groovelab_ghost_lease_token');
+          window.location.href = '/master-admin';
+          return;
+        }
+      }
+
       sessionStorage.setItem('groovelab_support_ghost', 'true');
       if (ghostSchoolId) sessionStorage.setItem('groovelab_ghost_school_id', ghostSchoolId);
       if (ghostUserId) sessionStorage.setItem('groovelab_ghost_impersonated_user_id', ghostUserId);
@@ -2543,7 +1598,8 @@ function App() {
           setLoggedInUserId(realUser.id);
 
           try {
-            sessionStorage.setItem('groovelab_cached_user', JSON.stringify(impersonatedUserObj));
+            const cacheImpersonated = targetRole === 'student' ? { ...impersonatedUserObj, last_name: null } : impersonatedUserObj;
+            sessionStorage.setItem('groovelab_cached_user', JSON.stringify(cacheImpersonated));
           } catch (e) {}
 
           const targetPlatform: 'campus' | 'groovelab' = (realUser.is_groovelab_active && !realUser.is_campus_active) ? 'groovelab' : 'campus';
@@ -2587,6 +1643,33 @@ function App() {
 
       resolveGhostIdentity();
     }
+  }, []);
+
+  // 🛡️ Ghost-Support 120-Minute Periodic Watchdog (Hiscox CyberSafe / OWASP ASVS Level 3)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const isGhostActive = sessionStorage.getItem('groovelab_support_ghost') === 'true';
+    if (!isGhostActive) return;
+
+    const interval = setInterval(() => {
+      const ghostStartedAtStr = sessionStorage.getItem('groovelab_ghost_started_at');
+      if (ghostStartedAtStr) {
+        const startedAt = parseInt(ghostStartedAtStr, 10);
+        if (!isNaN(startedAt) && (Date.now() - startedAt > 120 * 60 * 1000)) {
+          console.warn('[Security] Ghost session exceeded 120 minutes TTL. Auto-terminating session.');
+          sessionStorage.removeItem('groovelab_support_ghost');
+          sessionStorage.removeItem('groovelab_ghost_started_at');
+          sessionStorage.removeItem('groovelab_ghost_school_id');
+          sessionStorage.removeItem('groovelab_ghost_impersonated_user_id');
+          sessionStorage.removeItem('groovelab_ghost_active_role');
+          sessionStorage.removeItem('groovelab_ghost_lease_token');
+          alert('Die maximale Dauer der Ghost-Support-Sitzung (120 Minuten) wurde erreicht. Die Sitzung wurde aus Sicherheitsgründen beendet.');
+          window.location.href = '/master-admin';
+        }
+      }
+    }, 30000);
+
+    return () => clearInterval(interval);
   }, []);
 
   const [session, setSessionRaw] = useState<any>(null);
@@ -3797,9 +2880,11 @@ function App() {
         fetchDashboardData(loggedInUserId);
       }, 45000);
 
-      // 2. Continuous Heartbeat Monitor (Universal: Students, Teachers, Admins, Secretaries)
+      // 2. Continuous Heartbeat Monitor (Students, Admins, Secretaries - Teachers excluded under TVöD § 26 BDSG)
       const heartbeatInterval = setInterval(async () => {
         if (!user) return;
+        // 🛡️ TVöD § 26 BDSG / LPVG: Teachers are strictly excluded from periodic surveillance telemetry
+        if (user.role === 'teacher') return;
         // For students, require an active session without checkout
         if (user.role === 'student' && (!session || session.check_out_time)) return;
 
@@ -3934,14 +3019,17 @@ function App() {
       } else if (userData) {
         // --- UPDATE OFFLINE CACHE & PERSISTENT USER ---
         try {
-          sessionStorage.setItem('groovelab_cached_user', JSON.stringify(userData));
+          const isStudentRole = (userData.role || '').toLowerCase() === 'student';
+          const userToCache = isStudentRole ? { ...userData, last_name: undefined } : userData;
+          sessionStorage.setItem('groovelab_cached_user', JSON.stringify(userToCache));
           sessionStorage.setItem('groovelab_user_id', userData.id);
         } catch (e) {}
         try {
+          const isStudentRole = (userData.role || '').toLowerCase() === 'student';
           const minimalUserData = {
             id: userData.id,
             first_name: userData.first_name,
-            last_name: userData.last_name,
+            last_name: isStudentRole ? undefined : userData.last_name,
             role: userData.role,
             roles: userData.roles,
             school_id: userData.school_id,
@@ -4207,7 +3295,6 @@ function App() {
       if (typeof window !== 'undefined') {
         (window as any).debugSchoolId = schoolId;
         (window as any).debugUserId = userId;
-        (window as any).debugUserData = JSON.stringify(userData);
       }
       if (!schoolId || schoolId.length !== 36) {
         console.warn('[Dashboard] No valid school_id found. Board will be empty.');
@@ -6668,7 +5755,7 @@ function App() {
     }
 
     try {
-      if (loggedInUserId) {
+      if (loggedInUserId && user?.role !== 'teacher') {
         // Mark user as offline
         const pastDate = new Date(Date.now() - 10 * 60000).toISOString();
         const { error } = await supabase.from('users').update({ last_seen: pastDate }).eq('id', loggedInUserId);
@@ -6810,6 +5897,7 @@ function App() {
       localStorage.removeItem('groovelab_location_mode');
       localStorage.removeItem('groovelab_active_tab');
 
+      await scrubSharedDeviceCache();
       window.location.replace(getRedirectUrl());
       return;
     }
@@ -6888,6 +5976,7 @@ function App() {
     sessionStorage.removeItem('gl_global_device_key');
     localStorage.removeItem('gl_global_device_key');
 
+    await scrubSharedDeviceCache();
     window.location.replace(getRedirectUrl());
   };
 
@@ -7006,8 +6095,8 @@ function App() {
     const isStaff = userToLogin?.role === 'teacher' || userToLogin?.role === 'admin' || userToLogin?.role === 'secretary';
     const mode = (isStaff && activePlatform === 'groovelab') ? 'lab' : (isHome ? 'home' : 'lab');
     
-    // If we are switching profiles, mark the OLD one as offline first
-    if (loggedInUserId && loggedInUserId !== userId) {
+    // If we are switching profiles, mark the OLD one as offline first (excluding teachers)
+    if (loggedInUserId && loggedInUserId !== userId && user?.role !== 'teacher') {
       const pastDate = new Date(Date.now() - 10 * 60000).toISOString();
       await supabase.from('users').update({ last_seen: pastDate }).eq('id', loggedInUserId);
     }
@@ -7070,11 +6159,13 @@ function App() {
     const startTab = (resolvedPlatform === 'groovelab') ? 'live' : 'briefing';
     setActiveStudentTab(startTab);
 
-    // Immediate Heartbeat on Login (non-blocking for instantaneous login transition!)
-    supabase
-      .from('users')
-      .update({ last_seen: new Date().toISOString() })
-      .eq('id', userId);
+    // Immediate Heartbeat on Login (non-blocking for instantaneous login transition! Excludes teachers under TVöD § 26 BDSG)
+    if (userToLogin?.role !== 'teacher') {
+      supabase
+        .from('users')
+        .update({ last_seen: new Date().toISOString() })
+        .eq('id', userId);
+    }
       
     // Force a hard reload to absolutely guarantee that any lingering camera 
     // media streams from the browser are destroyed.
@@ -7308,7 +6399,7 @@ function App() {
         if (Date.now() - lastActivityTime > 5 * 60 * 1000) return;
 
         const now = new Date().toISOString();
-        if (user?.id) {
+        if (user?.id && user.role !== 'teacher') {
           await supabase
             .from('users')
             .update({ last_seen: now })
@@ -7361,7 +6452,7 @@ function App() {
     window.addEventListener('online', handleOnlineSync);
 
     const handleBeforeUnload = () => {
-      if (user?.id) {
+      if (user?.id && user.role !== 'teacher') {
         const pastDate = new Date(Date.now() - 10 * 60000).toISOString();
         const body = JSON.stringify({ last_seen: pastDate });
         const url = `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/users?id=eq.${user.id}`;
@@ -7998,10 +7089,12 @@ function App() {
           const updated = { 
             ...prevUser, 
             role: newRole,
+            last_name: newRole === 'student' ? null : prevUser.last_name,
             is_ghost_mode: prevUser.is_ghost_mode ?? isGhostParam
           };
           try {
-            sessionStorage.setItem('groovelab_cached_user', JSON.stringify(updated));
+            const userToCache = newRole === 'student' ? { ...updated, last_name: null } : updated;
+            sessionStorage.setItem('groovelab_cached_user', JSON.stringify(userToCache));
           } catch (e) {}
           return updated;
         });
@@ -10362,7 +9455,7 @@ function App() {
                           onClick={() => {
                             if (isParentSessionActive) {
                               sessionStorage.setItem('groovelab_parent_unlocked_global', 'true');
-                              sessionStorage.setItem(`groovelab_parent_session_${sibling.id}`, String(Date.now() + 60 * 60 * 1000));
+                              sessionStorage.setItem(`groovelab_parent_session_${sibling.id}`, String(Date.now() + 180 * 1000));
                             } else {
                               sessionStorage.removeItem('groovelab_parent_unlocked_global');
                               sessionStorage.removeItem(`groovelab_parent_session_${sibling.id}`);
@@ -11169,6 +10262,8 @@ function App() {
                     <span onClick={() => setShowPrivacy(true)} style={{ cursor: 'pointer' }}>Datenschutz</span>
                     <span style={{ opacity: 0.5 }}>•</span>
                     <span onClick={() => setShowAgb(true)} style={{ cursor: 'pointer' }}>AGB</span>
+                    <span style={{ opacity: 0.5 }}>•</span>
+                    <span onClick={() => setShowCancellation(true)} style={{ cursor: 'pointer' }}>Widerruf</span>
                     <span style={{ opacity: 0.5 }}>•</span>
                     <span onClick={() => setShowImpressum(true)} style={{ cursor: 'pointer' }}>Impressum</span>
                   </div>
@@ -12488,6 +11583,8 @@ function App() {
                         <span onClick={() => setShowPrivacy(true)} style={{ cursor: 'pointer' }}>Datenschutz</span>
                         <span style={{ opacity: 0.5 }}>•</span>
                         <span onClick={() => setShowAgb(true)} style={{ cursor: 'pointer' }}>AGB</span>
+                        <span style={{ opacity: 0.5 }}>•</span>
+                        <span onClick={() => setShowCancellation(true)} style={{ cursor: 'pointer' }}>Widerruf</span>
                         <span style={{ opacity: 0.5 }}>•</span>
                         <span onClick={() => setShowImpressum(true)} style={{ cursor: 'pointer' }}>Impressum</span>
                       </div>
@@ -14657,11 +13754,15 @@ function App() {
             onUnlock={() => {
               setIsCampusUnlocked(true);
               setShowCampusPinPrompt(false);
-              setActivePlatform('campus');
-              const isStaff = user?.role === 'teacher' || user?.role === 'admin' || user?.role === 'secretary';
-              const startTab = isStaff ? 'live' : 'briefing';
-              setActiveStudentTab(startTab);
-              localStorage.setItem('campus_active_tab', startTab);
+              const wasScreenLocked = isScreenLockedByInactivity;
+              setIsScreenLockedByInactivity(false);
+              if (!wasScreenLocked) {
+                setActivePlatform('campus');
+                const isStaff = user?.role === 'teacher' || user?.role === 'admin' || user?.role === 'secretary';
+                const startTab = isStaff ? 'live' : 'briefing';
+                setActiveStudentTab(startTab);
+                localStorage.setItem('campus_active_tab', startTab);
+              }
             }}
             onClose={() => {
               setShowCampusPinPrompt(false);
@@ -15966,8 +15067,158 @@ function App() {
           <AdminSecuritySuiteModal
             schoolId={school?.id || user?.school_id || (Array.isArray(user?.schools) ? user?.schools[0]?.id : user?.schools?.id)}
             onClose={() => setShowAdminSecuritySuiteModal(false)}
+            onOpenAccessReport={() => setShowQuarterlyAccessReportModal(true)}
           />
         </Suspense>
+      )}
+
+      {showQuarterlyAccessReportModal && (
+        <Suspense fallback={null}>
+          <QuarterlyAccessReportModal
+            school={school || (Array.isArray(user?.schools) ? user?.schools[0] : user?.schools)}
+            schoolUsers={schoolUsers || []}
+            onClose={() => setShowQuarterlyAccessReportModal(false)}
+          />
+        </Suspense>
+      )}
+
+      {/* 🛡️ Universal 45-Minute Inactivity Idle Privacy-Screen Lock (Hiscox CyberSafe / BSI APP.3.1 / OWASP ASVS) */}
+      {isScreenLockedByInactivity && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 999999,
+            backdropFilter: 'blur(28px)',
+            WebkitBackdropFilter: 'blur(28px)',
+            backgroundColor: 'rgba(15, 23, 42, 0.75)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '24px'
+          }}
+        >
+          <div
+            style={{
+              background: 'linear-gradient(145deg, #ffffff 0%, #f8fafc 100%)',
+              borderRadius: '28px',
+              padding: '36px 32px',
+              maxWidth: '440px',
+              width: '100%',
+              textAlign: 'center',
+              boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.4) inset',
+              position: 'relative'
+            }}
+          >
+            {/* Lock Icon */}
+            <div
+              style={{
+                width: '64px',
+                height: '64px',
+                borderRadius: '22px',
+                background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                margin: '0 auto 20px',
+                color: '#ffffff',
+                boxShadow: '0 10px 25px -5px rgba(2, 132, 199, 0.4)'
+              }}
+            >
+              <Lock size={32} />
+            </div>
+
+            <h3
+              style={{
+                fontSize: '1.4rem',
+                fontWeight: 900,
+                color: '#0f172a',
+                marginBottom: '8px',
+                letterSpacing: '-0.02em',
+                fontFamily: "'Plus Jakarta Sans', sans-serif"
+              }}
+            >
+              Sitzung geschützt
+            </h3>
+
+            <p
+              style={{
+                fontSize: '0.92rem',
+                color: '#475569',
+                lineHeight: 1.55,
+                marginBottom: '20px'
+              }}
+            >
+              Automatische Bildschirmsperre nach 45 Minuten Inaktivität zum Schutz vor unbefugten Blicken (Shoulder Surfing). Ihre offenen Daten und Formulare bleiben vollständig erhalten.
+            </p>
+
+            <div
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '6px 14px',
+                borderRadius: '999px',
+                background: '#e0f2fe',
+                color: '#0369a1',
+                fontSize: '0.8rem',
+                fontWeight: 800,
+                marginBottom: '26px'
+              }}
+            >
+              <span>🛡️</span>
+              <span>Hiscox CyberSafe &amp; DSGVO Art. 32 konform</span>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <button
+                type="button"
+                onClick={() => setShowCampusPinPrompt(true)}
+                style={{
+                  width: '100%',
+                  padding: '14px 20px',
+                  borderRadius: '16px',
+                  background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+                  color: '#ffffff',
+                  border: 'none',
+                  fontSize: '1rem',
+                  fontWeight: 900,
+                  cursor: 'pointer',
+                  boxShadow: '0 8px 20px -4px rgba(2, 132, 199, 0.35)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                <Key size={18} />
+                <span>Mit PIN entsperren</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  handleLogout(true, false);
+                }}
+                style={{
+                  width: '100%',
+                  padding: '12px 20px',
+                  borderRadius: '16px',
+                  background: 'transparent',
+                  color: '#64748b',
+                  border: '1px solid #cbd5e1',
+                  fontSize: '0.92rem',
+                  fontWeight: 750,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                Abmelden
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
 

@@ -3,6 +3,7 @@ import { X, CheckCircle2, ShieldCheck, Download, FileText, Printer } from 'lucid
 import { supabase } from '../lib/supabase';
 import { generateEnterpriseSecurityWhitepaperPDF } from '../utils/securityWhitepaperGenerator';
 import { generateDpoComplianceDossierPDF } from '../utils/dpoComplianceDossierGenerator';
+import { generateStaffCouncilDeclarationPDF } from '../utils/staffCouncilDeclarationGenerator';
 
 interface AVVModalProps {
   isOpen: boolean;
@@ -285,6 +286,34 @@ export const AVVModal: React.FC<AVVModalProps> = ({ isOpen, onClose, school, onA
             >
               <Download size={14} color="#1d4ed8" />
               Behörden-Dossier (PDF)
+            </button>
+
+            <button
+              type="button"
+              onClick={() => generateStaffCouncilDeclarationPDF({
+                schoolName: school?.name || school?.school_name,
+                schoolAddress: school?.address || school?.city,
+                schoolSigneeName: signeeName || school?.avv_signee_name,
+                schoolId: targetSchoolId
+              })}
+              title="Offizielle Bestätigung für Betriebs- und Personalräte (§ 87 BetrVG / Herrenberg) als PDF herunterladen"
+              style={{
+                background: '#ffffff',
+                border: '1px solid #cbd5e1',
+                borderRadius: '10px',
+                padding: '6px 12px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                fontSize: '0.78rem',
+                fontWeight: 800,
+                color: '#0f172a',
+                cursor: 'pointer',
+                transition: 'all 0.15s'
+              }}
+            >
+              <ShieldCheck size={14} color="#ea4335" />
+              Personalrats-Attest (§ 87 BetrVG)
             </button>
 
             <button

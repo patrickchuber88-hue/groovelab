@@ -15,9 +15,10 @@ import { generateEnterpriseSecurityWhitepaperPDF } from '../utils/securityWhitep
 interface AdminSecuritySuiteModalProps {
   schoolId: string;
   onClose: () => void;
+  onOpenAccessReport?: () => void;
 }
 
-export const AdminSecuritySuiteModal: React.FC<AdminSecuritySuiteModalProps> = ({ schoolId, onClose }) => {
+export const AdminSecuritySuiteModal: React.FC<AdminSecuritySuiteModalProps> = ({ schoolId, onClose, onOpenAccessReport }) => {
   const [activeTab, setActiveTab] = useState<'devices' | 'rate_limits' | 'token_revocation'>('devices');
   const [loading, setLoading] = useState<boolean>(true);
   const [overview, setOverview] = useState<any>(null);
@@ -218,6 +219,31 @@ export const AdminSecuritySuiteModal: React.FC<AdminSecuritySuiteModalProps> = (
               <FileText size={14} color="#34a853" />
               Whitepaper (PDF)
             </button>
+
+            {onOpenAccessReport && (
+              <button
+                type="button"
+                onClick={onOpenAccessReport}
+                title="Quartalsweisen Rechte- und Rollen-Zertifizierungsbericht (DSGVO/Hiscox) öffnen"
+                style={{
+                  background: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '10px',
+                  padding: '6px 12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  fontSize: '0.78rem',
+                  fontWeight: 700,
+                  color: '#0f172a',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s'
+                }}
+              >
+                <ShieldCheck size={14} color="#ea4335" />
+                Rechte-Zertifizierung
+              </button>
+            )}
 
             <button
               onClick={onClose}

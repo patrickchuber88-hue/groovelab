@@ -72,6 +72,7 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
   const [hasCampus, setHasCampus] = useState<boolean>(Boolean(school?.has_campus_subscription));
   const [hasGroovelab, setHasGroovelab] = useState<boolean>(Boolean(school?.has_groovelab_subscription));
   const [subscriptionBypass, setSubscriptionBypass] = useState<boolean>(school?.subscription_bypass ?? false);
+  const [mfaEnforcedForAdmins, setMfaEnforcedForAdmins] = useState<boolean>(Boolean(school?.mfa_enforced_for_admins));
 
   // Audio-Tresor Storage State (Synchronized with Financial Control & SecretaryDashboard)
   const [extraStorageGb, setExtraStorageGb] = useState<number>(() => {
@@ -104,6 +105,7 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
       setHasCampus(Boolean(school.has_campus_subscription));
       setHasGroovelab(Boolean(school.has_groovelab_subscription));
       setSubscriptionBypass(school.subscription_bypass ?? false);
+      setMfaEnforcedForAdmins(Boolean(school.mfa_enforced_for_admins));
       setExtraStorageGb(() => {
         if (school.storage_addon_gb !== undefined && school.storage_addon_gb !== null && Number(school.storage_addon_gb) > 0) return Number(school.storage_addon_gb);
         if (school.extra_storage_gb !== undefined && school.extra_storage_gb !== null && Number(school.extra_storage_gb) > 0) return Number(school.extra_storage_gb);
@@ -128,6 +130,7 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
     school?.has_campus_subscription,
     school?.has_groovelab_subscription,
     school?.subscription_bypass,
+    school?.mfa_enforced_for_admins,
     school?.storage_addon_gb,
     school?.extra_storage_gb,
     school?.extra_billing_option,
@@ -216,6 +219,7 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
         has_campus_subscription: hasCampus,
         has_groovelab_subscription: hasGroovelab,
         subscription_bypass: subscriptionBypass,
+        mfa_enforced_for_admins: mfaEnforcedForAdmins,
         storage_addon_gb: extraStorageGb,
         storage_addon_monthly_fee: addonFee,
         extra_billing_option: extraStorageGb === 20 ? 'option1' : extraStorageGb > 0 ? 'addon' : 'none'
@@ -1232,6 +1236,64 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
                   <strong>Unterzeichner:</strong> {school.avv_signee_name || 'Schulleitung / Vertretungsberechtigt'}
                 </div>
               )}
+            </div>
+
+            {/* 🛡️ HISCOX CYBERSAFE 05/2026: MFA ENFORCEMENT POLICY FOR SCHOOL ADMINS */}
+            <div style={{
+              background: '#ffffff',
+              border: mfaEnforcedForAdmins ? '1.5px solid #0284c7' : '1px solid #e2e8f0',
+              borderRadius: '20px',
+              padding: '24px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '14px',
+              boxShadow: mfaEnforcedForAdmins ? '0 4px 18px rgba(2, 132, 199, 0.08)' : '0 2px 8px rgba(0,0,0,0.02)',
+              transition: 'all 0.2s ease'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                    <span style={{
+                      background: mfaEnforcedForAdmins ? '#e0f2fe' : '#f1f5f9',
+                      color: mfaEnforcedForAdmins ? '#0369a1' : '#64748b',
+                      padding: '3px 10px',
+                      borderRadius: '100px',
+                      fontSize: '0.68rem',
+                      fontWeight: 900
+                    }}>
+                      HISCOX CYBERSAFE 05/2026 • FERNZUGRIFFE &amp; MFA
+                    </span>
+                    {mfaEnforcedForAdmins && (
+                      <span style={{ background: '#ecfdf5', color: '#059669', padding: '3px 10px', borderRadius: '100px', fontSize: '0.68rem', fontWeight: 900, border: '1px solid #a7f3d0' }}>
+                        ✓ 2FA Verpflichtend Aktiv
+                      </span>
+                    )}
+                  </div>
+                  <h4 style={{ margin: '8px 0 4px 0', fontSize: '1.02rem', fontWeight: 900, color: '#0f172a' }}>
+                    Mehrfaktor-Authentifizierung (MFA) für Schulleitung vorschreiben
+                  </h4>
+                  <p style={{ margin: 0, fontSize: '0.80rem', color: '#64748b', lineHeight: 1.5, maxWidth: '580px' }}>
+                    Erzwingt bei der Schulleitung (<code>admin</code>) und Verwaltung dieser Musikschule die verpflichtende Nutzung von TOTP (Authenticator-App) oder WebAuthn (Passkey) bei Fernzugriffen, um die Cyber-Versicherungs-Obliegenheiten nach Hiscox CyberSafe 05/2026 strikt einzuhalten.
+                  </p>
+                </div>
+
+                <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={mfaEnforcedForAdmins}
+                    onChange={(e) => setMfaEnforcedForAdmins(e.target.checked)}
+                    style={{
+                      width: '20px',
+                      height: '20px',
+                      cursor: 'pointer',
+                      accentColor: '#0284c7'
+                    }}
+                  />
+                  <span style={{ fontSize: '0.84rem', fontWeight: 800, color: mfaEnforcedForAdmins ? '#0284c7' : '#475569' }}>
+                    {mfaEnforcedForAdmins ? 'MFA ist aktiv' : 'MFA optional'}
+                  </span>
+                </label>
+              </div>
             </div>
 
             {/* DSB & Audit Portal Launcher Button */}

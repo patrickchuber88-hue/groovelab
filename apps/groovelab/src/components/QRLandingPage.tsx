@@ -3152,7 +3152,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         if (isParentMatch) {
           sessionStorage.setItem(`groovelab_parent_unlocked_${token}`, 'true');
           sessionStorage.setItem(`groovelab_parent_unlocked_${profile.id}`, 'true');
-          sessionStorage.setItem(`groovelab_parent_session_${profile.id}`, String(Date.now() + 15 * 60 * 1000));
+          sessionStorage.setItem(`groovelab_parent_session_${profile.id}`, String(Date.now() + 180 * 1000));
           setParentUnlocked(true);
         } else {
           setParentUnlocked(false);
@@ -6007,7 +6007,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                           const isOk = await verifyParentPinClient(profile.id, nextVal.trim());
                           if (isOk) {
                             sessionStorage.setItem(`groovelab_parent_unlocked_${profile.id}`, 'true');
-                            sessionStorage.setItem(`groovelab_parent_session_${profile.id}`, String(Date.now() + 60 * 60 * 1000));
+                            sessionStorage.setItem(`groovelab_parent_session_${profile.id}`, String(Date.now() + 180 * 1000));
                             setParentUnlocked(true);
                             setParentUnlockInput('');
                           } else {
@@ -6067,7 +6067,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                               }
 
                               sessionStorage.setItem(`groovelab_parent_unlocked_${profile.id}`, 'true');
-                              sessionStorage.setItem(`groovelab_parent_session_${profile.id}`, String(Date.now() + 60 * 60 * 1000));
+                              sessionStorage.setItem(`groovelab_parent_session_${profile.id}`, String(Date.now() + 180 * 1000));
                               setProfile(prev => prev ? { ...prev, has_parent_pin: true } : null);
                               setParentUnlocked(true);
                               setParentSetupPin('');

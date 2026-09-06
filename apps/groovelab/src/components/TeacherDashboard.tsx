@@ -1046,115 +1046,14 @@ export function TeacherDashboard({
   }, [isTeacher, locationMode, localCheckedIn, teacher, rooms]);
 
   const handleGeofenceCheck = () => {
-    // 1. Bypass check on localhost or if geofence bypass is active in the school's database settings
-    const schoolData = Array.isArray(teacher?.schools) ? teacher?.schools[0] : teacher?.schools;
-    const hasGeofenceBypass = !!(schoolData?.opening_hours?.geofence_bypass);
-    const isLocalhost = typeof window !== 'undefined' && (
-      window.location.hostname === 'localhost' || 
-      window.location.hostname === '127.0.0.1' ||
-      window.location.hostname.endsWith('.local') ||
-      /^192\.168\./.test(window.location.hostname) ||
-      /^10\./.test(window.location.hostname) ||
-      /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(window.location.hostname)
-    );
-
-    if (isLocalhost || hasGeofenceBypass) {
-      console.log('[Geofence] Bypassing location check (localhost or database bypass active).');
-      if (isTeacher) {
-        performDirectTeacherCheckin();
-      } else {
-        setCheckingInStatus('success');
-        setShowKioskView(true);
-      }
-      return;
+    // ⚡ Enterprise+ Tier-1 Privacy: Zero geolocation tracking (§ 87 BetrVG / DSGVO Art. 5)
+    console.log('[Presence] Direct check-in activated without location tracking.');
+    if (isTeacher) {
+      performDirectTeacherCheckin();
+    } else {
+      setCheckingInStatus('success');
+      setShowKioskView(true);
     }
-
-    setCheckingInStatus('locating');
-    setGeoErrorMsg('');
-
-    if (!navigator.geolocation) {
-      setCheckingInStatus('error');
-      setGeoErrorMsg('Geolocation wird von deinem Browser nicht unterstützt.');
-      return;
-    }
-
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        setCheckingInStatus('verifying');
-        const currentPos = {
-          lat: position.coords.latitude,
-          lng: position.coords.longitude
-        };
-
-        let isWithinAnyRoom = false;
-
-        // Check against room coordinates & geofences
-        if (rooms && rooms.length > 0) {
-          for (const room of rooms) {
-            const points = Array.isArray(room.geofence_points) ? room.geofence_points : [];
-            const allCoords = [...points];
-            if (room.latitude && room.longitude) {
-              allCoords.push({ lat: room.latitude, lng: room.longitude });
-            }
-
-            for (const pt of allCoords) {
-              if (pt && pt.lat && pt.lng) {
-                const dist = getDistanceFromLatLonInM(currentPos.lat, currentPos.lng, Number(pt.lat), Number(pt.lng));
-                if (dist < 100) {
-                  isWithinAnyRoom = true;
-                  break;
-                }
-              }
-            }
-            if (isWithinAnyRoom) break;
-          }
-        }
-
-        // If not found in any room geofence, fallback to school coordinates
-        const schoolData = teacher?.schools;
-        if (!isWithinAnyRoom && schoolData?.latitude && schoolData?.longitude) {
-          const distToSchool = getDistanceFromLatLonInM(currentPos.lat, currentPos.lng, Number(schoolData.latitude), Number(schoolData.longitude));
-          const radius = schoolData.geofence_radius_meters || 150;
-          if (distToSchool < radius) {
-            isWithinAnyRoom = true;
-          }
-        }
-
-        if (isWithinAnyRoom) {
-          if (isTeacher) {
-            performDirectTeacherCheckin();
-          } else {
-            setCheckingInStatus('success');
-            setShowKioskView(true);
-          }
-        } else {
-          setCheckingInStatus('error');
-          setGeoErrorMsg('Du befindest dich anscheinend nicht vor Ort in der Musikschule.');
-          setShakeLock(true);
-          setTimeout(() => setShakeLock(false), 500);
-        }
-      },
-      (error) => {
-        setCheckingInStatus('error');
-        setShakeLock(true);
-        setTimeout(() => setShakeLock(false), 500);
-        switch (error.code) {
-          case error.PERMISSION_DENIED:
-            setGeoErrorMsg('Standortzugriff wurde abgelehnt. Bitte aktiviere den GPS-Zugriff in deinen Browsereinstellungen.');
-            break;
-          case error.POSITION_UNAVAILABLE:
-            setGeoErrorMsg('Standortinformationen sind nicht verfügbar.');
-            break;
-          case error.TIMEOUT:
-            setGeoErrorMsg('Die GPS-Abfrage dauerte zu lange (Timeout).');
-            break;
-          default:
-            setGeoErrorMsg('Ein unbekannter Fehler bei der Standortabfrage ist aufgetreten.');
-            break;
-        }
-      },
-      { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
-    );
   };
 
   const handleKioskStationSelect = async (station: any) => {
@@ -4980,10 +4879,7 @@ export function TeacherDashboard({
       const ghostSchoolId = isGhostMode ? (sessionStorage.getItem('groovelab_ghost_school_id') || '') : '';
       const ghostSchoolName = isGhostMode ? (sessionStorage.getItem('groovelab_ghost_school_name') || 'Musikschule') : 'Musikschule';
 
-      if (!isGhostMode) {
-        // Update coach presence in DB (non-blocking)
-        supabase.from('users').update({ last_seen: new Date().toISOString() }).eq('id', userId).then(() => {});
-      }
+      // 🛡️ TVöD § 26 BDSG / LPVG: Teachers are strictly exempt from presence tracking and last_seen updates
 
     try {
       // 0. Shoutbox & Profile Info (Fetched in parallel first)

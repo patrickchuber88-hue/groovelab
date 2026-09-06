@@ -329,6 +329,11 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
                 • <strong>LK 4 (Bildungsbiografie &amp; Meisterwerke):</strong> Gemeisterte Stücke und Jahres-Badges (reine Metadaten gem. Art. 6 Abs. 1 lit. b DSGVO) verbleiben über Schuljahre hinweg (mehrjährig) im Profil; physische Löschung erfolgt 30 Tage nach formeller Exmatrikulation / Kündigung.<br />
                 • <strong>LK 5 (B2B-Abrechnungsbelege):</strong> 10 Jahre Aufbewahrungsfrist gem. § 147 AO (strikte B2B-Sammelrechnung ohne Schüler-Klarnamen).
               </div>
+
+              <div>
+                <strong style={{ color: '#0f172a' }}>10. Sicherheit der Verarbeitung, Angriffsabwehr &amp; Web Application Firewall (Art. 6 Abs. 1 lit. f &amp; Art. 32 DSGVO)</strong><br />
+                Zur Gewährleistung der Systemsicherheit, Abwehr unberechtigter Zugriffsversuche, automatisierter Schadprogramme, DDoS-Attacken sowie verdächtiger Proxy- und Anonymisierungsnetzwerke (z. B. Tor-Exit-Nodes oder bekannte Exploit-Knoten) setzen wir an den Zugangspunkten unserer Systeme automatisierte Filter- und Schutzmechanismen (Web Application Firewall) ein. Hierbei werden IP-Adressen und technische Verbindungsparameter zur Gefahrenabwehr automatisiert verarbeitet und potenziell schädliche Anfragen präventiv abgewiesen. Eine Profilbildung oder Weitergabe an Dritte findet nicht statt. Dies dient unserem berechtigten Interesse an der technischen Integrität und dem Schutz der Bildungs- und Übedaten von Minderjährigen gem. Art. 6 Abs. 1 lit. f i. V. m. Art. 32 DSGVO.
+              </div>
             </div>
           )}
 
@@ -348,9 +353,9 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
                   <strong style={{ color: '#0f172a' }}>1. Vertragsgegenstand, Rechtsnatur, Pädagogischer Add-On-Status &amp; Notfall-Klausel (SaaS-Mietvertrag)</strong><br />
                   (1) Diese Bestimmungen regeln die Bereitstellung der cloudbasierten Schulmanagement- und Übeplattform <strong>Campus-Groovelab</strong> durch den Betreiber Patrick Huber (Einzelunternehmer). Der Vertrag qualifiziert sich rechtlich als <strong>Software-as-a-Service (SaaS)-Mietvertrag gemäß § 535 ff. BGB (DE) / §§ 1090 ff. ABGB (AT) / Art. 253 ff. OR (CH)</strong> über die Bereitstellung von Cloud-Infrastruktur, Datenbank-Hosting, Datensicherung und Systemwartung.<br />
                   (2) <strong>Pädagogischer Add-On-Charakter:</strong> Campus-Groovelab ist ein didaktisches Zusatzwerkzeug zur Unterstützung des Fachunterrichts und des häuslichen Übens. Die Plattform ersetzt kein behördliches oder amtliches Schulverwaltungssystem (wie ASV, WinSchool oder Musikschul-Manager).<br />
-                  (3) <strong>Notfall- &amp; Nachrangigkeitsklausel:</strong> Die Musikschule stellt sicher, dass der reguläre Schulbetrieb und die primäre Notfallkommunikation (Telefon, E-Mail, herkömmliche Vertretungspläne) unabhängig von der Plattform gewährleistet bleiben. Bei kurzzeitigen Serverstörungen, Netzausfällen oder Wartungsfenstern findet der Schulunterricht regulär statt. Eine Haftung des Betreibers für ausgefallene Unterrichtsstunden, verpasste Bandproben oder Honorarausfälle ist ausgeschlossen, es sei denn, der Ausfall beruht auf einer vorsätzlichen oder grob fahrlässigen Pflichtverletzung des Betreibers oder der schuldhaften Verletzung einer wesentlichen Vertragspflicht (Kardinalpflicht). Die Haftungsregelungen gemäß § 6 dieser AGB gelten vollumfänglich.<br />
+                  (3) <strong>Notfall- &amp; Nachrangigkeitsklausel:</strong> Die Musikschule stellt sicher, dass der reguläre Schulbetrieb und die primäre Notfallkommunikation (Telefon, E-Mail, herkömmliche Vertretungspläne) unabhängig von der Plattform gewährleistet bleiben. Bei kurzzeitigen Serverstörungen, Netzausfällen oder Wartungsfenstern findet der Schulunterricht regulär statt. Eine Haftung des Betreibers für ausgefallene Unterrichtsstunden, verpasste Bandproben oder Honorarausfälle ist ausgeschlossen, es sei denn, der Ausfall beruht auf einer vorsätzlichen oder grob fahrlässigen Pflichtverletzung des Betreibers oder der schuldhaften Verletzung einer wesentlichen Vertragspflicht (Kardinalpflicht). Die Haftungsregelungen gemäß § 7 dieser AGB gelten vollumfänglich.<br />
                   (4) Soweit im Rahmen der Bereitstellung personenbezogene Daten verarbeitet werden, gilt ergänzend die Vereinbarung zur Auftragsverarbeitung (AVV gemäß Art. 28 DSGVO bzw. Art. 9 nDSG) als integraler Vertragsbestandteil.<br />
-                  (5) Der Betreiber gewährleistet eine Verfügbarkeit der Cloud-Infrastruktur von 99,5 % im Jahresmittel (ausgenommen angekündigte Wartungsarbeiten außerhalb der Kernunterrichtszeiten).
+                  (5) Der Betreiber gewährleistet eine Verfügbarkeit der Cloud-Infrastruktur von 99,5 % im Jahresmittel (ausgenommen angekündigte Wartungsarbeiten außerhalb der Kernunterrichtszeiten). Zur Abwehr von Cyber-Angriffen und zur Sicherung des störungsfreien Schulbetriebs behält sich der Betreiber vor, automatisierte Angriffsnetzwerke oder schädliche Datenverbindungen an der Firewall technisch abzuweisen. Der reguläre weltweite Zugriff für Schüler und Lehrkräfte im Rahmen privater Reisen (z. B. Urlaubsaufenthalte) bleibt hiervon unberührt.
                 </div>
 
                 <div>
@@ -411,10 +416,11 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
                 </span>
 
                 <div>
-                  <strong style={{ color: '#0f172a' }}>8. Kostenfreier Schnuppermonat, Schuljahres-Bereitstellung &amp; Schüler-Bestandsschutz (Ausschließliche Jahresbeitragszahlung)</strong><br />
+                  <strong style={{ color: '#0f172a' }}>8. Kostenfreier Schnuppermonat, Schuljahres-Bereitstellung, Schüler-Bestandsschutz &amp; Sorgfaltspflichten (Ausschließliche Jahresbeitragszahlung)</strong><br />
                   (1) Eltern, die das interaktive Campus-Modul für ihr Kind aktivieren, erhalten den laufenden Anmeldemonat zu 100 % kostenfrei zum Kennenlernen. Für die verbleibenden Monate bis zum individuellen Schuljahresende der Schule wird die Bereitstellung als einmaliger Jahresbeitrag (errechnet aus 0,49 € in DE/AT bzw. CHF 1.00 in CH pro bezahltem Monat) abgerechnet. Eine monatliche Einzelabrechnung ist zur Vermeidung unverhältnismäßiger Transaktionsgebühren ausgeschlossen.<br />
                   (2) <strong>Schuljahresübergang &amp; Schüler-Bestandsschutz:</strong> Bei einer Aktivierung im letzten Monat des Schuljahres ist der Zugang für diesen verbleibenden Restmonat vollständig kostenfrei zum Kennenlernen. Für das Folgeschuljahr gilt für Schüler und Eltern der Bestandsschutz der jeweiligen Musikschule: Solange der Vertrag zwischen der Musikschule und dem Betreiber ununterbrochen fortbesteht, bleibt der Jahresbeitrag für die Schüler dieser Musikschule preisstabil. Eine Erhöhung der Schülerbeiträge für Bestandskunden ist ausgeschlossen.<br />
-                  (3) <strong>Mindestalter &amp; Bildschirmfreies Üben (Screenless Practice):</strong> Das Mindestalter für Schüler beträgt 6 Jahre. Zur Vermeidung unnötiger Bildschirmzeit bei Grundschulkindern unterstützt die Plattform das didaktische Prinzip des bildschirmfreien Übens („Screenless Practice“): Im Modus „Von Eltern geführt“ verbleibt das Endgerät bei den Eltern; Übezeiten am echten Instrument werden per 1-Klick-Quittierung verbucht.
+                  (3) <strong>Mindestalter &amp; Bildschirmfreies Üben (Screenless Practice):</strong> Das Mindestalter für Schüler beträgt 6 Jahre. Zur Vermeidung unnötiger Bildschirmzeit bei Grundschulkindern unterstützt die Plattform das didaktische Prinzip des bildschirmfreien Übens („Screenless Practice“): Im Modus „Von Eltern geführt“ verbleibt das Endgerät bei den Eltern; Übezeiten am echten Instrument werden per 1-Klick-Quittierung verbucht.<br />
+                  (4) <strong>Sorgfaltspflichten bei Zugangsdaten &amp; PINs:</strong> Eltern und Schüler sind verpflichtet, persönliche Zugangsdaten (QR-Ausweise, Eltern-PIN, persönliche Schüler-PIN) vor dem Zugriff unbefugter Dritter zu schützen. Bei Verlust des Schulausweises oder dem Verdacht einer missbräuchlichen Nutzung ist unverzüglich das Sekretariat der Musikschule zur Neugenerierung des Ausweis-Tokens zu informieren.
                 </div>
 
                 <div>
@@ -425,6 +431,11 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
                 <div>
                   <strong style={{ color: '#0f172a' }}>10. Elektronischer Kündigungsbutton &amp; Sofort-Widerruf (§ 312k BGB)</strong><br />
                   Während des kostenfreien Schnuppermonats können Eltern den Zugang mit 1 Klick im Elternbereich sofort und ohne Kosten widerrufen. Nach Durchführung der Kündigung wird unverzüglich eine elektronische Kündigungsbestätigung mit Datum und Zeitstempel bereitgestellt.
+                </div>
+
+                <div>
+                  <strong style={{ color: '#0f172a' }}>11. Digitale Netiquette, Jugendschutz &amp; Ausschluss missbräuchlicher Nutzung</strong><br />
+                  Die plattforminterne Kommunikation (Direktnachrichten, Ensemble-Shouts) dient ausschließlich dem didaktischen Informationsaustausch rund um Fachunterricht, Üben und Proben. Beleidigende, diskriminierende, jugendgefährdende oder schulordnungswidrige Inhalte sind streng untersagt. Bei schwerwiegenden Verstößen kann die Schulleitung den internen Nachrichtenversand für das betreffende Profil temporär deaktivieren.
                 </div>
               </div>
             </div>

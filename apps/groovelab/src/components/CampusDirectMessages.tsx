@@ -20,7 +20,7 @@ import {
   ChevronDown,
   RotateCcw
 } from 'lucide-react';
-import { formatTeacherFullName, formatSingleStudentAnonymized } from '../utils/nameHelper';
+import { formatTeacherFullName, formatSingleStudentAnonymized, formatStudentPureFirstName } from '../utils/nameHelper';
 
 const getInstrumentAvatarUrl = (instrument: string | null | undefined): string => {
   if (!instrument) return '/avatars/gitarre_avatar_new.png';
@@ -88,6 +88,10 @@ const formatStudentDisplayName = (u: any): string => {
 
   // Only abbreviate last name for STUDENTS (per AGENTS.md rule)
   if (role === 'student' || role === 'pupil') {
+    const isStudentViewer = typeof window !== 'undefined' && sessionStorage.getItem('groovelab_active_workspace') === 'student';
+    if (isStudentViewer) {
+      return formatStudentPureFirstName(u.first_name);
+    }
     return formatSingleStudentAnonymized(u.first_name, u.full_last_name || u.last_name, u.id);
   }
 
@@ -596,7 +600,7 @@ export function CampusDirectMessages({
 
       if (isMatch) {
         sessionStorage.setItem('groovelab_parent_unlocked_global', 'true');
-        sessionStorage.setItem(`groovelab_parent_session_${user?.id}`, String(Date.now() + 60 * 60 * 1000));
+        sessionStorage.setItem(`groovelab_parent_session_${user?.id}`, String(Date.now() + 180 * 1000));
         setShowParentPinModal(false);
         setParentPinInput('');
         setForceUpdateTick(prev => prev + 1);

@@ -50,7 +50,7 @@ export const AudioMemoRecorder: React.FC<AudioMemoRecorderProps> = ({
   }, [audioUrl, stopHardwareStream]);
 
   const startRecording = async () => {
-    if (user?.parent_allow_audio === false) {
+    if (user?.parent_allow_audio === false || (user as any)?.parent_permissions?.allow_student_audio === false) {
       setErrorMsg('Sprachaufnahmen wurden von den Erziehungsberechtigten deaktiviert.');
       return;
     }
@@ -400,6 +400,24 @@ export const AudioMemoRecorder: React.FC<AudioMemoRecorderProps> = ({
           <span>{errorMsg}</span>
         </div>
       )}
+
+      {/* 🔒 DSGVO & Kindersicherheits-Transparenzhinweis (100% DE-Hosting & Schuljahresspeicherung) */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '6px',
+        marginTop: '10px',
+        paddingTop: '8px',
+        borderTop: '1px solid rgba(52, 168, 83, 0.15)',
+        fontSize: '0.68rem',
+        color: '#475569',
+        fontWeight: 600
+      }}>
+        <Lock size={11} style={{ color: '#16a34a', flexShrink: 0 }} />
+        <span>
+          🔒 Geschützt in deutscher Schulcloud (Falkenstein, DE) • Didaktisches Jahres-Portfolio bis 30.09. (jederzeit von Eltern & Lehrkraft löschbar).
+        </span>
+      </div>
     </div>
   );
 };

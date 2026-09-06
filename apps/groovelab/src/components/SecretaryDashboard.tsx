@@ -23280,6 +23280,11 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                 <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 800, color: '#1e293b' }}>5. Hosting & Datenbank-Infrastruktur</h4>
                 <p style={{ margin: 0 }}>Campus-Groovelab wird zu 100% auf Servern in Deutschland (Hetzner Falkenstein) gehostet, um einen sicheren, performanten und datenschutzkonformen Betrieb zu gewährleisten. Sowohl das Web-Frontend als auch die Datenbankinfrastruktur werden über die <strong>Hetzner Online GmbH</strong> (Hetzner.com) am Standort Falkenstein betrieben. Mit diesem Dienstleister wurde ein gesetzeskonformer Vertrag zur Auftragsverarbeitung (AV-Vertrag nach Art. 28 DSGVO) geschlossen, um den Schutz Ihrer Daten zu jeder Zeit im Einklang mit der DSGVO zu gewährleisten.</p>
               </div>
+
+              <div>
+                <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 800, color: '#1e293b' }}>6. Sicherheit der Verarbeitung & Angriffsabwehr (Art. 6 Abs. 1 lit. f & Art. 32 DSGVO)</h4>
+                <p style={{ margin: 0 }}>Zur Gewährleistung der Systemsicherheit und zum Schutz von Minderjährigen werden automatisierte WAF- und Filtersysteme eingesetzt, die schädliche Zugriffe (z. B. Botnetze, Tor-Exit-Nodes oder Exploit-Scans) präventiv und lautlos abweisen.</p>
+              </div>
             </div>
           </div>
           </div>

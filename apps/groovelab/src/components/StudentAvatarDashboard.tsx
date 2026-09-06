@@ -17,7 +17,7 @@ import { checkIsAudioTresorActive, ALL_STICKERS, getUnifiedStickersMap, getUnifi
 import { UpdateAnnouncementHero } from './common/UpdateAnnouncementHero';
 import { usePremiumOnboardingTour, TourStep, TourStartButton } from './PremiumOnboardingTour';
 import { MobileBriefingCarousel } from './ui/MobileBriefingCarousel';
-import { cleanHomeworkNotesText, maskLastName, formatTeacherFullName } from '../utils/nameHelper';
+import { cleanHomeworkNotesText, maskLastName, formatTeacherFullName, formatStudentPureFirstName } from '../utils/nameHelper';
 import { CampusGroovelabBrand, CampusGroovelabText, CampusGroovelabLogo } from './CampusGroovelabBrand';
 import { validateNewPin } from '../utils/pinValidation';
 import { CampusLevelSwitcher, CampusUiLevel } from './campus/CampusLevelSwitcher';
@@ -719,9 +719,16 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     return false;
   });
 
+  // 🛡️ TIER-1 ENTERPRISE GOLDSTANDARD: Ephemeral in-memory Parent PIN cache (Zero browser storage leaks)
+  const inMemoryParentPinRef = useRef<string>('');
+
   useEffect(() => {
     const handleParentModeChanged = (e: any) => {
-      setIsParentUnlocked(Boolean(e.detail));
+      const unlocked = Boolean(e.detail);
+      setIsParentUnlocked(unlocked);
+      if (!unlocked) {
+        inMemoryParentPinRef.current = '';
+      }
     };
     window.addEventListener('groovelab_parent_mode_changed', handleParentModeChanged);
     return () => window.removeEventListener('groovelab_parent_mode_changed', handleParentModeChanged);
@@ -847,6 +854,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     timeoutSeconds: 180,
     warningThresholdSeconds: 10,
     onLock: () => {
+      inMemoryParentPinRef.current = '';
       setIsParentUnlocked(false);
       setSettingsSubTab('overview');
       setActiveStudentSettingsModal(null);
@@ -860,62 +868,6 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     return `REC-${p1}-${p2}`;
   };
 
-  const extractPinCandidates = (u: any): string[] => {
-    if (!u) return [];
-    const candidates: string[] = [];
-
-    const addVal = (val?: any) => {
-      if (val === undefined || val === null) return;
-      const str = String(val).trim();
-      if (!str) return;
-      candidates.push(str);
-      if (str.length < 6 && /^\d+$/.test(str)) {
-        candidates.push(str.padStart(6, '0'));
-      }
-    };
-
-    addVal(u.parent_pin);
-    addVal(u.personal_pin);
-    addVal(u.onboarding_pin);
-    addVal(u.starter_pin);
-    addVal(u.emergency_pin);
-    addVal(u.recovery_key);
-    addVal(u.ausweis_nummer);
-
-    // Dynamic Birthdate Formats (e.g. 11.10.1988 -> 111088, 11101988, 19881011)
-    const rawBirth = u.birth_date || u.birthdate || u.day_of_birth;
-    if (rawBirth) {
-      const bStr = String(rawBirth).trim();
-      const isoMatch = bStr.match(/^(\d{4})-(\d{2})-(\d{2})/);
-      if (isoMatch) {
-        const [, y, m, d] = isoMatch;
-        const yShort = y.slice(2);
-        candidates.push(`${d}${m}${yShort}`);
-        candidates.push(`${d}${m}${y}`);
-        candidates.push(`${y}${m}${d}`);
-        candidates.push(`${yShort}${m}${d}`);
-        candidates.push(`${d}${m}`.padStart(6, '0'));
-      }
-      const dotMatch = bStr.match(/^(\d{1,2})\.(\d{1,2})\.(\d{2,4})/);
-      if (dotMatch) {
-        const [, dRaw, mRaw, yRaw] = dotMatch;
-        const d = dRaw.padStart(2, '0');
-        const m = mRaw.padStart(2, '0');
-        const yShort = yRaw.length === 4 ? yRaw.slice(2) : yRaw;
-        const yFull = yRaw.length === 2 ? `20${yRaw}` : yRaw;
-        candidates.push(`${d}${m}${yShort}`);
-        candidates.push(`${d}${m}${yFull}`);
-        candidates.push(`${d}${m}`.padStart(6, '0'));
-      }
-      const digitsOnly = bStr.replace(/\D/g, '');
-      if (digitsOnly.length === 6 || digitsOnly.length === 8) {
-        candidates.push(digitsOnly);
-      }
-    }
-
-    return Array.from(new Set(candidates));
-  };
-
   const handleVerifyParentPinAttempt = async (cleanInput: string, onSuccess: () => void) => {
     if (parentGateCooldownSeconds > 0) return;
     setParentGateError('');
@@ -927,7 +879,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     try {
       let isOk = false;
 
-      // 1. Primary: Server-Side verify_parent_pin RPC
+      // 1. Primary: Server-Side verify_parent_pin RPC (Fail-Closed, zero student PIN fallback)
       try {
         const { data: parentOk } = await supabase.rpc('verify_parent_pin', {
           student_id: targetId,
@@ -936,25 +888,15 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
         if (parentOk === true) isOk = true;
       } catch (e) {}
 
-      // 2. Fallback: Server-Side verify_personal_pin RPC
-      if (!isOk) {
-        try {
-          const { data: personalOk } = await supabase.rpc('verify_personal_pin', {
-            user_uuid: targetId,
-            input_pin: cleanInput
-          });
-          if (personalOk === true) isOk = true;
-        } catch (e) {}
-      }
-
       if (isOk) {
+        inMemoryParentPinRef.current = cleanInput;
         setParentGateFailedCount(0);
         setParentGatePinInput('');
         setIsParentUnlocked(true);
         setIsVerifyingParentGate(false);
 
-        sessionStorage.setItem(`groovelab_parent_session_${targetId}`, String(Date.now() + 60 * 60 * 1000));
-        if (studentId) sessionStorage.setItem(`groovelab_parent_session_${studentId}`, String(Date.now() + 60 * 60 * 1000));
+        sessionStorage.setItem(`groovelab_parent_session_${targetId}`, String(Date.now() + 180 * 1000));
+        if (studentId) sessionStorage.setItem(`groovelab_parent_session_${studentId}`, String(Date.now() + 180 * 1000));
         sessionStorage.setItem(`groovelab_parent_unlocked_${targetId}`, 'true');
         if (studentId) sessionStorage.setItem(`groovelab_parent_unlocked_${studentId}`, 'true');
         sessionStorage.setItem('groovelab_parent_unlocked_global', 'true');
@@ -1091,6 +1033,8 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     allowLeaderboard?: boolean;
     allowProposals?: boolean;
     allowAudio?: boolean;
+    allowTeacherAudio?: boolean;
+    allowStudentAudio?: boolean;
     allowTts?: boolean;
     bedtimeEnabled?: boolean;
     bedtimeStart?: string;
@@ -1131,6 +1075,16 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     const nextAllowAudio = updates.allowAudio !== undefined 
       ? updates.allowAudio 
       : (draftAllowAudio !== null ? draftAllowAudio : ((studentUser as any)?.parent_allow_audio !== undefined && (studentUser as any)?.parent_allow_audio !== null ? Boolean((studentUser as any)?.parent_allow_audio) : true));
+    const nextAllowTeacherAudio = updates.allowTeacherAudio !== undefined
+      ? updates.allowTeacherAudio
+      : ((studentUser as any)?.parent_permissions?.allow_teacher_audio !== undefined
+          ? Boolean((studentUser as any)?.parent_permissions?.allow_teacher_audio)
+          : true);
+    const nextAllowStudentAudio = updates.allowStudentAudio !== undefined
+      ? updates.allowStudentAudio
+      : ((studentUser as any)?.parent_permissions?.allow_student_audio !== undefined
+          ? Boolean((studentUser as any)?.parent_permissions?.allow_student_audio)
+          : nextAllowAudio);
     const nextAllowTts = updates.allowTts !== undefined 
       ? updates.allowTts 
       : (draftAllowTts !== null ? draftAllowTts : ((studentUser as any)?.parent_allow_tts !== undefined && (studentUser as any)?.parent_allow_tts !== null ? Boolean((studentUser as any)?.parent_allow_tts) : false));
@@ -1195,6 +1149,14 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       localStorage.setItem('campus_board_override_recordings', String(updates.allowAudio));
       if (studentId) localStorage.setItem(`groovelab_parent_allow_audio_${studentId}`, String(updates.allowAudio));
       window.dispatchEvent(new CustomEvent('campus_board_permission_changed', { detail: { boardId: 'recordings', allowed: updates.allowAudio } }));
+    }
+    if (updates.allowTeacherAudio !== undefined) {
+      if (studentId) localStorage.setItem(`groovelab_parent_allow_teacher_audio_${studentId}`, String(updates.allowTeacherAudio));
+      localStorage.setItem('campus_allow_teacher_audio', String(updates.allowTeacherAudio));
+    }
+    if (updates.allowStudentAudio !== undefined) {
+      if (studentId) localStorage.setItem(`groovelab_parent_allow_student_audio_${studentId}`, String(updates.allowStudentAudio));
+      localStorage.setItem('campus_allow_student_audio', String(updates.allowStudentAudio));
     }
     if (updates.allowTts !== undefined) {
       setDraftAllowTts(updates.allowTts);
@@ -1267,6 +1229,8 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       ...((studentUser as any)?.parent_permissions || {}),
       board_overrides: nextOverrides,
       parent_allow_tts: nextAllowTts,
+      allow_teacher_audio: nextAllowTeacherAudio,
+      allow_student_audio: nextAllowStudentAudio,
       bedtime_mode: {
         enabled: nextBedtimeEnabled,
         start: nextBedtimeStart,
@@ -1307,10 +1271,14 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
 
     try {
       if (targetStudentId) {
+        const settingsPayload = {
+          ...payload,
+          ...(inMemoryParentPinRef.current ? { parent_pin: inMemoryParentPinRef.current } : {})
+        };
         // 🛡️ Call immutable RPC for authoritative database storage with GoBD audit trail
         const { data: rpcRes, error: rpcErr } = await supabase.rpc('save_parent_controls', {
           p_student_id: targetStudentId,
-          p_settings: payload
+          p_settings: settingsPayload
         });
 
         if (rpcErr) {
@@ -1530,7 +1498,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       sessionStorage.removeItem(`groovelab_parent_session_${targetStudentId}`);
     } else {
       sessionStorage.setItem('groovelab_parent_unlocked_global', 'true');
-      sessionStorage.setItem(`groovelab_parent_session_${targetStudentId}`, String(Date.now() + 60 * 60 * 1000));
+      sessionStorage.setItem(`groovelab_parent_session_${targetStudentId}`, String(Date.now() + 180 * 1000));
     }
     window.location.search = `?student=${targetStudentId}`;
   };
@@ -1611,7 +1579,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       const hexHash = Math.abs(hash).toString(16).toUpperCase().padStart(8, '0').slice(-8);
       const refCode = `CG-${hexHash}-${yearShort}${monthStr}`;
 
-      const sName = `${studentUser?.first_name || 'Schüler'} ${studentUser?.last_name || ''}`.trim();
+      const sName = formatStudentPureFirstName(studentUser?.first_name, 'Schüler');
       const schoolName = studentUser?.schools?.name || 'Campus-Groovelab Partner-Musikschule';
       const isChf = studentUser?.schools?.currency === 'CHF';
       const amountStr = isChf ? 'CHF 5.88' : '5,88 €';
@@ -1737,7 +1705,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
   useEffect(() => {
     if (!studentId) return;
     const currentFirst = studentUser?.first_name || '';
-    const currentLast = studentUser?.last_name || '';
+    const currentLast = ''; // 🛡️ Zero-Knowledge: 100% last_name exclusion in student local storage
     const currentInst = studentUser?.resolved_instrument || studentUser?.instrument || '';
     const currentPhoto = (studentUser?.photo_url && (studentUser.photo_url.startsWith('http') || studentUser.photo_url.startsWith('/')))
       ? studentUser.photo_url
@@ -1773,17 +1741,12 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       const currentLevelKey = (draftUiLevel ?? (studentUser as any)?.campus_ui_level ?? (localStorage.getItem('campus_student_ui_level') || 'junior')) as 'junior' | 'teen' | 'pro';
       const curAbsences = draftAllowAbsences !== null ? draftAllowAbsences : ((studentUser as any)?.parent_allow_absences !== undefined && (studentUser as any)?.parent_allow_absences !== null ? Boolean((studentUser as any)?.parent_allow_absences) : (currentLevelKey === 'pro'));
       const curChat = draftAllowChat ?? (studentUser as any)?.parent_allow_chat ?? (currentLevelKey !== 'junior');
-      const curLeaderboard = draftAllowLeaderboard ?? (studentUser as any)?.parent_allow_leaderboard ?? (currentLevelKey !== 'junior');
+      const curLeaderboard = draftAllowLeaderboard !== null ? draftAllowLeaderboard : Boolean((studentUser as any)?.parent_allow_leaderboard);
       const curPractice = draftBoardOverrides.practice_board ?? (localStorage.getItem('campus_board_override_practice_board') !== 'false');
       const curMediathek = draftBoardOverrides.mediathek ?? (localStorage.getItem('campus_board_override_mediathek') === 'true' || currentLevelKey !== 'junior');
 
-      const fullStudentName = studentUser?.first_name 
-        ? `${studentUser.first_name} ${studentUser.last_name || ''}`.trim()
-        : 'Schüler-Profil';
-
-      const maskedStudentName = studentUser?.first_name 
-        ? `${studentUser.first_name} ${studentUser.last_name ? studentUser.last_name.trim().charAt(0) + '.' : ''}`.trim()
-        : 'Schüler-Profil';
+      const fullStudentName = formatStudentPureFirstName(studentUser?.first_name, 'Schüler-Profil');
+      const maskedStudentName = formatStudentPureFirstName(studentUser?.first_name, 'Schüler-Profil');
 
       // Resolve Teacher Name (Full Name, e.g. Severin Landenberger)
       let resolvedTeacherName = '';
@@ -2550,7 +2513,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
 
       const { data: classmates, error: classmatesErr } = await supabase
         .from('users')
-        .select('id, first_name, last_name')
+        .select('id, first_name')
         .eq('teacher_id', teacherId)
         .eq('school_id', schoolId);
 
@@ -2595,7 +2558,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
             .filter((s: any) => s.user_id === student.id)
             .reduce((sum: number, s: any) => sum + (s.duration_minutes || (s.duration_seconds ? Math.round(s.duration_seconds / 60) : 0)), 0);
           return {
-            name: `${student.first_name || ''} ${student.last_name ? student.last_name.trim().charAt(0) + '.' : ''}`.trim() || 'Schüler',
+            name: formatStudentPureFirstName(student.first_name, 'Schüler'),
             minutes: mins
           };
         })
@@ -2957,25 +2920,17 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
 
       if (targetId) {
         try {
+          // 1. Server-Side verify_parent_pin RPC (Fail-Closed, zero student PIN fallback)
           const { data: parentOk } = await supabase.rpc('verify_parent_pin', {
             student_id: targetId,
             input_pin: cleanInput
           });
           if (parentOk === true) isMatch = true;
         } catch (e) {}
-
-        if (!isMatch) {
-          try {
-            const { data: personalOk } = await supabase.rpc('verify_personal_pin', {
-              user_uuid: targetId,
-              input_pin: cleanInput
-            });
-            if (personalOk === true) isMatch = true;
-          } catch (e) {}
-        }
       }
 
       if (isMatch) {
+        inMemoryParentPinRef.current = cleanInput;
         sessionStorage.setItem('groovelab_parent_unlocked_global', 'true');
         if (targetId) sessionStorage.setItem(`groovelab_parent_unlocked_${targetId}`, 'true');
 
@@ -3059,10 +3014,8 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
           p_student_id: targetStudentId,
           p_occurrence_id: targetOccIdStr,
           p_date: occ.date,
-          p_start_time: occ.start_time || '15:00',
-          p_duration: occ.duration || 45,
           p_teacher_id: targetTeacherId,
-          p_schedule_id: targetScheduleId
+          p_parent_pin: inMemoryParentPinRef.current || null
         });
 
         if (!rpcErr && rpcRes?.success) {
@@ -3172,10 +3125,10 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
 
         const { data: userData } = await supabase
           .from('users')
-          .select('first_name, last_name')
+          .select('first_name')
           .eq('id', studentUserId)
           .single();
-        const userName = userData ? `${userData.first_name} ${maskLastName(userData.last_name)}` : 'Ein Schüler';
+        const userName = formatStudentPureFirstName(userData?.first_name, 'Ein Schüler');
         const isPinAuthed = skipPinCheck || checkIsParentUnlockedGlobal();
         const actorDesc = isPinAuthed ? ' (Eltern-PIN autorisiert)' : '';
 
@@ -3317,7 +3270,8 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
           p_duration: occ.duration || 45,
           p_teacher_id: targetTeacherId,
           p_schedule_id: targetScheduleId,
-          p_notes: 'canceled_by_student'
+          p_notes: 'canceled_by_student',
+          p_parent_pin: inMemoryParentPinRef.current || null
         });
 
         if (!rpcErr && rpcRes?.success) {
@@ -3401,10 +3355,10 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
 
           const { data: userData } = await supabase
             .from('users')
-            .select('first_name, last_name')
+            .select('first_name')
             .eq('id', targetStudentId)
             .single();
-          const studentName = userData ? `${userData.first_name} ${maskLastName(userData.last_name)}` : 'Ein Schüler';
+          const studentName = formatStudentPureFirstName(userData?.first_name, 'Ein Schüler');
           const actorDesc = skipPinCheck ? 'mit Eltern-PIN' : 'mit elterlicher Erlaubnis';
           const timeLabel = (occ.start_time || '16:30').substring(0, 5);
 
@@ -3505,10 +3459,10 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       // 2. Alert the teacher zur Abstimmung eines Alternativtermins
       const { data: userData } = await supabase
         .from('users')
-        .select('first_name, last_name')
+        .select('first_name')
         .eq('id', studentId)
         .single();
-      const studentName = userData ? `${userData.first_name} ${maskLastName(userData.last_name)}` : 'Ein Schüler';
+      const studentName = formatStudentPureFirstName(userData?.first_name, 'Ein Schüler');
       const formattedDeclinedDate = new Date(occ.date).toLocaleDateString('de-DE');
 
       await supabase.from('system_alerts').insert({
@@ -4362,9 +4316,11 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     setJuniorRecordDuration(0);
     setJuniorCountdown(null);
 
-    const isAllowed = draftAllowAudio ?? (studentUser as any)?.parent_allow_audio ?? (draftBoardOverrides.recordings ?? (typeof window !== 'undefined' ? localStorage.getItem('campus_board_override_recordings') !== 'false' : true));
+    const isStudentAudioPermitted = (studentUser as any)?.parent_permissions?.allow_student_audio !== false &&
+      (typeof window !== 'undefined' && studentId ? localStorage.getItem(`groovelab_parent_allow_student_audio_${studentId}`) !== 'false' : true);
+    const isAllowed = (draftAllowAudio ?? (studentUser as any)?.parent_allow_audio ?? (draftBoardOverrides.recordings ?? (typeof window !== 'undefined' ? localStorage.getItem('campus_board_override_recordings') !== 'false' : true))) && isStudentAudioPermitted;
     if (!isAllowed) {
-      alert('Die Aufnahme-Funktion ist im Eltern-Kontrollzentrum aktuell deaktiviert.');
+      alert('Die Aufnahme-Funktion für Schüler ist im Eltern-Kontrollzentrum aktuell deaktiviert.');
       setShowJuniorRecordModal(false);
       return;
     }
@@ -7622,7 +7578,6 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     setSavingProfile(true);
     try {
       const cleanFirstName = sanitizeTextInput(editingProfile.first_name);
-      const cleanLastName = sanitizeTextInput(editingProfile.last_name);
       const cleanPhone = sanitizeTextInput(editingProfile.phone);
       const cleanInstrument = sanitizeTextInput(editingProfile.instrument);
 
@@ -7630,7 +7585,6 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
           .from('users')
           .update({
             first_name: cleanFirstName,
-            last_name: cleanLastName,
             phone: cleanPhone,
             instrument: cleanInstrument,
             photo_url: editingProfile.photo_url
@@ -7643,7 +7597,6 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       const updatedProfile = {
         ...editingProfile,
         first_name: cleanFirstName,
-        last_name: cleanLastName,
         phone: cleanPhone,
         instrument: cleanInstrument
       };
@@ -7653,7 +7606,6 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       if (onProfileUpdate) {
         onProfileUpdate({
           first_name: cleanFirstName,
-          last_name: cleanLastName,
           phone: cleanPhone,
           instrument: cleanInstrument,
           photo_url: editingProfile.photo_url
@@ -8780,9 +8732,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     ctx.restore();
 
     // 8. Student Details
-    const actualStudentName = studentUser?.first_name 
-      ? `${studentUser.first_name}${studentUser.last_name ? ' ' + studentUser.last_name.charAt(0) + '.' : ''}`
-      : 'Musik-Schüler';
+    const actualStudentName = formatStudentPureFirstName(studentUser?.first_name, 'Musik-Schüler');
     const studentInstrument = studentUser?.instrument || '';
     const schoolName = studentUser?.schools?.name || 'Musikschule';
 
@@ -8937,7 +8887,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       // 1. Fetch all students in this school
       const { data: schoolStudents } = await supabase
         .from('users')
-        .select('id, first_name, last_name, teacher_id')
+        .select('id, first_name, teacher_id')
         .eq('school_id', schoolId)
         .eq('role', 'student');
 
@@ -9054,8 +9004,8 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
         });
         const monthlyStreak = monthlyWeeks.size;
 
-        // Privacy opt-out check
-        let isOptedOut = student.parent_allow_leaderboard === false;
+        // Privacy opt-out check (Private-by-Default Goldstandard: opt-in strictly required)
+        let isOptedOut = student.parent_allow_leaderboard !== true;
         try {
           const savedOpt = localStorage.getItem(`campus_privacy_show_highlights_${student.id}`);
           if (savedOpt !== null && JSON.parse(savedOpt) === false) {
@@ -9067,7 +9017,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
 
         const masteredThisMonth = studentSkills.filter((sk: any) => sk.progress_percent === 100 || sk.is_stage_ready);
 
-        const formattedStudentName = `${student.first_name || ''} ${student.last_name ? student.last_name.trim().charAt(0) + '.' : ''}`.trim();
+        const formattedStudentName = formatStudentPureFirstName(student.first_name, 'Schüler');
 
         if (monthlyStreak >= 2) {
           highlights.push({
@@ -9163,7 +9113,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       const [userRes, avatarRes, statsRes, briefingRes, emailRes, missionRes, pinsRes, logsRes, matrixRes, skillsRes] = await Promise.all([
         supabase
           .from('users')
-          .select('id, school_id, role, first_name, last_name, avatar_url, photo_url, instrument, teacher_id, is_active, is_campus_active, is_groovelab_active, campus_ui_level, briefing_sidebar_collapsed, parent_allow_chat, parent_allow_absences, parent_allow_reschedule_confirm, parent_allow_timer, parent_allow_leaderboard, parent_allow_proposals, parent_allow_audio, parent_allow_tts, has_parent_pin, has_personal_pin, parent_pin_configured, status, parent_permissions, joker_used_at, weekly_jokers_used, activated_at, is_pin_activated, created_at, push_notifications_enabled, push_notif_schedule_changes, push_notif_homework, push_notif_chat, push_notif_practice_reminder, push_notif_weekly_digest, push_notif_all_features, is_app_user, is_premium_user, subject, schools(*)')
+          .select('id, school_id, role, first_name, avatar_url, photo_url, instrument, teacher_id, is_active, is_campus_active, is_groovelab_active, campus_ui_level, briefing_sidebar_collapsed, parent_allow_chat, parent_allow_absences, parent_allow_reschedule_confirm, parent_allow_timer, parent_allow_leaderboard, parent_allow_proposals, parent_allow_audio, parent_allow_tts, has_parent_pin, has_personal_pin, parent_pin_configured, status, parent_permissions, joker_used_at, weekly_jokers_used, activated_at, is_pin_activated, created_at, push_notifications_enabled, push_notif_schedule_changes, push_notif_homework, push_notif_chat, push_notif_practice_reminder, push_notif_weekly_digest, push_notif_all_features, is_app_user, is_premium_user, subject, schools(*)')
           .eq('id', studentId)
           .single(),
         supabase
@@ -9791,7 +9741,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
             let todayLesson = null;
             if (todaySchedules) {
               const teacherName = todaySchedules.teacher 
-                ? `Herr/Frau ${(todaySchedules.teacher as any).last_name}` 
+                ? formatTeacherFullName(todaySchedules.teacher) 
                 : 'Lehrkraft';
               
               let resolvedRoom = (todaySchedules.rooms as any)?.name || 'Unterrichtsraum';
@@ -10369,25 +10319,31 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
 
                             const recKey = generateParentRecoveryKey();
                             try {
-                              const { data: rpcRes, error: rpcErr } = await supabase.rpc('set_parent_pin', {
-                                p_student_id: studentId,
-                                p_new_pin: nextVal
-                              });
-
-                              if (rpcErr || rpcRes !== true) {
-                                throw new Error(rpcErr?.message || 'Serverfehler beim Speichern.');
-                              }
-
+                              let rpcSuccess = false;
                               try {
-                                await supabase.from('users').update({ recovery_key: recKey }).eq('id', studentId);
-                              } catch (err) {}
+                                const { data: rpcRes, error: rpcErr } = await supabase.rpc('set_parent_pin_with_recovery_key', {
+                                  p_student_id: studentId,
+                                  p_new_pin: nextVal,
+                                  p_recovery_key: recKey
+                                });
+                                if (!rpcErr && rpcRes === true) rpcSuccess = true;
+                              } catch (e) {}
+
+                              if (!rpcSuccess) {
+                                const { data: fbRes, error: fbErr } = await supabase.rpc('set_parent_pin', {
+                                  p_student_id: studentId,
+                                  p_new_pin: nextVal
+                                });
+                                if (fbErr || fbRes !== true) {
+                                  throw new Error(fbErr?.message || 'Serverfehler beim Speichern der Eltern-PIN.');
+                                }
+                              }
                               
                               if (studentUser) {
                                 (studentUser as any).has_parent_pin = true;
-                                (studentUser as any).recovery_key = recKey;
                               }
 
-                              sessionStorage.setItem(`groovelab_parent_session_${studentId}`, String(Date.now() + 15 * 60 * 1000));
+                              sessionStorage.setItem(`groovelab_parent_session_${studentId}`, String(Date.now() + 180 * 1000));
                               sessionStorage.setItem(`groovelab_parent_unlocked_${studentId}`, 'true');
                               sessionStorage.setItem('groovelab_parent_unlocked_global', 'true');
                               window.dispatchEvent(new CustomEvent('groovelab_parent_mode_changed', { detail: true }));
@@ -10525,7 +10481,10 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
             Elternbereich wiederherstellen 🛡️
           </h3>
           <p style={{ margin: '0 0 18px 0', fontSize: '0.82rem', color: '#64748b', fontWeight: 600, lineHeight: 1.45 }}>
-            Gib deinen 8-stelligen Notfallschlüssel (z. B. <code>REC-7492-3810</code>) ein, um eine neue PIN festzulegen.
+            Gib deinen 8-stelligen Notfallschlüssel (z. B. <code>REC-7492-3810</code> aus dem Eltern-Setup) ein, um eine neue PIN festzulegen.<br />
+            <span style={{ fontSize: '0.74rem', color: '#64748b', display: 'block', marginTop: '4px', fontWeight: 700 }}>
+              🛡️ Aus Kinderschutzgründen ist dies nicht die Ausweisnummer deines Kindes.
+            </span>
           </p>
 
           {recoveryKeyError && (
@@ -11600,7 +11559,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                   ...studentUser,
                   id: studentId,
                   first_name: studentUser ? studentUser.first_name : '',
-                  last_name: studentUser ? studentUser.last_name : '',
+                  last_name: '', // 🛡️ Zero-Knowledge: 100% last_name exclusion in student view
                   photo_url: (studentUser && studentUser.photo_url) || '/avatar_ghost.jpg',
                   is_campus_active: studentUser ? studentUser.is_campus_active : false,
                   school_id: studentUser?.school_id,
@@ -11954,7 +11913,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       {certificateSong && (
         <Suspense fallback={null}>
           <MeisterwerkCertificateModal
-            studentName={studentUser?.first_name ? `${studentUser.first_name} ${studentUser.last_name || ''}`.trim() : 'Musikschüler'}
+            studentName={formatStudentPureFirstName(studentUser?.first_name, 'Musikschüler')}
             songTitle={certificateSong.title || 'Meisterwerk'}
             instrument={studentUser?.instrument || 'Instrument'}
             schoolName={resolvedSchoolName}

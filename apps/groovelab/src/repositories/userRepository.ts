@@ -122,8 +122,10 @@ export async function fetchSchoolById(schoolId: string, force = false): Promise<
   });
 }
 
-export function updateUserPresence(userId: string): void {
+export function updateUserPresence(userId: string, role?: string): void {
   if (!userId || typeof window === 'undefined') return;
+  // 🛡️ TVöD § 26 BDSG / LPVG: Teachers are strictly exempt from presence tracking
+  if (role === 'teacher') return;
   supabase
     .from('users')
     .update({ last_seen: new Date().toISOString() })

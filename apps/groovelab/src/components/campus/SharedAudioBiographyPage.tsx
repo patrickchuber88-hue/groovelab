@@ -33,6 +33,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { getBlob } from '../../utils/blobStorage';
+import { getSecureAudioUrl } from '../../utils/audioStorageHelper';
 
 interface PlaylistTrackItem {
   id: string;
@@ -641,13 +642,13 @@ export const SharedAudioBiographyPage: React.FC<SharedAudioBiographyPageProps> =
     showToast(messages[type]);
   };
 
-  const playTrack = (track: PlaylistTrackItem, idx: number) => {
+  const playTrack = async (track: PlaylistTrackItem, idx: number) => {
     if (audioRef.current) {
       audioRef.current.pause();
     }
 
     const isMasterPreferred = track.preferredVersion !== 'raw';
-    const effectiveUrl = isMasterPreferred 
+    const rawUrl = isMasterPreferred 
       ? (track.masteredAudioUrl || track.audioUrl) 
       : (track.audioUrl || track.masteredAudioUrl);
 
@@ -664,7 +665,9 @@ export const SharedAudioBiographyPage: React.FC<SharedAudioBiographyPageProps> =
       window.dispatchEvent(new CustomEvent('campus_family_listen_received', { detail: { targetId, trackId: track.id } }));
     } catch {}
 
-    if (effectiveUrl) {
+    if (rawUrl) {
+      // 🛡️ UrhG § 19a Compliance: JIT Pre-Signed URL for private audio streaming
+      const effectiveUrl = await getSecureAudioUrl(rawUrl, 'campus-assets', 300);
       const audio = new Audio(effectiveUrl);
       audio.muted = isMuted;
       audioRef.current = audio;
