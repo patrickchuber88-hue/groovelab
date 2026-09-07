@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase';
+import { isUUID } from '../utils/uuidValidator';
 
 export interface UserNote {
   id: string;
@@ -245,6 +246,10 @@ export const notesService = {
     // 1. Immediately return local cached notes (0ms Latenz)
     const localNotes = await this.getLocalNotes(userId);
 
+    if (!userId || !isUUID(userId)) {
+      return localNotes;
+    }
+
     // 2. Asynchronously sync with Supabase in background
     try {
       const { data, error } = await supabase
@@ -335,10 +340,12 @@ export const notesService = {
     await this.saveLocalNote(newNote);
 
     // 2. Optimistically push to Supabase in background
-    try {
-      await supabase.from('user_notes').insert([newNote]);
-    } catch (e) {
-      // Graceful fallback for offline / unmigrated DB
+    if (params.userId && isUUID(params.userId) && params.schoolId && isUUID(params.schoolId)) {
+      try {
+        await supabase.from('user_notes').insert([newNote]);
+      } catch (e) {
+        // Graceful fallback for offline / unmigrated DB
+      }
     }
 
     return newNote;
@@ -412,7 +419,7 @@ export const notesService = {
     }
 
     // 4. Scan Supabase user_notes
-    if (effectiveSchoolId) {
+    if (effectiveSchoolId && isUUID(effectiveSchoolId)) {
       try {
         const { data, error } = await supabase
           .from('user_notes')

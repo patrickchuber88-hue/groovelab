@@ -159,7 +159,7 @@ const ENGLISH_TO_GERMAN_PHONETICS: [RegExp, string][] = [
   [/\bJunior\b/gi, 'Dschunior'],
   [/\bTeen\b|\bTeens\b/gi, 'Tien'],
   [/\bBand Room\b|\bBand-Room\b/gi, 'Bänd-Ruum'],
-  [/\bBand\b/gi, 'Bänd'],
+  [/\bBand\b(?!\s*(?:\d+|I|II|III|IV|V\b|eins|zwei|drei))/gi, 'Bänd'],
   [/\bBands\b/gi, 'Bänds'],
   [/\bSound\b|\bSounds\b/gi, 'Saund'],
   [/\bRock\b/gi, 'Rokk'],
@@ -434,14 +434,14 @@ export function cleanTextForTts(text: string): string {
     // Kalenderwochen & Termine: kindgerecht
     .replace(/\bKW\s*(\d+)\b/gi, 'für Woche $1')
     .replace(/\bKalenderwoche\s*(\d+)\b/gi, 'Woche $1')
-    // Lehrwerk-Seitenbereiche & Einzelseiten (z. B. S. 1–3. -> auf den Seiten 1 bis 3)
-    .replace(/\b(?:auf\s+den\s+)?(?:Seiten?|S\.)\s*(\d+)\s*[-–—]\s*(\d+)\.?/gi, 'auf den Seiten $1 bis $2')
-    .replace(/\b(?:auf\s+)?(?:Seite|S\.)\s*(\d+)\.?/gi, 'auf Seite $1')
+    // Lehrwerk-Seitenbereiche & Einzelseiten (z. B. S. 1–3 -> auf den Seiten 1 bis 3)
+    .replace(/\b(?:auf\s+den\s+)?(?:Seiten?|S\.)\s*(\d+)\s*[-–—]\s*(\d+)/gi, 'auf den Seiten $1 bis $2')
+    .replace(/\b(?:auf\s+)?(?:Seite|S\.)\s*(\d+)/gi, 'auf Seite $1')
     // Taktbereiche & Einzeltakte
-    .replace(/\b(?:die\s+)?(?:Takte?|T\.)\s*(\d+)\s*[-–—]\s*(\d+)\.?/gi, 'die Takte $1 bis $2')
-    .replace(/\b(?:Takt|T\.)\s*(\d+)\.?/gi, 'Takt $1')
-    // Freistehende Zahlenbereiche wie "1-3." oder "1-3" (verhindert 'seite 1-drittens' und '1, 3.')
-    .replace(/\b(\d+)\s*[-–—]\s*(\d+)\.?/g, '$1 bis $2')
+    .replace(/\b(?:die\s+)?(?:Takte?|T\.)\s*(\d+)\s*[-–—]\s*(\d+)/gi, 'die Takte $1 bis $2')
+    .replace(/\b(?:Takt|T\.)\s*(\d+)/gi, 'Takt $1')
+    // Freistehende Zahlenbereiche wie "1-3"
+    .replace(/\b(\d+)\s*[-–—]\s*(\d+)/g, '$1 bis $2')
     // Musikalische Taktarten
     .replace(/\b4\/4\s*(?:-?\s*Takt)?/gi, 'Vier-Viertel-Takt')
     .replace(/\b3\/4\s*(?:-?\s*Takt)?/gi, 'Drei-Viertel-Takt')
@@ -452,11 +452,11 @@ export function cleanTextForTts(text: string): string {
     .replace(/\bp\/f\b|\bp \/ f\b/gi, 'leise und laut')
     .replace(/\bfff\b/gi, 'ganz ganz laut')
     .replace(/\bff\b/gi, 'ganz kräftig')
-    .replace(/\bf\b(?!\w)/g, 'laut')
+    .replace(/(?<![a-zA-ZäöüÄÖÜß0-9])f(?![a-zA-ZäöüÄÖÜß0-9.])/g, 'laut')
     .replace(/\bmf\b/gi, 'mittellaut')
     .replace(/\bmp\b/gi, 'mittelleise')
     .replace(/\bpp\b/gi, 'ganz leise')
-    .replace(/\bp\b(?!\w)/g, 'leise')
+    .replace(/(?<![a-zA-ZäöüÄÖÜß0-9])p(?![a-zA-ZäöüÄÖÜß0-9.])/g, 'leise')
     // Artikulation & Tempo für Kinder verständlich
     .replace(/\b(?:cresc\.|crescendo)\b/gi, 'schrittweise lauter werden')
     .replace(/\b(?:decresc\.|dim\.|diminuendo)\b/gi, 'schrittweise leiser werden')
@@ -538,46 +538,63 @@ export function buildContinuousHomeworkNarrative(options: {
 
   // 1. Leerzustand (Ferien / Keine Aufgaben)
   if (totalTasks === 0 && !hasAudio && !hasGeneralNotes) {
-    return cleanTextForTts('Für diese Woche sind noch keine Aufgaben eingetragen.');
+    return cleanTextForTts('Hallo! Für diese Woche sind noch keine Aufgaben eingetragen. Viel Freude beim Üben!');
   }
 
-  // 2. Pädagogischer Einstieg (Senior Pädagoge)
+  // 2. Pädagogischer Einstieg & Begrüßung (Senior Pädagoge)
+  const rawTeacher = (options.teacherName || '').trim();
+  const isGenericTeacher = !rawTeacher || /^(admin|sekretariat|verwaltung|lehrer|gast)$/i.test(rawTeacher);
+  let teacherIntro = '';
+  if (!isGenericTeacher && rawTeacher.length > 2) {
+    if (/^deine\s+lehrkraft/i.test(rawTeacher)) {
+      teacherIntro = ` von ${rawTeacher}`;
+    } else {
+      teacherIntro = ` von deiner Lehrkraft ${rawTeacher}`;
+    }
+  }
+
   if (totalTasks > 1) {
-    parts.push('Hier sind deine Aufgaben für diese Woche.');
+    parts.push(`Hallo! Hier sind deine Aufgaben für diese Woche${teacherIntro}.`);
   } else if (totalTasks === 1) {
-    parts.push('Hier ist deine Hausaufgabe für diese Woche.');
+    parts.push(`Hallo! Hier ist deine Hausaufgabe für diese Woche${teacherIntro}.`);
   } else {
-    parts.push('Hier sind deine Hinweise für diese Woche.');
+    parts.push(`Hallo! Hier sind deine musikalischen Hinweise für diese Woche${teacherIntro}.`);
   }
 
-  let taskNumber = 1;
-  const ordinals = [
-    'Erste Aufgabe:',
-    'Zweite Aufgabe:',
-    'Dritte Aufgabe:',
-    'Vierte Aufgabe:',
-    'Fünfte Aufgabe:',
-    'Sechste Aufgabe:',
-    'Siebte Aufgabe:',
-    'Achte Aufgabe:'
-  ];
+  // 3. Didaktische Satzverbinder für natürlichen, kindgerechten Redefluss (Legato Flow)
+  const getTaskConnector = (index: number, total: number): string => {
+    if (total <= 1) return '';
+    if (index === 0) return 'Als Erstes übst du';
+    if (index === 1) {
+      return total === 2 ? 'Und als Zweites übst du' : 'Als Nächstes übst du';
+    }
+    if (index === total - 1) return 'Und zum Schluss übst du';
+    if (index === 2) return 'Als Drittes übst du';
+    return 'Außerdem übst du';
+  };
 
-  // 3. Lehrwerke / Buch-Aufgaben (Eigenständige Aufgabenkategorie)
+  let currentIndex = 0;
+
+  // 4. Lehrwerke / Buch-Aufgaben (Eigenständige Aufgabenkategorie)
   if (hasBooks) {
     booksList.forEach((b) => {
       const bookTitle = formatBookTitleForSpeech(b.title);
       const pagePhrase = formatPageNumbersGerman(b.pageNums, b.formattedPages);
-      const ordinalPrefix = totalTasks > 1 ? (ordinals[taskNumber - 1] || `Aufgabe ${taskNumber}:`) : '';
+      const connector = getTaskConnector(currentIndex, totalTasks);
 
       let bookSentence = '';
-      if (pagePhrase) {
-        bookSentence = `Im Lehrwerk ${bookTitle} übst du ${pagePhrase}.`;
+      if (totalTasks === 1) {
+        if (pagePhrase) {
+          bookSentence = `Im Lehrwerk ${bookTitle} übst du ${pagePhrase}.`;
+        } else {
+          bookSentence = `Im Lehrwerk ${bookTitle} vertiefst du deine aktuellen Übungen.`;
+        }
       } else {
-        bookSentence = `Im Lehrwerk ${bookTitle} übst du deine aktuellen Übungen.`;
-      }
-
-      if (ordinalPrefix) {
-        bookSentence = `${ordinalPrefix} ${bookSentence}`;
+        if (pagePhrase) {
+          bookSentence = `${connector} im Lehrwerk ${bookTitle} ${pagePhrase}.`;
+        } else {
+          bookSentence = `${connector} im Lehrwerk ${bookTitle} deine aktuellen Übungen.`;
+        }
       }
 
       // Hinweise zu den Seiten des Lehrwerks
@@ -597,49 +614,53 @@ export function buildContinuousHomeworkNarrative(options: {
       }
 
       parts.push(bookSentence);
-      taskNumber++;
+      currentIndex++;
     });
   }
 
-  // 4. Songs & Repertoire (Eigenständige Aufgabenkategorie)
+  // 5. Songs & Repertoire (Eigenständige Aufgabenkategorie)
   if (hasSongs) {
     songsList.forEach((s) => {
       const songInfo = formatSongTitleForSpeech(s.title);
       const cleanSongNote = s.note ? cleanTeacherNoteForSpeech(s.note) : '';
-      const ordinalPrefix = totalTasks > 1 ? (ordinals[taskNumber - 1] || `Aufgabe ${taskNumber}:`) : '';
+      const connector = getTaskConnector(currentIndex, totalTasks);
 
       let songSentence = '';
-      if (cleanSongNote) {
-        songSentence = `Beim Song ${songInfo.spokenPhrase} lautet dein Fahrplan: ${cleanSongNote}.`;
+      if (totalTasks === 1) {
+        if (cleanSongNote) {
+          songSentence = `Beim Song ${songInfo.spokenPhrase} lautet dein Fahrplan: ${cleanSongNote}.`;
+        } else {
+          songSentence = `Beim Song ${songInfo.spokenPhrase} übst du das Stück weiter.`;
+        }
       } else {
-        songSentence = `Beim Song ${songInfo.spokenPhrase} übst du das Stück weiter.`;
-      }
-
-      if (ordinalPrefix) {
-        songSentence = `${ordinalPrefix} ${songSentence}`;
+        if (cleanSongNote) {
+          songSentence = `${connector} beim Song ${songInfo.spokenPhrase}. Dein Fahrplan lautet: ${cleanSongNote}.`;
+        } else {
+          songSentence = `${connector} beim Song ${songInfo.spokenPhrase} das Stück weiter.`;
+        }
       }
 
       parts.push(songSentence);
-      taskNumber++;
+      currentIndex++;
     });
   }
 
-  // 5. Unterrichtsaufnahmen (Sichtbare Anzahl)
+  // 6. Unterrichtsaufnahmen (Sichtbare Anzahl)
   if (hasAudio) {
     if (options.audioCount === 1) {
       parts.push('Dazu gibt es eine Aufnahme aus dem Unterricht zum Mitspielen.');
     } else {
-      parts.push(`Dazu gibt es ${options.audioCount} Unterrichtsaufnahmen zum Mitspielen.`);
+      parts.push(`Dazu gibt es ${options.audioCount} Aufnahmen aus dem Unterricht zum Mitspielen.`);
     }
   }
 
-  // 6. Zusätzliche Hinweise der Lehrkraft
+  // 7. Zusätzliche Hinweise der Lehrkraft
   if (hasGeneralNotes && options.generalNotes) {
     const cleanGen = cleanTeacherNoteForSpeech(options.generalNotes.trim());
     parts.push(`Ein wichtiger Hinweis von deiner Lehrkraft: ${cleanGen}.`);
   }
 
-  // 7. Ermutigender Abschluss (Senior Pädagoge)
+  // 8. Ermutigender Abschluss (Senior Pädagoge)
   parts.push('Viel Freude beim Üben!');
 
   const fullRawText = parts.join(' ');

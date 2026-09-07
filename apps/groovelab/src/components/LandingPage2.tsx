@@ -12,6 +12,7 @@ interface LandingPage2Props {
   onShowPrivacy: () => void;
   onShowAgb: () => void;
   onShowImpressum: () => void;
+  onShowAccessibility?: () => void;
 }
 
 export const LandingPage2: React.FC<LandingPage2Props> = ({ 
@@ -19,7 +20,8 @@ export const LandingPage2: React.FC<LandingPage2Props> = ({
   onRegister,
   onShowPrivacy,
   onShowAgb,
-  onShowImpressum
+  onShowImpressum,
+  onShowAccessibility
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
@@ -715,6 +717,7 @@ export const LandingPage2: React.FC<LandingPage2Props> = ({
         <div className="footer-link" onClick={() => onShowPrivacy()}>Datenschutz</div>
         <div className="footer-link" onClick={() => onShowAgb()}>AGB</div>
         <div className="footer-link" onClick={() => onShowImpressum()}>Impressum</div>
+        <div className="footer-link" onClick={() => onShowAccessibility ? onShowAccessibility() : onShowPrivacy()}>Barrierefreiheit</div>
       </div>
 
       {/* Secret Master Admin Authentication Modal */}

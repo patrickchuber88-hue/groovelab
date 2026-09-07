@@ -2547,7 +2547,7 @@ export const generateB2BSchoolInvoicePDF = async (params: B2BInvoiceParams) => {
   doc.setFontSize(8.5);
   doc.setTextColor(slateMuted[0], slateMuted[1], slateMuted[2]);
   doc.text('Cloud-Infrastruktur & Musikschul-Hosting', 20, 30);
-  doc.text('Server-Standort: Frankfurt am Main (Hetzner Cloud)', 20, 34);
+  doc.text('Server-Standort: Falkenstein / Nürnberg (Hetzner Cloud Germany)', 20, 34);
 
   // Invoice Details Box (Right)
   doc.setFont('helvetica', 'bold');
@@ -2937,7 +2937,7 @@ export const generateSlaCertificatePDF = async (params: SlaCertificateParams | s
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(10);
   doc.setTextColor(slateDark[0], slateDark[1], slateDark[2]);
-  doc.text('1. Infrastruktur- & Latenz-Metriken (Frankfurt Cluster)', 20, 108);
+  doc.text('1. Infrastruktur- & Latenz-Metriken (Hetzner Sovereign Cluster)', 20, 108);
 
   const metrics = [
     { label: 'PostgreSQL Datenbank-Cluster Verfügbarkeit', val: `${Math.min(100, uptime).toFixed(2)}%`, status: isSlaAchieved ? '🟢 Exzellent' : '🟡 Überwacht' },
@@ -3031,7 +3031,7 @@ export const generateSlaCertificatePDF = async (params: SlaCertificateParams | s
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(6.5);
   doc.setTextColor(slateMuted[0], slateMuted[1], slateMuted[2]);
-  doc.text('Campus-Groovelab • Enterprise Cloud Infrastructure • Frankfurt am Main • DSGVO-konform', 20, 280);
+  doc.text('Campus-Groovelab • Enterprise Cloud Infrastructure • Falkenstein / Nürnberg • DSGVO-konform', 20, 280);
   doc.text('Seite 1 von 1', 190, 280, { align: 'right' });
 
   const cleanSchool = schoolName.replace(/[^a-zA-Z0-9_-]/g, '_');
@@ -3190,7 +3190,7 @@ export const generateIncidentReportPDF = async (params: IncidentReportParams) =>
   doc.text('Campus-Groovelab SRE & Incident Response Team', 20, currentY + 5);
   doc.text(`Freigegeben am: ${now.toLocaleDateString('de-DE')}`, 110, currentY + 5);
 
-  doc.text('Campus-Groovelab • Enterprise Cloud Infrastructure • Frankfurt am Main • DSGVO-konform', 20, 280);
+  doc.text('Campus-Groovelab • Enterprise Cloud Infrastructure • Falkenstein / Nürnberg • DSGVO-konform', 20, 280);
   doc.text('Seite 1 von 1', 190, 280, { align: 'right' });
 
   doc.save(`Incident_Report_${reportNumber}.pdf`);
@@ -3443,7 +3443,7 @@ export const generateExecutiveSummaryPDF = async (params: ExecutiveSummaryPdfPar
 
   doc.setFontSize(8.5);
   doc.setTextColor(slateMuted[0], slateMuted[1], slateMuted[2]);
-  doc.text(`Erstellt am: ${dateStr}, ${timeStr} Uhr • Rechenzentrum: Hetzner Cloud (Frankfurt EU)`, 20, 33);
+  doc.text(`Erstellt am: ${dateStr}, ${timeStr} Uhr • Rechenzentrum: Hetzner Cloud (Falkenstein / Nürnberg EU)`, 20, 33);
 
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(slateDark[0], slateDark[1], slateDark[2]);
@@ -3622,7 +3622,7 @@ export const generateExecutiveSummaryPDF = async (params: ExecutiveSummaryPdfPar
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(6.8);
   doc.setTextColor(22, 101, 52);
-  doc.text('• Sämtliche Daten werden ausschließlich im ISO 27001-zertifizierten Rechenzentrum Frankfurt (Hetzner Cloud EU) gehostet.', 24, currentY + 9.5);
+  doc.text('• Sämtliche Daten werden ausschließlich im ISO 27001-zertifizierten Rechenzentrum Falkenstein / Nürnberg (Hetzner Online GmbH, Deutschland) gehostet.', 24, currentY + 9.5);
   doc.text('• OWASP ASVS Level 3 Fail-Closed Doktrin aktiv: Keine unverschlüsselten PINs, kein Schülerprofiling, strikte Mandantentrennung.', 24, currentY + 13.5);
 
   // Footer

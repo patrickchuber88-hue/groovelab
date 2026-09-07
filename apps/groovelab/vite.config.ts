@@ -43,7 +43,7 @@ export default defineConfig({
   build: {
     sourcemap: false, // Strict block on production source maps
     minify: 'esbuild',
-    chunkSizeWarningLimit: 800,
+    chunkSizeWarningLimit: 1000,
     modulePreload: {
       resolveDependencies: (_filename, deps) => {
         // High-performance filter: Do not eagerly preload heavy dashboards on initial boot
@@ -94,7 +94,13 @@ export default defineConfig({
           if (id.includes('BillingDashboard')) {
             return 'billing-dashboard-suite';
           }
-          if (id.includes('SchoolDetailDrawer') || id.includes('MasterAdminDashboard') || id.includes('masterAdmin/')) {
+          if (id.includes('SchoolDetailDrawer')) {
+            return 'master-admin-school-drawer';
+          }
+          if (id.includes('ReconciliationTab')) {
+            return 'master-admin-reconciliation';
+          }
+          if (id.includes('MasterAdminDashboard') || id.includes('masterAdmin/')) {
             return 'master-admin-core';
           }
           if (id.includes('components/admin/')) {

@@ -9,6 +9,7 @@ import {
   resolveStorageAddonFee 
 } from '../schoolMetricsAggregator';
 import { MasterPricingRates } from '../pricingEngine';
+import { computeSchoolDunningStatus, SchoolDunningLevel } from '../schoolDunningEngine';
 
 function assert(condition: boolean, message: string) {
   if (!condition) {
@@ -286,5 +287,179 @@ const totalLiveArr = parseFloat((totalLiveMrr * 12).toFixed(2));
 assert(totalLiveArr === 827.04, `Total Platform ARR must equal 827.04 €, got ${totalLiveArr} €`);
 
 console.log(`✅ Test 6 passed: Live Multi-Tenant MRR Invariant holds at exactly ${totalLiveMrr} € / Mo. (ARR: ${totalLiveArr} € / Jahr)!\n`);
+
+// --- TEST 7: B2B Delinquency Escalation Engine Invariants ---
+console.log('Test 7: B2B Delinquency Escalation Engine Invariants (28-day Standard Grace & 5-Tier Escalation Matrix)');
+
+const testDate = '2026-10-01T12:00:00Z'; // Reference simulated date
+
+// 7.1 Grace Period (Level 0): Due on 2026-09-10 (21 days overdue <= 28)
+const invGrace = [{
+  id: 'inv-grace',
+  school_id: 'school-delinq-1',
+  amount: 35.13,
+  status: 'sent',
+  due_date: '2026-09-10',
+  recipient_type: 'school'
+}];
+const dunningGrace = computeSchoolDunningStatus({ id: 'school-delinq-1' }, invGrace, testDate);
+assert(dunningGrace.level === 'level_0_current', `Level 0 expected, got ${dunningGrace.level}`);
+assert(!dunningGrace.isDelinquent, 'Level 0 must not be delinquent');
+assert(!dunningGrace.isSecretaryReadOnly, 'Secretary must not be read-only in Level 0');
+assert(!dunningGrace.isAudioTresorReadOnly, 'Audio-Tresor must not be read-only in Level 0');
+assert(!dunningGrace.isTeacherReadOnly, 'Teacher must not be read-only in Level 0');
+assert(dunningGrace.overdueDays === 21, `Days overdue expected 21, got ${dunningGrace.overdueDays}`);
+assert(dunningGrace.baseGraceDays === 28, `Base grace days must be 28, got ${dunningGrace.baseGraceDays}`);
+
+// 7.2 Reminder (Level 1): Due on 2026-08-31 (31 days overdue, 29..36)
+const invReminder = [{
+  id: 'inv-rem',
+  school_id: 'school-delinq-1',
+  amount: 45.00,
+  status: 'sent',
+  due_date: '2026-08-31',
+  recipient_type: 'school'
+}];
+const dunningReminder = computeSchoolDunningStatus({ id: 'school-delinq-1' }, invReminder, testDate);
+assert(dunningReminder.level === 'level_1_reminder', `Level 1 expected, got ${dunningReminder.level}`);
+assert(dunningReminder.isDelinquent, 'Level 1 must be marked delinquent');
+assert(!dunningReminder.isSecretaryReadOnly, 'Secretary must still have write access in Level 1');
+assert(!dunningReminder.isAudioTresorReadOnly, 'Audio-Tresor must still accept uploads in Level 1');
+assert(!dunningReminder.isTeacherReadOnly, 'Teacher must have write access in Level 1');
+assert(!dunningReminder.isDunningFeeApplied, 'Dunning fee must not be applied in Level 1');
+
+// 7.3 Warning (Level 2): Due on 2026-08-22 (40 days overdue, 37..43)
+const invWarning = [{
+  id: 'inv-warn',
+  school_id: 'school-delinq-1',
+  amount: 25.00,
+  status: 'pending',
+  due_date: '2026-08-22',
+  recipient_type: 'school'
+}];
+const dunningWarning = computeSchoolDunningStatus({ id: 'school-delinq-1' }, invWarning, testDate);
+assert(dunningWarning.level === 'level_2_warning', `Level 2 expected, got ${dunningWarning.level}`);
+assert(dunningWarning.adminCountdownDays === 4, `Expected 4 days until admin read-only, got ${dunningWarning.adminCountdownDays}`);
+assert(!dunningWarning.isSecretaryReadOnly, 'Secretary must still have write access in Level 2');
+assert(!dunningWarning.isAudioTresorReadOnly, 'Audio-Tresor must still accept uploads in Level 2');
+assert(!dunningWarning.isDunningFeeApplied, 'Dunning fee must not be applied in Level 2');
+
+// 7.4 Admin Read-Only (Level 3): Due on 2026-08-15 (47 days overdue, 44..51)
+const invAdminRo = [{
+  id: 'inv-ro-admin',
+  school_id: 'school-delinq-1',
+  amount: 19.90,
+  status: 'sent',
+  due_date: '2026-08-15',
+  recipient_type: 'school'
+}];
+const dunningAdminRo = computeSchoolDunningStatus({ id: 'school-delinq-1', has_campus_subscription: true, has_groovelab_subscription: true }, invAdminRo, testDate);
+assert(dunningAdminRo.level === 'level_3_admin_readonly', `Level 3 expected, got ${dunningAdminRo.level}`);
+assert(dunningAdminRo.isSecretaryReadOnly === true, 'Secretary MUST be read-only in Level 3');
+assert(dunningAdminRo.isAudioTresorReadOnly === true, 'Audio-Tresor MUST be read-only in Level 3');
+assert(dunningAdminRo.isTeacherReadOnly === false, 'Teacher must NOT be read-only in Level 3');
+assert(dunningAdminRo.isDunningFeeApplied === true, 'Dunning fee must be applied in Level 3');
+assert(dunningAdminRo.dunningFee === 19.90, `Kombi dunning fee must be 19.90 €, got ${dunningAdminRo.dunningFee}`);
+
+// 7.5 Module-Specific Dunning Fee Invariants (Campus 14.90 €, GrooveLab 9.90 €)
+const dunningCampusOnly = computeSchoolDunningStatus({ id: 'school-delinq-1', has_campus_subscription: true, has_groovelab_subscription: false }, invAdminRo, testDate);
+assert(dunningCampusOnly.dunningFee === 14.90, `Campus-only dunning fee must be 14.90 €, got ${dunningCampusOnly.dunningFee}`);
+
+const dunningGrooveLabOnly = computeSchoolDunningStatus({ id: 'school-delinq-1', has_campus_subscription: false, has_groovelab_subscription: true }, invAdminRo, testDate);
+assert(dunningGrooveLabOnly.dunningFee === 9.90, `GrooveLab-only dunning fee must be 9.90 €, got ${dunningGrooveLabOnly.dunningFee}`);
+
+// 7.6 48h Trust Extension Invariant (Sofort-Freigabe suspends read-only lock)
+const schoolWithTrust = {
+  id: 'school-delinq-1',
+  has_campus_subscription: true,
+  has_groovelab_subscription: true,
+  dunning_trust_extension_until: '2026-10-02T00:00:00Z' // 24h into the future relative to refDate midnight
+};
+const dunningTrust = computeSchoolDunningStatus(schoolWithTrust, invAdminRo, testDate);
+assert(dunningTrust.level === 'level_3_admin_readonly', 'Level stays Level 3 for auditability');
+assert(dunningTrust.isTrustExtended === true, 'Trust pass must be active');
+assert(dunningTrust.isSecretaryReadOnly === false, 'Secretary lock must be temporarily lifted by trust pass');
+assert(dunningTrust.isAudioTresorReadOnly === false, 'Audio-Tresor lock must be temporarily lifted by trust pass');
+assert(dunningTrust.trustRemainingHours === 24, `Expected 24 remaining hours, got ${dunningTrust.trustRemainingHours}`);
+
+// 7.7 Teacher Warning (Level 4): Due on 2026-08-07 (55 days overdue, 52..58)
+const invTeacherWarn = [{
+  id: 'inv-warn-teach',
+  school_id: 'school-delinq-1',
+  amount: 50.00,
+  status: 'sent',
+  due_date: '2026-08-07',
+  recipient_type: 'school'
+}];
+const dunningTeacherWarn = computeSchoolDunningStatus({ id: 'school-delinq-1' }, invTeacherWarn, testDate);
+assert(dunningTeacherWarn.level === 'level_4_teacher_warning', `Level 4 expected, got ${dunningTeacherWarn.level}`);
+assert(dunningTeacherWarn.isSecretaryReadOnly === true, 'Secretary must be read-only in Level 4');
+assert(dunningTeacherWarn.isAudioTresorReadOnly === true, 'Audio-Tresor must be read-only in Level 4');
+assert(dunningTeacherWarn.isTeacherReadOnly === false, 'Teacher must not be read-only in Level 4 (warning countdown)');
+assert(dunningTeacherWarn.teacherCountdownDays === 4, `Expected 4 days until teacher read-only, got ${dunningTeacherWarn.teacherCountdownDays}`);
+
+// 7.8 Full Read-Only (Level 5): Due on 2026-07-28 (65 days overdue, >= 59)
+const invFullRo = [{
+  id: 'inv-ro-full',
+  school_id: 'school-delinq-1',
+  amount: 99.00,
+  status: 'overdue',
+  due_date: '2026-07-28',
+  recipient_type: 'school'
+}];
+const dunningFullRo = computeSchoolDunningStatus({ id: 'school-delinq-1' }, invFullRo, testDate);
+assert(dunningFullRo.level === 'level_5_full_readonly', `Level 5 expected, got ${dunningFullRo.level}`);
+assert(dunningFullRo.isSecretaryReadOnly === true, 'Secretary must be read-only in Level 5');
+assert(dunningFullRo.isAudioTresorReadOnly === true, 'Audio-Tresor must be read-only in Level 5');
+assert(dunningFullRo.isTeacherReadOnly === true, 'Teacher MUST be read-only in Level 5');
+
+// 7.9 Sommerferien-Moratorium Invariant (42 Days Grace Period in July/August)
+const summerTestDate = '2026-08-01T12:00:00Z'; // In August
+const invSummer = [{
+  id: 'inv-summer',
+  school_id: 'school-delinq-1',
+  amount: 50.00,
+  status: 'sent',
+  due_date: '2026-06-25', // 37 days overdue (would be Level 2 normally, but <= 42 in summer)
+  recipient_type: 'school'
+}];
+const dunningSummer = computeSchoolDunningStatus({ id: 'school-delinq-1' }, invSummer, summerTestDate);
+assert(dunningSummer.baseGraceDays === 42, `Summer baseGraceDays must be 42, got ${dunningSummer.baseGraceDays}`);
+assert(dunningSummer.level === 'level_0_current', `Summer moratorium must protect 37-day overdue school in Level 0, got ${dunningSummer.level}`);
+assert(!dunningSummer.isDelinquent, 'Must not be delinquent under summer moratorium');
+
+// 7.10 🃏 Kulanzjoker Invariant (+30 Days Stundung & 0,00 € Verzugspauschale)
+const schoolWithKulanz = {
+  id: 'school-delinq-1',
+  dunning_kulanz_until: '2026-10-15T12:00:00Z' // Valid until mid-October
+};
+const dunningKulanz = computeSchoolDunningStatus(schoolWithKulanz, invAdminRo, testDate); // 47 days overdue
+assert(dunningKulanz.isKulanzActive === true, 'Kulanzjoker must be active');
+assert(dunningKulanz.baseGraceDays === 58, `Base grace days must be 28 + 30 = 58, got ${dunningKulanz.baseGraceDays}`);
+assert(dunningKulanz.level === 'level_0_current', `Kulanzjoker must reset level to Level 0, got ${dunningKulanz.level}`);
+assert(dunningKulanz.dunningFee === 0, `Verzugspauschale must be waived (0,00 €), got ${dunningKulanz.dunningFee}`);
+assert(dunningKulanz.isSecretaryReadOnly === false, 'Secretary lock must be lifted by Kulanzjoker');
+
+// 7.11 Exemption: Subscription Bypass & Active Trial
+const dunningBypass = computeSchoolDunningStatus({ id: 'school-delinq-1', subscription_bypass: true }, invFullRo, testDate);
+assert(dunningBypass.level === 'level_0_current', 'Subscription bypass must enforce Level 0');
+assert(!dunningBypass.isDelinquent, 'Subscription bypass must never be delinquent');
+
+const dunningTrial = computeSchoolDunningStatus({ id: 'school-delinq-1', is_trial: true }, invFullRo, testDate);
+assert(dunningTrial.level === 'level_0_current', 'Active trial must enforce Level 0');
+
+// 7.12 Multiple Overdue Invoices & Oldest Sorting Invariant
+const multiInvoices = [
+  { id: 'inv-newer', school_id: 'school-delinq-1', amount: 30.00, status: 'sent', due_date: '2026-09-10', recipient_type: 'school' }, // 21 days
+  { id: 'inv-older', school_id: 'school-delinq-1', amount: 45.50, status: 'sent', due_date: '2026-07-20', recipient_type: 'school' }, // 73 days -> Level 5
+  { id: 'inv-paid', school_id: 'school-delinq-1', amount: 100.00, status: 'paid', due_date: '2026-07-01', recipient_type: 'school' } // paid -> ignored
+];
+const dunningMulti = computeSchoolDunningStatus({ id: 'school-delinq-1' }, multiInvoices, testDate);
+assert(dunningMulti.level === 'level_5_full_readonly', 'Oldest overdue invoice must govern the escalation level');
+assert(dunningMulti.overdueDays === 73, `Expected 73 days overdue from oldest invoice, got ${dunningMulti.overdueDays}`);
+assert(dunningMulti.totalOverdueAmount === 75.50, `Expected 75.50 € total overdue, got ${dunningMulti.totalOverdueAmount}`);
+assert(dunningMulti.oldestOverdueInvoice?.id === 'inv-older', 'Oldest overdue invoice must be inv-older');
+
+console.log('✅ Test 7 passed: B2B Delinquency Escalation Engine Invariants hold with 100% determinism!\n');
 
 console.log('🎉 ALL BILLING INVARIANT TESTS PASSED WITH 100% CONSISTENCY!');

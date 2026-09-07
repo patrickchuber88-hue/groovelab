@@ -6,6 +6,11 @@ const supabaseUrl = process.env.SUPABASE_URL || 'https://supabase.178.105.10.2.s
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+function isUUID(val: unknown): val is string {
+  return typeof val === 'string' && UUID_REGEX.test(val);
+}
+
 /**
  * Helper to check the global messaging policy ("THE MUTED WALL").
  * Returns false if allow_messages_global is false in the school settings.
@@ -55,7 +60,7 @@ export async function getSecretaryBriefingHandler(req: Request, res: Response): 
       }
     }
 
-    if (userId && !schoolId) {
+    if (userId && isUUID(userId) && !schoolId) {
       const { data: profile } = await supabase
         .from('users')
         .select('school_id')
@@ -66,8 +71,8 @@ export async function getSecretaryBriefingHandler(req: Request, res: Response): 
       }
     }
 
-    if (!schoolId) {
-      res.status(400).json({ error: 'School ID is required for secretary briefing.' });
+    if (!schoolId || !isUUID(schoolId)) {
+      res.status(400).json({ error: 'Valid School ID (UUID) is required for secretary briefing.' });
       return;
     }
 
@@ -171,8 +176,8 @@ export async function getTeacherBriefingHandler(req: Request, res: Response): Pr
       }
     }
 
-    if (!userId) {
-      res.status(400).json({ error: 'User ID (teacher) is required.' });
+    if (!userId || !isUUID(userId)) {
+      res.status(400).json({ error: 'Valid User ID (teacher UUID) is required.' });
       return;
     }
 
@@ -207,17 +212,8 @@ export async function getTeacherBriefingHandler(req: Request, res: Response): Pr
         status,
         day_of_week,
         instrument,
-        rooms (id, name),
-        student:users!schedules_student_id_fkey (
-          id,
-          first_name,
-          last_name,
-          is_app_user,
-          is_premium_user,
-          instrument,
-          birth_date,
-          avatars (avatar_style, evolution_level, xp, streak_flame)
-        )
+        student_id,
+        rooms (id, name)
       `)
       .eq('teacher_id', userId)
       .eq('day_of_week', todayWeekday);
@@ -241,8 +237,22 @@ export async function getTeacherBriefingHandler(req: Request, res: Response): Pr
         schedules (
           instrument,
           rooms (id, name)
-        ),
-        student:users!schedule_occurrences_student_id_fkey (
+        )
+      `)
+      .eq('teacher_id', userId)
+      .or(`date.eq.${todayStr},original_date.eq.${todayStr}`);
+
+    // Resolve students cleanly from users view without unstable embedded view joins
+    const studentIds = Array.from(new Set([
+      ...(slots || []).map((s: any) => s.student_id),
+      ...(occurrences || []).map((o: any) => o.student_id)
+    ])).filter((id: any): id is string => Boolean(id && isUUID(id)));
+
+    const studentMap = new Map<string, any>();
+    if (studentIds.length > 0) {
+      const { data: studentsData } = await supabase
+        .from('users')
+        .select(`
           id,
           first_name,
           last_name,
@@ -251,14 +261,17 @@ export async function getTeacherBriefingHandler(req: Request, res: Response): Pr
           instrument,
           birth_date,
           avatars (avatar_style, evolution_level, xp, streak_flame)
-        )
-      `)
-      .eq('teacher_id', userId)
-      .or(`date.eq.${todayStr},original_date.eq.${todayStr}`);
+        `)
+        .in('id', studentIds);
+
+      (studentsData || []).forEach((st: any) => {
+        studentMap.set(st.id, st);
+      });
+    }
 
     // Format regular schedules
     let timeline = (slots || []).map((slot: any) => {
-      const student = slot.student;
+      const student = studentMap.get(slot.student_id);
       const avatar = student?.avatars?.[0] || null;
       const isPremium = student?.is_premium_user ?? false;
       const isAnalogStickerUser = !student?.is_app_user || !isPremium || avatar?.avatar_style === 'Standard_Silhouette';
@@ -284,12 +297,12 @@ export async function getTeacherBriefingHandler(req: Request, res: Response): Pr
     // Merge with occurrences for target date
     if (occurrences && occurrences.length > 0) {
       occurrences.forEach((occ: any) => {
-        const student = occ.student;
+        const student = studentMap.get(occ.student_id);
         const avatar = student?.avatars?.[0] || null;
         const isPremium = student?.is_premium_user ?? false;
         const isAnalogStickerUser = !student?.is_app_user || !isPremium || avatar?.avatar_style === 'Standard_Silhouette';
         const formattedTime = occ.start_time ? occ.start_time.substring(0, 5) : '00:00';
-        const occStudentId = occ.student?.id || occ.student_id;
+        const occStudentId = occ.student_id;
 
         if (occ.original_date === todayStr && occ.date !== todayStr) {
           // Rescheduled AWAY from today -> mark as rescheduled_away
@@ -341,7 +354,7 @@ export async function getTeacherBriefingHandler(req: Request, res: Response): Pr
     const nextSlot = timeline.find((s) => s.timeSlot >= currentStr) || timeline[0] || null;
     let prepMirror = null;
 
-    if (nextSlot && nextSlot.student) {
+    if (nextSlot && nextSlot.student && isUUID(nextSlot.student.id)) {
       const studentId = nextSlot.student.id;
       
       // Fetch next student's avatar & practice stats
@@ -415,10 +428,7 @@ export async function getTeacherBriefingHandler(req: Request, res: Response): Pr
           original_date,
           start_time,
           status,
-          student:users!schedule_occurrences_student_id_fkey (
-            first_name,
-            last_name
-          )
+          student_id
         `)
         .eq('teacher_id', userId)
         .gte('date', mondayStr)
@@ -431,8 +441,20 @@ export async function getTeacherBriefingHandler(req: Request, res: Response): Pr
           return hasDateDiff && occ.date >= todayStr;
         });
 
+        const weekStudentIds = Array.from(new Set(rescheduledUpcoming.map((o: any) => o.student_id))).filter((id: any): id is string => Boolean(id && isUUID(id)));
+        const weekStudentMap = new Map<string, any>();
+        if (weekStudentIds.length > 0) {
+          const { data: stData } = await supabase
+            .from('users')
+            .select('id, first_name, last_name')
+            .in('id', weekStudentIds);
+          (stData || []).forEach((st: any) => weekStudentMap.set(st.id, st));
+        }
+
         rescheduledReminders = rescheduledUpcoming.map((occ: any) => {
           const dateObj = new Date(occ.date);
+          const student = weekStudentMap.get(occ.student_id);
+          const studentName = student ? `${student.first_name} ${student.last_name}`.trim() : 'Schüler';
           const weekdayStr = dateObj.toLocaleDateString('de-DE', { weekday: 'long' });
           const weekdayShort = dateObj.toLocaleDateString('de-DE', { weekday: 'short' }).replace('.', '');
           const day = String(dateObj.getDate()).padStart(2, '0');
@@ -445,7 +467,7 @@ export async function getTeacherBriefingHandler(req: Request, res: Response): Pr
 
           return {
             id: occ.id,
-            studentName: `${occ.student?.first_name || ''} ${occ.student?.last_name || ''}`.trim(),
+            studentName,
             originalWeekday: originalWeekdayStr,
             weekday: weekdayStr,
             weekdayShort,
@@ -489,8 +511,8 @@ export async function getStudentBriefingHandler(req: Request, res: Response): Pr
       }
     }
 
-    if (!userId) {
-      res.status(400).json({ error: 'User ID (student) is required.' });
+    if (!userId || !isUUID(userId)) {
+      res.status(400).json({ error: 'Valid User ID (student UUID) is required.' });
       return;
     }
 
@@ -513,8 +535,8 @@ export async function getStudentBriefingHandler(req: Request, res: Response): Pr
         .from('schedules')
         .select(`
           time_slot,
-          rooms (name),
-          teacher:users!schedules_teacher_id_fkey (first_name, last_name)
+          teacher_id,
+          rooms (name)
         `)
         .eq('student_id', userId)
         .eq('day_of_week', todayWeekday)
@@ -533,10 +555,20 @@ export async function getStudentBriefingHandler(req: Request, res: Response): Pr
     // Query messaging policy (depends on school_id)
     const allowMessages = await checkAllowMessagesGlobal(student.school_id);
 
+    let teacherProfile: { first_name?: string; last_name?: string } | null = null;
+    if (todaySchedules?.teacher_id && isUUID(todaySchedules.teacher_id)) {
+      const { data: tData } = await supabase
+        .from('users')
+        .select('first_name, last_name')
+        .eq('id', todaySchedules.teacher_id)
+        .maybeSingle();
+      teacherProfile = tData;
+    }
+
     let todayLesson = null;
     if (todaySchedules) {
-      const teacherName = todaySchedules.teacher 
-        ? `Herr/Frau ${(todaySchedules.teacher as any).last_name}` 
+      const teacherName = teacherProfile 
+        ? `Herr/Frau ${teacherProfile.last_name}` 
         : 'Lehrkraft';
       todayLesson = {
         time: todaySchedules.time_slot,

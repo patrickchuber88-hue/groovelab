@@ -78,6 +78,7 @@ export interface SchoolYearCalculation {
   freeMonthName: string;
   freePeriodDescription: string;
   paidStartMonthName: string;
+  paidStartMonth: number;
   paidStartYear: number;
   paidEndMonthName: string;
   paidEndYear: number;
@@ -88,6 +89,7 @@ export interface SchoolYearCalculation {
   periodDescription: string; // e.g. "01.10.2026 – 31.08.2027" or "01.09.2026 – 31.07.2027"
   isFirstYearDiscount: boolean;
   currency: 'EUR' | 'CHF';
+  isCurrentTrialPeriod: boolean;
 }
 
 export function calculateTransitionEffectiveDate(nowDate?: Date): {
@@ -256,11 +258,14 @@ export function calculateSchoolYearDirectBilling(
   const endFormatted = `${String(finalEndDay).padStart(2, '0')}.${String(finalEndMonth).padStart(2, '0')}.${finalEndYear}`;
   const periodDescription = `${startFormatted} – ${endFormatted}`;
   const isFirstYearDiscount = remainingPaidMonths <= 11;
+  const paidStartDate = new Date(paidStartYear, paidStartMonth - 1, 1, 0, 0, 0, 0);
+  const isCurrentTrialPeriod = date.getTime() < paidStartDate.getTime();
 
   return {
     freeMonthName,
     freePeriodDescription,
     paidStartMonthName,
+    paidStartMonth,
     paidStartYear,
     paidEndMonthName: finalEndMonthName,
     paidEndYear: finalEndYear,
@@ -270,6 +275,7 @@ export function calculateSchoolYearDirectBilling(
     totalAmountStr,
     periodDescription,
     isFirstYearDiscount,
-    currency
+    currency,
+    isCurrentTrialPeriod
   };
 }

@@ -20,6 +20,7 @@ import { usePremiumOnboardingTour, TourStep, TourStartButton } from './PremiumOn
 import { MobileBriefingCarousel } from './ui/MobileBriefingCarousel';
 import { cleanHomeworkNotesText, maskLastName, formatTeacherFullName, formatStudentPureFirstName } from '../utils/nameHelper';
 import { CampusGroovelabBrand, CampusGroovelabText, CampusGroovelabLogo } from './CampusGroovelabBrand';
+import { calculateSchoolYearDirectBilling } from '../utils/epcGiroCode';
 import { validateNewPin } from '../utils/pinValidation';
 import { CampusLevelSwitcher, CampusUiLevel } from './campus/CampusLevelSwitcher';
 import { CampusJuniorDashboard } from './campus/CampusJuniorDashboard';
@@ -68,6 +69,7 @@ const HelpCenterModal = lazy(() => import('./help/HelpCenterModal').then(m => ({
 const StudentToolboxModal = lazy(() => import('./campus/StudentToolboxModal').then(m => ({ default: m.StudentToolboxModal })));
 const PushNotificationSoftPromptModal = lazy(() => import('./ui/PushNotificationSoftPromptModal').then(m => ({ default: m.PushNotificationSoftPromptModal })));
 const ParentCampusActivationModal = lazy(() => import('./ParentCampusActivationModal').then(m => ({ default: m.ParentCampusActivationModal })));
+const PaymentGracePeriodSoftLockModal = lazy(() => import('./PaymentGracePeriodSoftLockModal').then(m => ({ default: m.PaymentGracePeriodSoftLockModal })));
 const Confetti = lazy(() => import('react-confetti'));
 
 interface HomeworkBookErrorBoundaryProps {
@@ -567,6 +569,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
   const [settingsSubTab, setSettingsSubTab] = useState<'notifications' | 'parent_controls' | 'security' | 'modules' | 'billing' | 'legal' | 'overview'>('parent_controls');
   const [activeStudentSettingsModal, setActiveStudentSettingsModal] = useState<'notifications' | 'parent_controls' | 'security' | 'modules' | 'billing' | 'legal' | null>(null);
   const [showParentActivationModal, setShowParentActivationModal] = useState(false);
+  const [showSoftLockModal, setShowSoftLockModal] = useState(false);
   const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false);
   const [isHelpCenterOpen, setIsHelpCenterOpen] = useState(false);
   const [pinFormNew, setPinFormNew] = useState('');
@@ -581,7 +584,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
   const [matchCelebrationData, setMatchCelebrationData] = useState<any | null>(null);
 
   // Parent Control Center Draft States & Step-Up Save Modal (Deterministic SSOT)
-  const [parentControlsTab, setParentControlsTab] = useState<'governance' | 'insights' | 'cancellations'>('governance');
+  const [parentControlsTab, setParentControlsTab] = useState<'governance' | 'insights' | 'cancellations' | 'downloads'>('governance');
   const [parentBriefingDismissed, setParentBriefingDismissed] = useState<boolean>(() => {
     if (typeof window === 'undefined' || !studentId) return false;
     const dismissedAt = localStorage.getItem(`groovelab_parent_dismissed_briefing_${studentId}`);
@@ -963,7 +966,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       allowTimer: true,
       allowLeaderboard: false,
       allowProposals: false,
-      allowAudio: true,
+      allowAudio: false, // 🛡️ Privacy by Default (Art. 25 Abs. 2 DSGVO)
       allowTts: true,
       bedtimeEnabled: true,
       bedtimeStart: '20:00',
@@ -971,7 +974,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       boardOverrides: {
         practice_board: true,
         mediathek: false,
-        recordings: true,
+        recordings: false, // 🛡️ Privacy by Default
         events: true,
         campus_cup: false,
         messages: false
@@ -986,7 +989,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       allowTimer: true,
       allowLeaderboard: true,
       allowProposals: true,
-      allowAudio: true,
+      allowAudio: false, // 🛡️ Privacy by Default (Art. 25 Abs. 2 DSGVO)
       allowTts: false,
       bedtimeEnabled: true,
       bedtimeStart: '21:30',
@@ -994,7 +997,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       boardOverrides: {
         practice_board: true,
         mediathek: true,
-        recordings: true,
+        recordings: false, // 🛡️ Privacy by Default
         events: true,
         campus_cup: true,
         messages: true
@@ -1075,17 +1078,17 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       : (draftAllowProposals !== null ? draftAllowProposals : ((studentUser as any)?.parent_allow_proposals !== undefined && (studentUser as any)?.parent_allow_proposals !== null ? Boolean((studentUser as any)?.parent_allow_proposals) : false));
     const nextAllowAudio = updates.allowAudio !== undefined 
       ? updates.allowAudio 
-      : (draftAllowAudio !== null ? draftAllowAudio : ((studentUser as any)?.parent_allow_audio !== undefined && (studentUser as any)?.parent_allow_audio !== null ? Boolean((studentUser as any)?.parent_allow_audio) : true));
+      : (draftAllowAudio !== null ? draftAllowAudio : ((studentUser as any)?.parent_allow_audio !== undefined && (studentUser as any)?.parent_allow_audio !== null ? Boolean((studentUser as any)?.parent_allow_audio) : false));
     const nextAllowTeacherAudio = updates.allowTeacherAudio !== undefined
       ? updates.allowTeacherAudio
       : ((studentUser as any)?.parent_permissions?.allow_teacher_audio !== undefined
           ? Boolean((studentUser as any)?.parent_permissions?.allow_teacher_audio)
-          : true);
+          : false);
     const nextAllowStudentAudio = updates.allowStudentAudio !== undefined
       ? updates.allowStudentAudio
       : ((studentUser as any)?.parent_permissions?.allow_student_audio !== undefined
           ? Boolean((studentUser as any)?.parent_permissions?.allow_student_audio)
-          : nextAllowAudio);
+          : false);
     const nextAllowTts = updates.allowTts !== undefined 
       ? updates.allowTts 
       : (draftAllowTts !== null ? draftAllowTts : ((studentUser as any)?.parent_allow_tts !== undefined && (studentUser as any)?.parent_allow_tts !== null ? Boolean((studentUser as any)?.parent_allow_tts) : false));
@@ -2382,7 +2385,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       const [{ data: occurrences }, { data: schedules }] = await Promise.all([
         supabase
           .from('schedule_occurrences')
-          .select('*, schedule:schedule_id(*, rooms(name)), teacher:users!schedule_occurrences_teacher_id_fkey(first_name, last_name)')
+          .select('*, schedule:schedule_id(*, rooms(name))')
           .eq('student_id', studentId)
           .gte('date', todayStr)
           .order('date', { ascending: true })
@@ -2671,7 +2674,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       const [{ data: occurrences, error: occErr }, { data: schedules, error: schErr }] = await Promise.all([
         supabase
           .from('schedule_occurrences')
-          .select('*, schedule:schedule_id(*, rooms(name)), teacher:users!schedule_occurrences_teacher_id_fkey(first_name, last_name)')
+          .select('*, schedule:schedule_id(*, rooms(name))')
           .eq('student_id', studentId)
           .gte('date', startStr)
           .lte('date', endStr)
@@ -3616,10 +3619,87 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     return () => window.removeEventListener('campus_reset_homework_board', handleReset);
   }, []);
 
+  const isDirectBillingSoftLocked = useMemo(() => {
+    if (!studentUser) return false;
+    if (isTeacherSession) return false;
+
+    // 1. Exemption checks (Hardship, Sibling Bonus from 3rd child):
+    if (
+      studentUser.exempt_from_direct_billing === true ||
+      (studentUser as any).is_hardship_exempt === true ||
+      studentUser.student_billing_payment_method === 'family_bonus' ||
+      studentUser.payment_status === 'hardship'
+    ) {
+      return false;
+    }
+
+    // 2. Verified paid check:
+    if (
+      Boolean((studentUser as any).student_billing_cash_paid) ||
+      studentUser.payment_status === 'paid' ||
+      (typeof window !== 'undefined' && localStorage.getItem(`campus_paid_${studentId}`) === 'true')
+    ) {
+      return false;
+    }
+
+    // 3. Direct billing check:
+    const schoolBillingOption = (studentUser.schools as any)?.student_billing_option;
+    const isDirectBilling = ['option2', 'student_full', 'student_partial'].includes(schoolBillingOption) ||
+      studentUser.student_billing_payment_method === 'bank_transfer' ||
+      (typeof window !== 'undefined' && localStorage.getItem(`campus_payment_status_${studentId}`) === 'transfer_pending');
+
+    if (!isDirectBilling) {
+      return false;
+    }
+
+    // 🌟 GOLDSTANDARD SCHNUPPERMONAT IMMUNITÄT:
+    // Im kostenfreien Schnuppermonat (vor Fälligkeit des regulären Schuljahresbeitrags ab 01. des bezahlten Monats)
+    // greift NIEMALS ein Soft-Lock!
+    const schoolStartMonth = Number((studentUser.schools as any)?.school_year_start_month || 9);
+    const schoolStartDay = Number((studentUser.schools as any)?.school_year_start_day || 1);
+    const isChf = (studentUser.schools as any)?.currency === 'CHF';
+    const schoolYearCalc = calculateSchoolYearDirectBilling(
+      undefined,
+      isChf ? 'CHF' : 'EUR',
+      undefined,
+      schoolStartMonth,
+      schoolStartDay,
+      (studentUser.schools as any)?.direct_billing_effective_date
+    );
+
+    const now = new Date();
+    const paidPeriodStart = new Date(schoolYearCalc.paidStartYear, schoolYearCalc.paidStartMonth - 1, 1, 0, 0, 0, 0);
+
+    // Wenn der bezahlte Zeitraum noch nicht begonnen hat (z. B. im September bei Fälligkeit zum 01.10.):
+    // 100% Freier Zugang ohne Soft-Lock!
+    if (now < paidPeriodStart) {
+      return false;
+    }
+
+    // 4. Transfer date / Grace period evaluation (erst nach Fälligkeitsbeginn):
+    const transferDateStr = (studentUser as any).activated_at || 
+      (typeof window !== 'undefined' ? localStorage.getItem(`campus_transfer_date_${studentId}`) : null) || 
+      studentUser.created_at;
+
+    if (!transferDateStr) return false;
+
+    const activationDate = new Date(transferDateStr);
+    const referenceDate = activationDate > paidPeriodStart ? activationDate : paidPeriodStart;
+    const diffMs = now.getTime() - referenceDate.getTime();
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+    // 14 days grace period nach Fälligkeitsbeginn
+    return diffDays > 14;
+  }, [studentUser, isTeacherSession, studentId]);
+
   const handleOpenHomeworkBookWithView = (
     targetTab: 'document' | 'logbook' | 'stickeralbum' | 'skillradar' | 'audiobiography' = 'document',
     targetViewMode: 'document' | 'recordings' | 'loopstation' | 'practice' = 'document'
   ) => {
+    if ((targetViewMode === 'loopstation' || targetViewMode === 'practice' || targetTab === 'audiobiography') && isDirectBillingSoftLocked) {
+      setShowSoftLockModal(true);
+      return;
+    }
     isTargetedHwTabRef.current = true;
     setHomeworkBookTab(targetTab);
     setHomeworkBookViewMode(targetViewMode);
@@ -4387,13 +4467,17 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     setJuniorRecordDuration(0);
     setJuniorCountdown(null);
 
-    const isStudentAudioPermitted = (studentUser as any)?.parent_permissions?.allow_student_audio !== false &&
-      (typeof window !== 'undefined' && studentId ? localStorage.getItem(`groovelab_parent_allow_student_audio_${studentId}`) !== 'false' : true);
-    const isAllowed = (draftAllowAudio ?? (studentUser as any)?.parent_allow_audio ?? (draftBoardOverrides.recordings ?? (typeof window !== 'undefined' ? localStorage.getItem('campus_board_override_recordings') !== 'false' : true))) && isStudentAudioPermitted;
-    if (!isAllowed) {
-      alert('Die Aufnahme-Funktion für Schüler ist im Eltern-Kontrollzentrum aktuell deaktiviert.');
-      setShowJuniorRecordModal(false);
-      return;
+    const isStudentActor = !isTeacherSession;
+    const isStudentAudioPermitted = (studentUser as any)?.parent_permissions?.allow_student_audio === true ||
+      (typeof window !== 'undefined' && studentId ? localStorage.getItem(`groovelab_parent_allow_student_audio_${studentId}`) === 'true' : false);
+    const isAudioGloballyAllowed = (draftAllowAudio === true || (studentUser as any)?.parent_allow_audio === true || (typeof window !== 'undefined' && localStorage.getItem(`groovelab_parent_allow_audio_${studentId}`) === 'true'));
+
+    if (isStudentActor) {
+      if (!isStudentAudioPermitted || !isAudioGloballyAllowed) {
+        alert('Die Aufnahme-Funktion für Schüler ist im Eltern-Kontrollzentrum aktuell noch nicht freigegeben (Privacy by Default). Bitte deine Eltern, sie im Eltern-Bereich zu aktivieren.');
+        setShowJuniorRecordModal(false);
+        return;
+      }
     }
 
     // 🎙️ Check if school Audio-Tresor storage quota is exceeded
@@ -7032,6 +7116,10 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
   };
 
   const handleStartPracticeSession = async () => {
+    if (isDirectBillingSoftLocked) {
+      setShowSoftLockModal(true);
+      return;
+    }
     if (typeof (DeviceOrientationEvent as any).requestPermission === 'function') {
       try {
         const permission = await (DeviceOrientationEvent as any).requestPermission();
@@ -8150,8 +8238,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
 
   // 📚 Zentraler Wochenplan-Resolver für Junior: Bündelt Lehrwerke, Songs, Unterrichtsaufnahmen und Lehrkraft-Notiz
   const getJuniorWeeklyHomeworkSummary = useCallback(() => {
-    const latestItem = (progressItems || []).find((item: any) => item.is_current_homework || item.topic_name?.startsWith('Hausaufgabe KW '));
-    const currentWeekStr = latestItem ? getItemWeek(latestItem) : getISOWeekRaw(new Date(), 1);
+    const currentWeekStr = getISOWeek(getSimulatedNow());
     const cleanTitle = (t: string) => (t || '').replace(/\s*\((gitarre|guitar|e-gitarre|bass|e-bass|drums|schlagzeug|klavier|piano|keys|keyboard|vocals|gesang|stimme|allgemein)\)/i, '');
 
     // 1. Gather all active homework books & pages directly from localProgress (assigned Lehrwerke)
@@ -8318,7 +8405,8 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     const currentWeekNotes: string[] = [];
     (progressItems || []).forEach((item: any) => {
       const itemW = getItemWeek(item);
-      const isActive = item.is_current_homework || item.topic_name?.startsWith('Hausaufgabe KW ') || itemW === currentWeekStr;
+      const isCurrentHwSnapshot = item.topic_name === `Hausaufgabe KW ${currentWeekStr.split('-W')[1] || ''}` || itemW === currentWeekStr;
+      const isActive = Boolean(item.is_current_homework) || isCurrentHwSnapshot;
       if (isActive && item.homework_notes && item.homework_notes.trim()) {
         try {
           const parsed = JSON.parse(item.homework_notes);
@@ -8391,6 +8479,46 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       }
     });
 
+    // 🌉 Smart Audio Bridge: Bridge active practice tracks from latest past lesson if current week has none
+    if (audioTracks.length === 0 && (formattedJuniorBooks.length > 0 || otherActiveSongs.length > 0)) {
+      const pastHwSnapshots = (progressItems || []).filter((item: any) => {
+        if (!item.topic_name?.startsWith('Hausaufgabe KW ')) return false;
+        const itWeekIso = getItemWeek(item);
+        return itWeekIso && itWeekIso < currentWeekStr;
+      });
+      pastHwSnapshots.sort((a: any, b: any) => {
+        const wA = getItemWeek(a);
+        const wB = getItemWeek(b);
+        if (wA !== wB) return wB.localeCompare(wA);
+        const tA = new Date(a.updated_at || a.created_at || 0).getTime();
+        const tB = new Date(b.updated_at || b.created_at || 0).getTime();
+        return tB - tA;
+      });
+      const latestPast = pastHwSnapshots[0];
+      if (latestPast && latestPast.homework_notes) {
+        try {
+          const parsed = typeof latestPast.homework_notes === 'string' ? JSON.parse(latestPast.homework_notes) : latestPast.homework_notes;
+          if (Array.isArray(parsed)) {
+            parsed.forEach((item: string, index: number) => {
+              if (typeof item === 'string' && item.startsWith('AUDIO:')) {
+                const parts = item.substring(6).split('|');
+                audioTracks.push({
+                  url: parts[0],
+                  duration: parseFloat(parts[1]) || 0,
+                  date: parts[2],
+                  label: parts[3] || `Aufnahme #${audioTracks.length + 1}`,
+                  author: parts[4] || 'teacher',
+                  songTag: parts[7] || undefined,
+                  isCarriedOver: true,
+                  idx: index
+                });
+              }
+            });
+          }
+        } catch {}
+      }
+    }
+
     const cleanGeneralNote = (text: string) => {
       if (!text) return '';
       let clean = text;
@@ -8413,7 +8541,34 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
         .trim();
     };
 
-    const generalNoteRaw = currentWeekNotes.find(n => !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('LATENCY:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:') && !n.startsWith('STUDENT_QUESTION:'));
+    let generalNoteRaw = currentWeekNotes.find(n => !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('LATENCY:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:') && !n.startsWith('STUDENT_QUESTION:'));
+    if (!generalNoteRaw && (formattedJuniorBooks.length > 0 || otherActiveSongs.length > 0)) {
+      const pastHwSnapshots = (progressItems || []).filter((item: any) => {
+        if (!item.topic_name?.startsWith('Hausaufgabe KW ')) return false;
+        const itWeekIso = getItemWeek(item);
+        return itWeekIso && itWeekIso < currentWeekStr;
+      });
+      pastHwSnapshots.sort((a: any, b: any) => {
+        const wA = getItemWeek(a);
+        const wB = getItemWeek(b);
+        if (wA !== wB) return wB.localeCompare(wA);
+        const tA = new Date(a.updated_at || a.created_at || 0).getTime();
+        const tB = new Date(b.updated_at || b.created_at || 0).getTime();
+        return tB - tA;
+      });
+      const latestPast = pastHwSnapshots[0];
+      if (latestPast && latestPast.homework_notes) {
+        try {
+          const parsed = typeof latestPast.homework_notes === 'string' ? JSON.parse(latestPast.homework_notes) : latestPast.homework_notes;
+          if (Array.isArray(parsed)) {
+            const pastNote = parsed.find((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('LATENCY:') && !n.startsWith('LOOP:') && !n.startsWith('SYSTEM:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:') && !n.startsWith('STUDENT_QUESTION:'));
+            if (pastNote) generalNoteRaw = pastNote;
+          } else if (typeof parsed === 'string') {
+            generalNoteRaw = parsed;
+          }
+        } catch {}
+      }
+    }
     const generalNote = generalNoteRaw ? cleanGeneralNote(generalNoteRaw) : '';
 
     const studentQuestionEntry = currentWeekNotes.find(n => typeof n === 'string' && (n.startsWith('STUDENT_QUESTION:') || n.startsWith('❓ Frage für den Unterricht:')));
@@ -9191,7 +9346,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       const [userRes, avatarRes, statsRes, briefingRes, emailRes, missionRes, pinsRes, logsRes, matrixRes, skillsRes] = await Promise.all([
         supabase
           .from('users')
-          .select('id, school_id, role, first_name, avatar_url, photo_url, instrument, teacher_id, is_active, is_campus_active, is_groovelab_active, campus_ui_level, briefing_sidebar_collapsed, parent_allow_chat, parent_allow_absences, parent_allow_reschedule_confirm, parent_allow_timer, parent_allow_leaderboard, parent_allow_proposals, parent_allow_audio, parent_allow_tts, has_parent_pin, has_personal_pin, parent_pin_configured, status, parent_permissions, joker_used_at, weekly_jokers_used, activated_at, is_pin_activated, created_at, push_notifications_enabled, push_notif_schedule_changes, push_notif_homework, push_notif_chat, push_notif_practice_reminder, push_notif_weekly_digest, push_notif_all_features, is_app_user, is_premium_user, subject, schools(*)')
+          .select('id, school_id, role, first_name, avatar_url, photo_url, instrument, teacher_id, is_active, is_campus_active, is_groovelab_active, campus_ui_level, briefing_sidebar_collapsed, parent_allow_chat, parent_allow_absences, parent_allow_reschedule_confirm, parent_allow_timer, parent_allow_leaderboard, parent_allow_proposals, parent_allow_audio, parent_allow_tts, has_parent_pin, has_personal_pin, parent_pin_configured, status, parent_permissions, joker_used_at, weekly_jokers_used, activated_at, is_pin_activated, created_at, push_notifications_enabled, push_notif_schedule_changes, push_notif_homework, push_notif_chat, push_notif_practice_reminder, push_notif_weekly_digest, push_notif_all_features, is_app_user, is_premium_user, subject, payment_status, student_billing_payment_method, student_billing_cash_paid, exempt_from_direct_billing, schools(*)')
           .eq('id', studentId)
           .single(),
         supabase
@@ -11671,6 +11826,8 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                 isParentUnlocked={isParentUnlocked || checkIsParentUnlockedGlobal()}
                 parentPermissions={(studentUser as any)?.parent_permissions}
                 onSaveParentOverrides={(overrides) => applyAndSaveParentControls({ boardOverrides: overrides })}
+                isSoftLocked={isDirectBillingSoftLocked}
+                onTriggerSoftLock={() => setShowSoftLockModal(true)}
               />
             </Suspense>
           </HomeworkBookErrorBoundary>
@@ -12214,13 +12371,34 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
           <ParentCampusActivationModal
             student={studentUser || { id: studentId }}
             schoolData={{
+              ...(studentUser?.schools || {}),
               name: studentUser?.schools?.name || 'Campus-Groovelab Partner-Musikschule',
-              billing_company: 'Campus-Groovelab Plattformbetrieb'
+              billing_company: (studentUser?.schools as any)?.billing_company || 'Campus-Groovelab Plattformbetrieb'
             }}
             onClose={() => setShowParentActivationModal(false)}
             onPaymentSubmitted={() => {
               setShowParentActivationModal(false);
               fetchStudentAndAvatar();
+            }}
+          />
+        </Suspense>
+      )}
+
+      {/* Tier-1 SaaS B2C Soft-Lock Modal for expired grace period */}
+      {showSoftLockModal && (
+        <Suspense fallback={null}>
+          <PaymentGracePeriodSoftLockModal
+            student={studentUser || { id: studentId }}
+            schoolData={{
+              ...(studentUser?.schools || {}),
+              name: studentUser?.schools?.name || 'Campus-Groovelab Partner-Musikschule',
+              billing_company: (studentUser?.schools as any)?.billing_company || 'Campus-Groovelab Plattformbetrieb',
+              currency: studentUser?.schools?.currency
+            }}
+            onClose={() => setShowSoftLockModal(false)}
+            onOpenActivationModal={() => {
+              setShowSoftLockModal(false);
+              setShowParentActivationModal(true);
             }}
           />
         </Suspense>

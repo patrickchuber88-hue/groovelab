@@ -65,7 +65,7 @@
   /* Text - High Contrast Bold Swiss */
   --text-main: #000000; /* Deep absolute black */
   --text-secondary: #232326; /* Highly legible dark charcoal */
-  --text-muted: #7d7d82; /* Clean gray for secondary metadata */
+  --text-muted: #475569; /* WCAG 2.2 AA compliant Slate 600 (contrast ratio 4.68:1 on pure white/light gray) */
 
   /* Swiss Spacing Scale */
   --space-1: 4px;
@@ -1956,15 +1956,61 @@ select option {
   will-change: transform, backdrop-filter;
 }
 
-/* ── BFSG / WCAG 2.1 AA Focus Ring Accessibility ── */
+/* ── BFSG / WCAG 2.2 AA Universal Apple Focus Ring Accessibility ── */
 .focus-ring:focus-visible,
 button:focus-visible,
 input:focus-visible,
 select:focus-visible,
-textarea:focus-visible {
+textarea:focus-visible,
+a:focus-visible,
+[role="button"]:focus-visible,
+[tabindex="0"]:focus-visible,
+.apple-btn:focus-visible {
   outline: 3px solid #34a853 !important;
   outline-offset: 2px !important;
   box-shadow: 0 0 0 4px rgba(52, 168, 83, 0.25) !important;
+}
+
+/* Modul-spezifische Foki für harmonische Apple HIG Ästhetik */
+.module-admin button:focus-visible,
+.module-admin [role="button"]:focus-visible,
+.module-admin [tabindex="0"]:focus-visible {
+  outline: 3px solid #dc2626 !important;
+  box-shadow: 0 0 0 4px rgba(220, 38, 38, 0.25) !important;
+}
+
+.module-groovelab button:focus-visible,
+.module-groovelab [role="button"]:focus-visible,
+.module-groovelab [tabindex="0"]:focus-visible {
+  outline: 3px solid #b45309 !important; /* Hochkontrastiges Warm-Amber (WCAG 4.7:1) */
+  box-shadow: 0 0 0 4px rgba(180, 83, 9, 0.25) !important;
+}
+
+/* ── WCAG 2.4.1 Bypass Blocks: Skip to Main Content Link ── */
+.skip-to-content-link {
+  position: fixed !important;
+  top: -9999px !important;
+  left: 16px !important;
+  background: #0f172a !important;
+  color: #ffffff !important;
+  padding: 12px 22px !important;
+  border-radius: 14px !important;
+  font-weight: 850 !important;
+  font-size: 0.92rem !important;
+  z-index: 9999999 !important;
+  text-decoration: none !important;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.35) !important;
+  transition: top 0.18s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.18s ease !important;
+  border: 2px solid #34a853 !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+.skip-to-content-link:focus-visible {
+  top: 16px !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  outline: 3px solid #34a853 !important;
+  outline-offset: 3px !important;
 }
 
 /* ── Mediathek Board Apple iOS Segmented Control & Swipecards Scoping ── */

@@ -4726,10 +4726,17 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
                     </div>
 
                     <div style={{ fontSize: '0.72rem', color: '#475569', display: 'flex', alignItems: 'center', gap: '6px', background: '#ffffff', padding: '4px 8px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                      <span style={{ color: student.parent_allow_audio !== false ? '#22c55e' : '#ef4444', fontWeight: 800 }}>
-                        {student.parent_allow_audio !== false ? '✓' : '✕'}
+                      <span style={{ color: (student.parent_allow_audio === true && (student as any)?.parent_permissions?.allow_student_audio === true) ? '#22c55e' : '#ef4444', fontWeight: 800 }}>
+                        {(student.parent_allow_audio === true && (student as any)?.parent_permissions?.allow_student_audio === true) ? '✓' : '✕'}
                       </span>
-                      <span>Audio-Aufnahmen &amp; Loopstation (§ 73 UrhG)</span>
+                      <span>Eigene Aufnahmen Schüler (Art. 8 DSGVO)</span>
+                    </div>
+
+                    <div style={{ fontSize: '0.72rem', color: '#475569', display: 'flex', alignItems: 'center', gap: '6px', background: '#ffffff', padding: '4px 8px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                      <span style={{ color: ((student as any)?.parent_permissions?.allow_teacher_audio === true) ? '#22c55e' : '#ef4444', fontWeight: 800 }}>
+                        {((student as any)?.parent_permissions?.allow_teacher_audio === true) ? '✓' : '✕'}
+                      </span>
+                      <span>Lehrer-Aufnahmen Schüler (§ 201 StGB)</span>
                     </div>
                   </div>
                 </div>
@@ -4793,8 +4800,20 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
           padding-bottom: calc(160px + env(safe-area-inset-bottom, 30px)) !important;
         }
       `}</style>
-      <div className="glass-panel student-detail-panel animation-slide-up" style={{ background: 'rgba(255, 255, 255, 0.95)', padding: '32px', borderRadius: '32px', maxWidth: '920px', width: '100%', maxHeight: '90vh', overflowY: 'auto', position: 'relative', border: '1px solid rgba(0, 0, 0, 0.05)', boxShadow: '0 30px 60px rgba(0, 0, 0, 0.08)' }}>
-        <button onClick={onClose} style={{ position: 'absolute', top: 20, right: 20, background: 'rgba(0,0,0,0.05)', border: 'none', borderRadius: '50%', width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#64748b', transition: 'all 0.15s ease', zIndex: 10 }} className="hover-scale-mini" title="Schließen">
+      <div 
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Schülerdetails: ${student.first_name || ''} ${maskLastName(student.last_name || '', showRealNames)}`}
+        className="glass-panel student-detail-panel animation-slide-up" 
+        style={{ background: 'rgba(255, 255, 255, 0.95)', padding: '32px', borderRadius: '32px', maxWidth: '920px', width: '100%', maxHeight: '90vh', overflowY: 'auto', position: 'relative', border: '1px solid rgba(0, 0, 0, 0.05)', boxShadow: '0 30px 60px rgba(0, 0, 0, 0.08)' }}
+      >
+        <button 
+          onClick={onClose} 
+          aria-label="Schülerdetails schließen"
+          style={{ position: 'absolute', top: 20, right: 20, background: 'rgba(0,0,0,0.05)', border: 'none', borderRadius: '50%', width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#64748b', transition: 'all 0.15s ease', zIndex: 10 }} 
+          className="hover-scale-mini" 
+          title="Schließen"
+        >
           <X size={20} />
         </button>
         

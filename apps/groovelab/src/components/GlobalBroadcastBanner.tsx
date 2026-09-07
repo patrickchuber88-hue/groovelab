@@ -142,7 +142,7 @@ export const GlobalBroadcastBanner: React.FC<GlobalBroadcastBannerProps> = ({
       textColor = '#0f172a';
       IconComponent = Wrench;
       displayTitle = 'Plattform-Wartungsmodus aktiv';
-      const reasonDetail = announcement.message || 'Server-Optimierung im Rechenzentrum Frankfurt';
+      const reasonDetail = announcement.message || 'Server-Optimierung im Rechenzentrum (Hetzner Falkenstein / Nürnberg)';
       displayMessage = etaText
         ? `Schulbetrieb im geschützten Read-Only-Modus (${reasonDetail}). ${etaText} Uptime-SLA wird überwacht.`
         : `Schulbetrieb im geschützten Read-Only-Modus (${reasonDetail}). Uptime-SLA wird überwacht.`;

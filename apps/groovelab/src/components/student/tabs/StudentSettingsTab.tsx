@@ -15,6 +15,8 @@ import { AddSiblingModal } from '../../campus/AddSiblingModal';
 import { Avatar, getInstrumentAvatarUrl, STUDENT_AVATARS } from '../studentAvatars.constants';
 import { CAMPUS_AGE_STANDARDS } from '../studentAgeStandards';
 import { StudentBillingInvoicesSection } from '../StudentBillingInvoicesSection';
+import JSZip from 'jszip';
+import { ALL_STICKERS, getUnifiedStickerStatus } from '../../../domain/stickersAndTresor';
 
 export interface StudentSettingsTabProps {
   activeStudentSettingsModal: string | null;
@@ -78,7 +80,7 @@ export interface StudentSettingsTabProps {
   newGeneratedRecoveryKey: string;
   onProfileUpdate?: (updated: any) => void;
   parentBriefingDismissed: boolean;
-  parentControlsTab: 'governance' | 'insights' | 'cancellations';
+  parentControlsTab: 'governance' | 'insights' | 'cancellations' | 'downloads';
   parentGateCooldownSeconds: number;
   parentGateError: string | null;
   parentGatePinInput: string;
@@ -112,7 +114,7 @@ export interface StudentSettingsTabProps {
   setIsSavingPin: React.Dispatch<React.SetStateAction<boolean>>;
   setNewGeneratedRecoveryKey: React.Dispatch<React.SetStateAction<string>>;
   setParentBriefingDismissed: React.Dispatch<React.SetStateAction<boolean>>;
-  setParentControlsTab: React.Dispatch<React.SetStateAction<'governance' | 'insights' | 'cancellations'>>;
+  setParentControlsTab: React.Dispatch<React.SetStateAction<'governance' | 'insights' | 'cancellations' | 'downloads'>>;
   setParentGateError: React.Dispatch<React.SetStateAction<string>> | ((err: any) => void);
   setParentGatePinInput: React.Dispatch<React.SetStateAction<string>>;
   setParentSetupConfirm: React.Dispatch<React.SetStateAction<string>>;
@@ -276,6 +278,274 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
     studentUser,
     totalPracticeMinutes
   } = props;
+
+  const [downloadingSection, setDownloadingSection] = React.useState<string | null>(null);
+  const [downloadProgressMsg, setDownloadProgressMsg] = React.useState<string>('');
+  const [downloadFeedback, setDownloadFeedback] = React.useState<string | null>(null);
+
+  const downloadBlobAsFile = (blob: Blob, fileName: string) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const gatherStudentAudioRecordings = () => {
+    const recordings: { title: string; url: string; date: string; duration?: number }[] = [];
+    const seenUrls = new Set<string>();
+
+    try {
+      const raw = localStorage.getItem(`campus_junior_recordings_${studentId}`) || '[]';
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        parsed.forEach((rec: any, idx: number) => {
+          const u = rec.audioUrl || rec.url;
+          if (u && !seenUrls.has(u)) {
+            seenUrls.add(u);
+            recordings.push({
+              title: rec.title || rec.label || `Übe-Aufnahme #${idx + 1}`,
+              url: u,
+              date: rec.date || rec.created_at || new Date().toISOString().split('T')[0],
+              duration: rec.duration
+            });
+          }
+        });
+      }
+    } catch (e) {}
+
+    try {
+      const rawBio = localStorage.getItem(`campus_milestones_${studentId}`) || '[]';
+      const parsedBio = JSON.parse(rawBio);
+      if (Array.isArray(parsedBio)) {
+        parsedBio.forEach((m: any) => {
+          const u = m.audioUrl || m.masteredAudioUrl;
+          if (u && !seenUrls.has(u)) {
+            seenUrls.add(u);
+            recordings.push({
+              title: m.title || 'Meilenstein',
+              url: u,
+              date: m.recordedAt || new Date().toISOString().split('T')[0],
+              duration: m.duration
+            });
+          }
+        });
+      }
+    } catch (e) {}
+
+    return recordings;
+  };
+
+  const gatherUnlockedStickers = () => {
+    const ctx = {
+      practiceMinutes: totalPracticeMinutes || 0,
+      xp: studentUser?.xp || 0,
+      streakDays: studentUser?.current_streak || 0,
+      progressItems: []
+    };
+    return ALL_STICKERS.map(st => {
+      const status = getUnifiedStickerStatus(st, ctx);
+      return {
+        id: st.id,
+        emoji: st.emoji,
+        title: st.title,
+        desc: st.desc,
+        category: st.category,
+        rarity: st.rarity,
+        rarityLabel: st.rarityLabel,
+        isUnlocked: status.isUnlocked,
+        count: status.count,
+        details: status.details
+      };
+    });
+  };
+
+  const handleDownloadFullArchive = async () => {
+    setDownloadingSection('full');
+    setDownloadProgressMsg('Stelle didaktische Chronik, Sticker-Album & Audio-Dateien zusammen...');
+    try {
+      const zip = new JSZip();
+      const safeName = (studentUser?.first_name || 'Schueler').replace(/[^a-zA-Z0-9_-]/g, '_');
+      const rootFolder = zip.folder(`Campus_Meisterwerk_Archiv_${safeName}`) || zip;
+
+      const unlockedStickers = gatherUnlockedStickers();
+      const chronicle = {
+        export_date: new Date().toISOString(),
+        schueler: {
+          vorname: studentUser?.first_name || '',
+          gesamt_uebezeit_minuten: totalPracticeMinutes || 0,
+          xp_punkte: studentUser?.xp || 0,
+          aktuelle_streak_tage: studentUser?.current_streak || 0,
+        },
+        sammel_sticker_album: {
+          gesamt_verfuegbar: ALL_STICKERS.length,
+          freigeschaltet_anzahl: unlockedStickers.filter(s => s.isUnlocked).length,
+          auszeichnungen: unlockedStickers.filter(s => s.isUnlocked)
+        },
+        dsgVO_hinweis: 'Dieses Archiv wurde gemäß Art. 20 DSGVO (Recht auf Datenübertragbarkeit) erstellt.'
+      };
+      rootFolder.file('didaktik_chronik_und_sticker.json', JSON.stringify(chronicle, null, 2));
+
+      const audios = gatherStudentAudioRecordings();
+      if (audios.length > 0) {
+        const audioFolder = rootFolder.folder('audio_tresor') || rootFolder;
+        for (let i = 0; i < audios.length; i++) {
+          const a = audios[i];
+          setDownloadProgressMsg(`Lade Aufnahme ${i + 1} von ${audios.length}: ${a.title}...`);
+          try {
+            const res = await fetch(a.url);
+            if (res.ok) {
+              const blob = await res.blob();
+              const safeTitle = a.title.replace(/[^a-zA-Z0-9_-]/g, '_');
+              audioFolder.file(`${a.date}_${safeTitle}.webm`, blob);
+            }
+          } catch (err) {}
+        }
+      }
+
+      setDownloadProgressMsg('Erstelle ZIP-Komprimierung...');
+      const zipBlob = await zip.generateAsync({ type: 'blob' });
+      downloadBlobAsFile(zipBlob, `Campus-Meisterwerk-Archiv_${safeName}_${new Date().toISOString().split('T')[0]}.zip`);
+      setDownloadFeedback('Vollständiges Meisterwerk-Archiv erfolgreich heruntergeladen!');
+    } catch (e) {
+      setDownloadFeedback('Fehler beim Erstellen des Archivs.');
+    } finally {
+      setDownloadingSection(null);
+      setDownloadProgressMsg('');
+      setTimeout(() => setDownloadFeedback(null), 4000);
+    }
+  };
+
+  const handleDownloadAudioOnly = async () => {
+    setDownloadingSection('audio');
+    setDownloadProgressMsg('Sammle Audio-Aufnahmen...');
+    try {
+      const zip = new JSZip();
+      const safeName = (studentUser?.first_name || 'Schueler').replace(/[^a-zA-Z0-9_-]/g, '_');
+      const audios = gatherStudentAudioRecordings();
+      
+      if (audios.length === 0) {
+        setDownloadFeedback('Keine Audioaufnahmen im Tresor vorhanden.');
+        setDownloadingSection(null);
+        return;
+      }
+
+      for (let i = 0; i < audios.length; i++) {
+        const a = audios[i];
+        setDownloadProgressMsg(`Packe Audio ${i + 1}/${audios.length}: ${a.title}...`);
+        try {
+          const res = await fetch(a.url);
+          if (res.ok) {
+            const blob = await res.blob();
+            const safeTitle = a.title.replace(/[^a-zA-Z0-9_-]/g, '_');
+            zip.file(`${a.date}_${safeTitle}.webm`, blob);
+          }
+        } catch (err) {}
+      }
+
+      const zipBlob = await zip.generateAsync({ type: 'blob' });
+      downloadBlobAsFile(zipBlob, `Audio-Tresor_${safeName}_${new Date().toISOString().split('T')[0]}.zip`);
+      setDownloadFeedback('Audio-Tresor Aufnahmen erfolgreich heruntergeladen!');
+    } catch (e) {
+      setDownloadFeedback('Fehler beim Herunterladen der Aufnahmen.');
+    } finally {
+      setDownloadingSection(null);
+      setDownloadProgressMsg('');
+      setTimeout(() => setDownloadFeedback(null), 4000);
+    }
+  };
+
+  const handleDownloadBiographyOnly = async () => {
+    setDownloadingSection('biography');
+    setDownloadProgressMsg('Sammle Meilensteine der Audio-Biografie...');
+    try {
+      const zip = new JSZip();
+      const safeName = (studentUser?.first_name || 'Schueler').replace(/[^a-zA-Z0-9_-]/g, '_');
+      const rawBio = localStorage.getItem(`campus_milestones_${studentId}`) || '[]';
+      const milestones = JSON.parse(rawBio);
+
+      let count = 0;
+      for (const m of milestones) {
+        const u = m.audioUrl || m.masteredAudioUrl;
+        if (u) {
+          count++;
+          setDownloadProgressMsg(`Lade Meilenstein ${count}: ${m.title}...`);
+          try {
+            const res = await fetch(u);
+            if (res.ok) {
+              const blob = await res.blob();
+              const safeTitle = (m.title || 'Meilenstein').replace(/[^a-zA-Z0-9_-]/g, '_');
+              zip.file(`${safeTitle}.webm`, blob);
+            }
+          } catch (err) {}
+        }
+      }
+
+      if (count === 0) {
+        setDownloadFeedback('Noch keine Audio-Biografie Aufnahmen vorhanden.');
+        setDownloadingSection(null);
+        return;
+      }
+
+      const zipBlob = await zip.generateAsync({ type: 'blob' });
+      downloadBlobAsFile(zipBlob, `Audio-Biografie_${safeName}_${new Date().toISOString().split('T')[0]}.zip`);
+      setDownloadFeedback('Audio-Biografie Meilensteine erfolgreich heruntergeladen!');
+    } catch (e) {
+      setDownloadFeedback('Fehler beim Export der Biografie.');
+    } finally {
+      setDownloadingSection(null);
+      setDownloadProgressMsg('');
+      setTimeout(() => setDownloadFeedback(null), 4000);
+    }
+  };
+
+  const handleDownloadChronicleAndStickers = async () => {
+    setDownloadingSection('chronicle');
+    setDownloadProgressMsg('Erstelle Sammel-Sticker-Album & Didaktik-Chronik...');
+    try {
+      const unlockedStickers = gatherUnlockedStickers();
+      const safeName = (studentUser?.first_name || 'Schueler').replace(/[^a-zA-Z0-9_-]/g, '_');
+
+      const data = {
+        dokument_titel: `Sammel-Sticker-Album & Didaktik-Chronik: ${studentUser?.first_name || ''}`,
+        erstellt_am: new Date().toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }),
+        plattform: 'Campus-Groovelab',
+        statistiken: {
+          gesamt_uebezeit: `${totalPracticeMinutes || 0} Minuten`,
+          xp_stand: `${studentUser?.xp || 0} XP`,
+          aktuelle_streak: `${studentUser?.current_streak || 0} Tage`
+        },
+        sammel_sticker_album: unlockedStickers.map(st => ({
+          emoji: st.emoji,
+          titel: st.title,
+          beschreibung: st.desc,
+          kategorie: st.category,
+          seltenheitsgrad: st.rarityLabel,
+          status: st.isUnlocked ? 'Freigeschaltet ⭐' : 'Noch gesperrt 🔒',
+          anzahl: st.count,
+          auszeichnungen: st.details
+        }))
+      };
+
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      downloadBlobAsFile(blob, `Didaktik-Chronik_und_Sticker-Album_${safeName}.json`);
+
+      if (typeof handleExportGdprReport === 'function') {
+        await handleExportGdprReport();
+      }
+
+      setDownloadFeedback('Sammel-Sticker-Album & Didaktik-Chronik erfolgreich exportiert!');
+    } catch (e) {
+      setDownloadFeedback('Fehler beim Export.');
+    } finally {
+      setDownloadingSection(null);
+      setDownloadProgressMsg('');
+      setTimeout(() => setDownloadFeedback(null), 4000);
+    }
+  };
 
   return (
       <div style={{ display: (activeTab === 'settings' && studentUser) ? 'flex' : 'none', marginTop: '0px', flexDirection: 'column', gap: '20px', maxWidth: '1000px', margin: '0 auto', width: '100%', padding: '0' }}>
@@ -1068,17 +1338,17 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                       const curTimer = draftAllowTimer !== null ? draftAllowTimer : ((studentUser as any)?.parent_allow_timer !== undefined && (studentUser as any)?.parent_allow_timer !== null ? Boolean((studentUser as any)?.parent_allow_timer) : (studentId && typeof window !== 'undefined' && localStorage.getItem(`groovelab_parent_allow_timer_${studentId}`) !== null ? localStorage.getItem(`groovelab_parent_allow_timer_${studentId}`) === 'true' : true));
                       const curLeaderboard = draftAllowLeaderboard !== null ? draftAllowLeaderboard : ((studentUser as any)?.parent_allow_leaderboard !== undefined && (studentUser as any)?.parent_allow_leaderboard !== null ? Boolean((studentUser as any)?.parent_allow_leaderboard) : (studentId && typeof window !== 'undefined' && localStorage.getItem(`groovelab_parent_allow_leaderboard_${studentId}`) !== null ? localStorage.getItem(`groovelab_parent_allow_leaderboard_${studentId}`) === 'true' : (currentLvlKey !== 'junior')));
                       const curProposals = draftAllowProposals !== null ? draftAllowProposals : ((studentUser as any)?.parent_allow_proposals !== undefined && (studentUser as any)?.parent_allow_proposals !== null ? Boolean((studentUser as any)?.parent_allow_proposals) : (studentId && typeof window !== 'undefined' && localStorage.getItem(`groovelab_parent_allow_proposals_${studentId}`) !== null ? localStorage.getItem(`groovelab_parent_allow_proposals_${studentId}`) === 'true' : (draftBoardOverrides.mediathek ?? (currentLvlKey !== 'junior'))));
-                      const curAudio = draftAllowAudio !== null ? draftAllowAudio : ((studentUser as any)?.parent_allow_audio !== undefined && (studentUser as any)?.parent_allow_audio !== null ? Boolean((studentUser as any)?.parent_allow_audio) : (studentId && typeof window !== 'undefined' && localStorage.getItem(`groovelab_parent_allow_audio_${studentId}`) !== null ? localStorage.getItem(`groovelab_parent_allow_audio_${studentId}`) === 'true' : (draftBoardOverrides.recordings ?? true)));
+                      const curAudio = draftAllowAudio !== null ? draftAllowAudio : ((studentUser as any)?.parent_allow_audio !== undefined && (studentUser as any)?.parent_allow_audio !== null ? Boolean((studentUser as any)?.parent_allow_audio) : (studentId && typeof window !== 'undefined' && localStorage.getItem(`groovelab_parent_allow_audio_${studentId}`) !== null ? localStorage.getItem(`groovelab_parent_allow_audio_${studentId}`) === 'true' : (draftBoardOverrides.recordings ?? false)));
                       const curTeacherAudio = (studentUser as any)?.parent_permissions?.allow_teacher_audio !== undefined
                         ? Boolean((studentUser as any)?.parent_permissions?.allow_teacher_audio)
                         : (studentId && typeof window !== 'undefined' && localStorage.getItem(`groovelab_parent_allow_teacher_audio_${studentId}`) !== null
                             ? localStorage.getItem(`groovelab_parent_allow_teacher_audio_${studentId}`) === 'true'
-                            : true);
+                            : false);
                       const curStudentAudio = (studentUser as any)?.parent_permissions?.allow_student_audio !== undefined
                         ? Boolean((studentUser as any)?.parent_permissions?.allow_student_audio)
                         : (studentId && typeof window !== 'undefined' && localStorage.getItem(`groovelab_parent_allow_student_audio_${studentId}`) !== null
                             ? localStorage.getItem(`groovelab_parent_allow_student_audio_${studentId}`) === 'true'
-                            : curAudio);
+                            : false);
                       const curTts = draftAllowTts !== null ? draftAllowTts : ((studentUser as any)?.parent_allow_tts !== undefined && (studentUser as any)?.parent_allow_tts !== null ? Boolean((studentUser as any)?.parent_allow_tts) : (studentId && typeof window !== 'undefined' && localStorage.getItem(`groovelab_parent_allow_tts_${studentId}`) !== null ? localStorage.getItem(`groovelab_parent_allow_tts_${studentId}`) === 'true' : (currentLvlKey === 'junior')));
 
                       const isDeviating = 
@@ -1224,8 +1494,83 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                       const totalUpdatesCount = studentCancellations.length + pendingReschedules.length + confirmedReschedules.length;
                       const hasTerminUpdates = totalUpdatesCount > 0;
 
+                      const pendingTeacherAudioRequest = (() => {
+                        if (typeof window === 'undefined' || !studentId) return null;
+                        const raw = localStorage.getItem(`groovelab_parent_req_teacher_audio_${studentId}`);
+                        if (!raw) return null;
+                        try {
+                          return JSON.parse(raw);
+                        } catch (e) {
+                          return { requestedAt: raw, teacherName: 'Die Lehrkraft' };
+                        }
+                      })();
+
                       return (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                          {/* 🛡️ Anfrage der Lehrkraft für didaktische Audio-Freigabe */}
+                          {pendingTeacherAudioRequest && !curTeacherAudio && (
+                            <div style={{
+                              background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
+                              borderRadius: '20px',
+                              padding: '16px 18px',
+                              border: '1.5px solid #86efac',
+                              boxShadow: '0 4px 18px rgba(22, 163, 74, 0.12)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              gap: '14px',
+                              flexWrap: 'wrap'
+                            }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: '240px' }}>
+                                <div style={{
+                                  width: '38px',
+                                  height: '38px',
+                                  borderRadius: '12px',
+                                  background: '#22c55e',
+                                  color: '#ffffff',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  flexShrink: 0,
+                                  boxShadow: '0 2px 8px rgba(34, 197, 94, 0.3)'
+                                }}>
+                                  <Headphones size={20} />
+                                </div>
+                                <div>
+                                  <div style={{ fontSize: '0.88rem', fontWeight: 850, color: '#14532d' }}>
+                                    Didaktische Audio-Freigabe erbeten
+                                  </div>
+                                  <div style={{ fontSize: '0.74rem', color: '#166534', fontWeight: 500, lineHeight: 1.35, marginTop: '2px' }}>
+                                    {pendingTeacherAudioRequest.teacherName || 'Deine Lehrkraft'} bittet um Erlaubnis, im Unterricht kurze Tonaufnahmen zur Fehleranalyse und Play-Alongs aufnehmen zu dürfen.
+                                  </div>
+                                </div>
+                              </div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    applyAndSaveParentControls({ allowTeacherAudio: true });
+                                    if (studentId) localStorage.removeItem(`groovelab_parent_req_teacher_audio_${studentId}`);
+                                  }}
+                                  style={{
+                                    background: '#16a34a',
+                                    color: '#ffffff',
+                                    border: 'none',
+                                    borderRadius: '12px',
+                                    padding: '8px 16px',
+                                    fontSize: '0.80rem',
+                                    fontWeight: 800,
+                                    cursor: 'pointer',
+                                    boxShadow: '0 2px 8px rgba(22, 163, 74, 0.25)'
+                                  }}
+                                  className="hover-scale"
+                                >
+                                  ✓ Jetzt freigeben
+                                </button>
+                              </div>
+                            </div>
+                          )}
+
                           {/* 🛡️ Termin-Updates & Ausfälle Zusammenfassungs-Banner für Eltern */}
                           {hasTerminUpdates && !parentBriefingDismissed && (
                             <div style={{
@@ -1481,6 +1826,30 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                                   {cancelledSchoolYearOccurrences.length}
                                 </span>
                               )}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setParentControlsTab('downloads')}
+                              style={{
+                                flex: 1,
+                                border: 'none',
+                                background: parentControlsTab === 'downloads' ? '#ffffff' : 'transparent',
+                                color: parentControlsTab === 'downloads' ? '#0284c7' : '#64748b',
+                                fontWeight: parentControlsTab === 'downloads' ? 850 : 650,
+                                fontSize: '0.80rem',
+                                padding: '9px 8px',
+                                borderRadius: '10px',
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '6px',
+                                boxShadow: parentControlsTab === 'downloads' ? '0 2px 6px rgba(0,0,0,0.06)' : 'none',
+                                transition: 'all 0.15s ease'
+                              }}
+                            >
+                              <Download size={16} />
+                              <span>Downloads &amp; Tresor</span>
                             </button>
                           </div>
 
@@ -1754,7 +2123,7 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                               />
                             </label>
 
-                            {/* Toggle 4: Mikrofon & Eigene Song-Aufnahmen */}
+                            {/* Toggle 4: Checkbox 1 - Eigene Song-Aufnahmen des Schülers (Art. 8 DSGVO / KUG) */}
                             <label style={{
                               display: 'flex',
                               alignItems: 'center',
@@ -1767,11 +2136,14 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                               <div style={{ paddingRight: '12px', textAlign: 'left' }}>
                                 <div style={{ fontSize: '0.86rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                                   <Mic size={16} color="#0284c7" style={{ flexShrink: 0 }} />
-                                  <span>Mikrofon &amp; Eigene Song-Aufnahmen des Schülers</span>
+                                  <span>Eigene Tonaufnahmen des Schülers (Übe-Studio &amp; Loopstation)</span>
+                                  <span style={{ fontSize: '0.66rem', fontWeight: 800, padding: '2px 7px', borderRadius: '6px', background: '#e0f2fe', color: '#0369a1' }}>
+                                    Art. 8 DSGVO
+                                  </span>
                                   {hlAudio.badge}
                                 </div>
                                 <div style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 500, lineHeight: 1.35, marginTop: '2px' }}>
-                                  Erlaubt deinem Kind, eigene Übe-Aufnahmen, Loopstation-Spuren und Sprachmemos mit dem Mikrofon aufzuzeichnen. Inkl. Hardware-Schutz (Stopp bei Tab-Wechsel) und 30-Tage-Löschfrist.
+                                  Erlaubt deinem Kind, eigene Übe-Aufnahmen, Loopstation-Spuren und Memos mit dem Mikrofon aufzuzeichnen. Standardmäßig deaktiviert (Privacy by Default) zum Schutz Minderjähriger. Inkl. 30-Tage-Speicherfrist.
                                 </div>
                               </div>
                               <input
@@ -1786,7 +2158,7 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                               />
                             </label>
 
-                            {/* Toggle 4b: Unterrichts-Aufnahmen durch die Lehrkraft (§ 73 UrhG / Art. 6 DSGVO) */}
+                            {/* Toggle 4b: Checkbox 2 - Didaktische Tonaufnahmen der Lehrkraft im Unterricht (§ 201 StGB / § 73 UrhG) */}
                             <label style={{
                               display: 'flex',
                               alignItems: 'center',
@@ -1794,26 +2166,27 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                               padding: '14px 16px',
                               borderRadius: '16px',
                               cursor: 'pointer',
-                              background: '#f8fafc',
-                              border: '1px solid #e2e8f0'
+                              background: curTeacherAudio ? '#f0fdf4' : '#f8fafc',
+                              border: curTeacherAudio ? '1.5px solid #86efac' : '1px solid #e2e8f0',
+                              transition: 'all 0.2s ease'
                             }}>
                               <div style={{ paddingRight: '12px', textAlign: 'left' }}>
                                 <div style={{ fontSize: '0.86rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                                  <Headphones size={16} color="#34a853" style={{ flexShrink: 0 }} />
-                                  <span>Didaktische Audio-Memos der Lehrkraft</span>
+                                  <Headphones size={16} color="#16a34a" style={{ flexShrink: 0 }} />
+                                  <span>Tonaufnahmen des Schülers durch die Lehrkraft im Unterricht</span>
                                   <span style={{ fontSize: '0.66rem', fontWeight: 800, padding: '2px 7px', borderRadius: '6px', background: '#dcfce7', color: '#15803d' }}>
-                                    § 73 UrhG konform
+                                    § 201 StGB / § 73 UrhG
                                   </span>
                                 </div>
                                 <div style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 500, lineHeight: 1.35, marginTop: '2px' }}>
-                                  Erlaubt der Lehrkraft, im Unterricht Übe-Hilfen, Play-Alongs und Vorspiele direkt zur Hausaufgabe aufzunehmen. Aufnahmen bleiben im Schülerprofil bilateral abrufbar.
+                                  Erlaubt der Lehrkraft, im Unterricht Tonaufnahmen deines Kindes für didaktische Zwecke (Korrektur, Vorspiel-Analyse) anzufertigen. Ist dieser Schalter aus, darf die Lehrkraft zum Schutz der Schüler ausschließlich sich selbst vorspielen.
                                 </div>
                               </div>
                               <input
                                 type="checkbox"
                                 checked={curTeacherAudio}
                                 onChange={(e) => applyAndSaveParentControls({ allowTeacherAudio: e.target.checked })}
-                                style={{ width: '20px', height: '20px', accentColor: '#34a853', cursor: 'pointer' }}
+                                style={{ width: '20px', height: '20px', accentColor: '#16a34a', cursor: 'pointer' }}
                               />
                             </label>
 
@@ -2971,6 +3344,381 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                                 <ShieldCheck size={14} color="#64748b" style={{ flexShrink: 0 }} />
                                 <span>Rechtssicher dokumentiert nach § 241 Abs. 2 BGB und der Musikschulordnung. Stornierungsfristen richten sich nach dem Unterrichtsvertrag.</span>
                               </div>
+                            </div>
+                          )}
+
+                          {/* Tab 4: Downloads & Didaktik-Datentresor (DSGVO Art. 20) */}
+                          {parentControlsTab === 'downloads' && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                              {/* Header Card */}
+                              <div style={{
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '12px',
+                                padding: '24px',
+                                borderRadius: '24px',
+                                background: '#ffffff',
+                                border: '1px solid #e2e8f0',
+                                boxShadow: '0 8px 24px -4px rgba(15, 23, 42, 0.04)',
+                                textAlign: 'left'
+                              }}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                    <div style={{
+                                      width: '44px',
+                                      height: '44px',
+                                      borderRadius: '14px',
+                                      background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
+                                      border: '1px solid #bfdbfe',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      color: '#2563eb',
+                                      flexShrink: 0
+                                    }}>
+                                      <Download size={22} strokeWidth={2.5} />
+                                    </div>
+                                    <div>
+                                      <div style={{ fontSize: '1.08rem', fontWeight: 950, color: '#0f172a', letterSpacing: '-0.01em' }}>
+                                        Downloads &amp; Didaktik-Datentresor
+                                      </div>
+                                      <div style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600, lineHeight: 1.4, marginTop: '2px' }}>
+                                        Volle Datensouveränität nach Art. 20 DSGVO. Sichere alle Übedaten, Audioaufnahmen und Sammel-Sticker auf deinem lokalen Rechner.
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <span style={{
+                                    background: '#ecfdf5',
+                                    color: '#15803d',
+                                    padding: '5px 12px',
+                                    borderRadius: '100px',
+                                    fontSize: '0.74rem',
+                                    fontWeight: 800,
+                                    border: '1px solid #bbf7d0',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '5px'
+                                  }}>
+                                    <ShieldCheck size={14} />
+                                    <span>DSGVO Art. 20 konform</span>
+                                  </span>
+                                </div>
+
+                                {downloadProgressMsg && (
+                                  <div style={{
+                                    background: '#eff6ff',
+                                    border: '1px solid #bfdbfe',
+                                    borderRadius: '12px',
+                                    padding: '10px 14px',
+                                    color: '#1e40af',
+                                    fontSize: '0.82rem',
+                                    fontWeight: 700,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '8px'
+                                  }}>
+                                    <RotateCcw size={16} className="spin-slow" />
+                                    <span>{downloadProgressMsg}</span>
+                                  </div>
+                                )}
+
+                                {downloadFeedback && (
+                                  <div style={{
+                                    background: downloadFeedback.includes('Fehler') ? '#fef2f2' : '#f0fdf4',
+                                    border: `1px solid ${downloadFeedback.includes('Fehler') ? '#fecaca' : '#bbf7d0'}`,
+                                    borderRadius: '12px',
+                                    padding: '10px 14px',
+                                    color: downloadFeedback.includes('Fehler') ? '#dc2626' : '#15803d',
+                                    fontSize: '0.82rem',
+                                    fontWeight: 800,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '8px'
+                                  }}>
+                                    <CheckCircle size={16} />
+                                    <span>{downloadFeedback}</span>
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* 4 Modular Download Cards */}
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                                
+                                {/* 1. Vollständiges Meisterwerk-Archiv (.ZIP) */}
+                                <div style={{
+                                  background: '#ffffff',
+                                  border: '1.5px solid #e2e8f0',
+                                  borderRadius: '20px',
+                                  padding: '20px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'space-between',
+                                  flexWrap: 'wrap',
+                                  gap: '16px',
+                                  boxShadow: '0 4px 14px rgba(0,0,0,0.03)',
+                                  textAlign: 'left'
+                                }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '14px', maxWidth: '620px' }}>
+                                    <div style={{
+                                      width: '46px',
+                                      height: '46px',
+                                      borderRadius: '14px',
+                                      background: '#fef3c7',
+                                      border: '1px solid #fde68a',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      color: '#b45309',
+                                      fontSize: '1.3rem',
+                                      flexShrink: 0
+                                    }}>
+                                      📦
+                                    </div>
+                                    <div>
+                                      <div style={{ fontSize: '0.94rem', fontWeight: 900, color: '#0f172a' }}>
+                                        Vollständiges Meisterwerk-Archiv (.ZIP)
+                                      </div>
+                                      <div style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600, marginTop: '2px', lineHeight: 1.45 }}>
+                                        Enthält alle eigenen Tonaufnahmen aus dem Audio-Tresor, die Audio-Biografie, das <strong>komplette Sammel-Sticker-Album</strong> und die didaktische Chronik.
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={handleDownloadFullArchive}
+                                    disabled={downloadingSection !== null}
+                                    style={{
+                                      background: '#0f172a',
+                                      color: '#ffffff',
+                                      border: 'none',
+                                      borderRadius: '14px',
+                                      padding: '10px 18px',
+                                      fontSize: '0.84rem',
+                                      fontWeight: 850,
+                                      cursor: downloadingSection !== null ? 'not-allowed' : 'pointer',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '8px',
+                                      boxShadow: '0 4px 12px rgba(15, 23, 42, 0.15)',
+                                      opacity: downloadingSection !== null ? 0.6 : 1
+                                    }}
+                                  >
+                                    <Download size={15} />
+                                    <span>{downloadingSection === 'full' ? 'Exportiert...' : 'Komplett-ZIP herunterladen'}</span>
+                                  </button>
+                                </div>
+
+                                {/* 2. Nur Audio-Tresor & Übeaufnahmen (.ZIP) */}
+                                <div style={{
+                                  background: '#ffffff',
+                                  border: '1px solid #e2e8f0',
+                                  borderRadius: '20px',
+                                  padding: '20px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'space-between',
+                                  flexWrap: 'wrap',
+                                  gap: '16px',
+                                  boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
+                                  textAlign: 'left'
+                                }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '14px', maxWidth: '620px' }}>
+                                    <div style={{
+                                      width: '46px',
+                                      height: '46px',
+                                      borderRadius: '14px',
+                                      background: '#eff6ff',
+                                      border: '1px solid #bfdbfe',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      color: '#2563eb',
+                                      fontSize: '1.3rem',
+                                      flexShrink: 0
+                                    }}>
+                                      🎙️
+                                    </div>
+                                    <div>
+                                      <div style={{ fontSize: '0.94rem', fontWeight: 900, color: '#0f172a' }}>
+                                        Audio-Tresor &amp; Übeaufnahmen (.ZIP)
+                                      </div>
+                                      <div style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600, marginTop: '2px', lineHeight: 1.45 }}>
+                                        Alle selbst eingespielten Übe-Takes, Loopstation-Sessions und Hausaufgaben-Mitschnitte als sauber benannte Audiodateien.
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={handleDownloadAudioOnly}
+                                    disabled={downloadingSection !== null}
+                                    style={{
+                                      background: '#2563eb',
+                                      color: '#ffffff',
+                                      border: 'none',
+                                      borderRadius: '14px',
+                                      padding: '10px 18px',
+                                      fontSize: '0.84rem',
+                                      fontWeight: 850,
+                                      cursor: downloadingSection !== null ? 'not-allowed' : 'pointer',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '8px',
+                                      boxShadow: '0 3px 10px rgba(37, 99, 235, 0.2)',
+                                      opacity: downloadingSection !== null ? 0.6 : 1
+                                    }}
+                                  >
+                                    <Download size={15} />
+                                    <span>{downloadingSection === 'audio' ? 'Lade Audios...' : 'Audio-Paket herunterladen'}</span>
+                                  </button>
+                                </div>
+
+                                {/* 3. Nur Audio-Biografie & Meilensteine (.ZIP) */}
+                                <div style={{
+                                  background: '#ffffff',
+                                  border: '1px solid #e2e8f0',
+                                  borderRadius: '20px',
+                                  padding: '20px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'space-between',
+                                  flexWrap: 'wrap',
+                                  gap: '16px',
+                                  boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
+                                  textAlign: 'left'
+                                }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '14px', maxWidth: '620px' }}>
+                                    <div style={{
+                                      width: '46px',
+                                      height: '46px',
+                                      borderRadius: '14px',
+                                      background: '#fdf4ff',
+                                      border: '1px solid #f5d0fe',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      color: '#c026d3',
+                                      fontSize: '1.3rem',
+                                      flexShrink: 0
+                                    }}>
+                                      🌟
+                                    </div>
+                                    <div>
+                                      <div style={{ fontSize: '0.94rem', fontWeight: 900, color: '#0f172a' }}>
+                                        Audio-Biografie &amp; Meilensteine (.ZIP)
+                                      </div>
+                                      <div style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600, marginTop: '2px', lineHeight: 1.45 }}>
+                                        Die kuratierten Highlight-Aufnahmen deiner musikalischen Meilensteine (Erster Song, Bühnenerfolge, Lieblingsstücke).
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={handleDownloadBiographyOnly}
+                                    disabled={downloadingSection !== null}
+                                    style={{
+                                      background: '#a21caf',
+                                      color: '#ffffff',
+                                      border: 'none',
+                                      borderRadius: '14px',
+                                      padding: '10px 18px',
+                                      fontSize: '0.84rem',
+                                      fontWeight: 850,
+                                      cursor: downloadingSection !== null ? 'not-allowed' : 'pointer',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '8px',
+                                      boxShadow: '0 3px 10px rgba(162, 28, 175, 0.2)',
+                                      opacity: downloadingSection !== null ? 0.6 : 1
+                                    }}
+                                  >
+                                    <Download size={15} />
+                                    <span>{downloadingSection === 'biography' ? 'Lade Meilensteine...' : 'Biografie-ZIP herunterladen'}</span>
+                                  </button>
+                                </div>
+
+                                {/* 4. Didaktik-Chronik, Urkunden & Sammel-Sticker (.JSON / .PDF) */}
+                                <div style={{
+                                  background: '#ffffff',
+                                  border: '1px solid #e2e8f0',
+                                  borderRadius: '20px',
+                                  padding: '20px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'space-between',
+                                  flexWrap: 'wrap',
+                                  gap: '16px',
+                                  boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
+                                  textAlign: 'left'
+                                }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '14px', maxWidth: '620px' }}>
+                                    <div style={{
+                                      width: '46px',
+                                      height: '46px',
+                                      borderRadius: '14px',
+                                      background: '#f0fdf4',
+                                      border: '1px solid #bbf7d0',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      color: '#16a34a',
+                                      fontSize: '1.3rem',
+                                      flexShrink: 0
+                                    }}>
+                                      📜
+                                    </div>
+                                    <div>
+                                      <div style={{ fontSize: '0.94rem', fontWeight: 900, color: '#0f172a' }}>
+                                        Didaktik-Chronik, Urkunden &amp; Sammel-Sticker (.JSON / .PDF)
+                                      </div>
+                                      <div style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600, marginTop: '2px', lineHeight: 1.45 }}>
+                                        Das <strong>komplette Sammel-Sticker-Album</strong> mit allen freigeschalteten Badges, Emojis, Erwerbsdaten und didaktischen Lehrkraft-Begründungen sowie die offizielle DSGVO-Chronik.
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={handleDownloadChronicleAndStickers}
+                                    disabled={downloadingSection !== null}
+                                    style={{
+                                      background: '#16a34a',
+                                      color: '#ffffff',
+                                      border: 'none',
+                                      borderRadius: '14px',
+                                      padding: '10px 18px',
+                                      fontSize: '0.84rem',
+                                      fontWeight: 850,
+                                      cursor: downloadingSection !== null ? 'not-allowed' : 'pointer',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '8px',
+                                      boxShadow: '0 3px 10px rgba(22, 163, 74, 0.2)',
+                                      opacity: downloadingSection !== null ? 0.6 : 1
+                                    }}
+                                  >
+                                    <Download size={15} />
+                                    <span>{downloadingSection === 'chronicle' ? 'Exportiere...' : 'Sticker & Chronik exportieren'}</span>
+                                  </button>
+                                </div>
+
+                              </div>
+
+                              {/* Protection Notice */}
+                              <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                padding: '12px 16px',
+                                borderRadius: '14px',
+                                background: '#f8fafc',
+                                border: '1px solid #e2e8f0',
+                                color: '#64748b',
+                                fontSize: '0.72rem',
+                                lineHeight: 1.4
+                              }}>
+                                <ShieldCheck size={16} color="#16a34a" style={{ flexShrink: 0 }} />
+                                <span><strong>Schutz der Privatsphäre:</strong> Der Export enthält ausschließlich Daten des Schülers. Interne Vermerke und persönliche Lehrkraft-Notizen bleiben zum Schutz der Lehrkräfte strikt unzugänglich.</span>
+                              </div>
+
                             </div>
                           )}
                       </div>

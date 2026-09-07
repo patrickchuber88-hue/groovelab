@@ -16,6 +16,7 @@ interface StartseiteProps {
   onShowPrivacy?: () => void;
   onShowAgb?: () => void;
   onShowImpressum?: () => void;
+  onShowAccessibility?: () => void;
 }
 
 export const Startseite: React.FC<StartseiteProps> = ({ 
@@ -23,7 +24,8 @@ export const Startseite: React.FC<StartseiteProps> = ({
   onRegister,
   onShowPrivacy,
   onShowAgb,
-  onShowImpressum
+  onShowImpressum,
+  onShowAccessibility
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedModuleFilter, setSelectedModuleFilter] = useState<'all' | 'campus' | 'groovelab'>('all');
@@ -1174,6 +1176,7 @@ export const Startseite: React.FC<StartseiteProps> = ({
         <div className="footer-link" onClick={() => onShowPrivacy?.()}>Datenschutz</div>
         <div className="footer-link" onClick={() => onShowAgb?.()}>AGB</div>
         <div className="footer-link" onClick={() => onShowImpressum?.()}>Impressum</div>
+        <div className="footer-link" onClick={() => onShowAccessibility ? onShowAccessibility() : onShowPrivacy?.()}>Barrierefreiheit</div>
       </footer>
 
       {/* Secret Master Admin Authentication Modal */}

@@ -152,7 +152,11 @@ export const AdminSecuritySuiteModal: React.FC<AdminSecuritySuiteModalProps> = (
       boxSizing: 'border-box',
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
     }}>
-      <div style={{
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Sicherheits- & Geräte-Zentrale"
+        style={{
         background: '#ffffff',
         width: '100%',
         maxWidth: '680px',
@@ -246,7 +250,9 @@ export const AdminSecuritySuiteModal: React.FC<AdminSecuritySuiteModalProps> = (
             )}
 
             <button
+              type="button"
               onClick={onClose}
+              aria-label="Schließen"
               style={{
                 background: '#f8fafc',
                 border: 'none',

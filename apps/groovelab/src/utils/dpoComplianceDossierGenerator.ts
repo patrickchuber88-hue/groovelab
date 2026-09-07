@@ -164,7 +164,7 @@ export async function generateDpoComplianceDossierPDF(options: DpoDossierOptions
     const pillars = [
       {
         title: 'A. 100% Rechenzentren in Deutschland',
-        desc: 'Ausschließliche Datenverarbeitung in ISO 27001 zertifizierten Hochsicherheits-Rechenzentren (Hetzner Falkenstein/Nürnberg & Supabase AWS Region Frankfurt am Main). 0,00% Drittlandtransfer, kein US-FISA 702 Zugriff.'
+        desc: 'Ausschließliche Datenverarbeitung in ISO 27001 zertifizierten Hochsicherheits-Rechenzentren der Hetzner Online GmbH (Falkenstein/Vogtland & Nürnberg, Deutschland). 100% autarker, selbst gehosteter Technologie-Stack – 0,00% Drittlandtransfer, vollständige Immunität gegen US-FISA 702 und den US CLOUD Act.'
       },
       {
         title: 'B. Radikale Datenminimierung Minderjähriger',
@@ -231,7 +231,7 @@ export async function generateDpoComplianceDossierPDF(options: DpoDossierOptions
       ['Rechtsgrundlagen (DSGVO):', 'Art. 6 Abs. 1 lit. b DSGVO (Unterrichtsvertrag der Erziehungsberechtigten)\nArt. 6 Abs. 1 lit. e DSGVO i.V.m. Landes-SchulG (Kommunale Bildungsaufgabe)\nArt. 6 Abs. 1 lit. a / Art. 8 DSGVO (Einwilligung für optionale Audioaufnahmen)'],
       ['Kategorien betroffener Personen:', 'Musikschüler/innen (Minderjährige), Erziehungsberechtigte, Lehrkräfte, Sekretariats- & Schulleitungspersonal'],
       ['Verarbeitete Datenkategorien:', 'Vorname, Nachname (im Lehrerbereich pseudonymisiert auf Anfangsbuchstabe "Max M."), Instrument, Raum- und Zeitdisposition, didaktische Übenotizen, freiwillige Audioaufnahmen.\nExplizit KEINE Speicherung von: Schüler-E-Mails, Passwörtern oder Bankverbindungen.'],
-      ['Empfänger / Sub-Auftragsverarbeiter:', '1. Hetzner Online GmbH (Falkenstein/Nürnberg, Deutschland – ISO 27001 zertifiziert)\n2. Supabase Inc. / AWS Region Frankfurt am Main (eu-central-1, Deutschland – ISO 27001)'],
+      ['Empfänger / Sub-Auftragsverarbeiter:', '1. Hetzner Online GmbH (Falkenstein/Vogtland & Nürnberg, Deutschland – ISO 27001 zertifiziert)\n2. 100% Self-Hosted Open-Source Technologie-Stack (PostgreSQL, Supabase Auth/Storage Engine auf dediziertem Hetzner Bare-Metal VPS, kein Drittanbieter-Cloudtransfer)'],
       ['Drittlandübermittlung (Art. 44 ff.):', '0,00 % (NEIN) – Die Datenverarbeitung erfolgt ausnahmslos in Rechenzentren innerhalb der Bundesrepublik Deutschland.'],
       ['Regellöschfristen (DIN 66398):', 'Unterrichtsdaten: Dauer des Ausbildungsverhältnisses (Löschung 30 Tage nach Abmeldung)\nInaktive Profile: Automatische Inaktivierung nach 60 Tagen (Fair-Play Kostenschutz)\nSession-Logs: Unmittelbare Löschung nach Sitzungsende']
     ];

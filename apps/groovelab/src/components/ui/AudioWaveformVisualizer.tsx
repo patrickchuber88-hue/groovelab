@@ -174,6 +174,7 @@ export const AudioWaveformVisualizer: React.FC<AudioWaveformVisualizerProps> = (
       <button
         type="button"
         onClick={togglePlay}
+        aria-label={isPlaying ? 'Audio pausieren' : 'Audio abspielen'}
         style={{
           width: '38px',
           height: '38px',
@@ -203,6 +204,22 @@ export const AudioWaveformVisualizer: React.FC<AudioWaveformVisualizerProps> = (
         )}
         <canvas
           ref={canvasRef}
+          role="slider"
+          aria-label={title ? `Audio-Wellenform: ${title}` : "Audio-Wellenform Timeline"}
+          aria-valuemin={0}
+          aria-valuemax={Math.round(duration || 0)}
+          aria-valuenow={Math.round(currentTime)}
+          aria-valuetext={`${formatSeconds(currentTime)} von ${formatSeconds(duration || 0)}`}
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === 'ArrowRight' || e.key === 'ArrowUp') {
+              e.preventDefault();
+              if (audioRef.current) audioRef.current.currentTime = Math.min((duration || 0), currentTime + 5);
+            } else if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') {
+              e.preventDefault();
+              if (audioRef.current) audioRef.current.currentTime = Math.max(0, currentTime - 5);
+            }
+          }}
           width={280}
           height={32}
           onClick={handleCanvasClick}
@@ -212,8 +229,10 @@ export const AudioWaveformVisualizer: React.FC<AudioWaveformVisualizerProps> = (
             cursor: 'pointer',
             display: 'block'
           }}
-          title="Klicken zum Vor-/Zurückspringen"
-        />
+          title="Klicken oder Pfeiltasten zum Vor-/Zurückspringen"
+        >
+          Audio-Wellenform: {formatSeconds(currentTime)} von {formatSeconds(duration || 0)}
+        </canvas>
       </div>
 
       {/* Time Display */}

@@ -35,6 +35,7 @@ import {
   filterNotesForStudent,
   isInternalMetadataNote,
   checkIsAudioTresorActive,
+  checkIsAudioTresorReadOnly,
   type StickerUnlockContext,
   type StickerUnlockResult
 } from '../domain/stickersAndTresor';
@@ -46,7 +47,8 @@ export {
   cleanNotesText, 
   filterNotesForStudent,
   isInternalMetadataNote,
-  checkIsAudioTresorActive 
+  checkIsAudioTresorActive,
+  checkIsAudioTresorReadOnly
 };
 export type { StickerUnlockContext, StickerUnlockResult };
 
@@ -122,7 +124,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   groupStudents: propGroupStudents,
   isParentUnlocked = false,
   parentPermissions: propParentPermissions,
-  onSaveParentOverrides
+  onSaveParentOverrides,
+  isSoftLocked = false,
+  onTriggerSoftLock
 }) => {
   const uiLevel: 'junior' | 'teen' | 'pro' = propUiLevel || (student as any)?.campus_ui_level || 'pro';
   const isSessionTeacher = typeof window !== 'undefined' && (() => {
@@ -1116,6 +1120,13 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   const [isXpLegendOpen, setIsXpLegendOpen] = useState<boolean>(false);
   const [activeViewMode, setActiveViewMode] = useState<'document' | 'recordings' | 'loopstation' | 'practice' | 'tuner' | 'groovetrainer'>(initialViewMode || (isTeacherTools ? 'loopstation' : 'document'));
 
+  useEffect(() => {
+    if (isSoftLocked && !isTeacherMode && (activeViewMode === 'loopstation' || activeViewMode === 'practice' || activeViewMode === 'recordings' || activeViewMode === 'groovetrainer')) {
+      setActiveViewMode('document');
+      if (onTriggerSoftLock) onTriggerSoftLock();
+    }
+  }, [isSoftLocked, isTeacherMode, activeViewMode, onTriggerSoftLock]);
+
   // Speech Recognition & Audio play-along state
   const [isListening, setIsListening] = useState(false);
   const [isRecordingAudio, setIsRecordingAudio] = useState(false);
@@ -1650,7 +1661,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     }
 
     const narrative = buildContinuousHomeworkNarrative({
-      teacherName: (student as any)?.teacher_name || (student as any)?.teacher?.name,
+      teacherName: (effectiveTeacherFullName && effectiveTeacherFullName !== 'deine Lehrkraft') 
+        ? effectiveTeacherFullName 
+        : ((student as any)?.teacher_name || (student as any)?.teacher?.name),
       instrument: (student as any)?.instrument || (student as any)?.instrument_type,
       books: lehrwerkeList.map(b => ({
         title: b.title,
@@ -1755,6 +1768,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   const [recordingBpm, setRecordingBpm] = useState<number>(100);
   const [showRecordingMetronomePopup, setShowRecordingMetronomePopup] = useState<boolean>(false);
   const recordingMetronomeIntervalRef = useRef<any>(null);
+  const recordingMetronomeAudioCtxRef = useRef<AudioContext | null>(null);
   const recordingMetronomeRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -1770,6 +1784,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     window.addEventListener('mousedown', handleOutside);
     window.addEventListener('touchstart', handleOutside);
     window.addEventListener('keydown', handleEsc);
+
     return () => {
       window.removeEventListener('mousedown', handleOutside);
       window.removeEventListener('touchstart', handleOutside);
@@ -1781,7 +1796,13 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     try {
       const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
       if (!AudioCtx) return;
-      const ctx = new AudioCtx();
+      if (!recordingMetronomeAudioCtxRef.current || recordingMetronomeAudioCtxRef.current.state === 'closed') {
+        recordingMetronomeAudioCtxRef.current = new AudioCtx();
+      }
+      const ctx = recordingMetronomeAudioCtxRef.current;
+      if (ctx.state === 'suspended') {
+        ctx.resume().catch(() => {});
+      }
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.type = 'sine';
@@ -1809,12 +1830,20 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         clearInterval(recordingMetronomeIntervalRef.current);
         recordingMetronomeIntervalRef.current = null;
       }
+      if (recordingMetronomeAudioCtxRef.current && recordingMetronomeAudioCtxRef.current.state !== 'closed') {
+        recordingMetronomeAudioCtxRef.current.close().catch(() => {});
+        recordingMetronomeAudioCtxRef.current = null;
+      }
     }
 
     return () => {
       if (recordingMetronomeIntervalRef.current) {
         clearInterval(recordingMetronomeIntervalRef.current);
         recordingMetronomeIntervalRef.current = null;
+      }
+      if (recordingMetronomeAudioCtxRef.current && recordingMetronomeAudioCtxRef.current.state !== 'closed') {
+        recordingMetronomeAudioCtxRef.current.close().catch(() => {});
+        recordingMetronomeAudioCtxRef.current = null;
       }
     };
   }, [isRecordingAudio, isRecordingMetronomeActive, recordingBpm]);
@@ -2117,25 +2146,23 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       const studentIdVal = (student as any)?.id;
       const localAudioKey = studentIdVal && typeof window !== 'undefined' ? localStorage.getItem(`groovelab_parent_allow_audio_${studentIdVal}`) : null;
       const localStudentAudioKey = studentIdVal && typeof window !== 'undefined' ? localStorage.getItem(`groovelab_parent_allow_student_audio_${studentIdVal}`) : null;
-      const isAudioAllowed = (student as any)?.parent_allow_audio !== false && 
-        ((student as any)?.parent_permissions?.allow_student_audio !== false) &&
-        (localAudioKey !== null ? localAudioKey !== 'false' : true) &&
-        (localStudentAudioKey !== null ? localStudentAudioKey !== 'false' : true) &&
-        (typeof window !== 'undefined' ? localStorage.getItem('campus_board_override_recordings') !== 'false' && localStorage.getItem('campus_allow_audio') !== 'false' : true);
+      const isAudioAllowed = (student as any)?.parent_allow_audio === true && 
+        ((student as any)?.parent_permissions?.allow_student_audio === true || (localStudentAudioKey !== null ? localStudentAudioKey === 'true' : false)) &&
+        (localAudioKey !== null ? localAudioKey === 'true' : true);
       if (!isAudioAllowed) {
-        alert('Die Aufnahme-Funktion für Schüler ist im Eltern-Kontrollzentrum aktuell deaktiviert.');
+        alert('Die Aufnahme-Funktion für Schüler ist im Eltern-Kontrollzentrum aktuell noch nicht freigegeben (Privacy by Default). Bitte deine Eltern, sie im Eltern-Bereich zu aktivieren.');
         return null;
       }
     } else {
       // 🛡️ Didaktische Audio-Memos der Lehrkraft (§ 73 UrhG / Art. 6 DSGVO)
-      const studentIdVal = (student as any)?.id;
-      const localTeacherAudioKey = studentIdVal && typeof window !== 'undefined' ? localStorage.getItem(`groovelab_parent_allow_teacher_audio_${studentIdVal}`) : null;
-      const isTeacherAudioAllowed = ((student as any)?.parent_permissions?.allow_teacher_audio !== false) &&
-        (localTeacherAudioKey !== null ? localTeacherAudioKey !== 'false' : true);
-      if (!isTeacherAudioAllowed) {
-        alert('Die Erziehungsberechtigten haben didaktische Audio-Aufnahmen durch die Lehrkraft (§ 73 UrhG) im Eltern-Kontrollzentrum deaktiviert.');
-        return null;
-      }
+      // Haben die Erziehungsberechtigten Tonaufnahmen des Schülers untersagt, wird die Lehrkraft
+      // NICHT blockiert: Sie darf weiterhin eigene Referenz-Play-Alongs und Übe-Muster vorspielen.
+      // Die App blendet den rechtlichen Disclaimer (§ 201 StGB) und die Freigabe-Anfrage ein.
+    }
+
+    if (checkIsAudioTresorReadOnly(student)) {
+      alert('Der Audio-Tresor deiner Musikschule befindet sich im geschützten Nur-Lese-Modus (Zahlungsrückstand der B2B-Infrastruktur). Bestehende Aufnahmen können uneingeschränkt angehört und heruntergeladen werden. Neue Uploads sind vorübergehend pausiert.');
+      return null;
     }
 
     const audioNotesCount = homeworkNotesList.filter(note => note.startsWith("AUDIO:")).length;
@@ -8070,10 +8097,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     if (isEmbed) return null;
     return (
       <button
-
-
         type="button"
         onClick={handleClose}
+        aria-label="Dokumentation sichern und schließen"
         style={{
           background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
           border: '1px solid rgba(255,255,255,0.35)',
@@ -8106,7 +8132,11 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   const isMobileOrSim = isFullscreen || isMobileView || isInsideSim || (typeof window !== 'undefined' && window.innerWidth < 1024);
 
   const content = (
-    <div style={{
+    <div
+      role={isEmbed ? undefined : "dialog"}
+      aria-modal={isEmbed ? undefined : "true"}
+      aria-label="Meisterwerk- & Hausaufgabendokumentation"
+      style={{
       background: useNotebookLayout 
         ? (bookColor 
             ? `radial-gradient(circle, ${bookColor.from} 0%, ${bookColor.to} 100%)` 
@@ -8518,6 +8548,12 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
               activeViewMode;
 
             const handleTabSelect = (val: string) => {
+              if (isSoftLocked && !isTeacherMode && ['loopstation', 'practice', 'recordings', 'audiobiography', 'groovetrainer'].includes(val)) {
+                if (onTriggerSoftLock) {
+                  onTriggerSoftLock();
+                }
+                return;
+              }
               if (val === 'modules') {
                 setActiveModalTab('document');
                 setActiveViewMode('document');

@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import App from './App'
 import { MasterPricingProvider } from './context/MasterPricingContext'
+import { A11yProvider } from './components/common/A11yLiveAnnouncer'
 import { initGlobalErrorSanitizer } from './utils/errorSanitizer'
 import './index.css'
 
@@ -307,7 +308,9 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <GlobalErrorBoundary>
       <BrowserRouter>
         <MasterPricingProvider>
-          <App />
+          <A11yProvider>
+            <App />
+          </A11yProvider>
         </MasterPricingProvider>
       </BrowserRouter>
     </GlobalErrorBoundary>

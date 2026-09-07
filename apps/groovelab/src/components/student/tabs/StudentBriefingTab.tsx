@@ -774,8 +774,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                   {/* JUNIOR: 3 GOLDSTANDARD HELDEN-KARTEN (HAUSAUFGABE • RAKETE • STICKER)     */}
                   {/* ========================================================================= */}
                   {(() => {
-                    const latestItem = progressItems.find(item => item.is_current_homework || item.topic_name.startsWith('Hausaufgabe KW '));
-                    const currentWeekStr = latestItem ? getItemWeek(latestItem) : getISOWeekRaw(new Date(), 1);
+                    const currentWeekStr = getISOWeek(getSimulatedNow());
                     const cleanTitle = (t: string) => (t || '').replace(/linken park/gi, 'Linkin Park').replace(/\s*\((gitarre|guitar|e-gitarre|bass|e-bass|drums|schlagzeug|klavier|piano|keys|keyboard|vocals|gesang|stimme|allgemein)\)/i, '');
 
                     {/* 1. Gather all active homework books & pages from localProgress */}
@@ -902,7 +901,8 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                     const currentWeekNotes: string[] = [];
                     (progressItems || []).forEach(item => {
                       const itemW = getItemWeek(item);
-                      const isActive = item.is_current_homework || item.topic_name.startsWith('Hausaufgabe KW ') || itemW === currentWeekStr;
+                      const isCurrentHwSnapshot = item.topic_name === 'Hausaufgabe KW ' + (currentWeekStr.split('-W')[1] || '') || itemW === currentWeekStr;
+                      const isActive = Boolean(item.is_current_homework) || isCurrentHwSnapshot;
                       if (isActive && item.homework_notes && item.homework_notes.trim()) {
                         try {
                           const parsed = JSON.parse(item.homework_notes);
@@ -953,6 +953,46 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                       }
                     });
 
+                    // 🌉 Smart Audio Bridge: Bridge active practice tracks from latest past lesson if current week has none
+                    if (audioTracks.length === 0 && (activeJuniorBooks.length > 0 || activeJuniorSongs.length > 0)) {
+                      const pastHwSnapshots = (progressItems || []).filter((item: any) => {
+                        if (!item.topic_name?.startsWith('Hausaufgabe KW ')) return false;
+                        const itWeekIso = getItemWeek(item);
+                        return itWeekIso && itWeekIso < currentWeekStr;
+                      });
+                      pastHwSnapshots.sort((a: any, b: any) => {
+                        const wA = getItemWeek(a);
+                        const wB = getItemWeek(b);
+                        if (wA !== wB) return wB.localeCompare(wA);
+                        const tA = new Date(a.updated_at || a.created_at || 0).getTime();
+                        const tB = new Date(b.updated_at || b.created_at || 0).getTime();
+                        return tB - tA;
+                      });
+                      const latestPast = pastHwSnapshots[0];
+                      if (latestPast && latestPast.homework_notes) {
+                        try {
+                          const parsed = typeof latestPast.homework_notes === 'string' ? JSON.parse(latestPast.homework_notes) : latestPast.homework_notes;
+                          if (Array.isArray(parsed)) {
+                            parsed.forEach((item: string, index: number) => {
+                              if (typeof item === 'string' && item.startsWith('AUDIO:')) {
+                                const parts = item.substring(6).split('|');
+                                audioTracks.push({
+                                  url: parts[0],
+                                  duration: parseFloat(parts[1]) || 0,
+                                  date: parts[2],
+                                  label: parts[3] || ('Aufnahme #' + (audioTracks.length + 1)),
+                                  author: parts[4] || 'teacher',
+                                  songTag: parts[7] || undefined,
+                                  isCarriedOver: true,
+                                  idx: index
+                                });
+                              }
+                            });
+                          }
+                        } catch {}
+                      }
+                    }
+
                     const cleanGeneralNote = (text: string) => {
                       if (!text) return '';
                       let clean = text;
@@ -975,7 +1015,34 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                         .trim();
                     };
 
-                    const generalNoteRaw = currentWeekNotes.find(n => !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('LATENCY:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:') && !n.startsWith('STUDENT_QUESTION:'));
+                    let generalNoteRaw = currentWeekNotes.find(n => !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('LATENCY:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:') && !n.startsWith('STUDENT_QUESTION:'));
+                    if (!generalNoteRaw && (activeJuniorBooks.length > 0 || activeJuniorSongs.length > 0)) {
+                      const pastHwSnapshots = (progressItems || []).filter((item: any) => {
+                        if (!item.topic_name?.startsWith('Hausaufgabe KW ')) return false;
+                        const itWeekIso = getItemWeek(item);
+                        return itWeekIso && itWeekIso < currentWeekStr;
+                      });
+                      pastHwSnapshots.sort((a: any, b: any) => {
+                        const wA = getItemWeek(a);
+                        const wB = getItemWeek(b);
+                        if (wA !== wB) return wB.localeCompare(wA);
+                        const tA = new Date(a.updated_at || a.created_at || 0).getTime();
+                        const tB = new Date(b.updated_at || b.created_at || 0).getTime();
+                        return tB - tA;
+                      });
+                      const latestPast = pastHwSnapshots[0];
+                      if (latestPast && latestPast.homework_notes) {
+                        try {
+                          const parsed = typeof latestPast.homework_notes === 'string' ? JSON.parse(latestPast.homework_notes) : latestPast.homework_notes;
+                          if (Array.isArray(parsed)) {
+                            const pastNote = parsed.find((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('LATENCY:') && !n.startsWith('LOOP:') && !n.startsWith('SYSTEM:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:') && !n.startsWith('STUDENT_QUESTION:'));
+                            if (pastNote) generalNoteRaw = pastNote;
+                          } else if (typeof parsed === 'string') {
+                            generalNoteRaw = parsed;
+                          }
+                        } catch {}
+                      }
+                    }
                     const generalNote = generalNoteRaw ? cleanGeneralNote(generalNoteRaw) : '';
 
                     const studentQuestionRaw = currentWeekNotes.find(n => typeof n === 'string' && (n.startsWith('STUDENT_QUESTION:') || n.startsWith('❓ Frage für den Unterricht:')));
@@ -3550,8 +3617,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                     
                     {/* Spalte 1: Active Tracks & Lehrwerke 🎧 (Level 2: Teen) */}
                     {(() => {
-                      const latestItem = progressItems.find(item => item.is_current_homework || item.topic_name.startsWith('Hausaufgabe KW '));
-                      const currentWeekStr = latestItem && latestItem.updated_at ? getItemWeek(latestItem) : getISOWeek(new Date());
+                      const currentWeekStr = getISOWeek(getSimulatedNow());
                       const currentWeekNum = currentWeekStr.split('-W')[1] || '';
 
                       const parseHomeworkNotes = (rawNotes: any): string[] => {
@@ -5060,8 +5126,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                         return getISOWeekRaw(monday, 1);
                       };
 
-                      const latestItem = progressItems.find(item => item.is_current_homework || item.topic_name.startsWith('Hausaufgabe KW '));
-                      const currentWeekStr = latestItem ? getItemWeek(latestItem) : getISOWeekRaw(new Date(), 1);
+                      const currentWeekStr = getISOWeek(getSimulatedNow());
                       const prevWeekStr = getPrevWeek(currentWeekStr);
                       const currentWeekNum = currentWeekStr.split('-W')[1] || '';
                       const prevWeekNum = prevWeekStr.split('-W')[1] || '';

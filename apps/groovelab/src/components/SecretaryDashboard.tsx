@@ -55,6 +55,8 @@ const ParentInfoSheetModal = lazy(() => import('./modals/ParentInfoSheetModal').
 import { LegalTextModal } from './LegalTextModal';
 import { calculateSchoolYearDirectBilling, calculateTransitionEffectiveDate } from '../utils/epcGiroCode';
 import { generateTariffReceiptPDF } from '../utils/tariffReceiptPdfGenerator';
+import { computeSchoolDunningStatus, SchoolDunningStatus, getDunningVisualConfig } from '../domain/schoolDunningEngine';
+import { SchoolDunningPayModal } from './secretary/SchoolDunningPayModal';
 import { 
   fetchSchoolRoster, 
   getTeacherRoster, 
@@ -2486,6 +2488,55 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
       window.removeEventListener('groovelab_simulated_date_changed', handleSimDateSync);
     };
   }, [schoolId]);
+
+  // ─── ENTERPRISE B2B DELINQUENCY & GRACE PERIOD ARCHITECTURE ───
+  const [schoolInvoices, setSchoolInvoices] = useState<any[]>([]);
+  const [showDunningPayModal, setShowDunningPayModal] = useState<boolean>(false);
+
+  const [trustRefreshToken, setTrustRefreshToken] = useState<number>(0);
+
+  const dunningStatus = useMemo<SchoolDunningStatus>(() => {
+    const oldest = Array.isArray(schoolInvoices) 
+      ? schoolInvoices.find((i: any) => i && i.due_date && String(i.status || '').toLowerCase() !== 'paid' && String(i.status || '').toLowerCase() !== 'bezahlt') 
+      : null;
+    const localTrustUntil = oldest ? localStorage.getItem(`groovelab_trust_token_${oldest.id}`) : null;
+
+    const effectiveSchool = {
+      ...(currentSchoolProfile || {
+        id: schoolId,
+        is_trial: isSchoolTrial,
+        trial_ends_at: schoolTrialEndsAt,
+        subscription_bypass: subscriptionBypass
+      }),
+      dunning_trust_extension_until: currentSchoolProfile?.dunning_trust_extension_until || localTrustUntil || undefined
+    };
+    return computeSchoolDunningStatus(effectiveSchool, schoolInvoices, simulatedToday || undefined);
+  }, [currentSchoolProfile, schoolId, isSchoolTrial, schoolTrialEndsAt, subscriptionBypass, schoolInvoices, simulatedToday, trustRefreshToken]);
+
+  useEffect(() => {
+    if (schoolId) {
+      if (dunningStatus.isAudioTresorReadOnly) {
+        localStorage.setItem(`groovelab_audio_tresor_readonly_${schoolId}`, 'true');
+      } else {
+        localStorage.removeItem(`groovelab_audio_tresor_readonly_${schoolId}`);
+      }
+      if (dunningStatus.isTeacherReadOnly) {
+        localStorage.setItem(`groovelab_teacher_readonly_${schoolId}`, 'true');
+      } else {
+        localStorage.removeItem(`groovelab_teacher_readonly_${schoolId}`);
+      }
+      localStorage.setItem(`groovelab_dunning_level_${schoolId}`, dunningStatus.level);
+    }
+  }, [schoolId, dunningStatus.isAudioTresorReadOnly, dunningStatus.isTeacherReadOnly, dunningStatus.level]);
+
+  const assertSecretaryWriteAccess = (actionLabel?: string): boolean => {
+    if (dunningStatus.isSecretaryReadOnly) {
+      alert(`Administrativer Schreibschutz aktiv: Da die B2B-Infrastrukturrechnung seit über 30 Tagen aussteht, ist diese Aktion (${actionLabel || 'Bearbeiten/Erstellen'}) vorübergehend gesperrt. Bitte begleiche den Betrag über den angezeigten EPC-QR GiroCode.`);
+      return false;
+    }
+    return true;
+  };
+
   const [expandedYears, setExpandedYears] = useState<Record<string, boolean>>({ '2026': true, '2025': true });
   const [isCancelled, setIsCancelled] = useState<boolean>(() => {
     return typeof window !== 'undefined' && localStorage.getItem(`isCancelled_${schoolId}`) === 'true';
@@ -4750,8 +4801,10 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
             .select('id, type, amount, status, billing_date, due_date, items')
             .eq('school_id', schoolId)
             .then(({ data, error }) => {
-              if (data && !error && typeof window !== 'undefined') {
-                data.forEach((inv: any) => {
+              if (data && !error) {
+                setSchoolInvoices(data);
+                if (typeof window !== 'undefined') {
+                  data.forEach((inv: any) => {
                   if (inv.items && inv.items.gobd_version === 4) {
                     const snapKey = `campus_gobd_v4_${schoolId}_${inv.id}`;
                     const validAmount = (inv.amount && Number(inv.amount) > 0) ? Number(inv.amount) : (inv.items.amount || undefined);
@@ -4762,7 +4815,8 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                   }
                 });
               }
-            });
+            }
+          });
         }
 
         // Calculate bookedExtraUsers from user_quota (anything above 150 is extra)
@@ -6967,6 +7021,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
 
   const handleCreateTeacher = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!assertSecretaryWriteAccess('Lehrkraft anlegen')) return;
     if (!newTeacherFirstName.trim() || !newTeacherLastName.trim()) return;
 
     if (!isAvvSigned) {
@@ -7372,6 +7427,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
 
   const handleCreateStudentCampus = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!assertSecretaryWriteAccess('Schüler anlegen')) return;
     if (!newStudentFirstName || !newStudentLastName) {
       alert('Bitte Vorname und Nachname ausfüllen.');
       return;
@@ -7417,6 +7473,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
 
   const handleCreateStudentGroovelab = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!assertSecretaryWriteAccess('Schüler anlegen')) return;
     if (!newStudentFirstName || !newStudentLastName) {
       alert('Bitte Vorname und Nachname ausfüllen.');
       return;
@@ -12021,6 +12078,72 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                 Bestellprozess abschließen
               </button>
             )}
+          </div>
+        )}
+
+        {/* ─── ENTERPRISE B2B DELINQUENCY & GRACE PERIOD ESCALATION BANNER ─── */}
+        {!subscriptionBypass && dunningStatus.isDelinquent && (
+          <div style={{
+            background: dunningStatus.isSecretaryReadOnly
+              ? '#fef2f2'
+              : (dunningStatus.level === 'level_2_warning' ? '#fffbeb' : '#eff6ff'),
+            borderBottom: dunningStatus.isSecretaryReadOnly
+              ? '1px solid #fee2e2'
+              : (dunningStatus.level === 'level_2_warning' ? '1px solid #fef3c7' : '1px solid #dbeafe'),
+            padding: '12px 40px',
+            fontSize: '0.84rem',
+            color: dunningStatus.isSecretaryReadOnly
+              ? '#991b1b'
+              : (dunningStatus.level === 'level_2_warning' ? '#92400e' : '#1e40af'),
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            fontWeight: 700,
+            fontFamily: "'Plus Jakarta Sans', sans-serif",
+            flexShrink: 0,
+            boxShadow: '0 2px 8px rgba(0,0,0,0.03)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <span style={{ fontSize: '1.2rem' }}>
+                {dunningStatus.isSecretaryReadOnly ? '🚨' : (dunningStatus.level === 'level_2_warning' ? '⚠️' : 'ℹ️')}
+              </span>
+              <span>
+                {dunningStatus.isSecretaryReadOnly ? (
+                  <>
+                    <strong>Administrativer Schreibschutz aktiv:</strong> Offene B2B-Infrastrukturrechnung in Höhe von <strong>{dunningStatus.totalOverdueAmount.toFixed(2)} €</strong> (überfällig seit {dunningStatus.overdueDays} Tagen). Neuanlagen sind pausiert. Schüler &amp; Unterrichtsbetrieb bleiben uneingeschränkt geschützt.
+                  </>
+                ) : dunningStatus.level === 'level_2_warning' ? (
+                  <>
+                    <strong>Dringende Mahnung:</strong> Offene B2B-Infrastrukturrechnung in Höhe von <strong>{dunningStatus.totalOverdueAmount.toFixed(2)} €</strong>. Noch <strong>{dunningStatus.adminCountdownDays} {dunningStatus.adminCountdownDays === 1 ? 'Tag' : 'Tage'}</strong> bis zum administrativen Schreibschutz &amp; Audio-Tresor-Uploadstopp.
+                  </>
+                ) : (
+                  <>
+                    <strong>Zahlungserinnerung:</strong> Für die Musikschule liegt eine offene B2B-Infrastrukturrechnung über <strong>{dunningStatus.totalOverdueAmount.toFixed(2)} €</strong> vor (Fällig seit {dunningStatus.overdueDays} Tagen).
+                  </>
+                )}
+              </span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <button
+                onClick={() => setShowDunningPayModal(true)}
+                style={{
+                  background: dunningStatus.isSecretaryReadOnly ? '#dc2626' : (dunningStatus.level === 'level_2_warning' ? '#d97706' : '#2563eb'),
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '100px',
+                  padding: '7px 18px',
+                  fontSize: '0.76rem',
+                  fontWeight: 900,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                }}
+              >
+                <span>⚡ Sofort ausgleichen (EPC-QR)</span>
+              </button>
+            </div>
           </div>
         )}
 
@@ -19517,6 +19640,8 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
               activeStudentsModalList={activeStudentsModalList}
               setActiveStudentsModalList={setActiveStudentsModalList}
               getEffectiveStorageUsedBytes={getEffectiveStorageUsedBytes}
+              isSecretaryReadOnly={dunningStatus.isSecretaryReadOnly}
+              onOpenDunningPayModal={() => setShowDunningPayModal(true)}
             />
           </Suspense>
         )}
@@ -23022,6 +23147,24 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
           initialTab={showAgb ? 'terms' : 'privacy'}
         />
       )}
+
+      {/* Modal: B2B Delinquency EPC-QR Sofortausgleich */}
+      <SchoolDunningPayModal
+        isOpen={showDunningPayModal}
+        onClose={() => setShowDunningPayModal(false)}
+        dunningStatus={dunningStatus}
+        schoolName={schoolName || currentSchoolProfile?.name || 'Musikschule'}
+        operatorCompany={operatorCompany}
+        operatorIban={operatorIban}
+        operatorBic={operatorBic}
+        onGoToLicenses={() => {
+          setActiveTab('secretary');
+          setSecretarySubTab('licenses');
+        }}
+        onActivateTrustExtension={() => {
+          setTrustRefreshToken(Date.now());
+        }}
+      />
 
       {/* Floating Developer Reset Button (Dev Mode Only) */}
       {isDevEnvironment() && typeof window !== 'undefined' && localStorage.getItem('show_dev_reset_button') === 'true' && activeTab === 'secretary' && secretarySubTab === 'licenses' && (

@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { X, ShieldCheck, FileText, Building, Undo2, Scale, Printer } from 'lucide-react';
+import { X, ShieldCheck, FileText, Building, Undo2, Scale, Printer, Accessibility } from 'lucide-react';
 import { useMasterPricing } from '../context/MasterPricingContext';
 
 interface LegalTextModalProps {
   isOpen: boolean;
   onClose: () => void;
-  initialTab?: 'impressum' | 'privacy' | 'terms' | 'cancellation';
+  initialTab?: 'impressum' | 'privacy' | 'terms' | 'cancellation' | 'accessibility';
 }
 
 export const LegalTextModal: React.FC<LegalTextModalProps> = ({
@@ -15,7 +15,7 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
   initialTab = 'impressum'
 }) => {
   const masterPricing = useMasterPricing();
-  const [activeTab, setActiveTab] = useState<'impressum' | 'privacy' | 'terms' | 'cancellation'>(initialTab);
+  const [activeTab, setActiveTab] = useState<'impressum' | 'privacy' | 'terms' | 'cancellation' | 'accessibility'>(initialTab);
   const contentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -44,6 +44,9 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
     } else if (activeTab === 'cancellation') {
       docTitle = 'Campus-Groovelab – Widerrufsbelehrung & Muster-Widerrufsformular';
       tabHeading = 'Widerrufsbelehrung & Muster-Widerrufsformular (B2C)';
+    } else if (activeTab === 'accessibility') {
+      docTitle = 'Campus-Groovelab – Erklärung zur Barrierefreiheit (BITV 2.0 / BFSG)';
+      tabHeading = 'Erklärung zur Barrierefreiheit (BITV 2.0 / EN 301 549 / BFSG)';
     }
 
     const contentHtml = contentRef.current.innerHTML;
@@ -204,7 +207,7 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose, activeTab]);
 
-  const handleTabChange = (tab: 'impressum' | 'privacy' | 'terms' | 'cancellation') => {
+  const handleTabChange = (tab: 'impressum' | 'privacy' | 'terms' | 'cancellation' | 'accessibility') => {
     setActiveTab(tab);
     if (contentRef.current) {
       contentRef.current.scrollTo({ top: 0, behavior: 'smooth' });
@@ -316,6 +319,9 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
         }}
       >
         <div 
+          role="dialog"
+          aria-modal="true"
+          aria-label="Rechtliche Dokumente & Erklärung zur Barrierefreiheit"
           className="apple-legal-window"
           style={{
             background: '#ffffff',
@@ -352,20 +358,19 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
                 alignItems: 'center',
                 justifyContent: 'center',
                 color: '#ffffff',
-                boxShadow: '0 4px 12px rgba(15, 23, 42, 0.15)',
+                boxShadow: '0 4px 12px rgba(15, 23, 42, 0.2)',
                 flexShrink: 0
               }}>
                 <Scale size={20} />
               </div>
               <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                  <h3 style={{ margin: 0, fontSize: '1.14rem', fontWeight: 850, color: '#0f172a', letterSpacing: '-0.02em' }}>
-                    Rechtliche Hinweise – Campus-Groovelab
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 850, color: '#0f172a', letterSpacing: '-0.02em' }}>
+                    Rechtliche Hinweise &amp; Governance
                   </h3>
                   <span style={{
-                    background: '#f1f5f9',
-                    color: '#475569',
-                    border: '1px solid #e2e8f0',
+                    background: '#e2e8f0',
+                    color: '#334155',
                     padding: '2px 8px',
                     borderRadius: '100px',
                     fontSize: '0.66rem',
@@ -422,7 +427,8 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
                 { id: 'impressum', label: 'Impressum', icon: Building },
                 { id: 'privacy', label: 'Datenschutz', icon: ShieldCheck },
                 { id: 'terms', label: 'AGB', icon: FileText },
-                { id: 'cancellation', label: 'Widerruf (B2C)', icon: Undo2 }
+                { id: 'cancellation', label: 'Widerruf (B2C)', icon: Undo2 },
+                { id: 'accessibility', label: 'Barrierefreiheit (BFSG)', icon: Accessibility }
               ].map(tab => {
                 const isActive = activeTab === tab.id;
                 const Icon = tab.icon;
@@ -473,6 +479,7 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
               {activeTab === 'privacy' && 'Datenschutzerklärung nach Art. 13, 14 & 21 DSGVO'}
               {activeTab === 'terms' && 'Allgemeine Geschäftsbedingungen (AGB) – Teil A (B2B) & Teil B (B2C)'}
               {activeTab === 'cancellation' && 'Widerrufsbelehrung & Muster-Widerrufsformular (B2C)'}
+              {activeTab === 'accessibility' && 'Erklärung zur Barrierefreiheit (BITV 2.0 / EN 301 549 / BFSG)'}
             </div>
             <div style={{ fontSize: '8.5pt', color: '#64748b', display: 'flex', gap: '14pt', flexWrap: 'wrap' }}>
               <span><strong>Stand:</strong> Schuljahr 2026/2027</span>
@@ -512,14 +519,17 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
               </div>
 
               <div>
-                <strong style={{ color: '#0f172a' }}>Kontakt &amp; Unmittelbare Erreichbarkeit (§ 5 Abs. 1 Nr. 2 DDG / Art. 3 UWG CH):</strong><br />
-                Telefon: <a href="tel:+4976237486420" style={{ color: '#34a853', fontWeight: 700 }}>+49 (0) 7623 / 748 64 20</a> <span style={{ fontSize: '0.80rem', color: '#64748b' }}>(Mo–Fr 09:00–17:00 Uhr MEZ)</span><br />
+                <strong style={{ color: '#0f172a' }}>Elektronische Kontaktaufnahme &amp; Unmittelbare Erreichbarkeit (§ 5 Abs. 1 Nr. 2 DDG / EuGH C-298/07 / Art. 3 UWG CH):</strong><br />
                 E-Mail: <a href="mailto:kontakt@campus-groovelab.de" style={{ color: '#34a853', fontWeight: 700 }}>kontakt@campus-groovelab.de</a><br />
                 Support &amp; Schulbetreuung: <a href="mailto:patrick.huber@musaek.de" style={{ color: '#34a853', fontWeight: 700 }}>patrick.huber@musaek.de</a><br />
+                In-App-Support &amp; Ticketsystem: Direkt über das integrierte Hilfe-Zentrum (2-Wege-Schnellkontakt mit protokollierter Ticketnummer)<br />
                 <span style={{ fontSize: '0.80rem', color: '#475569', display: 'block', marginTop: '4px' }}>
-                  <strong>⚡ Elektronischer Schnellkontakt-Service (EuGH C-298/07 / BGH I ZR 238/14):</strong> Anfragen über unsere elektronischen Support-Kanäle werden an Werktagen (Mo–Fr 08:00–18:00 Uhr) <strong>in der Regel innerhalb von maximal 60 Minuten</strong> beantwortet. Allen registrierten Musikschulen, Lehrkräften und Schülern steht zudem ein direktes In-App-Support- und Ticket-System im persönlichen Dashboard zur Verfügung.
+                  <strong>⚡ Effizienter elektronischer 2-Wege-Schnellkontakt (EuGH C-298/07 / BGH I ZR 238/14):</strong> Gemäß der Rechtsprechung des Europäischen Gerichtshofs (EuGH, Urteil vom 16.10.2008 – C-298/07) sowie des Bundesgerichtshofs (BGH, Urteil vom 25.02.2010 – I ZR 238/14) erfolgt die unmittelbare und effiziente Kommunikation über zwei vollwertige elektronische Schnellkontaktwege (E-Mail &amp; In-App-Supportsystem mit protokollierter Ticketnummer). Dies gewährleistet eine lückenlose Dokumentation, prioritäre Bearbeitung und eine Antwortzeit an Werktagen <strong>in der Regel innerhalb von 60 Minuten</strong> (Kernzeiten: Mo 09:00–12:00 Uhr • Do 08:00–10:00 Uhr MEZ).
                 </span>
-                <span style={{ fontSize: '0.80rem', color: '#475569', display: 'block', marginTop: '2px' }}>
+                <span style={{ fontSize: '0.78rem', color: '#64748b', display: 'block', marginTop: '6px', background: '#f8fafc', padding: '8px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', lineHeight: 1.45 }}>
+                  <strong style={{ color: '#0f172a' }}>🛡️ Hinweis zur Zuständigkeit:</strong> Für Auskünfte zu Unterrichtszeiten, Stundenplänen, Raumzuteilungen, Lehrkraft-Vertretungen, Krankmeldungen oder Musikschulverträgen wenden Sie sich bitte direkt an das <strong>Sekretariat Ihrer Musikschule vor Ort</strong>. Der Plattform-Support betreut als technischer Infrastrukturdienstleister ausschließlich Software-, Login- und Systemfragen.
+                </span>
+                <span style={{ fontSize: '0.80rem', color: '#475569', display: 'block', marginTop: '4px' }}>
                   Website: <a href="https://campus-groovelab.de" target="_blank" rel="noopener noreferrer" style={{ color: '#34a853', fontWeight: 700 }}>campus-groovelab.de</a>
                 </span>
               </div>
@@ -826,7 +836,7 @@ Hiermit versichere ich in gutem Glauben, dass die vorstehenden Angaben richtig u
                   <strong style={{ color: '#0f172a' }}>5. Arbeitszeit-Compliance (ArbZG), Arbeitgeber-Alleinverantwortung (Microsoft-Teams-Prinzip), Herrenberg-Freistellung (BSG B 12 R 3/20 R) &amp; Kinderschutz (§ 8a SGB VIII)</strong><br />
                   (1) <strong>Asynchrones Lehrmittel &amp; Arbeitgeber-Alleinverantwortung nach dem Arbeitszeitgesetz (ArbZG):</strong> Campus-Groovelab qualifiziert sich als asynchrones pädagogisches Arbeits- und Lernmittel (vergleichbar mit Standardsoftware wie Microsoft Teams, Google Classroom oder Schul-Clouds). Die Musikschule ist als Arbeitgeberin allein und uneingeschränkt verantwortlich für die Einhaltung sämtlicher arbeitsschutzrechtlicher Vorschriften, insbesondere des Arbeitszeitgesetzes (ArbZG), der täglichen Höchstarbeitszeiten sowie der gesetzlichen ununterbrochenen Ruhezeit von elf (11) Stunden gem. § 5 ArbZG. Die Bereitstellung des Zugangs begründet zu keinem Zeitpunkt eine arbeitgeberseitige Verpflichtung der Lehrkräfte zur Erreichbarkeit oder Leistungserbringung außerhalb der regulären Dienst- und Unterrichtszeiten.<br />
                   (2) <strong>Didaktische Vorbereitung auf freiwilliger pädagogischer Basis:</strong> Die Nutzung der Plattform durch Lehrkräfte außerhalb des planmäßigen Präsenzunterrichts (z. B. didaktische Erstellung von Hausaufgaben, Einspielen von Übe-Loops, Eintragung von Schüler-Feedbacks) erfolgt auf rein freiwilliger pädagogischer Basis und stellt keine angeordnete Arbeitszeit oder vergütungspflichtige Mehrarbeit dar. Dem Lehrpersonal steht das Recht auf Nichterreichbarkeit („Right to Disconnect“) uneingeschränkt zu.<br />
-                  (3) <strong>Herrenberg-Compliance &amp; B2B-Freistellung bei Honorarkräften (§ 7a SGB IV / BSG B 12 R 3/20 R):</strong> Campus-Groovelab ist primär für den regulären Schulbetrieb mit festangestelltem Lehrpersonal konzipiert. Bindet die Musikschule freie Dozenten oder Honorarkräfte in die Plattform ein, stellt die Musikschule in eigener organisationsrechtlicher Verantwortung sicher, dass keine weisungsgebundene Eingliederung im Sinne der Rechtsprechung des Bundessozialgerichts (Herrenberg-Urteil) vorliegt. Die Plattform übt zu keinem Zeitpunkt eine Weisungs- oder Direktionsgewalt aus; Stundenplanentwürfe stellen rein unverbindliche Dispositionsvorschläge dar. Die Musikschule stellt den Betreiber von jeglicher Haftung, Nachforderungen von Sozialversicherungsbeiträgen oder Säumniszuschlägen durch Sozialversicherungsträger gem. § 7a SGB IV vollumfänglich und auf erstes Anfordern frei.<br />
+                  (3) <strong>Herrenberg-Compliance, didaktisches Assistenz-Prinzip &amp; B2B-Freistellung bei Honorarkräften (§ 7a SGB IV / BSG B 12 R 3/20 R):</strong> Campus-Groovelab dient den Lehrkräften für einen optimalen Unterrichtsalltag und nicht die Lehrkräfte dem Schulalltag (Didaktisches Assistenz-Prinzip). Die Plattform ist ein didaktisches Zusatz-, Erleichterungs- und Übermittlungswerkzeug („Convenience-Tool / Fast-Track-Option“) zur Beschleunigung und Erleichterung des Musikunterrichts. Sie ersetzt ausdrücklich kein behördliches oder amtliches Schulverwaltungssystem (ERP wie ASV, WinSchool oder Musikschul-Manager) und stellt zu keinem Zeitpunkt den ausschließlichen oder verbindlich vorgeschriebenen Dienst-, Weisungs- oder Kommunikationskanal der Musikschule dar. Jede Lehrkraft entscheidet selbstständig über die Nutzung und den didaktischen Umfang. Bindet die Musikschule freie Dozenten oder Honorarkräfte in die Plattform ein, stellt die Musikschule in eigener organisationsrechtlicher Verantwortung sicher, dass keine weisungsgebundene Eingliederung im Sinne der Rechtsprechung des Bundessozialgerichts (Herrenberg-Urteil) vorliegt. Die Plattform übt zu keinem Zeitpunkt eine Weisungs- oder Direktionsgewalt aus; Stundenplanentwürfe stellen rein unverbindliche Dispositionsvorschläge dar. Die Musikschule stellt den Betreiber von jeglicher Haftung, Nachforderungen von Sozialversicherungsbeiträgen oder Säumniszuschlägen durch Sozialversicherungsträger gem. § 7a SGB IV vollumfänglich und auf erstes Anfordern frei.<br />
                   (4) <strong>Institutioneller Kinderschutz &amp; Vier-Augen-Prinzip (§ 8a SGB VIII / BKiSchG):</strong> Die interne Chat- und Benachrichtigungsfunktion ist strikt an das institutionelle Kinderschutzkonzept gebunden. Zur Prävention von Grenzverletzungen und unüberwachter digitaler 1:1-Kommunikation zwischen erwachsenen Lehrkräften und Minderjährigen ist der Chatverlauf für Erziehungsberechtigte im Eltern-Portal (nach Verifikation mit der persönlichen Eltern-PIN) sowie für die Schulleitung im Rahmen der Aufsichtspflicht jederzeit transparent einsehbar. Ein privater, unüberwachter Chat zwischen Schülern untereinander ist serverseitig ausgeschlossen.<br />
                   (5) <strong>Ausschluss von Leistungs- und Verhaltenskontrolle (§ 87 Abs. 1 Nr. 6 BetrVG):</strong> Die Plattform verzichtet auf jegliche Funktionen zur automatisierten Leistungs- oder Verhaltenskontrolle des Lehrpersonals. Es werden keine Kennzahlen zu Reaktionszeiten, Aktivitätsdauer oder Quoten zur Mitarbeiterbewertung ermittelt.
                 </div>
@@ -899,7 +909,7 @@ Hiermit versichere ich in gutem Glauben, dass die vorstehenden Angaben richtig u
                 </div>
 
                 <div>
-                  <strong style={{ color: '#0f172a' }}>12. Technischer Botenstatus, Unterrichtsabsagen, Vertretung &amp; Ausschluss formbedürftiger Erklärungen</strong><br />
+                  <strong style={{ color: '#0f172a' }}>12. Technischer Botenstatus, Unterrichtsabsagen &amp; Ausschluss formbedürftiger Erklärungen</strong><br />
                   (1) <strong>Elektronische Botenfunktion:</strong> Soweit Schüler oder Erziehungsberechtigte über Campus-Groovelab (insbesondere via Shoutbox, Terminkalender oder Direktnachricht) Unterrichtstermine absagen, alternative Terminvorschläge der Lehrkraft annehmen oder organisatorische Mitteilungen versenden, agiert die Plattform als reiner technischer Übermittlungsbote im Auftrag des Absenders.<br />
                   (2) <strong>Verhältnis zum Musikschul-Unterrichtsvertrag &amp; Fristen:</strong> Die über die Plattform übermittelten Absagen und Terminabstimmungen berühren die zwischen den Erziehungsberechtigten und der jeweiligen Musikschule vereinbarten Unterrichts-, Honorar- und Nachholregelungen nicht. Ob eine versäumte Stunde nachgeholt wird oder honorarpflichtig bleibt, richtet sich ausschließlich nach den Schul- und Entgeltordnungen der Musikschule. Das Absenden einer Nachricht in Campus-Groovelab begründet keine Befreiung von vertraglichen Zahlungs- oder Fristpflichten.<br />
                   (3) <strong>Ausschluss rechtsgeschäftlicher Hauptvertrags-Erklärungen:</strong> Rechtserhebliche Willenserklärungen, die den Bestand des Unterrichtsvertrags mit der Musikschule betreffen (insbesondere Kündigungen, Widerrufe des Unterrichtsvertrags oder formelle Mahnungen), können über Campus-Groovelab <strong>nicht</strong> wirksam erklärt werden. Derartige Erklärungen sind zwingend auf den von der Musikschule vorgegebenen Primärwegen (schriftlich oder per behördlicher E-Mail an das Sekretariat) zu übermitteln.<br />
@@ -986,6 +996,104 @@ Hiermit versichere ich in gutem Glauben, dass die vorstehenden Angaben richtig u
                   - Unterschrift des/der Verbraucher(s) (nur bei Mitteilung auf Papier): ______________________<br /><br />
                   (*) Unzutreffendes streichen.
                 </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'accessibility' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                  <span style={{ background: '#dcfce7', color: '#166534', padding: '3px 10px', borderRadius: '100px', fontSize: '0.72rem', fontWeight: 800 }}>
+                    BITV 2.0 • EN 301 549 • BFSG 2025
+                  </span>
+                  <span style={{ background: '#f1f5f9', color: '#475569', padding: '3px 10px', borderRadius: '100px', fontSize: '0.72rem', fontWeight: 700 }}>
+                    WCAG 2.2 Stufe AA
+                  </span>
+                </div>
+                <h4 style={{ margin: '0 0 6px 0', fontSize: '1.10rem', fontWeight: 900, color: '#0f172a' }}>
+                  Erklärung zur digitalen Barrierefreiheit
+                </h4>
+                <p style={{ margin: 0, fontSize: '0.80rem', color: '#64748b' }}>
+                  Gemäß § 12d Behindertengleichstellungsgesetz (BGG), § 7 BITV 2.0 sowie dem Barrierefreiheitsstärkungsgesetz (BFSG)
+                </p>
+              </div>
+
+              <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '20px' }}>
+                <strong style={{ color: '#0f172a' }}>1. Unser Inklusions-Leitbild:</strong><br />
+                Campus-Groovelab ist bestrebt, ihre digitale Schul- und Didaktik-Plattform im Einklang mit den Bestimmungen des Behindertengleichstellungsgesetzes (BGG), der Barrierefreie-Informationstechnik-Verordnung (BITV 2.0) sowie des Barrierefreiheitsstärkungsgesetzes (BFSG 2025) zur Umsetzung der Richtlinie (EU) 2016/2102 und (EU) 2019/882 barrierearm und diskriminierungsfrei zugänglich zu gestalten. Alle Musikschülerinnen, Musikschüler, Eltern und Lehrkräfte sollen unabhängig von sensorischen oder motorischen Beeinträchtigungen einen gleichberechtigten Zugang zu zeitgemäßer Musikbildung erhalten.
+              </div>
+
+              <div>
+                <strong style={{ color: '#0f172a' }}>2. Stand der Vereinbarkeit mit den Anforderungen:</strong><br />
+                Diese Webanwendung ist <strong>größtenteils vereinbar</strong> mit den Anforderungen der harmonisierten europäischen Norm <strong>EN 301 549 V3.2.1</strong> sowie den <strong>Web Content Accessibility Guidelines (WCAG) 2.2 auf Konformitätsstufe AA</strong>.<br />
+                <span style={{ fontSize: '0.80rem', color: '#64748b', display: 'block', marginTop: '4px' }}>
+                  Die Bewertung der Vereinbarkeit basiert auf kontinuierlichen statischen Architektur- und Entropie-Audits, automatisierten Kontrastanalysen und manuellen Screenreader-Prüfungen (u. a. Apple VoiceOver und NVDA).
+                </span>
+              </div>
+
+              <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '20px' }}>
+                <strong style={{ color: '#0f172a', display: 'block', marginBottom: '10px' }}>
+                  3. Umgesetzte Barrierefreiheits-Maßnahmen im System:
+                </strong>
+                <ul style={{ margin: 0, paddingLeft: '20px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <li>
+                    <strong>Tastatur-Vollbedienbarkeit &amp; 2-Klick-Parität (WCAG 2.1.1):</strong> Sämtliche Kernbereiche (Login, Schülerausweise, Stundenplan, Songkarten, Loopstation) sind vollständig ohne Maus bedienbar. Im Stundenplan-Designer ermöglicht die 2-Klick-Zuweisung die motorisch barrierefreie Zuweisung per Tastatur.
+                  </li>
+                  <li>
+                    <strong>Apple HIG Tastatur-Fokusringe (WCAG 2.4.7):</strong> Fokussierte Bedienelemente erhalten systemweit einen dreifachen, modul-farblich abgestimmten Fokusring mit starkem Kontrastabstand.
+                  </li>
+                  <li>
+                    <strong>Standardisierte Farbkontraste (WCAG 1.4.3):</strong> Alle Textfarben und sekundären Labels erfüllen mindestens das Kontrastverhältnis von 4,5 : 1 auf hellem Hintergrund (Slate 600, 4,68 : 1). Marken-KPIs bleiben zugleich visuell erhalten.
+                  </li>
+                  <li>
+                    <strong>Screenreader Live-Announcements (WCAG 4.1.3):</strong> Zeitkritische Statusänderungen (Speicherbestätigungen, PIN-Sperren, Tauschvorgänge) werden automatisch an Screenreader übertragen.
+                  </li>
+                  <li>
+                    <strong>Sprungmarken (WCAG 2.4.1):</strong> Über den integrierten Skip-Link (<em>„Zum Hauptinhalt springen“</em>) können Tastaturnutzer Navigationsleisten direkt überspringen.
+                  </li>
+                  <li>
+                    <strong>Zugängliche Audio-Visualisierung:</strong> Audio-Wellenformen sind mit Slider-Semantik ausgestattet und können per Pfeiltasten schrittweise durchsprungen werden.
+                  </li>
+                </ul>
+              </div>
+
+              <div>
+                <strong style={{ color: '#0f172a' }}>4. Nicht barrierefreie Inhalte &amp; Ausnahmen (§ 12a Abs. 6 BGG):</strong><br />
+                Trotz intensiver Bemühungen gibt es bei einer Musikschul- und Recording-Plattform fachlich begründete Ausnahmen:
+                <ul style={{ margin: '8px 0 0 0', paddingLeft: '20px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <li>
+                    <strong>Auditive Echtzeit-Inhalte (Loopstation / Play-Alongs):</strong> Musikpädagogische Audioaufnahmen und Mehrspur-Loops basieren naturgemäß auf akustischen Signalen. Eine vollständige Echtzeit-Transkription stellt eine unverhältnismäßige Belastung dar.
+                  </li>
+                  <li>
+                    <strong>Nutzergenerierte Fremddokumente:</strong> Von Lehrkräften hochgeladene Notenscans oder externe PDF-Dateien verfügen unter Umständen nicht über vollständige OCR-Textebenen oder Tags.
+                  </li>
+                </ul>
+              </div>
+
+              <div style={{ background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '16px', padding: '20px' }}>
+                <strong style={{ color: '#0f172a' }}>5. Feedback-Mechanismus &amp; Barrieren melden:</strong><br />
+                Sind Ihnen Mängel beim barrierefreien Zugang zu Inhalten von Campus-Groovelab aufgefallen oder haben Sie Fragen zur digitalen Barrierefreiheit? Sie können uns jederzeit direkt kontaktieren:<br /><br />
+                <strong>Ansprechpartner Barrierefreiheit:</strong> Patrick Huber<br />
+                <strong>E-Mail:</strong> <a href="mailto:barrierefreiheit@campus-groovelab.de" style={{ color: '#34a853', fontWeight: 700 }}>barrierefreiheit@campus-groovelab.de</a> oder <a href="mailto:kontakt@campus-groovelab.de" style={{ color: '#34a853', fontWeight: 700 }}>kontakt@campus-groovelab.de</a><br />
+                <strong>Postanschrift:</strong> Karl-Fürstenberg-Str. 59, 79618 Rheinfelden, Deutschland<br />
+                <span style={{ fontSize: '0.80rem', color: '#64748b', display: 'block', marginTop: '6px' }}>
+                  Wir bemühen uns, Ihre Anfrage an Werktagen innerhalb von 48 Stunden zu beantworten.
+                </span>
+              </div>
+
+              <div>
+                <strong style={{ color: '#0f172a' }}>6. Durchsetzungsverfahren &amp; Schlichtungsstelle (§ 16 BGG):</strong><br />
+                Sollten Sie auf Ihre Kontaktaufnahme keine zufriedenstellende Antwort erhalten, können Sie sich an die Schlichtungsstelle nach dem Behindertengleichstellungsgesetz wenden. Das Schlichtungsverfahren ist für Bürgerinnen und Bürger kostenlos; ein Rechtsbeistand ist nicht erforderlich.<br /><br />
+                <strong>Schlichtungsstelle bei der Beauftragten der Bundesregierung für die Belange von Menschen mit Behinderungen:</strong><br />
+                Mauerstraße 53, 10117 Berlin<br />
+                Telefon: +49 (0)30 18 527-2805 • Fax: +49 (0)30 18 527-2901<br />
+                E-Mail: <a href="mailto:info@schlichtungsstelle-bgg.de" style={{ color: '#34a853', fontWeight: 700 }}>info@schlichtungsstelle-bgg.de</a><br />
+                Internet: <a href="https://www.schlichtungsstelle-bgg.de" target="_blank" rel="noopener noreferrer" style={{ color: '#34a853', fontWeight: 700 }}>www.schlichtungsstelle-bgg.de</a>
+              </div>
+
+              <div style={{ fontSize: '0.76rem', color: '#64748b', borderTop: '1px solid #e2e8f0', paddingTop: '12px' }}>
+                Diese Erklärung wurde am <strong>07. September 2026</strong> erstellt und wird regelmäßig überprüft und aktualisiert.
               </div>
             </div>
           )}

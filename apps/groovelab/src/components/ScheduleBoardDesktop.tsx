@@ -39,6 +39,7 @@ import { ScheduleCalendarViewDesktop as ScheduleCalendarView } from './ScheduleC
 import { StudentScheduleSlotsModal } from './StudentScheduleSlotsModal';
 import { run15StageSolver } from '../engine/Schedule15StageSolverEngine';
 import { getParentOnboardingUrl } from '../utils/tenantUrlHelper';
+import { isUUID } from '../utils/uuidValidator';
 export interface Student {
   id: string;
   first_name: string;
@@ -2223,10 +2224,13 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
           }
         }
 
-        const { data: prefsData, error: prefsErr } = await supabase
-          .from('student_schedule_preferences')
-          .select('*')
-          .in('student_id', targetStudentIds);
+        const validStudentIds = targetStudentIds.filter(isUUID);
+        const { data: prefsData, error: prefsErr } = validStudentIds.length > 0
+          ? await supabase
+              .from('student_schedule_preferences')
+              .select('*')
+              .in('student_id', validStudentIds)
+          : { data: [], error: null };
 
         if (!prefsErr && prefsData) {
           const combinedPrefs: any[] = [];
@@ -2299,58 +2303,68 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
           setSelectedStudentPrefs([]);
         }
 
-        const firstStudentId = targetStudentIds[0];
+        const firstStudentId = targetStudentIds.find(isUUID);
         
-        const { data: studentData, error: studentError } = await supabase
-          .from('students')
-          .select('parent_notes')
-          .eq('id', firstStudentId)
-          .maybeSingle();
-        if (!studentError && studentData) {
-          setSelectedStudentNote(studentData.parent_notes || null);
-        }
+        if (firstStudentId) {
+          const { data: studentData, error: studentError } = await supabase
+            .from('students')
+            .select('parent_notes')
+            .eq('id', firstStudentId)
+            .maybeSingle();
+          if (!studentError && studentData) {
+            setSelectedStudentNote(studentData.parent_notes || null);
+          } else {
+            setSelectedStudentNote(null);
+          }
 
-        const { data: curStudent } = await supabase
-          .from('users')
-          .select('sibling_group_id')
-          .eq('id', firstStudentId)
-          .single();
-
-        if (curStudent?.sibling_group_id) {
-          const { data: sibData } = await supabase
+          const { data: curStudent } = await supabase
             .from('users')
-            .select('id, first_name, last_name, instrument, lesson_duration')
-            .eq('sibling_group_id', curStudent.sibling_group_id)
-            .neq('id', firstStudentId)
+            .select('sibling_group_id')
+            .eq('id', firstStudentId)
             .maybeSingle();
 
-          if (sibData) {
-            const { data: sibSch } = await supabase
-              .from('schedules')
-              .select('day_of_week, start_time, room_id, teacher:users!schedules_teacher_id_fkey(first_name, last_name)')
-              .eq('student_id', sibData.id)
+          if (curStudent?.sibling_group_id) {
+            const { data: sibData } = await supabase
+              .from('users')
+              .select('id, first_name, last_name, instrument, lesson_duration')
+              .eq('sibling_group_id', curStudent.sibling_group_id)
+              .neq('id', firstStudentId)
               .maybeSingle();
 
-            const { data: sibPrefs } = await supabase
-              .from('student_schedule_preferences')
-              .select('*')
-              .eq('student_id', sibData.id);
+            if (sibData && isUUID(sibData.id)) {
+              const { data: sibSch } = await supabase
+                .from('schedules')
+                .select('day_of_week, start_time, room_id, teacher_id')
+                .eq('student_id', sibData.id)
+                .maybeSingle();
 
-            setSiblingInfo({
-              id: sibData.id,
-              first_name: sibData.first_name || '',
-              last_name: sibData.last_name || '',
-              instrument: sibData.instrument || '',
-              duration: sibData.lesson_duration || 30,
-              assignedDay: sibSch?.day_of_week,
-              assignedTime: sibSch?.start_time,
-              teacher_name: sibSch?.teacher ? `${Array.isArray(sibSch.teacher) ? sibSch.teacher[0]?.first_name : (sibSch.teacher as any).first_name} ${Array.isArray(sibSch.teacher) ? sibSch.teacher[0]?.last_name : (sibSch.teacher as any).last_name}` : undefined,
-              preferences: sibPrefs || []
-            });
+              const { data: sibPrefs } = await supabase
+                .from('student_schedule_preferences')
+                .select('*')
+                .eq('student_id', sibData.id);
+
+              const teacherMatch = (teachers || []).find((t: any) => t.id === sibSch?.teacher_id);
+              const teacherName = teacherMatch ? `${teacherMatch.first_name || ''} ${teacherMatch.last_name || ''}`.trim() : undefined;
+
+              setSiblingInfo({
+                id: sibData.id,
+                first_name: sibData.first_name || '',
+                last_name: sibData.last_name || '',
+                instrument: sibData.instrument || '',
+                duration: sibData.lesson_duration || 30,
+                assignedDay: sibSch?.day_of_week,
+                assignedTime: sibSch?.start_time,
+                teacher_name: teacherName || undefined,
+                preferences: sibPrefs || []
+              });
+            } else {
+              setSiblingInfo(null);
+            }
           } else {
             setSiblingInfo(null);
           }
         } else {
+          setSelectedStudentNote(null);
           setSiblingInfo(null);
         }
       } catch (err) {
@@ -3179,15 +3193,16 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
     setToast({ message: 'Termine per Drag & Drop zusammengeführt!', type: 'success' });
   };
 
-  // Handle drops on columns
+  // Handle drops on columns (support both Drag & Drop and accessible 2-click selection)
   const handleDropOnBoard = async (targetBoardId: string, index?: number, droppedCustomTime?: string, isAltSwap: boolean = false) => {
-    if (!draggedStudentId) return;
+    const activeId = draggedStudentId || selectedStudentId;
+    if (!activeId) return;
 
-    const isBreakDrag = draggedStudentId.startsWith('break-') || draggedStudentId === 'sidebar-pause';
-    let student = students.find(s => s.id === draggedStudentId);
+    const isBreakDrag = activeId.startsWith('break-') || activeId === 'sidebar-pause';
+    let student = students.find(s => s.id === activeId);
     if (!student && !isBreakDrag) {
       for (const b of boards) {
-        const found = b.students.find(s => s.id === draggedStudentId);
+        const found = b.students.find(s => s.id === activeId);
         if (found) {
           student = found;
           break;
@@ -3196,8 +3211,12 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
     }
     if (!student && !isBreakDrag) return;
 
+    const effectiveSource = dragSource || (selectedStudentId ? 'sidebar' : null);
+    const effectiveSourceBoardId = dragSourceBoardId;
+
     // Execute standard drop with explicit move vs swap control
-    await executeStandardDrop(draggedStudentId, targetBoardId, index, dragSource, dragSourceBoardId, undefined, droppedCustomTime, isAltSwap);
+    await executeStandardDrop(activeId, targetBoardId, index, effectiveSource, effectiveSourceBoardId, undefined, droppedCustomTime, isAltSwap);
+    setSelectedStudentId(null);
   };
 
   const executeStandardDrop = async (sourceId: string, targetBoardId: string, index?: number, source?: string | null, sourceBoardId?: string | null, chosenInstrument?: string, droppedCustomTime?: string, isAltSwap: boolean = false) => {
@@ -4270,9 +4289,9 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
           if (s.room_id !== board.roomId) return false;
           if (s.day_of_week !== board.dayOfWeek) return false;
 
-          const [bsh, bsm] = parseTime(s.start_time.substring(0, 5));
+          const [bsh, bsm] = parseTime(s.start_time ? s.start_time.substring(0, 5) : '00:00');
           const bStart = bsh * 60 + bsm;
-          const [beh, bem] = parseTime(s.end_time.substring(0, 5));
+          const [beh, bem] = parseTime(s.end_time ? s.end_time.substring(0, 5) : '23:59');
           const bEnd = beh * 60 + bem;
 
           return startMin < bEnd && endMin > bStart;
@@ -5740,6 +5759,13 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                   return (
                     <div
                       key={board.id}
+                      role="region"
+                      aria-label={`Wochentag ${DAYS_OF_WEEK.find(d => d.value === board.dayOfWeek)?.name || 'Tag'}`}
+                      onClick={() => {
+                        if (selectedStudentId) {
+                          handleDropOnBoard(board.id);
+                        }
+                      }}
                       onDragOver={handleDragOver}
                       onDrop={(e) => {
                         e.preventDefault();
@@ -6424,6 +6450,15 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                           return (
                             <div
                               key={bs.id}
+                              role="button"
+                              tabIndex={0}
+                              aria-label={`Pause ${breakStartTime} bis ${breakEndTime} Uhr`}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  e.preventDefault();
+                                  (e.currentTarget as HTMLElement).click();
+                                }
+                              }}
                               draggable={true}
                               onDragStart={(e) => handleDragStart(bs.id, 'board', board.id, e)}
                               onDragEnd={handleDragEnd}
@@ -6616,9 +6651,9 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                             if (s.room_id !== board.roomId) return false;
                             if (s.day_of_week !== board.dayOfWeek) return false;
 
-                            const [bsh, bsm] = parseTime(s.start_time.substring(0, 5));
+                            const [bsh, bsm] = parseTime(s.start_time ? s.start_time.substring(0, 5) : '00:00');
                             const bStart = bsh * 60 + bsm;
-                            const [beh, bem] = parseTime(s.end_time.substring(0, 5));
+                            const [beh, bem] = parseTime(s.end_time ? s.end_time.substring(0, 5) : '23:59');
                             const bEnd = beh * 60 + bem;
 
                             return startMin < bEnd && endMin > bStart;
@@ -6795,6 +6830,15 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                           return (
                             <div
                               key={bs.id}
+                              role="button"
+                              tabIndex={0}
+                              aria-label={`Geplanter Termin: ${bs.first_name || ''} ${maskLastName(bs.last_name || '', showRealNames)}, ${bs.assignedTime || ''}, ${bs.duration || 30} Minuten`}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  e.preventDefault();
+                                  (e.currentTarget as HTMLElement).click();
+                                }
+                              }}
                               draggable={true}
                               onDragStart={(e) => handleDragStart(bs.id, 'board', board.id, e)}
                               onDragEnd={handleDragEnd}
@@ -7443,6 +7487,15 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                   return (
                     <div
                       key={s.id}
+                      role="button"
+                      tabIndex={0}
+                      aria-label={`Schüler ${s.first_name} ${maskLastName(s.last_name, showRealNames)}, ${s.instrument || 'Instrument'}, ${s.duration || 30} Minuten${isSelected ? ', ausgewählt für Zuweisung' : ''}`}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          (e.currentTarget as HTMLElement).click();
+                        }
+                      }}
                       draggable={true}
                       onPointerDown={(e) => e.stopPropagation()}
                       onMouseDown={(e) => {

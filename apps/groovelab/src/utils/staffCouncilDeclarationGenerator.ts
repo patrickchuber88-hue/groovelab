@@ -91,7 +91,7 @@ export async function generateStaffCouncilDeclarationPDF(options: StaffCouncilDe
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8);
     doc.setTextColor(textGray[0], textGray[1], textGray[2]);
-    const summaryText = 'Die Schulmanagement- und Übe-Plattform Campus-Groovelab wurde nach der Subsidiaritäts-Doktrin und dem Grundsatz der „digitalen Kreidetafel“ konzipiert: Sie dient als rein freiwilliges, unterstützendes Convenience-Werkzeug („Fast-Track“) zur Unterrichtsbegleitung und ersetzt weder städtische ERP-Systeme noch offizielle Dienstwege. Die Plattform enthält keinerlei Überwachungsfunktionen für Lehrkräfte und schützt Honorarkräfte durch volle Übermittlungsfreiheit vor Scheinselbstständigkeitsrisiken.';
+    const summaryText = 'Leitbild & Schutzprinzip: Campus-Groovelab dient den Lehrkräften für einen optimalen Unterrichtsalltag und nicht die Lehrkräfte dem Schulalltag. Die Schulmanagement- und Übe-Plattform wurde nach der Subsidiaritäts-Doktrin und dem Grundsatz der „digitalen Kreidetafel“ konzipiert: Sie dient als rein freiwilliges, unterstützendes Convenience-Werkzeug („Fast-Track“) zur Unterrichtsbegleitung und ersetzt weder städtische ERP-Systeme noch offizielle Dienstwege. Die Plattform enthält keinerlei Überwachungsfunktionen für Lehrkräfte und schützt Honorarkräfte durch volle didaktische Freiheit vor Scheinselbstständigkeitsrisiken.';
     const splitSummary = doc.splitTextToSize(summaryText, contentWidth - 10);
     doc.text(splitSummary, margin + 5, 55);
 
@@ -148,8 +148,8 @@ export async function generateStaffCouncilDeclarationPDF(options: StaffCouncilDe
 
     const section2Points = [
       {
-        title: 'A. Reine Dispositionsvorschläge, Übermittlungsfreiheit & Weisungsfreiheit',
-        desc: 'Stundenplan-, Raum- und Terminbelegungsfunktionen stellen rechtlich unverbindliche didaktische Dispositionsvorschläge dar. Lehrkräften (insbesondere freien Honorarkräften) steht es vollkommen frei, Termine und Raumwünsche digital über Campus-Groovelab oder herkömmlich (per E-Mail, Telefon oder Zettel) an die Verwaltung zu übermitteln. Es besteht kein Nutzungszwang und keine arbeitsteilige Einbindung in den städtischen Weisungsapparat.'
+        title: 'A. Didaktisches Assistenz-Prinzip, Übermittlungsfreiheit & Weisungsfreiheit',
+        desc: 'Campus-Groovelab dient dem Unterrichtsalltag der Lehrkraft, nicht dem Schulalltag der Schulleitung. Stundenplan-, Raum- und Terminbelegungsfunktionen stellen rechtlich unverbindliche didaktische Dispositionsvorschläge dar. Lehrkräften (insbesondere freien Honorarkräften) steht es vollkommen frei, Termine und Raumwünsche digital über Campus-Groovelab oder herkömmlich (per E-Mail, Telefon oder Zettel) an die Verwaltung zu übermitteln. Es besteht kein Nutzungszwang und keine arbeitsteilige Einbindung in den städtischen Weisungsapparat.'
       },
       {
         title: 'B. Subsidiaritäts-Doktrin, Nichterreichbarkeit & Zeiteinteilung (§ 5 ArbSchG)',
@@ -265,7 +265,7 @@ export async function generateStaffCouncilDeclarationPDF(options: StaffCouncilDe
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7.8);
     doc.setTextColor(textGray[0], textGray[1], textGray[2]);
-    const sealText = 'Der Betreiber bestätigt hiermit ausdrücklich, dass der Einsatz von Campus-Groovelab den Erfordernissen des Personalvertretungsrechts (§ 87 Abs. 1 Nr. 6 BetrVG, LPVG der Länder, BPersVG) sowie den Anforderungen der DSGVO (Art. 5, 28, 32) und des § 26 BDSG vollumfänglich entspricht. Als rein unterstützendes, weisungsfreies Beschleunigungswerkzeug wahrt die Plattform die Autonomie von Honorarkräften (BSG B 12 R 3/20 R). Das vorliegende Attest kann von der Schulleitung direkt der Personalvertretung (Personalrat, Betriebsrat, Lehrerrat) zur Genehmigung bzw. Kenntnisnahme vorgelegt werden.';
+    const sealText = 'Der Betreiber bestätigt hiermit ausdrücklich, dass der Einsatz von Campus-Groovelab den Erfordernissen des Personalvertretungsrechts (§ 87 Abs. 1 Nr. 6 BetrVG, LPVG der Länder, BPersVG) sowie den Anforderungen der DSGVO (Art. 5, 28, 32) und des § 26 BDSG vollumfänglich entspricht. Nach dem Leitbild des didaktischen Assistenz-Prinzips dient die Plattform den Lehrkräften für den optimalen Unterrichtsalltag, nicht die Lehrkräfte dem Schulalltag. Als weisungsfreies Beschleunigungswerkzeug wahrt die Plattform die pädagogische Autonomie von Honorarkräften (BSG B 12 R 3/20 R). Das vorliegende Attest kann von der Schulleitung direkt der Personalvertretung (Personalrat, Betriebsrat, Lehrerrat) zur Genehmigung bzw. Kenntnisnahme vorgelegt werden.';
     const splitSeal = doc.splitTextToSize(sealText, contentWidth - 12);
     doc.text(splitSeal, margin + 6, curY + 15);
 

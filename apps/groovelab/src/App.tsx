@@ -50,6 +50,7 @@ const QuarterlyAccessReportModal = lazy(() => import('./components/ui/QuarterlyA
 
 
 import { LegalConsentGate } from './components/LegalConsentGate';
+import { announceA11y } from './components/common/A11yLiveAnnouncer';
 
 import { MobileBottomNav } from './components/ui/MobileBottomNav';
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
@@ -648,10 +649,12 @@ function App() {
 
   // Declarative definition of renderLegalModals to ensure availability across all routes/landing pages
   const renderLegalModals = () => {
-    const isLegalOpen = showPrivacy || showAgb || showImpressum || showCancellation;
-    const initialTab: 'privacy' | 'terms' | 'impressum' | 'cancellation' = showPrivacy 
-      ? 'privacy' 
-      : (showAgb ? 'terms' : (showCancellation ? 'cancellation' : 'impressum'));
+    const isLegalOpen = showPrivacy || showAgb || showImpressum || showCancellation || showAccessibility;
+    const initialTab: 'privacy' | 'terms' | 'impressum' | 'cancellation' | 'accessibility' = showAccessibility
+      ? 'accessibility'
+      : (showPrivacy 
+        ? 'privacy' 
+        : (showAgb ? 'terms' : (showCancellation ? 'cancellation' : 'impressum')));
 
     return (
       <LegalTextModal 
@@ -662,6 +665,7 @@ function App() {
           setShowAgb(false);
           setShowImpressum(false);
           setShowCancellation(false);
+          setShowAccessibility(false);
         }}
       />
     );
@@ -1000,6 +1004,7 @@ function App() {
   const [showAgb, setShowAgb] = useState(false);
   const [showImpressum, setShowImpressum] = useState(false);
   const [showCancellation, setShowCancellation] = useState(false);
+  const [showAccessibility, setShowAccessibility] = useState(false);
   const [showPilotAgreementModal, setShowPilotAgreementModal] = useState(false);
   const [showTrialInfoModal, setShowTrialInfoModal] = useState(false);
   const [stationIdFromStorage, setStationIdFromStorage] = useState(() => typeof window !== 'undefined' ? localStorage.getItem('groovelab_station_id') : null);
@@ -1803,6 +1808,30 @@ function App() {
       window.dispatchEvent(new CustomEvent('campus_reset_homework_board'));
     }
     setActiveStudentTabRaw(val);
+    const tabLabels: Record<string, string> = {
+      briefing: 'Briefing-Dashboard geöffnet',
+      homework_book: 'Hausaufgabenheft geöffnet',
+      practice_board: 'Übe-Pfad geöffnet',
+      practice: 'Übe-Studio geöffnet',
+      mediathek: 'Mediathek geöffnet',
+      events: 'Termine geöffnet',
+      campus_cup: 'Campus-Cup geöffnet',
+      messages: 'Nachrichten geöffnet',
+      settings: 'Einstellungen geöffnet',
+      overview: 'Übersicht geöffnet',
+      live: 'Live-Lab geöffnet',
+      library: 'Song-Bibliothek geöffnet',
+      repertoire: 'Repertoire geöffnet',
+      bands: 'Band-Zentrale geöffnet',
+      schedule: 'Stundenplan geöffnet',
+      students: 'Schüler-Übersicht geöffnet',
+      songs: 'Song-Verwaltung geöffnet',
+      rooms: 'Raumplaner geöffnet',
+      billing: 'Abrechnung geöffnet'
+    };
+    if (tabLabels[val]) {
+      announceA11y(tabLabels[val]);
+    }
     // Persist the tab to the correct sessionStorage and localStorage keys based on the current active platform
     const platform = (typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_active_platform') || localStorage.getItem('groovelab_active_platform')) : null) || 'campus';
     if (typeof window !== 'undefined') {
@@ -3307,8 +3336,12 @@ function App() {
 
       const schoolData = Array.isArray(userData.schools) ? userData.schools[0] : userData.schools;
       const isMaster = userData.is_master_admin === true;
-      if (schoolData?.is_paused && !isMaster) {
-        console.warn('[Dashboard] School is paused!');
+      const isStudentUser = userData.role?.toLowerCase() === 'student';
+      // 🛡️ Axiom der didaktischen Immunität: Schüler dürfen NIEMALS durch Schul-Pausierung ausgesperrt werden.
+      // 🛡️ B2B-Delinquenz-Schutz: isSchoolPaused greift NUR bei expliziter Suspendierung durch den Master-Admin (status === 'suspended').
+      const isExplicitlySuspended = schoolData?.status === 'suspended' && schoolData?.is_paused === true;
+      if (isExplicitlySuspended && !isMaster && !isStudentUser) {
+        console.warn('[Dashboard] School is explicitly suspended by Master-Admin!');
         setIsSchoolPaused(true);
         setUser(userData);
         setLoading(false);
@@ -6795,6 +6828,7 @@ function App() {
           onShowPrivacy={() => setShowPrivacy(true)}
           onShowAgb={() => setShowAgb(true)}
           onShowImpressum={() => setShowImpressum(true)}
+          onShowAccessibility={() => setShowAccessibility(true)}
         />
         {renderLegalModals()}
       </Suspense>
@@ -6897,6 +6931,7 @@ function App() {
             onShowPrivacy={() => setShowPrivacy(true)}
             onShowAgb={() => setShowAgb(true)}
             onShowImpressum={() => setShowImpressum(true)}
+            onShowAccessibility={() => setShowAccessibility(true)}
           />
           {renderLegalModals()}
         </Suspense>
@@ -7223,8 +7258,8 @@ function App() {
     }
   }
 
-  // 2.6 DEACTIVATED / PAUSED SCHOOL CHECK
-  if (isSchoolPaused) {
+  // 2.6 DEACTIVATED / PAUSED SCHOOL CHECK (Students possess Didactic Immunity)
+  if (isSchoolPaused && user?.role?.toLowerCase() !== 'student') {
     return (
       <div style={{
         position: 'fixed',
@@ -9721,7 +9756,7 @@ function App() {
         }} />
 
 
-      <main className="main-content" style={{ 
+      <main id="main-content" tabIndex={-1} className="main-content" style={{ 
         overflow: (windowWidth <= 768 || activeStudentTab !== 'live') ? 'auto' : 'hidden', 
         flex: 1, 
         display: 'flex', 
@@ -10271,6 +10306,8 @@ function App() {
                     <span onClick={() => setShowCancellation(true)} style={{ cursor: 'pointer' }}>Widerruf</span>
                     <span style={{ opacity: 0.5 }}>•</span>
                     <span onClick={() => setShowImpressum(true)} style={{ cursor: 'pointer' }}>Impressum</span>
+                    <span style={{ opacity: 0.5 }}>•</span>
+                    <span onClick={() => setShowAccessibility(true)} style={{ cursor: 'pointer' }}>Barrierefreiheit</span>
                   </div>
                   <span style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 600 }}><CampusGroovelabText fontSize="0.7rem" fontWeight={600} /> © {new Date().getFullYear()}</span>
                 </div>
@@ -11592,6 +11629,8 @@ function App() {
                         <span onClick={() => setShowCancellation(true)} style={{ cursor: 'pointer' }}>Widerruf</span>
                         <span style={{ opacity: 0.5 }}>•</span>
                         <span onClick={() => setShowImpressum(true)} style={{ cursor: 'pointer' }}>Impressum</span>
+                        <span style={{ opacity: 0.5 }}>•</span>
+                        <span onClick={() => setShowAccessibility(true)} style={{ cursor: 'pointer' }}>Barrierefreiheit</span>
                       </div>
                       <span style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 600 }}><CampusGroovelabText fontSize="0.7rem" fontWeight={600} /> © {new Date().getFullYear()}</span>
                     </div>

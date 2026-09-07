@@ -25,7 +25,7 @@ export const CAMPUS_AGE_STANDARDS: Record<string, CampusAgeStandard> = {
     allowTimer: true,
     allowLeaderboard: false,
     allowProposals: false,
-    allowAudio: true,
+    allowAudio: false, // 🛡️ Privacy by Default (Art. 25 Abs. 2 DSGVO): Audio standardmäßig deaktiviert
     allowTts: true,
     bedtimeEnabled: true,
     bedtimeStart: '20:00',
@@ -33,7 +33,7 @@ export const CAMPUS_AGE_STANDARDS: Record<string, CampusAgeStandard> = {
     boardOverrides: {
       practice_board: true,
       mediathek: false,
-      recordings: true,
+      recordings: false, // 🛡️ Privacy by Default
       events: true,
       campus_cup: false,
       messages: false
@@ -48,7 +48,7 @@ export const CAMPUS_AGE_STANDARDS: Record<string, CampusAgeStandard> = {
     allowTimer: true,
     allowLeaderboard: true,
     allowProposals: true,
-    allowAudio: true,
+    allowAudio: false, // 🛡️ Privacy by Default (Art. 25 Abs. 2 DSGVO): Audio standardmäßig deaktiviert
     allowTts: false,
     bedtimeEnabled: true,
     bedtimeStart: '21:30',
@@ -56,7 +56,7 @@ export const CAMPUS_AGE_STANDARDS: Record<string, CampusAgeStandard> = {
     boardOverrides: {
       practice_board: true,
       mediathek: true,
-      recordings: true,
+      recordings: false, // 🛡️ Privacy by Default
       events: true,
       campus_cup: true,
       messages: true

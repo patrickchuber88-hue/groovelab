@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { ShieldCheck, Scale, FileText, CheckCircle2, AlertCircle, ChevronDown, ChevronUp, Lock, Check } from 'lucide-react';
 import { ACTIVE_LEGAL_VERSION, LEGAL_DOCUMENTS, computeSha256 } from '../legal/legalContent';
+import { isUUID } from '../utils/uuidValidator';
 
 interface LegalConsentGateProps {
   user: {
@@ -47,8 +48,8 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
     let isMounted = true;
 
     async function verifyLegalStatus() {
-      // Ghost mode or missing user ID bypasses gate to allow emergency operator actions
-      if (!user?.id || user.is_ghost_mode) {
+      // Ghost mode or missing/invalid user ID bypasses gate to allow emergency operator actions
+      if (!user?.id || !isUUID(user.id) || user.is_ghost_mode) {
         if (isMounted) {
           setIsCompliant(true);
           setIsChecking(false);

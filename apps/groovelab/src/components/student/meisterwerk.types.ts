@@ -34,6 +34,8 @@ export interface MeisterwerkDocumentationModalProps {
   isParentUnlocked?: boolean;
   parentPermissions?: any;
   onSaveParentOverrides?: (overrides: Record<string, boolean>) => void;
+  isSoftLocked?: boolean;
+  onTriggerSoftLock?: () => void;
 }
 
 export interface ProgressItem {

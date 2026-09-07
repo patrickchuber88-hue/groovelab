@@ -149,14 +149,20 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
     try {
       setIsSubmitting(true);
       const isFamilyBonus = linkedSiblings.length >= 2;
+      const initialPaymentStatus = isFamilyBonus ? 'paid' : 'transfer_pending';
+      const isCashPaid = isFamilyBonus ? true : false;
+      const nowIso = new Date().toISOString();
+
       const { error } = await supabase
         .from('students')
         .update({
           student_billing_payment_method: isFamilyBonus ? 'family_bonus' : 'bank_transfer',
-          payment_status: 'paid',
+          payment_status: initialPaymentStatus,
+          student_billing_cash_paid: isCashPaid,
           is_campus_active: true,
           exempt_from_direct_billing: isFamilyBonus ? true : false,
-          updated_at: new Date().toISOString()
+          activated_at: nowIso,
+          updated_at: nowIso
         })
         .eq('id', student.id);
 
@@ -165,17 +171,27 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
         await supabase
           .from('users')
           .update({
-            student_billing_payment_method: 'bank_transfer',
-            payment_status: 'paid',
+            student_billing_payment_method: isFamilyBonus ? 'family_bonus' : 'bank_transfer',
+            payment_status: initialPaymentStatus,
+            student_billing_cash_paid: isCashPaid,
             is_campus_active: true,
-            updated_at: new Date().toISOString()
+            exempt_from_direct_billing: isFamilyBonus ? true : false,
+            activated_at: nowIso,
+            updated_at: nowIso
           })
           .eq('id', student.id);
       }
 
       try {
         if (typeof window !== 'undefined') {
-          localStorage.setItem(`campus_paid_${student.id}`, 'true');
+          if (isFamilyBonus) {
+            localStorage.setItem(`campus_paid_${student.id}`, 'true');
+            localStorage.setItem(`campus_payment_status_${student.id}`, 'paid');
+          } else {
+            localStorage.setItem(`campus_payment_status_${student.id}`, 'transfer_pending');
+            localStorage.setItem(`campus_transfer_date_${student.id}`, nowIso);
+            localStorage.removeItem(`campus_paid_${student.id}`);
+          }
           localStorage.setItem(`campus_active_${student.id}`, 'true');
         }
       } catch (e) {}
@@ -343,7 +359,7 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(6.8);
       doc.setTextColor(100, 116, 139);
-      doc.text('Gesetzliches Widerrufsrecht (§ 312d BGB / Art. 246a EGBGB): 14 Tage ab Vertragsschluss, im 1. Schnuppermonat jederzeit kostenfrei widerrufbar.', 22, 254);
+      doc.text('Gesetzliches Widerrufsrecht (§ 312g i. V. m. § 355 BGB / Art. 246a EGBGB): 14 Tage ab Vertragsschluss, im 1. Schnuppermonat jederzeit kostenfrei widerrufbar.', 22, 254);
 
       // Legal note
       doc.setFontSize(7.5);
@@ -701,8 +717,26 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
             boxShadow: '0 4px 16px rgba(0, 0, 0, 0.02)'
           }}>
             <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#0369a1', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '10px' }}>
-              ✦ Schritt 1: Mit Ihrer Banking-App scannen ✦
+              {schoolYearCalc.isCurrentTrialPeriod 
+                ? `✦ Zahlungsanweisung für das Schuljahr (Fällig zum 01. ${schoolYearCalc.paidStartMonthName}) ✦`
+                : '✦ Schritt 1: Mit Ihrer Banking-App scannen ✦'}
             </span>
+
+            {schoolYearCalc.isCurrentTrialPeriod && (
+              <div style={{
+                background: '#ecfdf5',
+                border: '1.5px solid #a7f3d0',
+                borderRadius: '12px',
+                padding: '10px 14px',
+                marginBottom: '14px',
+                fontSize: '0.76rem',
+                color: '#065f46',
+                lineHeight: '1.45',
+                textAlign: 'left'
+              }}>
+                <strong>🎁 Kostenfreier Schnuppermonat ({schoolYearCalc.freeMonthName}):</strong> Das Campus-Studio für Ihr Kind wird mit Klick auf den Freischalt-Button <strong>sofort und ohne Vorauszahlung freigeschaltet</strong>. Die Überweisung von {isChf ? `CHF ${totalAmountStr}` : `${totalAmountStr} €`} für die verbleibende Schuljahresnutzung ({periodDescription}) können Sie bequem jetzt oder bis zum 01.{String(schoolYearCalc.paidStartMonth).padStart(2, '0')}. vornehmen.
+              </div>
+            )}
 
             {/* QR Inlay */}
             <div style={{
@@ -834,7 +868,11 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
             }}>
               <CheckCircle2 size={20} color="#10b981" />
               <div>
-                <div>Überweisung registriert! Sobald die Buchung eingeht, schaltet sich die App automatisch frei.</div>
+                <div>
+                  {schoolYearCalc.isCurrentTrialPeriod
+                    ? `✓ Kostenfreier Schnuppermonat (${schoolYearCalc.freeMonthName}) aktiviert! Das Campus-Studio ist ab sofort für Ihr Kind freigeschaltet.`
+                    : 'Überweisung registriert! Ihr 14-tägiger Vertrauenszugang ist ab sofort aktiv. Sobald der Zahlungseingang verbucht ist, wird die Freischaltung für das gesamte Schuljahr dauerhaft bestätigt.'}
+                </div>
                 <div style={{ fontSize: '0.74rem', color: '#047857', fontWeight: 600, marginTop: '2px' }}>
                   ✓ Ihr offizieller Vertrags- &amp; Überweisungsbeleg (PDF gem. § 312f BGB) wurde automatisch heruntergeladen.
                 </div>
@@ -937,7 +975,7 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <span style={{ fontWeight: 800, color: '#0f172a' }}>🛡️ Gesetzliches Widerrufsrecht</span>
                 <span style={{ fontSize: '0.66rem', color: '#059669', background: '#ecfdf5', padding: '1px 6px', borderRadius: '6px', fontWeight: 700 }}>
-                  § 312d BGB • Art. 246a EGBGB
+                  § 312g • § 355 BGB • Art. 246a EGBGB
                 </span>
               </div>
               <div>
@@ -990,10 +1028,12 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
               {isSubmitting 
                 ? 'Wird freigeschaltet...' 
                 : submittedSuccess 
-                  ? '✓ Überweisung gemeldet' 
+                  ? (schoolYearCalc.isCurrentTrialPeriod ? '✓ Schnuppermonat freigeschaltet' : '✓ Überweisung gemeldet') 
                   : isThirdOrMoreChild 
                     ? 'Kostenlos freischalten' 
-                    : 'Zahlungspflichtig bestellen'}
+                    : schoolYearCalc.isCurrentTrialPeriod
+                      ? `Kostenfreien Schnuppermonat jetzt starten (${freeMonthDisplay})`
+                      : 'Zahlungspflichtig bestellen'}
             </button>
 
             {/* 2-Column secondary tools */}

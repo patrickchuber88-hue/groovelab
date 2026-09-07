@@ -898,6 +898,9 @@ export const TeacherNotesBoardModal: React.FC<TeacherNotesBoardModalProps> = ({
       }}
     >
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Notizen-Board"
         style={{
           width: '100%',
           maxWidth: '1380px',
@@ -1117,6 +1120,7 @@ export const TeacherNotesBoardModal: React.FC<TeacherNotesBoardModalProps> = ({
             <button
               type="button"
               onClick={onClose}
+              aria-label="Board schließen"
               title="Board schließen (Esc)"
               style={{
                 width: '32px',

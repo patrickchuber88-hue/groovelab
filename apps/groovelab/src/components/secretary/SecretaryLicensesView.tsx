@@ -157,6 +157,8 @@ export interface SecretaryLicensesViewProps {
   activeStudentsModalList: any;
   setActiveStudentsModalList: (val: any) => void;
   getEffectiveStorageUsedBytes: (profile: any) => number;
+  isSecretaryReadOnly?: boolean;
+  onOpenDunningPayModal?: (inv?: any) => void;
 }
 
 export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
@@ -301,7 +303,9 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
     loadingTariffBookings,
     activeStudentsModalList,
     setActiveStudentsModalList,
-    getEffectiveStorageUsedBytes
+    getEffectiveStorageUsedBytes,
+    isSecretaryReadOnly = false,
+    onOpenDunningPayModal
   } = props;
 
   // Local state for active tab inside booked licenses view
@@ -3968,13 +3972,29 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                                     Schüler auflisten
                                                   </button>
                                                 )}
-                                                <button 
-                                                  onClick={() => setSelectedInvoice(inv)} 
-                                                  className="hover-scale font-bold"
-                                                  style={{ border: '1px solid #cbd5e1', background: '#ffffff', borderRadius: '10px', padding: '6px 12px', fontSize: '0.72rem', cursor: 'pointer', transition: 'all 0.2s' }}
-                                                >
-                                                  PDF
-                                                </button>
+                                                {(() => {
+                                                  const isPaid = inv.status === 'Bezahlt' || inv.status === 'paid' || inv.paid === true;
+                                                  return (
+                                                    <>
+                                                      {!isPaid && onOpenDunningPayModal && (
+                                                        <button 
+                                                          onClick={() => onOpenDunningPayModal(inv)} 
+                                                          className="hover-scale font-bold"
+                                                          style={{ border: '1px solid #16a34a', background: '#dcfce7', color: '#15803d', borderRadius: '10px', padding: '6px 12px', fontSize: '0.72rem', cursor: 'pointer', transition: 'all 0.2s', marginRight: '6px' }}
+                                                        >
+                                                          ⚡ Bezahlen
+                                                        </button>
+                                                      )}
+                                                      <button 
+                                                        onClick={() => setSelectedInvoice(inv)} 
+                                                        className="hover-scale font-bold"
+                                                        style={{ border: '1px solid #cbd5e1', background: '#ffffff', borderRadius: '10px', padding: '6px 12px', fontSize: '0.72rem', cursor: 'pointer', transition: 'all 0.2s' }}
+                                                      >
+                                                        PDF
+                                                      </button>
+                                                    </>
+                                                  );
+                                                })()}
                                               </div>
                                             </div>
                                           ))}

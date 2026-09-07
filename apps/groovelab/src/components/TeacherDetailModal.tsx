@@ -97,6 +97,9 @@ export const TeacherDetailModal: React.FC<TeacherDetailModalProps> = ({ teacher,
         }
       `}</style>
       <div 
+        role="dialog"
+        aria-modal="true"
+        aria-label="Lehrkraft-Details"
         className="glass-panel teacher-detail-panel animation-slide-up" 
         style={{ 
           background: 'rgba(255, 255, 255, 0.95)', 

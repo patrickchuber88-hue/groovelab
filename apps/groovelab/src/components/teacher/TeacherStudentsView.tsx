@@ -230,6 +230,15 @@ export const TeacherStudentsView: React.FC<TeacherStudentsViewProps> = ({
                     return (
                       <div 
                         key={student.id} 
+                        role="button"
+                        tabIndex={0}
+                        aria-label={`Schülerprofil öffnen: ${student.first_name} ${maskLastName(student.last_name, showRealNames)}, ${student.instrument || 'Musiker'}`}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            setSelectedStudentProfile(student);
+                          }
+                        }}
                         className="google-card"
                         style={{ 
                           padding: windowWidth < 768 ? '14px 12px' : '24px', 

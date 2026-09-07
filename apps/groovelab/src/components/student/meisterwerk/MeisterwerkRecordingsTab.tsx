@@ -1984,9 +1984,10 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
 
                       const studentIdVal = (student as any)?.id;
                       const localAudioKey = studentIdVal && typeof window !== 'undefined' ? localStorage.getItem(`groovelab_parent_allow_audio_${studentIdVal}`) : null;
-                      const isAudioAllowed = (student as any)?.parent_allow_audio !== false && 
-                        (localAudioKey !== null ? localAudioKey !== 'false' : true) &&
-                        (typeof window !== 'undefined' ? localStorage.getItem('campus_board_override_recordings') !== 'false' && localStorage.getItem('campus_allow_audio') !== 'false' : true);
+                      const localStudentAudioKey = studentIdVal && typeof window !== 'undefined' ? localStorage.getItem(`groovelab_parent_allow_student_audio_${studentIdVal}`) : null;
+                      const isAudioAllowed = (student as any)?.parent_allow_audio === true && 
+                        ((student as any)?.parent_permissions?.allow_student_audio === true || (localStudentAudioKey !== null ? localStudentAudioKey === 'true' : false)) &&
+                        (localAudioKey !== null ? localAudioKey === 'true' : true);
 
                       if (!isAudioAllowed) {
                         return (

@@ -1311,7 +1311,8 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
                               const userUpdates: any = { 
                                 is_campus_active: nextActive,
                                 exempt_from_direct_billing: markAsHardship ? true : (nextActive ? Boolean(student.exempt_from_direct_billing) : false),
-                                payment_status: nextActive ? (markAsHardship ? 'hardship' : (isDirectBilling ? 'paid' : 'active')) : 'passive'
+                                payment_status: nextActive ? (markAsHardship ? 'hardship' : (isDirectBilling ? 'paid' : 'active')) : 'passive',
+                                student_billing_cash_paid: nextActive ? true : false
                               };
 
                               const { data: existingUser } = await supabase.from('users').select('id').eq('id', student.id).maybeSingle();

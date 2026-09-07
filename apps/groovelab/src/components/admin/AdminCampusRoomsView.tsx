@@ -737,8 +737,8 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
 
         const hasBlockedSlot = roomBlockedSlots.some((s: any) => {
           if (s.room_id !== room.id || s.day_of_week !== targetDayInt) return false;
-          const blockStart = toMin(s.start_time.substring(0, 5));
-          const blockEnd = toMin(s.end_time.substring(0, 5));
+          const blockStart = toMin((s.start_time || '00:00').substring(0, 5));
+          const blockEnd = toMin((s.end_time || '23:59').substring(0, 5));
           return blockStart < newEnd && blockEnd > newStart;
         });
         if (hasBlockedSlot) return false;
@@ -1014,8 +1014,8 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
       });
 
       const mappedBlockedSlots = blockedSlotsForSlot.map((s: any) => {
-        const startTimeStr = s.start_time.substring(0, 5);
-        const endTimeStr = s.end_time.substring(0, 5);
+        const startTimeStr = s.start_time ? s.start_time.substring(0, 5) : '00:00';
+        const endTimeStr = s.end_time ? s.end_time.substring(0, 5) : '23:59';
 
         return {
           id: s.id,
@@ -1233,8 +1233,8 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
         if (s.room_id !== roomId) return false;
         if (s.day_of_week !== targetDayInt) return false;
 
-        const blockStart = toMin(s.start_time.substring(0, 5));
-        const blockEnd   = toMin(s.end_time.substring(0, 5));
+        const blockStart = toMin((s.start_time || '00:00').substring(0, 5));
+        const blockEnd   = toMin((s.end_time || '23:59').substring(0, 5));
 
         return blockStart < newEnd && blockEnd > newStart;
       });
@@ -1650,8 +1650,8 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
         if (s.room_id !== booking.roomId) return false;
         if (s.day_of_week !== (targetDayIdx + 1)) return false;
 
-        const blockStart = toMin(s.start_time.substring(0, 5));
-        const blockEnd   = toMin(s.end_time.substring(0, 5));
+        const blockStart = toMin((s.start_time || '00:00').substring(0, 5));
+        const blockEnd   = toMin((s.end_time || '23:59').substring(0, 5));
 
         return blockStart < newEndMins && blockEnd > newStartMins;
       });
@@ -1784,8 +1784,8 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
             if (s.room_id !== finalB.roomId) return false;
             if (s.day_of_week !== targetDayIntVal) return false;
 
-            const blockStart = toMin(s.start_time.substring(0, 5));
-            const blockEnd   = toMin(s.end_time.substring(0, 5));
+            const blockStart = toMin((s.start_time || '00:00').substring(0, 5));
+            const blockEnd   = toMin((s.end_time || '23:59').substring(0, 5));
 
             return blockStart < finalEnd && blockEnd > finalStart;
           });

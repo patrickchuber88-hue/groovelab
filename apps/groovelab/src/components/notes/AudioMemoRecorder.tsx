@@ -51,9 +51,16 @@ export const AudioMemoRecorder: React.FC<AudioMemoRecorderProps> = ({
   }, [audioUrl, stopHardwareStream]);
 
   const startRecording = async () => {
-    if (user?.parent_allow_audio === false || (user as any)?.parent_permissions?.allow_student_audio === false) {
-      setErrorMsg('Sprachaufnahmen wurden von den Erziehungsberechtigten deaktiviert.');
-      return;
+    const isStudent = user?.role?.toLowerCase() === 'student';
+    if (isStudent) {
+      const studentId = user?.id;
+      const isAllowed = user?.parent_allow_audio === true && 
+        ((user as any)?.parent_permissions?.allow_student_audio === true ||
+        (studentId && typeof window !== 'undefined' ? localStorage.getItem(`groovelab_parent_allow_student_audio_${studentId}`) === 'true' : false));
+      if (!isAllowed) {
+        setErrorMsg('Sprachaufnahmen wurden von den Erziehungsberechtigten noch nicht freigegeben (Privacy by Default).');
+        return;
+      }
     }
     if (!hasTresor) return;
     setErrorMsg(null);

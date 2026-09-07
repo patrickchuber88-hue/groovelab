@@ -81,7 +81,7 @@ export const ExecutiveTab: React.FC<ExecutiveTabProps> = ({
   const [exportingCfoPdf, setExportingCfoPdf] = useState(false);
   const [cfoExportToast, setCfoExportToast] = useState<string | null>(null);
   const [showEmergencyModal, setShowEmergencyModal] = useState(false);
-  const [emergencyReason, setEmergencyReason] = useState('Planmäßige Rechenzentrums-Wartung (Hetzner Cloud Frankfurt)');
+  const [emergencyReason, setEmergencyReason] = useState('Planmäßige Rechenzentrums-Wartung (Hetzner Falkenstein / Nürnberg)');
   const [isMaintenanceMode, setIsMaintenanceMode] = useState(false);
   const [liveDbLatency, setLiveDbLatency] = useState<number>(24);
 
@@ -94,7 +94,7 @@ export const ExecutiveTab: React.FC<ExecutiveTabProps> = ({
   const sliderTrackRef = React.useRef<HTMLDivElement | null>(null);
 
   const [incidentTitle, setIncidentTitle] = useState('Geplante Datenbank- & Cache-Optimierung');
-  const [incidentRootCause, setIncidentRootCause] = useState('Routinemäßige PostgreSQL Index-Optimierung im Frankfurter Rechenzentrum.');
+  const [incidentRootCause, setIncidentRootCause] = useState('Routinemäßige PostgreSQL Index-Optimierung im Rechenzentrum (Hetzner Falkenstein / Nürnberg).');
   const [incidentResolution, setIncidentResolution] = useState('Hot-Reload der Indizes und automatischer Failover auf sekundären Node.');
   const [incidentPrevention, setIncidentPrevention] = useState('Erweiterte automatische Latenz-Überwachung und Zero-Downtime Hot-Standby.');
   const [broadcastSent, setBroadcastSent] = useState(false);
@@ -303,8 +303,8 @@ export const ExecutiveTab: React.FC<ExecutiveTabProps> = ({
   // 1-Click Incident Presets
   const applyIncidentPreset = (presetKey: 'hetzner' | 'db_upgrade' | 'ddos' | 'decix') => {
     if (presetKey === 'hetzner') {
-      setIncidentTitle('Hetzner Rechenzentrum Frankfurt: Stromnetz- / Hardware-Störung');
-      setIncidentRootCause('Primäre USV-Spannungsversorgung im Rechenzentrum Frankfurt (Hetzner Cloud) fiel kurzzeitig aus. Automatisches Failover auf redundante Knoten wurde erfolgreich ausgeführt. Zu keinem Zeitpunkt lag ein Datenverlust oder ein Sicherheitsleck vor.');
+      setIncidentTitle('Hetzner Rechenzentrum: Stromnetz- / Hardware-Störung');
+      setIncidentRootCause('Primäre USV-Spannungsversorgung im Rechenzentrum Falkenstein / Nürnberg (Hetzner Datacenter Park) fiel kurzzeitig aus. Automatisches Failover auf redundante Knoten wurde erfolgreich ausgeführt. Zu keinem Zeitpunkt lag ein Datenverlust oder ein Sicherheitsleck vor.');
       setIncidentResolution('Automatisches Umschalten auf die sekundäre Hot-Standby Instanz und Wiederherstellung der vollen IOPS-Leistung.');
       setIncidentPrevention('Einführung einer Multi-Availability-Zone-Architektur zur vollkommen unterbrechungsfreien Lastverteilung.');
       if (slaMode === 'simulator') setSlaUptime(99.20);
@@ -691,7 +691,7 @@ export const ExecutiveTab: React.FC<ExecutiveTabProps> = ({
         const sha256Hex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 
         await supabase.from('global_broadcasts').insert({
-          title: 'System-Wartung im Rechenzentrum Frankfurt',
+          title: 'System-Wartung im Rechenzentrum (Hetzner Falkenstein / Nürnberg)',
           message: emergencyReason,
           type: 'maintenance',
           is_active: true,
@@ -1819,7 +1819,7 @@ export const ExecutiveTab: React.FC<ExecutiveTabProps> = ({
             </div>
 
             <div style={{ textAlign: 'right' }}>
-              <span style={{ fontSize: '0.66rem', color: '#64748b', fontWeight: 700, display: 'block' }}>Hetzner Frankfurt</span>
+              <span style={{ fontSize: '0.66rem', color: '#64748b', fontWeight: 700, display: 'block' }}>Hetzner Falkenstein</span>
               <span style={{ fontSize: '0.76rem', color: '#10b981', fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>
                 ⚡ {liveDbLatency} ms Ping
               </span>
@@ -1930,7 +1930,7 @@ export const ExecutiveTab: React.FC<ExecutiveTabProps> = ({
             <div style={{ background: '#f8fafc', padding: '15px', borderRadius: '16px', border: '1px solid #f1f5f9' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontSize: '0.70rem', color: '#64748b', fontWeight: 750, textTransform: 'uppercase' }}>API Edge Latenz</span>
-                <span style={{ fontSize: '0.66rem', color: '#0284c7', fontWeight: 700 }}>Frankfurt EU</span>
+                <span style={{ fontSize: '0.66rem', color: '#0284c7', fontWeight: 700 }}>Falkenstein EU</span>
               </div>
               <div style={{ fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', margin: '4px 0', fontVariantNumeric: 'tabular-nums' }}>
                 P95: 18 ms
@@ -2778,7 +2778,7 @@ export const ExecutiveTab: React.FC<ExecutiveTabProps> = ({
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '6px', marginBottom: '8px' }}>
                     <button
                       type="button"
-                      onClick={() => setEmergencyReason('Rechenzentrum Frankfurt (USV-Umschaltung / Hardware-Wartung)')}
+                      onClick={() => setEmergencyReason('Rechenzentrum (Hetzner Falkenstein / Nürnberg USV-Umschaltung)')}
                       style={{ padding: '6px 10px', borderRadius: '8px', background: '#f8fafc', border: '1px solid #cbd5e1', fontSize: '0.74rem', fontWeight: 750, color: '#334155', cursor: 'pointer', textAlign: 'left' }}
                     >
                       Hetzner USV-Wartung
@@ -3477,7 +3477,7 @@ export const ExecutiveTab: React.FC<ExecutiveTabProps> = ({
                       <Building2 size={18} color="#0f172a" />
                       <div>
                         <div style={{ fontWeight: 850, color: '#0f172a' }}>Hetzner Rechenzentrum</div>
-                        <div style={{ fontSize: '0.68rem', color: '#64748b' }}>USV-Umschaltung Frankfurt</div>
+                        <div style={{ fontSize: '0.68rem', color: '#64748b' }}>USV-Umschaltung Falkenstein / Nürnberg</div>
                       </div>
                     </button>
 

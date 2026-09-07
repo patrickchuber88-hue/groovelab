@@ -16,6 +16,7 @@ export interface AudioTrackItem {
   topic?: string;
   author?: string;
   isTeacher?: boolean;
+  isCarriedOver?: boolean;
 }
 
 interface AudioTrackCarouselProps {
@@ -29,6 +30,7 @@ interface AudioTrackCarouselProps {
   activeTopicContext?: string;
   isFutureWeek?: boolean;
   defaultExpanded?: boolean;
+  isCarriedOver?: boolean;
 }
 
 // Lightweight WebAudio beep helper for 4-beat count-in
@@ -70,7 +72,8 @@ export const AudioTrackCarousel: React.FC<AudioTrackCarouselProps> = ({
   isTeacher = true,
   activeTopicContext,
   isFutureWeek = false,
-  defaultExpanded
+  defaultExpanded,
+  isCarriedOver = false
 }) => {
   const [activeIndex, setActiveIndex] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(false);
@@ -81,6 +84,8 @@ export const AudioTrackCarousel: React.FC<AudioTrackCarouselProps> = ({
   const harmonizedTracks = React.useMemo(() => {
     return harmonizeAudioList(tracks || [], isTeacher, activeTopicContext);
   }, [tracks, isTeacher, activeTopicContext]);
+
+  const hasCarriedOverTracks = isCarriedOver || harmonizedTracks.some(t => Boolean(t.isCarriedOver));
 
   useEffect(() => {
     if (activeIndex >= harmonizedTracks.length && harmonizedTracks.length > 0) {
@@ -115,7 +120,7 @@ export const AudioTrackCarousel: React.FC<AudioTrackCarouselProps> = ({
             userSelect: 'none'
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <Mic size={12} style={{ color: '#16a34a' }} />
             <span style={{
               fontSize: '0.70rem',
@@ -125,6 +130,24 @@ export const AudioTrackCarousel: React.FC<AudioTrackCarouselProps> = ({
             }}>
               Unterrichtsaufnahmen ({harmonizedTracks.length})
             </span>
+            {hasCarriedOverTracks && (
+              <span style={{
+                fontSize: '0.64rem',
+                fontWeight: 800,
+                color: '#15803d',
+                background: '#dcfce7',
+                border: '1px solid #86efac',
+                borderRadius: '100px',
+                padding: '1px 6px',
+                lineHeight: 1.3,
+                letterSpacing: '0.01em',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '3px'
+              }}>
+                <span>Letzte Stunde</span>
+              </span>
+            )}
           </div>
           {harmonizedTracks.length > 2 && !readOnly && (
             <span style={{
@@ -295,6 +318,7 @@ export const AudioTrackCarousel: React.FC<AudioTrackCarouselProps> = ({
         onDelete={!readOnly && onDelete ? handleDeleteCurrent : undefined}
         onKeep={!readOnly && onKeep ? handleKeepCurrent : undefined}
         onHide={!readOnly && onHide ? handleHideCurrent : undefined}
+        isCarriedOver={hasCarriedOverTracks}
       />
     </div>
   );
@@ -823,6 +847,7 @@ interface AppleSplitCapsulePlayerProps {
   onDelete?: (e: React.MouseEvent) => void;
   onKeep?: (e: React.MouseEvent) => void;
   onHide?: (e: React.MouseEvent) => void;
+  isCarriedOver?: boolean;
 }
 
 const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
@@ -836,7 +861,8 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
   onNext,
   onDelete,
   onKeep,
-  onHide
+  onHide,
+  isCarriedOver = false
 }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [duration, setDuration] = useState<number>(initialDuration || 0);
@@ -1048,6 +1074,24 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
           }}>
             Unterrichtsaufnahmen
           </span>
+          {isCarriedOver && (
+            <span style={{
+              fontSize: '0.64rem',
+              fontWeight: 800,
+              color: '#15803d',
+              background: '#dcfce7',
+              border: '1px solid #86efac',
+              borderRadius: '100px',
+              padding: '1px 6px',
+              lineHeight: 1.3,
+              letterSpacing: '0.01em',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '3px'
+            }}>
+              <span>Letzte Stunde</span>
+            </span>
+          )}
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>

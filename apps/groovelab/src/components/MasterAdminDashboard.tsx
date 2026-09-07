@@ -1347,7 +1347,8 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
 
       const updates: any = {
         is_campus_active: true,
-        student_billing_cash_paid: true
+        student_billing_cash_paid: true,
+        payment_status: 'paid'
       };
       if (!user.is_groovelab_active) {
         updates.is_groovelab_active = true;
@@ -1378,7 +1379,8 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
       const updates = { 
         is_campus_active: true,
         is_groovelab_active: true,
-        student_billing_cash_paid: true
+        student_billing_cash_paid: true,
+        payment_status: 'paid'
       };
       const { error } = await supabase
         .from('users')
@@ -7765,6 +7767,8 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
               delete safePayload.custom_price_kombi;
               delete safePayload.subscription_bypass_until;
               delete safePayload.subscription_bypass_reason;
+              delete safePayload.summer_moratorium_active;
+              delete safePayload.dunning_kulanz_until;
               delete safePayload.mfa_enforced_for_admins;
 
               const fallbackRes = await supabase

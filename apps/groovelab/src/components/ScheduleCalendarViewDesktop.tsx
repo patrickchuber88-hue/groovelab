@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase, queryCache } from '../lib/supabase';
 import { 
   ChevronLeft, 
   ChevronRight, 
@@ -34,6 +34,7 @@ import {
 } from 'lucide-react';
 import { useRealNamesVisibility, maskLastName, formatTeacherFullName, formatDisplaySubjectOrInstrument } from '../utils/nameHelper';
 import { MeisterwerkDocumentationModal, checkIsAudioTresorActive } from './MeisterwerkDocumentationModal';
+import { validateChatMessageContent } from '../utils/chatRespectGuard';
 interface ScheduleOccurrence {
   id: string;
   student_id: string | null;
@@ -98,6 +99,12 @@ export const timeToMinutes = (t: string) => {
   const h = parseInt(parts[0]) || 0;
   const m = parseInt(parts[1]) || 0;
   return h * 60 + m;
+};
+
+export const minutesToTime = (m: number): string => {
+  const h = Math.floor(m / 60) % 24;
+  const mins = m % 60;
+  return `${String(h).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
 };
 
 export function ScheduleCalendarViewDesktop({ 
@@ -286,6 +293,9 @@ export function ScheduleCalendarViewDesktop({
   const grabOffsetRef = useRef<number>(0);
   const [currentRescheduleIndex, setCurrentRescheduleIndex] = useState(0);
   const [allOpenReschedules, setAllOpenReschedules] = useState<ScheduleOccurrence[]>([]);
+  const baseOccurrencesRef = useRef<ScheduleOccurrence[]>([]);
+  baseOccurrencesRef.current = baseOccurrences;
+
   const fetchAllOpenReschedules = useCallback(async () => {
     if (!userId) return;
     try {
@@ -307,7 +317,7 @@ export function ScheduleCalendarViewDesktop({
       }
 
       // Also collect cancelled lessons from current visible baseOccurrences
-      const currentWeekOpen = baseOccurrences.filter(occ => isCancelledLesson(occ));
+      const currentWeekOpen = baseOccurrencesRef.current.filter(occ => isCancelledLesson(occ));
 
       // Merge and deduplicate DB + currentWeek cancelled lessons
       const seen = new Set<string>();
@@ -325,7 +335,7 @@ export function ScheduleCalendarViewDesktop({
     } catch (err) {
       console.warn('Error fetching all open reschedules:', err);
     }
-  }, [userId, baseOccurrences]);
+  }, [userId]);
 
   useEffect(() => {
     fetchAllOpenReschedules();
@@ -359,87 +369,10 @@ export function ScheduleCalendarViewDesktop({
     fetchTeachers();
   }, [schoolId]);
 
-  // Multiselect & Batch Substitution Mode states
-  const [isSubModeActive, setIsSubModeActive] = useState<boolean>(false);
-  const [selectedSubOccIds, setSelectedSubOccIds] = useState<Set<string>>(new Set());
-  const [batchSubTeacherId, setBatchSubTeacherId] = useState<string>('');
-  const [batchSubNotes, setBatchSubNotes] = useState<string>('');
-  const [isApplyingBatchSub, setIsApplyingBatchSub] = useState<boolean>(false);
-
   // Cross-Week 2-Click Swap Mode states
   const [isSwapModeActive, setIsSwapModeActive] = useState<boolean>(false);
   const [swapSourceOcc, setSwapSourceOcc] = useState<ScheduleOccurrence | null>(null);
   const [swapDetailModalOcc, setSwapDetailModalOcc] = useState<ScheduleOccurrence | null>(null);
-
-  const toggleOccSelection = (occId: string) => {
-    const next = new Set(selectedSubOccIds);
-    if (next.has(occId)) {
-      next.delete(occId);
-    } else {
-      next.add(occId);
-    }
-    setSelectedSubOccIds(next);
-  };
-
-  const toggleDaySelection = (dateStr: string) => {
-    const dayOccs = baseOccurrences.filter(o => 
-      o.date === dateStr && o.student_id && o.student_id !== 'vacant' && o.status !== 'cancelled' && o.id
-    );
-    if (dayOccs.length === 0) return;
-
-    const next = new Set(selectedSubOccIds);
-    const allSelected = dayOccs.every(o => o.id && next.has(o.id));
-
-    if (allSelected) {
-      dayOccs.forEach(o => o.id && next.delete(o.id));
-    } else {
-      dayOccs.forEach(o => o.id && next.add(o.id));
-    }
-
-    setSelectedSubOccIds(next);
-  };
-
-  const applyBatchSubstitution = async () => {
-    if (selectedSubOccIds.size === 0) {
-      await showAlert('Bitte wähle mindestens einen Unterrichtstermin aus.');
-      return;
-    }
-    if (!batchSubTeacherId) {
-      await showAlert('Bitte wähle einen Vertretungslehrer aus oder wähle "Vertretung aufheben".');
-      return;
-    }
-
-    setIsApplyingBatchSub(true);
-    try {
-      const isClearingSub = batchSubTeacherId === 'CLEAR';
-      const subTeacherIdToSave = isClearingSub ? null : batchSubTeacherId;
-      const isSub = !isClearingSub;
-
-      for (const occId of Array.from(selectedSubOccIds)) {
-        await persistOccurrenceDirectly(occId, {
-          substitute_teacher_id: subTeacherIdToSave,
-          is_substitute: isSub,
-          substitute_notes: batchSubNotes || null
-        });
-      }
-
-      await loadOccurrences();
-      await showAlert(isClearingSub 
-        ? `Vertretung für ${selectedSubOccIds.size} Termin(e) erfolgreich aufgehoben.`
-        : `Vertretung für ${selectedSubOccIds.size} Termin(e) erfolgreich zugewiesen!`
-      );
-
-      setSelectedSubOccIds(new Set());
-      setBatchSubTeacherId('');
-      setBatchSubNotes('');
-      setIsSubModeActive(false);
-    } catch (err) {
-      console.error('Error applying batch substitution:', err);
-      await showAlert('Fehler beim Zuweisen der Vertretung.');
-    } finally {
-      setIsApplyingBatchSub(false);
-    }
-  };
 
   const scrollIntervalRef = useRef<any>(null);
   const teacherScheduleLimitsRef = useRef<Record<number, { min: number; max: number }>>({});
@@ -576,6 +509,19 @@ export function ScheduleCalendarViewDesktop({
   };
 
   const loadHolidays = async (url: string) => {
+    if (!url) return;
+    const cacheKey = `groovelab_holidays_cache_${schoolId || 'global'}_${encodeURIComponent(url.slice(0, 40))}`;
+    try {
+      const cached = localStorage.getItem(cacheKey);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed && typeof parsed.timestamp === 'number' && (Date.now() - parsed.timestamp < 24 * 60 * 60 * 1000) && Array.isArray(parsed.data) && parsed.data.length > 0) {
+          setHolidays(parsed.data);
+          return;
+        }
+      }
+    } catch (e) {}
+
     try {
       const urls = (() => {
         try {
@@ -659,6 +605,9 @@ export function ScheduleCalendarViewDesktop({
         });
 
       setHolidays(holidayRanges);
+      try {
+        localStorage.setItem(cacheKey, JSON.stringify({ timestamp: Date.now(), data: holidayRanges }));
+      } catch (e) {}
     } catch (err) {
       console.error('Error loading holidays:', err);
     }
@@ -1071,6 +1020,13 @@ export function ScheduleCalendarViewDesktop({
     }
 
     const messageContent = chatTypedMessage.trim();
+    if (!messageContent) return;
+
+    const validation = validateChatMessageContent(messageContent);
+    if (!validation.isValid) {
+      await showAlert(validation.reason || 'Deine Nachricht entspricht nicht den Respekt-Richtlinien.');
+      return;
+    }
 
     try {
       // Optimistic update
@@ -2029,47 +1985,79 @@ export function ScheduleCalendarViewDesktop({
 
       try {
         const [
-          rbResult,
+          rbDataResult,
           schedResult,
-          mySchedResult,
           evResult,
-          rbData2Result,
-          allOccsResult,
           mainOccsResult,
           schoolStudentsResult,
           schoolUsersResult
         ] = await Promise.all([
-          supabase.from('room_bookings').select('room_id, date, start_time, room:rooms(name)').eq('booked_by', userId).gte('date', startDateStr).lte('date', endDateStr),
-          supabase.from('schedules').select('room_id, time_slot, duration, day_of_week, teacher_id, student_id, student:users!schedules_student_id_fkey(first_name, last_name, instrument), teacher:users!schedules_teacher_id_fkey(first_name, last_name)').eq('school_id', schoolId).not('room_id', 'is', null),
-          supabase.from('schedules').select('room_id, time_slot, duration, day_of_week, teacher_id, student_id, student:users!schedules_student_id_fkey(first_name, last_name, instrument)').eq('teacher_id', userId).eq('school_id', schoolId),
-          supabase.from('campus_events').select('room_id, event_date, start_time, end_time, title').eq('school_id', schoolId).gte('event_date', startDateStr).lte('event_date', endDateStr).not('room_id', 'is', null),
-          supabase.from('room_bookings').select('room_id, date, start_time, end_time, booked_by, user:users(first_name, last_name)').eq('school_id', schoolId).gte('date', startDateStr).lte('date', endDateStr).not('room_id', 'is', null),
-          supabase.from('schedule_occurrences').select('id, date, start_time, original_date, duration, status, teacher_id, student_id, schedule_id, notes').eq('teacher_id', userId).or(`and(date.gte.${startDateStr},date.lte.${endDateStr}),and(original_date.gte.${startDateStr},original_date.lte.${endDateStr})`),
-          supabase.from('schedule_occurrences').select('id, date, start_time, original_date, duration, status, notes, teacher_id, student_id, schedule_id, student:users!schedule_occurrences_student_id_fkey(first_name, last_name, instrument, is_campus_active, is_groovelab_active, group_id)').eq('teacher_id', userId).or(`and(date.gte.${startDateStr},date.lte.${endDateStr}),and(original_date.gte.${startDateStr},original_date.lte.${endDateStr})`).order('date').order('start_time'),
-          supabase.from('students').select('id, user_id, teacher_id').eq('school_id', schoolId),
-          supabase.from('users').select('id, teacher_id, first_name, last_name').eq('school_id', schoolId).eq('role', 'student')
+          // 1. Unified Room Bookings for the school week (includes room name and user)
+          supabase.from('room_bookings')
+            .select('room_id, date, start_time, end_time, booked_by, room:rooms(name), user:users(first_name, last_name)')
+            .eq('school_id', schoolId)
+            .gte('date', startDateStr)
+            .lte('date', endDateStr)
+            .not('room_id', 'is', null),
+
+          // 2. Unified Schedules: Teacher's own slots + any room-occupying slots in the school
+          supabase.from('schedules')
+            .select('room_id, time_slot, duration, day_of_week, teacher_id, student_id, student:users!schedules_student_id_fkey(first_name, last_name, instrument), teacher:users!schedules_teacher_id_fkey(first_name, last_name)')
+            .eq('school_id', schoolId)
+            .or(`teacher_id.eq.${userId},not.room_id.is.null`),
+
+          // 3. Campus Events for Room Collision checks
+          supabase.from('campus_events')
+            .select('room_id, event_date, start_time, end_time, title')
+            .eq('school_id', schoolId)
+            .gte('event_date', startDateStr)
+            .lte('event_date', endDateStr)
+            .not('room_id', 'is', null),
+
+          // 4. Main Occurrences (single query with full fields and joins)
+          supabase.from('schedule_occurrences')
+            .select('id, date, start_time, original_date, duration, status, notes, teacher_id, student_id, schedule_id, student:users!schedule_occurrences_student_id_fkey(first_name, last_name, instrument, is_campus_active, is_groovelab_active, group_id)')
+            .eq('teacher_id', userId)
+            .or(`and(date.gte.${startDateStr},date.lte.${endDateStr}),and(original_date.gte.${startDateStr},original_date.lte.${endDateStr})`)
+            .order('date')
+            .order('start_time'),
+
+          // 5. School Students Catalog (SWR Cached 60s)
+          queryCache.fetch(`students_table_${schoolId}`, async () => {
+            const { data } = await supabase.from('students').select('id, user_id, teacher_id').eq('school_id', schoolId);
+            return data || [];
+          }, { ttlMs: 60_000, staleWhileRevalidate: true }),
+
+          // 6. School Student Users (SWR Cached 60s)
+          queryCache.fetch(`student_users_${schoolId}`, async () => {
+            const { data } = await supabase.from('users').select('id, teacher_id, first_name, last_name').eq('school_id', schoolId).eq('role', 'student');
+            return data || [];
+          }, { ttlMs: 60_000, staleWhileRevalidate: true })
         ]);
 
-        if (rbResult.data) roomBookings = rbResult.data;
-        
-        let mergedSchedules = schedResult.data || [];
-        if (mySchedResult.data && mySchedResult.data.length > 0) {
-          const mySlots = mySchedResult.data.map((s: any) => ({ ...s, teacher_id: userId, _ownSlot: true }));
-          const withoutOwn = mergedSchedules.filter((s: any) => !s._ownSlot);
-          mergedSchedules = [...withoutOwn, ...mySlots];
+        if (rbDataResult.data) {
+          roomBookings = rbDataResult.data.filter((b: any) => b.booked_by === userId);
+          setCachedWeekRoomBookings(rbDataResult.data);
         }
+        
+        const mergedSchedules = (schedResult.data || []).map((s: any) => ({
+          ...s,
+          _ownSlot: s.teacher_id === userId
+        }));
         setCachedWeekSchedules(mergedSchedules);
 
         if (evResult.data) setCachedWeekEvents(evResult.data);
-        if (rbData2Result.data) setCachedWeekRoomBookings(rbData2Result.data);
-        if (allOccsResult.data) setCachedWeekOccurrences(allOccsResult.data);
+        if (mainOccsResult.data) setCachedWeekOccurrences(mainOccsResult.data);
 
         studentTeacherMap.clear();
-        (schoolStudentsResult.data || []).forEach((st: any) => {
+        const studentsList = Array.isArray(schoolStudentsResult) ? schoolStudentsResult : ((schoolStudentsResult as any)?.data || []);
+        studentsList.forEach((st: any) => {
           if (st.id) studentTeacherMap.set(st.id, st.teacher_id || null);
           if (st.user_id) studentTeacherMap.set(st.user_id, st.teacher_id || null);
         });
-        (schoolUsersResult.data || []).forEach((u: any) => {
+
+        const usersList = Array.isArray(schoolUsersResult) ? schoolUsersResult : ((schoolUsersResult as any)?.data || []);
+        usersList.forEach((u: any) => {
           if (u.id) studentTeacherMap.set(u.id, u.teacher_id || null);
           const fn = (u.first_name || '').trim().toLowerCase();
           const ln = (u.last_name || '').trim().toLowerCase();
@@ -4772,7 +4760,7 @@ export function ScheduleCalendarViewDesktop({
             </div>
           </div>
 
-          {/* Center / Highlight: Feature Toggles & Vertretung zuweisen */}
+          {/* Center / Highlight: Feature Toggles */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <div className="apple-btn-group">
               {/* Tausch-Modus Button (Ersetzt Vertretung) */}
@@ -5336,11 +5324,7 @@ export function ScheduleCalendarViewDesktop({
             >
               <div 
                 onClick={() => {
-                  if (isSubModeActive) {
-                    toggleDaySelection(dateStr);
-                  } else {
-                    setFocusedDayOffset(focusedDayOffset === offset ? null : offset);
-                  }
+                  setFocusedDayOffset(focusedDayOffset === offset ? null : offset);
                 }}
                 style={{
                   textAlign: 'center',
@@ -5353,35 +5337,17 @@ export function ScheduleCalendarViewDesktop({
                   cursor: 'pointer',
                   borderRadius: '12px',
                   padding: '6px',
-                  background: isSubModeActive ? 'rgba(99, 102, 241, 0.06)' : 'transparent',
-                  border: isSubModeActive ? '1px dashed #6366f1' : '1px solid transparent',
+                  background: 'transparent',
+                  border: '1px solid transparent',
                   transition: 'background 0.2s',
                   userSelect: 'none',
                   position: 'relative'
                 }}
-                onMouseOver={e => e.currentTarget.style.background = isSubModeActive ? 'rgba(99, 102, 241, 0.12)' : 'rgba(0,0,0,0.03)'}
-                onMouseOut={e => e.currentTarget.style.background = isSubModeActive ? 'rgba(99, 102, 241, 0.06)' : 'transparent'}
-                title={isSubModeActive ? "Klick: Alle Termine dieses Tages für Vertretung selektieren/abwählen" : (focusedDayOffset === offset ? "Zurück zur Wochenansicht" : "Diesen Tag vergrößern (Fokus-Ansicht)")}
+                onMouseOver={e => e.currentTarget.style.background = 'rgba(0,0,0,0.03)'}
+                onMouseOut={e => e.currentTarget.style.background = 'transparent'}
+                title={focusedDayOffset === offset ? "Zurück zur Wochenansicht" : "Diesen Tag vergrößern (Fokus-Ansicht)"}
               >
-                {isSubModeActive && (() => {
-                  const validDayOccs = baseOccurrences.filter(o => o.date === dateStr && o.student_id && o.student_id !== 'vacant' && o.status !== 'cancelled' && o.id);
-                  const isDayFullySelected = validDayOccs.length > 0 && validDayOccs.every(o => o.id && selectedSubOccIds.has(o.id));
-                  return (
-                    <div style={{
-                      fontSize: '0.62rem',
-                      fontWeight: 800,
-                      color: isDayFullySelected ? '#ffffff' : '#4f46e5',
-                      background: isDayFullySelected ? '#4f46e5' : '#e0e7ff',
-                      padding: '2px 8px',
-                      borderRadius: '10px',
-                      marginBottom: '4px'
-                    }}>
-                      {isDayFullySelected ? '✓ Tag selektiert' : '⚡ Tag selektieren'}
-                    </div>
-                  );
-                })()}
-
-                {focusedDayOffset === offset && !isSubModeActive && (
+                {focusedDayOffset === offset && (
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
@@ -6094,11 +6060,12 @@ export function ScheduleCalendarViewDesktop({
                   const occDateObj = new Date(occ.date + 'T00:00:00');
                   const occDayOfWeek = occDateObj.getDay() || 7;
 
+                  const occStartTimeSafe = (occ.start_time || '').substring(0, 5);
                   const isAtMasterSlot = Boolean(
                     masterDayOfWeek !== null && 
                     masterAssignedTime !== null && 
                     masterDayOfWeek === occDayOfWeek && 
-                    masterAssignedTime.substring(0, 5) === occ.start_time.substring(0, 5)
+                    masterAssignedTime.substring(0, 5) === occStartTimeSafe
                   );
                   
                   let isTimeOrDayMoved = false;
@@ -6106,19 +6073,19 @@ export function ScheduleCalendarViewDesktop({
                     isTimeOrDayMoved = false;
                   } else if (masterDayOfWeek !== null && masterAssignedTime !== null) {
                     isTimeOrDayMoved = masterDayOfWeek !== occDayOfWeek ||
-                                       masterAssignedTime.substring(0, 5) !== occ.start_time.substring(0, 5);
+                                       masterAssignedTime.substring(0, 5) !== occStartTimeSafe;
                   } else {
                     isTimeOrDayMoved = (occ.original_date && occ.original_date !== occ.date) ||
-                                       (occ.original_start_time && occ.start_time && occ.original_start_time.substring(0, 5) !== occ.start_time.substring(0, 5)) || false;
+                                       (occ.original_start_time && occ.start_time && occ.original_start_time.substring(0, 5) !== occStartTimeSafe) || false;
                   }
 
                   const hasPendingEdit = Boolean(pendingChanges && (pendingChanges[occ.id] || Object.values(pendingChanges).some((p: any) => p.id === occ.id)));
                   const isMovedFromMaster = Boolean(
                     occ.status === 'pending_reschedule' ||
                     occ.status === 'rescheduled_confirmed' ||
-                    (masterDayOfWeek !== null && masterAssignedTime !== null && (masterDayOfWeek !== occDayOfWeek || masterAssignedTime.substring(0, 5) !== occ.start_time.substring(0, 5))) ||
+                    (masterDayOfWeek !== null && masterAssignedTime !== null && (masterDayOfWeek !== occDayOfWeek || masterAssignedTime.substring(0, 5) !== occStartTimeSafe)) ||
                     (occ.original_date && occ.original_date !== occ.date) ||
-                    (occ.original_start_time && occ.start_time && occ.original_start_time.substring(0, 5) !== occ.start_time.substring(0, 5))
+                    (occ.original_start_time && occ.start_time && occ.original_start_time.substring(0, 5) !== occStartTimeSafe)
                   );
 
                   // 1. Gelb gestrichelt = Verschoben aber noch nicht bestätigt durch den Schüler / Entwurf
@@ -6258,6 +6225,10 @@ export function ScheduleCalendarViewDesktop({
  
                   const occStartMinutes = timeToMinutes(occ.start_time);
                   const occEndMinutes = occStartMinutes + (occ.duration || 45);
+                  const occStartLabel = (occ.start_time || '00:00').substring(0, 5);
+                  const occEndLabel = (occ as any).end_time 
+                    ? String((occ as any).end_time).substring(0, 5) 
+                    : minutesToTime(occEndMinutes);
                   const topPx = (occStartMinutes - dayBaselineMinutes) * 2.5;
 
                   // Determine the teacher's regular teaching window for this weekday:
@@ -6338,13 +6309,7 @@ export function ScheduleCalendarViewDesktop({
                     finalColors.text = '#3730a3';
                   }
 
-                  // Multiselect Vertretungs-Modus Hinzufügen
-                  const isSelectedForSubCard = Boolean(isSubModeActive && occ.id && selectedSubOccIds.has(occ.id));
                   const isSelectedForSwap = Boolean(isSwapModeActive && swapSourceOcc && occ.id && swapSourceOcc.id === occ.id);
-                  if (isSelectedForSubCard) {
-                    cardBackground = 'linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%)';
-                    finalColors.border = '#4f46e5';
-                  }
                   if (isSelectedForSwap) {
                     cardBackground = 'linear-gradient(135deg, #fefce8 0%, #fef08a 100%)';
                     finalColors.border = '#eab308';
@@ -6368,6 +6333,7 @@ export function ScheduleCalendarViewDesktop({
                   );
                   const isGruppenunterricht = isGroup && !isExplicitMerged;
                   const isEnsemble = isGroup && isExplicitMerged;
+                  const cardRoomName = occ.room_override_name || (occ.room_id ? rooms.find(r => String(r.id) === String(occ.room_id))?.name : '') || occ.schedules?.room?.name || '';
 
                   if (isGap) return null;
 
@@ -6375,6 +6341,15 @@ export function ScheduleCalendarViewDesktop({
                     <React.Fragment key={group.key}>
                       <div 
                         id={`occ-${occ.id}`}
+                        role="button"
+                        tabIndex={0}
+                        aria-label={`Termin ${displayNames || (isBreak ? 'Pause' : 'Freier Slot')}, ${occStartLabel} bis ${occEndLabel} Uhr${cardRoomName ? `, ${cardRoomName}` : ''}${isSwap ? ', getauschter Termin' : ''}${isRescheduled ? ', verschobener Termin' : ''}${(isSick || isCancelled) ? ', abgesagter Termin' : ''}`}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            (e.currentTarget as HTMLElement).click();
+                          }
+                        }}
                         draggable={!( (currentUserRole === 'admin' || currentUserRole === 'secretary') && !hasSubmittedSchedule ) && !isBreak && !isVacant}
                         onMouseDown={(e) => {
                           const cardRect = e.currentTarget.getBoundingClientRect();
@@ -6434,11 +6409,6 @@ export function ScheduleCalendarViewDesktop({
                             setSwapSourceOcc(null);
                             setIsSwapModeActive(false);
                             setDropDecisionState({ sourceId: sId, targetId: tId });
-                            return;
-                          }
-                          if (isSubModeActive) {
-                            if (isBreak || isVacant || !occ.id) return;
-                            toggleOccSelection(occ.id);
                             return;
                           }
                           if (isGroupModeActive) {
@@ -6645,6 +6615,7 @@ export function ScheduleCalendarViewDesktop({
                                     {isSwap && (
                                       <button 
                                         type="button"
+                                        aria-label="Termin getauscht – Details anzeigen"
                                         onClick={(e) => {
                                           e.stopPropagation();
                                           setSwapDetailModalOcc(occ);
@@ -6847,14 +6818,7 @@ export function ScheduleCalendarViewDesktop({
                                   </div>
                                 )}
 
-                                {/* Vertretung & Selection Badge */}
-                                {isSelectedForSubCard && (
-                                  <div style={{ fontSize: '0.6rem', fontWeight: 900, color: '#4f46e5', background: '#e0e7ff', padding: '1px 5px', borderRadius: '4px', marginTop: '2px' }}>
-                                    ✓ Selektiert
-                                  </div>
-                                )}
-
-                                {!isSelectedForSubCard && (occ.substitute_teacher_id || occ.is_substitute) && (
+                                {(occ.substitute_teacher_id || occ.is_substitute) && (
                                   <div style={{ fontSize: '0.6rem', fontWeight: 800, color: '#3730a3', background: '#e0e7ff', padding: '1px 5px', borderRadius: '4px', border: '1px solid #c7d2fe', marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                     Vertretung: {formatTeacherFullName(occ.substitute_teacher || allSchoolTeachers.find(t => t.id === occ.substitute_teacher_id)) || 'Lehrkraft'}
                                   </div>
@@ -6969,6 +6933,7 @@ export function ScheduleCalendarViewDesktop({
                                     {isSwap && (
                                       <button 
                                         type="button"
+                                        aria-label="Termin getauscht – Details anzeigen"
                                         onClick={(e) => {
                                           e.stopPropagation();
                                           setSwapDetailModalOcc(occ);
@@ -7253,6 +7218,7 @@ return (
                                   {isSwap && (
                                     <button 
                                       type="button"
+                                      aria-label="Termin getauscht – Details anzeigen"
                                       onClick={(e) => {
                                         e.stopPropagation();
                                         setSwapDetailModalOcc(occ);
@@ -8154,69 +8120,7 @@ return (
                       )}
                     </div>
 
-                    {/* Vertretungslehrer Card (Ausfall-Management) */}
-                    <div style={{
-                      background: '#f8fafc',
-                      borderRadius: '14px',
-                      padding: '12px 14px',
-                      marginBottom: '16px',
-                      border: '1px solid #e2e8f0'
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                        <label style={{ fontSize: '0.66rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'flex', alignItems: 'center', gap: '6px', margin: 0 }}>
-                          <UserCheck size={12} style={{ color: '#6366f1' }} />
-                          <span>Vertretungslehrer festlegen</span>
-                        </label>
-                        {editOccState.substitute_teacher_id && (
-                          <span style={{ fontSize: '0.65rem', fontWeight: 800, background: '#e0e7ff', color: '#3730a3', padding: '2px 8px', borderRadius: '12px' }}>
-                            Vertretung aktiv
-                          </span>
-                        )}
-                      </div>
 
-                      <select
-                        value={editOccState.substitute_teacher_id || ''}
-                        onChange={e => setEditOccState({ ...editOccState, substitute_teacher_id: e.target.value || null })}
-                        style={{
-                          width: '100%',
-                          padding: '10px 12px',
-                          borderRadius: '10px',
-                          border: '1px solid rgba(0,0,0,0.12)',
-                          fontSize: '0.88rem',
-                          fontWeight: 600,
-                          color: '#1d1d1f',
-                          background: '#ffffff',
-                          boxSizing: 'border-box',
-                          marginBottom: editOccState.substitute_teacher_id ? '8px' : '0'
-                        }}
-                      >
-                        <option value="">-- Keine Vertretung (Reguläre Lehrkraft) --</option>
-                        {(((teachers && teachers.length > 0) ? teachers : allSchoolTeachers) || []).map((t: any) => (
-                          <option key={t.id} value={t.id}>
-                            {t.first_name} {t.last_name || ''} {t.instrument ? `(${t.instrument})` : ''}
-                          </option>
-                        ))}
-                      </select>
-
-                      {editOccState.substitute_teacher_id && (
-                        <input
-                          type="text"
-                          placeholder="Hinweis für Vertretungslehrer (z.B. Stück auf S. 12 weiterüben)..."
-                          value={editOccState.substitute_notes || ''}
-                          onChange={e => setEditOccState({ ...editOccState, substitute_notes: e.target.value })}
-                          style={{
-                            width: '100%',
-                            padding: '8px 12px',
-                            borderRadius: '10px',
-                            border: '1px solid rgba(0,0,0,0.12)',
-                            fontSize: '0.8rem',
-                            color: '#1d1d1f',
-                            boxSizing: 'border-box',
-                            marginTop: '6px'
-                          }}
-                        />
-                      )}
-                    </div>
                     {occ && occ.student && !isEnsembleOcc && (
                       <div style={{
                         background: '#f8fafc',
@@ -8978,6 +8882,9 @@ return (
             }}
           >
             <div 
+              role="dialog"
+              aria-modal="true"
+              aria-label="Tausch-Details"
               onClick={(e) => e.stopPropagation()}
               style={{ 
                 background: '#ffffff', 
@@ -9445,124 +9352,7 @@ return (
       );
     })()}
 
-    {isSubModeActive && (
-      <div style={{
-        position: 'fixed',
-        bottom: '24px',
-        left: '50%',
-        transform: 'translateX(-50%)',
-        zIndex: 99999,
-        background: '#0f172a',
-        color: '#ffffff',
-        borderRadius: '20px',
-        padding: '12px 20px',
-        boxShadow: '0 12px 40px rgba(0, 0, 0, 0.35)',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '14px',
-        maxWidth: '92vw',
-        border: '1px solid rgba(255, 255, 255, 0.15)',
-        backdropFilter: 'blur(16px)'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{
-            background: '#6366f1',
-            color: '#ffffff',
-            fontWeight: 800,
-            fontSize: '0.78rem',
-            padding: '4px 10px',
-            borderRadius: '12px'
-          }}>
-            {selectedSubOccIds.size} Termine gewählt
-          </span>
-          <span style={{ fontSize: '0.82rem', fontWeight: 600, color: '#94a3b8' }}>
-            Vertretung zuweisen:
-          </span>
-        </div>
 
-        <select
-          value={batchSubTeacherId}
-          onChange={e => setBatchSubTeacherId(e.target.value)}
-          style={{
-            padding: '8px 12px',
-            borderRadius: '10px',
-            border: '1px solid rgba(255,255,255,0.2)',
-            fontSize: '0.84rem',
-            fontWeight: 700,
-            color: '#ffffff',
-            background: '#1e293b',
-            outline: 'none',
-            cursor: 'pointer'
-          }}
-        >
-          <option value="">-- Vertretungslehrer wählen --</option>
-          <option value="CLEAR">❌ Vertretung aufheben (Zurück zum Stammlehrer)</option>
-          {(((teachers && teachers.length > 0) ? teachers : allSchoolTeachers) || []).map((t: any) => (
-            <option key={t.id} value={t.id}>
-              {t.first_name} {t.last_name || ''} {t.instrument ? `(${t.instrument})` : ''}
-            </option>
-          ))}
-        </select>
-
-        <input
-          type="text"
-          placeholder="Hinweis für Vertretungslehrer..."
-          value={batchSubNotes}
-          onChange={e => setBatchSubNotes(e.target.value)}
-          style={{
-            padding: '8px 12px',
-            borderRadius: '10px',
-            border: '1px solid rgba(255,255,255,0.2)',
-            fontSize: '0.82rem',
-            color: '#ffffff',
-            background: '#1e293b',
-            outline: 'none',
-            width: '200px'
-          }}
-        />
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <button
-            onClick={applyBatchSubstitution}
-            disabled={isApplyingBatchSub || selectedSubOccIds.size === 0 || !batchSubTeacherId}
-            style={{
-              padding: '8px 16px',
-              borderRadius: '10px',
-              border: 'none',
-              background: selectedSubOccIds.size > 0 && batchSubTeacherId ? '#6366f1' : '#475569',
-              color: '#ffffff',
-              fontWeight: 800,
-              fontSize: '0.82rem',
-              cursor: selectedSubOccIds.size > 0 && batchSubTeacherId ? 'pointer' : 'not-allowed',
-              transition: 'all 0.2s'
-            }}
-          >
-            {isApplyingBatchSub ? 'Speichere...' : 'Vertretung anwenden'}
-          </button>
-
-          <button
-            onClick={() => {
-              setIsSubModeActive(false);
-              setSelectedSubOccIds(new Set());
-              setBatchSubTeacherId('');
-              setBatchSubNotes('');
-            }}
-            style={{
-              padding: '8px 12px',
-              borderRadius: '10px',
-              border: '1px solid rgba(255,255,255,0.2)',
-              background: 'transparent',
-              color: '#94a3b8',
-              fontWeight: 600,
-              fontSize: '0.8rem',
-              cursor: 'pointer'
-            }}
-          >
-            Beenden
-          </button>
-        </div>
-      </div>
-    )}
 
     </div>
   );

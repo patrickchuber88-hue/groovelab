@@ -583,7 +583,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
   const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
   const [error, setError] = useState<string | null>(null);
-  const [legalModalTab, setLegalModalTab] = useState<'impressum' | 'privacy' | 'terms' | 'cancellation' | null>(null);
+  const [legalModalTab, setLegalModalTab] = useState<'impressum' | 'privacy' | 'terms' | 'cancellation' | 'accessibility' | null>(null);
   const [showDpoPortalModal, setShowDpoPortalModal] = useState(false);
   const [firstNameFocused, setFirstNameFocused] = useState(false);
   const [lastNameFocused, setLastNameFocused] = useState(false);
@@ -4057,7 +4057,12 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
   }
 
   return (
-    <div style={{
+    <div
+      id="main-content"
+      tabIndex={-1}
+      role="main"
+      aria-label="Login & Schulausweis-Authentifizierung"
+      style={{
       position: 'fixed',
       inset: 0,
       display: 'flex',
@@ -6034,6 +6039,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         <form onSubmit={(e) => { e.preventDefault(); handlePinLogin(pinInput); }} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
           <div style={{ display: 'flex', gap: '10px' }}>
             <input
+              id="login-credential-input"
+              aria-label="Ausweis-Nummer oder persönliche PIN"
               type="text"
               value={pinInput}
               onChange={(e) => setPinInput(e.target.value)}
@@ -6072,6 +6079,11 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               {pinLockoutSeconds > 0 ? `Gesperrt (${pinLockoutSeconds}s)` : 'Login'}
             </button>
           </div>
+          {pinLockoutSeconds > 0 && (
+            <div role="alert" aria-live="assertive" style={{ fontSize: '12px', fontWeight: 750, color: '#ef4444', textAlign: 'center', padding: '4px 8px' }}>
+              Zugang vorübergehend gesperrt. Bitte warte noch {pinLockoutSeconds} Sekunden.
+            </div>
+          )}
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginTop: '4px' }}>
             <input 
               type="checkbox" 
@@ -7257,6 +7269,15 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           onMouseOut={(e) => { e.currentTarget.style.color = isGroovelabKiosk ? '#854d0e' : '#4ade80'; }}
         >
           Impressum
+        </span>
+        <span style={{ opacity: 0.4 }}>•</span>
+        <span 
+          onClick={() => setLegalModalTab('accessibility')} 
+          style={{ cursor: 'pointer', transition: 'color 0.2s' }} 
+          onMouseOver={(e) => { e.currentTarget.style.color = isGroovelabKiosk ? '#713f12' : '#ffffff'; }}
+          onMouseOut={(e) => { e.currentTarget.style.color = isGroovelabKiosk ? '#854d0e' : '#4ade80'; }}
+        >
+          Barrierefreiheit
         </span>
       </div>
 

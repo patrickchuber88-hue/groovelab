@@ -216,6 +216,16 @@ export function GroupedSongCard({
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '12px' : '32px', marginBottom: '16px', position: 'relative' }}>
       <div 
+        role="button"
+        tabIndex={0}
+        aria-expanded={isExpanded}
+        aria-label={`Song ${songGroup.title || 'Song'} von ${songGroup.artist || 'Unbekannt'}, ${isExpanded ? 'eingeklappt' : 'ausgeklappt'}`}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            onToggle();
+          }
+        }}
         onClick={onToggle}
         className={`glass-panel animation-slide-up ${isBandReady ? 'band-ready' : ''} ${activeSkill.progress >= 90 && !activeSkill.is_stage_ready ? 'challenge-glow' : ''}`} 
         style={{ 

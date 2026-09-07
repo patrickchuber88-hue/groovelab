@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="de">
   <head>
     <meta charset="UTF-8" />
     <script>
@@ -143,10 +143,37 @@
         src: local('Helvetica Neue'), local('Arial'), local('-apple-system');
         font-display: swap;
       }
+      /* Critical A11y Skip Link (Zero FOUC & Keyboard Only) */
+      .skip-to-content-link {
+        position: fixed !important;
+        top: -9999px !important;
+        left: 16px !important;
+        z-index: 9999999 !important;
+        padding: 12px 22px !important;
+        background: #0f172a !important;
+        color: #ffffff !important;
+        font-size: 0.92rem !important;
+        font-weight: 850 !important;
+        text-decoration: none !important;
+        border-radius: 14px !important;
+        border: 2px solid #34a853 !important;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.35) !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
+        transition: top 0.18s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.18s ease !important;
+      }
+      .skip-to-content-link:focus-visible {
+        top: 16px !important;
+        opacity: 1 !important;
+        pointer-events: auto !important;
+        outline: 3px solid #34a853 !important;
+        outline-offset: 3px !important;
+      }
     </style>
     <title>Campus-Groovelab</title>
   </head>
   <body>
+    <a href="#main-content" class="skip-to-content-link" style="position: fixed; top: -9999px; left: 16px; opacity: 0; pointer-events: none;">Zum Hauptinhalt springen</a>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

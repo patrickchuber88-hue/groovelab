@@ -38,7 +38,8 @@ export const StudentOnboardingPage: React.FC<StudentOnboardingPageProps> = ({ to
   const [parentAllowLeaderboard, setParentAllowLeaderboard] = useState(true);
   const [parentAllowGroups, setParentAllowGroups] = useState(true);
   const [parentAllowProposals, setParentAllowProposals] = useState(true);
-  const [parentAllowAudio, setParentAllowAudio] = useState(true);
+  const [parentAllowAudio, setParentAllowAudio] = useState(false); // 🛡️ Privacy by Default (Art. 25 Abs. 2 DSGVO)
+  const [parentAllowTeacherAudio, setParentAllowTeacherAudio] = useState(false); // 🛡️ Privacy by Default
 
   const handleSaveParentalConsent = async () => {
     if (!parentalConsent || !student?.id) return;
@@ -56,7 +57,11 @@ export const StudentOnboardingPage: React.FC<StudentOnboardingPageProps> = ({ to
           parent_allow_leaderboard: parentAllowLeaderboard,
           parent_allow_groups: parentAllowGroups,
           parent_allow_proposals: parentAllowProposals,
-          parent_allow_audio: parentAllowAudio
+          parent_allow_audio: parentAllowAudio,
+          parent_permissions: {
+            allow_student_audio: parentAllowAudio,
+            allow_teacher_audio: parentAllowTeacherAudio
+          }
         })
         .eq('id', student.id);
       setConsentSaved(true);
@@ -591,7 +596,6 @@ Deine Vorteile auf einen Blick:
                       setParentAllowChat(true);
                       setParentAllowTimer(true);
                       setParentAllowLeaderboard(true);
-                      setParentAllowAudio(true);
                     }}
                     style={{
                       padding: '12px 10px',
@@ -618,7 +622,6 @@ Deine Vorteile auf einen Blick:
                       setParentAllowChat(true);
                       setParentAllowTimer(false);
                       setParentAllowLeaderboard(false);
-                      setParentAllowAudio(true);
                     }}
                     style={{
                       padding: '12px 10px',
@@ -688,14 +691,25 @@ Deine Vorteile auf einen Blick:
                     </span>
                   </label>
 
-                  {/* Optional parental privacy setting 2: Loopstation Audio Recording */}
+                  {/* Optional parental privacy setting 2a: Student own audio recording */}
                   <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', fontSize: '0.74rem', color: '#334155', fontWeight: 650, cursor: 'pointer', background: '#f8fafc', padding: '10px 12px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                       <input type="checkbox" checked={parentAllowAudio} onChange={e => setParentAllowAudio(e.target.checked)} style={{ accentColor: '#34a853', width: '16px', height: '16px', flexShrink: 0 }} />
-                      <span>🎙️ Audio-Feedback &amp; Loopstation im Unterricht (§ 73 UrhG)</span>
+                      <span>🎙️ Eigene Tonaufnahmen des Schülers (Übe-Studio &amp; Loopstation)</span>
                     </div>
-                    <span style={{ fontSize: '0.6rem', fontWeight: 800, color: '#166534', background: '#dcfce7', padding: '2px 6px', borderRadius: '6px', whiteSpace: 'nowrap' }}>
-                      Empfohlen
+                    <span style={{ fontSize: '0.6rem', fontWeight: 800, color: '#64748b', background: '#f1f5f9', padding: '2px 6px', borderRadius: '6px', whiteSpace: 'nowrap' }}>
+                      Opt-In (Art. 8 DSGVO)
+                    </span>
+                  </label>
+
+                  {/* Optional parental privacy setting 2b: Teacher recording of student */}
+                  <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', fontSize: '0.74rem', color: '#334155', fontWeight: 650, cursor: 'pointer', background: '#f8fafc', padding: '10px 12px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <input type="checkbox" checked={parentAllowTeacherAudio} onChange={e => setParentAllowTeacherAudio(e.target.checked)} style={{ accentColor: '#34a853', width: '16px', height: '16px', flexShrink: 0 }} />
+                      <span>🎧 Tonaufnahmen des Schülers durch die Lehrkraft (§ 201 StGB)</span>
+                    </div>
+                    <span style={{ fontSize: '0.6rem', fontWeight: 800, color: '#64748b', background: '#f1f5f9', padding: '2px 6px', borderRadius: '6px', whiteSpace: 'nowrap' }}>
+                      Opt-In (§ 73 UrhG)
                     </span>
                   </label>
                 </div>

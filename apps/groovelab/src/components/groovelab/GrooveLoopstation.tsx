@@ -23,6 +23,7 @@ import { supabase } from '../../lib/supabase';
 import * as lamejs from '@breezystack/lamejs';
 import { processPureRawAudioBuffer, audioBufferToWavBlob, TARGET_PURE_RAW_LUFS, TARGET_PEAK_DBTP } from '../../utils/audioMasteringEngine';
 import { checkIsAudioTresorActive } from '../../domain/stickersAndTresor';
+import { announceA11y } from '../common/A11yLiveAnnouncer';
 
 export interface Track {
   id: number;
@@ -708,8 +709,11 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
   }, []);
 
   const runAutoCalibrationSequence = async () => {
-    if (student?.parent_allow_audio === false || (student as any)?.parent_permissions?.allow_student_audio === false) {
-      alert("Audioaufnahmen wurden von den Erziehungsberechtigten für dieses Schülerprofil deaktiviert.");
+    const isStudentAudioAllowed = student?.parent_allow_audio === true && 
+      ((student as any)?.parent_permissions?.allow_student_audio === true ||
+      (student?.id && typeof window !== 'undefined' ? localStorage.getItem(`groovelab_parent_allow_student_audio_${student.id}`) === 'true' : false));
+    if (!isStudentAudioAllowed) {
+      alert("Audioaufnahmen wurden von den Erziehungsberechtigten für dieses Schülerprofil noch nicht freigegeben (Privacy by Default). Bitte die Eltern, die Funktion im Eltern-Bereich zu aktivieren.");
       return;
     }
     setIsCalibratingLatency(true);
@@ -1708,8 +1712,11 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
   };
 
   const startAutoSequence = async () => {
-    if (student?.parent_allow_audio === false || (student as any)?.parent_permissions?.allow_student_audio === false) {
-      alert("Audioaufnahmen wurden von den Erziehungsberechtigten für dieses Schülerprofil deaktiviert.");
+    const isStudentAudioAllowed = student?.parent_allow_audio === true && 
+      ((student as any)?.parent_permissions?.allow_student_audio === true ||
+      (student?.id && typeof window !== 'undefined' ? localStorage.getItem(`groovelab_parent_allow_student_audio_${student.id}`) === 'true' : false));
+    if (!isStudentAudioAllowed) {
+      alert("Audioaufnahmen wurden von den Erziehungsberechtigten für dieses Schülerprofil noch nicht freigegeben (Privacy by Default). Bitte die Eltern, die Funktion im Eltern-Bereich zu aktivieren.");
       return;
     }
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -2501,9 +2508,42 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
     setCountInBeats(null);
   };
 
+  // ── WCAG 2.1.1 Keyboard Accessibility: Leertaste schaltet Play/Stop, Escape stoppt ──
+  useEffect(() => {
+    const handleLoopKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
+        return;
+      }
+
+      if (e.code === 'Space' || e.key === ' ') {
+        e.preventDefault();
+        if (isPlayingRef.current) {
+          stopAll();
+          announceA11y('Wiedergabe der Loopstation gestoppt');
+        } else {
+          playAll();
+          announceA11y('Wiedergabe der Loopstation gestartet');
+        }
+      } else if (e.key === 'Escape') {
+        if (isPlayingRef.current) {
+          e.preventDefault();
+          stopAll();
+          announceA11y('Wiedergabe gestoppt');
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleLoopKeyDown);
+    return () => window.removeEventListener('keydown', handleLoopKeyDown);
+  }, []);
+
   const startRecording = async (trackId: number) => {
-    if (student?.parent_allow_audio === false || (student as any)?.parent_permissions?.allow_student_audio === false) {
-      alert("Audioaufnahmen wurden von den Erziehungsberechtigten für dieses Schülerprofil deaktiviert.");
+    const isStudentAudioAllowed = student?.parent_allow_audio === true && 
+      ((student as any)?.parent_permissions?.allow_student_audio === true ||
+      (student?.id && typeof window !== 'undefined' ? localStorage.getItem(`groovelab_parent_allow_student_audio_${student.id}`) === 'true' : false));
+    if (!isStudentAudioAllowed) {
+      alert("Audioaufnahmen wurden von den Erziehungsberechtigten für dieses Schülerprofil noch nicht freigegeben (Privacy by Default). Bitte die Eltern, die Funktion im Eltern-Bereich zu aktivieren.");
       return;
     }
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {

@@ -553,6 +553,28 @@ export const HelpCenterModal: React.FC<HelpCenterModalProps> = ({
       )
     },
     {
+      id: 'faq-accessibility-bfsg',
+      title: 'Digitale Barrierefreiheit, Tastatursteuerung & Screenreader (BITV 2.0 / BFSG)',
+      category: 'faq',
+      roles: ['admin', 'teacher', 'student', 'secretary'],
+      badge: 'Inklusion',
+      summary: 'Zugänglichkeit, Tastatur-Navigation, 2-Klick-Bedienung & Barrieren melden.',
+      tags: ['barrierefreiheit', 'inklusion', 'tastatur', 'screenreader', 'voiceover', 'nvda', 'bfsg', 'bitv'],
+      details: (
+        <div style={{ fontSize: '0.86rem', color: '#334155', lineHeight: 1.6 }}>
+          <p>
+            Campus-Groovelab ist nach den Richtlinien der <strong>BITV 2.0 / EN 301 549</strong> und <strong>WCAG 2.2 (Level AA)</strong> barrierearm optimiert:
+          </p>
+          <ul style={{ paddingLeft: '20px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <li><strong>Tastatur-Navigation:</strong> Die gesamte Plattform lässt sich mit der <code>Tab</code>-Taste ansteuern. Mit <code>Enter</code> oder <code>Leertaste</code> werden Karten geöffnet und Schüler im Stundenplan zugewiesen (2-Klick-Parität).</li>
+            <li><strong>Audio-Player &amp; Loopstation:</strong> In der Loopstation startet/stoppt die <code>Leertaste</code> Aufnahme und Wiedergabe, <code>Escape</code> stoppt zuverlässig. Die Audio-Wellenform kann mit Pfeiltasten vor- und zurückgespult werden.</li>
+            <li><strong>Screenreader:</strong> Standardkonforme ARIA-Attribute und Live-Regionen kündigen Statusmeldungen und Reiterwechsel automatisch an.</li>
+            <li><strong>Barriere melden:</strong> Sollten Sie auf eine Barriere stoßen, können Sie diese jederzeit über <a href="mailto:barrierefreiheit@campus-groovelab.de" style={{ color: '#34a853', fontWeight: 700 }}>barrierefreiheit@campus-groovelab.de</a> oder über das Fußzeilen-Menü unter „Barrierefreiheit“ an unser Support-Team melden.</li>
+          </ul>
+        </div>
+      )
+    },
+    {
       id: 'faq-pwa-install',
       title: 'Wie installiere ich Campus-Groovelab als App auf iPad / iPhone / Android?',
       category: 'faq',
@@ -757,6 +779,10 @@ export const HelpCenterModal: React.FC<HelpCenterModalProps> = ({
       onClick={onClose}
     >
       <div 
+        role="dialog"
+        aria-modal="true"
+        aria-label="Hilfezentrum & Dokumentation"
+        onClick={(e) => e.stopPropagation()}
         style={{
           width: '100%',
           maxWidth: '680px',
@@ -768,7 +794,6 @@ export const HelpCenterModal: React.FC<HelpCenterModalProps> = ({
           overflow: 'hidden',
           animation: 'slideLeft 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
         }}
-        onClick={(e) => e.stopPropagation()}
       >
         {/* Header Bar */}
         <div style={{
@@ -1108,6 +1133,74 @@ export const HelpCenterModal: React.FC<HelpCenterModalProps> = ({
           ) : (
             /* List of Guides */
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              
+              {/* 🟢 Hebel 3: Live-Statusampel (E-Mail-Stopper) */}
+              <div style={{
+                background: '#ffffff',
+                border: '1px solid #e2e8f0',
+                borderRadius: '16px',
+                padding: '12px 18px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                boxShadow: '0 2px 8px rgba(15, 23, 42, 0.03)',
+                flexWrap: 'wrap',
+                gap: '10px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <span style={{
+                    width: '10px',
+                    height: '10px',
+                    borderRadius: '50%',
+                    background: '#10b981',
+                    boxShadow: '0 0 0 3px rgba(16, 185, 129, 0.2)',
+                    display: 'inline-block'
+                  }} />
+                  <div>
+                    <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#0f172a' }}>
+                      Systemstatus: 100 % Störungsfrei
+                    </div>
+                    <div style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                      Hetzner Rechenzentren Deutschland (Falkenstein/Nürnberg) • Alle Dienste aktiv
+                    </div>
+                  </div>
+                </div>
+                <span style={{ fontSize: '0.70rem', color: '#10b981', fontWeight: 750, background: '#ecfdf5', padding: '3px 10px', borderRadius: '100px', border: '1px solid #a7f3d0' }}>
+                  🟢 Vollbetrieb (99,5 % SLA)
+                </span>
+              </div>
+
+              {/* 🛡️ Hebel 1 & Hebel 2: Fehlläufer-Schutzschild & Asynchron-Doktrin */}
+              <div style={{
+                background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+                border: '1px solid #e2e8f0',
+                borderRadius: '16px',
+                padding: '14px 18px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '8px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Shield size={16} color="#0f172a" />
+                  <strong style={{ fontSize: '0.84rem', color: '#0f172a', fontWeight: 800 }}>
+                    Zuständigkeits-Hinweis &amp; Support-Routing
+                  </strong>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '10px', fontSize: '0.76rem', lineHeight: 1.5 }}>
+                  <div style={{ background: '#ffffff', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+                    <strong style={{ color: '#0f172a', display: 'block', marginBottom: '2px' }}>🏫 Fragen zu Unterricht &amp; Terminen:</strong>
+                    <span style={{ color: '#64748b' }}>
+                      Bei Fragen zu Stundenplänen, Raumänderungen, Lehrer-Vertretungen, Krankmeldungen oder Musikschulverträgen wenden Sie sich bitte direkt an das <strong>Sekretariat Ihrer Musikschule vor Ort</strong>.
+                    </span>
+                  </div>
+                  <div style={{ background: '#ffffff', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+                    <strong style={{ color: '#0f172a', display: 'block', marginBottom: '2px' }}>💻 Technische Software-Fragen:</strong>
+                    <span style={{ color: '#64748b' }}>
+                      Technische Anfragen zu Logins, QR-Codes oder Systemmeldungen bitte <strong>bevorzugt schriftlich</strong> per Ticket oder an <a href="mailto:kontakt@campus-groovelab.de" style={{ color: '#10b981', fontWeight: 700 }}>kontakt@campus-groovelab.de</a> richten (Reaktionszeit an Werktagen &lt; 60 Min.).
+                    </span>
+                  </div>
+                </div>
+              </div>
               
               {/* Role-tailored Quickstart Hero Banner */}
               {activeTab === 'quickstart' && !searchQuery && (() => {

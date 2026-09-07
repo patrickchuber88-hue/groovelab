@@ -465,12 +465,17 @@ export function QRCodeModal({ user, activePlatform, onClose }: QRCodeModalProps)
       }}
     >
       <div 
+        role="dialog"
+        aria-modal="true"
+        aria-label="Digitaler Schulausweis"
         onClick={(e) => e.stopPropagation()}
         style={{ maxWidth: '440px', width: '100%', position: 'relative' }}
       >
         {/* Close Button */}
         <button 
+          type="button"
           onClick={onClose}
+          aria-label="Schließen"
           style={{
             position: 'absolute',
             top: typeof window !== 'undefined' && window.innerWidth <= 640 ? '12px' : '-48px',

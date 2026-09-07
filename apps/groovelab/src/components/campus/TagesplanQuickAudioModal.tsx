@@ -314,6 +314,10 @@ export const TagesplanQuickAudioModal: React.FC<TagesplanQuickAudioModalProps> =
       try { recognitionRef.current.stop(); } catch {}
       recognitionRef.current = null;
     }
+    if (audioCtxRef.current && audioCtxRef.current.state !== 'closed') {
+      try { audioCtxRef.current.close(); } catch {}
+      audioCtxRef.current = null;
+    }
     setIsDictating(false);
   };
 

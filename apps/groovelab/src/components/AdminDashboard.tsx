@@ -17,6 +17,7 @@ import { useRealNamesVisibility, maskLastName, formatTeacherFullName } from '../
 import { StudentToDelete } from './ConfirmDeleteStudentModal';
 import { deleteStudentFully } from '../utils/studentDeletionService';
 import { revokeStudentToken } from '../utils/tokenSigner';
+import { isUUID } from '../utils/uuidValidator';
 
 // Lazy load heavy sub-suites & modals on demand
 const StudentDetailModal = lazy(() => import('./StudentDetailModal').then(m => ({ default: m.StudentDetailModal })));
@@ -1673,6 +1674,7 @@ export function AdminDashboard({
 
   const fetchTeacherStudentsHelper = async (teacherId: string, schoolId: string, platform: string) => {
     let assignedStudentIds: string[] = [];
+    if (!teacherId || !isUUID(teacherId)) return assignedStudentIds;
 
     if (platform === 'campus') {
       const [{ data: schedData }, { data: occData }, { data: groupData }] = await Promise.all([
@@ -1954,17 +1956,19 @@ export function AdminDashboard({
 
       if (activeTab === 'students' || activeTab === 'schedule') {
         try {
-          const { data: prefData } = await supabase
-            .from('student_schedule_preferences')
-            .select('student_id, preference_type, day_of_week, start_time')
-            .eq('school_id', currentAdmin.school_id);
-          if (prefData) {
-            const map: Record<string, any[]> = {};
-            prefData.forEach((p: any) => {
-              if (!map[p.student_id]) map[p.student_id] = [];
-              map[p.student_id].push(p);
-            });
-            setAllSchedulePreferences(map);
+          if (currentAdmin?.school_id && isUUID(currentAdmin.school_id)) {
+            const { data: prefData } = await supabase
+              .from('student_schedule_preferences')
+              .select('student_id, preference_type, day_of_week, start_time')
+              .eq('school_id', currentAdmin.school_id);
+            if (prefData) {
+              const map: Record<string, any[]> = {};
+              prefData.forEach((p: any) => {
+                if (!map[p.student_id]) map[p.student_id] = [];
+                map[p.student_id].push(p);
+              });
+              setAllSchedulePreferences(map);
+            }
           }
         } catch (e) {
           console.warn('Failed to fetch schedule preferences:', e);
@@ -2065,7 +2069,7 @@ export function AdminDashboard({
 
           const { data: occursData } = await supabase
             .from('schedule_occurrences')
-            .select('*, student:users!schedule_occurrences_student_id_fkey(*), teacher:users!schedule_occurrences_teacher_id_fkey(*), schedules!schedule_occurrences_schedule_id_fkey(*)')
+            .select('*')
             .eq('school_id', adminData.school_id)
             .or(`and(date.gte.${startDateStr},date.lte.${endDateStr}),and(original_date.gte.${startDateStr},date.lte.${endDateStr})`);
 
@@ -2123,10 +2127,16 @@ export function AdminDashboard({
             setDbRoomBookings([]);
           }
 
-          // Map room overrides onto loaded occurrences so their room is correct
-          let mappedOccurs = occursData || [];
+          // Map room overrides and schedules onto loaded occurrences so their room is correct
+          let mappedOccurs = (occursData || []).map((occ: any) => {
+            const sch = (schedulesData || []).find((s: any) => s.id === occ.schedule_id);
+            return {
+              ...occ,
+              schedules: sch || null
+            };
+          });
           if (dbBookingsData && occursData) {
-            mappedOccurs = occursData.map((occ: any) => {
+            mappedOccurs = mappedOccurs.map((occ: any) => {
               const booking = dbBookingsData.find(b => 
                 b.date === occ.date && 
                 b.start_time.substring(0, 5) === occ.start_time.substring(0, 5) &&

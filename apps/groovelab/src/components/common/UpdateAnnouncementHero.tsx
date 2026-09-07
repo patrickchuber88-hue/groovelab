@@ -25,7 +25,7 @@ export const UpdateAnnouncementHero: React.FC<UpdateAnnouncementHeroProps> = ({
           .order('created_at', { ascending: false })
           .limit(1);
 
-        if (error) throw error;
+        if (error) return;
         if (data && data.length > 0) {
           const item = data[0] as PlatformAnnouncement;
           

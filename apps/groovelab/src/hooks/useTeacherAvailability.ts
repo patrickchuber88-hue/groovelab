@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import { isUUID } from '../utils/uuidValidator';
 
 export interface DayConfig {
   start: string;
@@ -25,41 +26,42 @@ export function useTeacherAvailability(student: any) {
         setLoading(true);
         let teacherId = student?.teacher_id;
         
-        // 1. Determine teacher ID strictly
-        if (!teacherId && student?.id) {
+        const validStudentId = isUUID(student?.id) ? student.id : null;
+
+        // 1. Determine teacher ID strictly (only execute DB lookups if student ID is a valid UUID)
+        if (!teacherId && validStudentId) {
           const { data: uRow } = await supabase
             .from('users')
             .select('teacher_id')
-            .eq('id', student.id)
+            .eq('id', validStudentId)
             .maybeSingle();
           if (uRow?.teacher_id) teacherId = uRow.teacher_id;
         }
 
-        if (!teacherId && student?.id) {
+        if (!teacherId && validStudentId) {
           const { data: stRow } = await supabase
             .from('students')
             .select('teacher_id')
-            .eq('id', student.id)
+            .eq('id', validStudentId)
             .maybeSingle();
           if (stRow?.teacher_id) teacherId = stRow.teacher_id;
         }
 
-        if (!teacherId && student?.id) {
+        if (!teacherId && validStudentId) {
           const { data: pendRow } = await supabase
             .from('pending_students_decrypted')
-            .select('teacher_id, created_by')
-            .eq('id', student.id)
+            .select('teacher_id')
+            .eq('id', validStudentId)
             .maybeSingle();
           if (pendRow?.teacher_id) teacherId = pendRow.teacher_id;
-          else if (pendRow?.created_by) teacherId = pendRow.created_by;
         }
 
         // 2. Check schedules table
-        if (!teacherId && student?.id) {
+        if (!teacherId && validStudentId) {
           const { data: schedRow } = await supabase
             .from('schedules')
             .select('teacher_id')
-            .eq('student_id', student.id)
+            .eq('student_id', validStudentId)
             .not('teacher_id', 'is', null)
             .limit(1)
             .maybeSingle();
@@ -95,8 +97,8 @@ export function useTeacherAvailability(student: any) {
           } catch (e) {}
         }
 
-        // If no strict teacherId found, we abort to prevent data leaks.
-        if (!teacherId) {
+        // If no strict teacherId found or invalid format, we abort to prevent data leaks and 400 errors.
+        if (!teacherId || !isUUID(teacherId)) {
           if (active) {
             setAvailability(null);
             setLoading(false);

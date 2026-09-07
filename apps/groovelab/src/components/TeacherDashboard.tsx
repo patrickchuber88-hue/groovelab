@@ -14,10 +14,12 @@ import { supabase, deleteUserStorageAssets } from '../lib/supabase';
 import { Monitor, Music, Award, Box, Plus, AlertCircle, AlertTriangle, User, Users, Star, TrendingUp, Shield, Zap, Play, Info, CheckCircle, Check, Search, Trash2, Bell, X, Clock, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, LayoutDashboard, LogOut, Flame, GraduationCap, UserPlus, Edit3, Calendar, Activity, CheckSquare, Mail, Copy, Sparkles, BookOpen, MessageSquare, Lock, Palmtree, Heart, Settings, Key, Sun, ThumbsUp, Building2, Hourglass, Eye, EyeOff, ShieldCheck, CheckCheck, CalendarX, Send, Lightbulb, Download, Sliders, Mic, Disc, Radio, Timer, ArrowRight, Headphones, FileText, DoorOpen, HelpCircle, RotateCcw, Phone } from 'lucide-react';
 import { notesService, UserNote } from '../services/notesService';
 import { formatCleanNoteContent } from './notes/notesConstants';
-import { checkIsAudioTresorActive } from '../domain/stickersAndTresor';
+import { checkIsAudioTresorActive, checkIsAudioTresorReadOnly } from '../domain/stickersAndTresor';
+import { computeSchoolDunningStatus, SchoolDunningStatus, getDunningVisualConfig } from '../domain/schoolDunningEngine';
 import { UpdateAnnouncementHero } from './common/UpdateAnnouncementHero';
 import { renderInstrumentIcon } from '../utils/instruments';
 import { getDistanceFromLatLonInM } from '../utils/geo';
+import { isUUID } from '../utils/uuidValidator';
 import { useRealNamesVisibility, maskLastName, formatSingleStudentAnonymized, formatGroupStudentsAnonymized, getGroupTypeLabel, sanitizeBirthDateToDayOnly, formatTeacherFullName } from '../utils/nameHelper';
 import { StudentToDelete } from './ConfirmDeleteStudentModal';
 import { deleteStudentFully } from '../utils/studentDeletionService';
@@ -724,6 +726,7 @@ export function TeacherDashboard({
     };
   }, [teacher?.school_id, session?.users?.school_id]);
   const [schoolData, setSchoolData] = useState<any>(null);
+  const [teacherDunningStatus, setTeacherDunningStatus] = useState<SchoolDunningStatus | null>(null);
   const isTeacher = viewMode === 'admin';
   // localCheckedIn: flips immediately on check-in so the overlay hides without waiting for parent prop updates
   const [localCheckedIn, setLocalCheckedIn] = useState(false);
@@ -3168,11 +3171,6 @@ export function TeacherDashboard({
               room_id,
               teacher_id,
               rooms (id, name)
-            ),
-            student:users!schedule_occurrences_student_id_fkey (
-              id,
-              first_name,
-              last_name
             )
           `);
 
@@ -3957,7 +3955,7 @@ export function TeacherDashboard({
   const [loadingPrepMirror, setLoadingPrepMirror] = useState<boolean>(false);
 
   useEffect(() => {
-    if (!activeStudent?.id) {
+    if (!activeStudent?.id || !isUUID(activeStudent.id)) {
       setDynamicPrepMirror(null);
       return;
     }
@@ -4040,8 +4038,6 @@ export function TeacherDashboard({
           (getItemWeek(item) === currentWeekStr || (item.updated_at && getISOWeekRaw(item.updated_at, 1) === currentWeekStr))
         );
 
-        const currentWeekNotes = currentWeekNotesItem ? parseHomeworkNotes(currentWeekNotesItem.homework_notes) : [];
-
         const prevWeekItems = matrixItems.filter(item => 
           !item.topic_name.startsWith('Hausaufgabe KW ') && 
           item.status !== 'MASTERED' && 
@@ -4057,6 +4053,9 @@ export function TeacherDashboard({
         );
 
         const prevWeekNotes = prevWeekNotesItem ? parseHomeworkNotes(prevWeekNotesItem.homework_notes) : [];
+        const currentWeekNotes = currentWeekNotesItem 
+          ? parseHomeworkNotes(currentWeekNotesItem.homework_notes) 
+          : (currentWeekItems.length > 0 && prevWeekNotes.length > 0 ? prevWeekNotes : []);
 
         const rawStudentName = activeStudent.first_name 
           ? `${activeStudent.first_name} ${maskLastName(activeStudent.last_name, showRealNames)}`.trim()
@@ -4248,21 +4247,12 @@ export function TeacherDashboard({
               duration,
               instrument,
               rooms (id, name)
-            ),
-            student:users!schedule_occurrences_student_id_fkey (
-              id,
-              first_name,
-              last_name,
-              is_app_user,
-              instrument,
-              birth_date,
-              avatars (avatar_style, evolution_level, xp, streak_flame)
             )
           `)
           .eq('school_id', teacherProfile.school_id)
           .or(`date.eq.${todayStr},original_date.eq.${todayStr}`);
 
-        if (targetTeacherId && targetTeacherId !== 'master-support-id') {
+        if (targetTeacherId && targetTeacherId !== 'master-support-id' && isUUID(targetTeacherId)) {
           occQuery = occQuery.eq('teacher_id', targetTeacherId);
         }
 
@@ -4648,11 +4638,11 @@ export function TeacherDashboard({
            // Merge with occurrences for target date
            if (combinedOccurrences && combinedOccurrences.length > 0) {
              combinedOccurrences.forEach((occ: any) => {
-               const student = occ.student;
+               const occStudentId = occ.student?.id || occ.student_id || occ.studentId;
+               const student = occ.student || schoolStudents.find((s: any) => String(s.id) === String(occStudentId)) || allStudents.find((s: any) => String(s.id) === String(occStudentId));
                const avatar = student?.avatars?.[0] || null;
                const isAnalogStickerUser = !student?.is_app_user || avatar?.avatar_style === 'Standard_Silhouette';
                const formattedTime = occ.start_time ? occ.start_time.substring(0, 5) : (occ.startTime ? occ.startTime.substring(0, 5) : '00:00');
-               const occStudentId = occ.student?.id || occ.student_id || occ.studentId;
                const occStudentFirstName = (occ.student?.first_name || occ.studentName || occ.student_name || '').split(' ')[0].toLowerCase();
                const occStudentLastName = (occ.student?.last_name || occ.student_last_name || '').split(' ').slice(1).join(' ').toLowerCase();
 
@@ -4731,7 +4721,7 @@ export function TeacherDashboard({
           const nextSlot = timeline.find((s: any) => s.timeSlot >= currentStr) || timeline[0] || null;
           let prepMirror = null;
 
-          if (nextSlot && nextSlot.student) {
+          if (nextSlot && nextSlot.student && isUUID(nextSlot.student.id)) {
             const studentId = nextSlot.student.id;
             
             const [avatarRes, progressRes, matrixRes] = await Promise.all([
@@ -4807,8 +4797,6 @@ export function TeacherDashboard({
               (getItemWeek(item) === currentWeekStr || (item.updated_at && getISOWeekRaw(item.updated_at, 1) === currentWeekStr))
             );
 
-            const currentWeekNotes = currentWeekNotesItem ? parseHomeworkNotes(currentWeekNotesItem.homework_notes) : [];
-
             const prevWeekItems = matrixItems.filter(item => 
               !item.topic_name.startsWith('Hausaufgabe KW ') && 
               item.status !== 'MASTERED' && 
@@ -4824,6 +4812,9 @@ export function TeacherDashboard({
             );
 
             const prevWeekNotes = prevWeekNotesItem ? parseHomeworkNotes(prevWeekNotesItem.homework_notes) : [];
+            const currentWeekNotes = currentWeekNotesItem 
+              ? parseHomeworkNotes(currentWeekNotesItem.homework_notes) 
+              : (currentWeekItems.length > 0 && prevWeekNotes.length > 0 ? prevWeekNotes : []);
 
             prepMirror = {
               studentId,
@@ -4872,17 +4863,13 @@ export function TeacherDashboard({
                 original_date,
                 start_time,
                 status,
-                student:users!schedule_occurrences_student_id_fkey (
-                  id,
-                  first_name,
-                  last_name
-                )
+                student_id
               `)
               .eq('school_id', teacherProfile.school_id)
               .gte('date', mondayStr)
               .lte('date', sundayStr);
 
-            if (targetTeacherId && targetTeacherId !== 'master-support-id') {
+            if (targetTeacherId && targetTeacherId !== 'master-support-id' && isUUID(targetTeacherId)) {
               weekQuery = weekQuery.eq('teacher_id', targetTeacherId);
             }
 
@@ -4905,10 +4892,11 @@ export function TeacherDashboard({
                 const timeFormatted = occ.start_time ? occ.start_time.substring(0, 5) : '';
                 const originalDateObj = occ.original_date ? new Date(occ.original_date) : null;
                 const originalWeekdayStr = originalDateObj ? originalDateObj.toLocaleDateString('de-DE', { weekday: 'long' }) : 'seinem regulären Termin';
+                const foundStudent = allStudents.find((s: any) => String(s.id) === String(occ.student_id)) || occ.student;
 
                 return {
                   id: occ.id,
-                  studentName: `${occ.student?.first_name || ''} ${maskLastName(occ.student?.last_name, showRealNames)}`.trim(),
+                  studentName: foundStudent ? `${foundStudent.first_name || ''} ${maskLastName(foundStudent.last_name, showRealNames)}`.trim() : 'Schüler',
                   originalWeekday: originalWeekdayStr,
                   weekday: weekdayStr,
                   weekdayShort,
@@ -5279,6 +5267,16 @@ export function TeacherDashboard({
           if (sd) {
             setSchoolData(sd);
             setInitialSchoolData(JSON.parse(JSON.stringify(sd)));
+
+            // ─── ENTERPRISE B2B DELINQUENCY & GRACE PERIOD ARCHITECTURE ───
+            supabase
+              .from('invoices')
+              .select('id, type, amount, status, billing_date, due_date, items')
+              .eq('school_id', tData.school_id)
+              .then(({ data: invData }) => {
+                const status = computeSchoolDunningStatus(sd, invData || [], getSimulatedNow());
+                setTeacherDunningStatus(status);
+              });
             if (Number(sd.storage_addon_gb || 0) > 0 && sd.storage_addon_status !== 'cancelled') {
               localStorage.setItem('groovelab_storage_addon_active', 'true');
               localStorage.setItem('campus_storage_addon_active', 'true');
@@ -7410,6 +7408,7 @@ useEffect(() => {
             teacherName={teacher?.first_name ? `${teacher.first_name} ${teacher.last_name || ''}`.trim() : (teacher?.name || '')}
             schoolName={schoolData?.name || ''}
             hasTresorStorage={Number(schoolData?.storage_addon_gb || 0) > 0 || checkIsAudioTresorActive(docStudent)}
+            readOnly={teacherDunningStatus?.isTeacherReadOnly || false}
             uiLevel={docStudent?.campus_ui_level || 'pro'}
             groupStudents={docStudent?.groupStudents || (docStudent?.students && docStudent.students.length > 1 ? docStudent.students : [])}
             onProfileClick={(student) => {
@@ -7424,7 +7423,7 @@ useEffect(() => {
       {quickAudioStudent && (
         <Suspense fallback={null}>
           <TagesplanQuickAudioModal
-            isOpen={Boolean(quickAudioStudent)}
+            isOpen={Boolean(quickAudioStudent) && !teacherDunningStatus?.isTeacherReadOnly}
             student={quickAudioStudent}
             teacher={teacher}
             dateStr={getSimulatedNow().toISOString()}
@@ -7649,6 +7648,40 @@ useEffect(() => {
           width: '100%'
         }}
       >
+        {/* ─── ENTERPRISE B2B DELINQUENCY & GRACE PERIOD TEACHER BANNER ─── */}
+        {teacherDunningStatus && (teacherDunningStatus.level === 'level_4_teacher_warning' || teacherDunningStatus.isTeacherReadOnly) && (
+          <div style={{
+            background: teacherDunningStatus.isTeacherReadOnly ? '#fef2f2' : '#fffbeb',
+            borderBottom: teacherDunningStatus.isTeacherReadOnly ? '1px solid #fee2e2' : '1px solid #fef3c7',
+            borderRadius: '16px',
+            padding: '14px 20px',
+            fontSize: '0.84rem',
+            color: teacherDunningStatus.isTeacherReadOnly ? '#991b1b' : '#92400e',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            fontWeight: 700,
+            fontFamily: "'Plus Jakarta Sans', sans-serif",
+            marginBottom: '16px',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
+          }}>
+            <span style={{ fontSize: '1.25rem' }}>
+              {teacherDunningStatus.isTeacherReadOnly ? '🚨' : '⚠️'}
+            </span>
+            <span style={{ lineHeight: 1.5 }}>
+              {teacherDunningStatus.isTeacherReadOnly ? (
+                <>
+                  <strong>Didaktischer Schreibstopp aktiv:</strong> Aufgrund eines offenen B2B-Infrastrukturbeitrags der Musikschule ist das Erstellen neuer Hausaufgaben, Sprachaufnahmen und Notizen vorübergehend pausiert. Stundenpläne, Schülerübersichten und Repertoire stehen weiterhin im Lesemodus zur Verfügung.
+                </>
+              ) : (
+                <>
+                  <strong>Hinweis der Schulleitung:</strong> Für deine Musikschule besteht ein Zahlungsrückstand. In <strong>{teacherDunningStatus.teacherCountdownDays} {teacherDunningStatus.teacherCountdownDays === 1 ? 'Tag' : 'Tagen'}</strong> wechselt das System in den didaktischen Nur-Lese-Modus. Bitte wende dich bei Fragen an das Sekretariat.
+                </>
+              )}
+            </span>
+          </div>
+        )}
+
         {/* Header - only if hideHeader is false */}
         {!hideHeader && activeTab !== 'briefing' && (
           <header className="mobile-header-flex" style={{ marginBottom: activeTab === 'live' ? '16px' : '32px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>

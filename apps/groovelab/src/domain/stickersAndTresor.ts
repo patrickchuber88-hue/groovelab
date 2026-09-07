@@ -367,3 +367,56 @@ export const checkIsAudioTresorActive = (studentObj?: any): boolean => {
 
   return false;
 };
+
+/**
+ * Returns true if the school's Audio-Tresor is in protected Read-Only mode due to B2B delinquency (Day 30+).
+ * Existing recordings remain 100% playable and downloadable (Zero-Deletion Guarantee).
+ * New uploads are paused until the outstanding B2B invoice is settled.
+ */
+export const checkIsAudioTresorReadOnly = (studentOrSchool?: any, dunningLevel?: string): boolean => {
+  if (dunningLevel) {
+    if (dunningLevel === 'level_3_admin_readonly' || 
+        dunningLevel === 'level_4_teacher_warning' || 
+        dunningLevel === 'level_5_full_readonly') {
+      return true;
+    }
+  }
+
+  const rawSch = studentOrSchool?.schools || studentOrSchool?.school;
+  const sch = Array.isArray(rawSch) ? rawSch[0] : (rawSch || studentOrSchool);
+  const sId = studentOrSchool?.school_id || (studentOrSchool as any)?.schoolId || sch?.id || 
+    (typeof window !== 'undefined' ? (localStorage.getItem('groovelab_school_id') || localStorage.getItem('campus_school_id')) : null);
+
+  if (sch?.is_audio_tresor_readonly === true || 
+      sch?.dunning_level === 'level_3_admin_readonly' || 
+      sch?.dunning_level === 'level_4_teacher_warning' || 
+      sch?.dunning_level === 'level_5_full_readonly') {
+    return true;
+  }
+
+  if (typeof window !== 'undefined') {
+    if (localStorage.getItem('groovelab_audio_tresor_readonly') === 'true' || 
+        localStorage.getItem('campus_audio_tresor_readonly') === 'true') {
+      return true;
+    }
+    if (sId) {
+      if (localStorage.getItem(`groovelab_audio_tresor_readonly_${sId}`) === 'true' ||
+          localStorage.getItem(`campus_audio_tresor_readonly_${sId}`) === 'true') {
+        return true;
+      }
+      try {
+        const overridesStr = localStorage.getItem('groovelab_school_overrides') || localStorage.getItem('campus_school_overrides');
+        if (overridesStr) {
+          const overrides = JSON.parse(overridesStr);
+          if (overrides[sId]?.is_audio_tresor_readonly === true) return true;
+          const lvl = overrides[sId]?.dunning_level;
+          if (lvl === 'level_3_admin_readonly' || lvl === 'level_4_teacher_warning' || lvl === 'level_5_full_readonly') {
+            return true;
+          }
+        }
+      } catch (e) {}
+    }
+  }
+
+  return false;
+};

@@ -3,9 +3,10 @@ import {
   CheckCircle, Monitor, Lock, ExternalLink, Settings, 
   Music, Zap, Users, Award, PlayCircle, Youtube, Calendar, Camera, X, Search,
   ChevronLeft, ChevronRight, Clock, AlertCircle, RotateCcw, QrCode, Plus, Mic2, MapPin, Mic,
-  ChevronDown, Check
+  ChevronDown, Check, Trash2, ShieldCheck, AlertTriangle, Flag, Moon
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { validateChatMessageContent, ChatRespectValidationResult } from '../utils/chatRespectGuard';
 
 import { normalizeInstrument as normalize } from '../utils/instruments';
 
@@ -154,7 +155,40 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
   }, [user, selectedBandForProfile?.school_id]);
   const [isLoadingShout, setIsLoadingShout] = useState(false);
   const [shoutboxError, setShoutboxError] = useState<string | null>(null);
+  const [shoutRespectWarning, setShoutRespectWarning] = useState<ChatRespectValidationResult | null>(null);
   const [isPostingShout, setIsPostingShout] = useState(false);
+
+  // 14 Tage (2 Unterrichtszyklen) Rolling Window gem. Art. 5 Abs. 1 lit. e DSGVO
+  const FOURTEEN_DAYS_MS = 14 * 24 * 60 * 60 * 1000;
+
+  // Bandroom Curfew: 20:00–07:00 Uhr und Wochenende ganztägig geschützt
+  const isCurfewActive = useMemo(() => {
+    const now = new Date();
+    const day = now.getDay(); // 0 = Sonntag, 6 = Samstag
+    const hours = now.getHours();
+    if (day === 0 || day === 6) return true;
+    if (hours >= 20 || hours < 7) return true;
+    return false;
+  }, []);
+
+  const isTeacherOrCoach = useMemo(() => {
+    if (!user) return false;
+    const role = (user.role || '').toLowerCase();
+    const isTeacher = role === 'teacher' || role === 'admin' || role === 'secretary';
+    const isBandCoach = selectedBandForProfile?.coach_id === user.id;
+    return isTeacher || isBandCoach;
+  }, [user, selectedBandForProfile]);
+
+  const [recentShoutTimestamps, setRecentShoutTimestamps] = useState<number[]>([]);
+
+  const canModerateShout = (msg: any) => {
+    if (!user) return false;
+    const role = (user.role || '').toLowerCase();
+    const isTeacher = role === 'teacher' || role === 'admin' || role === 'secretary';
+    const isBandCoach = selectedBandForProfile?.coach_id === user.id;
+    const isOwnMsg = msg.user_id === user.id;
+    return isTeacher || isBandCoach || isOwnMsg;
+  };
   const [isJoiningProposal, setIsJoiningProposal] = useState(false);
   const [isDeletingProposal, setIsDeletingProposal] = useState<string | null>(null);
   const [isLoadingPlanner, setIsLoadingPlanner] = useState(false);
@@ -445,10 +479,19 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
   const fetchShoutbox = async () => {
     try {
       setIsLoadingShout(true);
+      // Purge 14-Tage ältere Nachrichten opportunistisch im Hintergrund (Art. 5 Abs. 1 lit. e DSGVO)
+      try {
+        await supabase.rpc('cleanup_expired_band_shoutbox');
+      } catch {
+        // Nicht blockierend
+      }
+
+      const fourteenDaysAgo = new Date(Date.now() - FOURTEEN_DAYS_MS).toISOString();
       const { data, error } = await supabase
         .from('band_shoutbox')
         .select('*, author:users!user_id(id, first_name, photo_url)')
         .eq('band_id', selectedBandForProfile.id)
+        .gte('created_at', fourteenDaysAgo)
         .order('created_at', { ascending: true });
 
       if (error) {
@@ -464,34 +507,100 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
     }
   };
 
+  const deleteShoutMessage = async (msgId: string) => {
+    try {
+      const { error } = await supabase
+        .from('band_shoutbox')
+        .delete()
+        .eq('id', msgId);
+      if (error) {
+        console.error('[Shoutbox] Delete error:', error);
+      } else {
+        setShoutboxMessages(prev => prev.filter(m => m.id !== msgId));
+      }
+    } catch (err) {
+      console.error('[Shoutbox] Delete error:', err);
+    }
+  };
+
+  const flagShoutMessage = async (msgId: string) => {
+    try {
+      // Optimistisches Ausblenden für Schüler
+      setShoutboxMessages(prev => prev.map(m => m.id === msgId ? { ...m, is_flagged: true, flagged_by: [user?.id] } : m));
+      const { error } = await supabase.rpc('flag_band_shoutbox_message', { p_message_id: msgId });
+      if (error) {
+        // Fallback Direkt-Update
+        await supabase.from('band_shoutbox').update({ is_flagged: true }).eq('id', msgId);
+      }
+    } catch (err) {
+      console.error('[Shoutbox] Error flagging shout:', err);
+    }
+  };
+
+  const unflagShoutMessage = async (msgId: string) => {
+    try {
+      setShoutboxMessages(prev => prev.map(m => m.id === msgId ? { ...m, is_flagged: false, flagged_by: [] } : m));
+      const { error } = await supabase.rpc('unflag_band_shoutbox_message', { p_message_id: msgId });
+      if (error) {
+        await supabase.from('band_shoutbox').update({ is_flagged: false, flagged_by: [] }).eq('id', msgId);
+      }
+    } catch (err) {
+      console.error('[Shoutbox] Error unflagging shout:', err);
+    }
+  };
+
   const postShoutMessage = async () => {
-    console.log('[Shoutbox] Attempting to post message...');
-    if (!newShoutMessage.trim()) {
-      console.warn('[Shoutbox] Empty message, aborting.');
+    const messageText = newShoutMessage.trim();
+    if (!messageText) {
       return;
     }
     if (!user) {
-      console.error('[Shoutbox] No user logged in, cannot post.');
       setShoutboxError('Du musst eingeloggt sein, um Nachrichten zu schreiben.');
       return;
     }
+
+    // Hebel 2: Bandroom Curfew Check (Schutz der Schulleitung & Lehrkräfte)
+    if (isCurfewActive && !isTeacherOrCoach) {
+      setShoutboxError('🌙 Band-Ruhepause aktiv: Außerhalb der Schulzeiten (20:00–07:00 Uhr & am Wochenende) ist die Shoutbox pausiert.');
+      return;
+    }
+
+    // Hebel 4: Anti-Flooding Rate-Limiting (max 4 Shouts in 5 Minuten)
+    const nowTime = Date.now();
+    const recent = recentShoutTimestamps.filter(t => nowTime - t < 5 * 60 * 1000);
+    if (recent.length >= 4 && !isTeacherOrCoach) {
+      setShoutboxError('🎸 Band-Pause: Bitte warte kurz vor deinem nächsten Shout (Spamschutz: max. 4 Shouts in 5 Minuten).');
+      return;
+    }
+
+    // Hebel 4: 280-Zeichen-Bremse
+    if (messageText.length > 280) {
+      setShoutboxError('Nachricht zu lang (maximal 280 Zeichen erlaubt).');
+      return;
+    }
+
+    const validation = validateChatMessageContent(messageText);
+    if (!validation.isValid) {
+      setShoutRespectWarning(validation);
+      return;
+    }
+    setShoutRespectWarning(null);
     
     setIsPostingShout(true);
     setShoutboxError(null);
     
     try {
-      console.log('[Shoutbox] Inserting into DB:', { band_id: selectedBandForProfile.id, user_id: user.id });
       const { error } = await supabase.from('band_shoutbox').insert({
         band_id: selectedBandForProfile.id,
         user_id: user.id,
-        content: newShoutMessage.trim()
+        content: messageText
       });
       
       if (error) {
         console.error('[Shoutbox] Supabase error:', error);
         setShoutboxError(`Fehler beim Senden: ${error.message}`);
       } else {
-        console.log('[Shoutbox] Message posted successfully!');
+        setRecentShoutTimestamps([...recent, nowTime]);
         setNewShoutMessage('');
         fetchShoutbox();
       }
@@ -1694,18 +1803,46 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
                 alignItems: 'stretch'
               }}>
                 {/* Shoutbox */}
-                <div style={{ ...widgetStyle, display: 'flex', flexDirection: 'column', height: '400px', padding: '32px' }}>
-                  <h4 style={{ ...widgetHeaderStyle, fontSize: '0.8rem' }}><Zap size={16} /> Shoutbox <span style={{ opacity: 0.5, fontWeight: 700, fontSize: '0.65rem', marginLeft: '4px' }}>(Mitglieder)</span></h4>
+                <div style={{ ...widgetStyle, display: 'flex', flexDirection: 'column', height: '440px', padding: '28px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                    <h4 style={{ ...widgetHeaderStyle, fontSize: '0.8rem', margin: 0 }}>
+                      <Zap size={16} /> Shoutbox <span style={{ opacity: 0.5, fontWeight: 700, fontSize: '0.65rem', marginLeft: '4px' }}>(Mitglieder)</span>
+                    </h4>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(34, 197, 94, 0.12)', border: '1px solid rgba(34, 197, 94, 0.3)', borderRadius: '100px', padding: '2px 8px', fontSize: '0.62rem', color: '#4ade80', fontWeight: 750 }}>
+                      <ShieldCheck size={11} /> Band-Knigge
+                    </div>
+                  </div>
+
+                  {/* Respect Guidance Disclaimer (Safe-Harbor & Kein Rechtsschein gem. Art. 6 DSA) */}
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    background: 'rgba(255,255,255,0.03)',
+                    border: '1px solid rgba(255,255,255,0.06)',
+                    borderRadius: '10px',
+                    padding: '6px 10px',
+                    fontSize: '0.64rem',
+                    color: 'rgba(255,255,255,0.6)',
+                    fontWeight: 600,
+                    marginBottom: '8px',
+                    lineHeight: 1.3
+                  }}>
+                    <span>🎸 <strong>Teamgeist im Bandraum:</strong> Respektvoller Umgang verbindet unsere Band. Automatischer Respekt-Filter aktiv (keine 24/7-Live-Aufsicht). Verstöße können gemeldet werden.</span>
+                  </div>
+
                   {shoutboxError && (
                     <div style={{ color: '#ef4444', fontSize: '0.65rem', marginBottom: '8px', padding: '6px', background: 'rgba(239,68,68,0.1)', borderRadius: '8px' }}>
                       {shoutboxError}
                     </div>
                   )}
+
+                  {/* Messages List with 14-Day Rolling Window (Art. 5 DSGVO) & Flag-to-Hide */}
                   <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: "8px", paddingRight: '4px' }} className="custom-scrollbar">
                     {shoutboxMessages.filter((msg: any) => {
                       const msgDate = new Date(msg.created_at);
                       const now = new Date();
-                      return (now.getTime() - msgDate.getTime()) < (24 * 60 * 60 * 1000);
+                      return (now.getTime() - msgDate.getTime()) < FOURTEEN_DAYS_MS;
                     }).length === 0 ? (
                       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '12px', opacity: 0.6, padding: '20px', textAlign: 'center' }}>
                         <div style={{ fontSize: '1.8rem', animation: 'pulse-subtle 4s infinite ease-in-out' }}>⚡</div>
@@ -1716,73 +1853,293 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
                       shoutboxMessages.filter((msg: any) => {
                         const msgDate = new Date(msg.created_at);
                         const now = new Date();
-                        return (now.getTime() - msgDate.getTime()) < (24 * 60 * 60 * 1000);
-                      }).map((msg: any) => (
-                        <div key={msg.id} style={{ display: "flex", gap: "10px", background: "#1a1a1a", padding: "12px", borderRadius: "14px", border: '1px solid rgba(255,255,255,0.06)' }}>
-                          <img 
-                            src={msg.author?.photo_url || "/avatar_ghost.jpg"} 
-                            style={{ width: "28px", height: "28px", borderRadius: "8px", objectFit: 'cover', cursor: 'pointer' }} 
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if ((window as any).openUserProfile) {
-                                (window as any).openUserProfile(msg.author);
-                              }
-                            }}
-                            className="hover-scale-mini"
-                          />
-                          <div style={{ flex: 1 }}>
-                            <div style={{ fontSize: "0.7rem", fontWeight: 950, color: "white", marginBottom: '2px' }}>{msg.author?.first_name}</div>
-                            <div style={{ fontSize: "0.8rem", color: "white", lineHeight: 1.3, opacity: 0.9 }}>{msg.content}</div>
+                        return (now.getTime() - msgDate.getTime()) < FOURTEEN_DAYS_MS;
+                      }).map((msg: any) => {
+                        const isFlagged = Boolean(msg.is_flagged || (Array.isArray(msg.flagged_by) && msg.flagged_by.length > 0));
+
+                        // Flag-to-Hide: Für Schüler ausgeblendet, für Lehrer/Coach zur Prüfung sichtbar
+                        if (isFlagged && !isTeacherOrCoach) {
+                          return (
+                            <div key={msg.id} style={{ display: "flex", alignItems: "center", gap: "8px", background: "rgba(239,68,68,0.06)", padding: "8px 12px", borderRadius: "10px", border: "1px dashed rgba(239,68,68,0.25)", color: "rgba(255,255,255,0.45)", fontSize: "0.68rem", fontStyle: "italic" }}>
+                              <AlertTriangle size={12} color="#f87171" style={{ flexShrink: 0 }} />
+                              <span>Diese Nachricht wurde zur Überprüfung gemeldet und vorübergehend ausgeblendet.</span>
+                            </div>
+                          );
+                        }
+
+                        if (isFlagged && isTeacherOrCoach) {
+                          return (
+                            <div key={msg.id} style={{ display: "flex", flexDirection: "column", gap: "6px", background: "rgba(239,68,68,0.12)", padding: "10px 12px", borderRadius: "12px", border: "1px solid rgba(239,68,68,0.4)" }}>
+                              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                                <span style={{ fontSize: "0.65rem", fontWeight: 900, color: "#f87171", display: "flex", alignItems: "center", gap: "4px" }}>
+                                  <Flag size={11} /> Gemeldete Nachricht (Zur Prüfung)
+                                </span>
+                                <div style={{ display: "flex", gap: "6px" }}>
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); unflagShoutMessage(msg.id); }}
+                                    title="Freigeben"
+                                    style={{ background: "rgba(34,197,94,0.2)", border: "1px solid rgba(34,197,94,0.4)", color: "#4ade80", borderRadius: "6px", padding: "2px 8px", fontSize: "0.62rem", fontWeight: 800, cursor: "pointer" }}
+                                    className="hover-scale"
+                                  >
+                                    ✓ Freigeben
+                                  </button>
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); deleteShoutMessage(msg.id); }}
+                                    title="Löschen"
+                                    style={{ background: "rgba(239,68,68,0.2)", border: "1px solid rgba(239,68,68,0.4)", color: "#f87171", borderRadius: "6px", padding: "2px 8px", fontSize: "0.62rem", fontWeight: 800, cursor: "pointer" }}
+                                    className="hover-scale"
+                                  >
+                                    <Trash2 size={10} style={{ display: "inline", marginRight: "2px" }} /> Löschen
+                                  </button>
+                                </div>
+                              </div>
+                              <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                                <img src={msg.author?.photo_url || "/avatar_ghost.jpg"} style={{ width: "22px", height: "22px", borderRadius: "6px", objectFit: "cover" }} alt="Avatar" />
+                                <div style={{ flex: 1 }}>
+                                  <span style={{ fontSize: "0.68rem", fontWeight: 850, color: "white", marginRight: "6px" }}>{msg.author?.first_name}:</span>
+                                  <span style={{ fontSize: "0.74rem", color: "white", opacity: 0.9 }}>{msg.content}</span>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        }
+
+                        return (
+                          <div key={msg.id} style={{ display: "flex", gap: "10px", background: "#1a1a1a", padding: "12px", borderRadius: "14px", border: '1px solid rgba(255,255,255,0.06)', position: 'relative' }} className="group">
+                            <img 
+                              src={msg.author?.photo_url || "/avatar_ghost.jpg"} 
+                              style={{ width: "28px", height: "28px", borderRadius: "8px", objectFit: 'cover', cursor: 'pointer' }} 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if ((window as any).openUserProfile) {
+                                  (window as any).openUserProfile(msg.author);
+                                }
+                              }}
+                              className="hover-scale-mini"
+                              alt="Avatar"
+                            />
+                            <div style={{ flex: 1 }}>
+                              <div style={{ fontSize: "0.7rem", fontWeight: 950, color: "white", marginBottom: '2px' }}>{msg.author?.first_name}</div>
+                              <div style={{ fontSize: "0.8rem", color: "white", lineHeight: 1.3, opacity: 0.9 }}>{msg.content}</div>
+                            </div>
+                            
+                            <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                              {/* Hebel 3: Schüler-Melde-Button (Auto-Takedown Flag-to-Hide) */}
+                              {msg.user_id !== user?.id && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (window.confirm('Möchtest du diese Nachricht melden? Sie wird sofort für die Band ausgeblendet und von der Lehrkraft geprüft.')) {
+                                      flagShoutMessage(msg.id);
+                                    }
+                                  }}
+                                  title="Unpassende Nachricht melden (Auto-Ausblendung)"
+                                  aria-label="Nachricht melden"
+                                  style={{
+                                    background: 'transparent',
+                                    border: 'none',
+                                    color: 'rgba(255,255,255,0.25)',
+                                    cursor: 'pointer',
+                                    padding: '4px',
+                                    borderRadius: '6px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    transition: 'all 0.15s'
+                                  }}
+                                  onMouseEnter={(e) => {
+                                    e.currentTarget.style.color = '#f59e0b';
+                                    e.currentTarget.style.background = 'rgba(245,158,11,0.1)';
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    e.currentTarget.style.color = 'rgba(255,255,255,0.25)';
+                                    e.currentTarget.style.background = 'transparent';
+                                  }}
+                                >
+                                  <Flag size={11} />
+                                </button>
+                              )}
+
+                              {/* Takedown / Delete für Moderatoren oder Verfasser */}
+                              {canModerateShout(msg) && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    deleteShoutMessage(msg.id);
+                                  }}
+                                  title="Nachricht entfernen"
+                                  aria-label="Nachricht entfernen"
+                                  style={{
+                                    background: 'transparent',
+                                    border: 'none',
+                                    color: 'rgba(255,255,255,0.3)',
+                                    cursor: 'pointer',
+                                    padding: '4px',
+                                    borderRadius: '6px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    transition: 'all 0.15s'
+                                  }}
+                                  onMouseEnter={(e) => {
+                                    e.currentTarget.style.color = '#ef4444';
+                                    e.currentTarget.style.background = 'rgba(239,68,68,0.1)';
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    e.currentTarget.style.color = 'rgba(255,255,255,0.3)';
+                                    e.currentTarget.style.background = 'transparent';
+                                  }}
+                                >
+                                  <Trash2 size={12} />
+                                </button>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      ))
+                        );
+                      })
                     )}
                   </div>
-                  <div style={{ marginTop: "12px" }}>
-                    <div style={{ position: "relative", display: 'flex', gap: '8px' }}>
-                      <textarea 
-                        value={newShoutMessage} 
-                        onChange={(e) => setNewShoutMessage(e.target.value)} 
-                        onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); postShoutMessage(); } }} 
-                        placeholder="Nachricht..." 
-                        style={{ 
-                          flex: 1, 
-                          background: "rgba(255,255,255,0.03)", 
-                          border: "1px solid rgba(255,255,255,0.08)", 
-                          color: "white", 
-                          padding: "12px", 
-                          borderRadius: "14px", 
-                          resize: "none", 
-                          outline: "none", 
-                          fontSize: '0.8rem', 
-                          minHeight: '42px',
-                          boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.2)',
-                          transition: 'all 0.2s'
-                        }} 
-                      />
-                      <button 
-                        onClick={postShoutMessage}
-                        disabled={isPostingShout || !newShoutMessage.trim()}
-                        style={{ 
-                          background: `linear-gradient(135deg, ${brandColor}, #facc15)`, 
-                          color: 'black', 
-                          border: 'none', 
-                          borderRadius: '14px', 
-                          padding: '0 16px', 
-                          cursor: (isPostingShout || !newShoutMessage.trim()) ? 'default' : 'pointer', 
-                          opacity: (isPostingShout || !newShoutMessage.trim()) ? 0.4 : 1,
-                          boxShadow: (isPostingShout || !newShoutMessage.trim()) ? 'none' : `0 4px 15px ${brandColor}44`,
-                          transition: 'all 0.2s',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center'
-                        }}
-                        className="hover-scale"
-                      >
-                        <Zap size={16} fill="black" />
-                      </button>
+
+                  {/* Pre-Flight Respect Guard Warning & Crisis Intervention Card */}
+                  {shoutRespectWarning && (
+                    <div style={{
+                      background: shoutRespectWarning.isCrisis ? 'rgba(239, 68, 68, 0.15)' : 'rgba(245, 158, 11, 0.15)',
+                      border: `1px solid ${shoutRespectWarning.isCrisis ? 'rgba(239, 68, 68, 0.4)' : 'rgba(245, 158, 11, 0.4)'}`,
+                      borderRadius: '10px',
+                      padding: '8px 10px',
+                      marginTop: '8px',
+                      fontSize: '0.68rem',
+                      color: shoutRespectWarning.isCrisis ? '#fca5a5' : '#fde047',
+                      fontWeight: 650,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '4px'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 800 }}>
+                        <AlertTriangle size={13} color={shoutRespectWarning.isCrisis ? '#ef4444' : '#f59e0b'} />
+                        <span>{shoutRespectWarning.isCrisis ? 'Wichtiger Hinweis & Hilfe' : 'Respekt-Guard'}</span>
+                      </div>
+                      <div>{shoutRespectWarning.reason}</div>
+                      {shoutRespectWarning.isCrisis && (
+                        <div style={{ fontSize: '0.64rem', color: '#fca5a5', marginTop: '2px' }}>
+                          Nummer gegen Kummer: <a href="tel:116111" style={{ color: '#ffffff', fontWeight: 900, textDecoration: 'underline' }}>📞 116 111</a>
+                        </div>
+                      )}
                     </div>
-                  </div>
+                  )}
+
+                  {/* Hebel 2: Bandroom Curfew vs. Composer Area */}
+                  {isCurfewActive && !isTeacherOrCoach ? (
+                    <div style={{
+                      background: 'rgba(99, 102, 241, 0.10)',
+                      border: '1px solid rgba(99, 102, 241, 0.25)',
+                      borderRadius: '14px',
+                      padding: '12px 14px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px',
+                      marginTop: '12px',
+                      color: '#c7d2fe',
+                      fontSize: '0.72rem',
+                      lineHeight: 1.35
+                    }}>
+                      <Moon size={18} color="#a5b4fc" style={{ flexShrink: 0 }} />
+                      <div>
+                        <strong style={{ color: '#ffffff', display: 'block', marginBottom: '1px' }}>🌙 Band-Ruhepause aktiv (20:00–07:00 & Wochenende)</strong>
+                        Neue Shouts sind am nächsten Schultag wieder möglich. Habt einen entspannten Feierabend!
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ marginTop: "10px" }}>
+                      {/* Hebel 4: Quick-Chips für Termin- und Song-Abstimmungen */}
+                      <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '4px', marginBottom: '6px' }} className="custom-scrollbar">
+                        {[
+                          { label: '⏰ Probe', prefix: '⏰ Probe: ' },
+                          { label: '🎸 Song-Idee', prefix: '🎸 Song-Idee: ' },
+                          { label: '🔥 Part sitzt!', prefix: '🔥 Mein Part sitzt zu 100%! ' },
+                          { label: '📄 Noten', prefix: '📄 Bitte Noten mitbringen für: ' }
+                        ].map(chip => (
+                          <button
+                            key={chip.label}
+                            type="button"
+                            onClick={() => {
+                              setNewShoutMessage(prev => prev ? `${prev} ${chip.prefix}` : chip.prefix);
+                              if (shoutRespectWarning) setShoutRespectWarning(null);
+                            }}
+                            style={{
+                              background: 'rgba(255,255,255,0.06)',
+                              border: '1px solid rgba(255,255,255,0.1)',
+                              borderRadius: '100px',
+                              padding: '3px 9px',
+                              color: '#f1f5f9',
+                              fontSize: '0.62rem',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              whiteSpace: 'nowrap',
+                              flexShrink: 0,
+                              transition: 'all 0.15s'
+                            }}
+                            className="hover-scale-mini"
+                          >
+                            {chip.label}
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Textarea mit 280-Zeichen-Bremse */}
+                      <div style={{ position: "relative", display: 'flex', gap: '8px' }}>
+                        <textarea 
+                          value={newShoutMessage} 
+                          maxLength={280}
+                          onChange={(e) => {
+                            setNewShoutMessage(e.target.value);
+                            if (shoutRespectWarning) setShoutRespectWarning(null);
+                          }} 
+                          onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); postShoutMessage(); } }} 
+                          placeholder="Nachricht an die Band... (max. 280 Zeichen)" 
+                          style={{ 
+                            flex: 1, 
+                            background: "rgba(255,255,255,0.03)", 
+                            border: "1px solid rgba(255,255,255,0.08)", 
+                            color: "white", 
+                            padding: "10px 12px", 
+                            borderRadius: "14px", 
+                            resize: "none", 
+                            outline: "none", 
+                            fontSize: '0.78rem', 
+                            minHeight: '40px',
+                            boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.2)',
+                            transition: 'all 0.2s'
+                          }} 
+                        />
+                        <button 
+                          onClick={postShoutMessage}
+                          disabled={isPostingShout || !newShoutMessage.trim()}
+                          style={{ 
+                            background: `linear-gradient(135deg, ${brandColor}, #facc15)`, 
+                            color: 'black', 
+                            border: 'none', 
+                            borderRadius: '14px', 
+                            padding: '0 16px', 
+                            cursor: (isPostingShout || !newShoutMessage.trim()) ? 'default' : 'pointer', 
+                            opacity: (isPostingShout || !newShoutMessage.trim()) ? 0.4 : 1,
+                            boxShadow: (isPostingShout || !newShoutMessage.trim()) ? 'none' : `0 4px 15px ${brandColor}44`,
+                            transition: 'all 0.2s',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                          }}
+                          className="hover-scale"
+                          aria-label="Shout senden"
+                        >
+                          <Zap size={16} fill="black" />
+                        </button>
+                      </div>
+                      
+                      {/* Character Counter */}
+                      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '2px', fontSize: '0.60rem', color: (280 - newShoutMessage.length) < 30 ? '#f59e0b' : 'rgba(255,255,255,0.35)', fontWeight: 650 }}>
+                        {280 - newShoutMessage.length} Zeichen
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Wochenplaner */}

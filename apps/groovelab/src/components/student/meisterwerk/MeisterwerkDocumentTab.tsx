@@ -1,4 +1,5 @@
-import React, { Suspense } from 'react';
+import React, { Suspense, useState, useMemo, useCallback } from 'react';
+import { supabase } from '../../../lib/supabase';
 import {
   Activity, ArrowRightLeft, Award, BookOpen, Calendar, Check, ChevronDown, ChevronLeft,
   ChevronRight, Clock, Copy, Disc, Edit3, FileText, Hash, HelpCircle, History, Lightbulb,
@@ -503,6 +504,43 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
     useNotebookLayout,
     viewingWeekOffset
   } = props;
+
+  // 🛡️ Datenschutz- & Minderjährigenschutz-Schranke (§ 201 StGB / Art. 8 DSGVO)
+  const isStudentAudioForbiddenForTeacher = useMemo(() => {
+    const studentIdVal = (student as any)?.id;
+    const localTeacherAudioKey = studentIdVal && typeof window !== 'undefined' ? localStorage.getItem(`groovelab_parent_allow_teacher_audio_${studentIdVal}`) : null;
+    const isAllowed = ((student as any)?.parent_permissions?.allow_teacher_audio === true) || (localTeacherAudioKey !== null ? localTeacherAudioKey === 'true' : false);
+    return !isAllowed;
+  }, [student]);
+
+  const [teacherConsentRequested, setTeacherConsentRequested] = useState(false);
+
+  const handleRequestParentAudioConsent = useCallback(async () => {
+    if (!student?.id) return;
+    const reqPayload = {
+      requestedAt: new Date().toISOString(),
+      teacherName: effectiveTeacherFullName || 'Deine Lehrkraft'
+    };
+    localStorage.setItem(`groovelab_parent_req_teacher_audio_${student.id}`, JSON.stringify(reqPayload));
+    setTeacherConsentRequested(true);
+
+    try {
+      const senderId = (student as any)?.teacher_id || (typeof window !== 'undefined' ? sessionStorage.getItem('groovelab_user_id') : null);
+      if (senderId) {
+        await supabase.from('campus_direct_messages').insert({
+          sender_id: senderId,
+          recipient_id: student.id,
+          school_id: student.school_id,
+          sender_role: 'teacher',
+          recipient_role: 'student',
+          content: `🎵 Didaktische Audio-Freigabe erbeten: ${effectiveTeacherFullName || 'Deine Lehrkraft'} möchte dir im Unterricht kurze Tonaufnahmen für didaktische Übungszwecke (Korrektur, Play-Along) anfertigen. Bitte deine Eltern, dies im Elternbereich kurz freizugeben.`,
+          message_type: 'audio_consent_request'
+        });
+      }
+    } catch (e) {}
+
+    alert(`✓ Freigabe-Anfrage an die Erziehungsberechtigten von ${studentFirstName || 'dem Schüler'} übermittelt.`);
+  }, [student, effectiveTeacherFullName, studentFirstName]);
 
   return (
             <>
@@ -5655,6 +5693,9 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                         let audioNotes: any[] = [];
                         let homeworkNoteItems: string[] = [];
                         let histWeekItem: any = null;
+                        let isAudioCarriedOver = false;
+                        let isNotesCarriedOver = false;
+                        let carriedOverWeekLabel = '';
 
                         const hasTransferredWeek = Boolean(
                           localStorage.getItem(`week_transferred_${student.id}_${viewingWeekIso}`) === 'true' ||
@@ -5817,6 +5858,100 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                             .filter(a => !!a.url);
 
                           homeworkNoteItems = getHomeworkNoteItems(generalHomeworkNotes);
+
+                          // 🌉 SMART AUDIO & NOTE BRIDGE: Pädagogische Kontinuität
+                          // Wenn der Schüler aktive Hausaufgaben hat (Lehrwerk oder Song), aber für die aktuelle Woche
+                          // noch keine neuen Audioaufnahmen oder Notizen vorliegen, übernehme nahtlos die Aufnahmen
+                          // und Notizen der vorherigen Unterrichtsstunde aus dem jüngsten Wochen-Snapshot.
+                          const hasActiveOngoingHomework = (lehrwerkeList.length > 0 || otherHWs.length > 0);
+                          if (isCurrentWeek && hasActiveOngoingHomework && (audioNotes.length === 0 || homeworkNoteItems.length === 0)) {
+                            const pastWeekSnapshots = (progressItems || []).filter((item: any) => {
+                              if (!item.topic_name?.startsWith('Hausaufgabe KW ')) return false;
+                              const itWeekIso = getItemWeek(item);
+                              return itWeekIso && itWeekIso < viewingWeekIso;
+                            });
+
+                            pastWeekSnapshots.sort((a: any, b: any) => {
+                              const wA = getItemWeek(a);
+                              const wB = getItemWeek(b);
+                              if (wA !== wB) return wB.localeCompare(wA);
+                              const tA = new Date(a.updated_at || a.created_at || 0).getTime();
+                              const tB = new Date(b.updated_at || b.created_at || 0).getTime();
+                              return tB - tA;
+                            });
+
+                            const latestPastHwSnapshot = pastWeekSnapshots[0];
+                            if (latestPastHwSnapshot && latestPastHwSnapshot.homework_notes) {
+                              try {
+                                const parsedPastNotes = typeof latestPastHwSnapshot.homework_notes === 'string'
+                                  ? JSON.parse(latestPastHwSnapshot.homework_notes)
+                                  : latestPastHwSnapshot.homework_notes;
+
+                                const kwMatch = latestPastHwSnapshot.topic_name.match(/Hausaufgabe KW\s*(\d+)/i);
+                                carriedOverWeekLabel = kwMatch ? `KW ${kwMatch[1]}` : 'Letzte Stunde';
+
+                                if (Array.isArray(parsedPastNotes)) {
+                                  // 1. Audio-Aufnahmen der Vorwoche übernehmen
+                                  if (audioNotes.length === 0) {
+                                    const pastAudios = parsedPastNotes
+                                      .filter((n: string) => typeof n === 'string' && n.includes('AUDIO:'))
+                                      .map((cleanStr: string, index: number) => {
+                                        const parts = cleanStr.substring(cleanStr.indexOf('AUDIO:') + 6).split('|');
+                                        return {
+                                          url: parts[0]?.trim(),
+                                          duration: parseInt(parts[1] || '0', 10),
+                                          date: parts[2]?.trim(),
+                                          label: parts[3]?.trim() || `Aufnahme #${index + 1}`,
+                                          author: parts[4]?.trim() || 'teacher',
+                                          songTag: parts[7]?.trim() || undefined,
+                                          originalIdx: index,
+                                          idx: index,
+                                          isCarriedOver: true
+                                        };
+                                      })
+                                      .filter(a => !!a.url);
+
+                                    if (pastAudios.length > 0) {
+                                      audioNotes = pastAudios;
+                                      isAudioCarriedOver = true;
+                                    }
+                                  }
+
+                                  // 2. Lehrkraft-Notiz der Vorwoche übernehmen, falls aktuell noch leer
+                                  if (homeworkNoteItems.length === 0) {
+                                    const pastNotes = parsedPastNotes
+                                      .filter((n: string) => {
+                                        if (typeof n !== 'string') return false;
+                                        const lower = n.toLowerCase();
+                                        return !n.startsWith('AUDIO:') && 
+                                               !n.startsWith('STICKER:') && 
+                                               !n.startsWith('LOOP:') &&
+                                               !lower.startsWith('latency:') && 
+                                               !lower.startsWith('latency_calibration:') && 
+                                               !n.startsWith('SYSTEM:') && 
+                                               !n.startsWith('FEEDBACK:') && 
+                                               !n.startsWith('STUDENT_NOTE_');
+                                      })
+                                      .map((s: string) => s.trim())
+                                      .filter(Boolean);
+
+                                    if (pastNotes.length > 0) {
+                                      homeworkNoteItems = pastNotes;
+                                      isNotesCarriedOver = true;
+                                    }
+                                  }
+                                } else if (typeof parsedPastNotes === 'string' && homeworkNoteItems.length === 0) {
+                                  const pastNotes = getHomeworkNoteItems(parsedPastNotes);
+                                  if (pastNotes.length > 0) {
+                                    homeworkNoteItems = pastNotes;
+                                    isNotesCarriedOver = true;
+                                  }
+                                }
+                              } catch (bridgeErr) {
+                                console.warn('[MeisterwerkDocumentTab] Error bridging past lesson notes:', bridgeErr);
+                              }
+                            }
+                          }
                         } else {
                           // === HISTORICAL OR FUTURE WEEK ARCHIVED SNAPSHOT ===
                           histWeekItem = (progressItems || []).find((item: any) => {
@@ -7378,12 +7513,13 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                     <div style={{ paddingTop: '2px' }}>
                                       <AudioTrackCarousel
                                         tracks={audioNotes}
-                                        onDelete={!readOnly ? handleDeleteNote : undefined}
-                                        readOnly={readOnly}
+                                        onDelete={!readOnly && !isAudioCarriedOver ? handleDeleteNote : undefined}
+                                        readOnly={readOnly || isAudioCarriedOver}
                                         isFutureWeek={isFutureWeek}
                                         isTeacher={true}
                                         activeTopicContext={topicName}
                                         defaultExpanded={readOnly}
+                                        isCarriedOver={isAudioCarriedOver}
                                       />
                                     </div>
                                   )}
@@ -7449,6 +7585,25 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                                 transition: 'opacity 0.15s ease'
                                               }}>
                                                 <FileText size={14} style={{ color: '#16a34a', flexShrink: 0 }} />
+
+                                                {/* Carried over badge from previous lesson */}
+                                                {isNotesCarriedOver && (
+                                                  <span style={{
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    gap: '3px',
+                                                    background: '#f8fafc',
+                                                    color: '#475569',
+                                                    border: '1px solid #cbd5e1',
+                                                    borderRadius: '8px',
+                                                    padding: '2px 7px',
+                                                    fontSize: '0.70rem',
+                                                    fontWeight: 800,
+                                                    flexShrink: 0
+                                                  }}>
+                                                    <span>Aus letzter Stunde</span>
+                                                  </span>
+                                                )}
                                                 
                                                 {/* Personal Badge if targeted to current student */}
                                                 {parsedAnn.isSpecificToCurrent && (
@@ -7525,7 +7680,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
 
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
                                               {/* Contextual Inline Tag Picker / Badge */}
-                                              {!readOnly ? (
+                                              {!readOnly && !isNotesCarriedOver ? (
                                                 <div style={{ position: 'relative' }}>
                                                   <button
                                                     type="button"
@@ -7820,7 +7975,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                   </span>
                                 </div>
 
-                                {/* § 60a Abs. 3 Nr. 2 UrhG Compliance Notice */}
+                                {/* 🎙️ Didaktisches Hörbeispiel & 1:1-Übungs-Track (§ 60a Abs. 1 UrhG & § 15 Abs. 3 UrhG) */}
                                 <div style={{
                                   fontSize: '0.67rem',
                                   color: '#64748b',
@@ -7833,9 +7988,55 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                   alignItems: 'center',
                                   gap: '6px'
                                 }}>
-                                  <span style={{ fontSize: '0.75rem' }}>⚖️</span>
-                                  <span><strong>UrhG-Hinweis:</strong> Das Teilen geschützter Verlagsnoten ist gem. § 60a Abs. 3 Nr. 2 UrhG gesetzlich unzulässig. Zulässig sind didaktische Eigenaufnahmen, Übungs-Tracks und gemeinfreie Werke.</span>
+                                  <span style={{ fontSize: '0.75rem' }}>🎙️</span>
+                                  <span><strong>Didaktisches Hörbeispiel & Übungs-Track (§ 60a UrhG):</strong> Diese Aufnahme dient ausschließlich dem persönlichen 1:1-Übungsgebrauch dieses Schülers. Eine öffentliche Verbreitung oder Weitergabe ist unzulässig (§ 15 Abs. 3 UrhG).</span>
                                 </div>
+
+                                {/* 🛡️ Eltern-Veto Schranke & Exkulpations-Banner (§ 201 StGB / Art. 8 DSGVO) */}
+                                {isTeacherTools && isStudentAudioForbiddenForTeacher && (
+                                  <div style={{
+                                    background: '#fffbeb',
+                                    border: '1.5px solid #fef3c7',
+                                    borderRadius: '12px',
+                                    padding: '10px 14px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    gap: '12px',
+                                    flexWrap: 'wrap'
+                                  }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: '220px' }}>
+                                      <span style={{ fontSize: '1rem' }}>⚠️</span>
+                                      <div style={{ fontSize: '0.72rem', color: '#92400e', lineHeight: 1.35 }}>
+                                        <strong>Eltern-Veto aktiv:</strong> Erziehungsberechtigte untersagen Tonaufnahmen des Schülers. Bitte <strong>ausschließlich eigenes Lehrkraft-Vorspiel</strong> aufnehmen (§ 201 StGB)!
+                                      </div>
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={handleRequestParentAudioConsent}
+                                      disabled={teacherConsentRequested}
+                                      style={{
+                                        background: teacherConsentRequested ? '#f1f5f9' : '#ffffff',
+                                        border: '1px solid #f59e0b',
+                                        color: teacherConsentRequested ? '#64748b' : '#b45309',
+                                        fontSize: '0.72rem',
+                                        fontWeight: 800,
+                                        padding: '6px 12px',
+                                        borderRadius: '8px',
+                                        cursor: teacherConsentRequested ? 'default' : 'pointer',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '6px',
+                                        boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+                                        flexShrink: 0
+                                      }}
+                                      className={teacherConsentRequested ? '' : 'hover-scale'}
+                                    >
+                                      <Mail size={12} />
+                                      <span>{teacherConsentRequested ? '✓ Anfrage gesendet' : 'Eltern-Freigabe anfragen'}</span>
+                                    </button>
+                                  </div>
+                                )}
 
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                                   {playAlongCountInRemaining !== null ? (
@@ -8444,6 +8645,26 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
 
                                   {/* 2. Textarea Bereich */}
                                   <div style={{ padding: '12px 16px' }}>
+                                    {activeNoteTarget === 'student' && viewingWeekOffset === 0 && (isAudioCarriedOver || isNotesCarriedOver) && !generalHomeworkNotes.trim() && (
+                                      <div style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '8px',
+                                        padding: '8px 12px',
+                                        marginBottom: '10px',
+                                        borderRadius: '10px',
+                                        background: '#f8fafc',
+                                        border: '1px solid #e2e8f0',
+                                        fontSize: '0.78rem',
+                                        color: '#475569',
+                                        fontWeight: 650
+                                      }}>
+                                        <span style={{ fontSize: '0.9rem' }}>💡</span>
+                                        <span>
+                                          Schüler übt aktuell mit den Unterrichtsaufnahmen & Notizen aus {carriedOverWeekLabel || 'der letzten Stunde'}. Sobald du neue Einträge speicherst, lösen diese die Vorwoche ab.
+                                        </span>
+                                      </div>
+                                    )}
                                     {activeNoteTarget === 'student' ? (
                                       <textarea
                                         ref={studentNotesTextareaRef}

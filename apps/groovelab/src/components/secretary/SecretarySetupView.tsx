@@ -1,9 +1,11 @@
 import React from 'react';
 import {
   AlertCircle, Check, CheckCircle, Clock, Copy, Database, Download,
-  Eye, FileText, Fingerprint, KeyRound, Lightbulb, Printer, QrCode, School, ShieldAlert,
+  Eye, FileCheck, FileText, Fingerprint, KeyRound, Lightbulb, Printer, QrCode, School, ShieldAlert,
   ShieldCheck, Sparkles, Trash2, Upload, X, Zap
 } from 'lucide-react';
+import { generateMessengerSafetyCertificatePDF } from '../../utils/messengerSafetyCertificateGenerator';
+import { copyMessengerClauseToClipboard } from '../../utils/messengerClauseTemplate';
 
 export interface SecretarySetupViewProps {
   schoolId: string;
@@ -179,6 +181,8 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
     students,
     contractEndsAt
   } = props;
+
+  const [copiedClause, setCopiedClause] = React.useState(false);
 
   return (
           <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -1211,6 +1215,60 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
                               className="hover-scale"
                             >
                               <Printer size={14} /> DSB-Ausweis drucken
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => generateMessengerSafetyCertificatePDF({
+                                schoolName: schoolName || 'Musikschule',
+                                schoolAddress: `${schoolStreet || ''} ${schoolHouseNumber || ''}, ${schoolZipCode || ''} ${schoolCity || ''}`.trim(),
+                                schoolId
+                              })}
+                              style={{
+                                background: 'linear-gradient(135deg, #15803d 0%, #16a34a 100%)',
+                                color: '#ffffff',
+                                border: 'none',
+                                padding: '8px 16px',
+                                borderRadius: '10px',
+                                fontWeight: 800,
+                                fontSize: '0.78rem',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                boxShadow: '0 4px 12px rgba(22, 163, 74, 0.25)'
+                              }}
+                              className="hover-scale"
+                            >
+                              <FileCheck size={14} /> Messenger-Attest (PDF)
+                            </button>
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                const ok = await copyMessengerClauseToClipboard(schoolName);
+                                if (ok) {
+                                  setCopiedClause(true);
+                                  setTimeout(() => setCopiedClause(false), 3000);
+                                }
+                              }}
+                              style={{
+                                background: copiedClause ? '#16a34a' : '#0f172a',
+                                color: '#ffffff',
+                                border: 'none',
+                                padding: '8px 16px',
+                                borderRadius: '10px',
+                                fontWeight: 800,
+                                fontSize: '0.78rem',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                boxShadow: '0 4px 12px rgba(15, 23, 42, 0.20)',
+                                transition: 'all 0.2s ease'
+                              }}
+                              className="hover-scale"
+                            >
+                              {copiedClause ? <Check size={14} /> : <Copy size={14} />}
+                              {copiedClause ? 'Klausel kopiert!' : 'Schulordnungs-Klausel'}
                             </button>
                           </div>
                         </div>

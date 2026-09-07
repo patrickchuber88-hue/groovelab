@@ -1,8 +1,9 @@
 import React from 'react';
 import {
-  BookOpen, Clock, Disc, Lightbulb, Radio, ShieldCheck, Sliders, Sparkles, X
+  BookOpen, Clock, Disc, Lightbulb, Moon, Radio, ShieldCheck, Sliders, Sparkles, X
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { DEFAULT_QUIET_HOURS_CONFIG, QuietHoursConfig } from '../../utils/chatRespectGuard';
 
 export interface TeacherSettingsViewProps {
   teacher: any;
@@ -94,6 +95,15 @@ export const TeacherSettingsView: React.FC<TeacherSettingsViewProps> = ({
                 gradient: 'linear-gradient(135deg, #ca8a04 0%, #854d0e 100%)',
                 shadowColor: 'rgba(202, 138, 4, 0.40)',
                 icon: ShieldCheck
+              },
+              {
+                id: 'quiet_hours',
+                title: 'Chat-Ruhezeiten',
+                subtitle: teacher?.quiet_hours?.enabled !== false ? `${teacher?.quiet_hours?.start_time || '19:00'} – ${teacher?.quiet_hours?.end_time || '07:30'} Uhr` : 'Deaktiviert',
+                badge: teacher?.quiet_hours?.enabled !== false ? 'Aktiv' : 'Aus',
+                gradient: 'linear-gradient(135deg, #6366f1 0%, #4338ca 100%)',
+                shadowColor: 'rgba(99, 102, 241, 0.35)',
+                icon: Moon
               },
               {
                 id: 'feedback',
@@ -291,16 +301,17 @@ export const TeacherSettingsView: React.FC<TeacherSettingsViewProps> = ({
                       width: '42px',
                       height: '42px',
                       borderRadius: '12px',
-                      background: 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)',
+                      background: activeTeacherSettingsModal === 'quiet_hours' ? 'linear-gradient(135deg, #6366f1 0%, #4338ca 100%)' : 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      boxShadow: '0 4px 12px rgba(234, 179, 8, 0.3)'
+                      boxShadow: activeTeacherSettingsModal === 'quiet_hours' ? '0 4px 12px rgba(99, 102, 241, 0.3)' : '0 4px 12px rgba(234, 179, 8, 0.3)'
                     }}>
                       {activeTeacherSettingsModal === 'livelab' && <Radio size={22} color="#ffffff" />}
                       {activeTeacherSettingsModal === 'repertoire' && <Disc size={22} color="#ffffff" />}
                       {(activeTeacherSettingsModal === 'profile' || activeTeacherSettingsModal === 'avatar') && <Sparkles size={22} color="#ffffff" />}
                       {activeTeacherSettingsModal === 'security' && <ShieldCheck size={22} color="#ffffff" />}
+                      {activeTeacherSettingsModal === 'quiet_hours' && <Moon size={22} color="#ffffff" />}
                     </div>
                     <div>
                       <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
@@ -308,12 +319,14 @@ export const TeacherSettingsView: React.FC<TeacherSettingsViewProps> = ({
                         {activeTeacherSettingsModal === 'repertoire' && 'Repertoire & Song-Standards'}
                         {(activeTeacherSettingsModal === 'profile' || activeTeacherSettingsModal === 'avatar') && 'Coach-Profil & Musiker-Avatar'}
                         {activeTeacherSettingsModal === 'security' && 'Sicherheit & Kiosk-PIN'}
+                        {activeTeacherSettingsModal === 'quiet_hours' && 'Chat-Ruhezeiten & Feierabend'}
                       </h3>
                       <p style={{ margin: '2px 0 0 0', fontSize: '0.74rem', color: '#64748b', fontWeight: 500 }}>
                         {activeTeacherSettingsModal === 'livelab' && 'Wähle deinen Standard-Proberaum und automatische Kiosk-Abmeldezeiten im Bandraum.'}
                         {activeTeacherSettingsModal === 'repertoire' && 'Definiere Schwellenwerte für bühnenreife Songs und Band-Vorschlagsrechte.'}
                         {(activeTeacherSettingsModal === 'profile' || activeTeacherSettingsModal === 'avatar') && 'Deine hinterlegten Stammdaten und Musiker-Avatar im GrooveLab-Modul.'}
                         {activeTeacherSettingsModal === 'security' && '4-stellige Coach-PIN und Sicherheitsstatus für den Proberaum.'}
+                        {activeTeacherSettingsModal === 'quiet_hours' && 'Lege fest, wann deine didaktische Ruhezeit gilt. Dein Feierabend ist geschützt (gem. § 5 ArbZG & Herrenberg-Urteil).'}
                       </p>
                     </div>
                   </div>
@@ -748,6 +761,235 @@ export const TeacherSettingsView: React.FC<TeacherSettingsViewProps> = ({
                             Rolle: <strong>GrooveLab Coach (Band-Lehrkraft)</strong><br />
                             Zugriffsberechtigungen: <strong>Live Lab, Song-Bibliothek &amp; Repertoire-Planer</strong>
                           </span>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {activeTeacherSettingsModal === 'quiet_hours' && (() => {
+                    const currentConfig: QuietHoursConfig = teacher?.quiet_hours || DEFAULT_QUIET_HOURS_CONFIG;
+                    const isEnabled = currentConfig.enabled !== false;
+                    const startTime = currentConfig.start_time || '19:00';
+                    const endTime = currentConfig.end_time || '07:30';
+                    const isWeekendAllDay = currentConfig.weekend_all_day !== false;
+
+                    const updateConfig = async (newConfig: QuietHoursConfig) => {
+                      if (!teacher?.id) return;
+                      try {
+                        await supabase.from('users').update({ quiet_hours: newConfig }).eq('id', teacher.id);
+                        setTeacher((prev: any) => ({ ...prev, quiet_hours: newConfig }));
+                      } catch (err: any) {
+                        console.error('[TeacherSettings] Error updating quiet hours:', err);
+                      }
+                    };
+
+                    return (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                        {/* Toggle Active / Inactive */}
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          background: isEnabled ? '#f0fdf4' : '#f8fafc',
+                          border: `1.5px solid ${isEnabled ? '#86efac' : '#e2e8f0'}`,
+                          borderRadius: '16px',
+                          padding: '16px 18px'
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <div style={{
+                              width: '38px',
+                              height: '38px',
+                              borderRadius: '10px',
+                              background: isEnabled ? '#dcfce7' : '#e2e8f0',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              color: isEnabled ? '#16a34a' : '#64748b'
+                            }}>
+                              <Moon size={20} strokeWidth={2.4} />
+                            </div>
+                            <div>
+                              <div style={{ fontWeight: 800, fontSize: '0.90rem', color: '#0f172a' }}>
+                                Ruhezeit-Schutz aktivieren
+                              </div>
+                              <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: '2px' }}>
+                                {isEnabled ? 'Schutz aktiv – Schüler sehen außerhalb deiner Dienstzeiten den Abwesenheitshinweis' : 'Deaktiviert – Nachrichten werden ohne Ruhezeit-Banner empfangen'}
+                              </div>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => updateConfig({ ...currentConfig, enabled: !isEnabled })}
+                            style={{
+                              width: '46px',
+                              height: '26px',
+                              borderRadius: '100px',
+                              border: 'none',
+                              background: isEnabled ? '#16a34a' : '#cbd5e1',
+                              cursor: 'pointer',
+                              position: 'relative',
+                              transition: 'background 0.2s',
+                              padding: 0
+                            }}
+                          >
+                            <div style={{
+                              width: '20px',
+                              height: '20px',
+                              borderRadius: '50%',
+                              background: '#ffffff',
+                              position: 'absolute',
+                              top: '3px',
+                              left: isEnabled ? '23px' : '3px',
+                              transition: 'left 0.2s',
+                              boxShadow: '0 1px 3px rgba(0,0,0,0.2)'
+                            }} />
+                          </button>
+                        </div>
+
+                        {/* Time Pickers */}
+                        <div style={{
+                          display: 'grid',
+                          gridTemplateColumns: '1fr 1fr',
+                          gap: '14px',
+                          opacity: isEnabled ? 1 : 0.45,
+                          pointerEvents: isEnabled ? 'auto' : 'none'
+                        }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                            <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#334155' }}>
+                              🌙 Beginn der Ruhezeit (abends):
+                            </label>
+                            <input
+                              type="time"
+                              value={startTime}
+                              onChange={(e) => updateConfig({ ...currentConfig, start_time: e.target.value })}
+                              style={{
+                                padding: '10px 14px',
+                                borderRadius: '12px',
+                                border: '1.5px solid #cbd5e1',
+                                fontSize: '0.92rem',
+                                fontWeight: 700,
+                                color: '#0f172a',
+                                outline: 'none',
+                                background: '#ffffff'
+                              }}
+                            />
+                            <span style={{ fontSize: '0.68rem', color: '#94a3b8' }}>Standard: 19:00 Uhr</span>
+                          </div>
+
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                            <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#334155' }}>
+                              ☀️ Ende der Ruhezeit (morgens):
+                            </label>
+                            <input
+                              type="time"
+                              value={endTime}
+                              onChange={(e) => updateConfig({ ...currentConfig, end_time: e.target.value })}
+                              style={{
+                                padding: '10px 14px',
+                                borderRadius: '12px',
+                                border: '1.5px solid #cbd5e1',
+                                fontSize: '0.92rem',
+                                fontWeight: 700,
+                                color: '#0f172a',
+                                outline: 'none',
+                                background: '#ffffff'
+                              }}
+                            />
+                            <span style={{ fontSize: '0.68rem', color: '#94a3b8' }}>Standard: 07:30 Uhr</span>
+                          </div>
+                        </div>
+
+                        {/* Weekend Toggle */}
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          background: '#f8fafc',
+                          border: '1px solid #e2e8f0',
+                          borderRadius: '14px',
+                          padding: '12px 16px',
+                          opacity: isEnabled ? 1 : 0.45,
+                          pointerEvents: isEnabled ? 'auto' : 'none'
+                        }}>
+                          <div>
+                            <div style={{ fontWeight: 750, fontSize: '0.82rem', color: '#1e293b' }}>
+                              Wochenende ganztägig geschützt
+                            </div>
+                            <div style={{ fontSize: '0.70rem', color: '#64748b' }}>
+                              Samstag und Sonntag gilt durchgehend die Ruhezeit
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => updateConfig({ ...currentConfig, weekend_all_day: !isWeekendAllDay })}
+                            style={{
+                              width: '42px',
+                              height: '24px',
+                              borderRadius: '100px',
+                              border: 'none',
+                              background: isWeekendAllDay ? '#6366f1' : '#cbd5e1',
+                              cursor: 'pointer',
+                              position: 'relative',
+                              transition: 'background 0.2s',
+                              padding: 0
+                            }}
+                          >
+                            <div style={{
+                              width: '18px',
+                              height: '18px',
+                              borderRadius: '50%',
+                              background: '#ffffff',
+                              position: 'absolute',
+                              top: '3px',
+                              left: isWeekendAllDay ? '21px' : '3px',
+                              transition: 'left 0.2s',
+                              boxShadow: '0 1px 3px rgba(0,0,0,0.2)'
+                            }} />
+                          </button>
+                        </div>
+
+                        {/* Reset to Default Button */}
+                        <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
+                          <button
+                            type="button"
+                            onClick={() => updateConfig(DEFAULT_QUIET_HOURS_CONFIG)}
+                            style={{
+                              background: 'transparent',
+                              border: '1px solid #cbd5e1',
+                              borderRadius: '10px',
+                              padding: '6px 14px',
+                              fontSize: '0.74rem',
+                              fontWeight: 700,
+                              color: '#64748b',
+                              cursor: 'pointer'
+                            }}
+                            className="hover-scale"
+                          >
+                            ↺ Auf Standard zurücksetzen (19:00–07:30 Uhr)
+                          </button>
+                        </div>
+
+                        {/* Legal & Didactic Autonomy Card */}
+                        <div style={{
+                          background: 'linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%)',
+                          border: '1px solid #bbf7d0',
+                          borderRadius: '14px',
+                          padding: '14px 16px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '4px'
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 800, fontSize: '0.78rem', color: '#166534' }}>
+                            <ShieldCheck size={16} color="#16a34a" />
+                            <span>Didaktische Autonomie & Arbeitszeitschutz (§ 5 ArbZG)</span>
+                          </div>
+                          <p style={{ margin: 0, fontSize: '0.72rem', color: '#15803d', lineHeight: 1.45 }}>
+                            Außerhalb deiner Unterrichts- und Dienstzeiten besteht keine Pflicht zur ständigen Erreichbarkeit. Im Chatfenster von Schülern wird dein Ruhezeit-Banner eingeblendet:
+                            <br />
+                            <em style={{ display: 'block', marginTop: '6px', padding: '8px 12px', background: '#ffffff', borderRadius: '8px', border: '1px solid #bbf7d0', color: '#166534' }}>
+                              „🌙 Ruhezeit von {teacher?.first_name ? `${teacher.first_name} ${teacher.last_name || ''}`.trim() : 'deiner Lehrkraft'}: Deine Nachricht wird zugestellt. Beachte bitte, dass Lehrkräfte außerhalb ihrer Unterrichtszeiten nicht zur Beantwortung verpflichtet sind. Dringende Absagen bitte per E-Mail an die Lehrkraft senden.“
+                            </em>
+                          </p>
                         </div>
                       </div>
                     );

@@ -72,6 +72,8 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
   const [hasCampus, setHasCampus] = useState<boolean>(Boolean(school?.has_campus_subscription));
   const [hasGroovelab, setHasGroovelab] = useState<boolean>(Boolean(school?.has_groovelab_subscription));
   const [subscriptionBypass, setSubscriptionBypass] = useState<boolean>(school?.subscription_bypass ?? false);
+  const [summerMoratoriumActive, setSummerMoratoriumActive] = useState<boolean>(Boolean(school?.summer_moratorium_active));
+  const [dunningKulanzUntil, setDunningKulanzUntil] = useState<string>(school?.dunning_kulanz_until || '');
   const [mfaEnforcedForAdmins, setMfaEnforcedForAdmins] = useState<boolean>(Boolean(school?.mfa_enforced_for_admins));
 
   // Audio-Tresor Storage State (Synchronized with Financial Control & SecretaryDashboard)
@@ -105,6 +107,8 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
       setHasCampus(Boolean(school.has_campus_subscription));
       setHasGroovelab(Boolean(school.has_groovelab_subscription));
       setSubscriptionBypass(school.subscription_bypass ?? false);
+      setSummerMoratoriumActive(Boolean(school.summer_moratorium_active));
+      setDunningKulanzUntil(school.dunning_kulanz_until || '');
       setMfaEnforcedForAdmins(Boolean(school.mfa_enforced_for_admins));
       setExtraStorageGb(() => {
         if (school.storage_addon_gb !== undefined && school.storage_addon_gb !== null && Number(school.storage_addon_gb) > 0) return Number(school.storage_addon_gb);
@@ -219,6 +223,8 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
         has_campus_subscription: hasCampus,
         has_groovelab_subscription: hasGroovelab,
         subscription_bypass: subscriptionBypass,
+        summer_moratorium_active: summerMoratoriumActive,
+        dunning_kulanz_until: dunningKulanzUntil ? new Date(dunningKulanzUntil).toISOString() : null,
         mfa_enforced_for_admins: mfaEnforcedForAdmins,
         storage_addon_gb: extraStorageGb,
         storage_addon_monthly_fee: addonFee,
@@ -907,6 +913,93 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
                     </p>
                   </div>
                 </label>
+              </div>
+
+              {/* ☀️ Sommerferien-Moratorium & 🃏 Kulanzjoker (ASVS L3 / FinOps) */}
+              <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '16px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                <label style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={summerMoratoriumActive}
+                    onChange={(e) => setSummerMoratoriumActive(e.target.checked)}
+                    style={{ accentColor: '#f59e0b', width: '18px', height: '18px', marginTop: '2px' }}
+                  />
+                  <div>
+                    <span style={{ fontWeight: 800, fontSize: '0.88rem', color: '#0f172a' }}>
+                      ☀️ Sommerferien-Moratorium (42 Tage Standard)
+                    </span>
+                    <p style={{ margin: '2px 0 0 0', fontSize: '0.72rem', color: '#64748b' }}>
+                      Verlängert die Kulanzphase auf 42 Tage (6 Wochen), um Ferien-Schließzeiten von Musikschul-Kassenämtern zu berücksichtigen.
+                    </p>
+                  </div>
+                </label>
+
+                {/* 🃏 Kulanzjoker */}
+                <div style={{
+                  padding: '14px 16px',
+                  borderRadius: '14px',
+                  background: dunningKulanzUntil && new Date(dunningKulanzUntil).getTime() > Date.now() ? '#ecfdf5' : '#f8fafc',
+                  border: dunningKulanzUntil && new Date(dunningKulanzUntil).getTime() > Date.now() ? '1px solid #a7f3d0' : '1px solid #e2e8f0',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '12px'
+                }}>
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontSize: '1.05rem' }}>🃏</span>
+                      <span style={{ fontWeight: 850, fontSize: '0.86rem', color: '#0f172a' }}>
+                        Kulanzjoker (+30 Tage Stundung &amp; Erlass Verzugspauschale)
+                      </span>
+                    </div>
+                    <p style={{ margin: '4px 0 0 0', fontSize: '0.72rem', color: '#64748b' }}>
+                      {dunningKulanzUntil && new Date(dunningKulanzUntil).getTime() > Date.now()
+                        ? `Aktiv bis ${new Date(dunningKulanzUntil).toLocaleDateString('de-DE')} – Verzugspauschale auf 0,00 € erlassen, Schreibsperren suspendiert.`
+                        : 'Gewährt der Schule per 1-Click sofort 30 zusätzliche Tage Zahlungsziel und erlässt etwaige Mahngebühren.'}
+                    </p>
+                  </div>
+
+                  {dunningKulanzUntil && new Date(dunningKulanzUntil).getTime() > Date.now() ? (
+                    <button
+                      type="button"
+                      onClick={() => setDunningKulanzUntil('')}
+                      style={{
+                        padding: '6px 12px',
+                        borderRadius: '10px',
+                        background: '#ffffff',
+                        border: '1px solid #fca5a5',
+                        color: '#dc2626',
+                        fontSize: '0.74rem',
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                        whiteSpace: 'nowrap'
+                      }}
+                    >
+                      Widerrufen
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const until = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+                        setDunningKulanzUntil(until);
+                      }}
+                      style={{
+                        padding: '6px 14px',
+                        borderRadius: '10px',
+                        background: '#0f172a',
+                        border: 'none',
+                        color: '#ffffff',
+                        fontSize: '0.74rem',
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                        whiteSpace: 'nowrap'
+                      }}
+                    >
+                      🃏 Joker ziehen (+30 T)
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           </div>

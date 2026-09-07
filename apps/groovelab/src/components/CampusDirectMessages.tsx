@@ -18,9 +18,16 @@ import {
   Sparkles, 
   CheckCheck, 
   ChevronDown,
-  RotateCcw
+  RotateCcw,
+  AlertTriangle
 } from 'lucide-react';
 import { formatTeacherFullName, formatSingleStudentAnonymized, formatStudentPureFirstName } from '../utils/nameHelper';
+import { isUUID } from '../utils/uuidValidator';
+import { 
+  validateChatMessageContent, 
+  isQuietHoursActive, 
+  ChatRespectValidationResult 
+} from '../utils/chatRespectGuard';
 
 const getInstrumentAvatarUrl = (instrument: string | null | undefined): string => {
   if (!instrument) return '/avatars/gitarre_avatar_new.png';
@@ -547,6 +554,16 @@ export function CampusDirectMessages({
   const [filterType, setFilterType] = useState<'all' | 'unread'>('all');
   const [activeSubTab, setActiveSubTab] = useState<string>('all');
   const [assignedStudents, setAssignedStudents] = useState<any[]>([]);
+  const [respectWarning, setRespectWarning] = useState<ChatRespectValidationResult | null>(null);
+
+  const isRecipientInQuietHours = useMemo(() => {
+    if (!selectedRecipient) return false;
+    const role = (selectedRecipient.role || '').toLowerCase();
+    const roles = Array.isArray(selectedRecipient.roles) ? selectedRecipient.roles.map((r: any) => String(r).toLowerCase()) : [];
+    const isTeacher = role === 'teacher' || roles.includes('teacher');
+    if (!isTeacher) return false;
+    return isQuietHoursActive(selectedRecipient.quiet_hours);
+  }, [selectedRecipient]);
   const checkIsMobile = () => {
     if (typeof window === 'undefined') return false;
     return window.innerWidth < 768 || Boolean(document.querySelector('.sim-viewport-mobile, .sim-viewport-portrait'));
@@ -621,13 +638,13 @@ export function CampusDirectMessages({
       const fetchStudentTeachers = async () => {
         try {
           const studentId = user?.id || (typeof window !== 'undefined' ? sessionStorage.getItem('groovelab_user_id') : null);
-          if (!studentId) return;
+          if (!studentId || !isUUID(studentId)) return;
 
           const teacherMap = new Map<string, any>();
 
           // 1. Direct teacher_id on student profile
           const directTeacherId = user?.teacher_id;
-          if (directTeacherId) {
+          if (directTeacherId && isUUID(directTeacherId)) {
             const { data: directTeacher } = await supabase
               .from('users')
               .select('*')
@@ -642,12 +659,10 @@ export function CampusDirectMessages({
           try {
             const { data: scheds } = await supabase
               .from('schedules')
-              .select('teacher_id, teacher:users!schedules_teacher_id_fkey(*)')
+              .select('teacher_id')
               .eq('student_id', studentId);
             (scheds || []).forEach((sc: any) => {
-              if (sc.teacher && sc.teacher.id) {
-                teacherMap.set(sc.teacher.id, sc.teacher);
-              } else if (sc.teacher_id && !teacherMap.has(sc.teacher_id)) {
+              if (sc.teacher_id && !teacherMap.has(sc.teacher_id)) {
                 const matchInSchool = (schoolUsers || []).find((su: any) => su.id === sc.teacher_id);
                 if (matchInSchool) teacherMap.set(sc.teacher_id, matchInSchool);
               }
@@ -658,12 +673,10 @@ export function CampusDirectMessages({
           try {
             const { data: occs } = await supabase
               .from('schedule_occurrences')
-              .select('teacher_id, teacher:users!schedule_occurrences_teacher_id_fkey(*)')
+              .select('teacher_id')
               .eq('student_id', studentId);
             (occs || []).forEach((o: any) => {
-              if (o.teacher && o.teacher.id) {
-                teacherMap.set(o.teacher.id, o.teacher);
-              } else if (o.teacher_id && !teacherMap.has(o.teacher_id)) {
+              if (o.teacher_id && !teacherMap.has(o.teacher_id)) {
                 const matchInSchool = (schoolUsers || []).find((su: any) => su.id === o.teacher_id);
                 if (matchInSchool) teacherMap.set(o.teacher_id, matchInSchool);
               }
@@ -1035,7 +1048,7 @@ export function CampusDirectMessages({
         const targetStudentId = isStudent ? user?.id : selectedRecipient?.id;
         const targetTeacherId = isStudent ? selectedRecipient?.id : user?.id;
 
-        if (!targetStudentId) {
+        if (!targetStudentId || !isUUID(targetStudentId)) {
           setStudentOccurrences([]);
           return;
         }
@@ -1449,6 +1462,13 @@ export function CampusDirectMessages({
 
   const sendDirectQuickMessage = async (content: string) => {
     if (!content.trim() || !selectedRecipient) return;
+
+    const validation = validateChatMessageContent(content);
+    if (!validation.isValid) {
+      setRespectWarning(validation);
+      return;
+    }
+    setRespectWarning(null);
     
     if (activeSubTab !== 'all' && activeSubTab !== 'general' && activeSubTab !== 'system') {
       const targetOccTab = allOccurrenceTabs.find(tab => tab.id === activeSubTab || (tab.allIds && tab.allIds.includes(activeSubTab)));
@@ -1474,6 +1494,12 @@ export function CampusDirectMessages({
     if (!typedMessage.trim() || !selectedRecipient) return;
     
     const messageText = typedMessage.trim();
+    const validation = validateChatMessageContent(messageText);
+    if (!validation.isValid) {
+      setRespectWarning(validation);
+      return;
+    }
+    setRespectWarning(null);
     setTypedMessage('');
     await sendDirectQuickMessage(messageText);
   };
@@ -2616,30 +2642,34 @@ export function CampusDirectMessages({
 
                 {/* Right to Disconnect / Ruhezeit-Hinweis (Arbeitszeit- & Lehrkräfte-Schutz gem. § 5 ArbZG) */}
                 {(() => {
-                  const now = new Date();
-                  const day = now.getDay();
-                  const hour = now.getHours();
-                  const isWeekend = day === 0 || day === 6;
-                  const isAfterHours = hour < 8 || hour >= 19;
-                  if ((isWeekend || isAfterHours) && user?.role === 'student') {
+                  if (isRecipientInQuietHours && isStudent) {
+                    const teacherName = formatTeacherFullName(selectedRecipient);
                     return (
                       <div style={{
                         display: 'flex',
-                        alignItems: 'center',
+                        alignItems: 'flex-start',
                         gap: '8px',
                         background: '#f8fafc',
                         border: '1px solid #e2e8f0',
                         borderRadius: '12px',
-                        padding: '6px 12px',
+                        padding: '8px 12px',
                         marginBottom: '6px',
-                        fontSize: '0.72rem',
-                        color: '#64748b',
+                        fontSize: '0.74rem',
+                        color: '#475569',
                         fontWeight: 600,
                         width: '100%',
-                        boxSizing: 'border-box'
+                        boxSizing: 'border-box',
+                        lineHeight: 1.4
                       }}>
-                        <Clock size={13} color="#94a3b8" style={{ flexShrink: 0 }} />
-                        <span>🌱 <strong>Ruhezeit der Lehrkraft:</strong> Deine Nachricht wird zugestellt und am nächsten Schultag beantwortet.</span>
+                        <Clock size={15} color="#64748b" style={{ flexShrink: 0, marginTop: '2px' }} />
+                        <div>
+                          <div style={{ fontWeight: 800, color: '#1e293b', marginBottom: '2px' }}>
+                            🌙 Ruhezeit von {teacherName}:
+                          </div>
+                          <div>
+                            Deine Nachricht wird zugestellt. Beachte bitte, dass Lehrkräfte außerhalb ihrer Unterrichtszeiten nicht zur Beantwortung verpflichtet sind. Dringende Absagen bitte per E-Mail an die Lehrkraft senden.
+                          </div>
+                        </div>
                       </div>
                     );
                   }
@@ -2668,13 +2698,58 @@ export function CampusDirectMessages({
                   </span>
                 </div>
 
+                {/* 🚨 Pre-Flight Respect Guard Warning & Crisis Intervention Card */}
+                {respectWarning && (
+                  <div style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '6px',
+                    background: respectWarning.isCrisis ? '#fef2f2' : '#fffbeb',
+                    border: `1.5px solid ${respectWarning.isCrisis ? '#fca5a5' : '#fcd34d'}`,
+                    borderRadius: '14px',
+                    padding: '10px 14px',
+                    marginBottom: '8px',
+                    width: '100%',
+                    boxSizing: 'border-box'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: respectWarning.isCrisis ? '#991b1b' : '#92400e', fontWeight: 800, fontSize: '0.80rem' }}>
+                      <AlertTriangle size={16} color={respectWarning.isCrisis ? '#dc2626' : '#d97706'} style={{ flexShrink: 0 }} />
+                      <span>{respectWarning.isCrisis ? 'Wichtiger Hinweis & Hilfeangebot' : 'Respektvoller Umgang im Schul-Chat'}</span>
+                    </div>
+                    <div style={{ fontSize: '0.74rem', color: respectWarning.isCrisis ? '#7f1d1d' : '#78350f', lineHeight: 1.4, fontWeight: 550 }}>
+                      {respectWarning.reason}
+                    </div>
+                    {respectWarning.isCrisis && (
+                      <div style={{
+                        background: '#ffffff',
+                        border: '1px solid #fecaca',
+                        borderRadius: '8px',
+                        padding: '6px 10px',
+                        fontSize: '0.72rem',
+                        color: '#991b1b',
+                        fontWeight: 700,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        marginTop: '2px'
+                      }}>
+                        <span>Kostenlose & anonyme Nummer gegen Kummer:</span>
+                        <a href="tel:116111" style={{ color: '#b91c1c', textDecoration: 'underline', fontWeight: 900 }}>📞 116 111</a>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* Apple HIG In-Field Send Composer */}
                 <form onSubmit={handleSend} style={{ display: 'flex', width: '100%', position: 'relative', alignItems: 'center' }}>
                   <input 
                     type="text" 
                     placeholder="Deine Nachricht..."
                     value={typedMessage}
-                    onChange={e => setTypedMessage(e.target.value)}
+                    onChange={e => {
+                      setTypedMessage(e.target.value);
+                      if (respectWarning) setRespectWarning(null);
+                    }}
                     style={{
                       width: '100%',
                       padding: '11px 48px 11px 18px',

@@ -558,6 +558,10 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
       matchStandalone.removeEventListener?.('change', handleStandaloneChange);
+      if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+        audioContextRef.current.close().catch(err => console.warn('Error closing AudioContext in QRLandingPage:', err));
+        audioContextRef.current = null;
+      }
     };
   }, []);
 
@@ -1448,7 +1452,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           parent_allow_leaderboard: userData.parent_allow_leaderboard !== undefined && userData.parent_allow_leaderboard !== null ? Boolean(userData.parent_allow_leaderboard) : false,
           parent_allow_groups: userData.parent_allow_groups !== undefined && userData.parent_allow_groups !== null ? Boolean(userData.parent_allow_groups) : false,
           parent_allow_proposals: userData.parent_allow_proposals !== undefined && userData.parent_allow_proposals !== null ? Boolean(userData.parent_allow_proposals) : false,
-          parent_allow_audio: userData.parent_allow_audio !== undefined && userData.parent_allow_audio !== null ? Boolean(userData.parent_allow_audio) : true,
+          parent_allow_audio: userData.parent_allow_audio !== undefined && userData.parent_allow_audio !== null ? Boolean(userData.parent_allow_audio) : false,
           parent_permissions: userData.parent_permissions || null,
           campus_ui_level: userData.campus_ui_level || localStorage.getItem('campus_student_ui_level') || 'junior'
         });

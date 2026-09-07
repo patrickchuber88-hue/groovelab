@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { ShieldCheck, Download, Search, FileText, Lock, CheckCircle2, ChevronDown, RefreshCw, X, Copy, Check, Filter, Clock, Printer, Building, FileCheck, CheckSquare, Sparkles } from 'lucide-react';
 import { generateStudentGdprDataTakeout, downloadGdprJsonArchive } from '../utils/gdprDataTakeout';
 import { generateDpoComplianceDossierPDF } from '../utils/dpoComplianceDossierGenerator';
+import { generateMessengerSafetyCertificatePDF } from '../utils/messengerSafetyCertificateGenerator';
+import { copyMessengerClauseToClipboard, getMessengerClauseTemplate } from '../utils/messengerClauseTemplate';
 
 interface DpoAuditPortalProps {
   onClose?: () => void;
@@ -29,6 +31,7 @@ export function DpoAuditPortal({ onClose, schoolName = 'Stadtmusikschule', schoo
   const [categoryFilter, setCategoryFilter] = useState<string>('ALL');
   const [copiedHashId, setCopiedHashId] = useState<string | null>(null);
   const [showAvvModal, setShowAvvModal] = useState<boolean>(false);
+  const [copiedClauseDpo, setCopiedClauseDpo] = useState<boolean>(false);
 
   // Real school name
   const cleanSchoolName = schoolName || 'Musäk Bad Säckingen';
@@ -853,32 +856,90 @@ export function DpoAuditPortal({ onClose, schoolName = 'Stadtmusikschule', schoo
                   </p>
                 </div>
 
-                <button
-                  onClick={() => generateDpoComplianceDossierPDF({
-                    schoolName: cleanSchoolName,
-                    schoolAddress,
-                    schoolSigneeName,
-                    schoolId: school?.id
-                  })}
-                  style={{
-                    background: '#0f172a',
-                    color: '#ffffff',
-                    border: 'none',
-                    borderRadius: '14px',
-                    padding: '12px 20px',
-                    fontWeight: 800,
-                    fontSize: '0.84rem',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    boxShadow: '0 4px 12px rgba(15, 23, 42, 0.15)',
-                    transition: 'all 0.15s ease'
-                  }}
-                  className="hover-scale no-print"
-                >
-                  <Download size={16} /> Offizielles DSB-Dossier (PDF)
-                </button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                  <button
+                    onClick={() => generateMessengerSafetyCertificatePDF({
+                      schoolName: cleanSchoolName,
+                      schoolAddress,
+                      schoolSigneeName,
+                      schoolId: school?.id
+                    })}
+                    style={{
+                      background: 'linear-gradient(135deg, #15803d 0%, #16a34a 100%)',
+                      color: '#ffffff',
+                      border: 'none',
+                      borderRadius: '14px',
+                      padding: '12px 18px',
+                      fontWeight: 800,
+                      fontSize: '0.84rem',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      boxShadow: '0 4px 12px rgba(22, 163, 74, 0.25)',
+                      transition: 'all 0.15s ease'
+                    }}
+                    className="hover-scale no-print"
+                  >
+                    <FileCheck size={16} /> Kinderschutz- &amp; Messenger-Attest (PDF)
+                  </button>
+
+                  <button
+                    onClick={async () => {
+                      const ok = await copyMessengerClauseToClipboard(cleanSchoolName);
+                      if (ok) {
+                        setCopiedClauseDpo(true);
+                        setTimeout(() => setCopiedClauseDpo(false), 3000);
+                      }
+                    }}
+                    style={{
+                      background: copiedClauseDpo ? '#16a34a' : '#334155',
+                      color: '#ffffff',
+                      border: 'none',
+                      borderRadius: '14px',
+                      padding: '12px 18px',
+                      fontWeight: 800,
+                      fontSize: '0.84rem',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      boxShadow: '0 4px 12px rgba(51, 65, 85, 0.20)',
+                      transition: 'all 0.15s ease'
+                    }}
+                    className="hover-scale no-print"
+                  >
+                    {copiedClauseDpo ? <Check size={16} /> : <Copy size={16} />}
+                    {copiedClauseDpo ? 'Muster-Klausel kopiert!' : 'Schulordnungs-Klausel'}
+                  </button>
+
+                  <button
+                    onClick={() => generateDpoComplianceDossierPDF({
+                      schoolName: cleanSchoolName,
+                      schoolAddress,
+                      schoolSigneeName,
+                      schoolId: school?.id
+                    })}
+                    style={{
+                      background: '#0f172a',
+                      color: '#ffffff',
+                      border: 'none',
+                      borderRadius: '14px',
+                      padding: '12px 20px',
+                      fontWeight: 800,
+                      fontSize: '0.84rem',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      boxShadow: '0 4px 12px rgba(15, 23, 42, 0.15)',
+                      transition: 'all 0.15s ease'
+                    }}
+                    className="hover-scale no-print"
+                  >
+                    <Download size={16} /> Offizielles DSB-Dossier (PDF)
+                  </button>
+                </div>
               </div>
 
               {/* 4 Cards Grid for Municipal DPOs */}
@@ -1105,6 +1166,69 @@ export function DpoAuditPortal({ onClose, schoolName = 'Stadtmusikschule', schoo
                       <li><strong>Keine Arbeitszeiterfassung (ArbZG-Abgrenzung):</strong> Die Plattform fungiert als reines didaktisches Dispositionsmittel („Kreidetafel-Doktrin“). Sie enthält keine Stempeluhr und erfasst keine Arbeitszeiten der Lehrkräfte.</li>
                       <li><strong>Recht auf Nichterreichbarkeit (§ 5 ArbSchG):</strong> Mitteilungen sind asynchron. Lehrkräfte sind nicht verpflichtet, außerhalb des Fachunterrichts Nachrichten abzurufen.</li>
                     </ul>
+                  </div>
+                </div>
+
+                {/* 6. Muster für die Schulordnung & Unterrichtsverträge: Messenger-Kodex */}
+                <div style={{
+                  background: '#ffffff',
+                  border: '1px solid rgba(226, 232, 240, 0.8)',
+                  borderRadius: '24px',
+                  padding: '28px',
+                  boxShadow: '0 8px 24px rgba(15, 23, 42, 0.03)'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#e0f2fe', color: '#0369a1', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <FileText size={20} />
+                      </div>
+                      <div>
+                        <h4 style={{ margin: 0, fontSize: '1.02rem', fontWeight: 900, color: '#0f172a' }}>
+                          6. Muster-Schulordnungs-Klausel: Digitaler Messenger- &amp; Kommunikations-Kodex
+                        </h4>
+                        <span style={{ fontSize: '0.74rem', color: '#64748b' }}>
+                          Schlüsselfertiger Textbaustein zur Aufnahme in Schulvertrag, Hausordnung &amp; Schulanmeldeformulare
+                        </span>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={async () => {
+                        const ok = await copyMessengerClauseToClipboard(cleanSchoolName);
+                        if (ok) {
+                          setCopiedClauseDpo(true);
+                          setTimeout(() => setCopiedClauseDpo(false), 3000);
+                        }
+                      }}
+                      style={{
+                        background: copiedClauseDpo ? '#16a34a' : '#0284c7',
+                        color: '#ffffff',
+                        border: 'none',
+                        borderRadius: '10px',
+                        padding: '8px 16px',
+                        fontWeight: 800,
+                        fontSize: '0.78rem',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        boxShadow: '0 4px 12px rgba(2, 132, 199, 0.20)',
+                        transition: 'all 0.15s ease'
+                      }}
+                      className="hover-scale no-print"
+                    >
+                      {copiedClauseDpo ? <Check size={14} /> : <Copy size={14} />}
+                      {copiedClauseDpo ? 'Muster-Klausel kopiert!' : 'Muster-Klausel kopieren'}
+                    </button>
+                  </div>
+
+                  <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '18px', fontSize: '0.78rem', lineHeight: 1.65, color: '#334155' }}>
+                    <div style={{ fontWeight: 800, color: '#0f172a', marginBottom: '8px', fontSize: '0.84rem' }}>
+                      § [...] Digitale Kommunikation &amp; Nutzung der Schul-Plattform „Campus-Groovelab“
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', whiteSpace: 'pre-line' }}>
+                      {getMessengerClauseTemplate(cleanSchoolName)}
+                    </div>
                   </div>
                 </div>
 
