@@ -28,8 +28,41 @@ echo "    Backup-Root:     ${BACKUP_ROOT}"
 echo "    Sandbox-ID:      ${SANDBOX_CONTAINER}"
 echo "=============================================================================="
 
+# Monitoring & Alerting Konfiguration (Dead Man's Switch)
+MONITORING_ENV="/etc/campus-groovelab/monitoring.env"
+if [ -f "${MONITORING_ENV}" ]; then
+    # shellcheck source=/dev/null
+    source "${MONITORING_ENV}"
+fi
+HEALTHCHECK_DRILL_URL="${HEALTHCHECK_DRILL_URL:-}"
+DISCORD_WEBHOOK_URL="${DISCORD_WEBHOOK_URL:-}"
+
+send_drill_alert() {
+    local msg="$1"
+    echo "🚨 ALERT: ${msg}" >&2
+    if [ -n "${HEALTHCHECK_DRILL_URL}" ]; then
+        curl -fsS -m 10 --retry 3 "${HEALTHCHECK_DRILL_URL}/fail" >/dev/null 2>&1 || true
+    fi
+    if [ -n "${DISCORD_WEBHOOK_URL}" ]; then
+        curl -fsS -m 10 -H "Content-Type: application/json" -d "{\"content\":\"🚨 **Campus-Groovelab DR Drill Alert**: ${msg}\"}" "${DISCORD_WEBHOOK_URL}" >/dev/null 2>&1 || true
+    fi
+}
+
+send_drill_success() {
+    if [ -n "${HEALTHCHECK_DRILL_URL}" ]; then
+        curl -fsS -m 10 --retry 3 "${HEALTHCHECK_DRILL_URL}" >/dev/null 2>&1 || true
+    fi
+    if [ -n "${DISCORD_WEBHOOK_URL}" ]; then
+        curl -fsS -m 10 -H "Content-Type: application/json" -d "{\"content\":\"✅ **Campus-Groovelab DR Drill Passed**: RTO ${RTO_SECONDS}s, 100% Integrity.\"}" "${DISCORD_WEBHOOK_URL}" >/dev/null 2>&1 || true
+    fi
+}
+
 # Trap für sauberes Aufräumen bei Abbruch oder Fehlern
 cleanup() {
+    EXIT_CODE=$?
+    if [ "${EXIT_CODE}" -ne 0 ]; then
+        send_drill_alert "DR Sandbox Drill failed with exit code ${EXIT_CODE}"
+    fi
     echo ""
     echo "🧹 Führe forensische Sandbox-Bereinigung durch..."
     if docker ps -a --format '{{.Names}}' | grep -q "^${SANDBOX_CONTAINER}$"; then
@@ -216,5 +249,7 @@ echo "    Sicherheits-Regeln: ${RLS_POLICIES_COUNT} RLS-Policies aktiv"
 echo "    RTO Wiederherstellung: ${RTO_SECONDS}s (SLA erfüllt: < 900s)"
 echo "    Gesamtdauer Drill: ${TOTAL_DRILL_DURATION}s"
 echo "=============================================================================="
+
+send_drill_success
 
 exit 0

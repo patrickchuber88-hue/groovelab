@@ -49,6 +49,38 @@ STORAGE_BOX_USER="${STORAGE_BOX_USER:-u664755}"
 STORAGE_BOX_PORT="${STORAGE_BOX_PORT:-23}"
 STORAGE_BOX_DEST="${STORAGE_BOX_DEST:-backups}"
 
+# Monitoring & Alerting Konfiguration (Dead Man's Switch)
+MONITORING_ENV="/etc/campus-groovelab/monitoring.env"
+if [ -f "${MONITORING_ENV}" ]; then
+    # shellcheck source=/dev/null
+    source "${MONITORING_ENV}"
+fi
+HEALTHCHECK_BACKUP_URL="${HEALTHCHECK_BACKUP_URL:-}"
+DISCORD_WEBHOOK_URL="${DISCORD_WEBHOOK_URL:-}"
+
+send_alert() {
+    local msg="$1"
+    echo "🚨 ALERT: ${msg}" >&2
+    if [ -n "${HEALTHCHECK_BACKUP_URL}" ]; then
+        curl -fsS -m 10 --retry 3 "${HEALTHCHECK_BACKUP_URL}/fail" >/dev/null 2>&1 || true
+    fi
+    if [ -n "${DISCORD_WEBHOOK_URL}" ]; then
+        curl -fsS -m 10 -H "Content-Type: application/json" -d "{\"content\":\"🚨 **Campus-Groovelab Backup Alert**: ${msg}\"}" "${DISCORD_WEBHOOK_URL}" >/dev/null 2>&1 || true
+    fi
+}
+
+send_success() {
+    if [ -n "${HEALTHCHECK_BACKUP_URL}" ]; then
+        curl -fsS -m 10 --retry 3 "${HEALTHCHECK_BACKUP_URL}" >/dev/null 2>&1 || true
+    fi
+}
+
+trap 'send_alert "Backup failed unexpectedly on line $LINENO"' ERR
+
+if [ -n "${HEALTHCHECK_BACKUP_URL}" ]; then
+    curl -fsS -m 10 --retry 3 "${HEALTHCHECK_BACKUP_URL}/start" >/dev/null 2>&1 || true
+fi
+
 echo "=============================================================================="
 echo "🛡️  Campus-Groovelab Tier-1 Enterprise+ Backup & Encryption Engine"
 echo "    Startzeit:     $(date '+%Y-%m-%d %H:%M:%S %Z')"
@@ -181,6 +213,21 @@ find "${MONTHLY_DIR}" -type f -name "*.sql.gz.age*" -mtime +365 -delete 2>/dev/n
 echo "  ✓ Lokale Bereinigung abgeschlossen."
 
 echo ""
+echo "⚖️  5. Synchronisiere DSGVO Art. 17 Löschregister (Tombstones)..."
+TOMBSTONE_FILE="${LOCAL_BACKUP_ROOT}/gdpr_tombstones.jsonl"
+docker exec "${CONTAINER_NAME}" psql -U "${DB_USER}" -d "${DB_NAME}" -t -A -c \
+    "SELECT json_build_object('record_id', record_id, 'table_name', table_name, 'deleted_at', created_at) FROM audit_logs WHERE action = 'DELETE';" 2>/dev/null > "${TOMBSTONE_FILE}.tmp" || true
+
+if [ -f "${TOMBSTONE_FILE}.tmp" ]; then
+    mv "${TOMBSTONE_FILE}.tmp" "${TOMBSTONE_FILE}"
+    echo "  ✓ DSGVO-Löschregister aktualisiert: ${TOMBSTONE_FILE}"
+fi
+
+send_success
+
+echo ""
 echo "=============================================================================="
 echo "✅ [$(date '+%Y-%m-%d %H:%M:%S %Z')] Tier-1 Backup-Lauf erfolgreich beendet!"
 echo "=============================================================================="
+
+exit 0
