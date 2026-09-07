@@ -625,8 +625,16 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
   const [kioskSelectedRoomId, setKioskSelectedRoomId] = useState<string>('');
   const [activeSessionStationIds, setActiveSessionStationIds] = useState<string[]>([]);
   const [loadingKioskData, setLoadingKioskData] = useState(false);
-  const [loadingLocation, setLoadingLocation] = useState(false);
-  const [isCameraActive, setIsCameraActive] = useState(true);
+  const [isCameraActive, setIsCameraActive] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('platform') === 'campus' || params.get('module') === 'campus') {
+      return false;
+    }
+    const hasKioskToken = !!localStorage.getItem('groovelab_kiosk_token');
+    const isKioskModeActive = localStorage.getItem('groovelab_kiosk_mode') === 'true';
+    return Boolean(kioskStationId || hasKioskToken || isKioskModeActive || params.get('groovelab') === 'true' || params.get('platform') === 'groovelab');
+  });
   const [cameraHasError, setCameraHasError] = useState(false);
   const [scanSuccess, setScanSuccess] = useState(false);
   const qrFileInputRef = useRef<HTMLInputElement>(null);
@@ -4868,8 +4876,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                   textAlign: 'center',
                   boxSizing: 'border-box'
                 }}>
-                  <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: 'rgba(255, 255, 255, 0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#eab308' }}>
-                    {cameraHasError ? <CameraOff size={24} style={{ color: '#ef4444' }} /> : <Tablet size={24} />}
+                  <div style={{ width: '52px', height: '52px', borderRadius: '16px', background: 'rgba(255, 255, 255, 0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(255, 255, 255, 0.12)' }}>
+                    {cameraHasError ? <CameraOff size={24} style={{ color: '#ef4444' }} /> : <Camera size={26} color={isGroovelabKiosk ? '#eab308' : '#4ade80'} />}
                   </div>
                   {cameraHasError ? (
                     <>
@@ -4944,7 +4952,13 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                       )}
                     </>
                   ) : (
-                    <>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', width: '100%' }}>
+                      <div style={{ fontSize: '15px', fontWeight: 850, color: '#ffffff', letterSpacing: '-0.01em' }}>
+                        QR-Ausweis vorhalten
+                      </div>
+                      <div style={{ fontSize: '11.5px', color: 'rgba(255, 255, 255, 0.65)', lineHeight: '1.4', maxWidth: '250px' }}>
+                        Kamera bei Bedarf starten – schützt Akku &amp; Privatsphäre.
+                      </div>
                       <button
                         type="button"
                         onClick={() => {
@@ -4952,23 +4966,30 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                           setIsCameraActive(true);
                         }}
                         style={{
-                          padding: '10px 20px',
-                          borderRadius: '12px',
+                          marginTop: '4px',
+                          padding: '12px 24px',
+                          borderRadius: '16px',
                           border: 'none',
-                          background: '#eab308',
-                          color: '#062413',
-                          fontWeight: 800,
-                          fontSize: '13px',
+                          background: isGroovelabKiosk ? '#eab308' : '#34a853',
+                          color: isGroovelabKiosk ? '#0f172a' : '#ffffff',
+                          fontWeight: 850,
+                          fontSize: '0.88rem',
                           cursor: 'pointer',
-                          boxShadow: '0 4px 12px rgba(234, 179, 8, 0.2)'
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          boxShadow: isGroovelabKiosk 
+                            ? '0 6px 18px rgba(234, 179, 8, 0.35)' 
+                            : '0 6px 18px rgba(52, 168, 83, 0.35)',
+                          transition: 'all 0.15s ease'
                         }}
+                        onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.03)'}
+                        onMouseOut={(e) => e.currentTarget.style.transform = 'none'}
                       >
-                        Kamera aktivieren
+                        <Camera size={16} />
+                        <span>Kamera starten</span>
                       </button>
-                      <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginTop: '8px', lineHeight: '1.4', maxWidth: '240px' }}>
-                        Wähle bei der Abfrage <strong>„Erlauben“</strong>. <span onClick={() => setShowPermissionHelp(true)} style={{ color: '#eab308', textDecoration: 'underline', cursor: 'pointer', fontWeight: 800 }}>Hilfe</span>
-                      </div>
-                    </>
+                    </div>
                   )}
                 </div>
               )}
@@ -5451,28 +5472,18 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 color: '#ffffff',
                 fontSize: '13px',
                 fontWeight: 700,
-                cursor: loadingLocation ? 'wait' : 'pointer',
+                cursor: 'pointer',
                 transition: 'all 0.2s',
                 textAlign: 'center',
                 boxSizing: 'border-box',
                 height: '48px',
-                outline: 'none',
-                opacity: loadingLocation ? 0.7 : 1
+                outline: 'none'
               }}
-              onMouseOver={(e) => { if (!loadingLocation) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.12)'; }}
-              onMouseOut={(e) => { if (!loadingLocation) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)'; }}
+              onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.12)'; }}
+              onMouseOut={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)'; }}
             >
-              {loadingLocation ? (
-                <>
-                  <div style={{ width: '12px', height: '12px', border: '2px solid white', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
-                  Standort wird ermittelt...
-                </>
-              ) : (
-                <>
-                  <Tablet size={16} color="#e6f4ea" />
-                  GrooveLab Kiosk-Modus
-                </>
-              )}
+              <Tablet size={16} color="#e6f4ea" />
+              GrooveLab Kiosk-Modus
             </button>
           </div>
         )}
@@ -5885,7 +5896,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               }}
             >
               <Fingerprint size={13} color="#4ade80" />
-              Fingerabdruck
+              Fingerabdruck / Face ID
             </button>
           )}
 
@@ -5921,7 +5932,45 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               }}
             >
               <KeyRound size={13} color="#4ade80" />
-              Passwort Login
+              Mit PIN anmelden
+            </button>
+          )}
+
+          {!isGroovelabKiosk && (
+            <button 
+              onClick={() => setShowAdminModal(true)}
+              style={{ 
+                background: 'rgba(255, 255, 255, 0.05)', 
+                border: '1px solid rgba(255, 255, 255, 0.12)', 
+                padding: '9px 16px',
+                borderRadius: '100px',
+                color: 'rgba(255, 255, 255, 0.85)', 
+                fontSize: '11px', 
+                fontWeight: 800, 
+                textTransform: 'uppercase', 
+                letterSpacing: '0.05em', 
+                cursor: 'pointer', 
+                transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                backdropFilter: 'blur(12px)',
+                WebkitBackdropFilter: 'blur(12px)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.15)'
+              }}
+              onMouseOver={(e) => { 
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.12)'; 
+                e.currentTarget.style.color = '#ffffff';
+                e.currentTarget.style.transform = 'translateY(-1px)';
+              }}
+              onMouseOut={(e) => { 
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'; 
+                e.currentTarget.style.color = 'rgba(255, 255, 255, 0.85)';
+                e.currentTarget.style.transform = 'none';
+              }}
+            >
+              <ShieldCheck size={13} color="#4ade80" />
+              Schulleitung &amp; Verwaltung
             </button>
           )}
         </div>
@@ -5988,7 +6037,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               type="text"
               value={pinInput}
               onChange={(e) => setPinInput(e.target.value)}
-              placeholder={pinLockoutSeconds > 0 ? `Gesperrt (${pinLockoutSeconds}s)` : "Ausweis ID..."}
+              placeholder={pinLockoutSeconds > 0 ? `Gesperrt (${pinLockoutSeconds}s)` : "Ausweis-Nummer oder PIN..."}
               disabled={loading || pinLockoutSeconds > 0}
               style={{
                 flex: 1,

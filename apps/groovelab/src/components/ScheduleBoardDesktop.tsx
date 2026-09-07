@@ -4778,45 +4778,49 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', width: '100%', maxWidth: '100%', margin: '0', fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" }}>
       <style>{`
         .apple-btn-group {
-          background: rgba(0, 0, 0, 0.03);
-          border: 1px solid rgba(0, 0, 0, 0.05);
-          border-radius: 10px;
-          padding: 3px;
+          background: rgba(0, 0, 0, 0.04);
+          border: 1px solid rgba(0, 0, 0, 0.04);
+          border-radius: 11px;
+          padding: 2.5px;
           display: flex;
           align-items: center;
           gap: 2px;
-          backdrop-filter: blur(10px);
+          backdrop-filter: blur(16px) saturate(180%);
+          box-shadow: inset 0 0.5px 1px rgba(0, 0, 0, 0.04);
         }
         .apple-btn {
           background: transparent;
-          border: none;
-          color: #475569;
-          border-radius: 7px;
-          padding: 6px 12px;
+          border: 0.5px solid transparent;
+          color: #3a3a3c;
+          border-radius: 8px;
+          padding: 5px 11px;
           font-size: 0.78rem;
           font-weight: 600;
+          letter-spacing: -0.01em;
           cursor: pointer;
-          transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+          transition: all 0.16s cubic-bezier(0.16, 1, 0.3, 1);
           display: flex;
           align-items: center;
           gap: 6px;
-          min-height: 30px;
+          min-height: 28px;
           outline: none;
         }
         .apple-btn:hover {
-          background: rgba(0, 0, 0, 0.04);
+          background: rgba(0, 0, 0, 0.035);
           color: #1d1d1f;
         }
         .apple-btn:active {
-          transform: scale(0.97);
+          transform: scale(0.965);
         }
         .apple-btn.active {
           background: #ffffff;
-          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+          color: #1d1d1f;
+          border-color: rgba(0, 0, 0, 0.04);
+          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 0 0 0.5px rgba(0, 0, 0, 0.04);
           font-weight: 700;
         }
         .apple-btn:disabled {
-          opacity: 0.4;
+          opacity: 0.35;
           cursor: not-allowed;
           pointer-events: none;
         }
@@ -5228,13 +5232,13 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                       : (isGroovelab 
                         ? 'linear-gradient(135deg, #eab308 0%, #d97706 100%)' 
                         : 'linear-gradient(135deg, #ea4335 0%, #c62828 100%)'),
-                    color: 'white', border: 'none', fontWeight: 800, padding: '8px 16px',
-                    borderRadius: '10px', fontSize: '0.78rem', cursor: 'pointer',
+                    color: 'white', border: 'none', fontWeight: 800, padding: '7px 16px',
+                    borderRadius: '11px', fontSize: '0.8rem', letterSpacing: '-0.01em', minHeight: '32px', cursor: 'pointer',
                     display: 'flex', alignItems: 'center', gap: '6px',
                     opacity: (submitting || boards.length === 0) ? 0.5 : 1,
                     pointerEvents: (submitting || boards.length === 0) ? 'none' : 'auto',
-                    boxShadow: `0 4px 12px ${brandColor}30`,
-                    transition: 'all 0.2s', outline: 'none'
+                    boxShadow: `0 2px 8px ${brandColor}35, inset 0 1px 0 rgba(255,255,255,0.25)`,
+                    transition: 'all 0.16s cubic-bezier(0.16, 1, 0.3, 1)', outline: 'none'
                   }}
                   onMouseOver={e => e.currentTarget.style.transform = 'translateY(-1px)'}
                   onMouseOut={e => e.currentTarget.style.transform = 'none'}

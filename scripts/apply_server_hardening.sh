@@ -37,6 +37,11 @@ ssh "$SERVER" 'cat << "EOF" > /etc/logrotate.d/campus_groovelab
 }
 EOF'
 
+# 4. Transfer and execute comprehensive Host Hardening (deployuser, SSH, UFW, Fail2Ban, Sysctl)
+echo "🛡️  4. Übertrage und führe umfassendes Host-Hardening (server_initial_hardening.sh) aus..."
+scp scripts/server_initial_hardening.sh "$SERVER:/root/scripts/server_initial_hardening.sh"
+ssh "$SERVER" "bash /root/scripts/server_initial_hardening.sh"
+
 echo ""
-echo "✅ Server-Hardening & Log-Rotation erfolgreich eingerichtet!"
+echo "✅ Vollständiges Campus-Groovelab Server-Hardening erfolgreich abgeschlossen!"
 echo "=============================================================================="

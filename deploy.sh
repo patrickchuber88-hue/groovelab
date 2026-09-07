@@ -6,7 +6,7 @@
 
 set -e
 
-SERVER="root@178.105.10.2"
+SERVER="${SERVER:-deployuser@178.105.10.2}"
 REMOTE_DIR="/var/www/groovelab"
 LOCAL_DIST="apps/groovelab/dist"
 
@@ -30,7 +30,7 @@ echo ""
 
 # 1. Sicherstellen, dass die Remote-Verzeichnisse existieren
 echo "📁 Remote-Verzeichnis & Backup-Ordner vorbereiten..."
-ssh "$SERVER" "mkdir -p $REMOTE_DIR /mnt/supabase_data/backups"
+ssh "$SERVER" "mkdir -p $REMOTE_DIR && sudo mkdir -p /mnt/supabase_data/backups && sudo chown deployuser:deployuser /mnt/supabase_data/backups 2>/dev/null || true"
 
 # 2. Pre-Deploy Backup der Live-Datenbank auf dem 14 GB Volume erstellen (falls DB-Container existiert)
 echo "🛡️  Erstelle Pre-Deploy Backup auf dem 14 GB Volume (/mnt/supabase_data/backups)..."
@@ -49,7 +49,7 @@ ssh "$SERVER" "WEB_CONTAINER=\$(docker ps --format '{{.Names}}' | grep -v 'supab
 
 # 5. Synchronisiere Enterprise Server-Skripte nach /root/scripts
 echo "⚙️  Synchronisiere Enterprise Server-Skripte..."
-ssh "$SERVER" "mkdir -p /root/scripts"
+ssh "$SERVER" "sudo mkdir -p /root/scripts && sudo chown -R deployuser:deployuser /root/scripts"
 scp scripts/backup_supabase_enterprise.sh scripts/sync_offsite_backup.sh scripts/nightly_secops_audit.sh scripts/server_health_watchdog.sh scripts/server_maintenance_weekly.sh "$SERVER:/root/scripts/" || true
 ssh "$SERVER" "chmod +x /root/scripts/*.sh 2>/dev/null || true"
 echo "  ✓ Server-Skripte synchronisiert & ausführbar."

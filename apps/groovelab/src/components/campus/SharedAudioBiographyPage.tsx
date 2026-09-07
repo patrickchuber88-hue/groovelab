@@ -812,16 +812,11 @@ export const SharedAudioBiographyPage: React.FC<SharedAudioBiographyPageProps> =
       const currPin = localStorage.getItem('campus_share_pin_current') || localStorage.getItem('campus_share_pin_global');
       if (currPin && /^\d{4}$/.test(currPin)) return currPin;
 
-      // Deterministic fallback matching AudioBiographyView
-      let hash = 4829;
-      const key = (targetId && targetId !== 'demo_student' && targetId !== 'anonymous_student') ? targetId : 'campus_talent_default';
-      for (let i = 0; i < key.length; i++) {
-        hash = ((hash << 5) - hash) + key.charCodeAt(i);
-        hash |= 0;
-      }
-      return (Math.abs(hash) % 9000 + 1000).toString();
+      // 🛡️ Hardened SEC-05: Zero predictable ID derivation.
+      // Enforces explicit cryptographic verification via urlPinHash or stored device PIN.
+      return null;
     } catch {}
-    return '4829';
+    return null;
   };
 
   const handleVerifyPin = (pinToTest?: string) => {
@@ -858,6 +853,13 @@ export const SharedAudioBiographyPage: React.FC<SharedAudioBiographyPageProps> =
       }
     }, 180);
   };
+
+  // Auto-verify if valid 4-digit urlPin is provided in search params
+  useEffect(() => {
+    if (!isUnlocked && urlPin && /^\d{4}$/.test(urlPin)) {
+      handleVerifyPin(urlPin);
+    }
+  }, [isUnlocked, urlPin]);
 
   const handleDigitChange = (index: number, val: string) => {
     const char = val.replace(/\D/g, '').slice(-1);

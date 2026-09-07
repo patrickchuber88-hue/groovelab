@@ -369,6 +369,7 @@ export function ScheduleCalendarViewDesktop({
   // Cross-Week 2-Click Swap Mode states
   const [isSwapModeActive, setIsSwapModeActive] = useState<boolean>(false);
   const [swapSourceOcc, setSwapSourceOcc] = useState<ScheduleOccurrence | null>(null);
+  const [swapDetailModalOcc, setSwapDetailModalOcc] = useState<ScheduleOccurrence | null>(null);
 
   const toggleOccSelection = (occId: string) => {
     const next = new Set(selectedSubOccIds);
@@ -2777,7 +2778,7 @@ export function ScheduleCalendarViewDesktop({
 
   const handleResetWeek = async () => {
     const confirmReset = await showConfirm(
-      'Möchtest du wirklich alle Termine dieser Kalenderwoche auf ihren regulären Stammtermin zurücksetzen? Alle Verschiebungen, Täusche und Ausfälle für diese Woche werden damit aufgehoben.'
+      'Möchtest du wirklich alle Terminänderungen, Verschiebungen und Ausfälle für diese Kalenderwoche auf die Stammdaten des Stundenplans zurücksetzen?'
     );
     if (!confirmReset) return;
 
@@ -2816,234 +2817,81 @@ export function ScheduleCalendarViewDesktop({
     try {
       setLoading(true);
 
-      // 2. Fetch master schedule definitions from DB
-      const { data: dbSchedules } = await supabase
-        .from('schedules')
-        .select('*')
-        .eq('teacher_id', userId);
+      // Notify students who had rescheduled/cancelled lessons in this week before deleting them
+      const DAYS_DE = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
+      const rescheduledOrCancelled = baseOccurrences.filter(occ => 
+        occ.student_id && 
+        occ.student_id !== 'vacant' && 
+        !occ.id.startsWith('mock-') && 
+        (['cancelled', 'canceled_by_student'].includes(occ.status) || (occ.original_date && (occ.original_date !== occ.date || occ.original_start_time !== occ.start_time)))
+      );
 
-      // 3. Build canonical Stammtermine for each day of this week
-      interface StammSlot {
-        schedule_id?: string;
-        student_id: string;
-        day_of_week: number;
-        target_date: string;
-        time_slot: string; // HH:mm:00
-        duration: number;
-        room_id: string | null;
-        instrument?: string;
-      }
+      for (const occ of rescheduledOrCancelled) {
+        try {
+          const origDateStr = occ.original_date || occ.date;
+          const origTimeStr = occ.original_start_time || occ.start_time;
+          const origDate = new Date(origDateStr);
+          const origDayLabel = DAYS_DE[origDate.getDay()];
+          const origTimeLabel = origTimeStr.substring(0, 5);
+          const shortOrigDay = origDayLabel.substring(0, 2) + '.';
+          const shortOrigDate = `${String(origDate.getDate()).padStart(2, '0')}.${String(origDate.getMonth() + 1).padStart(2, '0')}.${String(origDate.getFullYear()).substring(2, 4)}`;
 
-      const stammSlots: StammSlot[] = [];
-      const addedKeys = new Set<string>();
-
-      // From dbSchedules
-      (dbSchedules || []).forEach(s => {
-        if (!s.student_id || !s.day_of_week || !s.time_slot) return;
-        const dayNum = typeof s.day_of_week === 'number' ? s.day_of_week : parseInt(s.day_of_week, 10);
-        if (dayNum < 1 || dayNum > 7) return;
-
-        const targetDate = new Date(weekStart);
-        targetDate.setDate(targetDate.getDate() + (dayNum - 1));
-        const targetDateStr = toLocalYYYYMMDD(targetDate);
-        const timeSlotStr = s.time_slot.includes(':') && s.time_slot.split(':').length === 2 ? `${s.time_slot}:00` : s.time_slot;
-        const key = `${s.student_id}_${targetDateStr}`;
-
-        if (!addedKeys.has(key)) {
-          addedKeys.add(key);
-          stammSlots.push({
-            schedule_id: s.id,
-            student_id: s.student_id,
-            day_of_week: dayNum,
-            target_date: targetDateStr,
-            time_slot: timeSlotStr,
-            duration: s.duration || 30,
-            room_id: s.room_id || null,
-            instrument: s.instrument || 'Musiker'
+          const notificationMessage = `Der verschobene oder abgesagte Termin wurde auf den regulären Termin zurückgesetzt:\n${shortOrigDay} ${shortOrigDate} um ${origTimeLabel} Uhr.`;
+          
+          await supabase.from('campus_direct_messages').insert({
+            sender_id: userId,
+            recipient_id: occ.student_id,
+            content: notificationMessage
           });
-        }
-      });
-
-      // Fallback/augmentation from boards (designer template)
-      if (boards && boards.length > 0) {
-        boards.forEach(b => {
-          const dayNum = typeof b.dayOfWeek === 'number' ? b.dayOfWeek : parseInt(b.dayOfWeek, 10);
-          if (dayNum < 1 || dayNum > 7) return;
-
-          const targetDate = new Date(weekStart);
-          targetDate.setDate(targetDate.getDate() + (dayNum - 1));
-          const targetDateStr = toLocalYYYYMMDD(targetDate);
-
-          (b.students || []).forEach((st: any) => {
-            if (st.isBreak) return;
-            const timeSlotRaw = st.assignedTime || st.customStartTime || '14:00';
-            const timeSlotStr = timeSlotRaw.includes(':') && timeSlotRaw.split(':').length === 2 ? `${timeSlotRaw}:00` : timeSlotRaw;
-            const duration = st.duration || 30;
-
-            if (st.isGroup && st.groupStudents && Array.isArray(st.groupStudents)) {
-              st.groupStudents.forEach((gs: any) => {
-                const gsId = gs.id || gs.student_id;
-                if (!gsId || gsId.startsWith('group-') || gsId.startsWith('break-')) return;
-                const key = `${gsId}_${targetDateStr}`;
-                if (!addedKeys.has(key)) {
-                  addedKeys.add(key);
-                  stammSlots.push({
-                    student_id: gsId,
-                    day_of_week: dayNum,
-                    target_date: targetDateStr,
-                    time_slot: timeSlotStr,
-                    duration: gs.duration || duration,
-                    room_id: b.roomId || null,
-                    instrument: gs.instrument || st.instrument || 'Musiker'
-                  });
-                }
-              });
-            } else if (st.id && !st.id.startsWith('group-') && !st.id.startsWith('break-')) {
-              const key = `${st.id}_${targetDateStr}`;
-              if (!addedKeys.has(key)) {
-                addedKeys.add(key);
-                stammSlots.push({
-                  student_id: st.id,
-                  day_of_week: dayNum,
-                  target_date: targetDateStr,
-                  time_slot: timeSlotStr,
-                  duration: duration,
-                  room_id: b.roomId || null,
-                  instrument: st.instrument || 'Musiker'
-                });
-              }
-            }
-          });
-        });
-      }
-
-      // 4. Fetch all occurrences touching this week (by current date OR by original_date)
-      const { data: dbOccs } = await supabase
-        .from('schedule_occurrences')
-        .select('*')
-        .eq('teacher_id', userId)
-        .or(`and(date.gte.${weekStartStr},date.lte.${weekEndStr}),and(original_date.gte.${weekStartStr},original_date.lte.${weekEndStr})`);
-
-      // Also check if any occurrence belonging to this teacher's schedules was moved outside this week
-      const schedIds = (dbSchedules || []).map(s => s.id).filter(Boolean);
-      let outOccs: any[] = [];
-      if (schedIds.length > 0) {
-        const { data: movedOut } = await supabase
-          .from('schedule_occurrences')
-          .select('*')
-          .eq('teacher_id', userId)
-          .in('schedule_id', schedIds)
-          .or(`date.lt.${weekStartStr},date.gt.${weekEndStr}`)
-          .gte('original_date', weekStartStr)
-          .lte('original_date', weekEndStr);
-        if (movedOut) outOccs = movedOut;
-      }
-
-      const allRelatedOccsMap = new Map<string, any>();
-      (dbOccs || []).forEach(o => allRelatedOccsMap.set(o.id, o));
-      outOccs.forEach(o => allRelatedOccsMap.set(o.id, o));
-      const allOccs = Array.from(allRelatedOccsMap.values());
-
-      const updatePromises: any[] = [];
-      const deleteIds: string[] = [];
-      const coveredStammKeys = new Set<string>();
-
-      for (const occ of allOccs) {
-        const isAdHoc = occ.id?.startsWith('adhoc-') || (occ as any).is_adhoc;
-        if (isAdHoc) {
-          deleteIds.push(occ.id);
-          continue;
-        }
-
-        // Check if occurrence was moved INTO this week from another week
-        const wasMovedFromOutside = occ.original_date && (occ.original_date < weekStartStr || occ.original_date > weekEndStr);
-        if (wasMovedFromOutside) {
-          // Revert back to its home date and time
-          const homeSched = (dbSchedules || []).find(s => s.id === occ.schedule_id || s.student_id === occ.student_id);
-          const homeTime = homeSched?.time_slot ? (homeSched.time_slot.includes(':') && homeSched.time_slot.split(':').length === 2 ? `${homeSched.time_slot}:00` : homeSched.time_slot) : occ.start_time;
-
-          updatePromises.push(
-            supabase.from('schedule_occurrences').update({
-              date: occ.original_date,
-              start_time: homeTime,
-              status: 'scheduled',
-              original_date: null,
-              notes: null,
-              student_acknowledged: null,
-              teacher_acknowledged: true,
-              substitute_teacher_id: null
-            }).eq('id', occ.id)
-          );
-          continue;
-        }
-
-        // Look for matching StammSlot for this week
-        const matchingStamm = stammSlots.find(slot => 
-          (slot.schedule_id && slot.schedule_id === occ.schedule_id) ||
-          slot.student_id === occ.student_id
-        );
-
-        if (matchingStamm) {
-          const stammKey = `${matchingStamm.student_id}_${matchingStamm.target_date}`;
-          if (coveredStammKeys.has(stammKey)) {
-            // Duplicate occurrence for same slot, delete surplus
-            deleteIds.push(occ.id);
-          } else {
-            coveredStammKeys.add(stammKey);
-            // Revert unconditionally to Stammtermin
-            updatePromises.push(
-              supabase.from('schedule_occurrences').update({
-                date: matchingStamm.target_date,
-                start_time: matchingStamm.time_slot,
-                duration: matchingStamm.duration,
-                status: 'scheduled',
-                original_date: null,
-                notes: null,
-                student_acknowledged: null,
-                teacher_acknowledged: true,
-                substitute_teacher_id: null
-              }).eq('id', occ.id)
-            );
-          }
-        } else {
-          // Orphan occurrence not matching any StammSlot in template
-          deleteIds.push(occ.id);
+        } catch (err) {
+          console.warn('Error sending reset week notification:', err);
         }
       }
 
-      // Re-create any StammSlot missing an occurrence in DB for this week
-      const insertOccs: any[] = [];
-      for (const slot of stammSlots) {
-        const stammKey = `${slot.student_id}_${slot.target_date}`;
-        if (!coveredStammKeys.has(stammKey)) {
-          insertOccs.push({
-            school_id: schoolId,
-            teacher_id: userId,
-            student_id: slot.student_id,
-            schedule_id: slot.schedule_id || null,
-            date: slot.target_date,
-            start_time: slot.time_slot,
-            duration: slot.duration,
-            status: 'scheduled'
-          });
-        }
-      }
-
-      // Execute all DB writes
-      await Promise.all([
-        ...updatePromises,
-        deleteIds.length > 0 ? supabase.from('schedule_occurrences').delete().in('id', deleteIds) : Promise.resolve(),
-        insertOccs.length > 0 ? supabase.from('schedule_occurrences').insert(insertOccs) : Promise.resolve(),
-        supabase.from('room_bookings').delete().eq('booked_by', userId).gte('date', weekStartStr).lte('date', weekEndStr)
+      // Fetch occurrences about to be deleted so we can clean up their room bookings & DB records
+      const [resByDate, resByOrigDate] = await Promise.all([
+        supabase.from('schedule_occurrences').select('id, date, start_time').gte('date', weekStartStr).lte('date', weekEndStr),
+        supabase.from('schedule_occurrences').select('id, date, start_time').gte('original_date', weekStartStr).lte('original_date', weekEndStr)
       ]);
 
-      window.dispatchEvent(new CustomEvent('refresh-bookings'));
+      const occurrencesToDelete = [
+        ...(resByDate.data || []),
+        ...(resByOrigDate.data || [])
+      ];
+
+      const idsToDelete = Array.from(new Set(occurrencesToDelete.map(o => o.id)));
+
+      if (idsToDelete.length > 0) {
+        const { error } = await supabase
+          .from('schedule_occurrences')
+          .delete()
+          .in('id', idsToDelete);
+        
+        if (error) throw error;
+
+        // Clean up corresponding room bookings
+        try {
+          await Promise.all(
+            occurrencesToDelete.map(occ =>
+              supabase.from('room_bookings')
+                .delete()
+                .eq('booked_by', userId)
+                .eq('date', occ.date)
+                .eq('start_time', occ.start_time)
+            )
+          );
+          window.dispatchEvent(new CustomEvent('refresh-bookings'));
+        } catch (roomErr) {
+          console.warn('Error deleting room bookings on reset week:', roomErr);
+        }
+      }
+
       await loadOccurrences();
       await fetchAllOpenReschedules();
-      await showAlert('✅ Alle Termine dieser Woche wurden erfolgreich auf ihren Stammtermin zurückgesetzt.');
+      await showAlert('Stammdaten für diese Kalenderwoche erfolgreich geladen & zurückgesetzt.');
     } catch (err) {
-      console.error('Error resetting occurrences for week:', err);
-      await showAlert('Fehler beim Zurücksetzen der Termine.');
+      console.error('Error resetting saved occurrences for week:', err);
+      await showAlert('Fehler beim Zurücksetzen der gespeicherten Termine');
     } finally {
       setLoading(false);
     }
@@ -4519,45 +4367,49 @@ export function ScheduleCalendarViewDesktop({
           animation: pulse-yellow 2s infinite;
         }
         .apple-btn-group {
-          background: rgba(0, 0, 0, 0.03);
-          border: 1px solid rgba(0, 0, 0, 0.05);
-          border-radius: 10px;
-          padding: 3px;
+          background: rgba(0, 0, 0, 0.04);
+          border: 1px solid rgba(0, 0, 0, 0.04);
+          border-radius: 11px;
+          padding: 2.5px;
           display: flex;
           align-items: center;
           gap: 2px;
-          backdrop-filter: blur(10px);
+          backdrop-filter: blur(16px) saturate(180%);
+          box-shadow: inset 0 0.5px 1px rgba(0, 0, 0, 0.04);
         }
         .apple-btn {
           background: transparent;
-          border: none;
-          color: #475569;
-          border-radius: 7px;
-          padding: 6px 12px;
+          border: 0.5px solid transparent;
+          color: #3a3a3c;
+          border-radius: 8px;
+          padding: 5px 11px;
           font-size: 0.78rem;
           font-weight: 600;
+          letter-spacing: -0.01em;
           cursor: pointer;
-          transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+          transition: all 0.16s cubic-bezier(0.16, 1, 0.3, 1);
           display: flex;
           align-items: center;
           gap: 6px;
-          min-height: 30px;
+          min-height: 28px;
           outline: none;
         }
         .apple-btn:hover {
-          background: rgba(0, 0, 0, 0.04);
+          background: rgba(0, 0, 0, 0.035);
           color: #1d1d1f;
         }
         .apple-btn:active {
-          transform: scale(0.97);
+          transform: scale(0.965);
         }
         .apple-btn.active {
           background: #ffffff;
-          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+          color: #1d1d1f;
+          border-color: rgba(0, 0, 0, 0.04);
+          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 0 0 0.5px rgba(0, 0, 0, 0.04);
           font-weight: 700;
         }
         .apple-btn:disabled {
-          opacity: 0.4;
+          opacity: 0.35;
           cursor: not-allowed;
           pointer-events: none;
         }
@@ -4934,14 +4786,14 @@ export function ScheduleCalendarViewDesktop({
                   }
                 }}
                 className={`apple-btn ${isSwapModeActive ? 'active' : ''}`}
-                style={isSwapModeActive ? { color: '#2563eb', background: '#eff6ff', borderColor: '#bfdbfe', fontWeight: 800 } : {}}
+                style={isSwapModeActive ? { color: '#854d0e', background: '#fefce8', borderColor: '#fde047', fontWeight: 800 } : {}}
                 title="Wochenübergreifender 2-Klick-Tausch: Klicke 2 Termine an, um sie direkt zu tauschen"
               >
-                <ArrowLeftRight size={13} style={{ color: isSwapModeActive ? '#2563eb' : undefined }} />
+                <ArrowLeftRight size={13} style={{ color: isSwapModeActive ? '#854d0e' : undefined }} />
                 <span>Tauschen</span>
                 {swapSourceOcc && (
                   <span style={{
-                    background: '#2563eb',
+                    background: '#eab308',
                     color: '#ffffff',
                     fontSize: '0.62rem',
                     fontWeight: 900,
@@ -5211,7 +5063,7 @@ export function ScheduleCalendarViewDesktop({
                 width: '32px',
                 height: '32px',
                 borderRadius: '10px',
-                background: swapSourceOcc ? '#2563eb' : 'rgba(255, 255, 255, 0.15)',
+                background: swapSourceOcc ? '#eab308' : 'rgba(255, 255, 255, 0.15)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -5223,19 +5075,19 @@ export function ScheduleCalendarViewDesktop({
             <div style={{ minWidth: 0, fontSize: '0.85rem' }}>
               {!swapSourceOcc ? (
                 <div>
-                  <span style={{ fontWeight: 800, color: '#93c5fd' }}>⇄ Tauschmodus aktiv:</span>{' '}
+                  <span style={{ fontWeight: 800, color: '#fde047' }}>⇄ Tauschmodus aktiv:</span>{' '}
                   <span style={{ color: '#f1f5f9' }}>Klicke den <b>1. Schüler</b> an</span>
                 </div>
               ) : (
                 <div>
-                  <span style={{ fontWeight: 800, color: '#60a5fa' }}>1. Schüler:</span>{' '}
+                  <span style={{ fontWeight: 800, color: '#facc15' }}>1. Schüler:</span>{' '}
                   <span style={{ fontWeight: 700, color: '#ffffff' }}>
                     {`${swapSourceOcc.student?.first_name || 'Schüler'} ${maskLastName(swapSourceOcc.student?.last_name || '', showRealNames)}`}
                   </span>{' '}
                   <span style={{ color: '#94a3b8', fontSize: '0.78rem' }}>
                     ({new Date(`${swapSourceOcc.date}T00:00:00`).toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' })}, {swapSourceOcc.start_time.substring(0, 5)} Uhr)
                   </span>
-                  <div style={{ color: '#38bdf8', fontSize: '0.76rem', fontWeight: 600 }}>
+                  <div style={{ color: '#fef08a', fontSize: '0.76rem', fontWeight: 600 }}>
                     ➜ Klicke nun den <b>2. Schüler</b> an (Woche wechseln mit ‹ › möglich)
                   </div>
                 </div>
@@ -6007,7 +5859,13 @@ export function ScheduleCalendarViewDesktop({
                     });
                   } else {
                     const room_id = occ.schedules?.room_id || null;
-                    const isExplicitGroupOcc = Boolean(
+                    const isSwapOcc = Boolean(
+                      (occ as any).is_swap || 
+                      (occ as any).isSwap || 
+                      occ.notes?.startsWith('[Tauschtermin]') || 
+                      occ.notes?.includes('Getauscht mit')
+                    );
+                    const isExplicitGroupOcc = !isSwapOcc && Boolean(
                       occ.isGroupBlock || 
                       (occ as any).groupOccurrences?.length > 0 || 
                       (occ as any).isExplicitMerged || 
@@ -6318,11 +6176,12 @@ export function ScheduleCalendarViewDesktop({
 
                   const isSwap = Boolean(
                     (occ as any).is_swap ||
+                    (occ as any).isSwap ||
                     occ.notes?.startsWith('[Tauschtermin]') ||
                     occ.notes?.includes('Getauscht mit')
                   );
 
-                  const isGroupLesson = !isSwap && (isGroup || Boolean(displayNames && (displayNames.includes('&') || displayNames.includes(' & '))));
+                  const isGroupLesson = !isSwap && !occ.notes?.includes('[Tauschtermin]') && (isGroup || Boolean(displayNames && (displayNames.includes('&') || displayNames.includes(' & '))));
 
                   if (isCancelled || isSick) {
                     if (!isCancelledAck) {
@@ -6487,9 +6346,9 @@ export function ScheduleCalendarViewDesktop({
                     finalColors.border = '#4f46e5';
                   }
                   if (isSelectedForSwap) {
-                    cardBackground = 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)';
-                    finalColors.border = '#2563eb';
-                    finalColors.text = '#1d4ed8';
+                    cardBackground = 'linear-gradient(135deg, #fefce8 0%, #fef08a 100%)';
+                    finalColors.border = '#eab308';
+                    finalColors.text = '#854d0e';
                   }
                   
                   // Color side-by-side overlapping cards RED (conflict indicator)
@@ -6570,7 +6429,11 @@ export function ScheduleCalendarViewDesktop({
                               showActionToast('Tausch-Auswahl aufgehoben.');
                               return;
                             }
-                            await handleTwoClickSwap(swapSourceOcc, occ);
+                            const sId = swapSourceOcc.id;
+                            const tId = occ.id;
+                            setSwapSourceOcc(null);
+                            setIsSwapModeActive(false);
+                            setDropDecisionState({ sourceId: sId, targetId: tId });
                             return;
                           }
                           if (isSubModeActive) {
@@ -6613,14 +6476,14 @@ export function ScheduleCalendarViewDesktop({
                           background: isGap 
                             ? undefined 
                             : isSelectedForSwap
-                              ? 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)'
+                              ? 'linear-gradient(135deg, #fefce8 0%, #fef08a 100%)'
                               : ((isGroupModeActive && selectedForGroup.includes(occ.id))
                                 ? 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)'
                                 : (cardBackground || finalColors.bg)), 
                           border: isGap 
                             ? undefined
                             : isSelectedForSwap
-                              ? '2px solid #2563eb'
+                              ? '2px solid #eab308'
                               : ((isGroupModeActive && selectedForGroup.includes(occ.id))
                                 ? '2px solid #2563eb'
                                 : (isRescheduled 
@@ -6635,7 +6498,7 @@ export function ScheduleCalendarViewDesktop({
                           borderLeft: isGap 
                             ? undefined
                             : isSelectedForSwap
-                              ? '4px solid #2563eb'
+                              ? '4px solid #ca8a04'
                               : ((isGroupModeActive && selectedForGroup.includes(occ.id))
                                 ? '4px solid #2563eb'
                                 : (isRescheduled 
@@ -6659,7 +6522,7 @@ export function ScheduleCalendarViewDesktop({
                           left: (isCancelled || isSick) ? 'calc(0% + 8px)' : `calc(${layout?.left || 0}% + 8px)`,
                           width: (isCancelled || isSick) ? 'calc(100% - 16px)' : `calc(${layout?.width || 100}% - 16px)`,
                           boxShadow: isSelectedForSwap
-                            ? '0 0 16px rgba(37, 99, 235, 0.45)'
+                            ? '0 0 16px rgba(234, 179, 8, 0.55)'
                             : (isGroupModeActive && selectedForGroup.includes(occ.id))
                               ? '0 0 12px rgba(37, 99, 235, 0.45)'
                               : '0 1px 3px rgba(0,0,0,0.02), 0 4px 12px rgba(0,0,0,0.01)',
@@ -6698,10 +6561,12 @@ export function ScheduleCalendarViewDesktop({
                                     <span style={{ 
                                       fontSize: '0.65rem', 
                                       fontWeight: 800, 
-                                      color: finalColors.text, 
-                                      background: 'rgba(0,0,0,0.04)', 
+                                      color: '#1d1d1f', 
+                                      background: '#ffffff', 
+                                      boxShadow: '0 1px 2px rgba(0,0,0,0.06), 0 0 0 0.5px rgba(0,0,0,0.04)',
+                                      border: '1px solid rgba(0,0,0,0.08)',
                                       padding: '1px 4px', 
-                                      borderRadius: '3px',
+                                      borderRadius: '4px',
                                       whiteSpace: 'nowrap',
                                       display: 'inline-flex',
                                       alignItems: 'center',
@@ -6727,7 +6592,7 @@ export function ScheduleCalendarViewDesktop({
                                           border: 'none',
                                           fontSize: '0.65rem',
                                           fontWeight: 800,
-                                          color: finalColors.text,
+                                          color: '#1d1d1f',
                                           outline: 'none',
                                           padding: 0,
                                           cursor: 'pointer',
@@ -6737,20 +6602,12 @@ export function ScheduleCalendarViewDesktop({
                                         title="Startzeit manuell anpassen"
                                       />
                                       {(() => {
-                                        const roomId = occ.schedules?.room_id || occ.schedule?.room_id || occ.room_id || occ.student?.room_id;
-                                        let rName = roomId ? rooms.find(r => String(r.id) === String(roomId))?.name : '';
-                                        if (!rName) {
-                                          rName = occ.schedules?.room?.name || occ.schedule?.room?.name || occ.room?.name || occ.room_name || occ.raum || (typeof occ.room === 'string' ? occ.room : '');
-                                        }
-                                        if (!rName && selectedRoomIdForXRay) {
-                                          const rObj = rooms.find(r => String(r.id) === String(selectedRoomIdForXRay));
-                                          if (rObj) rName = rObj.name;
-                                        }
-                                        if (!rName && rooms && rooms.length > 0) {
-                                          const rObj = rooms.find(r => r.name?.includes('4')) || rooms[0];
-                                          if (rObj) rName = rObj.name;
-                                        }
-                                        const defaultRoomName = occ.schedules?.room?.name || (occ as any).original_room_name || (occ as any).originalRoomName || (occ.template_room_id ? rooms.find(r => r.id === occ.template_room_id)?.name : null);
+                                        const defaultRoomId = occ.template_room_id || (occ as any).original_room_id || occ.schedules?.room_id;
+                                        const defaultRoomName = occ.schedules?.room?.name || (occ as any).original_room_name || (occ.template_room_id ? rooms.find(r => r.id === occ.template_room_id)?.name : null);
+                                        
+                                        const currentRoomId = occ.room_override_id || occ.room_id || occ.schedules?.room_id;
+                                        const currentRoomName = occ.room_override_name || (currentRoomId ? rooms.find(r => String(r.id) === String(currentRoomId))?.name : '') || occ.schedules?.room?.name || '';
+                                        
                                         const isRoomChanged = Boolean(
                                           occ.room_override_id || 
                                           (occ as any).roomOverrideId || 
@@ -6760,53 +6617,60 @@ export function ScheduleCalendarViewDesktop({
                                           (occ as any).isRoomChanged || 
                                           (occ as any).is_room_booking || 
                                           (occ as any).isRoomBooking || 
-                                          (defaultRoomName && rName && defaultRoomName !== rName) || 
-                                          ((occ as any).original_room_id && occ.room_id && String((occ as any).original_room_id) !== String(occ.room_id))
+                                          (defaultRoomId && currentRoomId && String(defaultRoomId) !== String(currentRoomId)) ||
+                                          (defaultRoomName && currentRoomName && defaultRoomName !== currentRoomName)
                                         );
-                                        const dayRooms = Array.from(new Set(dayOccurrences.map(o => o.room_override_name || o.schedules?.room?.name || (o.template_room_id ? rooms.find(r => r.id === o.template_room_id)?.name : null) || (o.room_id ? rooms.find(r => r.id === o.room_id)?.name : null)).filter(Boolean)));
-                                        const shouldDisplayRoom = isRoomChanged || dayRooms.length > 1;
 
-                                        return shouldDisplayRoom && rName ? (
-                                           <span style={{ 
-                                             fontWeight: isRoomChanged ? 800 : 600, 
-                                             color: isRoomChanged ? '#7c3aed' : '#64748b',
-                                             background: isRoomChanged ? '#f3e8ff' : 'transparent',
-                                             border: isRoomChanged ? '1px solid #ddd6fe' : 'none',
-                                             padding: isRoomChanged ? '0.5px 4px' : '0',
-                                             borderRadius: isRoomChanged ? '4px' : '0',
-                                             fontSize: '0.62rem', 
-                                             whiteSpace: 'nowrap' 
-                                           }} title={isRoomChanged ? `Raum geändert zu ${rName}` : undefined}>
-                                             ({rName})
-                                           </span>
-                                        ) : null;
+                                        if (!isRoomChanged || !currentRoomName) return null;
+
+                                        return (
+                                          <span style={{ 
+                                            fontWeight: 800, 
+                                            color: '#7c3aed',
+                                            background: '#f3e8ff',
+                                            border: '1px solid #ddd6fe',
+                                            padding: '0.5px 4px',
+                                            borderRadius: '4px',
+                                            fontSize: '0.62rem', 
+                                            whiteSpace: 'nowrap' 
+                                          }} title={`Raum geändert zu ${currentRoomName}`}>
+                                            📍 {currentRoomName}
+                                          </span>
+                                        );
                                       })()}
                                     </span>
                                   </div>
 
                                   <div style={{ display: 'flex', alignItems: 'center', gap: '2px', flexShrink: 0 }}>
                                     {isSwap && (
-                                      <span 
+                                      <button 
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setSwapDetailModalOcc(occ);
+                                        }}
                                         style={{ 
-                                          fontSize: '0.56rem',
-                                          fontWeight: 900,
-                                          padding: '1px 4px',
-                                          borderRadius: '3px',
+                                          width: '18px',
+                                          height: '18px',
+                                          padding: 0,
+                                          borderRadius: '4px',
                                           display: 'inline-flex',
                                           alignItems: 'center',
-                                          gap: '2px',
-                                          textTransform: 'uppercase',
-                                          letterSpacing: '0.02em',
+                                          justifyContent: 'center',
                                           background: '#fef08a',
                                           color: '#854d0e',
                                           border: '1px solid #fde047',
-                                          whiteSpace: 'nowrap'
+                                          boxShadow: '0 1px 2px rgba(133,77,14,0.08)',
+                                          cursor: 'pointer',
+                                          flexShrink: 0,
+                                          transition: 'transform 0.15s ease'
                                         }} 
-                                        title={occ.notes || 'Tauschtermin'}
+                                        title="Tausch-Details anzeigen"
+                                        onMouseOver={e => e.currentTarget.style.transform = 'scale(1.1)'}
+                                        onMouseOut={e => e.currentTarget.style.transform = 'scale(1)'}
                                       >
-                                        <ArrowLeftRight size={8} strokeWidth={2.8} />
-                                        <span>Tausch</span>
-                                      </span>
+                                        <ArrowLeftRight size={10} strokeWidth={2.8} />
+                                      </button>
                                     )}
                                     {isParallelConflict && (
                                       <span style={{ 
@@ -6977,7 +6841,7 @@ export function ScheduleCalendarViewDesktop({
 
                                 {/* Tausch & Vertretung Badge */}
                                 {isSelectedForSwap && (
-                                  <div style={{ fontSize: '0.6rem', fontWeight: 900, color: '#1d4ed8', background: '#dbeafe', border: '1px solid #bfdbfe', padding: '1px 5px', borderRadius: '4px', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                  <div style={{ fontSize: '0.6rem', fontWeight: 900, color: '#854d0e', background: '#fef08a', border: '1px solid #fde047', padding: '1px 5px', borderRadius: '4px', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '3px' }}>
                                     <ArrowLeftRight size={9} />
                                     <span>1. Partner</span>
                                   </div>
@@ -7021,10 +6885,12 @@ export function ScheduleCalendarViewDesktop({
                                     <span style={{ 
                                       fontSize: '0.7rem', 
                                       fontWeight: 800, 
-                                      color: finalColors.text, 
-                                      background: 'rgba(0,0,0,0.04)', 
-                                      padding: '2px 4px', 
-                                      borderRadius: '4px',
+                                      color: '#1d1d1f', 
+                                      background: '#ffffff', 
+                                      boxShadow: '0 1px 2px rgba(0,0,0,0.06), 0 0 0 0.5px rgba(0,0,0,0.04)',
+                                      border: '1px solid rgba(0,0,0,0.08)',
+                                      padding: '1.5px 5px', 
+                                      borderRadius: '5px',
                                       display: 'inline-flex',
                                       alignItems: 'center',
                                       gap: '2px'
@@ -7049,7 +6915,7 @@ export function ScheduleCalendarViewDesktop({
                                           border: 'none',
                                           fontSize: '0.7rem',
                                           fontWeight: 800,
-                                          color: finalColors.text,
+                                          color: '#1d1d1f',
                                           outline: 'none',
                                           padding: 0,
                                           cursor: 'pointer',
@@ -7059,52 +6925,89 @@ export function ScheduleCalendarViewDesktop({
                                         title="Startzeit manuell anpassen"
                                       />
                                       {(() => {
-                                        const roomId = occ.schedules?.room_id;
-                                        const rName = roomId ? rooms.find(r => r.id === roomId)?.name : (occ.schedules?.room?.name || '');
-                                        return rName ? (
-                                          <span style={{ marginLeft: '3px', fontWeight: 600, opacity: 0.7, fontSize: '0.65rem' }}>
-                                            ({rName})
+                                        const defaultRoomId = occ.template_room_id || (occ as any).original_room_id || occ.schedules?.room_id;
+                                        const defaultRoomName = occ.schedules?.room?.name || (occ as any).original_room_name || (occ.template_room_id ? rooms.find(r => r.id === occ.template_room_id)?.name : null);
+                                        
+                                        const currentRoomId = occ.room_override_id || occ.room_id || occ.schedules?.room_id;
+                                        const currentRoomName = occ.room_override_name || (currentRoomId ? rooms.find(r => String(r.id) === String(currentRoomId))?.name : '') || occ.schedules?.room?.name || '';
+                                        
+                                        const isRoomChanged = Boolean(
+                                          occ.room_override_id || 
+                                          (occ as any).roomOverrideId || 
+                                          occ.room_override_name || 
+                                          (occ as any).roomOverrideName || 
+                                          (occ as any).is_room_changed || 
+                                          (occ as any).isRoomChanged || 
+                                          (occ as any).is_room_booking || 
+                                          (occ as any).isRoomBooking || 
+                                          (defaultRoomId && currentRoomId && String(defaultRoomId) !== String(currentRoomId)) ||
+                                          (defaultRoomName && currentRoomName && defaultRoomName !== currentRoomName)
+                                        );
+
+                                        if (!isRoomChanged || !currentRoomName) return null;
+
+                                        return (
+                                          <span style={{ 
+                                            marginLeft: '3px', 
+                                            fontWeight: 800, 
+                                            color: '#7c3aed',
+                                            background: '#f3e8ff',
+                                            border: '1px solid #ddd6fe',
+                                            padding: '0.5px 4px',
+                                            borderRadius: '4px',
+                                            fontSize: '0.65rem', 
+                                            whiteSpace: 'nowrap' 
+                                          }} title={`Raum geändert zu ${currentRoomName}`}>
+                                            📍 {currentRoomName}
                                           </span>
-                                       ) : null;
+                                        );
                                       })()}
                                     </span>
                                   </div>
 
-                                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px', flexShrink: 0 }}>
+                                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '3px', flexWrap: 'wrap', maxWidth: '65%', flexShrink: 0 }}>
                                     {isSwap && (
-                                      <span 
+                                      <button 
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setSwapDetailModalOcc(occ);
+                                        }}
                                         style={{ 
-                                          fontSize: '0.56rem',
-                                          fontWeight: 900,
-                                          padding: '1px 4px',
-                                          borderRadius: '3px',
+                                          width: '20px',
+                                          height: '20px',
+                                          padding: 0,
+                                          borderRadius: '5px',
                                           display: 'inline-flex',
                                           alignItems: 'center',
-                                          gap: '2px',
-                                          textTransform: 'uppercase',
-                                          letterSpacing: '0.02em',
+                                          justifyContent: 'center',
                                           background: '#fef08a',
                                           color: '#854d0e',
                                           border: '1px solid #fde047',
-                                          whiteSpace: 'nowrap'
+                                          boxShadow: '0 1px 2px rgba(133,77,14,0.08)',
+                                          cursor: 'pointer',
+                                          flexShrink: 0,
+                                          transition: 'transform 0.15s ease'
                                         }} 
-                                        title={occ.notes || 'Tauschtermin'}
+                                        title="Tausch-Details anzeigen"
+                                        onMouseOver={e => e.currentTarget.style.transform = 'scale(1.1)'}
+                                        onMouseOut={e => e.currentTarget.style.transform = 'scale(1)'}
                                       >
-                                        ⇄ Tausch
-                                      </span>
+                                        <ArrowLeftRight size={11} strokeWidth={2.8} />
+                                      </button>
                                     )}
                                     {isSelectedForSwap && (
                                       <span style={{ 
                                         fontSize: '0.58rem', 
                                         fontWeight: 900, 
-                                        color: '#1d4ed8', 
-                                        background: '#dbeafe', 
+                                        color: '#854d0e', 
+                                        background: '#fef08a', 
                                         padding: '1px 5px', 
                                         borderRadius: '4px', 
                                         display: 'inline-flex', 
                                         alignItems: 'center', 
                                         gap: '2px', 
-                                        border: '1px solid #bfdbfe',
+                                        border: '1px solid #fde047',
                                         flexShrink: 0
                                       }}>
                                         <ArrowLeftRight size={9} />
@@ -7153,11 +7056,6 @@ export function ScheduleCalendarViewDesktop({
                                             style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#34a853', display: 'inline-block', boxShadow: '0 0 0 1px rgba(255,255,255,0.8)', flexShrink: 0 }} 
                                           />
                                         )}
-                                      </span>
-                                    )}
-                                    {hasProtocol && (
-                                      <span style={{ fontSize: '0.58rem', fontWeight: 800, color: '#1b4332', background: '#d8f3dc', padding: '1px 4px', borderRadius: '3px', display: 'inline-flex', alignItems: 'center', gap: '2px', border: '1px solid rgba(40,167,69,0.15)' }}>
-                                        📝 Protokoll
                                       </span>
                                     )}
                                     {(isRescheduled || isResetPending) && (() => {
@@ -7239,14 +7137,14 @@ export function ScheduleCalendarViewDesktop({
                                   </div>
                                 </div>
 
-                                <div style={{ display: 'flex', flexDirection: 'column', width: '100%', marginBottom: '2px' }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', width: '100%', minHeight: '18px', flexShrink: 0, marginBottom: '2px' }}>
                                   <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', fontWeight: 800, color: finalColors.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%' }}>
                                     {isGroupLesson && (
                                       <Users size={12} style={{ color: finalColors.text, opacity: 0.85, flexShrink: 0 }} />
                                     )}
-                                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{displayNames}</span>
+                                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', flexShrink: 1 }}>{displayNames}</span>
                                     {isBreak && (
-                                      <span style={{ fontSize: '0.65rem', fontWeight: 600, opacity: 0.6 }}> • {occ.duration || 15} Min</span>
+                                      <span style={{ fontSize: '0.65rem', fontWeight: 600, opacity: 0.6, flexShrink: 0 }}> • {occ.duration || 15} Min</span>
                                     )}
                                   </div>
                                 </div>
@@ -7275,8 +7173,10 @@ return (
                                   <span style={{ 
                                     fontSize: '0.75rem', 
                                     fontWeight: 800, 
-                                    color: finalColors.text, 
-                                    background: 'rgba(0,0,0,0.05)', 
+                                    color: '#1d1d1f', 
+                                    background: '#ffffff', 
+                                    boxShadow: '0 1px 2px rgba(0,0,0,0.06), 0 0 0 0.5px rgba(0,0,0,0.04)',
+                                    border: '1px solid rgba(0,0,0,0.08)',
                                     padding: '2px 6px', 
                                     borderRadius: '5px',
                                     display: 'inline-flex',
@@ -7302,7 +7202,7 @@ return (
                                         border: 'none',
                                         fontSize: '0.75rem',
                                         fontWeight: 800,
-                                        color: finalColors.text,
+                                        color: '#1d1d1f',
                                         outline: 'none',
                                         padding: 0,
                                         cursor: 'pointer',
@@ -7312,15 +7212,74 @@ return (
                                       title="Startzeit manuell anpassen"
                                     />
                                     {(() => {
-                                      const roomId = occ.schedules?.room_id;
-                                      const rName = roomId ? rooms.find(r => r.id === roomId)?.name : (occ.schedules?.room?.name || '');
-                                      return rName ? (
-                                        <span style={{ marginLeft: '4px', fontWeight: 600, opacity: 0.7, fontSize: '0.68rem' }}>
-                                          ({rName})
+                                      const defaultRoomId = occ.template_room_id || (occ as any).original_room_id || occ.schedules?.room_id;
+                                      const defaultRoomName = occ.schedules?.room?.name || (occ as any).original_room_name || (occ.template_room_id ? rooms.find(r => r.id === occ.template_room_id)?.name : null);
+                                      
+                                      const currentRoomId = occ.room_override_id || occ.room_id || occ.schedules?.room_id;
+                                      const currentRoomName = occ.room_override_name || (currentRoomId ? rooms.find(r => String(r.id) === String(currentRoomId))?.name : '') || occ.schedules?.room?.name || '';
+                                      
+                                      const isRoomChanged = Boolean(
+                                        occ.room_override_id || 
+                                        (occ as any).roomOverrideId || 
+                                        occ.room_override_name || 
+                                        (occ as any).roomOverrideName || 
+                                        (occ as any).is_room_changed || 
+                                        (occ as any).isRoomChanged || 
+                                        (occ as any).is_room_booking || 
+                                        (occ as any).isRoomBooking || 
+                                        (defaultRoomId && currentRoomId && String(defaultRoomId) !== String(currentRoomId)) ||
+                                        (defaultRoomName && currentRoomName && defaultRoomName !== currentRoomName)
+                                      );
+
+                                      if (!isRoomChanged || !currentRoomName) return null;
+
+                                      return (
+                                        <span style={{ 
+                                          marginLeft: '4px', 
+                                          fontWeight: 800, 
+                                          color: '#7c3aed',
+                                          background: '#f3e8ff',
+                                          border: '1px solid #ddd6fe',
+                                          padding: '1px 5px',
+                                          borderRadius: '4px',
+                                          fontSize: '0.68rem', 
+                                          whiteSpace: 'nowrap' 
+                                        }} title={`Raum geändert zu ${currentRoomName}`}>
+                                          📍 {currentRoomName}
                                         </span>
-                                      ) : null;
+                                      );
                                     })()}
                                   </span>
+                                  {isSwap && (
+                                    <button 
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setSwapDetailModalOcc(occ);
+                                      }}
+                                      style={{ 
+                                        width: '22px',
+                                        height: '22px',
+                                        padding: 0,
+                                        borderRadius: '5px',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        background: '#fef08a',
+                                        color: '#854d0e',
+                                        border: '1px solid #fde047',
+                                        boxShadow: '0 1px 2px rgba(133,77,14,0.08)',
+                                        cursor: 'pointer',
+                                        flexShrink: 0,
+                                        transition: 'transform 0.15s ease'
+                                      }} 
+                                      title="Tausch-Details anzeigen"
+                                      onMouseOver={e => e.currentTarget.style.transform = 'scale(1.1)'}
+                                      onMouseOut={e => e.currentTarget.style.transform = 'scale(1)'}
+                                    >
+                                      <ArrowLeftRight size={12} strokeWidth={2.8} />
+                                    </button>
+                                  )}
                                   {isGroup && (
                                     <Users size={13} style={{ color: finalColors.text, opacity: 0.7 }} />
                                   )}
@@ -7342,11 +7301,6 @@ return (
                                   {isCancelled && !isExcused && !isUnexcused && (
                                     <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#991b1b', background: '#fee2e2', padding: '1px 5px', borderRadius: '4px', textTransform: 'uppercase', letterSpacing: '0.02em', border: '1px solid rgba(239,68,68,0.15)' }}>
                                       Abgesagt
-                                    </span>
-                                  )}
-                                  {hasProtocol && (
-                                    <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#1b4332', background: '#d8f3dc', padding: '1px 5px', borderRadius: '4px', display: 'inline-flex', alignItems: 'center', gap: '2px', border: '1px solid rgba(40,167,69,0.15)' }}>
-                                      📝 Protokoll
                                     </span>
                                   )}
                                   {(() => {
@@ -8846,7 +8800,7 @@ return (
               <div style={{ fontSize: '2.5rem' }}>🔀</div>
               <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, color: '#1d1d1f' }}>Termine zusammenführen oder tauschen?</h3>
               <p style={{ margin: 0, fontSize: '0.9rem', color: '#515154', lineHeight: 1.5 }}>
-                Du hast den Termin von <strong>{srcName}</strong> auf den Termin von <strong>{tgtName}</strong> gezogen. Was möchtest du tun?
+                Du hast die Termine von <strong>{srcName}</strong> und <strong>{tgtName}</strong> ausgewählt. Was möchtest du tun?
               </p>
               
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', width: '100%', marginTop: '8px' }}>
@@ -8960,8 +8914,265 @@ return (
           </div>
         );
       })()}
-      
 
+      {/* Swap Detail Modal */}
+      {swapDetailModalOcc && (() => {
+        const occ = swapDetailModalOcc;
+        const s1Name = `${occ.student?.first_name || ''} ${maskLastName(occ.student?.last_name || '', showRealNames)}`.trim() || 'Schüler';
+        const s1Instrument = occ.student?.instrument || (occ as any).instrument || '';
+        
+        // Find partner information
+        let partnerOcc: ScheduleOccurrence | null = null;
+        const link = swapLinks.find(l => l.id1 === occ.id || l.id2 === occ.id);
+        if (link) {
+          const partnerId = link.id1 === occ.id ? link.id2 : link.id1;
+          partnerOcc = occurrences.find(o => o.id === partnerId) || null;
+        }
+        if (!partnerOcc) {
+          partnerOcc = occurrences.find(o => 
+            o.id !== occ.id && 
+            o.is_swap && 
+            (
+              (occ.original_date && occ.original_start_time && o.date === occ.original_date && o.start_time?.substring(0, 5) === occ.original_start_time?.substring(0, 5)) ||
+              (o.notes && occ.student?.first_name && o.notes.includes(occ.student.first_name))
+            )
+          ) || null;
+        }
+
+        let partnerName = partnerOcc 
+          ? `${partnerOcc.student?.first_name || ''} ${maskLastName(partnerOcc.student?.last_name || '', showRealNames)}`.trim() 
+          : '';
+        if (!partnerName && occ.notes) {
+          const match = occ.notes.match(/Getauscht mit (.+)/i);
+          if (match && match[1]) partnerName = match[1].trim();
+        }
+        if (!partnerName) partnerName = 'Tauschpartner';
+
+        const partnerInstrument = partnerOcc?.student?.instrument || (partnerOcc as any)?.instrument || '';
+
+        const origDateStr = occ.original_date ? new Date(`${occ.original_date}T00:00:00`).toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' }) : 'Ursprünglich';
+        const origTimeStr = occ.original_start_time ? occ.original_start_time.substring(0, 5) : '';
+        const curDateStr = occ.date ? new Date(`${occ.date}T00:00:00`).toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' }) : '';
+        const curTimeStr = occ.start_time ? occ.start_time.substring(0, 5) : '';
+
+        const partnerOrigDateStr = partnerOcc?.original_date ? new Date(`${partnerOcc.original_date}T00:00:00`).toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' }) : (occ.date ? new Date(`${occ.date}T00:00:00`).toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' }) : '');
+        const partnerOrigTimeStr = partnerOcc?.original_start_time ? partnerOcc.original_start_time.substring(0, 5) : occ.start_time?.substring(0, 5);
+        const partnerCurDateStr = partnerOcc?.date ? new Date(`${partnerOcc.date}T00:00:00`).toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' }) : origDateStr;
+        const partnerCurTimeStr = partnerOcc?.start_time ? partnerOcc.start_time.substring(0, 5) : origTimeStr;
+
+        return (
+          <div 
+            onClick={() => setSwapDetailModalOcc(null)}
+            style={{ 
+              position: 'fixed', 
+              top: 0, 
+              left: 0, 
+              right: 0, 
+              bottom: 0, 
+              background: 'rgba(0,0,0,0.4)', 
+              backdropFilter: 'blur(8px)', 
+              zIndex: 100000, 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center'
+            }}
+          >
+            <div 
+              onClick={(e) => e.stopPropagation()}
+              style={{ 
+                background: '#ffffff', 
+                borderRadius: '24px', 
+                boxShadow: '0 24px 60px rgba(0,0,0,0.18), 0 0 0 1px rgba(0,0,0,0.06)', 
+                width: '460px', 
+                maxWidth: '92vw', 
+                padding: '28px',
+                display: 'flex', 
+                flexDirection: 'column',
+                gap: '20px', 
+                boxSizing: 'border-box' 
+              }}
+            >
+              {/* Header */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <div style={{ 
+                    width: '38px', 
+                    height: '38px', 
+                    borderRadius: '12px', 
+                    background: '#fef9c3', 
+                    border: '1px solid #fde047',
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center',
+                    color: '#854d0e'
+                  }}>
+                    <ArrowLeftRight size={20} strokeWidth={2.5} />
+                  </div>
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#1d1d1f' }}>Termintausch Details</h3>
+                    <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748b' }}>Zwei Schüler haben ihre Unterrichtszeiten getauscht</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSwapDetailModalOcc(null)}
+                  style={{
+                    background: 'rgba(0,0,0,0.05)',
+                    border: 'none',
+                    borderRadius: '50%',
+                    width: '28px',
+                    height: '28px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    color: '#64748b'
+                  }}
+                >
+                  <X size={15} />
+                </button>
+              </div>
+
+              {/* Comparison Cards */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {/* Schüler 1 */}
+                <div style={{ 
+                  background: '#f8fafc', 
+                  border: '1px solid #e2e8f0', 
+                  borderRadius: '14px', 
+                  padding: '14px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '6px'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{ fontSize: '0.92rem', fontWeight: 800, color: '#1e293b' }}>{s1Name}</span>
+                      {s1Instrument && (
+                        <span style={{ fontSize: '0.7rem', fontWeight: 600, color: '#64748b', background: '#e2e8f0', padding: '1px 6px', borderRadius: '4px' }}>
+                          {s1Instrument}
+                        </span>
+                      )}
+                    </div>
+                    <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#854d0e', background: '#fef9c3', padding: '2px 8px', borderRadius: '6px', border: '1px solid #fde047' }}>
+                      Gewählter Termin
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '0.8rem', color: '#334155' }}>
+                    <div>
+                      <span style={{ color: '#64748b', fontSize: '0.72rem' }}>Neuer Termin: </span>
+                      <strong>{curDateStr}, {curTimeStr} Uhr</strong>
+                    </div>
+                    {origTimeStr && (
+                      <div style={{ opacity: 0.7 }}>
+                        <span style={{ color: '#64748b', fontSize: '0.72rem' }}>Vorher: </span>
+                        <span>{origDateStr}, {origTimeStr} Uhr</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Arrow Divider */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', margin: '-4px 0' }}>
+                  <div style={{ height: '1px', flex: 1, background: '#e2e8f0' }} />
+                  <div style={{ 
+                    width: '24px', 
+                    height: '24px', 
+                    borderRadius: '50%', 
+                    background: '#eab308', 
+                    color: '#ffffff',
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center',
+                    boxShadow: '0 2px 6px rgba(234, 179, 8, 0.3)'
+                  }}>
+                    <ArrowLeftRight size={12} strokeWidth={2.6} />
+                  </div>
+                  <div style={{ height: '1px', flex: 1, background: '#e2e8f0' }} />
+                </div>
+
+                {/* Schüler 2 (Partner) */}
+                <div style={{ 
+                  background: '#f8fafc', 
+                  border: '1px solid #e2e8f0', 
+                  borderRadius: '14px', 
+                  padding: '14px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '6px'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{ fontSize: '0.92rem', fontWeight: 800, color: '#1e293b' }}>{partnerName}</span>
+                      {partnerInstrument && (
+                        <span style={{ fontSize: '0.7rem', fontWeight: 600, color: '#64748b', background: '#e2e8f0', padding: '1px 6px', borderRadius: '4px' }}>
+                          {partnerInstrument}
+                        </span>
+                      )}
+                    </div>
+                    <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#854d0e', background: '#fef9c3', padding: '2px 8px', borderRadius: '6px', border: '1px solid #fde047' }}>
+                      Getauschter Partner
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '0.8rem', color: '#334155' }}>
+                    <div>
+                      <span style={{ color: '#64748b', fontSize: '0.72rem' }}>Neuer Termin: </span>
+                      <strong>{partnerCurDateStr}, {partnerCurTimeStr} Uhr</strong>
+                    </div>
+                    {partnerOrigTimeStr && (
+                      <div style={{ opacity: 0.7 }}>
+                        <span style={{ color: '#64748b', fontSize: '0.72rem' }}>Vorher: </span>
+                        <span>{partnerOrigDateStr}, {partnerOrigTimeStr} Uhr</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Note / Memo */}
+              {occ.notes && (
+                <div style={{ 
+                  background: '#fffbeb', 
+                  border: '1px solid #fef3c7', 
+                  borderRadius: '10px', 
+                  padding: '10px 12px', 
+                  fontSize: '0.76rem', 
+                  color: '#92400e',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}>
+                  <span>📝</span>
+                  <span>{occ.notes}</span>
+                </div>
+              )}
+
+              {/* Action Button */}
+              <button
+                type="button"
+                onClick={() => setSwapDetailModalOcc(null)}
+                style={{
+                  width: '100%',
+                  padding: '11px 20px',
+                  borderRadius: '12px',
+                  border: 'none',
+                  background: '#1d1d1f',
+                  color: '#ffffff',
+                  fontSize: '0.88rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
+                }}
+                onMouseOver={e => e.currentTarget.style.filter = 'brightness(1.2)'}
+                onMouseOut={e => e.currentTarget.style.filter = 'none'}
+              >
+                Schließen
+              </button>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Floating Save Actions Bar at the bottom of the screen */}
       {Object.keys(pendingChanges).length > 0 && (

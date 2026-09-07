@@ -928,20 +928,21 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
       const currentStored = localStorage.getItem('campus_share_pin_current');
       if (currentStored && /^\d{4}$/.test(currentStored)) return currentStored;
 
-      // Deterministic 4-digit code based on ID string
-      let hash = 4829;
-      const key = (id && id !== 'anonymous_student') ? id : 'campus_talent_default';
-      for (let i = 0; i < key.length; i++) {
-        hash = ((hash << 5) - hash) + key.charCodeAt(i);
-        hash |= 0;
+      // Cryptographically random 4-digit PIN (Zero-Knowledge, non-derivable)
+      let randomPin = '4829';
+      if (typeof window !== 'undefined' && window.crypto && window.crypto.getRandomValues) {
+        const randomValues = new Uint32Array(1);
+        window.crypto.getRandomValues(randomValues);
+        randomPin = (1000 + (randomValues[0] % 9000)).toString();
+      } else {
+        randomPin = Math.floor(1000 + Math.random() * 9000).toString();
       }
-      const derivedPin = (Math.abs(hash) % 9000 + 1000).toString();
       
       // Save permanently to prevent unwanted re-rolling
-      localStorage.setItem(`campus_share_pin_${id}`, derivedPin);
-      localStorage.setItem('campus_share_pin_current', derivedPin);
-      localStorage.setItem('campus_share_pin_global', derivedPin);
-      return derivedPin;
+      localStorage.setItem(`campus_share_pin_${id}`, randomPin);
+      localStorage.setItem('campus_share_pin_current', randomPin);
+      localStorage.setItem('campus_share_pin_global', randomPin);
+      return randomPin;
     } catch {
       return '4829';
     }
