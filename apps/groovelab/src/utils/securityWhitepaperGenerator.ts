@@ -64,7 +64,7 @@ export async function generateEnterpriseSecurityWhitepaperPDF(): Promise<void> {
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8.5);
     doc.setTextColor(textGray[0], textGray[1], textGray[2]);
-    const summaryText = 'Campus-Groovelab erfüllt die höchsten europäischen Standards für Kinderschutz und Datensicherheit (BSI IT-Grundschutz, ISO/IEC 27001, DSGVO Art. 25/32 und COPPA). Durch die konsequente Zero-Knowledge- und Zero-Mail-Architektur werden auf der Plattform keine Schüler-E-Mails, Passwörter oder Zahlungsdaten gespeichert.';
+    const summaryText = 'Campus-Groovelab erfüllt die höchsten europäischen Standards für Kinderschutz und Datensicherheit (BSI IT-Grundschutz, ISO/IEC 27001, DSGVO Art. 25/32 und COPPA). Als unterstützendes Convenience-Werkzeug („Fast-Track“) zur didaktischen Unterrichtsbegleitung schützt die Plattform durch Zero-Knowledge- und Zero-Mail-Architektur vor Datenlecks: Keine Speicherung von Schüler-E-Mails, Passwörtern oder Bankdaten.';
     const splitSummary = doc.splitTextToSize(summaryText, contentWidth - 12);
     doc.text(splitSummary, margin + 6, 58);
 
@@ -202,7 +202,7 @@ export async function generateEnterpriseSecurityWhitepaperPDF(): Promise<void> {
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8);
     doc.setTextColor(textGray[0], textGray[1], textGray[2]);
-    const hostText = 'Vollständige Konformität für Städte, Gemeinden und Schulämter: VVT-Muster nach Art. 30 DSGVO, formelle DSFA-Schwellwertprüfung nach Art. 35 DSGVO (kein hohes Risiko) und sichere BYOD-Nutzung für Lehrkräfte ohne lokale Datenspeicherung. 100% deutsches Hosting in ISO 27001 Rechenzentren (Hetzner Falkenstein).';
+    const hostText = 'Vollständige Konformität für Städte, Gemeinden und Schulämter: Subsidiaritäts-Doktrin (Fast-Track-Werkzeug, offizielle Dienstwege bleiben beim Träger), VVT-Muster nach Art. 30 DSGVO, formelle DSFA-Schwellwertprüfung nach Art. 35 DSGVO (kein hohes Risiko), BYOD-Schutz für Lehrkräfte sowie 100% deutsches ISO 27001 Cloud-Hosting (Hetzner Falkenstein/Nürnberg).';
     const splitHost = doc.splitTextToSize(hostText, contentWidth - 12);
     doc.text(splitHost, margin + 6, curY + 15);
 

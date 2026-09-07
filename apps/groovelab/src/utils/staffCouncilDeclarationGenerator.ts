@@ -91,7 +91,7 @@ export async function generateStaffCouncilDeclarationPDF(options: StaffCouncilDe
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8);
     doc.setTextColor(textGray[0], textGray[1], textGray[2]);
-    const summaryText = 'Die Schulmanagement- und Übe-Plattform Campus-Groovelab wurde nach dem Grundsatz der „digitalen Kreidetafel“ konzipiert. Sie dient ausschließlich als pädagogisch-didaktisches Hilfsmittel zur Unterrichtsbegleitung. Die Plattform enthält keinerlei Überwachungsfunktionen, Tracking-Mechanismen oder automatisierte Bewertungslogiken für Lehrkräfte und schützt Honorarkräfte vor Scheinselbstständigkeitsrisiken.';
+    const summaryText = 'Die Schulmanagement- und Übe-Plattform Campus-Groovelab wurde nach der Subsidiaritäts-Doktrin und dem Grundsatz der „digitalen Kreidetafel“ konzipiert: Sie dient als rein freiwilliges, unterstützendes Convenience-Werkzeug („Fast-Track“) zur Unterrichtsbegleitung und ersetzt weder städtische ERP-Systeme noch offizielle Dienstwege. Die Plattform enthält keinerlei Überwachungsfunktionen für Lehrkräfte und schützt Honorarkräfte durch volle Übermittlungsfreiheit vor Scheinselbstständigkeitsrisiken.';
     const splitSummary = doc.splitTextToSize(summaryText, contentWidth - 10);
     doc.text(splitSummary, margin + 5, 55);
 
@@ -148,22 +148,22 @@ export async function generateStaffCouncilDeclarationPDF(options: StaffCouncilDe
 
     const section2Points = [
       {
-        title: 'A. Reine Dispositionsvorschläge ohne Weisungscharakter',
-        desc: 'Stundenplan-, Raum- und Terminbelegungsfunktionen stellen rechtlich unverbindliche didaktische Dispositionsvorschläge dar. Sie begründen keine arbeitsrechtliche Weisungsbefugnis und keine Einbindung in den arbeitsteiligen Apparat der Musikschule.'
+        title: 'A. Reine Dispositionsvorschläge, Übermittlungsfreiheit & Weisungsfreiheit',
+        desc: 'Stundenplan-, Raum- und Terminbelegungsfunktionen stellen rechtlich unverbindliche didaktische Dispositionsvorschläge dar. Lehrkräften (insbesondere freien Honorarkräften) steht es vollkommen frei, Termine und Raumwünsche digital über Campus-Groovelab oder herkömmlich (per E-Mail, Telefon oder Zettel) an die Verwaltung zu übermitteln. Es besteht kein Nutzungszwang und keine arbeitsteilige Einbindung in den städtischen Weisungsapparat.'
       },
       {
-        title: 'B. Recht auf Nichterreichbarkeit & freie Zeiteinteilung (§ 5 ArbSchG)',
-        desc: 'Lehrkräfte können Mitteilungen und Chats jederzeit deaktivieren. Es besteht keine vertragliche oder technische Pflicht zur Nutzung außerhalb vereinbarter Unterrichtsstunden. Freiwillige Vertretungs- oder Raumabsprachen erfolgen weisungsfrei.'
+        title: 'B. Subsidiaritäts-Doktrin, Nichterreichbarkeit & Zeiteinteilung (§ 5 ArbSchG)',
+        desc: 'Campus-Groovelab fungiert als rein unterstützendes Beschleunigungs- und Convenience-Werkzeug. Amtliche Arbeitsanweisungen verbleiben auf den städtischen Primärkanälen (E-Mail, MS Teams, Post). Lehrkräfte können Mitteilungen und Chats jederzeit deaktivieren; es besteht keine Pflicht zur Nutzung außerhalb vereinbarter Unterrichtsstunden.'
       }
     ];
 
     curY += 6;
     section2Points.forEach((p) => {
       doc.setFillColor(lightBg[0], lightBg[1], lightBg[2]);
-      doc.roundedRect(margin, curY, contentWidth, 21, 2, 2, 'F');
+      doc.roundedRect(margin, curY, contentWidth, 23, 2, 2, 'F');
       doc.setDrawColor(borderGray[0], borderGray[1], borderGray[2]);
       doc.setLineWidth(0.3);
-      doc.roundedRect(margin, curY, contentWidth, 21, 2, 2, 'S');
+      doc.roundedRect(margin, curY, contentWidth, 23, 2, 2, 'S');
 
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(8.8);
@@ -176,7 +176,7 @@ export async function generateStaffCouncilDeclarationPDF(options: StaffCouncilDe
       const splitP = doc.splitTextToSize(p.desc, contentWidth - 8);
       doc.text(splitP, margin + 4, curY + 11.5);
 
-      curY += 25;
+      curY += 27;
     });
 
     // Page 1 Footer
@@ -265,7 +265,7 @@ export async function generateStaffCouncilDeclarationPDF(options: StaffCouncilDe
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7.8);
     doc.setTextColor(textGray[0], textGray[1], textGray[2]);
-    const sealText = 'Der Betreiber bestätigt hiermit ausdrücklich, dass der Einsatz von Campus-Groovelab den Erfordernissen des Personalvertretungsrechts (§ 87 Abs. 1 Nr. 6 BetrVG, LPVG der Länder, BPersVG) sowie den Anforderungen der DSGVO (Art. 5, 28, 32) und des § 26 BDSG vollumfänglich entspricht. Das vorliegende Attest kann von der Schulleitung direkt der Personalvertretung (Personalrat, Betriebsrat, Lehrerrat) zur Genehmigung bzw. Kenntnisnahme vorgelegt werden.';
+    const sealText = 'Der Betreiber bestätigt hiermit ausdrücklich, dass der Einsatz von Campus-Groovelab den Erfordernissen des Personalvertretungsrechts (§ 87 Abs. 1 Nr. 6 BetrVG, LPVG der Länder, BPersVG) sowie den Anforderungen der DSGVO (Art. 5, 28, 32) und des § 26 BDSG vollumfänglich entspricht. Als rein unterstützendes, weisungsfreies Beschleunigungswerkzeug wahrt die Plattform die Autonomie von Honorarkräften (BSG B 12 R 3/20 R). Das vorliegende Attest kann von der Schulleitung direkt der Personalvertretung (Personalrat, Betriebsrat, Lehrerrat) zur Genehmigung bzw. Kenntnisnahme vorgelegt werden.';
     const splitSeal = doc.splitTextToSize(sealText, contentWidth - 12);
     doc.text(splitSeal, margin + 6, curY + 15);
 

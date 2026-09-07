@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { X, ShieldCheck, FileText, Building, Undo2 } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { X, ShieldCheck, FileText, Building, Undo2, Scale, Printer } from 'lucide-react';
 import { useMasterPricing } from '../context/MasterPricingContext';
 
 interface LegalTextModalProps {
@@ -15,200 +15,275 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
 }) => {
   const masterPricing = useMasterPricing();
   const [activeTab, setActiveTab] = useState<'impressum' | 'privacy' | 'terms' | 'cancellation'>(initialTab);
+  const contentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (isOpen) {
       setActiveTab(initialTab);
+      if (contentRef.current) {
+        contentRef.current.scrollTop = 0;
+      }
     }
   }, [isOpen, initialTab]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isOpen) {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
+  const handleTabChange = (tab: 'impressum' | 'privacy' | 'terms' | 'cancellation') => {
+    setActiveTab(tab);
+    if (contentRef.current) {
+      contentRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
 
   if (!isOpen) return null;
 
   return (
-    <div style={{
-      position: 'fixed',
-      inset: 0,
-      zIndex: 9999,
-      background: 'rgba(15, 23, 42, 0.75)',
-      backdropFilter: 'blur(10px)',
-      WebkitBackdropFilter: 'blur(10px)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: '16px'
-    }}>
-      <div style={{
-        background: '#ffffff',
-        width: '100%',
-        maxWidth: '820px',
-        maxHeight: '90vh',
-        borderRadius: '28px',
-        boxShadow: '0 30px 70px rgba(15, 23, 42, 0.3)',
-        display: 'flex',
-        flexDirection: 'column',
-        overflow: 'hidden',
-        border: '1.5px solid #cbd5e1'
-      }}>
-        {/* Header */}
-        <div style={{
-          padding: '20px 28px',
-          borderBottom: '1px solid #e2e8f0',
+    <>
+      <style>{`
+        @keyframes appleModalIn {
+          from {
+            opacity: 0;
+            transform: scale(0.97) translateY(8px);
+          }
+          to {
+            opacity: 1;
+            transform: scale(1) translateY(0);
+          }
+        }
+        .apple-custom-scrollbar::-webkit-scrollbar {
+          width: 6px;
+        }
+        .apple-custom-scrollbar::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .apple-custom-scrollbar::-webkit-scrollbar-thumb {
+          background: rgba(15, 23, 42, 0.14);
+          border-radius: 10px;
+        }
+        .apple-custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: rgba(15, 23, 42, 0.25);
+        }
+        @media print {
+          @page {
+            size: A4 portrait;
+            margin: 15mm;
+          }
+          html, body, * {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+          header, nav, aside, footer, .tour-step-backdrop, button, .no-print {
+            display: none !important;
+          }
+          .apple-legal-backdrop {
+            position: static !important;
+            background: #ffffff !important;
+            backdrop-filter: none !important;
+            -webkit-backdrop-filter: none !important;
+            padding: 0 !important;
+            z-index: auto !important;
+            display: block !important;
+          }
+          .apple-legal-window {
+            box-shadow: none !important;
+            border: none !important;
+            max-width: 100% !important;
+            max-height: none !important;
+            overflow: visible !important;
+            border-radius: 0 !important;
+          }
+        }
+      `}</style>
+      <div 
+        className="apple-legal-backdrop"
+        style={{
+          position: 'fixed',
+          inset: 0,
+          zIndex: 99999,
+          background: 'rgba(15, 23, 42, 0.45)',
+          backdropFilter: 'blur(24px) saturate(180%)',
+          WebkitBackdropFilter: 'blur(24px) saturate(180%)',
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'space-between',
-          background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)'
-        }}>
-          <div>
-            <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 900, color: '#0f172a' }}>
-              Rechtliche Hinweise – Campus-Groovelab
-            </h3>
-            <p style={{ margin: '2px 0 0 0', fontSize: '0.78rem', color: '#64748b', fontWeight: 500 }}>
-              Offizielle Dokumente & Compliance für Deutschland, Österreich und die Schweiz
-            </p>
+          justifyContent: 'center',
+          padding: '24px 16px'
+        }}
+        onClick={(e) => {
+          if (e.target === e.currentTarget) onClose();
+        }}
+      >
+        <div 
+          className="apple-legal-window"
+          style={{
+            background: '#ffffff',
+            width: '100%',
+            maxWidth: '860px',
+            maxHeight: 'min(90vh, 840px)',
+            height: '840px',
+            borderRadius: '26px',
+            boxShadow: '0 32px 80px -16px rgba(15, 23, 42, 0.28), 0 0 0 1px rgba(15, 23, 42, 0.08)',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+            fontFamily: "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+            animation: 'appleModalIn 0.22s cubic-bezier(0.16, 1, 0.3, 1)'
+          }}
+        >
+          {/* Apple HIG Titlebar / Header */}
+          <div style={{
+            padding: '18px 28px',
+            borderBottom: '1px solid rgba(226, 232, 240, 0.8)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)',
+            flexShrink: 0
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+              <div style={{
+                width: '40px',
+                height: '40px',
+                borderRadius: '12px',
+                background: '#0f172a',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#ffffff',
+                boxShadow: '0 4px 12px rgba(15, 23, 42, 0.15)',
+                flexShrink: 0
+              }}>
+                <Scale size={20} />
+              </div>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                  <h3 style={{ margin: 0, fontSize: '1.14rem', fontWeight: 850, color: '#0f172a', letterSpacing: '-0.02em' }}>
+                    Rechtliche Hinweise – Campus-Groovelab
+                  </h3>
+                  <span style={{
+                    background: '#f1f5f9',
+                    color: '#475569',
+                    border: '1px solid #e2e8f0',
+                    padding: '2px 8px',
+                    borderRadius: '100px',
+                    fontSize: '0.66rem',
+                    fontWeight: 750,
+                    letterSpacing: '0.02em'
+                  }}>
+                    DACH • B2B &amp; B2C
+                  </span>
+                </div>
+                <p style={{ margin: '3px 0 0 0', fontSize: '0.76rem', color: '#64748b', fontWeight: 500 }}>
+                  Offizielle Dokumente &amp; Compliance für Deutschland, Österreich und die Schweiz
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={onClose}
+              aria-label="Rechtliche Hinweise schließen"
+              style={{
+                border: 'none',
+                background: 'rgba(15, 23, 42, 0.05)',
+                width: '32px',
+                height: '32px',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                color: '#475569',
+                transition: 'all 0.15s ease',
+                flexShrink: 0
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(15, 23, 42, 0.1)'; e.currentTarget.style.color = '#0f172a'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(15, 23, 42, 0.05)'; e.currentTarget.style.color = '#475569'; }}
+            >
+              <X size={16} />
+            </button>
           </div>
-          <button
-            onClick={onClose}
-            aria-label="Rechtliche Hinweise schließen"
-            style={{
-              border: 'none',
+
+          {/* Apple HIG Segmented Control */}
+          <div style={{
+            padding: '10px 28px',
+            background: '#f8fafc',
+            borderBottom: '1px solid rgba(226, 232, 240, 0.8)',
+            flexShrink: 0
+          }}>
+            <div style={{
+              display: 'flex',
               background: '#e2e8f0',
-              width: '36px',
-              height: '36px',
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer',
+              padding: '3px',
+              borderRadius: '12px',
+              gap: '2px'
+            }}>
+              {[
+                { id: 'impressum', label: 'Impressum', icon: Building },
+                { id: 'privacy', label: 'Datenschutz', icon: ShieldCheck },
+                { id: 'terms', label: 'AGB', icon: FileText },
+                { id: 'cancellation', label: 'Widerruf (B2C)', icon: Undo2 }
+              ].map(tab => {
+                const isActive = activeTab === tab.id;
+                const Icon = tab.icon;
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => handleTabChange(tab.id as any)}
+                    style={{
+                      flex: 1,
+                      padding: '8px 12px',
+                      borderRadius: '9px',
+                      border: 'none',
+                      background: isActive ? '#ffffff' : 'transparent',
+                      color: isActive ? '#0f172a' : '#64748b',
+                      fontWeight: isActive ? 750 : 600,
+                      fontSize: '0.82rem',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '7px',
+                      boxShadow: isActive ? '0 2px 6px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04)' : 'none',
+                      transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
+                      whiteSpace: 'nowrap'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!isActive) e.currentTarget.style.color = '#0f172a';
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isActive) e.currentTarget.style.color = '#64748b';
+                    }}
+                  >
+                    <Icon size={15} color={isActive ? '#0f172a' : '#64748b'} />
+                    <span>{tab.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Content Body (Apple Content Stage) */}
+          <div 
+            ref={contentRef}
+            className="apple-custom-scrollbar"
+            style={{
+              padding: '28px 32px',
+              overflowY: 'auto',
+              flex: 1,
+              minHeight: 0,
+              fontSize: '0.85rem',
+              lineHeight: 1.68,
               color: '#334155',
-              transition: 'all 0.15s ease'
+              background: '#ffffff'
             }}
-            className="focus-ring"
           >
-            <X size={18} />
-          </button>
-        </div>
-
-        {/* 4-Tab Enterprise Navigation */}
-        <div style={{
-          display: 'flex',
-          background: '#f1f5f9',
-          padding: '6px',
-          gap: '6px',
-          borderBottom: '1px solid #e2e8f0',
-          overflowX: 'auto'
-        }}>
-          <button
-            onClick={() => setActiveTab('impressum')}
-            aria-label="Impressum anzeigen"
-            style={{
-              flex: 1,
-              padding: '10px 14px',
-              borderRadius: '12px',
-              border: 'none',
-              background: activeTab === 'impressum' ? '#ffffff' : 'transparent',
-              color: activeTab === 'impressum' ? '#0f172a' : '#64748b',
-              fontWeight: activeTab === 'impressum' ? 800 : 600,
-              fontSize: '0.82rem',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '6px',
-              boxShadow: activeTab === 'impressum' ? '0 2px 8px rgba(15, 23, 42, 0.06)' : 'none',
-              whiteSpace: 'nowrap'
-            }}
-            className="focus-ring"
-          >
-            <Building size={16} color={activeTab === 'impressum' ? '#ea4335' : '#64748b'} /> Impressum
-          </button>
-
-          <button
-            onClick={() => setActiveTab('privacy')}
-            aria-label="Datenschutzerklärung anzeigen"
-            style={{
-              flex: 1,
-              padding: '10px 14px',
-              borderRadius: '12px',
-              border: 'none',
-              background: activeTab === 'privacy' ? '#ffffff' : 'transparent',
-              color: activeTab === 'privacy' ? '#0f172a' : '#64748b',
-              fontWeight: activeTab === 'privacy' ? 800 : 600,
-              fontSize: '0.82rem',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '6px',
-              boxShadow: activeTab === 'privacy' ? '0 2px 8px rgba(15, 23, 42, 0.06)' : 'none',
-              whiteSpace: 'nowrap'
-            }}
-            className="focus-ring"
-          >
-            <ShieldCheck size={16} color={activeTab === 'privacy' ? '#34a853' : '#64748b'} /> Datenschutz
-          </button>
-
-          <button
-            onClick={() => setActiveTab('terms')}
-            aria-label="Allgemeine Geschäftsbedingungen anzeigen"
-            style={{
-              flex: 1,
-              padding: '10px 14px',
-              borderRadius: '12px',
-              border: 'none',
-              background: activeTab === 'terms' ? '#ffffff' : 'transparent',
-              color: activeTab === 'terms' ? '#0f172a' : '#64748b',
-              fontWeight: activeTab === 'terms' ? 800 : 600,
-              fontSize: '0.82rem',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '6px',
-              boxShadow: activeTab === 'terms' ? '0 2px 8px rgba(15, 23, 42, 0.06)' : 'none',
-              whiteSpace: 'nowrap'
-            }}
-            className="focus-ring"
-          >
-            <FileText size={16} color={activeTab === 'terms' ? '#eab308' : '#64748b'} /> AGB
-          </button>
-
-          <button
-            onClick={() => setActiveTab('cancellation')}
-            aria-label="Widerrufsbelehrung anzeigen"
-            style={{
-              flex: 1,
-              padding: '10px 14px',
-              borderRadius: '12px',
-              border: 'none',
-              background: activeTab === 'cancellation' ? '#ffffff' : 'transparent',
-              color: activeTab === 'cancellation' ? '#0f172a' : '#64748b',
-              fontWeight: activeTab === 'cancellation' ? 800 : 600,
-              fontSize: '0.82rem',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '6px',
-              boxShadow: activeTab === 'cancellation' ? '0 2px 8px rgba(15, 23, 42, 0.06)' : 'none',
-              whiteSpace: 'nowrap'
-            }}
-            className="focus-ring"
-          >
-            <Undo2 size={16} color={activeTab === 'cancellation' ? '#2563eb' : '#64748b'} /> Widerruf (B2C)
-          </button>
-        </div>
-
-        {/* Content Body */}
-        <div style={{
-          padding: '28px 32px',
-          overflowY: 'auto',
-          flex: 1,
-          fontSize: '0.84rem',
-          lineHeight: 1.65,
-          color: '#334155',
-          background: '#ffffff'
-        }}>
-          {activeTab === 'impressum' && (
+            {activeTab === 'impressum' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
               <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#0f172a' }}>
                 Angaben gemäß § 5 DDG (DE), § 5 ECG / § 25 MedienG (AT) &amp; Art. 3 Abs. 1 lit. s UWG (CH)
@@ -344,18 +419,40 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
               </h4>
 
               {/* ── TEIL A: B2B FÜR MUSIKSCHULEN & KOMMUNALE TRÄGER ── */}
-              <div style={{ background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: '16px', padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                <span style={{ fontSize: '0.78rem', fontWeight: 900, color: '#0369a1', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  TEIL A: Bestimmungen für Musikschulen, Kommunale Träger &amp; Bildungsträger (B2B / Juristische Personen des öffentlichen &amp; privaten Rechts)
-                </span>
+              <div style={{
+                background: '#ffffff',
+                border: '1px solid #e2e8f0',
+                borderRadius: '20px',
+                padding: '24px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '16px',
+                boxShadow: '0 2px 10px rgba(15, 23, 42, 0.02)'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{
+                    background: '#f0f9ff',
+                    color: '#0369a1',
+                    border: '1px solid #bae6fd',
+                    padding: '3px 12px',
+                    borderRadius: '100px',
+                    fontSize: '0.74rem',
+                    fontWeight: 800,
+                    letterSpacing: '0.04em',
+                    textTransform: 'uppercase'
+                  }}>
+                    TEIL A: Bestimmungen für Musikschulen &amp; Träger (B2B)
+                  </span>
+                </div>
 
                 <div>
-                  <strong style={{ color: '#0f172a' }}>1. Vertragsgegenstand, Rechtsnatur, Pädagogischer Add-On-Status &amp; Notfall-Klausel (SaaS-Mietvertrag)</strong><br />
+                  <strong style={{ color: '#0f172a' }}>1. Vertragsgegenstand, Rechtsnatur, Pädagogischer Add-On-Status, Convenience-Doktrin &amp; Notfall-Klausel (SaaS-Mietvertrag)</strong><br />
                   (1) Diese Bestimmungen regeln die Bereitstellung der cloudbasierten Schulmanagement- und Übeplattform <strong>Campus-Groovelab</strong> durch den Betreiber Patrick Huber (Einzelunternehmer). Der Vertrag qualifiziert sich rechtlich als <strong>Software-as-a-Service (SaaS)-Mietvertrag gemäß § 535 ff. BGB (DE) / §§ 1090 ff. ABGB (AT) / Art. 253 ff. OR (CH)</strong> über die Bereitstellung von Cloud-Infrastruktur, Datenbank-Hosting, Datensicherung und Systemwartung.<br />
-                  (2) <strong>Pädagogischer Add-On-Charakter:</strong> Campus-Groovelab ist ein didaktisches Zusatzwerkzeug zur Unterstützung des Fachunterrichts und des häuslichen Übens. Die Plattform ersetzt kein behördliches oder amtliches Schulverwaltungssystem (wie ASV, WinSchool oder Musikschul-Manager).<br />
-                  (3) <strong>Notfall- &amp; Nachrangigkeitsklausel:</strong> Die Musikschule stellt sicher, dass der reguläre Schulbetrieb und die primäre Notfallkommunikation (Telefon, E-Mail, herkömmliche Vertretungspläne) unabhängig von der Plattform gewährleistet bleiben. Bei kurzzeitigen Serverstörungen, Netzausfällen oder Wartungsfenstern findet der Schulunterricht regulär statt. Eine Haftung des Betreibers für ausgefallene Unterrichtsstunden, verpasste Bandproben oder Honorarausfälle ist ausgeschlossen, es sei denn, der Ausfall beruht auf einer vorsätzlichen oder grob fahrlässigen Pflichtverletzung des Betreibers oder der schuldhaften Verletzung einer wesentlichen Vertragspflicht (Kardinalpflicht). Die Haftungsregelungen gemäß § 7 dieser AGB gelten vollumfänglich.<br />
-                  (4) Soweit im Rahmen der Bereitstellung personenbezogene Daten verarbeitet werden, gilt ergänzend die Vereinbarung zur Auftragsverarbeitung (AVV gemäß Art. 28 DSGVO bzw. Art. 9 nDSG) als integraler Vertragsbestandteil.<br />
-                  (5) Der Betreiber gewährleistet eine Verfügbarkeit der Cloud-Infrastruktur von 99,5 % im Jahresmittel (ausgenommen angekündigte Wartungsarbeiten außerhalb der Kernunterrichtszeiten). Zur Abwehr von Cyber-Angriffen und zur Sicherung des störungsfreien Schulbetriebs behält sich der Betreiber vor, automatisierte Angriffsnetzwerke oder schädliche Datenverbindungen an der Firewall technisch abzuweisen. Der reguläre weltweite Zugriff für Schüler und Lehrkräfte im Rahmen privater Reisen (z. B. Urlaubsaufenthalte) bleibt hiervon unberührt.
+                  (2) <strong>Pädagogischer Add-On-Charakter &amp; Convenience-Doktrin (Subsidiaritäts-Garantie):</strong> Campus-Groovelab ist ein didaktisches Zusatz-, Erleichterungs- und Übermittlungswerkzeug („Convenience-Tool / Fast-Track-Option“) zur Beschleunigung interner Abläufe. Die Plattform ersetzt ausdrücklich kein behördliches oder amtliches Schulverwaltungssystem (ERP wie ASV, WinSchool oder Musikschul-Manager) und stellt zu keinem Zeitpunkt den ausschließlichen oder verbindlich vorgeschriebenen Dienst-, Weisungs- oder Kommunikationskanal der Musikschule dar.<br />
+                  (3) <strong>Primärwege, Weisungsautonomie der Schule &amp; Wahlfreiheit:</strong> Die offizielle dienstrechtliche Kommunikation, verbindliche Arbeitsanweisungen der Schulleitung sowie die hoheitliche Verwaltung von Schüler- und Honorarstammdaten verbleiben vollumfänglich auf den herkömmlichen Primärkanälen der Musikschule (behördliche E-Mail, interne Kommunikationssysteme wie MS Teams, Telefon, behördliche ERP-Software oder Aushang). Lehrkräfte und Mitarbeiter sind zu jedem Zeitpunkt berechtigt, Stundenpläne, Raumwünsche und Terminänderungen alternativ auf dem herkömmlichen Weg (per E-Mail oder telefonisch) an das Sekretariat zu übermitteln. Die Datenüberführung in das amtliche Verwaltungssystem der Schule obliegt der Musikschule.<br />
+                  (4) <strong>Notfall-, Nachrangigkeits- &amp; Schadenminderungsklausel (§ 254 BGB):</strong> Die Musikschule stellt sicher, dass der reguläre Schulbetrieb und die primäre Notfallkommunikation (Telefon, E-Mail, herkömmliche Vertretungspläne) unabhängig von der Plattform gewährleistet bleiben. Bei kurzzeitigen Serverstörungen, Netzausfällen oder Wartungsfenstern findet der Schulunterricht regulär statt; die Musikschule ist im Rahmen ihrer gesetzlichen Schadenminderungspflicht (§ 254 BGB) gehalten, Raum- und Terminabstimmungen über ihre Primärkanäle abzuwickeln. Eine Haftung des Betreibers für ausgefallene Unterrichtsstunden, verpasste Bandproben oder Honorarausfälle ist ausgeschlossen, es sei denn, der Ausfall beruht auf einer vorsätzlichen oder grob fahrlässigen Pflichtverletzung des Betreibers oder der schuldhaften Verletzung einer wesentlichen Vertragspflicht (Kardinalpflicht). Die Haftungsregelungen gemäß § 7 dieser AGB gelten vollumfänglich.<br />
+                  (5) Soweit im Rahmen der Bereitstellung personenbezogene Daten verarbeitet werden, gilt ergänzend die Vereinbarung zur Auftragsverarbeitung (AVV gemäß Art. 28 DSGVO bzw. Art. 9 nDSG) als integraler Vertragsbestandteil.<br />
+                  (6) Der Betreiber gewährleistet eine Verfügbarkeit der Cloud-Infrastruktur von 99,5 % im Jahresmittel (ausgenommen angekündigte Wartungsarbeiten außerhalb der Kernunterrichtszeiten). Zur Abwehr von Cyber-Angriffen und zur Sicherung des störungsfreien Schulbetriebs behält sich der Betreiber vor, automatisierte Angriffsnetzwerke oder schädliche Datenverbindungen an der Firewall technisch abzuweisen. Der reguläre weltweite Zugriff für Schüler und Lehrkräfte im Rahmen privater Reisen (z. B. Urlaubsaufenthalte) bleibt hiervon unberührt.
                 </div>
 
                 <div>
@@ -382,19 +479,22 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
                 </div>
 
                 <div>
-                  <strong style={{ color: '#0f172a' }}>4. Reine Metadaten-Architektur, Urheberrecht, Verwertungsgesellschaften (GEMA / AKM / SUISA) &amp; Notice-and-Takedown (§ 60a UrhG DE / § 42f UrhG AT / Art. 19 URG CH / Art. 6 &amp; 16 DSA)</strong><br />
-                  (1) <strong>Reine Metadaten-Architektur:</strong> Die Plattform Campus-Groovelab speichert, hostet und vervielfältigt keine urheberrechtlich geschützten Notensätze, Tabulaturen oder geschützten Verlags-Partituren. Die Mediathek verarbeitet ausschließlich freie bibliografische Metadaten (Interpret, Titel, Tonart, Besetzung, Lehrwerkstitel und Seitenzahlen) sowie Verlinkungen zu lizenzierten externen Mediendiensten (z. B. Spotify, YouTube) oder autorisierten Noten-Plattformen (z. B. Tomplay).<br />
-                  (2) <strong>Verwertungsgesellschaften-Klarstellung (GEMA, AKM, SUISA):</strong> Der Betreiber betreibt keine öffentliche Streaming-Mediathek geschützter Musikwerke. Aus diesem Grund entstehen durch die bloße Plattformbereitstellung keine gesonderten Melde- oder Vergütungspflichten der Plattform gegenüber Verwertungsgesellschaften (GEMA in Deutschland, AKM/Austro-Mechana in Österreich, SUISA in der Schweiz). Die Lizenzierung des eigentlichen Präsenzunterrichts und von Schulaufführungen obliegt der Musikschule über die jeweils bestehenden Gesamtverträge ihrer Landes- oder Bundesverbände.<br />
-                  (3) <strong>Verbot des Uploads / Verlinkens unlizenzierter Notensätze:</strong> Lehrkräften und Nutzern ist es streng untersagt, urheberrechtlich geschützte Noten-PDFs, Leadsheets, Verlags-Scans oder Verweise auf offensichtlich rechtswidrige Quellen in der Plattform abzulegen (§ 60a Abs. 3 Nr. 2 UrhG [DE], § 42f UrhG [AT], Art. 19 URG [CH]).<br />
-                  (4) <strong>Haftungsprivileg &amp; Notice-and-Takedown-Verfahren (Art. 6 &amp; 16 DSA):</strong> Der Betreiber stellt lediglich die technische Vermittlungsinfrastruktur bereit und haftet als Host-Provider gemäß Art. 6 Digital Services Act (DSA) erst ab tatsächlicher Kenntnis rechtswidriger Inhalte. Urheberrechtsinhaber und Verlage können Beanstandungen jederzeit über das elektronische Melde- und Abhilfeverfahren an <a href="mailto:copyright@campus-groovelab.de" style={{ color: '#2563eb', textDecoration: 'underline' }}>copyright@campus-groovelab.de</a> übermitteln. Berechtigt beanstandete Verweise werden unverzüglich gesperrt oder entfernt.
+                  <strong style={{ color: '#0f172a' }}>4. Reine Metadaten-Architektur für Noten, Didaktische Cover-Aufnahmen (§ 53, § 60a UrhG), Verwertungsgesellschaften (GEMA / AKM / SUISA) &amp; Notice-and-Takedown (Art. 6 &amp; 16 DSA)</strong><br />
+                  (1) <strong>Reine Metadaten-Architektur für Noten &amp; Ausschluss von Original-Masteraufnahmen:</strong> Die Plattform Campus-Groovelab speichert, hostet und vervielfältigt zu 0 % urheberrechtlich geschützte Notensätze, Leadsheets, Tabulaturen oder geschützte Verlags-Partituren sowie keine kommerziellen Original-Masteraufnahmen/Audiodateien von Plattenlabels. Die Mediathek verarbeitet für Lehrwerke ausschließlich freie bibliografische Metadaten (Interpret, Titel, Tonart, Besetzung, Lehrwerkstitel und Seitenzahlen) sowie Verlinkungen zu lizenzierten externen Mediendiensten (z. B. Spotify, YouTube) oder autorisierten Noten-Plattformen (z. B. Tomplay).<br />
+                  (2) <strong>Didaktische Schüler-Audioaufnahmen (Cover-Versionen im privaten Kreis gem. § 53, § 60a UrhG):</strong> Gehostet werden ausschließlich von den Schülern selbst im Rahmen des Instrumentalunterrichts oder beim häuslichen Üben eingespielte Audioaufnahmen (didaktische Cover-Versionen von Übestücken). Diese dienen rein dem pädagogischen Feedback mit der Lehrkraft (§ 60a UrhG) sowie dem Anhören im engsten privaten Familienkreis (§ 53 Abs. 1 UrhG / gesetzliche Privatkopie). Es existiert keine öffentliche Mediathek, kein offenes Streaming und keine freie Auffindbarkeit im Internet.<br />
+                  (3) <strong>Verwertungsgesellschaften-Klarstellung (GEMA, AKM, SUISA):</strong> Der Betreiber betreibt keine öffentliche Streaming-Mediathek geschützter Musikwerke. Aus diesem Grund entstehen durch die bloße Plattformbereitstellung keine gesonderten Melde- oder Vergütungspflichten der Plattform gegenüber Verwertungsgesellschaften (GEMA in Deutschland, AKM/Austro-Mechana in Österreich, SUISA in der Schweiz). Die Lizenzierung des eigentlichen Präsenzunterrichts und von Schulaufführungen obliegt der Musikschule über die jeweils bestehenden Gesamtverträge ihrer Landes- oder Bundesverbände.<br />
+                  (4) <strong>Verbot des Uploads / Verlinkens unlizenzierter Notensätze:</strong> Lehrkräften und Nutzern ist es streng untersagt, urheberrechtlich geschützte Noten-PDFs, Leadsheets, Verlags-Scans oder Verweise auf offensichtlich rechtswidrige Quellen in der Plattform abzulegen (§ 60a Abs. 3 Nr. 2 UrhG [DE], § 42f UrhG [AT], Art. 19 URG [CH]).<br />
+                  (5) <strong>Haftungsprivileg &amp; Notice-and-Takedown-Verfahren (Art. 6 &amp; 16 DSA):</strong> Der Betreiber stellt lediglich die technische Vermittlungsinfrastruktur bereit und haftet als Host-Provider gemäß Art. 6 Digital Services Act (DSA) erst ab tatsächlicher Kenntnis rechtswidriger Inhalte. Urheberrechtsinhaber und Verlage können Beanstandungen jederzeit über das elektronische Melde- und Abhilfeverfahren an <a href="mailto:copyright@campus-groovelab.de" style={{ color: '#2563eb', textDecoration: 'underline' }}>copyright@campus-groovelab.de</a> übermitteln. Berechtigt beanstandete Verweise werden unverzüglich gesperrt oder entfernt.<br />
+                  (6) <strong>Freistellungsverpflichtung bei Urheberrechtsverletzungen durch Nutzer:</strong> Die Musikschule trägt die alleinige rechtliche Verantwortung dafür, dass ihre Lehrkräfte, Mitarbeiter und Schüler keine urheberrechtsverletzenden Medien, Noten-PDFs oder rechtswidrigen Inhalte in die Plattform einstellen. Sollte der Betreiber von Urhebern, Verlagen, Verwertungsgesellschaften (GEMA, AKM, SUISA) oder sonstigen Dritten wegen angeblicher Schutzrechtsverletzungen durch von Nutzern der Musikschule eingestellte Inhalte in Anspruch genommen werden, stellt die Musikschule den Betreiber von allen berechtigten Ansprüchen, Gerichts- und angemessenen Rechtsverteidigungskosten auf erstes Anfordern frei, es sei denn, die Musikschule hat die Rechtsverletzung nachweislich nicht zu vertreten.
                 </div>
 
                 <div>
-                  <strong style={{ color: '#0f172a' }}>5. Autonomie von Honorarlehrkräften (Herrenberg-Compliance nach BSG B 12 R 3/20 R) &amp; Ausschluss von Leistungs- und Verhaltenskontrolle (§ 87 Abs. 1 Nr. 6 BetrVG / BPersVG)</strong><br />
-                  (1) Die Funktionen zur Raum-, Termin- und Stundenplanung innerhalb von Campus-Groovelab stellen rein didaktisch-organisatorische Hilfsmittel und unverbindliche Dispositionsvorschläge dar. Die Plattform übt zu keinem Zeitpunkt eine automatisierte Weisung, Zuweisung oder arbeitgeberseitige Direktionsgewalt gegenüber selbstständigen Lehrkräften (Honorarkräften) aus. Soweit selbstständige Lehrkräfte die Plattform nutzen, obliegt diesen die freie und eigenverantwortliche zeitliche und inhaltliche Abstimmung der Unterrichtstermine mit den Schülern.<br />
-                  (2) Die Musikschule stellt in eigener Verantwortung sicher, dass der tatsächliche Einsatz von Honorarkräften den sozialversicherungsrechtlichen Kriterien des Bundessozialgerichts entspricht. Eine Überwachung von Anwesenheitszeiten oder didaktischen Inhalten durch den Betreiber findet nicht statt.<br />
+                  <strong style={{ color: '#0f172a' }}>5. Autonomie von Honorarlehrkräften (Herrenberg-Compliance nach BSG B 12 R 3/20 R, Übermittlungsfreiheit) &amp; Ausschluss von Leistungs- und Verhaltenskontrolle (§ 87 Abs. 1 Nr. 6 BetrVG / BPersVG)</strong><br />
+                  (1) Die Funktionen zur Raum-, Termin- und Stundenplanung innerhalb von Campus-Groovelab stellen rein didaktisch-organisatorische Hilfsmittel und unverbindliche Dispositionsvorschläge dar. Die Plattform übt zu keinem Zeitpunkt eine automatisierte Weisung, Zuweisung oder arbeitgeberseitige Direktionsgewalt gegenüber selbstständigen Lehrkräften (Honorarkräften) aus. Honorarkräfte sind zu jedem Zeitpunkt frei, ob sie Campus-Groovelab als digitales Hilfsmittel nutzen oder ihre Termin- und Raumabstimmungen auf herkömmlichem Weg (per E-Mail oder Telefon) mit dem Schulsekretariat und den Schülern vornehmen.<br />
+                  (2) Die Musikschule stellt in eigener Verantwortung sicher, dass der tatsächliche Einsatz von Honorarkräften den sozialversicherungsrechtlichen Kriterien des Bundessozialgerichts entspricht und keine einseitigen Weisungen über die Plattform erteilt werden. Eine Überwachung von Anwesenheitszeiten oder didaktischen Inhalten durch den Betreiber findet nicht statt.<br />
                   (3) <strong>Ausschluss von Leistungs- und Verhaltenskontrolle:</strong> Die Plattform verzichtet auf jegliche Funktionen zur Mitarbeiterbewertung oder automatisierten Leistungs- und Verhaltenskontrolle. Es werden keine Kennzahlen zu Reaktionszeiten auf Chat-Nachrichten, durchschnittlichen Übezeiten der Schülerklassen oder Anwesenheitsquoten zur Mitarbeiterbewertung aggregiert oder an Schulleitungen übermittelt.<br />
-                  (4) <strong>Recht auf Nichterreichbarkeit &amp; asynchrone Kommunikation (§ 5 ArbSchG):</strong> Die interne Chat- und Benachrichtigungsfunktion („Shouts“) ist als rein asynchrones didaktisches Informationsmedium konzipiert. Lehrkräfte sind zu keinem Zeitpunkt verpflichtet, außerhalb ihrer individuellen Unterrichtszeiten oder an unterrichtsfreien Tagen Nachrichten abzurufen oder zu beantworten.
+                  (4) <strong>Recht auf Nichterreichbarkeit &amp; asynchrone Kommunikation (§ 5 ArbSchG):</strong> Die interne Chat- und Benachrichtigungsfunktion („Shouts“) ist als rein asynchrones didaktisches Informationsmedium konzipiert. Lehrkräfte sind zu keinem Zeitpunkt verpflichtet, außerhalb ihrer individuellen Unterrichtszeiten oder an unterrichtsfreien Tagen Nachrichten abzurufen oder zu beantworten.<br />
+                  (5) <strong>Negative Garantie &amp; Zweckbindungsverbot:</strong> Die Musikschule verpflichtet sich ausdrücklich, die Plattform und deren Zeit-, Raum- oder Kommunikationsdaten zu keinem Zeitpunkt zur Überwachung der Arbeitszeit, zur Leistungskontrolle oder für disziplinarische Maßnahmen gegenüber Beschäftigten oder Honorarkräften einzusetzen.
                 </div>
 
                 <div>
@@ -403,24 +503,50 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
                 </div>
 
                 <div>
-                  <strong style={{ color: '#0f172a' }}>7. B2B-Gewährleistung, Haftungsbegrenzung, Rechtswahl &amp; Gerichtsstand (§ 536a BGB DE / § 1096 ABGB AT / Art. 259a OR CH)</strong><br />
-                  (1) Gegenüber Unternehmern und juristischen Personen des öffentlichen Rechts wird die verschuldensunabhängige Schadensersatzhaftung des Betreibers für anfängliche Mängel (§ 536a Abs. 1 Alt. 1 BGB [DE] / § 1096 ABGB [AT] / Art. 259a OR [CH]) ausdrücklich ausgeschlossen. Bei einfacher Fahrlässigkeit haftet der Betreiber nur bei Verletzung wesentlicher Vertragspflichten (Kardinalpflichten) begrenzt auf den vertragstypisch vorhersehbaren Schaden.<br />
-                  (2) <strong>Rechtswahl &amp; Gerichtsstand:</strong> Es gilt das Recht der Bundesrepublik Deutschland unter Ausschluss des UN-Kaufrechts (CISG). Ist die Musikschule bzw. der Vertragspartner Kaufmann, eine juristische Person des öffentlichen Rechts oder ein öffentlich-rechtliches Sondervermögen, ist ausschließlicher Gerichtsstand für alle Streitigkeiten aus diesem Vertrag der Sitz des Betreibers (Lörrach / Rheinfelden).
+                  <strong style={{ color: '#0f172a' }}>7. B2B-Gewährleistung, Haftungsbegrenzung, 12-Monats-Verjährung, Rechtswahl &amp; Gerichtsstand (§ 536a BGB DE / § 1096 ABGB AT / Art. 259a OR CH)</strong><br />
+                  (1) Gegenüber Unternehmern und juristischen Personen des öffentlichen Rechts wird die verschuldensunabhängige Garantiehaftung des Betreibers für anfängliche Mängel (§ 536a Abs. 1 Alt. 1 BGB [DE] / § 1096 ABGB [AT] / Art. 259a OR [CH]) ausdrücklich und vollumfänglich ausgeschlossen. Bei einfacher Fahrlässigkeit haftet der Betreiber nur bei Verletzung wesentlicher Vertragspflichten (Kardinalpflichten) begrenzt auf den vertragstypisch vorhersehbaren Schaden. Eine Haftung für entgangenen Gewinn, mittelbare Schäden, Mangelfolgeschäden oder ausgefallene Unterrichtsstunden ist ausgeschlossen.<br />
+                  (2) <strong>Haftungshöchstgrenze (Liability Cap):</strong> Die Gesamthaftung des Betreibers für alle Schadensfälle innerhalb eines Kalenderjahres aus oder im Zusammenhang mit diesem Vertrag – gleich aus welchem Rechtsgrund – ist auf die Summe der vom Kunden in den letzten zwölf (12) Monaten vor Eintritt des schädigenden Ereignisses tatsächlich an den Betreiber entrichteten Netto-Vergütung, maximal jedoch auf einen Höchstbetrag von 10.000,00 € (bzw. CHF 10'000.00), beschränkt. Vorstehende Begrenzung gilt nicht bei Vorsatz, grober Fahrlässigkeit, bei Personenschäden (Verletzung von Leben, Körper oder Gesundheit) sowie bei gesetzlich zwingender Haftung (z. B. Produkthaftungsgesetz).<br />
+                  (3) <strong>Datenverlust &amp; Mitverschuldensklausel (§ 254 BGB):</strong> Für den Verlust von Daten haftet der Betreiber der Höhe nach nur insoweit, als der Schaden auch bei ordnungsgemäßer und täglicher Datensicherung durch den Kunden bzw. über das integrierte Schulausweis- und Datenexportmodul entstanden wäre. Die Haftung ist auf den typischen Wiederherstellungsaufwand beschränkt.<br />
+                  (4) <strong>12-monatige Verjährungsverkürzung:</strong> Sämtliche Ansprüche des Kunden wegen Mängeln oder Pflichtverletzungen verjähren innerhalb von zwölf (12) Monaten ab dem gesetzlichen Verjährungsbeginn. Hiervon unberührt bleibt die gesetzliche Verjährungsfrist für Schadensersatzansprüche wegen Vorsatz, grober Fahrlässigkeit sowie Verletzung von Leben, Körper oder Gesundheit.<br />
+                  (5) <strong>Rechtswahl &amp; Gerichtsstand:</strong> Es gilt das Recht der Bundesrepublik Deutschland unter Ausschluss des UN-Kaufrechts (CISG). Ist die Musikschule bzw. der Vertragspartner Kaufmann, eine juristische Person des öffentlichen Rechts oder ein öffentlich-rechtliches Sondervermögen, ist ausschließlicher Gerichtsstand für alle Streitigkeiten aus diesem Vertrag der Sitz des Betreibers (Lörrach / Rheinfelden).
                 </div>
               </div>
 
               {/* ── TEIL B: B2C FÜR ELTERN & SCHÜLER ── */}
-              <div style={{ background: '#f0fdf4', border: '1.5px solid #86efac', borderRadius: '16px', padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                <span style={{ fontSize: '0.78rem', fontWeight: 900, color: '#15803d', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  TEIL B: Bestimmungen für Eltern &amp; Schüler (B2C / § 13 BGB)
-                </span>
+              <div style={{
+                background: 'linear-gradient(180deg, #fbfdfc 0%, #ffffff 100%)',
+                border: '1px solid #e2e8f0',
+                borderRadius: '20px',
+                padding: '24px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '16px',
+                boxShadow: '0 2px 10px rgba(15, 23, 42, 0.02)'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{
+                    background: '#ecfdf5',
+                    color: '#047857',
+                    border: '1px solid #a7f3d0',
+                    padding: '3px 12px',
+                    borderRadius: '100px',
+                    fontSize: '0.74rem',
+                    fontWeight: 800,
+                    letterSpacing: '0.04em',
+                    textTransform: 'uppercase'
+                  }}>
+                    TEIL B: Bestimmungen für Eltern &amp; Schüler (B2C / § 13 BGB)
+                  </span>
+                </div>
 
                 <div>
                   <strong style={{ color: '#0f172a' }}>8. Kostenfreier Schnuppermonat, Schuljahres-Bereitstellung, Schüler-Bestandsschutz &amp; Sorgfaltspflichten (Ausschließliche Jahresbeitragszahlung)</strong><br />
                   (1) Eltern, die das interaktive Campus-Modul für ihr Kind aktivieren, erhalten den laufenden Anmeldemonat zu 100 % kostenfrei zum Kennenlernen. Für die verbleibenden Monate bis zum individuellen Schuljahresende der Schule wird die Bereitstellung als einmaliger Jahresbeitrag (errechnet aus 0,49 € in DE/AT bzw. CHF 1.00 in CH pro bezahltem Monat) abgerechnet. Eine monatliche Einzelabrechnung ist zur Vermeidung unverhältnismäßiger Transaktionsgebühren ausgeschlossen.<br />
                   (2) <strong>Schuljahresübergang &amp; Schüler-Bestandsschutz:</strong> Bei einer Aktivierung im letzten Monat des Schuljahres ist der Zugang für diesen verbleibenden Restmonat vollständig kostenfrei zum Kennenlernen. Für das Folgeschuljahr gilt für Schüler und Eltern der Bestandsschutz der jeweiligen Musikschule: Solange der Vertrag zwischen der Musikschule und dem Betreiber ununterbrochen fortbesteht, bleibt der Jahresbeitrag für die Schüler dieser Musikschule preisstabil. Eine Erhöhung der Schülerbeiträge für Bestandskunden ist ausgeschlossen.<br />
                   (3) <strong>Mindestalter &amp; Bildschirmfreies Üben (Screenless Practice):</strong> Das Mindestalter für Schüler beträgt 6 Jahre. Zur Vermeidung unnötiger Bildschirmzeit bei Grundschulkindern unterstützt die Plattform das didaktische Prinzip des bildschirmfreien Übens („Screenless Practice“): Im Modus „Von Eltern geführt“ verbleibt das Endgerät bei den Eltern; Übezeiten am echten Instrument werden per 1-Klick-Quittierung verbucht.<br />
-                  (4) <strong>Sorgfaltspflichten bei Zugangsdaten &amp; PINs:</strong> Eltern und Schüler sind verpflichtet, persönliche Zugangsdaten (QR-Ausweise, Eltern-PIN, persönliche Schüler-PIN) vor dem Zugriff unbefugter Dritter zu schützen. Bei Verlust des Schulausweises oder dem Verdacht einer missbräuchlichen Nutzung ist unverzüglich das Sekretariat der Musikschule zur Neugenerierung des Ausweis-Tokens zu informieren.
+                  (4) <strong>Sorgfaltspflichten bei Zugangsdaten &amp; PINs:</strong> Eltern und Schüler sind verpflichtet, persönliche Zugangsdaten (QR-Ausweise, Eltern-PIN, persönliche Schüler-PIN) vor dem Zugriff unbefugter Dritter zu schützen. Bei Verlust des Schulausweises oder dem Verdacht einer missbräuchlichen Nutzung ist unverzüglich das Sekretariat der Musikschule zur Neugenerierung des Ausweis-Tokens zu informieren.<br />
+                  (5) <strong>Pädagogischer Haftungsausschluss (Keine Erfolgsgarantie):</strong> Der Betreiber stellt mit Campus-Groovelab rein didaktische Hilfsmittel (z. B. Übe-Timer, Metronom, Loopstation, Gamification-Elemente) zur Verfügung. Die pädagogische Unterrichtsgestaltung, der persönliche Lernerfolg, Noten, Prüfungsergebnisse sowie die tatsächliche musikalische Beherrschung des Instruments verbleiben in der ausschließlichen pädagogischen Verantwortung der Musikschule, der jeweiligen Lehrkraft und des Schülers. Eine Erfolgsgarantie oder Haftung für das Erreichen didaktischer Lernziele ist ausgeschlossen.<br />
+                  (6) <strong>Endgeräte- &amp; Sensorik-Klausel:</strong> Die ordnungsgemäße Funktion gerätespezifischer Features (z. B. Display-Down-Sensorik beim Übe-Timer) hängt von der Hard- und Softwarekonfiguration des verwendeten Endgeräts ab. Für sensorische Messungenauigkeiten oder Betriebssystemeinschränkungen des Endgeräts übernimmt der Betreiber keine Haftung.
                 </div>
 
                 <div>
@@ -523,32 +649,68 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
           )}
         </div>
 
-        {/* Footer Close */}
+        {/* Apple HIG Footer Bar */}
         <div style={{
-          padding: '16px 28px',
-          borderTop: '1px solid #e2e8f0',
-          background: '#f8fafc',
+          padding: '14px 28px',
+          borderTop: '1px solid rgba(226, 232, 240, 0.8)',
+          background: 'linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%)',
           display: 'flex',
-          justifyContent: 'flex-end'
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexShrink: 0
         }}>
-          <button
-            onClick={onClose}
-            style={{
-              background: '#0f172a',
-              color: '#ffffff',
-              border: 'none',
-              borderRadius: '12px',
-              padding: '10px 22px',
-              fontSize: '0.84rem',
-              fontWeight: 800,
-              cursor: 'pointer'
-            }}
-            className="focus-ring"
-          >
-            Schließen
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.74rem', color: '#64748b' }}>
+            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#10b981', display: 'inline-block' }} />
+            <span style={{ fontWeight: 600 }}>Rechtssicher nach BGB, DSGVO, UrhG &amp; DSA • Schuljahr 2026/2027</span>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <button
+              type="button"
+              onClick={() => window.print()}
+              style={{
+                background: '#ffffff',
+                border: '1px solid #cbd5e1',
+                borderRadius: '11px',
+                padding: '8px 16px',
+                fontSize: '0.80rem',
+                fontWeight: 700,
+                color: '#334155',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                transition: 'all 0.15s ease'
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#94a3b8'; e.currentTarget.style.color = '#0f172a'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#cbd5e1'; e.currentTarget.style.color = '#334155'; }}
+            >
+              <Printer size={14} color="#475569" />
+              Drucken / PDF
+            </button>
+            <button
+              onClick={onClose}
+              style={{
+                background: '#0f172a',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: '11px',
+                padding: '8px 24px',
+                fontSize: '0.82rem',
+                fontWeight: 750,
+                cursor: 'pointer',
+                boxShadow: '0 2px 6px rgba(15, 23, 42, 0.2)',
+                transition: 'all 0.15s ease'
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = '#1e293b'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = '#0f172a'; }}
+            >
+              Schließen
+            </button>
+          </div>
         </div>
       </div>
     </div>
-  );
+  </>
+);
 };

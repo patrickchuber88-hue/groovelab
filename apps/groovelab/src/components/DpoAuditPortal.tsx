@@ -921,7 +921,7 @@ export function DpoAuditPortal({ onClose, schoolName = 'Stadtmusikschule', schoo
                         </tr>
                         <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
                           <td style={{ padding: '8px 4px', fontWeight: 800, color: '#0f172a' }}>Zweckbestimmung:</td>
-                          <td style={{ padding: '8px 4px' }}>Koordination des Musikschulunterrichts, Raum- &amp; Terminbelegung, Bereitstellung digitaler Hausaufgabennotizen &amp; werbefreie Übungs-Audiobegleitung</td>
+                          <td style={{ padding: '8px 4px' }}>Didaktisches Convenience- &amp; Beschleunigungswerkzeug („Fast-Track“) zur Raum- &amp; Terminabstimmung, Hausaufgaben-Sync &amp; didaktische Audiobegleitung ohne Werbefunktionen. Subsidiaritäts-Doktrin: Amtliche Schulverwaltung (ERP) und primäre Dienstwege verbleiben beim Träger. Gehostete Schüler-Übungsaufnahmen (Cover) dienen rein didaktischem Feedback und dem privaten Familienkreis (§ 53 Abs. 1, § 60a UrhG).</td>
                         </tr>
                         <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
                           <td style={{ padding: '8px 4px', fontWeight: 800, color: '#0f172a' }}>Rechtsgrundlagen:</td>
@@ -1100,8 +1100,9 @@ export function DpoAuditPortal({ onClose, schoolName = 'Stadtmusikschule', schoo
                     </strong>
                     <ul style={{ margin: 0, paddingLeft: '20px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
                       <li><strong>Keine Verhaltens- und Leistungskontrolle (§ 87 Abs. 1 Nr. 6 BetrVG / § 75 BPersVG):</strong> Es findet keine Auswertung, Messung oder Aggregation von Klickzahlen, Online-Zeiten, Reaktionsgeschwindigkeiten im Chat oder Erledigungsfristen für Lehrkräfte statt.</li>
+                      <li><strong>Subsidiaritäts-Doktrin &amp; Fast-Track Convenience:</strong> Campus-Groovelab ist ein freiwilliges, unterstützendes Beschleunigungswerkzeug. Dienstliche Weisungen und Arbeitsanweisungen verbleiben auf den städtischen Primärkanälen (E-Mail, MS Teams, Post).</li>
+                      <li><strong>Herrenberg-Autonomie &amp; Übermittlungsfreiheit (BSG B 12 R 3/20 R):</strong> Raum- und Terminzuweisungen stellen unverbindliche didaktische Abstimmungsvorschläge dar. Lehrkräften (insb. Honorarkräften) steht es frei, Termine per App oder herkömmlich (per E-Mail, Telefon oder Zettel) an die Verwaltung zu übermitteln; keine arbeitgeberseitige Direktion.</li>
                       <li><strong>Keine Arbeitszeiterfassung (ArbZG-Abgrenzung):</strong> Die Plattform fungiert als reines didaktisches Dispositionsmittel („Kreidetafel-Doktrin“). Sie enthält keine Stempeluhr und erfasst keine Arbeitszeiten der Lehrkräfte.</li>
-                      <li><strong>Herrenberg-Autonomie (BSG B 12 R 3/20 R):</strong> Raum- und Terminzuweisungen stellen unverbindliche didaktische Abstimmungsvorschläge dar; es erfolgt keine arbeitgeberseitige Weisung oder Direktion.</li>
                       <li><strong>Recht auf Nichterreichbarkeit (§ 5 ArbSchG):</strong> Mitteilungen sind asynchron. Lehrkräfte sind nicht verpflichtet, außerhalb des Fachunterrichts Nachrichten abzurufen.</li>
                     </ul>
                   </div>

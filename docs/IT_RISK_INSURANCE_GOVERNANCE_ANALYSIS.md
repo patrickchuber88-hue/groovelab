@@ -23,23 +23,24 @@ Das primäre juristische und finanzielle Risiko liegt in der **Rechtsform des Ei
 ┌──────────────────────────────────────────────────────────────────────────────────┐
 │              CAMPUS-GROOVELAB CODEBASE & SYSTEMKOMPONENTEN                       │
 │                                                                                  │
-│   [Event Coordinator]        [Audio-Loopstation]        [Stundenplan / RLS]      │
-│   CampusEventsBoard.tsx      AudioBiographyView.tsx     private_auth Schema      │
+│   [Stundenplan / Räume]      [Audio-Loopstation]        [Sicherheit / RLS]       │
+│   ScheduleBoard.tsx          AudioBiographyView.tsx     private_auth Schema      │
+│   (Event-Coord.: Roadmap)    (Schüler-Coveraufnahmen)   PostgreSQL RLS           │
 │            │                          │                          │               │
 └────────────┼──────────────────────────┼──────────────────────────┼───────────────┘
              ▼                          ▼                          ▼
 ┌──────────────────────────────────────────────────────────────────────────────────┐
 │              VERSICHERUNGSTECHNISCHE SCHADENSTATBESTÄNDE                         │
 │                                                                                  │
-│   • Echter Vermögensschaden  • Urheberrechtsverletzung  • DSGVO-Drittschaden     │
-│   • Ausfall Festival/Prüfung • § 201 StGB / Audio-Leak  • Art. 82 Schadensersatz │
-│   • Kommunaler Regress       • GEMA/SUISA Abmahnung     • LfDI-Bußgeldverfahren  │
+│   • Echter Vermögensschaden  • Urheberrechts-Abwehr      • DSGVO-Drittschaden     │
+│   • Ausfall Stundenplan/SLA  • § 53/§ 60a UrhG Cover     • Art. 82 Schadensersatz │
+│   • Kommunaler Regress       • GEMA/SUISA Abmahnungen   • LfDI-Bußgeldverfahren  │
 └──────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ### A. Echte Vermögensschäden bei Schulträgern (Verfügbarkeit & SLA)
-- **Architektur-Anker:** `apps/groovelab/src/components/CampusEventsBoard.tsx` (Event Coordinator für Konzerte/Festivals), `ScheduleBoard.tsx`, Smart Room Engine.
-- **Risiko:** Fällt der Server während einer Großveranstaltung mit hunderten Beteiligten oder zu Schuljahresbeginn bei der Stundenplanerstellung aus, können Schulen Schadensersatz für vergebliche Aufwendungen (z. B. Saalmieten, Technikerhonorare, Ersatzvordrucke) fordern.
+- **Architektur-Anker:** `ScheduleBoard.tsx`, Smart Room Engine (*Hinweis:* Der Event Coordinator ist derzeit ein reines Roadmap-Feature und noch nicht im Produktivbetrieb).
+- **Risiko:** Fällt der Server zu Schuljahresbeginn bei der Stundenplanerstellung oder Raumbelegung aus, können Schulen Schadensersatz für vergebliche Aufwendungen (z. B. manuelle Umplanungskosten, Raumausfälle) fordern.
 - **Erforderliche Deckung:** Vermögensschaden-Haftpflicht (VSH) mit mind. 1.000.000 € Deckungssumme.
 
 ### B. Datenschutz-Drittschäden & Minderjährigen-Schutz (Art. 8 & 82 DSGVO)
@@ -48,9 +49,9 @@ Das primäre juristische und finanzielle Risiko liegt in der **Rechtsform des Ei
 - **Erforderliche Deckung:** Spezifische Klausel zur Deckung von **Drittansprüchen aus Datenschutzverletzungen** sowie Übernahme der Rechtsverteidigungskosten vor Datenschutzaufsichtsbehörden.
 
 ### C. Urheberrechts- und Immaterialgüterrechts-Risiken (UrhG / DSA / GEMA)
-- **Architektur-Anker:** Song-Bibliotheken, Metadaten-Mediathek, Lehrer-Uploads, `apps/groovelab/src/components/LegalTextModal.tsx`.
-- **Risiko:** Zwar ist die Plattform als reine Metadaten-Architektur konzipiert, doch wenn Lehrkräfte Noten-PDFs oder urheberrechtlich geschützte Play-Alongs hochladen, greift bei verspäteter Reaktion auf Notice-and-Takedown-Meldungen die Haftung als Host-Provider (Art. 6 DSA).
-- **Erforderliche Deckung:** Mitversicherung von Urheberrechts-, Lizenz- und Markenrechtsverletzungen (inkl. anwaltlicher Abmahnkosten).
+- **Architektur-Anker:** Didaktische Schüleraufnahmen (Cover-Versionen), Song-Bibliotheken (reine Werk-Metadaten), `apps/groovelab/src/components/LegalTextModal.tsx`.
+- **Sachverhalt:** Die Plattform speichert, hostet und vervielfältigt keine Verlagsnoten oder kommerziellen Original-MP3s. Gehostet werden jedoch **didaktische Schüler-Eigenaufnahmen (Cover-Versionen von Übestücken)**. Diese sind zwar durch **§ 53 Abs. 1 UrhG** (Privatkopie im engsten Familienkreis) und **§ 60a UrhG** (Unterricht und Lehre) rechtlich privilegiert und rein nicht-öffentlich, dennoch können Verlage oder Verwertungsgesellschaften (GEMA, SUISA) unberechtigte Abmahnungen androhen.
+- **Erforderliche Deckung:** Mitversicherung von Urheberrechts-, Lizenz- und Markenrechtsverletzungen sowie passiver Rechtsschutz zur Abwehr unberechtigter Schutzrechtsabmahnungen.
 
 ### D. Cyber-Eigenschäden & Cloud-Infrastruktur-Zerstörung (First-Party)
 - **Architektur-Anker:** Hetzner Cloud Server, Docker-Compose, PostgreSQL-Storage.

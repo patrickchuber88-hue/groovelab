@@ -662,6 +662,30 @@ export const HelpCenterModal: React.FC<HelpCenterModalProps> = ({
       )
     },
     {
+      id: 'comp-subsidiarity-herrenberg',
+      title: 'Subsidiaritäts-Doktrin & Herrenberg-Compliance (BSG B 12 R 3/20 R)',
+      category: 'compliance',
+      roles: ['admin', 'secretary', 'teacher'],
+      badge: 'Schulrecht & Mitbestimmung',
+      summary: 'Campus-Groovelab als unterstützendes Fast-Track-Werkzeug, volle Übermittlungsfreiheit für Lehrkräfte.',
+      tags: ['subsidiarität', 'herrenberg', 'personalrat', 'betrvg', 'übermittlungsfreiheit', 'honorarkräfte', 'urheberrecht'],
+      details: (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '0.86rem', color: '#334155', lineHeight: 1.6 }}>
+          <p>
+            Campus-Groovelab ist als <strong>unterstützendes Fast-Track- und didaktisches Convenience-Werkzeug</strong> für den Musikschulalltag konzipiert und entlastet Schulleitungen und Kollegien rechtssicher:
+          </p>
+          <div style={{ background: '#f8fafc', borderRadius: '14px', padding: '14px', border: '1px solid #e2e8f0' }}>
+            <h5 style={{ margin: '0 0 6px 0', color: '#0f172a', fontWeight: 800 }}>⚖️ Die 3 rechtlichen Kernpfeiler:</h5>
+            <ul style={{ margin: 0, paddingLeft: '20px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <li><strong>Subsidiaritäts-Doktrin (Kein Zwang):</strong> Die Plattform ersetzt kein städtisches ERP-System (WinSchool, Musikschul-Manager). Offizielle Dienstwege, Weisungen und Arbeitsverträge verbleiben unverändert auf den primären Kanälen der Schule (E-Mail, MS Teams, Telefon, Post).</li>
+              <li><strong>Herrenberg-Immunität &amp; Übermittlungsfreiheit:</strong> Lehrkräfte (insbesondere freie Honorarkräfte) können ihren Stundenplan, Raumwünsche oder Terminverschiebungen schnell per App oder auf herkömmlichem Weg (per E-Mail, Telefon oder Zettel) an die Verwaltung übermitteln. Die App generiert unverbindliche Dispositionsvorschläge ohne Weisungscharakter.</li>
+              <li><strong>Schüler-Übungsaufnahmen &amp; Urheberrecht (§ 53 Abs. 1, § 60a UrhG):</strong> Schüler-Audios (z. B. Cover-Versionen von Unterrichtsstücken) dienen ausschließlich dem bilateralen pädagogischen Feedback und dem Teilen im privaten Kreis der Familie. Es findet kein öffentliches Streaming statt (GEMA- und urheberrechtskonform).</li>
+            </ul>
+          </div>
+        </div>
+      )
+    },
+    {
       id: 'comp-student-data-safety',
       title: 'Deine Privatsphäre & Kindersicherheit bei Campus-Groovelab',
       category: 'compliance',

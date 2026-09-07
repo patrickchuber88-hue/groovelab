@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import { generateEnterpriseSecurityWhitepaperPDF } from '../utils/securityWhitepaperGenerator';
 import { generateDpoComplianceDossierPDF } from '../utils/dpoComplianceDossierGenerator';
 import { generateStaffCouncilDeclarationPDF } from '../utils/staffCouncilDeclarationGenerator';
+import { logSecurityEvent } from '../services/auditLogService';
 
 interface AVVModalProps {
   isOpen: boolean;
@@ -115,6 +116,20 @@ export const AVVModal: React.FC<AVVModalProps> = ({ isOpen, onClose, school, onA
         console.error('Error updating AVV in Supabase:', updateError);
         throw updateError;
       }
+
+      // Revisionssicheres Audit-Logging in public.audit_logs (OWASP ASVS Level 3)
+      const auditChecksum = `SHA256-CG-AVV-${String(targetSchoolId).padStart(6, '0')}-DE`;
+      await logSecurityEvent({
+        action: 'AVV_CONTRACT_DIGITALLY_SIGNED',
+        schoolId: String(targetSchoolId),
+        targetId: String(targetSchoolId),
+        metadata: {
+          signee_title: trimmedName,
+          contract_version: 'Art. 28 DSGVO / Art. 9 nDSG v2026.1',
+          audit_checksum: auditChecksum,
+          signed_at: signedAt
+        }
+      });
 
       setSignedSuccess(true);
       if (onAVVSigned) onAVVSigned();
@@ -398,12 +413,13 @@ export const AVVModal: React.FC<AVVModalProps> = ({ isOpen, onClose, school, onA
           </div>
 
           <h4 style={{ fontSize: '0.88rem', fontWeight: 800, marginTop: '14px', color: '#0f172a' }}>
-            § 1 Gegenstand, Art &amp; Zweck der Verarbeitung, Kreidetafel-Doktrin &amp; Reine Metadaten (Art. 28 Abs. 3 lit. a DSGVO)
+            § 1 Gegenstand, Zweckbestimmung, Subsidiaritäts-Doktrin &amp; Reine Metadaten (Art. 28 Abs. 3 lit. a DSGVO)
           </h4>
           <p style={{ margin: '4px 0 12px 0' }}>
-            (1) Der Auftragnehmer erbringt für den Auftraggeber die Bereitstellung der webbasierten SaaS-Schulmanagement- und Übungsplattform <strong>Campus-Groovelab</strong>. Die Verarbeitung personenbezogener Daten erfolgt ausschließlich im Rahmen dieses Vertrags und auf dokumentierte Weisung des Auftraggebers.<br />
-            (2) <strong>Didaktisches Arbeitsmittel („Kreidetafel-Doktrin“) &amp; Ausschluss von Arbeitnehmerkontrolle:</strong> Die Plattform dient als rein didaktisch-organisatorisches Hilfsmittel zur Begleitung des Musikunterrichts. Eine automatisierte Überwachung, Anwesenheitskontrolle oder Leistungs- und Verhaltenskontrolle (§ 87 Abs. 1 Nr. 6 BetrVG / BPersVG) von Lehrkräften oder Honorarkräften findet nicht statt. Raum- und Stundenplanfunktionen stellen unverbindliche didaktische Dispositionsvorschläge dar.<br />
-            (3) <strong>Reine Metadaten-Architektur:</strong> Im Rahmen der Mediathek und Repertoire-Verwaltung werden keinerlei urheberrechtlich geschützte Noten-PDFs oder Notensätze gehostet oder verarbeitet, sondern ausschließlich freie bibliografische Metadaten (Titel, Interpret, Besetzung, Lehrwerk, Seitenzahlen) sowie autorisierte externe Verlinkungen (z. B. Spotify, YouTube, Tomplay).
+            (1) Der Auftragnehmer erbringt für den Auftraggeber die Bereitstellung der webbasierten SaaS-Schulmanagement- und didaktischen Übungsplattform <strong>Campus-Groovelab</strong>. Die Verarbeitung personenbezogener Daten erfolgt ausschließlich im Rahmen dieses Vertrags und auf dokumentierte Weisung des Auftraggebers.<br />
+            (2) <strong>Subsidiaritäts- &amp; Convenience-Doktrin („Fast-Track“) &amp; Ausschluss von Arbeitnehmerkontrolle:</strong> Campus-Groovelab fungiert als rein freiwilliges, unterstützendes Convenience- und Beschleunigungswerkzeug zur didaktischen Unterrichtsbegleitung. Die Plattform ersetzt weder das amtliche kommunale Schulverwaltungssystem (ERP wie WinSchool, Musikschul-Manager) noch die primären städtischen Kommunikationswege (E-Mail, MS Teams, Telefon, Post). Dienstliche Weisungen, Arbeitsanweisungen und der offizielle Schriftverkehr verbleiben ausnahmslos auf den herkömmlichen Dienstwegen. Eine automatisierte Überwachung, Anwesenheitskontrolle oder Leistungs- und Verhaltenskontrolle (§ 87 Abs. 1 Nr. 6 BetrVG / BPersVG) von Lehrkräften oder Honorarkräften findet nicht statt.<br />
+            (3) <strong>Herrenberg-Immunität (BSG B 12 R 3/20 R) &amp; Übermittlungsfreiheit:</strong> Stundenplan-, Raum- und Terminbelegungsfunktionen stellen unverbindliche didaktische Dispositionsvorschläge dar. Lehrkräften (insbesondere freien Honorarkräften) steht es vollkommen frei, Stundenpläne oder Terminverschiebungen digital über Campus-Groovelab zu disponieren oder auf herkömmlichem Weg (per E-Mail, Telefon oder Zettel) an die Schulverwaltung zu übermitteln. Die Plattform begründet kein Weisungsverhältnis und keinen Eingriff in die organisatorische Selbstständigkeit freier Mitarbeiter.<br />
+            (4) <strong>Reine Metadaten-Architektur &amp; Schüler-Übungsaufnahmen (§ 53 Abs. 1, § 60a UrhG):</strong> Im Rahmen der Mediathek und Repertoire-Verwaltung werden keinerlei urheberrechtlich geschützte Noten-PDFs oder kommerzielle Notensätze gehostet oder verarbeitet, sondern ausschließlich freie bibliografische Metadaten (Titel, Interpret, Besetzung, Lehrwerk, Seitenzahlen) sowie autorisierte externe Verlinkungen (z. B. Spotify, YouTube, Tomplay). Im Rahmen des Unterrichts gehostete Schüler-Übungsaufnahmen (z. B. didaktische Cover-Versionen geübter Stücke) dienen ausschließlich der individuellen didaktischen Rückmeldung und dem Teilen im geschlossenen privaten Kreis der Familie (§ 53 Abs. 1 UrhG). Ein öffentlicher Abruf oder Streaming findet nicht statt.
           </p>
 
           <h4 style={{ fontSize: '0.88rem', fontWeight: 800, marginTop: '14px', color: '#0f172a' }}>
@@ -478,6 +494,16 @@ export const AVVModal: React.FC<AVVModalProps> = ({ isOpen, onClose, school, onA
           <p style={{ margin: '4px 0 12px 0' }}>
             Die Speicherung und Löschung erfolgt nach dem strukturierten Kommunalen Löschkonzept (DIN 66398 / 5 Klassen): Temporäre Session-Daten verfallen sofort, didaktische Audio-Aufnahmen verbleiben für die Dauer des laufenden Schuljahres (mit Export-Möglichkeit) und werden zum 31.08. bereinigt, inaktive Schülerprofile wechseln nach 60 Tagen zum Budgetschutz der Musikschule in die Basis-Bereitstellung (0,09 €; Zugänge bleiben erhalten), und die Bildungsbiografie (Meisterwerke) wird nach Beendigung des Ausbildungsverhältnisses bzw. 30 Tage nach formeller Exmatrikulation physisch und unwiderruflich gelöscht. Der Auftraggeber erhält alle erforderlichen Nachweise zur Einhaltung der Pflichten nach Art. 28 DSGVO.
           </p>
+
+          <h4 style={{ fontSize: '0.88rem', fontWeight: 800, marginTop: '14px', color: '#0f172a' }}>
+            § 8 Haftung, Freistellung im Innenverhältnis &amp; Beweislast (Art. 82 DSGVO &amp; Art. 54 nDSG)
+          </h4>
+          <p style={{ margin: '4px 0 12px 0' }}>
+            (1) Die Parteien haften gegenüber betroffenen Personen nach den gesetzlichen Bestimmungen des Art. 82 DSGVO bzw. Art. 54 ff. nDSG.<br />
+            (2) <strong>Haftung im Innenverhältnis:</strong> Im Innenverhältnis zwischen den Parteien haftet der Auftragnehmer gegenüber dem Auftraggeber ausschließlich für Schäden, die auf einer schuldhaften Pflichtverletzung des Auftragnehmers gegen die ihm nach Art. 28 DSGVO spezifisch auferlegten Pflichten beruhen oder bei denen er unter Missachtung der rechtmäßig erteilten schriftlichen Weisungen des Auftraggebers gehandelt hat. Weist der Auftragnehmer nach, dass er für den Umstand, durch den der Schaden eingetreten ist, in keiner Weise verantwortlich ist (Art. 82 Abs. 3 DSGVO), ist eine Haftung im Innenverhältnis ausgeschlossen.<br />
+            (3) <strong>Vollständige Freistellung durch den Auftraggeber (Hold-Harmless):</strong> Der Auftraggeber stellt den Auftragnehmer vollumfänglich von sämtlichen Ansprüchen Dritter (insbesondere von Schülern, Erziehungsberechtigten, Lehrkräften oder Mitarbeitern) sowie von behördlichen Geldbußen, Verfahrens- und angemessenen Rechtsverteidigungskosten frei, die daraus resultieren, dass der Auftraggeber personenbezogene Daten ohne hinreichende Rechtsgrundlage in das System eingegeben, unzulässige oder rechtswidrige Weisungen erteilt, die erforderliche elterliche Zustimmung (Art. 8 DSGVO / Art. 6 nDSG) nicht ordnungsgemäß eingeholt oder gesetzliche Informationspflichten nach Art. 13, 14 DSGVO verletzt hat.<br />
+            (4) <strong>Haftungshöchstgrenze:</strong> Für sonstige Schäden aus oder im Zusammenhang mit dieser Vereinbarung gilt die im SaaS-Mietvertrag (AGB Teil A § 7) vereinbarte Haftungsbeschränkung und Haftungshöchstgrenze entsprechend.
+          </p>
         </div>
 
         {/* Signing Footer */}
@@ -511,7 +537,7 @@ export const AVVModal: React.FC<AVVModalProps> = ({ isOpen, onClose, school, onA
                     Gezeichnet durch: <strong>{school?.avv_signee_name || signeeName}</strong> am {new Date(school?.avv_signed_at || Date.now()).toLocaleDateString('de-DE')}
                   </div>
                   <div style={{ fontSize: '0.66rem', color: '#166534', fontFamily: 'monospace', marginTop: '2px', opacity: 0.85 }}>
-                    Audit-Prüfsumme: SHA256-CG-AVV-{school?.id ? String(school.id).padStart(6, '0') : '855992'}-DE
+                    Audit-Prüfsumme: SHA256-CG-AVV-{String(targetSchoolId || school?.id || '855992').padStart(6, '0')}-DE
                   </div>
                 </div>
               </div>

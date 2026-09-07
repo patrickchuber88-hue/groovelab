@@ -150,7 +150,7 @@ export async function generateDpoComplianceDossierPDF(options: DpoDossierOptions
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8);
     doc.setTextColor(textGray[0], textGray[1], textGray[2]);
-    const summaryText = 'Campus-Groovelab ist eine spezialisierte didaktische Software-Plattform für Musikschulen. Die Software wurde nach dem Grundsatz "Privacy by Design & by Default" (Art. 25 DSGVO) entwickelt. Zur Gewährleistung maximalen Schutzes für Minderjährige speichert die Plattform KEINE E-Mail-Adressen, KEINE Telefonnummern und KEINE Zahlungsdaten von Schülern. Schülernamen werden im Lehrerbereich standardmäßig auf Vorname + Initiale (z. B. Max M.) pseudonymisiert. Alle Daten werden in ISO 27001 zertifizierten Rechenzentren in Deutschland verarbeitet (100% EU-Hosting, 0% Drittlandtransfer).';
+    const summaryText = 'Campus-Groovelab ist eine spezialisierte didaktische Software-Plattform für Musikschulen, die als rein freiwilliges, unterstützendes Convenience-Werkzeug („Fast-Track“) zur Unterrichtsbegleitung dient. Sie ersetzt weder amtliche Schulverwaltungssysteme (ERP) noch offizielle städtische Dienstwege. Die Software wurde nach dem Grundsatz "Privacy by Design & by Default" (Art. 25 DSGVO) entwickelt. Zur Gewährleistung maximalen Schutzes für Minderjährige speichert die Plattform KEINE E-Mail-Adressen, KEINE Telefonnummern und KEINE Zahlungsdaten von Schülern. Schülernamen werden im Lehrerbereich standardmäßig auf Vorname + Initiale (z. B. Max M.) pseudonymisiert. 100% deutsches Hosting (ISO 27001, Hetzner), 0% Drittlandtransfer.';
     const splitSummary = doc.splitTextToSize(summaryText, contentWidth - 12);
     doc.text(splitSummary, margin + 6, curY + 15);
 
@@ -227,7 +227,7 @@ export async function generateDpoComplianceDossierPDF(options: DpoDossierOptions
       ['Bezeichnung der Tätigkeit:', 'Digitale Musikschulverwaltung, Raumplanung & didaktische Übebegleitung (Campus-Groovelab)'],
       ['Verantwortlicher Träger:', `${cleanSchoolName} (vertreten durch Schulleitung / Schulverwaltung)`],
       ['Auftragsverarbeiter (Art. 28):', 'Campus-Groovelab (Einzelunternehmen Patrick Huber, 79618 Rheinfelden, Deutschland)'],
-      ['Zweckbestimmung der Verarbeitung:', 'Koordination des Fachunterrichts, Raum- und Terminbelegung, Bereitstellung digitaler Hausaufgabennotizen & didaktische Audio-Übebegleitung ohne Werbefunktionen.'],
+      ['Zweckbestimmung der Verarbeitung:', 'Didaktisches Convenience- & Beschleunigungswerkzeug („Fast-Track“) zur Raum- & Terminabstimmung, Bereitstellung digitaler Hausaufgabennotizen & didaktische Audio-Übebegleitung ohne Werbefunktionen. Subsidiaritäts-Doktrin: Primäre Schulverwaltung (ERP) und Dienstwege verbleiben beim Träger. Gehostete Schüleraufnahmen (Cover) dienen rein didaktischem Feedback und dem privaten Familienkreis (§ 53 Abs. 1, § 60a UrhG).'],
       ['Rechtsgrundlagen (DSGVO):', 'Art. 6 Abs. 1 lit. b DSGVO (Unterrichtsvertrag der Erziehungsberechtigten)\nArt. 6 Abs. 1 lit. e DSGVO i.V.m. Landes-SchulG (Kommunale Bildungsaufgabe)\nArt. 6 Abs. 1 lit. a / Art. 8 DSGVO (Einwilligung für optionale Audioaufnahmen)'],
       ['Kategorien betroffener Personen:', 'Musikschüler/innen (Minderjährige), Erziehungsberechtigte, Lehrkräfte, Sekretariats- & Schulleitungspersonal'],
       ['Verarbeitete Datenkategorien:', 'Vorname, Nachname (im Lehrerbereich pseudonymisiert auf Anfangsbuchstabe "Max M."), Instrument, Raum- und Zeitdisposition, didaktische Übenotizen, freiwillige Audioaufnahmen.\nExplizit KEINE Speicherung von: Schüler-E-Mails, Passwörtern oder Bankverbindungen.'],
@@ -482,12 +482,16 @@ export async function generateDpoComplianceDossierPDF(options: DpoDossierOptions
         d: 'Es findet keine Auswertung, Messung oder Aggregation von Klickzahlen, Online-Zeiten, Reaktionsgeschwindigkeiten im Chat oder Erledigungsfristen für Lehrkräfte statt. Die Software erzeugt keine Verhaltensprofile.'
       },
       {
-        t: 'Keine Arbeitszeiterfassung (ArbZG-Abgrenzung)',
-        d: 'Die Plattform fungiert als reines didaktisches Dispositionsmittel ("Kreidetafel-Doktrin"). Sie enthält keine Stempeluhr und erfasst keine Arbeitszeiten oder Pausenzeiten der Lehrkräfte.'
+        t: 'Subsidiaritäts-Doktrin & Fast-Track Convenience',
+        d: 'Campus-Groovelab ist ein freiwilliges, unterstützendes Beschleunigungswerkzeug. Dienstliche Weisungen und Arbeitsverträge verbleiben auf den städtischen Primärkanälen (E-Mail, MS Teams, Post). Keine Weisungsbefugnis über die App.'
       },
       {
-        t: 'Herrenberg-Autonomie (BSG B 12 R 3/20 R Konformität)',
-        d: 'Raum- und Terminzuweisungen im Stundenplan-Designer stellen unverbindliche didaktische Abstimmungsvorschläge dar; es erfolgt keine arbeitgeberseitige Weisung oder Direktion.'
+        t: 'Herrenberg-Autonomie & Übermittlungsfreiheit (BSG B 12 R 3/20 R Konformität)',
+        d: 'Raum- und Terminzuweisungen im Stundenplan-Designer stellen unverbindliche didaktische Abstimmungsvorschläge dar. Volle Übermittlungsfreiheit für Lehrkräfte (per App oder herkömmlich per E-Mail/Telefon); keine arbeitgeberseitige Direktion.'
+      },
+      {
+        t: 'Keine Arbeitszeiterfassung (ArbZG-Abgrenzung)',
+        d: 'Die Plattform fungiert als reines didaktisches Dispositionsmittel ("Kreidetafel-Doktrin"). Sie enthält keine Stempeluhr und erfasst keine Arbeitszeiten oder Pausenzeiten der Lehrkräfte.'
       },
       {
         t: 'Recht auf Nichterreichbarkeit (§ 5 ArbSchG / Fürsorgepflicht)',

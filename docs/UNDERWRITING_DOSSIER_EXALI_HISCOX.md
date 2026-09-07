@@ -40,8 +40,8 @@ Bereitstellung, Hosting, Weiterentwicklung und Wartung der cloudbasierten Schulm
    - Band-Verwaltung & Repertoire-Planer
    - Song-Bibliotheken (reine bibliografische Metadaten gem. § 60a UrhG / Art. 19 URG)
    - Live Lab (Echtzeit-Band-Modul)
-3. **Event Coordinator (Veranstaltungsplanung):**
-   - Ablauf- und Bühnenplanung für Schulkonzerte und Musikschul-Festivals (`campus_events`)
+3. **Event Coordinator (Veranstaltungsplanung – ROADMAP):**
+   - Zukünftig geplantes Modul für Ablauf- und Bühnenplanung von Schulkonzerten (`campus_events`); derzeit **noch nicht im Live-Betrieb implementiert** (reine Roadmap-Planung).
 
 ### C. Kundengruppen & Vertragspartner
 - **B2B-Kunden:** Kommunale Schulträger, öffentlich-rechtliche und private Musikschulen, Bildungsträger (Vertragstyp: SaaS-Mietvertrag + AVV gem. Art. 28 DSGVO).
@@ -69,8 +69,12 @@ Bereitstellung, Hosting, Weiterentwicklung und Wartung der cloudbasierten Schulm
 > - **Eltern-Consent:** Mikrofonfunktion erfordert elterliche Freigabe im Elternbereich (`parent_allow_audio: true`).
 
 ### Frage 4: Werden urheberrechtlich geschützte Inhalte (Noten, MP3s, Videos) gehostet?
-> **Antwort: NEIN (Reine Metadaten-Architektur).**  
-> **Erläuterung:** Die Plattform speichert, hostet und vervielfältigt keine Noten-PDFs oder urheberrechtlich geschützte Verlagspartituren. Es werden ausschließlich Werk-Metadaten (Songtitel, Komponist, Lehrbuchtitel, Seitenzahlen) und Verweise auf lizenzierte Streamingdienste (Spotify, YouTube, Tomplay) verarbeitet. Ein elektronisches Melde- und Abhilfeverfahren (Notice-and-Takedown gem. Art. 6 & 16 Digital Services Act / DSA) an `copyright@campus-groovelab.de` ist live aktiv.
+> **Antwort: EINGESCHRÄNKT / NUR SCHÜLER-EIGENAUFNAHMEN (DIDAKTISCHE COVER-VERSIONEN IM PRIVATEN KREIS).**  
+> **Erläuterung:**  
+> - **Keine Verlagsnoten oder kommerziellen Original-MP3s:** Die Plattform speichert, hostet und vervielfältigt **zu 0 % urheberrechtlich geschützte Noten-PDFs, Leadsheets, Verlags-Partituren** oder kommerzielle Original-Masteraufnahmen/Audiodateien von Plattenlabels. Die Mediathek verarbeitet für Lehrwerke rein bibliografische Metadaten (Songtitel, Komponist, Lehrbuchtitel, Seitenzahlen) und Verlinkungen zu autorisierten Streaming-Diensten (Spotify, YouTube, Tomplay).  
+> - **Didaktische Schüler-Audioaufnahmen (Cover-Versionen):** Gehostet werden ausschließlich von den Schülern selbst im Rahmen des Instrumentalunterrichts oder beim häuslichen Üben eingespielte Audioaufnahmen (didaktische Cover-Versionen von Übestücken).  
+> - **Privilegierter, nicht-öffentlicher Kreis (§ 53, § 60a UrhG):** Diese Aufnahmen dienen rein didaktischen Zwecken zur Lernfortschrittskontrolle mit der Lehrkraft (§ 60a UrhG) sowie dem Anhören und Teilen im engsten privaten Familienkreis (§ 53 Abs. 1 UrhG / gesetzliche Privatkopie). Es existiert **keine öffentliche Mediathek, kein öffentliches Streaming und keine freie Auffindbarkeit im Internet**. Der Zugriff ist strikt auf das persönliche, PIN-geschützte Schüler- und Elternprofil beschränkt.  
+> - **DSA-Meldeverfahren:** Ein elektronisches Melde- und Abhilfeverfahren (Notice-and-Takedown gem. Art. 6 & 16 Digital Services Act / DSA) an `copyright@campus-groovelab.de` ist live aktiv.
 
 ### Frage 5: Wie hoch ist die vertraglich zugesicherte Verfügbarkeit (SLA)?
 > **Antwort: 99,5 % im Jahresmittel.**  
