@@ -170,6 +170,12 @@ export const CampusPinUnlockModal: React.FC<CampusPinUnlockModalProps> = ({
           });
           if (pinOk === true) isMatch = true;
         } else if (cleanInput.length === 6 || isSixDigits) {
+          // 🛡️ Volljährigkeits-Schutz (§ 2 BGB, §§ 1626, 1629 BGB, Art. 6, 8 DSGVO)
+          if (user?.is_adult && !user?.adult_allow_parent_access) {
+            alert('Dieser Schüler ist volljährig (§ 2 BGB). Der elterliche Einblick wurde zum Schutz der Privatsphäre deaktiviert.');
+            setPinInput('');
+            return;
+          }
           const { data: parentOk } = await supabase.rpc('verify_parent_pin', {
             student_id: user.id,
             input_pin: cleanInput

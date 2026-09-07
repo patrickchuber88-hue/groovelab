@@ -5390,28 +5390,35 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
             unsubmittedTeachersMap[u.id] = true;
           }
 
-          // Extract boards from planned_boards if DB schedules are missing for this teacher
+          // Extract boards from planned_boards: if a teacher has a submitted or approved draft, it is authoritative
           if (loadedDrafts.length > 0) {
             const targetDraft = (loadedSubmittedDraftId && loadedDrafts.find(d => d.id === loadedSubmittedDraftId)) || loadedDrafts[0];
-            if (targetDraft && Array.isArray(targetDraft.boards)) {
+            const hasValidBoards = targetDraft && Array.isArray(targetDraft.boards) && targetDraft.boards.some((b: any) => b.students && b.students.length > 0);
+
+            if (hasValidBoards) {
+              // Clear any stale database slots for this teacher so the designer draft governs
+              for (let d = 1; d <= 7; d++) {
+                delete teacherDays[`${u.id}_${d}`];
+              }
+
               targetDraft.boards.forEach((b: any) => {
                 if (b.dayOfWeek && b.students && b.students.length > 0) {
                   const key = `${u.id}_${b.dayOfWeek}`;
-                  if (!teacherDays[key] || teacherDays[key].length === 0) {
-                    teacherDays[key] = b.students.map((st: any) => ({
-                      id: `fallback_${u.id}_${st.id}`,
-                      school_id: schoolId,
-                      teacher_id: u.id,
-                      student_id: st.isBreak ? null : st.id,
-                      day_of_week: b.dayOfWeek,
-                      time_slot: st.assignedTime || b.startAnchor || '14:00',
-                      room_id: b.roomId || null,
-                      duration: st.duration || 30,
-                      status: 'ready_for_admin_review',
-                      instrument: st.instrument || 'Musiker',
-                      student_name: st.isBreak ? 'Pause' : `${st.first_name || ''} ${st.last_name || ''}`.trim() || 'Schüler'
-                    }));
-                  }
+                  teacherDays[key] = b.students.map((st: any) => ({
+                    id: `fallback_${u.id}_${st.id}`,
+                    school_id: schoolId,
+                    teacher_id: u.id,
+                    student_id: st.isBreak ? null : st.id,
+                    day_of_week: b.dayOfWeek,
+                    time_slot: st.assignedTime || b.startAnchor || '14:00',
+                    room_id: b.roomId || null,
+                    duration: st.duration || 30,
+                    status: (targetDraft as any)?.status || 'ready_for_admin_review',
+                    instrument: st.instrument || 'Musiker',
+                    student_name: st.isBreak ? 'Pause' : `${st.first_name || ''} ${st.last_name || ''}`.trim() || 'Schüler',
+                    isGroup: !!st.isGroup,
+                    groupStudents: st.groupStudents || []
+                  }));
                 }
               });
             }
@@ -9406,31 +9413,47 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
         const targetRoomId = plan.roomId;
 
         if (plan.teacherId && plan.teacherId !== 'groovelab') {
-          // Batch: update existing schedules
+          // Batch: purge stale schedules for this teacher & day of week to prevent duplicate/ghost accumulation
           scheduleUpdatePromises.push(
             supabase
               .from('schedules')
-              .update({ room_id: targetRoomId, status: 'approved' })
+              .delete()
               .eq('school_id', schoolId)
               .eq('teacher_id', plan.teacherId)
               .eq('day_of_week', plan.dayOfWeek)
           );
 
-          // Collect synthetic/missing slots for single bulk insert
+          // Collect clean active slots from approved plan
           if (plan.slots && plan.slots.length > 0) {
             for (const slot of plan.slots) {
-              if (!isUUID(slot.id)) {
-                slotsToInsert.push({
-                  school_id: schoolId,
-                  teacher_id: plan.teacherId,
-                  student_id: slot.student_id || null,
-                  day_of_week: plan.dayOfWeek,
-                  time_slot: slot.time_slot || slot.startTime || '14:00',
-                  room_id: targetRoomId,
-                  duration: slot.duration || 30,
-                  status: 'approved',
-                  instrument: slot.instrument || plan.instrument || 'Musiker'
-                });
+              if (!slot.isBreak) {
+                if (slot.isGroup && slot.groupStudents && slot.groupStudents.length > 0) {
+                  slot.groupStudents.forEach((gs: any) => {
+                    slotsToInsert.push({
+                      school_id: schoolId,
+                      teacher_id: plan.teacherId,
+                      student_id: gs.id,
+                      day_of_week: plan.dayOfWeek,
+                      time_slot: slot.time_slot || slot.startTime || '14:00',
+                      room_id: targetRoomId,
+                      duration: slot.duration || 30,
+                      status: 'approved',
+                      instrument: gs.instrument || slot.instrument || plan.instrument || 'Musiker'
+                    });
+                  });
+                } else if (slot.student_id) {
+                  slotsToInsert.push({
+                    school_id: schoolId,
+                    teacher_id: plan.teacherId,
+                    student_id: slot.student_id,
+                    day_of_week: plan.dayOfWeek,
+                    time_slot: slot.time_slot || slot.startTime || '14:00',
+                    room_id: targetRoomId,
+                    duration: slot.duration || 30,
+                    status: 'approved',
+                    instrument: slot.instrument || plan.instrument || 'Musiker'
+                  });
+                }
               }
             }
           }
@@ -9440,9 +9463,6 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
           teacherRoomMap[plan.teacherId][plan.dayOfWeek] = plan.roomId || null;
         }
       }
-
-      // ─── WAVE 1: Core DB writes (fully parallel) ───────────────────────────
-      // Run schedule updates, slot insert, teacher users fetch all at once
 
       const groovelabRoomsMap: Record<number, string | null> = {};
       assignedPlans.forEach((p: any) => {
@@ -9460,18 +9480,20 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
         }
       }
 
-      const [, , teacherUsersResult] = await Promise.all([
-        // 1. All schedule status/room updates
-        Promise.all(scheduleUpdatePromises),
-        // 2. Single bulk insert for synthetic slots
+      // ─── WAVE 1: Core DB writes ───────────────────────────────────────────
+      // 1. Purge stale schedules first so delete and insert do not race
+      if (scheduleUpdatePromises.length > 0) {
+        await Promise.all(scheduleUpdatePromises);
+      }
+
+      // 2. Insert clean approved slots, fetch teacher users, and update opening hours
+      const [, teacherUsersResult] = await Promise.all([
         slotsToInsert.length > 0
           ? supabase.from('schedules').insert(slotsToInsert).then(({ error }) => {
-              if (error) console.error('[SecretaryDashboard] Error inserting missing schedules:', error);
+              if (error) console.error('[SecretaryDashboard] Error inserting clean schedules:', error);
             })
           : Promise.resolve(),
-        // 3. Fetch teacher users (needed for planned_boards update)
         supabase.from('users').select('*').eq('school_id', schoolId),
-        // 4. Opening hours update for GrooveLab rooms (fire alongside others)
         opHoursChanged
           ? supabase.from('schools').update({ opening_hours: updatedOpHours }).eq('id', schoolId)
           : Promise.resolve()
@@ -9542,12 +9564,15 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
           const dayNum = typeof day_of_week === 'number' ? day_of_week : (parseInt(day_of_week, 10) || 1);
 
           const current = new Date(today);
+          current.setHours(0, 0, 0, 0);
           const currentDay = current.getDay() || 7;
           const diff = dayNum - currentDay;
           const targetDate = new Date(current);
           targetDate.setDate(current.getDate() + diff);
 
-          if (targetDate < today) {
+          const todayZero = new Date(today);
+          todayZero.setHours(0, 0, 0, 0);
+          if (targetDate < todayZero) {
             targetDate.setDate(targetDate.getDate() + 7);
           }
 

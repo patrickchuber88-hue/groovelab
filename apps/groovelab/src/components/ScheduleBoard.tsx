@@ -32,7 +32,8 @@ import {
   Sliders,
   RotateCcw,
   Grid3X3,
-  MoreVertical
+  MoreVertical,
+  Coffee
 } from 'lucide-react';
 import { useRealNamesVisibility, maskLastName, formatSingleStudentAnonymized, formatGroupStudentsAnonymized, formatCombinedStudentNames, getGroupTypeLabel } from '../utils/nameHelper';
 import { ScheduleCalendarView } from './ScheduleCalendarView';
@@ -699,8 +700,8 @@ function ScheduleBoardMobileView({ schoolId, userId }: ScheduleBoardProps) {
       selector: "tour-special-features"
     },
     {
-      title: "Einloggen & Senden 🚀",
-      description: "Wenn dein Stundenplan-Entwurf fertig ist, klicke auf 'Einloggen & Senden', um ihn zur Freigabe an die Verwaltung zu übermitteln.",
+      title: "Terminvorschlag abstimmen 🚀",
+      description: "Wenn dein Stundenplan-Entwurf fertig abgestimmt ist, klicke auf 'Abstimmen & Freigeben', um ihn zur Freigabe an die Schulleitung zu übermitteln.",
       selector: "tour-submit-section"
     }
   ], []);
@@ -1709,8 +1710,23 @@ function ScheduleBoardMobileView({ schoolId, userId }: ScheduleBoardProps) {
 
       if (schedData && schedData.length > 0) {
         setHasSubmittedSchedule(true);
-        // Default submittedDraftId to current active draft if none was saved in DB
-        const finalSubmittedId = loadedSubmittedDraftId || loadedActiveDraftId;
+        // Resolve canonical submitted draft ID: strictly prefer explicitly submitted/approved draft
+        let finalSubmittedId = '';
+        if (loadedSubmittedDraftId && loadedDrafts.some(d => d.id === loadedSubmittedDraftId)) {
+          finalSubmittedId = loadedSubmittedDraftId;
+        } else {
+          const approvedOrPendingDraft = loadedDrafts.find(d => (d as any).status === 'approved' || (d as any).status === 'ready_for_admin_review');
+          if (approvedOrPendingDraft) {
+            finalSubmittedId = approvedOrPendingDraft.id;
+          } else {
+            const draftWithMostStudents = [...loadedDrafts].sort((a, b) => {
+              const aCount = a.boards?.reduce((acc, brd) => acc + (brd.students?.length || 0), 0) || 0;
+              const bCount = b.boards?.reduce((acc, brd) => acc + (brd.students?.length || 0), 0) || 0;
+              return bCount - aCount;
+            })[0];
+            finalSubmittedId = draftWithMostStudents?.id || '';
+          }
+        }
         setSubmittedDraftId(finalSubmittedId);
 
         // Determine schedule review/approval status by looking at non-break schedules
@@ -2659,8 +2675,8 @@ function ScheduleBoardMobileView({ schoolId, userId }: ScheduleBoardProps) {
 
       const draftStateToSave = {
         activeDraftId: currentActiveId,
-        submittedDraftId: currentActiveId,
-        submittedAt: new Date().toISOString(),
+        submittedDraftId: submittedDraftId || '',
+        submittedAt: submittedDraftId ? (lastSubmittedTime || '') : '',
         drafts: updatedDrafts,
         allTeacherStudentIds,
         unassignedStudentIds
@@ -2683,121 +2699,15 @@ function ScheduleBoardMobileView({ schoolId, userId }: ScheduleBoardProps) {
         console.warn('[ScheduleBoard] users view persistence note:', viewErr);
       }
 
-      await supabase
-        .from('schedules')
-        .delete()
-        .eq('teacher_id', selectedTeacherId);
+      // HERMETIC SANDBOX INVARIANT:
+      // An unsubmitted draft must NEVER mutate `schedules` or `schedule_occurrences`!
+      // Production database tables remain 100% untouched until formal secretariat approval.
 
-      const inserts = [];
-      for (const board of validBoards) {
-        for (const s of board.students) {
-          const rawTime = s.assignedTime || board.startAnchor || '14:00';
-          const slotTime = snapTimeToGrid(rawTime, gridSnapMinutes || 15);
-          if (s.isGroup && s.groupStudents) {
-            for (const gs of s.groupStudents) {
-              inserts.push({
-                school_id: effectiveSchoolId,
-                teacher_id: selectedTeacherId,
-                student_id: gs.id,
-                day_of_week: board.dayOfWeek,
-                time_slot: slotTime,
-                room_id: board.roomId || null,
-                duration: s.duration || 30,
-                status: 'ready_for_admin_review',
-                instrument: gs.instrument || 'Musiker'
-              });
-            }
-          } else {
-            inserts.push({
-              school_id: effectiveSchoolId,
-              teacher_id: selectedTeacherId,
-              student_id: s.isBreak ? null : s.id,
-              day_of_week: board.dayOfWeek,
-              time_slot: slotTime,
-              room_id: board.roomId || null,
-              duration: s.duration || 30,
-              status: s.isBreak ? 'approved' : 'ready_for_admin_review',
-              instrument: s.isBreak ? null : (s.instrument || 'Musiker')
-            });
-          }
-        }
-      }
-
-      if (inserts.length > 0) {
-        const { data: insertedSchedules, error: insErr } = await supabase
-          .from('schedules')
-          .insert(inserts)
-          .select();
-
-        if (insErr) {
-          console.error('[ScheduleBoard] Error inserting schedules into Supabase:', insErr);
-        }
-
-        const occurrences: any[] = [];
-        const today = new Date();
-        const y = today.getFullYear();
-        const m = String(today.getMonth() + 1).padStart(2, '0');
-        const d = String(today.getDate()).padStart(2, '0');
-        const todayStr = `${y}-${m}-${d}`;
-
-        const schoolStartYear = today.getMonth() >= 8 ? today.getFullYear() : today.getFullYear() - 1;
-        const schoolYearEnd = new Date(`${schoolStartYear + 1}-08-31T23:59:59`);
-
-        (insertedSchedules || []).forEach((sch: any) => {
-          const { id: scheduleId, student_id, teacher_id, day_of_week, time_slot, duration } = sch;
-          if (!student_id || !day_of_week || !time_slot) return;
-          const dayNum = typeof day_of_week === 'number' ? day_of_week : (parseInt(day_of_week, 10) || 1);
-
-          const current = new Date(today);
-          const currentDay = current.getDay() || 7;
-          const diff = dayNum - currentDay;
-          const targetDate = new Date(current);
-          targetDate.setDate(current.getDate() + diff);
-
-          if (targetDate < today) {
-            targetDate.setDate(targetDate.getDate() + 7);
-          }
-
-          while (targetDate <= schoolYearEnd) {
-            const ty = targetDate.getFullYear();
-            const tm = String(targetDate.getMonth() + 1).padStart(2, '0');
-            const td = String(targetDate.getDate()).padStart(2, '0');
-            const dateStr = `${ty}-${tm}-${td}`;
-
-            const startTime = time_slot.includes(':') && time_slot.split(':').length === 2 ? time_slot + ':00' : time_slot;
-            occurrences.push({
-              schedule_id: scheduleId,
-              student_id,
-              teacher_id,
-              date: dateStr,
-              start_time: startTime,
-              duration: duration || 45,
-              status: 'scheduled'
-            });
-
-            targetDate.setDate(targetDate.getDate() + 7);
-          }
-        });
-
-        await supabase
-          .from('schedule_occurrences')
-          .delete()
-          .eq('teacher_id', selectedTeacherId)
-          .gte('date', todayStr);
-
-        if (occurrences.length > 0) {
-          await supabase
-            .from('schedule_occurrences')
-            .insert(occurrences);
-        }
-      }
-
-      setHasUnsubmittedEdits(false);
       if (showToastNotification) {
-        setToast({ message: 'Stundenplan zur Freigabe an die Verwaltung übermittelt! 🚀', type: 'success' });
+        setToast({ message: 'Entwurf erfolgreich gesichert! 💾', type: 'success' });
       }
     } catch (err) {
-      console.error('Error auto-saving schedule to Supabase:', err);
+      console.error('Error auto-saving schedule draft:', err);
     }
   };
 
@@ -4397,7 +4307,79 @@ function ScheduleBoardMobileView({ schoolId, userId }: ScheduleBoardProps) {
     try {
       setSubmitting(true);
       const validBoards = boards.filter(b => b.students.length > 0);
-      await persistScheduleToSupabase(validBoards, true);
+      const currentActiveId = activeDraftIdRef.current || activeDraftId;
+      
+      const now = new Date();
+      const formattedDate = now.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+      const formattedTime = now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+      const submitTimeString = `am ${formattedDate} um ${formattedTime} Uhr`;
+
+      // 1. Mark this specific draft as submitted
+      setSubmittedDraftId(currentActiveId);
+      setLastSubmittedTime(submitTimeString);
+      setHasSubmittedSchedule(true);
+      setScheduleStatus('pending');
+
+      const boardDefinitions = validBoards.map(b => ({
+        id: b.id,
+        dayOfWeek: b.dayOfWeek,
+        startAnchor: b.startAnchor,
+        roomId: b.roomId,
+        students: b.students.map(s => ({
+          id: s.id,
+          first_name: s.first_name,
+          last_name: s.last_name,
+          instrument: s.instrument,
+          duration: s.duration,
+          assignedDay: s.assignedDay,
+          assignedTime: s.assignedTime,
+          isBreak: s.isBreak,
+          customStartTime: s.customStartTime,
+          isGroup: s.isGroup,
+          groupStudents: s.groupStudents
+        }))
+      }));
+
+      const currentDraftsList = draftsRef.current.length > 0 ? draftsRef.current : drafts;
+      const updatedDrafts = currentDraftsList.map(d => {
+        if (d.id === currentActiveId) {
+          return { ...d, status: 'ready_for_admin_review', boards: boardDefinitions, submittedAt: now.toISOString() };
+        }
+        return d;
+      });
+      draftsRef.current = updatedDrafts;
+      setDrafts(updatedDrafts);
+
+      const allTeacherStudentIds = Array.from(new Set(
+        students
+          .flatMap(s => s.isGroup && s.groupStudents ? s.groupStudents.map(gs => gs.id) : [s.id])
+          .filter(id => id && !id.startsWith('group-') && !id.startsWith('break-'))
+      ));
+      const unassignedStudentIds = students
+        .filter(s => !s.isBreak && !s.assignedDay)
+        .flatMap(s => s.isGroup && s.groupStudents ? s.groupStudents.map(gs => gs.id) : [s.id])
+        .filter(id => id && !id.startsWith('group-') && !id.startsWith('break-'));
+
+      const draftStateToSave = {
+        activeDraftId: currentActiveId,
+        submittedDraftId: currentActiveId,
+        submittedAt: now.toISOString(),
+        drafts: updatedDrafts,
+        allTeacherStudentIds,
+        unassignedStudentIds
+      };
+
+      const activePlatform = localStorage.getItem('groovelab_active_platform') || 'groovelab';
+      localStorage.setItem(`groovelab_teacher_draft_state_${activePlatform}_${selectedTeacherId}`, JSON.stringify(draftStateToSave));
+
+      await supabase
+        .from('users')
+        .update({
+          planned_boards: draftStateToSave,
+          campus_räume: draftStateToSave,
+          groovelab_räume: draftStateToSave
+        })
+        .eq('id', selectedTeacherId);
 
       // Trigger alert notification for Secretariat
       const { data: teacherProfile } = await supabase
@@ -4407,8 +4389,8 @@ function ScheduleBoardMobileView({ schoolId, userId }: ScheduleBoardProps) {
         .single();
 
       const teacherName = teacherProfile ? `${teacherProfile.first_name} ${teacherProfile.last_name}` : 'Lehrkraft';
-      const unassignedStudentsCount = students.filter(s => !s.isBreak && !s.assignedDay).length;
-      const totalAssignedCount = boards.reduce((acc, b) => acc + b.students.filter(s => !s.isBreak && s.assignedTime).length, 0);
+      const unassignedStudentsCount = unassignedStudentIds.length;
+      const totalAssignedCount = validBoards.reduce((acc, b) => acc + b.students.filter(s => !s.isBreak && s.assignedTime).length, 0);
       const totalCount = totalAssignedCount + unassignedStudentsCount;
 
       const alertMsg = unassignedStudentsCount > 0
@@ -4425,15 +4407,10 @@ function ScheduleBoardMobileView({ schoolId, userId }: ScheduleBoardProps) {
       // Generate PDF Backup & Celebration
       await generatePDFBackup(validBoards, students);
       setShowCelebration(true);
-      setHasSubmittedSchedule(true);
-      setScheduleStatus('pending');
-      const now = new Date();
-      const formattedDate = now.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
-      const formattedTime = now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
-      setLastSubmittedTime(`am ${formattedDate} um ${formattedTime} Uhr`);
+      setToast({ message: 'Stundenplan zur Prüfung an die Verwaltung übermittelt! Bis zur Freigabe bleibt der bisherige Plan aktiv. 🚀', type: 'success' });
     } catch (err: any) {
-      console.error('Error saving schedule:', err);
-      await showAlert('Fehler beim Speichern: ' + err.message);
+      console.error('Error submitting schedule:', err);
+      await showAlert('Fehler beim Einreichen: ' + err.message);
     } finally {
       setSubmitting(false);
     }
@@ -4798,6 +4775,11 @@ function ScheduleBoardMobileView({ schoolId, userId }: ScheduleBoardProps) {
         >
           {onboardingSubmitting ? 'Wird gespeichert...' : 'Verfügbarkeit speichern & Stundenplan freischalten'}
         </button>
+
+        {/* ⚖️ Gesetzlicher Hinweis gem. § 16 Abs. 2 ArbZG / BAG-Rechtsprechung */}
+        <div style={{ marginTop: '12px', textAlign: 'center', fontSize: '0.70rem', color: '#64748b', lineHeight: '1.4', background: 'rgba(0,0,0,0.02)', padding: '6px 10px', borderRadius: '8px', border: '1px solid rgba(0,0,0,0.04)' }}>
+          ⚖️ <strong>Hinweis gem. § 16 Abs. 2 ArbZG:</strong> Der Stundenplan-Designer ist ein didaktisches Koordinierungsinstrument und ersetzt kein betriebliches Zeiterfassungssystem.
+        </div>
       </div>
     );
   }
@@ -4879,7 +4861,16 @@ function ScheduleBoardMobileView({ schoolId, userId }: ScheduleBoardProps) {
         <ScheduleCalendarView 
           schoolId={schoolId} 
           userId={selectedTeacherId} 
-          boards={drafts.find(d => d.id === submittedDraftId)?.boards || drafts.find(d => d.id === activeDraftId)?.boards || boards} 
+          boards={(() => {
+            // Das Stundenplan-Board bezieht sich immer 1:1 wasserdicht auf die eingereichten/genehmigten Termine des Stundenplan-Designers:
+            const targetDraft = 
+              (submittedDraftId && drafts.find(d => d.id === submittedDraftId)) ||
+              drafts.find(d => (d as any).status === 'approved') ||
+              drafts.find(d => (d as any).status === 'ready_for_admin_review') ||
+              drafts.find(d => d.id === activeDraftId) ||
+              drafts[0];
+            return targetDraft?.boards || [];
+          })()} 
           activeTab={activeTab} 
           setActiveTab={setActiveTab} 
           teachers={teachers}
@@ -5221,7 +5212,7 @@ function ScheduleBoardMobileView({ schoolId, userId }: ScheduleBoardProps) {
                   onMouseOut={e => e.currentTarget.style.transform = 'none'}
                 >
                   <Send size={13} />
-                  <span>{submitting ? 'Wird gesendet...' : 'Einloggen & Senden'}</span>
+                  <span>{submitting ? 'Wird übermittelt...' : 'Abstimmen & Freigeben'}</span>
                 </button>
               </div>
             </div>
@@ -5237,9 +5228,9 @@ function ScheduleBoardMobileView({ schoolId, userId }: ScheduleBoardProps) {
             <CheckCircle size={36} strokeWidth={2.5} />
           </div>
           <div>
-            <h3 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#1d1d1f', margin: 0, letterSpacing: '-0.02em' }}>Erfolgreich eingeloggt! 🎉</h3>
+            <h3 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#1d1d1f', margin: 0, letterSpacing: '-0.02em' }}>Terminvorschlag übermittelt! 🎉</h3>
             <p style={{ color: '#86868b', fontSize: '0.85rem', fontWeight: 500, marginTop: '8px', lineHeight: 1.4 }}>
-              Dein dynamischer Stundenplan wurde sicher gespeichert und zur Freigabe an die Verwaltung übermittelt. Eltern erhalten automatisch Push-Benachrichtigungen zur Bestätigung.
+              Dein pädagogischer Stundenplan-Vorschlag wurde sicher gespeichert und zur einvernehmlichen Freigabe an die Schulleitung übermittelt. Eltern erhalten nach Freigabe automatisch die Terminbestätigung.
             </p>
           </div>
           <button
@@ -5460,7 +5451,7 @@ function ScheduleBoardMobileView({ schoolId, userId }: ScheduleBoardProps) {
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <span style={{ fontSize: '1rem' }}>⚠️</span>
-                <span>Du hast den Stundenplan angepasst. Klicke auf <strong>"Einloggen & Senden"</strong>, um deine Korrekturen dauerhaft zu speichern.</span>
+                <span>Du hast den Stundenplan angepasst. Klicke auf <strong>"Abstimmen & Freigeben"</strong>, um deinen Terminvorschlag zur Freigabe zu übermitteln.</span>
               </div>
             </div>
           )}
@@ -6444,7 +6435,106 @@ function ScheduleBoardMobileView({ schoolId, userId }: ScheduleBoardProps) {
                         const cardHeightPx = bs.duration * PX_PER_MIN - 4;
 
                         if (bs.isBreak) {
-                          return null; // Do not display gap/break cards in schedule column
+                          const [bsh, bsm] = parseTime(bs.assignedTime || board.startAnchor);
+                          const endTotalMin = bsh * 60 + bsm + (bs.duration || 15);
+                          const endHours = Math.floor(endTotalMin / 60) % 24;
+                          const endMins = endTotalMin % 60;
+                          const breakEndTime = `${String(endHours).padStart(2, '0')}:${String(endMins).padStart(2, '0')}`;
+                          const breakStartTime = bs.assignedTime || `${String(bsh).padStart(2, '0')}:${String(bsm).padStart(2, '0')}`;
+
+                          return (
+                            <div
+                              key={bs.id}
+                              draggable={true}
+                              onDragStart={(e) => handleDragStart(bs.id, 'board', board.id, e)}
+                              onDragEnd={handleDragEnd}
+                              onDragOver={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setDragOverBoardId(board.id);
+                                setDragOverIndex(cardIndex);
+                              }}
+                              onDrop={(e) => { e.stopPropagation(); handleDropOnBoard(board.id, cardIndex); }}
+                              className="designer-student-card"
+                              style={{
+                                position: 'absolute',
+                                left: 0,
+                                right: 0,
+                                top: `${Math.max(cardTopPx, 0)}px`,
+                                height: `${Math.max(cardHeightPx, 32)}px`,
+                                background: 'linear-gradient(135deg, #ffffff 0%, #fefce8 100%)',
+                                border: '1px solid #fef08a',
+                                borderLeft: '4px solid #f59e0b',
+                                borderRadius: '10px',
+                                padding: '4px 8px',
+                                boxSizing: 'border-box',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                cursor: 'grab',
+                                boxShadow: '0 2px 6px rgba(245, 158, 11, 0.08)',
+                                zIndex: 10,
+                                userSelect: 'none'
+                              }}
+                            >
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
+                                <div style={{
+                                  width: '20px',
+                                  height: '20px',
+                                  borderRadius: '6px',
+                                  background: 'rgba(245, 158, 11, 0.15)',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  color: '#d97706',
+                                  flexShrink: 0
+                                }}>
+                                  <Coffee size={12} />
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'baseline', gap: '5px', minWidth: 0 }}>
+                                  <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#854d0e', letterSpacing: '-0.01em' }}>
+                                    {breakStartTime}–{breakEndTime}
+                                  </span>
+                                  <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#a16207' }}>
+                                    Pause
+                                  </span>
+                                </div>
+                              </div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+                                <span style={{
+                                  fontSize: '0.6rem',
+                                  fontWeight: 800,
+                                  background: 'rgba(245, 158, 11, 0.16)',
+                                  color: '#b45309',
+                                  padding: '1px 5px',
+                                  borderRadius: '5px'
+                                }}>
+                                  {bs.duration || 15}m
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleRemoveStudentFromBoard(board.id, bs.id);
+                                  }}
+                                  title="Pause löschen"
+                                  style={{
+                                    background: 'none',
+                                    border: 'none',
+                                    padding: '2px',
+                                    color: '#a16207',
+                                    cursor: 'pointer',
+                                    borderRadius: '4px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center'
+                                  }}
+                                >
+                                  <X size={12} />
+                                </button>
+                              </div>
+                            </div>
+                          );
                         }
 
                         const isSubmitted = hasSubmittedSchedule && activeDraftId === submittedDraftId;
@@ -9024,7 +9114,7 @@ function ScheduleBoardMobileView({ schoolId, userId }: ScheduleBoardProps) {
                     🗑️ Alle Zuteilungen zurücksetzen
                   </button>
                   <button type="button" onClick={() => { handleLockAndSend(); setShowDesignerToolsSheet(false); }} style={{ padding: '14px', borderRadius: '14px', background: 'linear-gradient(135deg, #34a853 0%, #2e7d32 100%)', border: 'none', color: '#ffffff', fontWeight: 800, fontSize: '0.92rem', cursor: 'pointer', textAlign: 'center', boxShadow: '0 4px 14px rgba(52, 168, 83, 0.35)', marginTop: '4px' }}>
-                    🚀 Einloggen & Senden
+                    🚀 Abstimmen & Freigeben
                   </button>
                 </div>
               </div>
@@ -9235,6 +9325,13 @@ function ScheduleBoardMobileView({ schoolId, userId }: ScheduleBoardProps) {
     )}
 
       {activeTab === 'calendar' ? <CalendarTourComponent /> : <DesignerTourComponent />}
+
+      {/* ⚖️ Gesetzlicher Hinweis gem. § 16 Abs. 2 ArbZG / BAG-Rechtsprechung */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '10px 16px', margin: '14px auto 4px auto', background: 'rgba(255, 255, 255, 0.7)', border: '1px solid rgba(0, 0, 0, 0.05)', borderRadius: '12px', maxWidth: '780px', width: '100%', boxSizing: 'border-box' }}>
+        <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600, textAlign: 'center', lineHeight: 1.4 }}>
+          ⚖️ <strong>Hinweis gem. § 16 Abs. 2 ArbZG:</strong> Der Stundenplan-Designer ist ein pädagogisches Koordinierungsinstrument zur Abstimmung von Unterrichtseinheiten und ersetzt kein betriebliches Arbeitszeiterfassungssystem.
+        </span>
+      </div>
     </div>
   );
 }

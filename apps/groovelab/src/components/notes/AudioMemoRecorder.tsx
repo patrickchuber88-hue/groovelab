@@ -114,7 +114,17 @@ export const AudioMemoRecorder: React.FC<AudioMemoRecorderProps> = ({
     setIsRecording(false);
   };
 
+  const isGhostMode = typeof window !== 'undefined' && (
+    sessionStorage.getItem('groovelab_support_ghost') === 'true' ||
+    user?.id === 'master-support-id' ||
+    (user as any)?.is_ghost_mode === true
+  );
+
   const handleTogglePlay = () => {
+    if (isGhostMode) {
+      alert('🔒 Audio-Wiedergabe im Support-Modus aus Vertraulichkeitsgründen (§ 201 StGB) gesperrt.');
+      return;
+    }
     if (!audioPlayerRef.current) return;
     if (isPlaying) {
       audioPlayerRef.current.pause();
@@ -338,22 +348,24 @@ export const AudioMemoRecorder: React.FC<AudioMemoRecorderProps> = ({
               />
               <button
                 onClick={handleTogglePlay}
+                disabled={isGhostMode}
+                title={isGhostMode ? "Audio-Wiedergabe im Support-Modus aus Vertraulichkeitsgründen (§ 201 StGB) gesperrt" : undefined}
                 style={{
-                  background: '#f1f5f9',
-                  color: '#334155',
+                  background: isGhostMode ? '#f8fafc' : '#f1f5f9',
+                  color: isGhostMode ? '#94a3b8' : '#334155',
                   border: '1px solid #cbd5e1',
                   padding: '6px 12px',
                   borderRadius: '10px',
                   fontSize: '0.78rem',
                   fontWeight: 750,
-                  cursor: 'pointer',
+                  cursor: isGhostMode ? 'not-allowed' : 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '6px'
                 }}
               >
-                {isPlaying ? <Pause size={14} /> : <Play size={14} />}
-                <span>{isPlaying ? 'Pause' : 'Anhören'}</span>
+                {isGhostMode ? <Lock size={14} /> : isPlaying ? <Pause size={14} /> : <Play size={14} />}
+                <span>{isGhostMode ? '🔒 Gesperrt (§ 201 StGB)' : isPlaying ? 'Pause' : 'Anhören'}</span>
               </button>
 
               <button

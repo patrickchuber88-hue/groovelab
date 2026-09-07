@@ -73,19 +73,19 @@ export const OfflineStatusBadge: React.FC<OfflineStatusBadgeProps> = ({ floating
         onClick={handleManualSync}
         style={{
           background: !offlineState.isOnline 
-            ? 'rgba(15, 23, 42, 0.90)' 
-            : (offlineState.isSyncing ? 'rgba(15, 23, 42, 0.90)' : 'rgba(22, 101, 52, 0.92)'),
+            ? 'rgba(6, 78, 59, 0.95)' 
+            : (offlineState.isSyncing ? 'rgba(15, 23, 42, 0.92)' : 'rgba(22, 101, 52, 0.94)'),
           backdropFilter: 'blur(16px)',
           WebkitBackdropFilter: 'blur(16px)',
           color: '#ffffff',
           borderRadius: '24px',
-          padding: '8px 14px',
-          border: '1px solid rgba(255, 255, 255, 0.15)',
-          boxShadow: '0 8px 24px -4px rgba(0, 0, 0, 0.25)',
+          padding: '8px 16px',
+          border: '1px solid rgba(255, 255, 255, 0.20)',
+          boxShadow: '0 8px 24px -4px rgba(0, 0, 0, 0.35)',
           display: 'flex',
           alignItems: 'center',
           gap: '8px',
-          fontSize: '0.74rem',
+          fontSize: '0.75rem',
           fontWeight: 750,
           cursor: offlineState.isOnline && offlineState.totalPending > 0 ? 'pointer' : 'default',
           userSelect: 'none',
@@ -95,8 +95,8 @@ export const OfflineStatusBadge: React.FC<OfflineStatusBadgeProps> = ({ floating
       >
         {!offlineState.isOnline ? (
           <>
-            <CloudOff size={14} color="#f87171" style={{ flexShrink: 0 }} />
-            <span>Offline – Lokal gesichert {offlineState.totalPending > 0 && `(${offlineState.totalPending})`}</span>
+            <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#34d399', boxShadow: '0 0 10px #34d399', flexShrink: 0 }} />
+            <span>🟢 Offline-Tresor aktiv · Stundenpläne &amp; Hausaufgaben lokal verfügbar {offlineState.totalPending > 0 && `(${offlineState.totalPending} bereit)`}</span>
           </>
         ) : offlineState.isSyncing ? (
           <>
@@ -110,7 +110,7 @@ export const OfflineStatusBadge: React.FC<OfflineStatusBadgeProps> = ({ floating
         ) : recentlySynced ? (
           <>
             <Check size={14} color="#4ade80" style={{ flexShrink: 0 }} />
-            <span>Alle Daten synchronisiert</span>
+            <span>✨ Wieder online · Daten synchronisiert</span>
           </>
         ) : (
           <>

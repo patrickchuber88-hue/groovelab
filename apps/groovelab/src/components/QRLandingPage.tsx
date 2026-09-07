@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
-import { Music, Shield, Clock, CheckCircle, AlertTriangle, Flame, Zap, /* Car, */ Calendar, MapPin, User, Check, Sparkles, Play, Pause, BookOpen, X, FileText, ArrowLeft, Mail, CreditCard, Lock, Settings, Key, Users, Trophy, MessageSquare, Timer, ChevronDown, Smartphone, Award, ExternalLink, ShieldCheck, CheckCheck, Download, Target, Radio, BarChart3, Fingerprint, Delete, Send, RotateCcw } from 'lucide-react';
+import { Music, Shield, Clock, CheckCircle, AlertTriangle, Flame, Zap, /* Car, */ Calendar, MapPin, User, Check, Sparkles, Play, Pause, BookOpen, X, FileText, ArrowLeft, Mail, CreditCard, Lock, Settings, Key, Users, Trophy, MessageSquare, Timer, ChevronDown, Smartphone, Award, ExternalLink, ShieldCheck, CheckCheck, Download, Target, Radio, BarChart3, Fingerprint, Delete, Send, RotateCcw, Share2, Printer, Copy } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { maskLastName, cleanHomeworkNotesText, formatTeacherFullName } from '../utils/nameHelper';
 import { isWebAuthnSupported, registerUserBiometrics, getStoredBiometricProfiles } from '../utils/webauthn';
@@ -189,6 +189,8 @@ interface ProfileData {
   is_trial?: boolean;
   trial_ends_at?: string | null;
   exempt_from_direct_billing?: boolean;
+  is_adult?: boolean | null;
+  adult_allow_parent_access?: boolean | null;
   has_parent_pin?: boolean | null;
   has_personal_pin?: boolean | null;
   personal_pin?: string | null;
@@ -398,6 +400,8 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
   const [loadingDashboard, setLoadingDashboard] = useState(false);
   const [practiceLoggedToday, setPracticeLoggedToday] = useState(false);
   const [avatar, setAvatar] = useState<any | null>(null);
+  const [isHomeworkShareMenuOpen, setIsHomeworkShareMenuOpen] = useState(false);
+  const [isHomeworkCopied, setIsHomeworkCopied] = useState(false);
 
   const [schoolFokusLevels, setSchoolFokusLevels] = useState<any>(null);
 
@@ -3119,6 +3123,12 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
 
       // 1. Try parent PIN verification (6 digits or explicit parent mode)
       if (pinToVerify.length === 6 || isParentPinMode) {
+        if (profile?.is_adult && !profile?.adult_allow_parent_access) {
+          setPinError('Dieser Schüler ist volljährig (§ 2 BGB). Der elterliche Einblick wurde zum Schutz der Privatsphäre deaktiviert.');
+          setPinInput('');
+          setPinLoading(false);
+          return;
+        }
         const { data: parentOk } = await supabase.rpc('verify_parent_pin', {
           student_id: profile.id,
           input_pin: pinToVerify
@@ -3645,7 +3655,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
 
   const handleAcknowledgeOccurrence = async (occ: any) => {
     try {
-      const isRescheduled = occ.status === 'pending_reschedule' || (occ.original_date && occ.original_date !== occ.date && occ.status !== 'rescheduled_confirmed');
+      const isRescheduled = occ.status === 'pending_reschedule' || occ.status === 'rescheduled' || (occ.original_date && occ.original_date !== occ.date && occ.status !== 'rescheduled_confirmed');
       const updateData: any = { student_acknowledged: true };
       if (isRescheduled) {
         updateData.status = 'rescheduled_confirmed';
@@ -3657,10 +3667,168 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         .eq('id', occ.id);
       if (error) throw error;
       
+      setOccurrences((prev: any[]) => prev.map((o: any) => o.id === occ.id ? { ...o, student_acknowledged: true, status: 'rescheduled_confirmed' } : o));
       await fetchDashboardData();
     } catch (err) {
       console.error('Error acknowledging occurrence:', err);
     }
+  };
+
+  // ── ⚡ 1-Klick-Express-Bestätigung für Eltern bei Terminänderungen ─────────────
+  const unconfirmedRescheduledOcc = useMemo(() => {
+    return (occurrences || []).find((occ: any) => {
+      if (!occ) return false;
+      const isCanceled = ['cancelled', 'teacher_sick', 'canceled_by_student', 'canceled_by_teacher_sick'].includes(occ.status);
+      if (isCanceled) return false;
+      const isConfirmed = occ.student_acknowledged === true || occ.status === 'rescheduled_confirmed';
+      if (isConfirmed) return false;
+      const isShifted = occ.status === 'pending_reschedule' || occ.status === 'rescheduled' ||
+        Boolean(occ.original_date && occ.original_date !== occ.date) ||
+        Boolean(occ.original_start_time && occ.start_time && occ.original_start_time.substring(0, 5) !== occ.start_time.substring(0, 5));
+      return isShifted;
+    });
+  }, [occurrences]);
+
+  const renderExpressRescheduleCard = () => {
+    if (!unconfirmedRescheduledOcc) return null;
+
+    const occ = unconfirmedRescheduledOcc;
+    const origDateStr = occ.original_date ? new Date(occ.original_date + 'T00:00:00').toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' }) : null;
+    const origTimeStr = occ.original_start_time ? occ.original_start_time.substring(0, 5) : null;
+    const newDateStr = new Date(occ.date + 'T00:00:00').toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long' });
+    const newTimeStr = occ.start_time ? occ.start_time.substring(0, 5) : '';
+    const roomName = occ.room_override_name || occ.room_name || occ.schedule?.room?.name || 'Groovelab Raum';
+    const teacherName = formatTeacherFullName(occ.teacher?.first_name, occ.teacher?.last_name) || 'deiner Lehrkraft';
+
+    return (
+      <div style={{
+        width: '100%',
+        maxWidth: '440px',
+        background: 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)',
+        border: '1.5px solid #fde68a',
+        borderRadius: '24px',
+        padding: '18px 20px',
+        boxShadow: '0 10px 25px -5px rgba(217, 119, 6, 0.12)',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '12px',
+        boxSizing: 'border-box'
+      }}>
+        {/* Header */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div style={{
+            width: '38px',
+            height: '38px',
+            borderRadius: '12px',
+            background: '#fef08a',
+            color: '#b45309',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 2px 8px rgba(217, 119, 6, 0.2)',
+            flexShrink: 0
+          }}>
+            <Clock size={20} strokeWidth={2.5} />
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <span style={{ fontSize: '0.68rem', fontWeight: 900, color: '#b45309', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              🔔 Terminänderung
+            </span>
+            <h4 style={{ margin: '1px 0 0 0', fontSize: '1.02rem', fontWeight: 900, color: '#78350f', letterSpacing: '-0.02em' }}>
+              Bitte neuen Termin bestätigen
+            </h4>
+          </div>
+        </div>
+
+        {/* Schedule Details */}
+        <div style={{
+          background: '#ffffff',
+          borderRadius: '16px',
+          padding: '12px 14px',
+          border: '1px solid #fef08a',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '6px'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', flexWrap: 'wrap', gap: '4px' }}>
+            <span style={{ fontSize: '0.74rem', color: '#92400e', fontWeight: 700 }}>Neuer Termin:</span>
+            <span style={{ fontSize: '0.90rem', fontWeight: 900, color: '#16a34a' }}>
+              {newDateStr}, {newTimeStr} Uhr
+            </span>
+          </div>
+
+          {(origDateStr || origTimeStr) && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', flexWrap: 'wrap', gap: '4px' }}>
+              <span style={{ fontSize: '0.74rem', color: '#94a3b8', fontWeight: 650 }}>Ursprünglich:</span>
+              <span style={{ fontSize: '0.78rem', color: '#64748b', textDecoration: 'line-through', fontWeight: 600 }}>
+                {origDateStr ? `${origDateStr}, ` : ''}{origTimeStr ? `${origTimeStr} Uhr` : ''}
+              </span>
+            </div>
+          )}
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', borderTop: '1px solid #fef3c7', paddingTop: '6px', marginTop: '2px' }}>
+            <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>Lehrkraft: {teacherName}</span>
+            <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>Raum: {roomName}</span>
+          </div>
+        </div>
+
+        {/* Action Buttons: 1-Click Accept vs Question */}
+        <div style={{ display: 'flex', gap: '8px', width: '100%' }}>
+          <button
+            type="button"
+            onClick={() => handleAcknowledgeOccurrence(occ)}
+            style={{
+              flex: 2,
+              background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
+              color: '#ffffff',
+              border: 'none',
+              borderRadius: '14px',
+              padding: '12px 14px',
+              fontSize: '0.86rem',
+              fontWeight: 900,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px',
+              boxShadow: '0 4px 14px rgba(34, 197, 94, 0.35)',
+              transition: 'all 0.15s ease'
+            }}
+            className="hover-scale-mini"
+          >
+            <Check size={16} strokeWidth={2.8} />
+            <span>Termin annehmen</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setActiveChatOcc(occ);
+            }}
+            style={{
+              flex: 1,
+              background: '#ffffff',
+              color: '#475569',
+              border: '1px solid #cbd5e1',
+              borderRadius: '14px',
+              padding: '12px 10px',
+              fontSize: '0.82rem',
+              fontWeight: 800,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '5px',
+              transition: 'all 0.15s ease'
+            }}
+            className="hover-scale-mini"
+          >
+            <MessageSquare size={14} strokeWidth={2.2} />
+            <span>Rückfrage</span>
+          </button>
+        </div>
+      </div>
+    );
   };
 
   const handleRejectReschedule = async (occ: any) => {
@@ -3763,7 +3931,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
       } catch (e) {}
 
       // 2. Try verify_parent_pin RPC
-      if (!isVerified) {
+      if (!isVerified && !(profile?.is_adult && !profile?.adult_allow_parent_access)) {
         try {
           const { data: parentOk } = await supabase.rpc('verify_parent_pin', {
             student_id: profile.id,
@@ -5233,6 +5401,93 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
       );
     }
 
+    const getHomeworkShareText = () => {
+      const sName = profile?.first_name || 'Schüler';
+      const sSchool = profile?.school_name || 'Campus-Groovelab';
+      const lines: string[] = [];
+      lines.push(`🎵 Campus-Groovelab • ${sSchool}`);
+      lines.push(`Wochenplan (KW ${currentKw}) für ${sName}`);
+      lines.push('');
+
+      if (lehrwerkeList.length > 0) {
+        lines.push('📖 LEHRWERKE:');
+        lehrwerkeList.forEach((lw: any) => {
+          const pagesStr = lw.pages && lw.pages.length > 0 ? ` (Seite ${lw.pages.join(', ')})` : '';
+          lines.push(`• ${lw.title}${pagesStr}`);
+        });
+        lines.push('');
+      }
+
+      if (otherHWs.length > 0) {
+        lines.push('🎵 SONGS & THEMEN:');
+        otherHWs.forEach((it: any) => {
+          const t = (it.topic_name || it.title || '').replace(/\s*\([^)]*\)\s*$/, '');
+          lines.push(`• ${t}`);
+        });
+        lines.push('');
+      }
+
+      if (notesList.length > 0) {
+        lines.push('📝 NOTIZEN:');
+        notesList.forEach((n: string) => {
+          lines.push(`• ${cleanHomeworkNotesText(n)}`);
+        });
+        lines.push('');
+      }
+
+      lines.push('📱 Web-App & Aufnahmen:');
+      lines.push(window.location.href);
+
+      return lines.join('\n');
+    };
+
+    const handleParentShare = async () => {
+      const text = getHomeworkShareText();
+      const sName = profile?.first_name || 'Schüler';
+      if (typeof navigator !== 'undefined' && 'share' in navigator) {
+        try {
+          await navigator.share({
+            title: `Hausaufgaben KW ${currentKw} - ${sName}`,
+            text: text,
+            url: window.location.href
+          });
+          setIsHomeworkShareMenuOpen(false);
+          return;
+        } catch {
+          // Fallback or user cancelled
+        }
+      }
+      handleCopyHomeworkText();
+    };
+
+    const handleCopyHomeworkText = () => {
+      try {
+        const text = getHomeworkShareText();
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text);
+        } else {
+          const ta = document.createElement('textarea');
+          ta.value = text;
+          document.body.appendChild(ta);
+          ta.select();
+          document.execCommand('copy');
+          document.body.removeChild(ta);
+        }
+        setIsHomeworkCopied(true);
+        setTimeout(() => {
+          setIsHomeworkCopied(false);
+          setIsHomeworkShareMenuOpen(false);
+        }, 2000);
+      } catch (err) {
+        console.warn('Clipboard write failed', err);
+      }
+    };
+
+    const handlePrintHomework = () => {
+      setIsHomeworkShareMenuOpen(false);
+      window.print();
+    };
+
     return (
       <div style={{
         borderRadius: '20px',
@@ -5265,6 +5520,138 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
             <span style={{ fontSize: '0.88rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em' }}>
               Schülervorschau (KW {currentKw})
             </span>
+          </div>
+
+          {/* 📤 Eltern-Export: WhatsApp-frei (AirDrop, System-Share, Clipboard & Print) */}
+          <div style={{ position: 'relative' }}>
+            <button
+              type="button"
+              onClick={() => setIsHomeworkShareMenuOpen(prev => !prev)}
+              style={{
+                background: isHomeworkShareMenuOpen ? '#ffffff' : '#f1f5f9',
+                border: '1px solid #e2e8f0',
+                borderRadius: '100px',
+                padding: '4px 10px',
+                fontSize: '0.74rem',
+                fontWeight: 800,
+                color: '#334155',
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
+                boxShadow: isHomeworkShareMenuOpen ? '0 2px 8px rgba(0,0,0,0.06)' : 'none',
+                transition: 'all 0.15s ease'
+              }}
+              className="hover-scale-mini"
+              title="Wochenplan teilen, kopieren oder drucken"
+            >
+              <Share2 size={12} color="#475569" strokeWidth={2.2} />
+              <span>Teilen / Drucken</span>
+              <ChevronDown size={11} color="#64748b" style={{ transform: isHomeworkShareMenuOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s ease' }} />
+            </button>
+
+            {isHomeworkShareMenuOpen && (
+              <div style={{
+                position: 'absolute',
+                top: 'calc(100% + 6px)',
+                right: 0,
+                zIndex: 9999,
+                minWidth: '220px',
+                background: '#ffffff',
+                borderRadius: '16px',
+                border: '1px solid #e2e8f0',
+                boxShadow: '0 16px 36px -4px rgba(15, 23, 42, 0.16), 0 4px 12px rgba(0,0,0,0.05)',
+                padding: '6px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '2px',
+                animation: 'fadeIn 0.15s ease'
+              }}>
+                <button
+                  type="button"
+                  onClick={handleParentShare}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    width: '100%',
+                    padding: '8px 10px',
+                    background: 'transparent',
+                    border: 'none',
+                    borderRadius: '10px',
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    color: '#0f172a',
+                    fontSize: '0.78rem',
+                    fontWeight: 750
+                  }}
+                >
+                  <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: '#f0fdf4', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#16a34a', flexShrink: 0 }}>
+                    <Share2 size={13} strokeWidth={2.2} />
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    <span>Wochenplan weiterleiten</span>
+                    <span style={{ fontSize: '0.65rem', fontWeight: 500, color: '#64748b' }}>AirDrop, Familie, Chat</span>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleCopyHomeworkText}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    width: '100%',
+                    padding: '8px 10px',
+                    background: isHomeworkCopied ? '#f0fdf4' : 'transparent',
+                    border: 'none',
+                    borderRadius: '10px',
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    color: isHomeworkCopied ? '#16a34a' : '#0f172a',
+                    fontSize: '0.78rem',
+                    fontWeight: 750
+                  }}
+                >
+                  <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: isHomeworkCopied ? '#dcfce7' : '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', color: isHomeworkCopied ? '#16a34a' : '#64748b', flexShrink: 0 }}>
+                    {isHomeworkCopied ? <Check size={13} strokeWidth={2.5} /> : <Copy size={13} strokeWidth={2.2} />}
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    <span>{isHomeworkCopied ? 'Kopiert!' : 'Text kopieren'}</span>
+                    <span style={{ fontSize: '0.65rem', fontWeight: 500, color: isHomeworkCopied ? '#16a34a' : '#64748b' }}>Für Notizen & To-Do-Listen</span>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handlePrintHomework}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    width: '100%',
+                    padding: '8px 10px',
+                    background: 'transparent',
+                    border: 'none',
+                    borderRadius: '10px',
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    color: '#0f172a',
+                    fontSize: '0.78rem',
+                    fontWeight: 750
+                  }}
+                >
+                  <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#2563eb', flexShrink: 0 }}>
+                    <Printer size={13} strokeWidth={2.2} />
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    <span>Drucken / PDF sichern</span>
+                    <span style={{ fontSize: '0.65rem', fontWeight: 500, color: '#64748b' }}>Für Notenständer & Kühlschrank</span>
+                  </div>
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
@@ -7379,6 +7766,9 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                 Profil Inaktiv
               </div>
             </div>
+
+            {/* ⚡ 1-Klick-Express-Bestätigung für Eltern bei Terminänderungen */}
+            {renderExpressRescheduleCard()}
 
             {/* Main Info Box */}
             <div style={{...styles.card, padding: '24px', gap: '20px'}}>
@@ -9800,6 +10190,8 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                     </div>
                   </div>
                 )}
+                {/* ⚡ 1-Klick-Express-Bestätigung für Eltern bei Terminänderungen */}
+                {renderExpressRescheduleCard()}
                 {renderLessonInfoCard(lessonToday, isLessonDay, nextLessonInfo)}
                 {renderSegmentedControl()}
                 {activeTab === 'action' ? (

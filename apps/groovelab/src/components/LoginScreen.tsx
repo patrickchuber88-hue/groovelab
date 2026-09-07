@@ -583,7 +583,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
   const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
   const [error, setError] = useState<string | null>(null);
-  const [legalModalTab, setLegalModalTab] = useState<'impressum' | 'privacy' | 'terms' | 'cancellation' | 'terminate' | null>(null);
+  const [legalModalTab, setLegalModalTab] = useState<'impressum' | 'privacy' | 'terms' | 'cancellation' | null>(null);
   const [showDpoPortalModal, setShowDpoPortalModal] = useState(false);
   const [firstNameFocused, setFirstNameFocused] = useState(false);
   const [lastNameFocused, setLastNameFocused] = useState(false);
@@ -7199,15 +7199,6 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           onMouseOut={(e) => { e.currentTarget.style.color = isGroovelabKiosk ? '#854d0e' : '#4ade80'; }}
         >
           Widerruf
-        </span>
-        <span style={{ opacity: 0.4 }}>•</span>
-        <span 
-          onClick={() => setLegalModalTab('terminate')} 
-          style={{ cursor: 'pointer', transition: 'color 0.2s' }} 
-          onMouseOver={(e) => { e.currentTarget.style.color = isGroovelabKiosk ? '#713f12' : '#ffffff'; }}
-          onMouseOut={(e) => { e.currentTarget.style.color = isGroovelabKiosk ? '#854d0e' : '#4ade80'; }}
-        >
-          Verträge hier kündigen
         </span>
         <span style={{ opacity: 0.4 }}>•</span>
         <span 

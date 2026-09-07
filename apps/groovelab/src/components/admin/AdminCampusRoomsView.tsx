@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect } from "react";
 import {
   ArrowLeft, Box, Calendar, Check, CheckCircle2, ChevronDown, ChevronLeft,
-  ChevronRight, Clock, Disc, DoorClosed, ExternalLink, Eye, Hourglass, Lock,
+  ChevronRight, Clock, Disc, DoorClosed, ExternalLink, Eye, Hourglass, Info, Lock,
   MapPin, Maximize2, Music, Plus, Search, Sliders, Star, Trash2, Users,
   Volume2, X, XCircle, Zap
 } from "lucide-react";
@@ -2535,7 +2535,7 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
                                 }}
                               >
                                 <Plus size={13} strokeWidth={2.6} />
-                                <span>Buchen</span>
+                                <span>Anfragen</span>
                               </button>
                             </div>
                           );
@@ -2771,7 +2771,7 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
                   }}
                 >
                   <Plus size={16} strokeWidth={2.6} />
-                  <span>Raum buchen</span>
+                  <span>Raum anfragen</span>
                 </button>
               </div>
             </div>
@@ -3672,7 +3672,7 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
                   }}
                 >
                   <Zap size={14} color={!showMyBookingsOnly ? brandColor : '#64748b'} strokeWidth={2.4} />
-                  <span>Raum buchen</span>
+                  <span>Raum anfragen</span>
                 </button>
                 <button
                   type="button"
@@ -3870,7 +3870,7 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
                               ) : (
                                 <>
                                   <Clock size={11} strokeWidth={2.4} style={{ color: '#9a3412' }} />
-                                  <span>Unbestätigt</span>
+                                  <span>Unter Vorbehalt (Sekretariat prüft)</span>
                                 </>
                               )}
                             </span>
@@ -3955,7 +3955,7 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
                     <div style={{ background: `${brandColor}15`, color: brandColor, padding: '4px', borderRadius: '8px', display: 'flex', alignItems: 'center' }}>
                       <Zap size={13} strokeWidth={2.5} />
                     </div>
-                    <span>Raum buchen</span>
+                    <span>Raumanfrage</span>
                   </h3>
                   <select
                     value={selectedCampusRoomId || ''}
@@ -4397,9 +4397,29 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
                       ? (selectedBooking?.isSchedule ? 'Als Einzeltermin übernehmen' : 'Änderung speichern')
                       : bookingTargetType === 'external'
                         ? 'Externe Blockierung speichern'
-                        : `${selectedRoom.name} buchen`}
+                        : `${selectedRoom.name} unter Vorbehalt anfragen`}
 
                 </button>
+
+                {/* ℹ️ Subsidiaritäts- & Vorbehalts-Hinweis */}
+                <div style={{
+                  background: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '10px',
+                  padding: '8px 12px',
+                  fontSize: '0.69rem',
+                  color: '#64748b',
+                  lineHeight: 1.4,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  marginTop: '4px'
+                }}>
+                  <Info size={13} style={{ flexShrink: 0, color: '#0284c7' }} />
+                  <span>
+                    <strong>Voranfrage unter Vorbehalt:</strong> Die verbindliche Raumzuteilung erfolgt nach Prüfung durch das Schulsekretariat im Schul-ERP.
+                  </span>
+                </div>
 
                 {isEditing && !selectedBooking?.isSchedule && (
                   <button
@@ -4748,7 +4768,7 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
                     </div>
                     <div>
                       <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em' }}>
-                        {selectedBooking ? 'Raumbuchung verwalten' : `${selectedRoom?.name || 'Raum'} buchen`}
+                        {selectedBooking ? 'Raumbuchung verwalten' : `${selectedRoom?.name || 'Raum'} anfragen (unter Vorbehalt)`}
                       </h3>
                       <p style={{ margin: '2px 0 0 0', fontSize: '0.74rem', color: '#64748b', fontWeight: 600 }}>
                         {new Date(bookingDate).toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' })}
@@ -5046,8 +5066,27 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
                       }}
                     >
                       <span>🟢</span>
-                      <span>{isEditing ? 'Buchung jetzt anpassen' : 'Raum jetzt verbindlich buchen'}</span>
+                      <span>{isEditing ? 'Raumanfrage anpassen' : 'Raumanfrage unter Vorbehalt senden'}</span>
                     </button>
+
+                    {/* ℹ️ Subsidiaritäts- & Vorbehalts-Hinweis */}
+                    <div style={{
+                      background: '#f8fafc',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '10px',
+                      padding: '8px 12px',
+                      fontSize: '0.69rem',
+                      color: '#64748b',
+                      lineHeight: 1.4,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px'
+                    }}>
+                      <Info size={13} style={{ flexShrink: 0, color: '#0284c7' }} />
+                      <span>
+                        <strong>Voranfrage unter Vorbehalt:</strong> Die verbindliche Raumzuteilung erfolgt nach Prüfung durch das Schulsekretariat im Schul-ERP.
+                      </span>
+                    </div>
 
                     {isEditing && (
                       <button

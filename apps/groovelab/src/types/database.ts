@@ -31,6 +31,10 @@ export interface DbUser {
   group_id?: string;
   schools?: DbSchool;
   employment_type?: 'employed' | 'freelance';
+  is_adult?: boolean;
+  adult_verified_at?: string;
+  adult_verified_by?: string;
+  adult_allow_parent_access?: boolean;
 }
 
 export interface DbBand {

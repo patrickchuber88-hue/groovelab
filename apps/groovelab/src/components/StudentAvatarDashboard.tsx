@@ -1813,6 +1813,76 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       alert('Der DSGVO-Auskunftsbericht konnte nicht exportiert werden.');
     }
   };
+
+  // Must-Have 4: DSGVO Art. 20 Full Data Portability JSON Archive Export
+  const handleExportFullDataArchive = async () => {
+    try {
+      const fullStudentName = formatStudentPureFirstName(studentUser?.first_name, 'Schueler');
+      const safeName = fullStudentName.replace(/[^a-zA-Z0-9_-]/g, '_');
+      const now = new Date();
+      const dateStr = now.toISOString().split('T')[0];
+
+      // Gather all local recordings metadata
+      const localRecordingsStr = typeof window !== 'undefined' ? localStorage.getItem(`campus_junior_recordings_${studentId}`) || '[]' : '[]';
+      let localRecordings: any[] = [];
+      try {
+        localRecordings = JSON.parse(localRecordingsStr);
+      } catch {}
+
+      // Gather local homework notes
+      const localHomeworkNotesStr = typeof window !== 'undefined' ? localStorage.getItem(`campus_homework_notes_${studentId}`) || '[]' : '[]';
+      let localHomeworkNotes: any[] = [];
+      try {
+        localHomeworkNotes = JSON.parse(localHomeworkNotesStr);
+      } catch {}
+
+      const currentLevelKey = (draftUiLevel ?? (studentUser as any)?.campus_ui_level ?? (localStorage.getItem('campus_student_ui_level') || 'junior')) as 'junior' | 'teen' | 'pro';
+
+      const archivePayload = {
+        meta: {
+          platform: 'Campus-Groovelab',
+          export_standard: 'Art. 20 Abs. 1 DSGVO (Recht auf Datenübertragbarkeit)',
+          generated_at: now.toISOString(),
+          student_id: studentId,
+          school_name: (studentUser as any)?.schools?.name || 'Campus-Groovelab Partner-Musikschule',
+          instrument: studentUser?.instrument || 'Instrumentalunterricht'
+        },
+        profile: {
+          first_name: studentUser?.first_name || '',
+          instrument: studentUser?.instrument || '',
+          campus_ui_level: currentLevelKey
+        },
+        practice_metrics: {
+          total_practice_minutes: totalPracticeMinutes || 0,
+          streak_days: avatar?.streak_flame || 1,
+          current_xp: currentXp || 0,
+          mastered_missions_count: (progressItems || []).filter((p: any) => p.status === 'MASTERED' || p.status === 'THEORY_DONE').length
+        },
+        homework_notes_history: localHomeworkNotes,
+        progress_items: progressItems || [],
+        audio_recordings_metadata: localRecordings.map((r: any) => ({
+          id: r.id,
+          title: r.title || r.name || 'Übe-Aufnahme',
+          duration_seconds: r.duration || 0,
+          created_at: r.created_at || r.timestamp || now.toISOString()
+        })),
+        stickers_unlocked: Object.values(unifiedStickersMap || {}).filter((s: any) => s?.isUnlocked)
+      };
+
+      const blob = new Blob([JSON.stringify(archivePayload, null, 2)], { type: 'application/json;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `CampusGroovelab_Datenarchiv_${safeName}_${dateStr}.json`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Error exporting full data archive:', err);
+      alert('Das vollständige Datenarchiv konnte nicht exportiert werden.');
+    }
+  };
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -3239,17 +3309,17 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     const fullTeacherName = rawTeacherFullName || fallbackTeacherName;
     const teacherPhrase = fullTeacherName ? `deiner Lehrkraft ${fullTeacherName}` : 'deiner Lehrkraft';
 
-    // Altersgerechtes Wording für Junior, Teen und Pro
-    const pedagogicalNotice = '💡 Hinweis: Da deine Musikstunde fest für dich reserviert ist, werden deine Eltern und deine Lehrkraft automatisch über diese Absage informiert.';
+    // Altersgerechtes Wording für Junior, Teen und Pro (Rechtliches Boten-Modell)
+    const contractualNotice = '📋 Hinweis: Die Plattform übermittelt deine Absage als Bote an deine Lehrkraft. Für eventuelle Nachholansprüche oder Ausfallhonorare gelten ausschließlich die Regelungen deines Musikschulvertrags.';
     let confirmMsg = '';
     if (skipPinCheck) {
-      confirmMsg = `Möchtest du den Unterrichtstermin am ${formattedDate} bei ${teacherPhrase} verbindlich absagen?\n\n${pedagogicalNotice}`;
+      confirmMsg = `Möchtest du die Absage für den Unterrichtstermin am ${formattedDate} an ${teacherPhrase} übermitteln?\n\n${contractualNotice}`;
     } else if (studentUiLevel === 'junior') {
-      confirmMsg = `Möchtest du ${teacherPhrase} Bescheid geben, dass du am ${formattedDate} fehlst?\n\n${pedagogicalNotice}\n\n(Deine Eltern haben dir erlaubt, dich für diesen Termin selbst abzumelden.)`;
+      confirmMsg = `Möchtest du ${teacherPhrase} Bescheid geben, dass du am ${formattedDate} fehlst?\n\n💡 Hinweis: Deine Eltern und deine Lehrkraft werden automatisch über diese Absage informiert.\n\n(Deine Eltern haben dir erlaubt, dich für diesen Termin selbst abzumelden.)`;
     } else if (studentUiLevel === 'teen') {
-      confirmMsg = `Möchtest du deinen Unterrichtstermin am ${formattedDate} bei ${teacherPhrase} absagen?\n\n${pedagogicalNotice}`;
+      confirmMsg = `Möchtest du die Absage für deinen Unterrichtstermin am ${formattedDate} an ${teacherPhrase} übermitteln?\n\n${contractualNotice}`;
     } else {
-      confirmMsg = `Möchtest du deinen Unterrichtstermin am ${formattedDate} bei ${teacherPhrase} verbindlich absagen?\n\n${pedagogicalNotice}`;
+      confirmMsg = `Möchtest du die Absage für deinen Unterrichtstermin am ${formattedDate} an ${teacherPhrase} übermitteln?\n\n${contractualNotice}`;
     }
 
     if (!confirm(confirmMsg)) return;
@@ -11816,6 +11886,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
         handleCloseSettingsModal={handleCloseSettingsModal}
         handleDownloadGoBdReceipt={handleDownloadGoBdReceipt}
         handleExportGdprReport={handleExportGdprReport}
+        handleExportFullDataArchive={handleExportFullDataArchive}
         handleOpenSettingsModule={handleOpenSettingsModule}
         handleRemoveFamilyProfile={handleRemoveFamilyProfile}
         handleSetInstantLock={handleSetInstantLock}

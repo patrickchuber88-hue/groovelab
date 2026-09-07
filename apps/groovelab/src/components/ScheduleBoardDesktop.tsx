@@ -15,6 +15,8 @@ import {
   Sparkles,
   MapPin,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Info,
   X,
   Search,
@@ -29,7 +31,8 @@ import {
   Sliders,
   RotateCcw,
   Grid3X3,
-  MoreVertical
+  MoreVertical,
+  Coffee
 } from 'lucide-react';
 import { useRealNamesVisibility, maskLastName } from '../utils/nameHelper';
 import { ScheduleCalendarViewDesktop as ScheduleCalendarView } from './ScheduleCalendarViewDesktop';
@@ -474,6 +477,13 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
   const [focusedDayOfWeek, setFocusedDayOfWeek] = useState<number | null>(null);
   const autoSaveDebounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Pool Auto-Collapse & Tip banner states
+  const [isPoolManuallyCollapsed, setIsPoolManuallyCollapsed] = useState<boolean | null>(null);
+  const [showTipBanner, setShowTipBanner] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return true;
+    return localStorage.getItem('groovelab_hide_designer_tip') !== 'true';
+  });
+
   // Dynamic Theme calculations
   const activePlatformStored = typeof localStorage !== 'undefined' ? localStorage.getItem('groovelab_active_platform') : 'campus';
   const isGroovelab = activePlatformStored === 'groovelab';
@@ -521,8 +531,8 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
       selector: "tour-special-features"
     },
     {
-      title: "Einloggen & Senden 🚀",
-      description: "Wenn dein Stundenplan-Entwurf fertig ist, klicke auf 'Einloggen & Senden', um ihn zur Freigabe an die Verwaltung zu übermitteln.",
+      title: "Terminvorschlag abstimmen 🚀",
+      description: "Wenn dein Stundenplan-Entwurf fertig abgestimmt ist, klicke auf 'Abstimmen & Freigeben', um ihn zur Freigabe an die Schulleitung zu übermitteln.",
       selector: "tour-submit-section"
     }
   ], []);
@@ -1555,13 +1565,34 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
 
       if (schedData && schedData.length > 0) {
         setHasSubmittedSchedule(true);
-        // Default submittedDraftId to current active draft if none was saved in DB
-        const finalSubmittedId = loadedSubmittedDraftId || loadedActiveDraftId;
+        // Resolve canonical submitted draft ID: strictly prefer explicitly submitted/approved draft
+        let finalSubmittedId = '';
+        if (loadedSubmittedDraftId && loadedDrafts.some(d => d.id === loadedSubmittedDraftId)) {
+          finalSubmittedId = loadedSubmittedDraftId;
+        } else {
+          const approvedOrPendingDraft = loadedDrafts.find(d => (d as any).status === 'approved' || (d as any).status === 'ready_for_admin_review');
+          if (approvedOrPendingDraft) {
+            finalSubmittedId = approvedOrPendingDraft.id;
+          } else {
+            // Find draft with the most assigned students (avoid picking a fresh empty draft)
+            const draftWithMostStudents = [...loadedDrafts].sort((a, b) => {
+              const aCount = a.boards?.reduce((acc, brd) => acc + (brd.students?.length || 0), 0) || 0;
+              const bCount = b.boards?.reduce((acc, brd) => acc + (brd.students?.length || 0), 0) || 0;
+              return bCount - aCount;
+            })[0];
+            finalSubmittedId = draftWithMostStudents?.id || '';
+          }
+        }
         setSubmittedDraftId(finalSubmittedId);
 
-        // Determine schedule review/approval status by looking at non-break schedules
+        // Determine schedule review/approval status
+        const submittedDraftObj = loadedDrafts.find(d => d.id === finalSubmittedId);
+        const isDraftPending = (submittedDraftObj as any)?.status === 'ready_for_admin_review';
+
         const nonBreakSchedules = schedData.filter(s => s.student_id !== null);
-        if (nonBreakSchedules.length > 0) {
+        if (isDraftPending) {
+          setScheduleStatus('pending');
+        } else if (nonBreakSchedules.length > 0) {
           const allApproved = nonBreakSchedules.every(s => s.status === 'approved');
           const hasPending = nonBreakSchedules.some(s => s.status === 'ready_for_admin_review');
           if (allApproved) {
@@ -1588,9 +1619,10 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
         }
 
         if (submissionDate && !isNaN(submissionDate.getTime())) {
-          const formattedDate = submissionDate.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
+          const rawDate = submissionDate.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
+          const cleanDate = rawDate.endsWith('.') ? rawDate.slice(0, -1) : rawDate;
           const formattedTime = submissionDate.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
-          setLastSubmittedTime(`am ${formattedDate}. um ${formattedTime}`);
+          setLastSubmittedTime(`am ${cleanDate}. um ${formattedTime} Uhr`);
         } else {
           setLastSubmittedTime(null);
         }
@@ -2506,8 +2538,8 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
 
       const draftStateToSave = {
         activeDraftId: currentActiveId,
-        submittedDraftId: currentActiveId,
-        submittedAt: new Date().toISOString(),
+        submittedDraftId: submittedDraftId || '',
+        submittedAt: submittedDraftId ? (lastSubmittedTime || '') : '',
         drafts: updatedDrafts,
         allTeacherStudentIds,
         unassignedStudentIds
@@ -2530,121 +2562,15 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
         console.warn('[ScheduleBoard] users view persistence note:', viewErr);
       }
 
-      await supabase
-        .from('schedules')
-        .delete()
-        .eq('teacher_id', selectedTeacherId);
+      // HERMETIC SANDBOX INVARIANT:
+      // An unsubmitted draft (e.g. Entwurf 4) must NEVER mutate `schedules` or `schedule_occurrences`!
+      // Production database tables remain 100% untouched until formal secretariat approval.
 
-      const inserts = [];
-      for (const board of validBoards) {
-        for (const s of board.students) {
-          const rawTime = s.assignedTime || board.startAnchor || '14:00';
-          const slotTime = snapTimeToGrid(rawTime, gridSnapMinutes || 15);
-          if (s.isGroup && s.groupStudents) {
-            for (const gs of s.groupStudents) {
-              inserts.push({
-                school_id: effectiveSchoolId,
-                teacher_id: selectedTeacherId,
-                student_id: gs.id,
-                day_of_week: board.dayOfWeek,
-                time_slot: slotTime,
-                room_id: board.roomId || null,
-                duration: s.duration || 30,
-                status: 'ready_for_admin_review',
-                instrument: gs.instrument || 'Musiker'
-              });
-            }
-          } else {
-            inserts.push({
-              school_id: effectiveSchoolId,
-              teacher_id: selectedTeacherId,
-              student_id: s.isBreak ? null : s.id,
-              day_of_week: board.dayOfWeek,
-              time_slot: slotTime,
-              room_id: board.roomId || null,
-              duration: s.duration || 30,
-              status: s.isBreak ? 'approved' : 'ready_for_admin_review',
-              instrument: s.isBreak ? null : (s.instrument || 'Musiker')
-            });
-          }
-        }
-      }
-
-      if (inserts.length > 0) {
-        const { data: insertedSchedules, error: insErr } = await supabase
-          .from('schedules')
-          .insert(inserts)
-          .select();
-
-        if (insErr) {
-          console.error('[ScheduleBoard] Error inserting schedules into Supabase:', insErr);
-        }
-
-        const occurrences: any[] = [];
-        const today = new Date();
-        const y = today.getFullYear();
-        const m = String(today.getMonth() + 1).padStart(2, '0');
-        const d = String(today.getDate()).padStart(2, '0');
-        const todayStr = `${y}-${m}-${d}`;
-
-        const schoolStartYear = today.getMonth() >= 8 ? today.getFullYear() : today.getFullYear() - 1;
-        const schoolYearEnd = new Date(`${schoolStartYear + 1}-08-31T23:59:59`);
-
-        (insertedSchedules || []).forEach((sch: any) => {
-          const { id: scheduleId, student_id, teacher_id, day_of_week, time_slot, duration } = sch;
-          if (!student_id || !day_of_week || !time_slot) return;
-          const dayNum = typeof day_of_week === 'number' ? day_of_week : (parseInt(day_of_week, 10) || 1);
-
-          let current = new Date(today);
-          const currentDay = current.getDay() || 7;
-          const diff = dayNum - currentDay;
-          let targetDate = new Date(current);
-          targetDate.setDate(current.getDate() + diff);
-
-          if (targetDate < today) {
-            targetDate.setDate(targetDate.getDate() + 7);
-          }
-
-          while (targetDate <= schoolYearEnd) {
-            const ty = targetDate.getFullYear();
-            const tm = String(targetDate.getMonth() + 1).padStart(2, '0');
-            const td = String(targetDate.getDate()).padStart(2, '0');
-            const dateStr = `${ty}-${tm}-${td}`;
-
-            const startTime = time_slot.includes(':') && time_slot.split(':').length === 2 ? time_slot + ':00' : time_slot;
-            occurrences.push({
-              schedule_id: scheduleId,
-              student_id,
-              teacher_id,
-              date: dateStr,
-              start_time: startTime,
-              duration: duration || 45,
-              status: 'scheduled'
-            });
-
-            targetDate.setDate(targetDate.getDate() + 7);
-          }
-        });
-
-        await supabase
-          .from('schedule_occurrences')
-          .delete()
-          .eq('teacher_id', selectedTeacherId)
-          .gte('date', todayStr);
-
-        if (occurrences.length > 0) {
-          await supabase
-            .from('schedule_occurrences')
-            .insert(occurrences);
-        }
-      }
-
-      setHasUnsubmittedEdits(false);
       if (showToastNotification) {
-        setToast({ message: 'Stundenplan zur Freigabe an die Verwaltung übermittelt! 🚀', type: 'success' });
+        setToast({ message: 'Entwurf erfolgreich gesichert! 💾', type: 'success' });
       }
     } catch (err) {
-      console.error('Error auto-saving schedule to Supabase:', err);
+      console.error('Error auto-saving schedule draft:', err);
     }
   };
 
@@ -3634,11 +3560,33 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
           }
           return s;
         });
+      } else if (slideUp) {
+        // Close gap: advance customStartTime for following cards
+        nextStudents = nextStudents.map((s, idx) => {
+          if (idx >= breakIndex && s.customStartTime) {
+            const [csh, csm] = parseTime(s.customStartTime);
+            const shifted = Math.max(0, csh * 60 + csm - 15);
+            const h = Math.floor(shifted / 60) % 24;
+            const m = shifted % 60;
+            return { ...s, customStartTime: `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}` };
+          }
+          return s;
+        });
       }
 
       const updatedBoard = recalculateBoardTimes({ ...board, students: nextStudents });
-      return prev.map(b => b.id === boardId ? updatedBoard : b);
+      const nextBoards = prev.map(b => b.id === boardId ? updatedBoard : b);
+
+      const currentActiveId = activeDraftIdRef.current || activeDraftId;
+      const currentList = draftsRef.current.length > 0 ? draftsRef.current : drafts;
+      const updatedDrafts = currentList.map(d => d.id === currentActiveId ? { ...d, boards: nextBoards } : d);
+      draftsRef.current = updatedDrafts;
+      setDrafts(updatedDrafts);
+      triggerDebouncedAutoSave(nextBoards);
+
+      return nextBoards;
     });
+    setToast({ message: 'Pause entfernt und Folgetermine aufgerückt! ⏱️', type: 'success' });
   };
 
   // Remove a student or group from a day board (make them unassigned again)
@@ -3787,6 +3735,111 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
     } catch (err) {
       console.error('Error updating lesson_duration in users table:', err);
     }
+  };
+
+  // Insert a 15-minute break automatically when continuous block exceeds 3 hours (ArbZG / Arbeitsschutz)
+  const handleInsertAutoBreak = (boardId: string) => {
+    pushUndoSnapshot();
+
+    setBoards(prev => {
+      const targetBoard = prev.find(b => b.id === boardId);
+      if (!targetBoard || targetBoard.students.length === 0) return prev;
+
+      // Find first teaching card to anchor start time
+      const firstStudent = targetBoard.students.find(s => !s.isBreak);
+      const baseStartTime = firstStudent?.assignedTime || firstStudent?.customStartTime || targetBoard.startAnchor || '14:00';
+      const [bsh, bsm] = parseTime(baseStartTime);
+      let runningMinutes = bsh * 60 + bsm;
+      let inserted = false;
+      let insertIndex = -1;
+      let pauseStartTime = '';
+
+      let continuousMinutes = 0;
+      for (let i = 0; i < targetBoard.students.length; i++) {
+        const s = targetBoard.students[i];
+        if (s.isBreak) {
+          continuousMinutes = 0;
+          continue;
+        }
+        continuousMinutes += (s.duration || 30);
+        const sTime = s.assignedTime || s.customStartTime || '14:00';
+        const [sh, sm] = parseTime(sTime);
+        runningMinutes = (sh * 60 + sm) + (s.duration || 30);
+
+        if (continuousMinutes >= 150) {
+          insertIndex = i + 1;
+          const ph = Math.floor(runningMinutes / 60) % 24;
+          const pm = runningMinutes % 60;
+          pauseStartTime = `${String(ph).padStart(2, '0')}:${String(pm).padStart(2, '0')}`;
+          inserted = true;
+          break;
+        }
+      }
+
+      if (!inserted) {
+        insertIndex = Math.max(1, Math.floor(targetBoard.students.length / 2));
+        const prevStudent = targetBoard.students[insertIndex - 1];
+        const prevTime = prevStudent?.assignedTime || prevStudent?.customStartTime || '14:00';
+        const [psh, psm] = parseTime(prevTime);
+        const pEnd = psh * 60 + psm + (prevStudent?.duration || 30);
+        const ph = Math.floor(pEnd / 60) % 24;
+        const pm = pEnd % 60;
+        pauseStartTime = `${String(ph).padStart(2, '0')}:${String(pm).padStart(2, '0')}`;
+      }
+
+      const newBreak: Student = {
+        id: `break-${crypto.randomUUID()}`,
+        first_name: 'Pause',
+        last_name: '',
+        instrument: '',
+        duration: 15,
+        isBreak: true,
+        customStartTime: pauseStartTime,
+        assignedTime: pauseStartTime,
+        assignedDay: targetBoard.dayOfWeek
+      };
+
+      const nextStudents: Student[] = [];
+      targetBoard.students.forEach((s, idx) => {
+        if (idx === insertIndex) {
+          nextStudents.push(newBreak);
+        }
+        if (idx >= insertIndex) {
+          let shiftedCustom = s.customStartTime;
+          if (shiftedCustom) {
+            const [csh, csm] = parseTime(shiftedCustom);
+            const advanced = csh * 60 + csm + 15;
+            const ah = Math.floor(advanced / 60) % 24;
+            const am = advanced % 60;
+            shiftedCustom = `${String(ah).padStart(2, '0')}:${String(am).padStart(2, '0')}`;
+          }
+          nextStudents.push({
+            ...s,
+            customStartTime: shiftedCustom
+          });
+        } else {
+          nextStudents.push(s);
+        }
+      });
+
+      if (insertIndex >= targetBoard.students.length) {
+        nextStudents.push(newBreak);
+      }
+
+      const updatedBoard = recalculateBoardTimes({ ...targetBoard, students: nextStudents });
+      const nextBoards = prev.map(b => b.id === boardId ? updatedBoard : b);
+
+      const currentActiveId = activeDraftIdRef.current || activeDraftId;
+      const currentList = draftsRef.current.length > 0 ? draftsRef.current : drafts;
+      const updatedDrafts = currentList.map(d => d.id === currentActiveId ? { ...d, boards: nextBoards } : d);
+      draftsRef.current = updatedDrafts;
+      setDrafts(updatedDrafts);
+      triggerDebouncedAutoSave(nextBoards);
+
+      return nextBoards;
+    });
+
+    setToast({ message: '15-Minuten-Pause erfolgreich eingeschoben! ☕', type: 'success' });
   };
 
   const generatePDFBackup = async (boardsToSave: DayBoard[], allStudents: Student[]) => {
@@ -4190,7 +4243,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
       return;
     }
 
-    if (!await showConfirm('Möchtest du diesen vollständigen Stundenplan final einloggen und an die Verwaltung senden?')) {
+    if (!await showConfirm('Möchtest du diesen vollständigen Stundenplan zur Prüfung an die Verwaltung übermitteln?')) {
       return;
     }
 
@@ -4244,7 +4297,79 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
     try {
       setSubmitting(true);
       const validBoards = boards.filter(b => b.students.length > 0);
-      await persistScheduleToSupabase(validBoards, true);
+      const currentActiveId = activeDraftIdRef.current || activeDraftId;
+      
+      const now = new Date();
+      const formattedDate = now.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+      const formattedTime = now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+      const submitTimeString = `am ${formattedDate} um ${formattedTime} Uhr`;
+
+      // 1. Mark this specific draft as submitted
+      setSubmittedDraftId(currentActiveId);
+      setLastSubmittedTime(submitTimeString);
+      setHasSubmittedSchedule(true);
+      setScheduleStatus('pending');
+
+      const boardDefinitions = validBoards.map(b => ({
+        id: b.id,
+        dayOfWeek: b.dayOfWeek,
+        startAnchor: b.startAnchor,
+        roomId: b.roomId,
+        students: b.students.map(s => ({
+          id: s.id,
+          first_name: s.first_name,
+          last_name: s.last_name,
+          instrument: s.instrument,
+          duration: s.duration,
+          assignedDay: s.assignedDay,
+          assignedTime: s.assignedTime,
+          isBreak: s.isBreak,
+          customStartTime: s.customStartTime,
+          isGroup: s.isGroup,
+          groupStudents: s.groupStudents
+        }))
+      }));
+
+      const currentDraftsList = draftsRef.current.length > 0 ? draftsRef.current : drafts;
+      const updatedDrafts = currentDraftsList.map(d => {
+        if (d.id === currentActiveId) {
+          return { ...d, status: 'ready_for_admin_review', boards: boardDefinitions, submittedAt: now.toISOString() };
+        }
+        return d;
+      });
+      draftsRef.current = updatedDrafts;
+      setDrafts(updatedDrafts);
+
+      const allTeacherStudentIds = Array.from(new Set(
+        students
+          .flatMap(s => s.isGroup && s.groupStudents ? s.groupStudents.map(gs => gs.id) : [s.id])
+          .filter(id => id && !id.startsWith('group-') && !id.startsWith('break-'))
+      ));
+      const unassignedStudentIds = students
+        .filter(s => !s.isBreak && !s.assignedDay)
+        .flatMap(s => s.isGroup && s.groupStudents ? s.groupStudents.map(gs => gs.id) : [s.id])
+        .filter(id => id && !id.startsWith('group-') && !id.startsWith('break-'));
+
+      const draftStateToSave = {
+        activeDraftId: currentActiveId,
+        submittedDraftId: currentActiveId,
+        submittedAt: now.toISOString(),
+        drafts: updatedDrafts,
+        allTeacherStudentIds,
+        unassignedStudentIds
+      };
+
+      const activePlatform = localStorage.getItem('groovelab_active_platform') || 'groovelab';
+      localStorage.setItem(`groovelab_teacher_draft_state_${activePlatform}_${selectedTeacherId}`, JSON.stringify(draftStateToSave));
+
+      await supabase
+        .from('users')
+        .update({
+          planned_boards: draftStateToSave,
+          campus_räume: draftStateToSave,
+          groovelab_räume: draftStateToSave
+        })
+        .eq('id', selectedTeacherId);
 
       // Trigger alert notification for Secretariat
       const { data: teacherProfile } = await supabase
@@ -4254,8 +4379,8 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
         .single();
 
       const teacherName = teacherProfile ? `${teacherProfile.first_name} ${teacherProfile.last_name}` : 'Lehrkraft';
-      const unassignedStudentsCount = students.filter(s => !s.isBreak && !s.assignedDay).length;
-      const totalAssignedCount = boards.reduce((acc, b) => acc + b.students.filter(s => !s.isBreak && s.assignedTime).length, 0);
+      const unassignedStudentsCount = unassignedStudentIds.length;
+      const totalAssignedCount = validBoards.reduce((acc, b) => acc + b.students.filter(s => !s.isBreak && s.assignedTime).length, 0);
       const totalCount = totalAssignedCount + unassignedStudentsCount;
 
       const alertMsg = unassignedStudentsCount > 0
@@ -4272,15 +4397,10 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
       // Generate PDF Backup & Celebration
       await generatePDFBackup(validBoards, students);
       setShowCelebration(true);
-      setHasSubmittedSchedule(true);
-      setScheduleStatus('pending');
-      const now = new Date();
-      const formattedDate = now.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
-      const formattedTime = now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
-      setLastSubmittedTime(`am ${formattedDate} um ${formattedTime} Uhr`);
+      setToast({ message: 'Stundenplan zur Prüfung an die Verwaltung übermittelt! Bis zur Freigabe bleibt der bisherige Plan aktiv. 🚀', type: 'success' });
     } catch (err: any) {
-      console.error('Error saving schedule:', err);
-      await showAlert('Fehler beim Speichern: ' + err.message);
+      console.error('Error submitting schedule:', err);
+      await showAlert('Fehler beim Einreichen: ' + err.message);
     } finally {
       setSubmitting(false);
     }
@@ -4645,6 +4765,11 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
         >
           {onboardingSubmitting ? 'Wird gespeichert...' : 'Verfügbarkeit speichern & Stundenplan freischalten'}
         </button>
+
+        {/* ⚖️ Gesetzlicher Hinweis gem. § 16 Abs. 2 ArbZG / BAG-Rechtsprechung */}
+        <div style={{ marginTop: '12px', textAlign: 'center', fontSize: '0.70rem', color: '#64748b', lineHeight: '1.4', background: 'rgba(0,0,0,0.02)', padding: '6px 10px', borderRadius: '8px', border: '1px solid rgba(0,0,0,0.04)' }}>
+          ⚖️ <strong>Hinweis gem. § 16 Abs. 2 ArbZG:</strong> Der Stundenplan-Designer ist ein didaktisches Koordinierungsinstrument und ersetzt kein betriebliches Zeiterfassungssystem.
+        </div>
       </div>
     );
   }
@@ -4721,7 +4846,16 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
         <ScheduleCalendarView 
           schoolId={schoolId} 
           userId={selectedTeacherId} 
-          boards={drafts.find(d => d.id === submittedDraftId)?.boards || drafts.find(d => d.id === activeDraftId)?.boards || boards} 
+          boards={(() => {
+            // Das Stundenplan-Board bezieht sich immer 1:1 wasserdicht auf die eingereichten/genehmigten Termine des Stundenplan-Designers:
+            const targetDraft = 
+              (submittedDraftId && drafts.find(d => d.id === submittedDraftId)) ||
+              drafts.find(d => (d as any).status === 'approved') ||
+              drafts.find(d => (d as any).status === 'ready_for_admin_review') ||
+              drafts.find(d => d.id === activeDraftId) ||
+              drafts[0];
+            return targetDraft?.boards || [];
+          })()} 
           activeTab={activeTab} 
           setActiveTab={setActiveTab} 
           teachers={teachers}
@@ -4905,6 +5039,19 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                     <option value={30}>30 Min</option>
                     <option value={60}>60 Min</option>
                   </select>
+                </div>
+
+                {/* 🟢 Mini-Legende Wunschzeit */}
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: 'rgba(255,255,255,0.85)', border: '1px solid rgba(0,0,0,0.08)', borderRadius: '8px', padding: '3px 10px', minHeight: '36px', boxSizing: 'border-box' }} title="Farb-Semantik im Designer: Grün = Wunschzeit des Schülers erfüllt • Weiß = Alternativzeit">
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '0.70rem', fontWeight: 700, color: '#15803d' }}>
+                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#22c55e', display: 'inline-block', boxShadow: '0 0 4px rgba(34,197,94,0.4)' }} />
+                    Wunschzeit
+                  </span>
+                  <span style={{ color: '#cbd5e1' }}>•</span>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '0.70rem', fontWeight: 700, color: '#64748b' }}>
+                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#ffffff', border: '1.5px solid #cbd5e1', display: 'inline-block' }} />
+                    Alternativzeit
+                  </span>
                 </div>
               </div>
 
@@ -5093,7 +5240,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                   onMouseOut={e => e.currentTarget.style.transform = 'none'}
                 >
                   <Send size={13} />
-                  <span>{submitting ? 'Wird gesendet...' : 'Einloggen & Senden'}</span>
+                  <span>{submitting ? 'Wird übermittelt...' : 'Stundenplan zur Freigabe einreichen'}</span>
                 </button>
               </div>
             </div>
@@ -5108,9 +5255,9 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
             <CheckCircle size={36} strokeWidth={2.5} />
           </div>
           <div>
-            <h3 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#1d1d1f', margin: 0, letterSpacing: '-0.02em' }}>Erfolgreich eingeloggt! 🎉</h3>
+            <h3 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#1d1d1f', margin: 0, letterSpacing: '-0.02em' }}>Terminvorschlag übermittelt! 🎉</h3>
             <p style={{ color: '#86868b', fontSize: '0.85rem', fontWeight: 500, marginTop: '8px', lineHeight: 1.4 }}>
-              Dein dynamischer Stundenplan wurde sicher gespeichert und zur Freigabe an die Verwaltung übermittelt. Eltern erhalten automatisch Push-Benachrichtigungen zur Bestätigung.
+              Dein pädagogischer Stundenplan-Vorschlag wurde sicher gespeichert und zur einvernehmlichen Freigabe an die Schulleitung übermittelt. Eltern erhalten nach Freigabe automatisch die Terminbestätigung.
             </p>
           </div>
           <button
@@ -5206,6 +5353,24 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
               </div>
             </div>
             
+            {/* Didactic Purpose & Secretariat Approval Disclaimer Badge */}
+            <div style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              background: 'rgba(52, 168, 83, 0.08)',
+              border: '1px solid rgba(52, 168, 83, 0.2)',
+              borderRadius: '100px',
+              padding: '3px 12px',
+              fontSize: '0.70rem',
+              fontWeight: 750,
+              color: '#15803d',
+              whiteSpace: 'nowrap'
+            }}>
+              <span>⚖️</span>
+              <span>Didaktische Entwurfsplanung • Genehmigungsvorbehalt durch Schulsekretariat</span>
+            </div>
+
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <button
                 type="button"
@@ -5329,7 +5494,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <span style={{ fontSize: '1rem' }}>⚠️</span>
-                <span>Du hast den Stundenplan angepasst. Klicke auf <strong>"Einloggen & Senden"</strong>, um deine Korrekturen dauerhaft zu speichern.</span>
+                <span>Du hast den Stundenplan angepasst. Klicke auf <strong>"Abstimmen & Freigeben"</strong>, um deinen Terminvorschlag zur Freigabe zu übermitteln.</span>
               </div>
             </div>
           )}
@@ -5399,22 +5564,38 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
           })()}
 
           {/* Info/Guide banner beneath header */}
-          <div style={{
-            background: 'rgba(37, 99, 235, 0.06)',
-            border: '1px solid rgba(37, 99, 235, 0.12)',
-            borderRadius: '12px',
-            padding: '10px 14px',
-            fontSize: '0.78rem',
-            color: '#1d4ed8',
-            fontWeight: 500,
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            marginBottom: '4px'
-          }}>
-            <span style={{ fontSize: '1rem' }}>💡</span>
-            <span>Nutze <strong>Automatisch zuteilen</strong> für die universitäre 4-Phasen-Zuteilung (18 Optimierungsstufen) oder ziehe Schüler per Drag & Drop flexibel in deine Unterrichtstage. <strong>Tipp: Karten rasten magnetisch im {gridSnapMinutes || 15}-Min-Raster ein und verdrängen nachfolgende Termine automatisch.</strong></span>
-          </div>
+          {showTipBanner && (
+            <div style={{
+              background: 'rgba(37, 99, 235, 0.06)',
+              border: '1px solid rgba(37, 99, 235, 0.12)',
+              borderRadius: '12px',
+              padding: '8px 14px',
+              fontSize: '0.78rem',
+              color: '#1d4ed8',
+              fontWeight: 500,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '8px',
+              marginBottom: '4px'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1 }}>
+                <span style={{ fontSize: '1rem' }}>💡</span>
+                <span>Nutze <strong>Automatisch zuteilen</strong> für die universitäre 4-Phasen-Zuteilung (18 Optimierungsstufen) oder ziehe Schüler per Drag & Drop flexibel in deine Unterrichtstage. <strong>Tipp: Karten rasten magnetisch im {gridSnapMinutes || 15}-Min-Raster ein und verdrängen nachfolgende Termine automatisch.</strong></span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowTipBanner(false);
+                  try { localStorage.setItem('groovelab_hide_designer_tip', 'true'); } catch (_) {}
+                }}
+                style={{ border: 'none', background: 'transparent', color: '#1d4ed8', opacity: 0.6, cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', borderRadius: '4px' }}
+                title="Hinweis ausblenden"
+              >
+                <X size={13} />
+              </button>
+            </div>
+          )}
 
           {/* Form to Add Day Board */}
           {showAddBoardForm && (
@@ -5473,7 +5654,11 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
           )}
 
           {/* Main workspace layout */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 240px', gap: '14px', alignItems: 'start' }}>
+          {(() => {
+            const currentUnassigned = students.filter(s => !s.isBreak && !s.assignedDay);
+            const isPoolCollapsed = isPoolManuallyCollapsed !== null ? isPoolManuallyCollapsed : (currentUnassigned.length === 0);
+            return (
+              <div style={{ display: 'grid', gridTemplateColumns: isPoolCollapsed ? 'minmax(0, 1fr) 44px' : 'minmax(0, 1fr) 240px', gap: '14px', alignItems: 'start', transition: 'all 0.25s' }}>
             
             {/* Trello Board List Column Area */}
             <div id="tour-day-boards" style={{ 
@@ -5490,131 +5675,183 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
               overflowX: 'auto',
               WebkitOverflowScrolling: 'touch'
             }}>
-              {boards.filter(b => focusedDayOfWeek === null || b.dayOfWeek === focusedDayOfWeek).map((board, index, arr) => {
-                const dayLabel = DAYS_OF_WEEK.find(d => d.value === board.dayOfWeek)?.name || '';
+              {(() => {
+                const visibleBoards = boards.filter(b => focusedDayOfWeek === null || b.dayOfWeek === focusedDayOfWeek);
                 const PX_PER_MIN = 2.5;
-                const [anchorH, anchorM] = parseTime(board.startAnchor);
-                const startMinutes = anchorH * 60 + anchorM;
-                const dayConfig = (teacherAvailability as any)?.[board.dayOfWeek];
-                let availEndMins = startMinutes + 300; // default 5 hours if not specified
-                if (dayConfig?.end) {
-                  const [eh, em] = parseTime(dayConfig.end);
-                  availEndMins = eh * 60 + em;
-                }
 
-                let maxStudentEndMins = startMinutes;
-                let curMins = startMinutes;
-                board.students.forEach(s => {
-                  curMins += s.duration;
-                  if (curMins > maxStudentEndMins) maxStudentEndMins = curMins;
-                });
+                // DAW-Synchronized horizontal timeline calculation across all visible boards
+                let minGlobalStart = 24 * 60;
+                let maxGlobalEnd = 0;
 
-                let maxPrefEndMins = startMinutes;
-                if ((selectedStudentId || draggedStudentId) && selectedStudentPrefs.length > 0) {
-                  selectedStudentPrefs.forEach(pref => {
-                    if (Number(pref.day_of_week) === Number(board.dayOfWeek)) {
-                      const [peh, pem] = parseTime(pref.end_time);
-                      const prefEndMins = peh * 60 + pem;
-                      if (prefEndMins > maxPrefEndMins) maxPrefEndMins = prefEndMins;
+                visibleBoards.forEach(b => {
+                  const [anchorH, anchorM] = parseTime(b.startAnchor || '14:00');
+                  const bStart = anchorH * 60 + anchorM;
+                  if (bStart < minGlobalStart) minGlobalStart = bStart;
+
+                  let maxStudEnd = bStart;
+                  let curMins = bStart;
+                  b.students.forEach(s => {
+                    const sTime = s.assignedTime || s.customStartTime;
+                    if (sTime) {
+                      const [sh, sm] = parseTime(sTime);
+                      const sEnd = sh * 60 + sm + (s.duration || 30);
+                      if (sEnd > maxStudEnd) maxStudEnd = sEnd;
+                    } else {
+                      curMins += (s.duration || 30);
+                      if (curMins > maxStudEnd) maxStudEnd = curMins;
                     }
                   });
-                }
 
-                const endMinutes = Math.max(availEndMins, maxStudentEndMins, maxPrefEndMins, startMinutes + 60);
-                const columnHeightPx = (endMinutes - startMinutes) * PX_PER_MIN + 48;
-                const startHour = Math.floor(startMinutes / 60);
-                const endHour = Math.ceil(endMinutes / 60);
-                const hourMarkers: { hour: number; top: number }[] = [];
-                for (let h = startHour; h <= endHour; h++) {
-                  const top = (h * 60 - startMinutes) * PX_PER_MIN;
-                  if (top >= -2 && top <= columnHeightPx + 30) {
-                    hourMarkers.push({ hour: h % 24, top });
+                  const dayConfig = (teacherAvailability as any)?.[b.dayOfWeek];
+                  let availEnd = bStart + 300;
+                  if (dayConfig?.end) {
+                    const [eh, em] = parseTime(dayConfig.end);
+                    availEnd = eh * 60 + em;
                   }
-                }
 
-                return (
-                  <div
-                    key={board.id}
-                    onDragOver={handleDragOver}
-                    onDrop={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      handleDropOnBoard(board.id);
-                    }}
-                    style={{ 
-                      flex: 1,
-                      minWidth: focusedDayOfWeek !== null ? '100%' : '170px',
-                      background: 'transparent', 
-                      borderRight: index < arr.length - 1 ? '1px solid #e2e8f0' : 'none', 
-                      padding: '0 10px', 
-                      display: 'flex', 
-                      flexDirection: 'column', 
-                      gap: '8px',
-                      transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
-                    }}
-                  >
-                    {/* Day Column Header */}
-                    <div 
-                      style={{ textAlign: 'center', paddingBottom: '8px', borderBottom: '1px solid rgba(0,0,0,0.05)', position: 'relative', cursor: 'pointer' }}
-                      onClick={() => setFocusedDayOfWeek(focusedDayOfWeek === board.dayOfWeek ? null : board.dayOfWeek)}
-                      title={focusedDayOfWeek === board.dayOfWeek ? "Zurück zur Wochenansicht" : "Diesen Tag vergrößern (Fokus-Ansicht)"}
+                  const bEnd = Math.max(availEnd, maxStudEnd, bStart + 60);
+                  if (bEnd > maxGlobalEnd) maxGlobalEnd = bEnd;
+                });
+
+                if (minGlobalStart === 24 * 60) minGlobalStart = 13 * 60;
+                const globalStartMinutes = Math.floor(minGlobalStart / 30) * 30;
+                const globalEndMinutes = Math.max(Math.ceil(maxGlobalEnd / 30) * 30, globalStartMinutes + 270);
+                const uniformColumnHeightPx = (globalEndMinutes - globalStartMinutes) * PX_PER_MIN + 48;
+
+                return visibleBoards.map((board, index, arr) => {
+                  const dayLabel = DAYS_OF_WEEK.find(d => d.value === board.dayOfWeek)?.name || '';
+                  const startMinutes = globalStartMinutes;
+                  const endMinutes = globalEndMinutes;
+                  const columnHeightPx = uniformColumnHeightPx;
+                  const startHour = Math.floor(startMinutes / 60);
+                  const endHour = Math.ceil(endMinutes / 60);
+                  const hourMarkers: { hour: number; top: number }[] = [];
+                  for (let h = startHour; h <= endHour; h++) {
+                    const top = (h * 60 - startMinutes) * PX_PER_MIN;
+                    if (top >= -2 && top <= columnHeightPx + 30) {
+                      hourMarkers.push({ hour: h % 24, top });
+                    }
+                  }
+
+                  return (
+                    <div
+                      key={board.id}
+                      onDragOver={handleDragOver}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleDropOnBoard(board.id);
+                      }}
+                      style={{ 
+                        flex: 1,
+                        minWidth: focusedDayOfWeek !== null ? '100%' : '170px',
+                        background: 'transparent', 
+                        borderRight: index < arr.length - 1 ? '1px solid #e2e8f0' : 'none', 
+                        padding: '0 10px', 
+                        display: 'flex', 
+                        flexDirection: 'column', 
+                        gap: '8px',
+                        transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
+                      }}
                     >
-                      {focusedDayOfWeek === board.dayOfWeek && (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setFocusedDayOfWeek(null);
-                          }}
-                          className="apple-btn"
-                          style={{
-                            position: 'absolute',
-                            top: '0px',
-                            right: '4px',
-                            padding: '4px 8px',
-                            fontSize: '0.65rem',
-                            background: 'rgba(0,0,0,0.05)',
-                            borderRadius: '6px',
-                            minHeight: '22px'
-                          }}
-                        >
-                          Wochenansicht
-                        </button>
-                      )}
-                      <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#86868b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Unterrichtstag</div>
-                      <div style={{ fontSize: '1rem', fontWeight: 800, color: '#1d1d1f' }}>{dayLabel} ({board.students.filter(s => !s.isBreak).length})</div>
+                      {/* Day Column Header with 100% uniform height to align grid baseline across all days */}
+                      <div 
+                        style={{ 
+                          textAlign: 'center', 
+                          paddingBottom: '8px', 
+                          borderBottom: '1px solid rgba(0,0,0,0.05)', 
+                          position: 'relative', 
+                          cursor: 'pointer',
+                          minHeight: '84px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          justifyContent: 'space-between'
+                        }}
+                        onClick={() => setFocusedDayOfWeek(focusedDayOfWeek === board.dayOfWeek ? null : board.dayOfWeek)}
+                        title={focusedDayOfWeek === board.dayOfWeek ? "Zurück zur Wochenansicht" : "Diesen Tag vergrößern (Fokus-Ansicht)"}
+                      >
+                        {focusedDayOfWeek === board.dayOfWeek && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setFocusedDayOfWeek(null);
+                            }}
+                            className="apple-btn"
+                            style={{
+                              position: 'absolute',
+                              top: '0px',
+                              right: '4px',
+                              padding: '4px 8px',
+                              fontSize: '0.65rem',
+                              background: 'rgba(0,0,0,0.05)',
+                              borderRadius: '6px',
+                              minHeight: '22px'
+                            }}
+                          >
+                            Wochenansicht
+                          </button>
+                        )}
+                        <div>
+                          <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#86868b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Unterrichtstag</div>
+                          <div style={{ fontSize: '1rem', fontWeight: 800, color: '#1d1d1f' }}>{dayLabel} ({board.students.filter(s => !s.isBreak).length})</div>
+                        </div>
 
-                      {/* TVöD / ArbZG Arbeitszeit-Warnhinweis */}
-                      {(() => {
-                        let maxContinuous = 0;
-                        let currentContinuous = 0;
-                        let totalAssigned = 0;
-                        for (const s of board.students) {
-                          if (s.isBreak) {
-                            currentContinuous = 0;
-                          } else {
-                            currentContinuous += s.duration;
-                            totalAssigned += s.duration;
-                            if (currentContinuous > maxContinuous) maxContinuous = currentContinuous;
+                        {/* TVöD / ArbZG Arbeitszeit-Warnhinweis */}
+                        {(() => {
+                          let maxContinuous = 0;
+                          let currentContinuous = 0;
+                          let totalAssigned = 0;
+                          for (const s of board.students) {
+                            if (s.isBreak) {
+                              currentContinuous = 0;
+                            } else {
+                              currentContinuous += (s.duration || 30);
+                              totalAssigned += (s.duration || 30);
+                              if (currentContinuous > maxContinuous) maxContinuous = currentContinuous;
+                            }
                           }
-                        }
 
-                        if (totalAssigned > 360 && maxContinuous > 360) {
-                          return (
-                            <div style={{ padding: '3px 8px', marginTop: '4px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px', fontSize: '0.68rem', fontWeight: 700, color: '#991b1b', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                              <span>⚠️ Gesetzliche Pflichtpause fehlt (über 6 Std. ohne Pause)</span>
-                            </div>
-                          );
-                        } else if (maxContinuous > 180) {
-                          return (
-                            <div style={{ padding: '3px 8px', marginTop: '4px', background: '#fefce8', border: '1px solid #fef08a', borderRadius: '6px', fontSize: '0.68rem', fontWeight: 700, color: '#854d0e', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                              <span>💡 Pause empfohlen (über 3 Std. am Stück)</span>
-                            </div>
-                          );
-                        }
-                        return null;
-                      })()}
-                    </div>
+                          if (totalAssigned > 360 && maxContinuous > 360) {
+                            return (
+                              <div style={{ padding: '3px 8px', marginTop: '4px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px', fontSize: '0.66rem', fontWeight: 700, color: '#991b1b', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
+                                <span>⚠️ Pflichtpause fehlt (&gt; 6 Std.)</span>
+                              </div>
+                            );
+                          } else if (maxContinuous > 180) {
+                            return (
+                              <div style={{ padding: '4px 8px', marginTop: '4px', background: '#fefce8', border: '1px solid #fef08a', borderRadius: '6px', fontSize: '0.66rem', fontWeight: 700, color: '#854d0e', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '4px' }}>
+                                <span>💡 Pause empfohlen (&gt; 3 Std.)</span>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleInsertAutoBreak(board.id);
+                                  }}
+                                  style={{
+                                    background: '#fef08a',
+                                    border: '1px solid #facc15',
+                                    borderRadius: '5px',
+                                    padding: '2px 7px',
+                                    fontSize: '0.62rem',
+                                    fontWeight: 800,
+                                    color: '#854d0e',
+                                    cursor: 'pointer',
+                                    whiteSpace: 'nowrap',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '2px'
+                                  }}
+                                  title="15-Minuten-Pause automatisch einschieben und Folgetermine verschieben"
+                                >
+                                  <span>+ 15m Pause</span>
+                                </button>
+                              </div>
+                            );
+                          }
+                          return <div style={{ height: '26px' }} />;
+                        })()}
+                      </div>
 
                     {/* ── PROPORTIONAL TIME-GRID ── */}
                     <div
@@ -6173,7 +6410,106 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                         const cardHeightPx = bs.duration * PX_PER_MIN - 4;
 
                         if (bs.isBreak) {
-                          return null; // Do not display gap/break cards in schedule column
+                          const [bsh, bsm] = parseTime(bs.assignedTime || board.startAnchor);
+                          const endTotalMin = bsh * 60 + bsm + (bs.duration || 15);
+                          const endHours = Math.floor(endTotalMin / 60) % 24;
+                          const endMins = endTotalMin % 60;
+                          const breakEndTime = `${String(endHours).padStart(2, '0')}:${String(endMins).padStart(2, '0')}`;
+                          const breakStartTime = bs.assignedTime || `${String(bsh).padStart(2, '0')}:${String(bsm).padStart(2, '0')}`;
+
+                          return (
+                            <div
+                              key={bs.id}
+                              draggable={true}
+                              onDragStart={(e) => handleDragStart(bs.id, 'board', board.id, e)}
+                              onDragEnd={handleDragEnd}
+                              onDragOver={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setDragOverBoardId(board.id);
+                                setDragOverIndex(cardIndex);
+                              }}
+                              onDrop={(e) => { e.stopPropagation(); handleDropOnBoard(board.id, cardIndex); }}
+                              className="designer-student-card"
+                              style={{
+                                position: 'absolute',
+                                left: 0,
+                                right: 0,
+                                top: `${Math.max(cardTopPx, 0)}px`,
+                                height: `${Math.max(cardHeightPx, 32)}px`,
+                                background: 'linear-gradient(135deg, #ffffff 0%, #fefce8 100%)',
+                                border: '1px solid #fef08a',
+                                borderLeft: '4px solid #f59e0b',
+                                borderRadius: '10px',
+                                padding: '4px 8px',
+                                boxSizing: 'border-box',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                cursor: 'grab',
+                                boxShadow: '0 2px 6px rgba(245, 158, 11, 0.08)',
+                                zIndex: 10,
+                                userSelect: 'none'
+                              }}
+                            >
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
+                                <div style={{
+                                  width: '20px',
+                                  height: '20px',
+                                  borderRadius: '6px',
+                                  background: 'rgba(245, 158, 11, 0.15)',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  color: '#d97706',
+                                  flexShrink: 0
+                                }}>
+                                  <Coffee size={12} />
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'baseline', gap: '5px', minWidth: 0 }}>
+                                  <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#854d0e', letterSpacing: '-0.01em' }}>
+                                    {breakStartTime}–{breakEndTime}
+                                  </span>
+                                  <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#a16207' }}>
+                                    Pause
+                                  </span>
+                                </div>
+                              </div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+                                <span style={{
+                                  fontSize: '0.6rem',
+                                  fontWeight: 800,
+                                  background: 'rgba(245, 158, 11, 0.16)',
+                                  color: '#b45309',
+                                  padding: '1px 5px',
+                                  borderRadius: '5px'
+                                }}>
+                                  {bs.duration || 15}m
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    executeRemoveBreak(board.id, bs.id, true);
+                                  }}
+                                  title="Pause löschen (Folgetermine rücken auf)"
+                                  style={{
+                                    background: 'none',
+                                    border: 'none',
+                                    padding: '2px',
+                                    color: '#a16207',
+                                    cursor: 'pointer',
+                                    borderRadius: '4px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center'
+                                  }}
+                                >
+                                  <X size={12} />
+                                </button>
+                              </div>
+                            </div>
+                          );
                         }
 
                         const isSubmitted = hasSubmittedSchedule && activeDraftId === submittedDraftId;
@@ -6781,8 +7117,9 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                               )}
                               <span style={{ fontSize: '0.62rem', fontWeight: 700, color: badgeColor, background: badgeBg, padding: '1px 5px', borderRadius: '4px', pointerEvents: 'none', display: 'flex', alignItems: 'center', gap: '3px' }}>
                                 {isInsideWunsch && (
-                                  <span title="Wunschtermin garantiert getroffen!" style={{ display: 'inline-flex', alignItems: 'center' }}>
-                                    <Star size={9} fill="currentColor" color="currentColor" />
+                                  <span title="Wunschtermin garantiert getroffen!" style={{ display: 'inline-flex', alignItems: 'center', gap: '2px', fontWeight: 800 }}>
+                                    <Star size={8} fill="currentColor" color="currentColor" />
+                                    <span style={{ fontSize: '0.55rem' }}>Wunsch</span>
                                   </span>
                                 )}
                                 {bs.duration}m
@@ -6925,7 +7262,8 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                     )}
                   </div>
                 );
-              })}
+              });
+            })()}
 
               {boards.length === 0 && (
                 <div style={{ flex: 1, background: 'rgba(255, 255, 255, 0.4)', border: '1.5px dashed rgba(0, 0, 0, 0.08)', borderRadius: '24px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '36px', textAlign: 'center', minHeight: '400px' }}>
@@ -6939,29 +7277,77 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
             </div>
 
             {/* Sidebar Student Pool */}
-            <div id="tour-student-pool" style={{ 
-              background: 'rgba(255, 255, 255, 0.55)', 
-              backdropFilter: 'blur(20px) saturate(190%)', 
-              WebkitBackdropFilter: 'blur(20px) saturate(190%)',
-              borderRadius: '20px', 
-              border: '1px solid rgba(255, 255, 255, 0.5)', 
-              padding: '14px', 
-              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.03)', 
-              display: 'flex', 
-              flexDirection: 'column', 
-              gap: '12px', 
-              position: 'sticky', 
-              top: '16px', 
-              height: 'fit-content' 
-            }}>
-              <div>
-                <h4 style={{ fontSize: '0.9rem', fontWeight: 800, color: '#1d1d1f', margin: 0 }}>
-                  Schüler-Pool ({students.length})
-                </h4>
-                <p style={{ color: '#86868b', fontSize: '0.68rem', fontWeight: 500, marginTop: '1px' }}>
-                  Drag & Drop auf die Spalten.
-                </p>
+            {isPoolCollapsed ? (
+              <div 
+                id="tour-student-pool" 
+                onClick={() => setIsPoolManuallyCollapsed(false)}
+                style={{ 
+                  background: 'rgba(255, 255, 255, 0.75)', 
+                  backdropFilter: 'blur(20px) saturate(190%)', 
+                  WebkitBackdropFilter: 'blur(20px) saturate(190%)',
+                  borderRadius: '20px', 
+                  border: '1px solid rgba(255, 255, 255, 0.6)', 
+                  padding: '16px 6px', 
+                  boxShadow: '0 8px 32px rgba(0, 0, 0, 0.03)', 
+                  display: 'flex', 
+                  flexDirection: 'column', 
+                  alignItems: 'center', 
+                  gap: '12px', 
+                  position: 'sticky', 
+                  top: '16px', 
+                  height: 'fit-content',
+                  cursor: 'pointer',
+                  width: '44px',
+                  userSelect: 'none',
+                  transition: 'all 0.2s'
+                }}
+                title="Schüler-Pool ausklappen"
+              >
+                <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: currentUnassigned.length === 0 ? 'rgba(52, 168, 83, 0.12)' : 'rgba(245, 158, 11, 0.12)', color: currentUnassigned.length === 0 ? '#15803d' : '#b45309', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  {currentUnassigned.length === 0 ? <CheckCircle size={15} /> : <Users size={15} />}
+                </div>
+                <div style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)', fontSize: '0.74rem', fontWeight: 800, color: '#475569', letterSpacing: '0.02em', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span>Schüler-Pool</span>
+                  <span style={{ background: currentUnassigned.length === 0 ? '#dcfce7' : '#fef3c7', color: currentUnassigned.length === 0 ? '#166534' : '#92400e', padding: '2px 5px', borderRadius: '4px', fontSize: '0.62rem' }}>
+                    {currentUnassigned.length}
+                  </span>
+                </div>
+                <ChevronLeft size={14} style={{ color: '#94a3b8', marginTop: '12px' }} />
               </div>
+            ) : (
+              <div id="tour-student-pool" style={{ 
+                background: 'rgba(255, 255, 255, 0.55)', 
+                backdropFilter: 'blur(20px) saturate(190%)', 
+                WebkitBackdropFilter: 'blur(20px) saturate(190%)',
+                borderRadius: '20px', 
+                border: '1px solid rgba(255, 255, 255, 0.5)', 
+                padding: '14px', 
+                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.03)', 
+                display: 'flex', 
+                flexDirection: 'column', 
+                gap: '12px', 
+                position: 'sticky', 
+                top: '16px', 
+                height: 'fit-content' 
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <h4 style={{ fontSize: '0.9rem', fontWeight: 800, color: '#1d1d1f', margin: 0 }}>
+                      Schüler-Pool ({students.length})
+                    </h4>
+                    <p style={{ color: '#86868b', fontSize: '0.68rem', fontWeight: 500, marginTop: '1px' }}>
+                      Drag & Drop auf die Spalten.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsPoolManuallyCollapsed(true)}
+                    style={{ border: 'none', background: 'rgba(0,0,0,0.04)', borderRadius: '6px', padding: '4px', cursor: 'pointer', color: '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                    title="Schüler-Pool einklappen"
+                  >
+                    <ChevronRight size={14} />
+                  </button>
+                </div>
 
               {/* Draggable Pause item */}
               <div
@@ -7228,8 +7614,11 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                 )}
               </div>
             </div>
+            )}
 
           </div>
+            );
+          })()}
 
         </>
       )}
@@ -8444,6 +8833,13 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
         )}
 
         {activeTab === 'calendar' ? <CalendarTourComponent /> : <DesignerTourComponent />}
+
+        {/* ⚖️ Gesetzlicher Hinweis gem. § 16 Abs. 2 ArbZG / BAG-Rechtsprechung */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '10px 16px', margin: '14px auto 4px auto', background: 'rgba(255, 255, 255, 0.7)', border: '1px solid rgba(0, 0, 0, 0.05)', borderRadius: '12px', maxWidth: '780px', width: '100%', boxSizing: 'border-box' }}>
+          <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600, textAlign: 'center', lineHeight: 1.4 }}>
+            ⚖️ <strong>Hinweis gem. § 16 Abs. 2 ArbZG:</strong> Der Stundenplan-Designer ist ein pädagogisches Koordinierungsinstrument zur Abstimmung von Unterrichtseinheiten und ersetzt kein betriebliches Arbeitszeiterfassungssystem.
+          </span>
+        </div>
 
     </div>
   );

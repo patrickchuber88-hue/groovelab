@@ -131,6 +131,8 @@ export const GhostSupportCapsule: React.FC<GhostSupportCapsuleProps> = ({
         
         const existingAuditRaw = localStorage.getItem('campus_ghost_audit_trail');
         const existingAudit = existingAuditRaw ? JSON.parse(existingAuditRaw) : [];
+        const ticketId = sessionStorage.getItem('groovelab_ghost_ticket_id') || 'DIRECT_EMERGENCY_SUPPORT';
+        const ticketReason = sessionStorage.getItem('groovelab_ghost_ticket_reason') || 'Technischer Diagnoselauf';
         const newLog = {
           id: `GHA-${Date.now()}`,
           timestamp: new Date().toISOString(),
@@ -139,6 +141,9 @@ export const GhostSupportCapsule: React.FC<GhostSupportCapsuleProps> = ({
           role: activeRole,
           durationSeconds: durationSec,
           operator: 'Patrick Huber (Platform Lead)',
+          ticketId,
+          ticketReason,
+          breakGlassJustification: '§ 202a StGB Break-Glass Support Consent',
           status: 'COMPLETED_CLEANLY'
         };
         localStorage.setItem('campus_ghost_audit_trail', JSON.stringify([newLog, ...existingAudit].slice(0, 50)));

@@ -51,6 +51,7 @@ export interface StudentSettingsTabProps {
   handleCloseSettingsModal: () => void;
   handleDownloadGoBdReceipt: (rec: any) => Promise<void>;
   handleExportGdprReport: () => Promise<void>;
+  handleExportFullDataArchive?: () => Promise<void>;
   handleOpenSettingsModule: (module: string) => void;
   handleRemoveFamilyProfile: (id: string, e?: React.MouseEvent) => void;
   handleSetInstantLock: (minutes: number | null) => Promise<void>;
@@ -181,6 +182,7 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
     handleCloseSettingsModal,
     handleDownloadGoBdReceipt,
     handleExportGdprReport,
+    handleExportFullDataArchive,
     handleOpenSettingsModule,
     handleRemoveFamilyProfile,
     handleSetInstantLock,
@@ -1484,6 +1486,49 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
 
                           {parentControlsTab === 'governance' && (
                             <>
+                              {/* 🛡️ Volljährigkeits-Selbstbestimmung (Art. 6 Abs. 1 lit. a DSGVO) */}
+                              {isAdultStudent && (
+                                <div style={{
+                                  background: '#f0fdf4',
+                                  border: '1px solid #bbf7d0',
+                                  borderRadius: '16px',
+                                  padding: '16px',
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  gap: '8px',
+                                  textAlign: 'left'
+                                }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                      <ShieldCheck size={18} color="#15803d" />
+                                      <span style={{ fontWeight: 800, fontSize: '0.88rem', color: '#15803d' }}>
+                                        Volljährigkeit (§ 2 BGB): Privatsphäre &amp; Eltern-Einblick
+                                      </span>
+                                    </div>
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.80rem', fontWeight: 700, color: '#15803d' }}>
+                                      <input 
+                                        type="checkbox" 
+                                        checked={Boolean((studentUser as any)?.adult_allow_parent_access)}
+                                        onChange={async (e) => {
+                                          const nextVal = e.target.checked;
+                                          try {
+                                            if (studentUser?.id || studentId) {
+                                              await supabase.from('users').update({ adult_allow_parent_access: nextVal }).eq('id', studentUser?.id || studentId);
+                                              if (studentUser) (studentUser as any).adult_allow_parent_access = nextVal;
+                                            }
+                                          } catch (err) {}
+                                        }}
+                                        style={{ width: '16px', height: '16px', accentColor: '#16a34a' }}
+                                      />
+                                      <span>Eltern-Lesezugriff gestatten</span>
+                                    </label>
+                                  </div>
+                                  <div style={{ fontSize: '0.74rem', color: '#166534', lineHeight: 1.4 }}>
+                                    Als volljährige Person bestimmst du selbst über deine Daten (Art. 6 Abs. 1 lit. a DSGVO). Wenn diese Option deaktiviert ist, wird der elterliche Zugriff über die Eltern-PIN vollständig gesperrt.
+                                  </div>
+                                </div>
+                              )}
+
                               {/* Campus UI Design Switcher (Junior, Teen, +16) */}
                           <div style={{
                             display: 'flex',
@@ -3914,6 +3959,45 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                             <span>PDF Export</span>
                           </button>
                         </div>
+
+                        {/* DSGVO Art. 20 Datenübertragbarkeit / Voll-Archiv Export */}
+                        {handleExportFullDataArchive && (
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '16px 18px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                              <Download size={18} color="#059669" style={{ flexShrink: 0 }} />
+                              <div>
+                                <div style={{ fontSize: '0.86rem', fontWeight: 800, color: '#0f172a' }}>
+                                  Vollständiges Datenarchiv (Art. 20 DSGVO)
+                                </div>
+                                <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 500, marginTop: '2px' }}>
+                                  Alle Hausaufgaben, Meisterwerke, Übe-Logs &amp; Audio-Memos als JSON herunterladen.
+                                </div>
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={handleExportFullDataArchive}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                padding: '8px 14px',
+                                borderRadius: '10px',
+                                background: '#059669',
+                                color: '#ffffff',
+                                border: 'none',
+                                fontSize: '0.78rem',
+                                fontWeight: 800,
+                                cursor: 'pointer',
+                                flexShrink: 0
+                              }}
+                              className="hover-scale"
+                            >
+                              <Download size={14} />
+                              <span>JSON Export</span>
+                            </button>
+                          </div>
+                        )}
 
                         {/* Impressum & Anbieterkennzeichnung */}
                         <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '18px', display: 'flex', flexDirection: 'column', gap: '10px' }}>

@@ -49,6 +49,8 @@ const AdminSecuritySuiteModal = lazy(() => import('./components/AdminSecuritySui
 const QuarterlyAccessReportModal = lazy(() => import('./components/ui/QuarterlyAccessReportModal').then(m => ({ default: m.QuarterlyAccessReportModal })));
 
 
+import { LegalConsentGate } from './components/LegalConsentGate';
+
 import { MobileBottomNav } from './components/ui/MobileBottomNav';
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
 import { GroupedSongCard } from './components/GroupedSongCard';
@@ -7180,26 +7182,28 @@ function App() {
   const activeWorkspace = typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_active_workspace') || localStorage.getItem('groovelab_active_workspace')) : null;
   if ((user.role?.toLowerCase() === 'secretary' || user.role?.toLowerCase() === 'admin') && activeWorkspace !== 'teacher') {
     return (
-      <ErrorBoundary>
-        {isGhostParam && (
-          <GhostSupportCapsule 
-            schoolName={user?.schools?.name || (Array.isArray(user?.schools) ? user.schools[0]?.name : undefined)} 
-            currentRole={user?.role}
-            onRoleChange={handleSwitchActiveRole}
-          />
-        )}
-        <Suspense fallback={<DashboardLoader />}>
-          <SecretaryDashboard 
-            schoolId={user?.school_id || (Array.isArray(user?.schools) ? user.schools[0]?.id : user?.schools?.id) || ''} 
-            userId={user?.id || ''} 
-            userRole={user?.role || 'secretary'}
-            userRoles={user?.roles || []}
-            onLogout={handleLogout} 
-            onRoleSwitched={handleSwitchActiveRole}
-            activePlatform={activePlatform}
-          />
-        </Suspense>
-      </ErrorBoundary>
+      <LegalConsentGate user={user}>
+        <ErrorBoundary>
+          {isGhostParam && (
+            <GhostSupportCapsule 
+              schoolName={user?.schools?.name || (Array.isArray(user?.schools) ? user.schools[0]?.name : undefined)} 
+              currentRole={user?.role}
+              onRoleChange={handleSwitchActiveRole}
+            />
+          )}
+          <Suspense fallback={<DashboardLoader />}>
+            <SecretaryDashboard 
+              schoolId={user?.school_id || (Array.isArray(user?.schools) ? user.schools[0]?.id : user?.schools?.id) || ''} 
+              userId={user?.id || ''} 
+              userRole={user?.role || 'secretary'}
+              userRoles={user?.roles || []}
+              onLogout={handleLogout} 
+              onRoleSwitched={handleSwitchActiveRole}
+              activePlatform={activePlatform}
+            />
+          </Suspense>
+        </ErrorBoundary>
+      </LegalConsentGate>
     );
   }
 
@@ -7612,7 +7616,8 @@ function App() {
   };
 
   return (
-    <DeviceSimulator>
+    <LegalConsentGate user={user}>
+      <DeviceSimulator>
       {isGhostParam && (
         <GhostSupportCapsule 
           schoolName={user?.schools?.name || (Array.isArray(user?.schools) ? user.schools[0]?.name : undefined)} 
@@ -15226,6 +15231,7 @@ function App() {
     </div>
   </div>
 </DeviceSimulator>
+</LegalConsentGate>
 );
 }
 

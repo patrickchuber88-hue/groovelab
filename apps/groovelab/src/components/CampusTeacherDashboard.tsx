@@ -1798,17 +1798,17 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
 
       if (error) throw error;
 
-      alert('Raum erfolgreich gebucht! ✅');
+      alert('Raumanfrage unter Vorbehalt übermittelt! ✅ (Sekretariat prüft)');
       setBookingModalOpen(false);
       await refreshAllData(teacher.school_id, userId);
     } catch (err: any) {
-      console.error('Error booking room:', err);
-      alert('Fehler beim Buchen des Raums: ' + err.message);
+      console.error('Error requesting room:', err);
+      alert('Fehler beim Übermitteln der Raumanfrage: ' + err.message);
     }
   };
 
   const handleCancelRoomBooking = async (bookingId: string) => {
-    if (!window.confirm('Möchtest du diese Raumbuchung wirklich stornieren?')) return;
+    if (!window.confirm('Möchtest du diese Raumanfrage wirklich zurückziehen?')) return;
 
     try {
       const isDynamic = allSchoolSchedules.find(s => s.id === bookingId)?.is_dynamic_reschedule;
@@ -3263,7 +3263,7 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
                                         onClick={() => handleOpenBookingModal(day, slot)}
                                         className="w-full py-4 rounded-xl border border-dashed border-slate-800 hover:border-emerald-500/40 hover:bg-emerald-500/5 text-center text-[10px] font-bold uppercase text-slate-500 hover:text-emerald-400 transition duration-150"
                                       >
-                                        + Buchen
+                                        + Anfragen
                                       </button>
                                     )}
                                   </td>
@@ -3330,7 +3330,7 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
             {/* Header */}
             <div className="p-6 border-b border-slate-800 flex items-center justify-between">
               <div>
-                <h3 className="text-lg font-black text-white">Raum buchen</h3>
+                <h3 className="text-lg font-black text-white">Raumanfrage (unter Vorbehalt)</h3>
                 <p className="text-xs font-bold text-emerald-400 uppercase tracking-wider mt-0.5">
                   {selectedRoom.name} - {bookingDay ? daysOfWeekLabels[bookingDay] : ''} um {bookingSlot}
                 </p>
@@ -3424,6 +3424,12 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
               })()}
             </div>
 
+            {/* ℹ️ Subsidiaritäts- & Vorbehalts-Hinweis */}
+            <div className="mx-6 mb-4 bg-slate-950/60 border border-slate-800 rounded-xl p-3 text-xs text-slate-400 flex items-start gap-2">
+              <span className="text-emerald-400 font-bold shrink-0">ℹ️ Voranfrage:</span>
+              <span>Die Raumreservierung erfolgt unter Vorbehalt und wird nach Prüfung durch das Schulsekretariat im Schul-ERP verbindlich.</span>
+            </div>
+
             {/* Footer */}
             <div className="p-6 border-t border-slate-800 bg-slate-950/20 flex gap-3">
               <button
@@ -3439,7 +3445,7 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
                 disabled={bookingType === 'lesson' && !bookingStudentId}
                 className="flex-1 py-3 bg-emerald-500 hover:bg-emerald-400 disabled:bg-emerald-800/40 disabled:text-slate-500 text-slate-950 font-black text-sm uppercase tracking-wider rounded-xl transition duration-150 shadow-lg shadow-emerald-500/20"
               >
-                Buchen
+                Unter Vorbehalt anfragen
               </button>
             </div>
           </div>

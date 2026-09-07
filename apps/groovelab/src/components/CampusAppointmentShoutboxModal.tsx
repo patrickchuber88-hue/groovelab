@@ -466,7 +466,21 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
       return;
     }
 
-    if (confirm(`Möchtest du den Termin am ${weekdayShort} ${formattedOccDate} um ${timeLabel} Uhr wirklich absagen?`)) {
+    // Check if appointment is short-term (< 2 hours away)
+    let isShortNotice = false;
+    try {
+      const timePart = startTimeRaw.includes(':') ? startTimeRaw : `${startTimeRaw}:00`;
+      const lessonDateTime = new Date(`${targetDate}T${timePart}`);
+      const diffMs = lessonDateTime.getTime() - Date.now();
+      isShortNotice = diffMs > 0 && diffMs < 2 * 60 * 60 * 1000;
+    } catch (e) {}
+
+    const shortNoticeWarning = isShortNotice 
+      ? '\n\n⚠️ Kurzfristige Absage: Da dieser Termin in weniger als 2 Stunden beginnt, bitten wir dich, deine Lehrkraft oder das Schulsekretariat zusätzlich telefonisch zu informieren.'
+      : '';
+    const contractualHint = '\n\n📋 Hinweis: Die Plattform übermittelt deine Absage als Bote an deine Lehrkraft. Es gelten die im Musikschulvertrag vereinbarten Absage- und Nachholregeln.';
+
+    if (confirm(`Möchtest du deine Absage für den Termin am ${weekdayShort} ${formattedOccDate} um ${timeLabel} Uhr an deine Lehrkraft übermitteln?${shortNoticeWarning}${contractualHint}`)) {
       await executeCancelAction();
     }
   };
@@ -1246,8 +1260,22 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
             </button>
           </form>
 
-          <div style={{ textAlign: 'center', fontSize: '0.68rem', color: '#94a3b8', fontWeight: 600 }}>
-            🔒 DSGVO-konforme Schulkommunikation · TLS 1.3 &amp; AES-256
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '2px',
+            textAlign: 'center',
+            fontSize: '0.67rem',
+            color: '#64748b',
+            lineHeight: 1.35
+          }}>
+            <span>
+              🔒 <strong>Bote für Unterrichtsabsprachen:</strong> Es gelten die Fristen deines Musikschulvertrags. Bitte keine Diagnosen oder sensiblen Attestdaten eintragen.
+            </span>
+            <span style={{ fontSize: '0.63rem', color: '#94a3b8' }}>
+              DSGVO-konform · Ende-zu-Ende gesicherte Schulübermittlung · TLS 1.3
+            </span>
           </div>
         </div>
       </div>

@@ -2,6 +2,7 @@ import React from 'react';
 import QRCode from 'react-qr-code';
 import { useMasterPricing } from '../context/MasterPricingContext';
 import { CampusGroovelabBrand, CampusGroovelabText, CampusGroovelabLogo } from './CampusGroovelabBrand';
+import { downloadZugferdXml } from '../utils/pdfGenerator';
 
 interface InvoicePDFTemplateProps {
   invoice: {
@@ -189,6 +190,42 @@ export const InvoicePDFTemplate: React.FC<InvoicePDFTemplateProps> = ({
               }}
             >
               Drucken / PDF
+            </button>
+            <button
+              onClick={() => {
+                downloadZugferdXml({
+                  invoiceId: invoice.id,
+                  invoiceDate: invoice.date,
+                  amount: invoice.amount,
+                  schoolName: school.name,
+                  schoolStreet: school.street,
+                  schoolZipCode: school.zipCode,
+                  schoolCity: school.city,
+                  operatorCompany: operator.company,
+                  operatorContact: operator.contact,
+                  operatorStreet: operator.street,
+                  operatorZip: operator.zip,
+                  operatorCity: operator.city,
+                  operatorIban: operator.iban,
+                  operatorBic: operator.bic,
+                  hasCampus: school.hasCampus,
+                  hasGroovelab: school.hasGroovelab
+                });
+              }}
+              style={{
+                background: '#0284c7',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: '8px',
+                padding: '6px 14px',
+                fontSize: '0.72rem',
+                fontWeight: 750,
+                cursor: 'pointer',
+                boxShadow: '0 2px 4px rgba(2, 132, 199, 0.15)'
+              }}
+              title="Strukturierte E-Rechnung nach EN 16931 / ZUGFeRD 2.2 herunterladen"
+            >
+              XML (E-Rechnung EN 16931)
             </button>
             <button
               onClick={onClose}

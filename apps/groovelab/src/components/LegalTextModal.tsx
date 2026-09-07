@@ -1,13 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { X, ShieldCheck, FileText, Building, Undo2, Scale, Printer, XCircle, CheckCircle2 } from 'lucide-react';
+import { X, ShieldCheck, FileText, Building, Undo2, Scale, Printer } from 'lucide-react';
 import { useMasterPricing } from '../context/MasterPricingContext';
-import { logSecurityEvent } from '../services/auditLogService';
 
 interface LegalTextModalProps {
   isOpen: boolean;
   onClose: () => void;
-  initialTab?: 'impressum' | 'privacy' | 'terms' | 'cancellation' | 'terminate';
+  initialTab?: 'impressum' | 'privacy' | 'terms' | 'cancellation';
 }
 
 export const LegalTextModal: React.FC<LegalTextModalProps> = ({
@@ -16,22 +15,8 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
   initialTab = 'impressum'
 }) => {
   const masterPricing = useMasterPricing();
-  const [activeTab, setActiveTab] = useState<'impressum' | 'privacy' | 'terms' | 'cancellation' | 'terminate'>(initialTab);
+  const [activeTab, setActiveTab] = useState<'impressum' | 'privacy' | 'terms' | 'cancellation'>(initialTab);
   const contentRef = useRef<HTMLDivElement>(null);
-
-  // § 312k BGB Kündigungsformular State
-  const [cancelParentName, setCancelParentName] = useState('');
-  const [cancelEmail, setCancelEmail] = useState('');
-  const [cancelStudentIdentifier, setCancelStudentIdentifier] = useState('');
-  const [cancelSchoolName, setCancelSchoolName] = useState('');
-  const [cancelType, setCancelType] = useState<'regular' | 'extraordinary'>('regular');
-  const [cancelReason, setCancelReason] = useState('');
-  const [cancelSubmitting, setCancelSubmitting] = useState(false);
-  const [cancelReceipt, setCancelReceipt] = useState<{
-    reference: string;
-    timestamp: string;
-    effectiveDateText: string;
-  } | null>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -59,9 +44,6 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
     } else if (activeTab === 'cancellation') {
       docTitle = 'Campus-Groovelab – Widerrufsbelehrung & Muster-Widerrufsformular';
       tabHeading = 'Widerrufsbelehrung & Muster-Widerrufsformular (B2C)';
-    } else if (activeTab === 'terminate') {
-      docTitle = 'Campus-Groovelab – Bestätigung der Vertragskündigung (§ 312k BGB)';
-      tabHeading = 'Kündigung elektronischer Verträge gem. § 312k BGB';
     }
 
     const contentHtml = contentRef.current.innerHTML;
@@ -440,8 +422,7 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
                 { id: 'impressum', label: 'Impressum', icon: Building },
                 { id: 'privacy', label: 'Datenschutz', icon: ShieldCheck },
                 { id: 'terms', label: 'AGB', icon: FileText },
-                { id: 'cancellation', label: 'Widerruf (B2C)', icon: Undo2 },
-                { id: 'terminate', label: 'Verträge kündigen (§ 312k)', icon: XCircle }
+                { id: 'cancellation', label: 'Widerruf (B2C)', icon: Undo2 }
               ].map(tab => {
                 const isActive = activeTab === tab.id;
                 const Icon = tab.icon;
@@ -624,15 +605,67 @@ Hiermit versichere ich in gutem Glauben, dass die vorstehenden Angaben richtig u
                 (1) <strong>Keine Zahlungs- oder Bankdaten von Familien:</strong> Auf Campus-Groovelab werden keinerlei Bank-, SEPA-, Kreditkarten- oder Abrechnungsvertragsdaten von Schülern oder Eltern gespeichert.<br />
                 (2) <strong>Zero-Mail-Architektur für Schüler und Eltern:</strong> Von Schülern und Erziehungsberechtigten werden zu 100 % keine privaten E-Mail-Adressen erhoben oder gespeichert. Der Zugang erfolgt passwortlos über physische Schulausweise (QR-Code / Ausweisnummer) in Kombination mit einer serverseitig gehashten PIN oder Passkeys (WebAuthn). Bei Schulleitungen, Lehrkräften und Schulverwaltung werden ausschließlich dienstliche E-Mail-Adressen verarbeitet, die zur Vertragsabwicklung, Einladung und Kontoverwaltung erforderlich sind (Art. 6 Abs. 1 lit. b DSGVO).<br />
                 (3) <strong>Namensdarstellung &amp; Schutz von Minderjährigen:</strong> Schülernamen werden in Lehrer-Übersichten datenschutzkonform auf „Vorname + N.“ (z. B. „Max M.“) gekürzt. Lehrkräftenamen werden für Schüler und Eltern mit vollem Namen angezeigt, um Verwechslungsfreiheit im Schulbetrieb zu gewährleisten.<br />
-                (4) <strong>Mindestalter &amp; Bildschirmfreies Üben („Screenless Practice“):</strong> Das Mindestalter beträgt 6 Jahre. Um Bildschirmzeiten bei jüngeren Kindern (6–9 Jahre) zu minimieren, können Übeeinheiten am akustischen Instrument von den Eltern im Elternmodus mit einem Klick quittiert werden (begrenzt auf max. 60 Min./Tag zur Vermeidung von Missbrauch).
+                (4) <strong>Mindestalter &amp; Bildschirmfreies Üben („Screenless Practice“):</strong> Das Mindestalter beträgt 6 Jahre. Um Bildschirmzeiten bei jüngeren Kindern (6–9 Jahre) zu minimieren, können Übeeinheiten am akustischen Instrument von den Eltern im Elternmodus mit einem Klick quittiert werden (begrenzt auf max. 60 Min./Tag zur Vermeidung von Missbrauch).<br />
+                (5) <strong>Ausschluss von Gesundheits- und Diagnosedaten (Art. 9 DSGVO / Art. 5 lit. c nDSG):</strong> Die plattforminterne Kommunikations- und Shoutbox-Funktion dient ausschließlich der organisatorischen Unterrichtsabstimmung und Terminabsprache. Die Erfassung, Speicherung oder Übermittlung von sensiblen Gesundheitsdaten, ärztlichen Attesten oder konkreten medizinischen Diagnosen ist untersagt und nicht Gegenstand der Plattformfunktion. Bei Abwesenheiten genügt die allgemeine Angabe „krankheitsbedingt“.
               </div>
 
               <div>
-                <strong style={{ color: '#0f172a' }}>3. Client-seitige Speicherung, Offline-Audio-Tresore &amp; Entbehrlichkeit eines Cookie-Banners (§ 25 Abs. 2 Nr. 2 TDDDG / § 165 TKG / Art. 6 nDSG)</strong><br />
+                <strong style={{ color: '#0f172a' }}>3. Client-seitige Speicherung, TDDDG-Transparenzmatrix &amp; Zero-Consent-Doktrin (§ 25 Abs. 2 Nr. 2 TDDDG / § 165 TKG / Art. 6 revDSG)</strong><br />
                 (1) <strong>Technisch zwingend erforderliche Speicherungen:</strong> Unsere Webanwendung verwendet lokale Speichertechnologien des Browsers (LocalStorage, SessionStorage, IndexedDB), um Kernfunktionen wie den sicheren Sitzungserhalt, Navigationseinstellungen und den Offline-Übebetrieb in Proberäumen bereitzustellen.<br />
                 (2) <strong>Keine Tracking- oder Werbe-Cookies:</strong> Es werden zu keinem Zeitpunkt Marketing-, Profiling- oder Drittanbieter-Tracking-Cookies gesetzt. Sämtliche client-seitigen Speicherungen sind gemäß <strong>§ 25 Abs. 2 Nr. 2 TDDDG</strong> (DE) sowie <strong>§ 165 Abs. 3 TKG 2021</strong> (AT) technisch unbedingt erforderlich. Ein Cookie-Banner ist daher gesetzlich entbehrlich.<br />
-                (3) <strong>Schutz lokaler Daten:</strong> Es werden keine Klartext-Passwörter im Browser gespeichert. Flüchtige Sitzungs-Identifikatoren (Session-Leases) verfallen automatisch. Sensible lokale Zwischenspeicher (z. B. Offline-Familienprofile) werden auf dem Endgerät über die browser-eigene Web Crypto API kryptografisch geschützt (PBKDF2 mit 100.000 Runden SHA-512 und AES-256-GCM).<br />
-                (4) <strong>Lokaler Audio-Tresor (IndexedDB):</strong> Zur Gewährleistung eines unterbrechungsfreien Probenbetriebs in schallisolierten Räumen ohne Internetverbindung werden temporäre Übe- und Playback-Audios lokal in geschützten IndexedDB-Datenspeichern des Browsers vorgehalten und bei aktiver Verbindung synchronisiert.
+                (3) <strong>Transparenzmatrix der lokalen Speicher-Schlüssel (TDDDG § 25 Abs. 2 Nr. 2):</strong><br />
+                <div style={{ overflowX: 'auto', marginTop: '8px', marginBottom: '8px' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.74rem', textAlign: 'left' }}>
+                    <thead>
+                      <tr style={{ background: '#f1f5f9', borderBottom: '1px solid #cbd5e1' }}>
+                        <th style={{ padding: '6px 8px' }}>Schlüssel / Kennung</th>
+                        <th style={{ padding: '6px 8px' }}>Typ</th>
+                        <th style={{ padding: '6px 8px' }}>Zweck &amp; Funktion</th>
+                        <th style={{ padding: '6px 8px' }}>Dauer</th>
+                        <th style={{ padding: '6px 8px' }}>Rechtsgrundlage</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
+                        <td style={{ padding: '6px 8px', fontFamily: 'monospace' }}>gl_active_session_lease_id</td>
+                        <td style={{ padding: '6px 8px' }}>LocalStorage</td>
+                        <td style={{ padding: '6px 8px' }}>Kryptografischer Session-Lease-Token zum Schutz vor Session-Hijacking</td>
+                        <td style={{ padding: '6px 8px' }}>Bis Abmeldung / max. 30 Tage</td>
+                        <td style={{ padding: '6px 8px' }}>§ 25 Abs. 2 Nr. 2 TDDDG</td>
+                      </tr>
+                      <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
+                        <td style={{ padding: '6px 8px', fontFamily: 'monospace' }}>groovelab_active_platform</td>
+                        <td style={{ padding: '6px 8px' }}>LocalStorage</td>
+                        <td style={{ padding: '6px 8px' }}>Beibehaltung des ausgewählten Moduls (Campus vs. GrooveLab)</td>
+                        <td style={{ padding: '6px 8px' }}>Dauerhaft bis Cache-Leerung</td>
+                        <td style={{ padding: '6px 8px' }}>§ 25 Abs. 2 Nr. 2 TDDDG</td>
+                      </tr>
+                      <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
+                        <td style={{ padding: '6px 8px', fontFamily: 'monospace' }}>campus_family_profiles</td>
+                        <td style={{ padding: '6px 8px' }}>LocalStorage</td>
+                        <td style={{ padding: '6px 8px' }}>Verschlüsselte Schnellumschaltung zwischen Geschwistern auf Familien-Geräten</td>
+                        <td style={{ padding: '6px 8px' }}>Bis Abmeldung</td>
+                        <td style={{ padding: '6px 8px' }}>§ 25 Abs. 2 Nr. 2 TDDDG</td>
+                      </tr>
+                      <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
+                        <td style={{ padding: '6px 8px', fontFamily: 'monospace' }}>groovelab_kiosk_token</td>
+                        <td style={{ padding: '6px 8px' }}>LocalStorage</td>
+                        <td style={{ padding: '6px 8px' }}>Hardware-Kopplung der Proberaum-Terminals im Kiosk-Betrieb der Musikschule</td>
+                        <td style={{ padding: '6px 8px' }}>Bis Terminal-Reset</td>
+                        <td style={{ padding: '6px 8px' }}>§ 25 Abs. 2 Nr. 2 TDDDG</td>
+                      </tr>
+                      <tr>
+                        <td style={{ padding: '6px 8px', fontFamily: 'monospace' }}>cg_tax_mode</td>
+                        <td style={{ padding: '6px 8px' }}>LocalStorage</td>
+                        <td style={{ padding: '6px 8px' }}>Steuer-Konfiguration (Regelbesteuerung vs. Kleinunternehmer)</td>
+                        <td style={{ padding: '6px 8px' }}>Dauerhaft</td>
+                        <td style={{ padding: '6px 8px' }}>§ 25 Abs. 2 Nr. 2 TDDDG</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                (4) <strong>Schutz lokaler Daten:</strong> Es werden keine Klartext-Passwörter im Browser gespeichert. Flüchtige Sitzungs-Identifikatoren verfallen automatisch. Sensible lokale Zwischenspeicher werden auf dem Endgerät über die browser-eigene Web Crypto API kryptografisch geschützt (PBKDF2 mit 100.000 Runden SHA-512 und AES-256-GCM).<br />
+                (5) <strong>Lokaler Audio-Tresor (IndexedDB):</strong> Zur Gewährleistung eines unterbrechungsfreien Probenbetriebs in schallisolierten Räumen ohne Internetverbindung werden temporäre Übe- und Playback-Audios lokal in geschützten IndexedDB-Datenspeichern des Browsers vorgehalten und bei aktiver Verbindung synchronisiert.
               </div>
 
               <div>
@@ -683,6 +716,31 @@ Hiermit versichere ich in gutem Glauben, dass die vorstehenden Angaben richtig u
                   <strong>Hinweis für Nutzer in der Schweiz:</strong> Deutschland verfügt gemäß Beschluss des Schweizer Bundesrats vom 25. August 2023 über ein angemessenes Schutzniveau (Art. 16 Abs. 1 nDSG i. V. m. Anhang 1 VDSG).
                 </span>
               </div>
+
+              <div>
+                <strong style={{ color: '#0f172a' }}>11. Besondere Bestimmungen für Nutzer in der Schweiz (Art. 16, 19, 60–66 revDSG)</strong><br />
+                (1) <strong>Grenzüberschreitende Datenbekanntgabe:</strong> Die Datenverarbeitung erfolgt in Rechenzentren in Deutschland (Europäische Union). Deutschland verfügt gemäß Beschluss des Schweizer Bundesrats über ein angemessenes Datenschutzniveau (Art. 16 Abs. 1 revDSG i. V. m. Anhang 1 VDSG).<br />
+                (2) <strong>Rechte nach dem Schweizer revDSG:</strong> Betroffene Personen in der Schweiz haben das Recht auf Auskunft (Art. 25 revDSG), Datenherausgabe und -übertragung in einem gängigen elektronischen Format (Art. 28 revDSG) sowie Berichtigung und Löschung unrichtiger Daten (Art. 32 revDSG).<br />
+                (3) <strong>Schweizer Aufsichtsbehörde:</strong> Eidgenössischer Datenschutz- und Öffentlichkeitsbeauftragter (EDÖB), Feldeggweg 1, CH-3003 Bern, Schweiz (<a href="https://www.edoeb.admin.ch" target="_blank" rel="noopener noreferrer" style={{ color: '#2563eb' }}>www.edoeb.admin.ch</a>).
+              </div>
+
+              <div>
+                <strong style={{ color: '#0f172a' }}>12. Deterministische Algorithmen &amp; Ausschluss von KI-Systemen (VO (EU) 2024/1689 ErwGr. 12 &amp; Art. 22 DSGVO)</strong><br />
+                (1) <strong>Kein KI-System im Sinne des EU AI Act:</strong> Die didaktischen Audio-Werkzeuge (CampusTuner Stimmgerät, Metronom, Loopstation) und die Stundenplan-Optimierung (15-Stufen-Solver) basieren auf rein deterministischen mathematischen Algorithmen der digitalen Signalverarbeitung (Fast-Fourier-Transformation, Autokorrelation) sowie klassischer Constraint-Satisfaction-Heuristik. Sie stellen gemäß Erwägungsgrund 12 der Verordnung (EU) 2024/1689 (EU AI Act) ausdrücklich keine Systeme der künstlichen Intelligenz dar (kein maschinelles Lernen, keine heuristische Profilbildung).<br />
+                (2) <strong>Ausschluss automatisierter Einzelentscheidungen (Art. 22 DSGVO / Human-in-the-Loop):</strong> Die automatische Stundenplan-Zuteilung erzeugt ausschließlich unverbindliche Entwurfsvorschläge für die Lehrkraft. Jeder Stundenplan muss aktiv von der Lehrkraft geprüft, bei Bedarf manuell angepasst und durch das Schulsekretariat freigegeben werden. Eine vollautomatisierte Entscheidung mit Rechtswirkung findet zu 100 % nicht statt.
+              </div>
+
+              <div>
+                <strong style={{ color: '#0f172a' }}>13. Benachrichtigungen &amp; Push-Kanäle (Trennung Transaktions- vs. Werbe-Push gem. § 7 UWG)</strong><br />
+                (1) <strong>Transaktionale Benachrichtigungen:</strong> Eilmeldungen zu Unterrichtsausfällen, Raumverlegungen, Vertretungsstunden und Hausaufgabenheft-Einträgen erfolgen im Rahmen der Unterrichts- und Vertragsabwicklung (Art. 6 Abs. 1 lit. b DSGVO) und stellen keine elektronische Werbung dar.<br />
+                (2) <strong>Werbliche Ankündigungen:</strong> Allgemeine Schulnachrichten, Konzertankündigungen oder Zusatzworkshops werden über separate Informationskanäle geführt und erfordern ein gesondertes, freiwilliges Einverständnis (Art. 6 Abs. 1 lit. a DSGVO / § 7 Abs. 2 UWG), das jederzeit in den Profileinstellungen mit 1 Klick widerrufen werden kann.
+              </div>
+
+              <div>
+                <strong style={{ color: '#0f172a' }}>14. Revisionssichere Archivierung, WORM-Doktrin &amp; Produkthaftung (PLD 2024 &amp; GoBD)</strong><br />
+                (1) <strong>Append-Only &amp; WORM-Schutz:</strong> Rechnungsdaten und steuerlich relevante Belege werden nach GoBD unveränderbar persistiert (Write Once, Read Many). Buchungsbelege werden mit einem kryptografischen SHA-256 Siegel versehen, um jede nachträgliche Manipulation forensisch auszuschließen.<br />
+                (2) <strong>Produkthaftungs-Zweckbestimmung:</strong> Campus-Groovelab ist ein pädagogisches Begleit- und Organisationswerkzeug für den Musikunterricht. Die originäre Pflicht zur Aufbewahrung von Personal- und Schülerstammdaten im Rahmen amtlicher Schulgesetze verbleibt bei den amtlichen Registern der Musikschule.
+              </div>
             </div>
           )}
 
@@ -723,7 +781,7 @@ Hiermit versichere ich in gutem Glauben, dass die vorstehenden Angaben richtig u
                   <strong style={{ color: '#0f172a' }}>1. Vertragsgegenstand, Rechtsnatur, Pädagogischer Add-On-Status, Subsidiaritäts-Grundsatz &amp; Notfall-Klausel (SaaS-Mietvertrag)</strong><br />
                   (1) Diese Bestimmungen regeln die Bereitstellung der cloudbasierten Schulmanagement- und Übeplattform <strong>Campus-Groovelab</strong> durch den Betreiber Patrick Huber (Einzelunternehmen, Karl-Fürstenberg-Str. 59, 79618 Rheinfelden, Deutschland). Der Vertrag qualifiziert sich rechtlich als <strong>Software-as-a-Service (SaaS)-Mietvertrag gemäß § 535 ff. BGB (DE) / §§ 1090 ff. ABGB (AT) / Art. 253 ff. OR (CH)</strong> über die Bereitstellung von Cloud-Infrastruktur, Datenbank-Hosting, Datensicherung und Systemwartung.<br />
                   (2) <strong>Pädagogischer Add-On-Charakter &amp; Subsidiaritäts-Grundsatz:</strong> Campus-Groovelab ist ein didaktisches Zusatz-, Erleichterungs- und Übermittlungswerkzeug („Convenience-Tool / Fast-Track-Option“) zur Beschleunigung und Erleichterung des Musikschulalltags. Die Plattform ersetzt ausdrücklich kein behördliches oder amtliches Schulverwaltungssystem (ERP-Software wie ASV, WinSchool oder Musikschul-Manager) und stellt zu keinem Zeitpunkt den ausschließlichen oder verbindlich vorgeschriebenen Dienst-, Weisungs- oder Kommunikationskanal der Musikschule dar.<br />
-                  (3) <strong>Primärwege, Weisungsautonomie der Schule &amp; Wahlfreiheit:</strong> Die offizielle dienstrechtliche Kommunikation, verbindliche Arbeitsanweisungen der Schulleitung sowie die hoheitliche Verwaltung von Schüler- und Honorarstammdaten verbleiben vollumfänglich auf den herkömmlichen Primärkanälen der Musikschule (behördliche E-Mail, interne Kommunikationssysteme wie MS Teams, Telefon, behördliche ERP-Software oder Aushang). Lehrkräfte und Mitarbeiter sind zu jedem Zeitpunkt berechtigt, Stundenpläne, Raumwünsche und Terminänderungen alternativ auf dem herkömmlichen Weg (per E-Mail oder telefonisch) an das Sekretariat zu übermitteln. Die Datenüberführung in das amtliche Verwaltungssystem der Schule obliegt der Musikschule.<br />
+                  (3) <strong>Primärwege, Weisungsautonomie der Schule, Vorbehalt &amp; Wahlfreiheit:</strong> Die offizielle dienstrechtliche Kommunikation, verbindliche Arbeitsanweisungen der Schulleitung sowie die hoheitliche Verwaltung von Schüler- und Honorarstammdaten verbleiben vollumfänglich auf den herkömmlichen Primärkanälen der Musikschule (behördliche E-Mail, interne Kommunikationssysteme wie MS Teams, Telefon, behördliche ERP-Software oder Aushang). Lehrkräfte und Mitarbeiter sind zu jedem Zeitpunkt berechtigt, Stundenpläne, Raumwünsche und Terminänderungen alternativ auf dem herkömmlichen Weg (per E-Mail oder telefonisch) an das Sekretariat zu übermitteln. Raumbuchungsanfragen, Stundenplanübermittlungen und Terminabstimmungen in der Plattform stellen unverbindliche Voranfragen („unter Vorbehalt“) bzw. technische Botenübermittlungen dar; sie begründen zu keinem Zeitpunkt eine automatische Buchungsgarantie oder rechtsgeschäftliche Bindungswirkung für das Raum- und Stundenkontingent der Musikschule. Die verbindliche Zuteilung und Einpflege in das amtliche Schul-ERP obliegt allein der Schulleitung bzw. dem Schulsekretariat. Die Datenüberführung in das amtliche Verwaltungssystem der Schule obliegt der Musikschule.<br />
                   (4) <strong>Notfall-, Nachrangigkeits- &amp; Schadenminderungsklausel (§ 254 BGB):</strong> Die Musikschule stellt sicher, dass der reguläre Schulbetrieb und die primäre Notfallkommunikation (Telefon, E-Mail, herkömmliche Vertretungspläne) unabhängig von der Plattform gewährleistet bleiben. Bei kurzzeitigen Serverstörungen, Netzausfällen oder Wartungsfenstern findet der Schulunterricht regulär statt; die Musikschule ist im Rahmen ihrer gesetzlichen Schadenminderungspflicht (§ 254 BGB) gehalten, Raum- und Terminabstimmungen über ihre Primärkanäle abzuwickeln. Eine Haftung des Betreibers für ausgefallene Unterrichtsstunden, verpasste Bandproben oder Honorarausfälle ist ausgeschlossen, es sei denn, der Ausfall beruht auf einer vorsätzlichen oder grob fahrlässigen Pflichtverletzung des Betreibers oder der schuldhaften Verletzung einer wesentlichen Vertragspflicht (Kardinalpflicht). Die Haftungsregelungen gemäß § 7 dieser AGB gelten vollumfänglich.<br />
                   (5) Soweit im Rahmen der Bereitstellung personenbezogene Daten verarbeitet werden, gilt ergänzend die Vereinbarung zur Auftragsverarbeitung (AVV gemäß Art. 28 DSGVO bzw. Art. 9 nDSG) als integraler Vertragsbestandteil.<br />
                   (6) Der Betreiber strebt eine Verfügbarkeit der Cloud-Infrastruktur von 99,5 % im Jahresmittel an (ausgenommen angekündigte Wartungsarbeiten außerhalb der Kernunterrichtszeiten). Zur Abwehr von Cyber-Angriffen und zur Sicherung des störungsfreien Schulbetriebs behält sich der Betreiber vor, automatisierte Angriffsnetzwerke oder schädliche Datenverbindungen an der Web Application Firewall technisch abzuweisen. Der reguläre weltweite Zugriff für Schüler und Lehrkräfte im Rahmen privater Reisen (z. B. Urlaubsaufenthalte) bleibt hiervon unberührt.
@@ -743,7 +801,7 @@ Hiermit versichere ich in gutem Glauben, dass die vorstehenden Angaben richtig u
                   (2) <strong>Sammelzahler vs. Direktabrechnung:</strong> GrooveLab-Aktivierungen werden immer zu 100 % von der Musikschule getragen (Sammelzahler). Für das Campus-Modul kann die Musikschule wahlweise Direktabrechnung mit den Eltern vereinbaren. Schüler-Direktabrechnungen werden ausnahmslos als einmaliger Jahresbeitrag (5,88 € in DE/AT bzw. CHF 12.00 in CH pro Schuljahr bzw. 4,80 € / CHF 9.60 bei Schulbezuschussung) abgerechnet – niemals monatlich (zur Vermeidung unverhältnismäßiger Banktransaktions- und Buchungsgebühren).<br />
                   (3) <strong>Fair-Play Inaktivitäts-Entlastung:</strong> Loggt sich ein Schüler über einen Zeitraum von mehr als sechzig (60) aufeinanderfolgenden Tagen nicht aktiv in die interaktive Plattform ein, wird das Profil zur Vermeidung unnötiger Kosten für die Musikschule automatisch in den passiven Basis-Bereitstellungsstatus (0,09 € / CHF 0.20 pro Monat) überführt. QR-Landingpages, Stundenpläne und Notizen bleiben vollständig aktiv.<br />
                   (4) <strong>Bestandsschutz-Zusage (Price-Lock):</strong> Der Betreiber sagt der Musikschule für die Dauer des ununterbrochenen Vertragsverhältnisses die Beibehaltung der bei Vertragsschluss vereinbarten monatlichen Basis-Hosting- und Bereitstellungspauschalen zu. Preisanpassungen für Neukunden haben keinerlei Auswirkung auf bestehende Verträge. Bei einer Kündigung und späteren Neuanmeldung gilt der zum Zeitpunkt der Neuanmeldung gültige Tarif.<br />
-                  (5) <strong>Steuerliche Hinweise:</strong> In Deutschland und Österreich gemäß § 19 UStG (DE) bzw. § 6 Abs. 1 Z 27 UStG (AT) umsatzsteuerbefreit (Kleinunternehmerregelung). Für die Schweiz gilt Leistungsort Schweiz (nicht im Inland steuerbar gem. Art. 8 Abs. 1 MWSTG).
+                  (5) <strong>Steuerliche Hinweise &amp; Bruttopreisgarantie für Bestandskunden:</strong> Soweit der Betreiber die Kleinunternehmerregelung in Anspruch nimmt, erfolgt die Abrechnung gem. § 19 UStG (DE) bzw. § 6 Abs. 1 Z 27 UStG (AT) ohne gesonderten Umsatzsteuerausweis. Bei Wechsel zur Regelbesteuerung (19 % MwSt.) gilt für alle bestehenden Verträge die unbedingte <strong>Bruttopreisgarantie</strong>: Der vereinbarte Rechnungs- und Zahlbetrag bleibt auf den Cent genau identisch; die anfallende gesetzliche Mehrwertsteuer wird vollständig aus dem vereinbarten Entgelt herausgerechnet und gesondert auf der Rechnung ausgewiesen (§ 14 UStG). Vorsteuerabzugsberechtigte Kunden können die ausgewiesene Steuer steuermindernd geltend machen. Für die Schweiz gilt Leistungsort Schweiz (nicht im Inland steuerbar gem. Art. 8 Abs. 1 MWSTG).
                 </div>
 
                 <div>
@@ -831,13 +889,21 @@ Hiermit versichere ich in gutem Glauben, dass die vorstehenden Angaben richtig u
                 </div>
 
                 <div>
-                  <strong style={{ color: '#0f172a' }}>10. Elektronischer Kündigungsbutton &amp; Sofort-Widerruf (§ 312k BGB)</strong><br />
-                  Während des kostenfreien Schnuppermonats können Eltern den Zugang mit 1 Klick im Elternbereich sofort und ohne Kosten widerrufen. Nach Durchführung der Kündigung wird unverzüglich eine elektronische Kündigungsbestätigung mit Datum und Zeitstempel bereitgestellt.
+                  <strong style={{ color: '#0f172a' }}>10. Sofort-Widerruf im Schnuppermonat &amp; Vertragsbeendigung im Eltern-Dashboard</strong><br />
+                  Während des kostenfreien Schnuppermonats können Eltern den Zugang mit 1 Klick im PIN-geschützten Elternbereich sofort und ohne Kosten widerrufen. Nach Durchführung der Kündigung bzw. des Widerrufs wird unverzüglich eine elektronische Kündigungsbestätigung (PDF) mit Zeitstempel und Aktenzeichen direkt zum Herunterladen und Ausdrucken bereitgestellt.
                 </div>
 
                 <div>
                   <strong style={{ color: '#0f172a' }}>11. Digitale Netiquette, Jugendschutz &amp; Ausschluss missbräuchlicher Nutzung</strong><br />
                   Die plattforminterne Kommunikation (Direktnachrichten, Ensemble-Shouts) dient ausschließlich dem didaktischen Informationsaustausch rund um Fachunterricht, Üben und Proben. Beleidigende, diskriminierende, jugendgefährdende oder schulordnungswidrige Inhalte sind streng untersagt. Bei schwerwiegenden Verstößen kann die Schulleitung den internen Nachrichtenversand für das betreffende Profil temporär deaktivieren.
+                </div>
+
+                <div>
+                  <strong style={{ color: '#0f172a' }}>12. Technischer Botenstatus, Unterrichtsabsagen, Vertretung &amp; Ausschluss formbedürftiger Erklärungen</strong><br />
+                  (1) <strong>Elektronische Botenfunktion:</strong> Soweit Schüler oder Erziehungsberechtigte über Campus-Groovelab (insbesondere via Shoutbox, Terminkalender oder Direktnachricht) Unterrichtstermine absagen, alternative Terminvorschläge der Lehrkraft annehmen oder organisatorische Mitteilungen versenden, agiert die Plattform als reiner technischer Übermittlungsbote im Auftrag des Absenders.<br />
+                  (2) <strong>Verhältnis zum Musikschul-Unterrichtsvertrag &amp; Fristen:</strong> Die über die Plattform übermittelten Absagen und Terminabstimmungen berühren die zwischen den Erziehungsberechtigten und der jeweiligen Musikschule vereinbarten Unterrichts-, Honorar- und Nachholregelungen nicht. Ob eine versäumte Stunde nachgeholt wird oder honorarpflichtig bleibt, richtet sich ausschließlich nach den Schul- und Entgeltordnungen der Musikschule. Das Absenden einer Nachricht in Campus-Groovelab begründet keine Befreiung von vertraglichen Zahlungs- oder Fristpflichten.<br />
+                  (3) <strong>Ausschluss rechtsgeschäftlicher Hauptvertrags-Erklärungen:</strong> Rechtserhebliche Willenserklärungen, die den Bestand des Unterrichtsvertrags mit der Musikschule betreffen (insbesondere Kündigungen, Widerrufe des Unterrichtsvertrags oder formelle Mahnungen), können über Campus-Groovelab <strong>nicht</strong> wirksam erklärt werden. Derartige Erklärungen sind zwingend auf den von der Musikschule vorgegebenen Primärwegen (schriftlich oder per behördlicher E-Mail an das Sekretariat) zu übermitteln.<br />
+                  (4) <strong>Datenschutzsensibilität bei Abwesenheitsgründen (Art. 9 DSGVO):</strong> Zur Wahrung des Schutzes sensibler Gesundheitsdaten Minderjähriger werden Nutzer gebeten, bei Absagen keine detaillierten Krankheitsdiagnosen oder medizinischen Attestinhalte in Freitextfelder einzugeben. Die Angabe der allgemeinen Kategorie („krankheitsbedingt“) ist vollumfänglich ausreichend.
                 </div>
               </div>
             </div>
@@ -921,330 +987,6 @@ Hiermit versichere ich in gutem Glauben, dass die vorstehenden Angaben richtig u
                   (*) Unzutreffendes streichen.
                 </div>
               </div>
-            </div>
-          )}
-
-          {activeTab === 'terminate' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
-              <div>
-                <h4 style={{ margin: 0, fontSize: '1.08rem', fontWeight: 900, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <XCircle size={18} color="#ef4444" />
-                  Kündigung von Verträgen im elektronischen Geschäftsverkehr (§ 312k BGB)
-                </h4>
-                <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '4px' }}>
-                  Gesetzlicher Kündigungsservice für Verbraucher (Eltern). Die Abgabe der Kündigungserklärung ist hier jederzeit barrierefrei und ohne vorherigen Login möglich.
-                </div>
-              </div>
-
-              {cancelReceipt ? (
-                /* § 312k Abs. 4 BGB: Unverzügliche Bestätigung in Textform */
-                <div style={{
-                  background: '#f0fdf4',
-                  border: '1.5px solid #86efac',
-                  borderRadius: '16px',
-                  padding: '20px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '12px'
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <div style={{
-                      width: '36px', height: '36px', borderRadius: '10px',
-                      background: '#22c55e', color: '#ffffff',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      flexShrink: 0
-                    }}>
-                      <CheckCircle2 size={22} />
-                    </div>
-                    <div>
-                      <div style={{ fontSize: '0.98rem', fontWeight: 900, color: '#14532d' }}>
-                        Kündigung erfolgreich übermittelt &amp; registriert
-                      </div>
-                      <div style={{ fontSize: '0.76rem', color: '#166534', fontWeight: 650 }}>
-                        Gesetzliche Eingangsbestätigung gem. § 312k Abs. 4 BGB
-                      </div>
-                    </div>
-                  </div>
-
-                  <div style={{
-                    background: '#ffffff',
-                    border: '1px solid #bbf7d0',
-                    borderRadius: '12px',
-                    padding: '14px',
-                    fontSize: '0.80rem',
-                    color: '#1e293b',
-                    lineHeight: 1.6
-                  }}>
-                    <div><strong>Kündigungs-Referenz:</strong> <span style={{ fontFamily: 'monospace', fontWeight: 800 }}>{cancelReceipt.reference}</span></div>
-                    <div><strong>Eingangszeitpunkt:</strong> {cancelReceipt.timestamp} Uhr</div>
-                    <div><strong>Vertragspartner:</strong> {cancelParentName} ({cancelEmail})</div>
-                    <div><strong>Schüler / Kind:</strong> {cancelStudentIdentifier}</div>
-                    {cancelSchoolName && <div><strong>Musikschule:</strong> {cancelSchoolName}</div>}
-                    <div><strong>Beendigungszeitpunkt:</strong> <span style={{ fontWeight: 800, color: '#15803d' }}>{cancelReceipt.effectiveDateText}</span></div>
-                  </div>
-
-                  <div style={{ fontSize: '0.74rem', color: '#166534', lineHeight: 1.45 }}>
-                    ✓ Ihre Erklärung ist rechtssicher in unserem System hinterlegt. Sie können dieses Dokument über die Schaltfläche „Drucken / PDF“ unten für Ihre Unterlagen sichern.
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setCancelReceipt(null);
-                      setCancelParentName('');
-                      setCancelEmail('');
-                      setCancelStudentIdentifier('');
-                      setCancelSchoolName('');
-                      setCancelReason('');
-                    }}
-                    style={{
-                      alignSelf: 'flex-start',
-                      background: '#ffffff',
-                      border: '1px solid #cbd5e1',
-                      borderRadius: '8px',
-                      padding: '6px 12px',
-                      fontSize: '0.74rem',
-                      fontWeight: 750,
-                      color: '#475569',
-                      cursor: 'pointer',
-                      marginTop: '4px'
-                    }}
-                  >
-                    Neues Formular aufrufen
-                  </button>
-                </div>
-              ) : (
-                /* § 312k Abs. 2 BGB: 2-Stufen Kündigungsformular */
-                <form
-                  onSubmit={async (e) => {
-                    e.preventDefault();
-                    if (!cancelParentName.trim() || !cancelEmail.trim() || !cancelStudentIdentifier.trim()) {
-                      alert('Bitte füllen Sie alle erforderlichen Felder aus.');
-                      return;
-                    }
-                    setCancelSubmitting(true);
-                    try {
-                      const now = new Date();
-                      const timestampStr = now.toLocaleString('de-DE', { dateStyle: 'medium', timeStyle: 'short' });
-                      const refCode = `KDG-${now.getFullYear()}-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
-                      const effectiveDateText = cancelType === 'extraordinary' 
-                        ? 'Sofort (Außerordentliche Kündigung)' 
-                        : 'Zum regulären Schuljahresende / nächstmöglichen Termin';
-
-                      try {
-                        await logSecurityEvent({
-                          action: 'CONSUMER_CONTRACT_CANCELLATION_SUBMITTED',
-                          metadata: {
-                            reference: refCode,
-                            parent_name: cancelParentName,
-                            email: cancelEmail,
-                            student_identifier: cancelStudentIdentifier,
-                            school_name: cancelSchoolName,
-                            cancellation_type: cancelType,
-                            reason: cancelReason || undefined,
-                            timestamp: now.toISOString()
-                          }
-                        });
-                      } catch (logErr) {
-                        console.warn('Cancellation log warning:', logErr);
-                      }
-
-                      setCancelReceipt({
-                        reference: refCode,
-                        timestamp: timestampStr,
-                        effectiveDateText
-                      });
-                    } finally {
-                      setCancelSubmitting(false);
-                    }
-                  }}
-                  style={{
-                    background: '#f8fafc',
-                    border: '1px solid #e2e8f0',
-                    borderRadius: '16px',
-                    padding: '20px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '14px'
-                  }}
-                >
-                  <div style={{ fontSize: '0.78rem', color: '#475569', lineHeight: 1.5 }}>
-                    Bitte geben Sie nachfolgend die Daten zur eindeutigen Zuordnung des Vertragsverhältnisses an. Nach Betätigung der Schaltfläche <strong>„Jetzt kündigen“</strong> erhalten Sie unverzüglich eine Eingangsbestätigung in Textform.
-                  </div>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#0f172a' }}>
-                        Name des Vertragspartners (Elternteil) *
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        placeholder="z. B. Dr. Sabine Muster"
-                        value={cancelParentName}
-                        onChange={(e) => setCancelParentName(e.target.value)}
-                        style={{
-                          padding: '9px 12px',
-                          borderRadius: '10px',
-                          border: '1px solid #cbd5e1',
-                          background: '#ffffff',
-                          fontSize: '0.82rem',
-                          fontWeight: 600,
-                          outline: 'none'
-                        }}
-                      />
-                    </div>
-
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#0f172a' }}>
-                        E-Mail-Adresse für Bestätigung *
-                      </label>
-                      <input
-                        type="email"
-                        required
-                        placeholder="muster@beispiel.de"
-                        value={cancelEmail}
-                        onChange={(e) => setCancelEmail(e.target.value)}
-                        style={{
-                          padding: '9px 12px',
-                          borderRadius: '10px',
-                          border: '1px solid #cbd5e1',
-                          background: '#ffffff',
-                          fontSize: '0.82rem',
-                          fontWeight: 600,
-                          outline: 'none'
-                        }}
-                      />
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#0f172a' }}>
-                        Name des Schülers / Kindes oder ID *
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        placeholder="z. B. Max Muster oder CG-XXXX"
-                        value={cancelStudentIdentifier}
-                        onChange={(e) => setCancelStudentIdentifier(e.target.value)}
-                        style={{
-                          padding: '9px 12px',
-                          borderRadius: '10px',
-                          border: '1px solid #cbd5e1',
-                          background: '#ffffff',
-                          fontSize: '0.82rem',
-                          fontWeight: 600,
-                          outline: 'none'
-                        }}
-                      />
-                    </div>
-
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#0f172a' }}>
-                        Musikschule (optional)
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="z. B. Musikschule Rheinfelden"
-                        value={cancelSchoolName}
-                        onChange={(e) => setCancelSchoolName(e.target.value)}
-                        style={{
-                          padding: '9px 12px',
-                          borderRadius: '10px',
-                          border: '1px solid #cbd5e1',
-                          background: '#ffffff',
-                          fontSize: '0.82rem',
-                          fontWeight: 600,
-                          outline: 'none'
-                        }}
-                      />
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#0f172a' }}>
-                      Art der Kündigung (§ 312k Abs. 2 Nr. 1 Buchst. a BGB)
-                    </label>
-                    <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.76rem', color: '#334155', cursor: 'pointer' }}>
-                        <input
-                          type="radio"
-                          name="cancelType"
-                          checked={cancelType === 'regular'}
-                          onChange={() => setCancelType('regular')}
-                          style={{ accentColor: '#0f172a' }}
-                        />
-                        <span>Ordentliche Kündigung (zum Schuljahresende / nächstmöglicher Termin)</span>
-                      </label>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.76rem', color: '#334155', cursor: 'pointer' }}>
-                        <input
-                          type="radio"
-                          name="cancelType"
-                          checked={cancelType === 'extraordinary'}
-                          onChange={() => setCancelType('extraordinary')}
-                          style={{ accentColor: '#0f172a' }}
-                        />
-                        <span>Außerordentliche fristlose Kündigung (§ 314 BGB)</span>
-                      </label>
-                    </div>
-                  </div>
-
-                  {cancelType === 'extraordinary' && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#0f172a' }}>
-                        Kündigungsgrund (bei außerordentlicher Kündigung erforderlich)
-                      </label>
-                      <textarea
-                        required
-                        placeholder="Bitte erläutern Sie den wichtigen Grund..."
-                        value={cancelReason}
-                        onChange={(e) => setCancelReason(e.target.value)}
-                        style={{
-                          padding: '9px 12px',
-                          borderRadius: '10px',
-                          border: '1px solid #cbd5e1',
-                          background: '#ffffff',
-                          fontSize: '0.80rem',
-                          minHeight: '60px',
-                          outline: 'none',
-                          resize: 'vertical'
-                        }}
-                      />
-                    </div>
-                  )}
-
-                  {/* Gesetzliche Schaltfläche gem. § 312k Abs. 2 S. 3 BGB */}
-                  <div style={{ marginTop: '6px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <button
-                      type="submit"
-                      disabled={cancelSubmitting}
-                      style={{
-                        background: cancelSubmitting ? '#94a3b8' : 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
-                        color: '#ffffff',
-                        border: 'none',
-                        borderRadius: '12px',
-                        padding: '12px 20px',
-                        fontSize: '0.88rem',
-                        fontWeight: 900,
-                        cursor: cancelSubmitting ? 'default' : 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '8px',
-                        boxShadow: '0 4px 14px rgba(239, 68, 68, 0.3)',
-                        transition: 'all 0.15s ease'
-                      }}
-                    >
-                      <span>{cancelSubmitting ? 'Wird übermittelt...' : 'Jetzt kündigen'}</span>
-                    </button>
-                    <div style={{ fontSize: '0.66rem', color: '#94a3b8', textAlign: 'center' }}>
-                      Gesetzlich vorgeschriebene Schaltfläche gem. § 312k Abs. 2 Nr. 2 BGB
-                    </div>
-                  </div>
-                </form>
-              )}
             </div>
           )}
         </div>

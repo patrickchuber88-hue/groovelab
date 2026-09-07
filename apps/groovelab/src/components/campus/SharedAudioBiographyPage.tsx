@@ -1006,9 +1006,20 @@ export const SharedAudioBiographyPage: React.FC<SharedAudioBiographyPageProps> =
             )}
           </div>
 
-          <span style={{ fontSize: '0.70rem', color: '#64748b', lineHeight: 1.4 }}>
-            Bei Fragen wende dich bitte an deine Musikschulleitung oder den zuständigen Fachlehrer.
-          </span>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <span style={{ fontSize: '0.70rem', color: '#64748b', lineHeight: 1.4 }}>
+              Bei Fragen wende dich bitte an deine Musikschulleitung oder den zuständigen Fachlehrer.
+            </span>
+            <span style={{ fontSize: '0.68rem', color: '#94a3b8', lineHeight: 1.4 }}>
+              Gegenvorstellung & Rechtsbehelf nach Art. 20 DSA:{' '}
+              <a 
+                href="mailto:dsa-appeal@campus-groovelab.de?subject=DSA-Gegenvorstellung%20Takedown" 
+                style={{ color: '#38bdf8', textDecoration: 'underline' }}
+              >
+                dsa-appeal@campus-groovelab.de
+              </a>
+            </span>
+          </div>
         </div>
       </div>
     );

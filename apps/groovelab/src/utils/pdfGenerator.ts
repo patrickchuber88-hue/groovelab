@@ -2030,9 +2030,19 @@ export const generateInvoicePDF = async (params: InvoicePDFParams) => {
 
   y += 24;
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(7.5);
-  doc.setTextColor(textMuted[0], textMuted[1], textMuted[2]);
-  doc.text('Umsatzsteuerbefreit gem. § 19 UStG (Kleinunternehmerregelung).', 20, y);
+  const platformTaxMode: 'small_business' | 'standard_vat' = 
+    (typeof window !== 'undefined' && localStorage.getItem('cg_tax_mode') === 'standard_vat')
+      ? 'standard_vat'
+      : 'small_business';
+
+  if (platformTaxMode === 'standard_vat') {
+    const totalGross = Number(params.amount || 0);
+    const net = +(totalGross / 1.19).toFixed(2);
+    const vat = +(totalGross - net).toFixed(2);
+    doc.text(`Rechnungsbetrag inkl. 19 % MwSt. (Netto: ${net.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })} + MwSt.: ${vat.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}).`, 20, y);
+  } else {
+    doc.text('Umsatzsteuerbefreit gem. § 19 UStG (Kleinunternehmerregelung).', 20, y);
+  }
 
   // Bank Transfer Box
   y += 8;
@@ -3627,3 +3637,114 @@ export const generateExecutiveSummaryPDF = async (params: ExecutiveSummaryPdfPar
 
   return { doc, filename };
 };
+
+// =============================================================================
+// E-RECHNUNG 2025: EN 16931 / ZUGFeRD 2.2 / FACTUR-X XML ENGINE (B2B SaaS)
+// Standard: Wachstumschancengesetz ab 01.01.2025 / UN/CEFACT CII Syntax
+// =============================================================================
+
+export const generateZugferdXml = (params: InvoicePDFParams): string => {
+  const cleanInvoiceId = params.invoiceId.startsWith('INV-') ? params.invoiceId.replace('INV-', 'RE-') : params.invoiceId;
+  const now = new Date();
+  const dateYmd = now.toISOString().slice(0, 10).replace(/-/g, '');
+  const totalAmount = Number(params.amount || 0).toFixed(2);
+  const opCompany = params.operatorCompany || 'Patrick Huber (Campus-Groovelab)';
+  const opStreet = params.operatorStreet || 'Karl-Fürstenberg-Str. 59';
+  const opZip = params.operatorZip || '79618';
+  const opCity = params.operatorCity || 'Rheinfelden';
+  const opIban = (params.operatorIban || '').replace(/\s+/g, '');
+  const opBic = (params.operatorBic || '').replace(/\s+/g, '');
+
+  const schoolName = params.schoolName || 'Musikschule';
+  const schoolStreet = params.schoolStreet || 'Schulstraße 1';
+  const schoolZip = params.schoolZipCode || '79618';
+  const schoolCity = params.schoolCity || 'Musterstadt';
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<rsm:CrossIndustryInvoice 
+  xmlns:rsm="urn:un:unece:uncefact:data:standard:CrossIndustryInvoice:100"
+  xmlns:ccts="urn:un:unece:uncefact:documentation:standard:CoreComponentsTechnicalSpecification:2"
+  xmlns:udt="urn:un:unece:uncefact:data:standard:UnqualifiedDataType:100"
+  xmlns:qdt="urn:un:unece:uncefact:data:standard:QualifiedDataType:100"
+  xmlns:ram="urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100">
+  <rsm:ExchangedDocumentContext>
+    <ram:GuidelineSpecifiedDocumentContextParameter>
+      <ram:ID>urn:cen.eu:en16931:2017#compliant#urn:factur-x.eu:1p0:basic</ram:ID>
+    </ram:GuidelineSpecifiedDocumentContextParameter>
+  </rsm:ExchangedDocumentContext>
+  <rsm:ExchangedDocument>
+    <ram:ID>${cleanInvoiceId}</ram:ID>
+    <ram:TypeCode>380</ram:TypeCode>
+    <ram:IssueDateTime>
+      <udt:DateTimeString format="102">${dateYmd}</udt:DateTimeString>
+    </ram:IssueDateTime>
+    <ram:IncludedNote>
+      <ram:Content>Rechnung für Cloud- &amp; Datenbank-Infrastruktur Campus-Groovelab. Keine Software-Lizenzgebühren (0,00 € inklusive).</ram:Content>
+    </ram:IncludedNote>
+  </rsm:ExchangedDocument>
+  <rsm:SupplyChainTradeTransaction>
+    <ram:ApplicableHeaderTradeAgreement>
+      <!-- Verkäufer / Plattformbetrieb -->
+      <ram:SellerTradeParty>
+        <ram:Name>${opCompany}</ram:Name>
+        <ram:PostalTradeAddress>
+          <ram:PostcodeCode>${opZip}</ram:PostcodeCode>
+          <ram:LineOne>${opStreet}</ram:LineOne>
+          <ram:CityName>${opCity}</ram:CityName>
+          <ram:CountryID>DE</ram:CountryID>
+        </ram:PostalTradeAddress>
+      </ram:SellerTradeParty>
+      <!-- Käufer / Musikschule -->
+      <ram:BuyerTradeParty>
+        <ram:Name>${schoolName}</ram:Name>
+        <ram:PostalTradeAddress>
+          <ram:PostcodeCode>${schoolZip}</ram:PostcodeCode>
+          <ram:LineOne>${schoolStreet}</ram:LineOne>
+          <ram:CityName>${schoolCity}</ram:CityName>
+          <ram:CountryID>DE</ram:CountryID>
+        </ram:PostalTradeAddress>
+      </ram:BuyerTradeParty>
+    </ram:ApplicableHeaderTradeAgreement>
+    <ram:ApplicableHeaderTradeDelivery />
+    <ram:ApplicableHeaderTradeSettlement>
+      <ram:InvoiceCurrencyCode>EUR</ram:InvoiceCurrencyCode>
+      <ram:SpecifiedTradeSettlementPaymentMeans>
+        <ram:TypeCode>58</ram:TypeCode>
+        <ram:PayeePartyCreditorFinancialAccount>
+          <ram:IBANID>${opIban}</ram:IBANID>
+        </ram:PayeePartyCreditorFinancialAccount>
+        <ram:PayeeSpecifiedCreditorFinancialInstitution>
+          <ram:BICID>${opBic}</ram:BICID>
+        </ram:PayeeSpecifiedCreditorFinancialInstitution>
+      </ram:SpecifiedTradeSettlementPaymentMeans>
+      <ram:SpecifiedTradeSettlementHeaderMonetarySummation>
+        <ram:LineTotalAmount>${totalAmount}</ram:LineTotalAmount>
+        <ram:TaxBasisTotalAmount>${totalAmount}</ram:TaxBasisTotalAmount>
+        <ram:TaxTotalAmount currencyID="EUR">0.00</ram:TaxTotalAmount>
+        <ram:GrandTotalAmount>${totalAmount}</ram:GrandTotalAmount>
+        <ram:DuePayableAmount>${totalAmount}</ram:DuePayableAmount>
+      </ram:SpecifiedTradeSettlementHeaderMonetarySummation>
+    </ram:ApplicableHeaderTradeSettlement>
+  </rsm:SupplyChainTradeTransaction>
+</rsm:CrossIndustryInvoice>`;
+};
+
+export const downloadZugferdXml = (params: InvoicePDFParams): void => {
+  try {
+    const xmlContent = generateZugferdXml(params);
+    const cleanInvoiceId = params.invoiceId.startsWith('INV-') ? params.invoiceId.replace('INV-', 'RE-') : params.invoiceId;
+    const blob = new Blob([xmlContent], { type: 'application/xml;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `ZUGFeRD_EN16931_${cleanInvoiceId}.xml`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    console.error('Error generating ZUGFeRD XML:', err);
+    alert('Die ZUGFeRD EN 16931 E-Rechnung konnte nicht erstellt werden.');
+  }
+};
+

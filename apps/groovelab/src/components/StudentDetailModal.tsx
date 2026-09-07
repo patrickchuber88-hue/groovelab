@@ -267,6 +267,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
   const [lessonDuration, setLessonDuration] = useState<number>(student.lesson_duration || 30);
   const [appUsageMode, setAppUsageMode] = useState<string>(student.app_usage_mode || 'student_only');
   const [parentPin, setParentPin] = useState<string>(student.parent_pin || '');
+  const [isAdult, setIsAdult] = useState<boolean>(Boolean(student.is_adult));
   const [groupId, setGroupId] = useState<string | null>(null);
   const [groupStudents, setGroupStudents] = useState<any[]>([]);
   const [schoolStudents, setSchoolStudents] = useState<any[]>([]);
@@ -1020,6 +1021,49 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
       alert(`Die Eltern-PIN für ${student.first_name || 'den Schüler'} wurde erfolgreich zurückgesetzt.`);
     } catch (err: any) {
       alert('Fehler beim Zurücksetzen der Eltern-PIN: ' + err.message);
+    }
+  };
+
+  const handleToggleAdultStatus = async (targetAdult: boolean) => {
+    try {
+      await ensureUserRawRecord(student);
+      const updates: any = {
+        is_adult: targetAdult,
+        adult_verified_at: targetAdult ? new Date().toISOString() : null
+      };
+      const { error: updateErr } = await supabase
+        .from('users')
+        .update(updates)
+        .eq('id', student.id);
+      if (updateErr) throw updateErr;
+
+      try {
+        await supabase.from('students').update(updates).eq('id', student.id);
+      } catch (e) {}
+
+      setIsAdult(targetAdult);
+      student.is_adult = targetAdult;
+      student.adult_verified_at = updates.adult_verified_at;
+
+      try {
+        await supabase.from('audit_logs').insert({
+          action: targetAdult ? 'STUDENT_LEGAL_MAJORITY_CONFIRMED' : 'STUDENT_LEGAL_MAJORITY_REVOKED',
+          school_id: student.school_id,
+          user_id: student.id,
+          details: {
+            student_id: student.id,
+            student_name: `${student.first_name} ${student.last_name || ''}`.trim(),
+            action_by: 'secretary',
+            timestamp: new Date().toISOString()
+          }
+        });
+      } catch (auditErr) {}
+
+      alert(targetAdult
+        ? `Schüler ${student.first_name || ''} wurde erfolgreich als volljährig (§ 2 BGB) markiert. Der elterliche Lesezugriff wurde zum Schutz der Privatsphäre deaktiviert.`
+        : `Volljährigkeits-Status für ${student.first_name || ''} wurde zurückgesetzt.`);
+    } catch (err: any) {
+      alert('Fehler beim Aktualisieren des Volljährigkeits-Status: ' + err.message);
     }
   };
 
@@ -4303,11 +4347,73 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
                         <ShieldCheck size={14} />
                         <span>Eltern-PIN zurücksetzen</span>
                       </button>
+                      </div>
+                    </>
+                  )}
+
+                  {/* 🛡️ Volljährigkeits-Status (§ 2 BGB / Art. 6, 8 DSGVO) */}
+                  <div style={{ height: '1px', background: '#f1f5f9', margin: '8px 0' }} />
+                  <div style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'space-between', 
+                    flexWrap: 'wrap', 
+                    gap: '12px',
+                    background: isAdult ? '#f0fdf4' : '#f8fafc',
+                    border: isAdult ? '1px solid #bbf7d0' : '1px solid #e2e8f0',
+                    borderRadius: '12px',
+                    padding: '12px 14px'
+                  }}>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ fontSize: '0.84rem', fontWeight: 800, color: isAdult ? '#15803d' : '#1e293b' }}>
+                          Volljährigkeits-Status (§ 2 BGB)
+                        </span>
+                        {isAdult && (
+                          <span style={{ 
+                            fontSize: '0.68rem', 
+                            fontWeight: 800, 
+                            background: '#dcfce7', 
+                            color: '#15803d', 
+                            padding: '2px 6px', 
+                            borderRadius: '6px' 
+                          }}>
+                            18+ Volljährig
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '3px' }}>
+                        {isAdult 
+                          ? 'Schüler ist volljährig. Elterlicher PIN-Zugriff ist zum Schutz der Privatsphäre deaktiviert.' 
+                          : 'Aktivieren, wenn der Schüler laut Schulvertrag das 18. Lebensjahr vollendet hat.'}
+                      </div>
                     </div>
-                  </>
-                )}
-              </div>
-            </section>
+                    <button
+                      type="button"
+                      onClick={() => handleToggleAdultStatus(!isAdult)}
+                      style={{
+                        background: isAdult ? '#ffffff' : '#f1f5f9',
+                        color: isAdult ? '#15803d' : '#475569',
+                        border: isAdult ? '1px solid #86efac' : '1px solid #cbd5e1',
+                        borderRadius: '10px',
+                        padding: '6px 12px',
+                        fontSize: '0.75rem',
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        transition: 'all 0.15s'
+                      }}
+                      className="hover-scale-mini"
+                      title={isAdult ? "Volljährigkeits-Status widerrufen" : "Schüler als 18+ volljährig bestätigen"}
+                    >
+                      <ShieldCheck size={14} color={isAdult ? '#16a34a' : '#64748b'} />
+                      <span>{isAdult ? 'Volljährig bestätigt ✓' : 'Als volljährig markieren'}</span>
+                    </button>
+                  </div>
+                </div>
+              </section>
           </div>
         </div>
       );

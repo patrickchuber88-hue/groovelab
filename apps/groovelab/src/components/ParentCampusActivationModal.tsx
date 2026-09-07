@@ -101,9 +101,27 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
   const freeMonthDisplay = isChf ? 'CHF 0.00' : '0,00 €';
   const remainingMonths = schoolYearCalc.remainingPaidMonths;
   const periodDescription = schoolYearCalc.periodDescription;
+  const resolvedSchoolTaxMode = 
+    schoolData?.tax_mode || 
+    schoolData?.opening_hours?.tax_settings?.tax_mode || 
+    (typeof window !== 'undefined' ? localStorage.getItem('cg_school_tax_mode') : null);
+
+  const platformTaxMode: 'small_business' | 'standard_vat' | 'vat_exempt_4_21' = 
+    resolvedSchoolTaxMode === 'vat_exempt_4_21'
+      ? 'vat_exempt_4_21'
+      : (resolvedSchoolTaxMode === 'standard_vat' || (typeof window !== 'undefined' && localStorage.getItem('cg_tax_mode') === 'standard_vat'))
+        ? 'standard_vat'
+        : 'small_business';
+
+  const effectiveNetFee = +(effectiveAnnualFee / 1.19).toFixed(2);
+  const effectiveVatAmount = +(effectiveAnnualFee - effectiveNetFee).toFixed(2);
   const taxDisclaimer = isChf 
-    ? 'Endpreis (Leistungsort Schweiz, gem. Art. 8 Abs. 1 MWSTG)' 
-    : 'Endpreis gem. § 19 UStG (steuerbefreit)';
+    ? 'Endpreis (Leistungsort Schweiz, gem. Art. 21 Abs. 2 Ziff. 11 MWSTG / Art. 8 Abs. 1 MWSTG)' 
+    : platformTaxMode === 'vat_exempt_4_21'
+      ? 'Endpreis (Umsatzsteuerfreie Bildungsleistung gem. § 4 Nr. 21 UStG)'
+      : platformTaxMode === 'standard_vat'
+        ? `Endpreis inkl. 19% MwSt. (Netto: ${effectiveNetFee.toFixed(2).replace('.', ',')} € + ${effectiveVatAmount.toFixed(2).replace('.', ',')} € MwSt.)`
+        : 'Endpreis gem. § 19 UStG (kein gesonderter Steuerausweis)';
 
   // Generate stable GoBD Reference Code: CG-[HASH8]-[YYMM]
   const referenceCode = generateStudentGoBdCode(student.id || 'TEMP-ID');
@@ -860,7 +878,7 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
                   </div>
                 </div>
                 <div style={{ fontSize: '0.70rem', color: '#64748b', marginTop: '2px', lineHeight: '1.4' }}>
-                  <strong>Transparenz-Garantie:</strong> Feste Schuljahresnutzung • Kein Abonnement • Keine automatische Verlängerung • Gesetzlicher Kündigungsbutton &amp; Widerruf jederzeit erreichbar (§ 312k BGB) • Endet automatisch zum Schuljahresende
+                  <strong>Transparenz-Garantie:</strong> Feste Schuljahresnutzung • Kein Abonnement • Keine automatische Verlängerung • Sofort-Widerruf jederzeit im Elternbereich • Endet automatisch zum Schuljahresende
                 </div>
               </div>
             )}

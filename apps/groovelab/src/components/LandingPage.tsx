@@ -25,7 +25,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
   const [email, setEmail] = useState<string>('');
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
   const [hoveredMenu, setHoveredMenu] = useState<string | null>(null);
-  const [activeDocument, setActiveDocument] = useState<'none' | 'terms' | 'privacy'>('none');
+  const [activeDocument, setActiveDocument] = useState<'none' | 'terms' | 'privacy' | 'cancellation' | 'impressum'>('none');
   const [showAccessModal, setShowAccessModal] = useState<boolean>(false);
   const [pendingEmail, setPendingEmail] = useState<string | undefined>(undefined);
   const [calcCampus, setCalcCampus] = useState<boolean>(true);
@@ -1814,16 +1814,15 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
             <span style={{ cursor: 'pointer' }} onClick={() => scrollToSection('pricing')}>Preise</span>
             <span style={{ cursor: 'pointer', fontWeight: 700 }} onClick={() => setActiveDocument('terms')}>AGB</span>
             <span style={{ cursor: 'pointer', fontWeight: 700 }} onClick={() => setActiveDocument('privacy')}>Datenschutz</span>
-            <span style={{ cursor: 'pointer', fontWeight: 700 }} onClick={() => setActiveDocument('cancellation' as any)}>Widerruf</span>
-            <span style={{ cursor: 'pointer', fontWeight: 700 }} onClick={() => setActiveDocument('terminate' as any)}>Verträge hier kündigen</span>
-            <span style={{ cursor: 'pointer', fontWeight: 700 }} onClick={() => setActiveDocument('impressum' as any)}>Impressum</span>
+            <span style={{ cursor: 'pointer', fontWeight: 700 }} onClick={() => setActiveDocument('cancellation')}>Widerruf</span>
+            <span style={{ cursor: 'pointer', fontWeight: 700 }} onClick={() => setActiveDocument('impressum')}>Impressum</span>
           </div>
         </div>
       </footer>
       <LegalTextModal
         isOpen={activeDocument !== 'none'}
         onClose={() => setActiveDocument('none')}
-        initialTab={activeDocument === 'privacy' ? 'privacy' : activeDocument === 'terms' ? 'terms' : (activeDocument as any) === 'cancellation' ? 'cancellation' : (activeDocument as any) === 'terminate' ? 'terminate' : 'impressum'}
+        initialTab={activeDocument === 'privacy' ? 'privacy' : activeDocument === 'terms' ? 'terms' : activeDocument === 'cancellation' ? 'cancellation' : 'impressum'}
       />
 
       {/* 🛡️ Datenschutz & Sicherheitsstufen Modal */}

@@ -11,7 +11,7 @@ import { AvatarImage, getInstrumentAvatarUrl, getDefaultMusicianAvatarUrl } from
 import { MUSIC_QUOTES, getQuotesForAudience, getDailyQuote } from '@groovelab/shared';
 import { usePremiumOnboardingTour, TourStartButton, TourStep } from './PremiumOnboardingTour';
 import { supabase, deleteUserStorageAssets } from '../lib/supabase';
-import { Monitor, Music, Award, Box, Plus, AlertCircle, AlertTriangle, User, Users, Star, TrendingUp, Shield, Zap, Play, Info, CheckCircle, Check, Search, Trash2, Bell, X, Clock, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, LayoutDashboard, LogOut, Flame, GraduationCap, UserPlus, Edit3, Calendar, Activity, CheckSquare, Mail, Copy, Sparkles, BookOpen, MessageSquare, Lock, Palmtree, Heart, Settings, Key, Sun, ThumbsUp, Building2, Hourglass, Eye, EyeOff, ShieldCheck, CheckCheck, CalendarX, Send, Lightbulb, Download, Sliders, Mic, Disc, Radio, Timer, ArrowRight, Headphones, FileText, DoorOpen, HelpCircle, RotateCcw } from 'lucide-react';
+import { Monitor, Music, Award, Box, Plus, AlertCircle, AlertTriangle, User, Users, Star, TrendingUp, Shield, Zap, Play, Info, CheckCircle, Check, Search, Trash2, Bell, X, Clock, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, LayoutDashboard, LogOut, Flame, GraduationCap, UserPlus, Edit3, Calendar, Activity, CheckSquare, Mail, Copy, Sparkles, BookOpen, MessageSquare, Lock, Palmtree, Heart, Settings, Key, Sun, ThumbsUp, Building2, Hourglass, Eye, EyeOff, ShieldCheck, CheckCheck, CalendarX, Send, Lightbulb, Download, Sliders, Mic, Disc, Radio, Timer, ArrowRight, Headphones, FileText, DoorOpen, HelpCircle, RotateCcw, Phone } from 'lucide-react';
 import { notesService, UserNote } from '../services/notesService';
 import { formatCleanNoteContent } from './notes/notesConstants';
 import { checkIsAudioTresorActive } from '../domain/stickersAndTresor';
@@ -2316,6 +2316,313 @@ export function TeacherDashboard({
       return isNewDateInWindow || isOrigDateInWindow;
     });
   }, [myChangedAppointments, scheduleChangesTimeWindow]);
+
+  // ── ⚡ 2h-Emergency-Check: Unbestätigte Terminverschiebungen < 2h ───────────────
+  const emergencyUnconfirmedAppointments = useMemo(() => {
+    if (!myChangedAppointments || myChangedAppointments.length === 0) return [];
+    const simNow = getSimulatedNow();
+    const getLocalYYYYMMDD = (d: Date) => {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+    const todayStr = getLocalYYYYMMDD(simNow);
+
+    return myChangedAppointments.filter((b: any) => {
+      if (!b) return false;
+      const isCancelled = b.status === 'cancelled' || b.status === 'canceled' || b.isCancelled || b.isSick;
+      if (isCancelled) return false;
+
+      const isConfirmed = b.student_acknowledged === true || b.studentAcknowledged === true || b.status === 'rescheduled_confirmed';
+      if (isConfirmed) return false;
+
+      let normDate = b.date || '';
+      if (normDate.includes('.')) {
+        const parts = normDate.split('.');
+        if (parts.length === 3) {
+          normDate = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+        }
+      }
+      if (normDate !== todayStr) return false;
+
+      const timeStr = b.startTime || b.start_time || b.timeSlot || b.time_slot;
+      if (!timeStr) return false;
+      const [hour, min] = timeStr.split(':').map(Number);
+      if (isNaN(hour) || isNaN(min)) return false;
+
+      const apptDate = new Date(simNow);
+      apptDate.setHours(hour, min, 0, 0);
+      const diffMinutes = Math.round((apptDate.getTime() - simNow.getTime()) / 60000);
+
+      // Weniger als 120 Min bis Unterrichtsbeginn oder bereits bis zu 30 Min im Gang
+      return diffMinutes <= 120 && diffMinutes >= -30;
+    });
+  }, [myChangedAppointments]);
+
+  const handleEmergencyShoutbox = (occ: any) => {
+    setActiveChatOcc({
+      ...occ,
+      id: occ.id || occ.occurrence_id || occ.ids?.[0],
+      date: occ.date,
+      start_time: occ.startTime || occ.start_time,
+      student_id: occ.student_id || occ.studentId || occ.id,
+      student: {
+        first_name: occ.student?.first_name || occ.studentName || occ.name || 'Schüler'
+      }
+    });
+  };
+
+  const handleAcknowledgeMündlich = async (occ: any) => {
+    try {
+      const occId = occ.id || occ.occurrence_id || occ.ids?.[0];
+      if (occId) {
+        await supabase
+          .from('schedule_occurrences')
+          .update({
+            student_acknowledged: true,
+            status: 'rescheduled_confirmed'
+          })
+          .eq('id', occId);
+      }
+      setMyChangedAppointments((prev: any[]) => prev.map((a: any) => (a.id === occ.id || a.id === occId) ? { ...a, student_acknowledged: true, studentAcknowledged: true, status: 'rescheduled_confirmed' } : a));
+      setToastMessage('✅ Termin als mündlich/telefonisch abgestimmt quittiert.');
+    } catch (err) {
+      console.error('Error acknowledging emergency appointment:', err);
+      setToastMessage('⚠️ Fehler beim Quittieren des Termins.');
+    }
+  };
+
+  const handleResetToOriginalSchedule = async (occ: any) => {
+    try {
+      const occId = occ.id || occ.occurrence_id || occ.ids?.[0];
+      const origDate = occ.original_date || occ.date;
+      const origStartTime = occ.original_start_time || occ.originalStartTime || occ.start_time;
+      if (occId && origDate && origStartTime) {
+        await supabase
+          .from('schedule_occurrences')
+          .update({
+            date: origDate,
+            start_time: origStartTime,
+            status: 'scheduled',
+            student_acknowledged: true
+          })
+          .eq('id', occId);
+      }
+      setMyChangedAppointments((prev: any[]) => prev.map((a: any) => (a.id === occ.id || a.id === occId) ? { ...a, date: origDate, start_time: origStartTime, status: 'scheduled', student_acknowledged: true } : a));
+      setToastMessage('↩️ Termin auf ursprünglichen Stammtermin zurückgesetzt.');
+    } catch (err) {
+      console.error('Error resetting emergency appointment:', err);
+      setToastMessage('⚠️ Fehler beim Zurücksetzen des Termins.');
+    }
+  };
+
+  const renderEmergencyCallout = (compact = false) => {
+    if (emergencyUnconfirmedAppointments.length === 0) return null;
+
+    return (
+      <div style={{
+        background: 'linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%)',
+        border: '1.5px solid #fed7aa',
+        borderRadius: compact ? '20px' : '28px',
+        padding: compact ? '16px' : '22px 24px',
+        boxShadow: '0 8px 30px -4px rgba(234, 88, 12, 0.12)',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '14px',
+        boxSizing: 'border-box',
+        marginBottom: '16px',
+        position: 'relative',
+        overflow: 'hidden'
+      }}>
+        {/* Pulsating emergency badge */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{
+              width: '38px',
+              height: '38px',
+              borderRadius: '12px',
+              background: '#ea580c',
+              color: '#ffffff',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 4px 14px rgba(234, 88, 12, 0.35)',
+              flexShrink: 0
+            }}>
+              <AlertTriangle size={20} strokeWidth={2.5} />
+            </div>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span style={{
+                  fontSize: '0.68rem',
+                  fontWeight: 900,
+                  color: '#ea580c',
+                  background: '#ffedd5',
+                  padding: '2px 8px',
+                  borderRadius: '100px',
+                  letterSpacing: '0.05em',
+                  textTransform: 'uppercase',
+                  border: '1px solid #fdba74'
+                }}>
+                  ⚡ 2h-Frühwarnung · Unbestätigte Verschiebung
+                </span>
+                <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#9a3412' }}>
+                  {emergencyUnconfirmedAppointments.length === 1 ? '1 unbestätigter Termin' : `${emergencyUnconfirmedAppointments.length} unbestätigte Termine`}
+                </span>
+              </div>
+              <h3 style={{ margin: '2px 0 0 0', fontSize: compact ? '0.98rem' : '1.12rem', fontWeight: 900, color: '#7c2d12', letterSpacing: '-0.02em' }}>
+                Terminverschiebung noch unbestätigt
+              </h3>
+            </div>
+          </div>
+        </div>
+
+        <p style={{ margin: 0, fontSize: '0.82rem', color: '#9a3412', fontWeight: 600, lineHeight: 1.45 }}>
+          Der verschobene Unterricht beginnt in weniger als 2 Stunden. Da in Campus-Groovelab zum Schutz von Minderjährigen keine privaten Telefonnummern gespeichert werden, kontaktiere den Schüler bitte rechtzeitig über deine herkömmlichen schulischen Kommunikationswege (z. B. Telefon über das Schulsekretariat/Schülerkartei) oder setze den Termin auf die Stammzeit zurück.
+        </p>
+
+        {/* List of unconfirmed appointments */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          {emergencyUnconfirmedAppointments.map((occ: any, idx: number) => {
+            const student = allStudents.find((s: any) => s.id === occ.student_id || s.id === occ.studentId || (occ.student && s.id === occ.student.id)) || occ.student;
+            const sName = student?.first_name 
+              ? `${student.first_name} ${maskLastName(student.last_name, showRealNames)}`.trim()
+              : (occ.studentName || occ.name || 'Schüler');
+            const timeStr = (occ.startTime || occ.start_time || occ.timeSlot || '').substring(0, 5);
+            const origTimeStr = (occ.original_start_time || occ.originalStartTime || '').substring(0, 5);
+            const rName = occ.room_name || occ.roomName || occ.schedule?.room?.name || 'Groovelab Raum';
+
+            return (
+              <div 
+                key={occ.id || `emerg-${idx}`}
+                style={{
+                  background: '#ffffff',
+                  border: '1px solid #fed7aa',
+                  borderRadius: '18px',
+                  padding: '14px 16px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '10px',
+                  boxShadow: '0 2px 8px rgba(234, 88, 12, 0.04)'
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '0.92rem', fontWeight: 900, color: '#1e293b' }}>
+                      {sName}
+                    </span>
+                    <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 650 }}>
+                      • {rName}
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    {origTimeStr && origTimeStr !== timeStr && (
+                      <span style={{ fontSize: '0.74rem', color: '#94a3b8', textDecoration: 'line-through', fontWeight: 650 }}>
+                        {origTimeStr}
+                      </span>
+                    )}
+                    <span style={{
+                      fontSize: '0.82rem',
+                      fontWeight: 900,
+                      color: '#c2410c',
+                      background: '#ffedd5',
+                      padding: '2px 8px',
+                      borderRadius: '8px'
+                    }}>
+                      Heute {timeStr} Uhr
+                    </span>
+                  </div>
+                </div>
+
+                {/* 3 Clear Action Buttons Row */}
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '2px' }}>
+                  <button
+                    type="button"
+                    onClick={() => handleResetToOriginalSchedule(occ)}
+                    style={{
+                      flex: '1 1 170px',
+                      background: '#ea580c',
+                      color: '#ffffff',
+                      border: 'none',
+                      borderRadius: '12px',
+                      padding: '9px 14px',
+                      fontSize: '0.82rem',
+                      fontWeight: 850,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px',
+                      boxShadow: '0 2px 8px rgba(234, 88, 12, 0.25)',
+                      transition: 'all 0.15s ease'
+                    }}
+                    className="hover-scale-mini"
+                    title="Terminverlegung zurückziehen und auf reguläre Stammzeit zurücksetzen"
+                  >
+                    <RotateCcw size={13} strokeWidth={2.5} />
+                    <span>Auf Stammtermin zurück</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleEmergencyShoutbox(occ)}
+                    style={{
+                      flex: '1 1 130px',
+                      background: '#ffffff',
+                      color: '#475569',
+                      border: '1px solid #cbd5e1',
+                      borderRadius: '12px',
+                      padding: '9px 12px',
+                      fontSize: '0.80rem',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px',
+                      transition: 'all 0.15s ease'
+                    }}
+                    className="hover-scale-mini"
+                    title="Termingekoppelte Shoutbox öffnen"
+                  >
+                    <MessageSquare size={13} strokeWidth={2.2} />
+                    <span>Shoutbox</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleAcknowledgeMündlich(occ)}
+                    style={{
+                      flex: '1 1 170px',
+                      background: '#f0fdf4',
+                      color: '#166534',
+                      border: '1px solid #bbf7d0',
+                      borderRadius: '12px',
+                      padding: '9px 12px',
+                      fontSize: '0.80rem',
+                      fontWeight: 850,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px',
+                      transition: 'all 0.15s ease'
+                    }}
+                    className="hover-scale-mini"
+                    title="Termin als telefonisch oder mündlich abgestimmt quittieren"
+                  >
+                    <Check size={13} strokeWidth={2.5} />
+                    <span>Mündlich abgestimmt</span>
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
 
   // Helper to check if today is student's birthday
   const isStudentBirthdayToday = (student: any): boolean => {
@@ -7535,6 +7842,9 @@ useEffect(() => {
                 <div style={{ padding: '60px', textAlign: 'center', color: '#64748b', fontWeight: 600 }}>Briefing wird geladen...</div>
               ) : briefingData ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {/* ⚡ 2h-Emergency-Check Outreach Guard Banner */}
+                  {renderEmergencyCallout(false)}
+
                   {/* Community Update & Helden-Moment Hero */}
                   <UpdateAnnouncementHero userId={userId} activePlatform={activePlatform} />
 
@@ -9613,7 +9923,8 @@ useEffect(() => {
               {/* SICKNESS CARD – 1:1 Unified Apple Squircle Card */}
               {renderSickCardWidget()}
 
-
+              {/* ⚡ 2h-Emergency-Check Outreach Guard in Sidebar */}
+              {renderEmergencyCallout(true)}
 
               {visibleChangedAppointments.length > 0 && (
                 <div style={{ 
