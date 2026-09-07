@@ -28,7 +28,7 @@ ON public.lessons(student_id, date);
 -- Accelerates Schedule Board, Calendar Views, and Teacher Dashboards
 CREATE INDEX IF NOT EXISTS idx_schedule_occurrences_teacher_date_covering
 ON public.schedule_occurrences(teacher_id, date)
-INCLUDE (id, student_id, room_id, start_time, end_time, status, notes);
+INCLUDE (id, student_id, start_time, duration, status, notes);
 
 -- 4. CLASS_FEED_POSTS & FEED_INTERACTIONS Indexing
 -- Accelerates social feed widget, emergency announcements, and read confirmations
@@ -67,13 +67,22 @@ ON public.user_notes(school_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_user_notes_user_updated_at
 ON public.user_notes(user_id, updated_at DESC);
 
--- 7. MASTER_AUDIT_TRAIL Forensics & Telemetry Indexes
+-- 7. AUDIT_LOGS Forensics & Telemetry Indexes
 -- Accelerates Master Admin compliance review, audit streaming, and security alerts
-CREATE INDEX IF NOT EXISTS idx_master_audit_trail_created_at_desc
-ON public.master_audit_trail(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at_desc
+ON public.audit_logs(created_at DESC);
 
-CREATE INDEX IF NOT EXISTS idx_master_audit_trail_action_created
-ON public.master_audit_trail(action, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_action_created
+ON public.audit_logs(action, created_at DESC);
+
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'master_audit_trail') THEN
+        EXECUTE 'CREATE INDEX IF NOT EXISTS idx_master_audit_trail_created_at_desc ON public.master_audit_trail(created_at DESC)';
+        EXECUTE 'CREATE INDEX IF NOT EXISTS idx_master_audit_trail_action_created ON public.master_audit_trail(action, created_at DESC)';
+        EXECUTE 'ANALYZE public.master_audit_trail';
+    END IF;
+END $$;
 
 -- 8. Refresh PostgreSQL Query Planner Statistics
 ANALYZE public.fokus_logs;
@@ -83,7 +92,7 @@ ANALYZE public.class_feed_posts;
 ANALYZE public.feed_interactions;
 ANALYZE public.band_song_slots;
 ANALYZE public.user_notes;
-ANALYZE public.master_audit_trail;
+ANALYZE public.audit_logs;
 
 -- 9. Notify PostgREST to Reload Schema Cache
 NOTIFY pgrst, 'reload schema';
