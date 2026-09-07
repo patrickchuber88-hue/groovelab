@@ -33,6 +33,7 @@ dist.tar.gz
 *.tar.gz
 backups/
 backup.sh
+!scripts/backup.sh
 scratch/
 
 # Environment and secrets
