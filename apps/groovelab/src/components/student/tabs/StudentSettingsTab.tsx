@@ -3922,7 +3922,7 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                           </span>
                           <p style={{ margin: 0, fontSize: '0.82rem', color: '#334155', lineHeight: 1.5, fontWeight: 550 }}>
                             <strong>Campus-Groovelab</strong> • Plattformbetrieb Patrick Huber, Karl-Fürstenberg Str. 59, 79618 Rheinfelden.<br />
-                            E-Mail: <a href="mailto:kontakt@campus-groovelab.de" style={{ color: '#059669', fontWeight: 700 }}>kontakt@campus-groovelab.de</a> (⚡ 60-Minuten Schnellkontakt-Garantie an Werktagen).<br />
+                            E-Mail: <a href="mailto:kontakt@campus-groovelab.de" style={{ color: '#059669', fontWeight: 700 }}>kontakt@campus-groovelab.de</a> (⚡ 60-Minuten Schnellkontakt-Service an Werktagen).<br />
                             Keine Lizenzkaufgebühren (Cloud- &amp; Hostingpauschale gem. § 19 UStG).<br />
                             Server-Standort &amp; Datenspeicherung: Bundesrepublik Deutschland (EU).
                           </p>

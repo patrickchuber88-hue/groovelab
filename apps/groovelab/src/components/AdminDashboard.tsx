@@ -85,17 +85,21 @@ Deutschland
 Kontakt & Schnelle elektronische Kommunikation (§ 5 Abs. 1 Nr. 2 DDG)
 E-Mail: patrick.huber@musaek.de / kontakt@campus-groovelab.de
 Website: https://campus-groovelab.de
-⚡ Elektronische Schnellkontakt-Garantie (BGH I ZR 238/14): Anfragen werden an Werktagen (Mo–Fr 08:00–18:00 Uhr) garantiert innerhalb von max. 60 Minuten beantwortet. Ein Support-Ticketsystem steht direkt im Dashboard zur Verfügung.
+⚡ Elektronischer Schnellkontakt-Service (EuGH C-298/07 / BGH I ZR 238/14): Anfragen werden an Werktagen (Mo–Fr 08:00–18:00 Uhr) in der Regel innerhalb von maximal 60 Minuten beantwortet. Ein Support-Ticketsystem steht direkt im Dashboard zur Verfügung.
+
+Zentrale Kontaktstelle für Behörden und Nutzer (Art. 11, 12 DSA):
+E-Mail: kontakt@campus-groovelab.de / copyright@campus-groovelab.de (Sprachen: Deutsch, Englisch)
 
 Umsatzsteuer
 Umsatzsteuerbefreit gemäß § 19 UStG (Kleinunternehmerregelung).
 
-EU-Streitschlichtung
+EU-Streitschlichtung & Verbraucherstreitbeilegung (§ 36 VSBG)
 Die Europäische Kommission stellt eine Plattform zur Online-Streitbeilegung (OS) bereit: https://ec.europa.eu/consumers/odr/.
 Unsere E-Mail-Adresse finden Sie oben im Impressum.
+Wir sind nicht bereit oder verpflichtet, an Streitbeilegungsverfahren vor einer Verbraucherschlichtungsstelle teilzunehmen.
 
-Verbraucherstreitbeilegung / Universalschlichtungsstelle
-Wir sind nicht bereit oder verpflichtet, an Streitbeilegungsverfahren vor einer Verbraucherschlichtungsstelle teilzunehmen.`;
+Haftung für Inhalte & Hosting-Immunität (Art. 6 DSA / § 7 DDG)
+Als Diensteanbieter sind wir gemäß § 7 Abs. 1 DDG für eigene Inhalte nach den allgemeinen Gesetzen verantwortlich. Für fremde Inhalte haften wir als Host-Provider nach Art. 6 DSA i. V. m. § 7 Abs. 2 DDG erst ab tatsächlicher Kenntnis einer rechtswidrigen Tätigkeit.`;
 
 const INSTRUMENT_COLORS: Record<string, string> = {
   "Guitar": "#ef4444", "E-Gitarre": "#ef4444",

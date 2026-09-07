@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { X, ShieldCheck, FileText, Building, Undo2, Scale, Printer } from 'lucide-react';
 import { useMasterPricing } from '../context/MasterPricingContext';
 
@@ -26,15 +27,182 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
     }
   }, [isOpen, initialTab]);
 
+  const handlePrintTextOnly = () => {
+    if (!contentRef.current) return;
+
+    let docTitle = 'Rechtliche Dokumente – Campus-Groovelab';
+    let tabHeading = 'Rechtliche Hinweise';
+    if (activeTab === 'impressum') {
+      docTitle = 'Campus-Groovelab – Impressum & Anbieterkennzeichnung';
+      tabHeading = 'Impressum & Anbieterkennzeichnung';
+    } else if (activeTab === 'privacy') {
+      docTitle = 'Campus-Groovelab – Datenschutzerklärung (DSGVO)';
+      tabHeading = 'Datenschutzerklärung nach Art. 13, 14 & 21 DSGVO';
+    } else if (activeTab === 'terms') {
+      docTitle = 'Campus-Groovelab – Allgemeine Geschäftsbedingungen (AGB)';
+      tabHeading = 'Allgemeine Geschäftsbedingungen (AGB) – Teil A (B2B) & Teil B (B2C)';
+    } else if (activeTab === 'cancellation') {
+      docTitle = 'Campus-Groovelab – Widerrufsbelehrung & Muster-Widerrufsformular';
+      tabHeading = 'Widerrufsbelehrung & Muster-Widerrufsformular (B2C)';
+    }
+
+    const contentHtml = contentRef.current.innerHTML;
+
+    // Clean up any previously created print iframe
+    const existingIframe = document.getElementById('apple-legal-print-frame');
+    if (existingIframe) {
+      existingIframe.remove();
+    }
+
+    const iframe = document.createElement('iframe');
+    iframe.id = 'apple-legal-print-frame';
+    iframe.style.position = 'fixed';
+    iframe.style.left = '-99999px';
+    iframe.style.top = '0';
+    iframe.style.width = '1024px';
+    iframe.style.height = '768px';
+    iframe.style.border = 'none';
+    iframe.style.zIndex = '-9999';
+    document.body.appendChild(iframe);
+
+    const doc = iframe.contentWindow?.document;
+    if (!doc) {
+      window.print();
+      return;
+    }
+
+    doc.open();
+    doc.write(`<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <title>${docTitle}</title>
+  <style>
+    @page {
+      size: A4 portrait;
+      margin: 18mm 15mm 20mm 15mm;
+    }
+    * {
+      box-sizing: border-box;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-size: 9.5pt;
+      line-height: 1.58;
+      color: #0f172a;
+      background: #ffffff;
+    }
+    .print-header {
+      border-bottom: 2px solid #0f172a;
+      padding-bottom: 12pt;
+      margin-bottom: 16pt;
+    }
+    .print-header-brand {
+      font-size: 15pt;
+      font-weight: 900;
+      color: #0f172a;
+      letter-spacing: -0.02em;
+    }
+    .print-header-title {
+      font-size: 12.5pt;
+      font-weight: 800;
+      color: #1e293b;
+      margin: 4pt 0 5pt 0;
+    }
+    .print-header-meta {
+      font-size: 8.5pt;
+      color: #64748b;
+      display: flex;
+      gap: 14pt;
+      flex-wrap: wrap;
+    }
+    h4 {
+      font-size: 11pt;
+      font-weight: 800;
+      color: #0f172a;
+      margin-top: 14pt;
+      margin-bottom: 5pt;
+      page-break-after: avoid;
+      break-after: avoid;
+    }
+    p, li {
+      margin-top: 3pt;
+      margin-bottom: 5pt;
+      color: #334155;
+    }
+    ul, ol {
+      padding-left: 16pt;
+      margin-top: 3pt;
+      margin-bottom: 6pt;
+    }
+    div[style*="border"] {
+      page-break-inside: avoid;
+      break-inside: avoid;
+      box-shadow: none !important;
+    }
+    .print-footer {
+      margin-top: 24pt;
+      padding-top: 8pt;
+      border-top: 1px solid #cbd5e1;
+      font-size: 8pt;
+      color: #94a3b8;
+      display: flex;
+      justify-content: space-between;
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+  </style>
+</head>
+<body>
+  <div class="print-header">
+    <div class="print-header-brand">Campus-Groovelab</div>
+    <div class="print-header-title">${tabHeading}</div>
+    <div class="print-header-meta">
+      <span><strong>Stand:</strong> Schuljahr 2026/2027</span>
+      <span><strong>Geltungsbereich:</strong> DACH (DE, AT, CH)</span>
+      <span><strong>Rechtskonform:</strong> BGB, DSGVO, UrhG &amp; DSA</span>
+    </div>
+  </div>
+
+  <div class="print-body">
+    ${contentHtml}
+  </div>
+
+  <div class="print-footer">
+    <span>Campus-Groovelab Schul-Cloud • Offizielles Rechtsdokument</span>
+    <span>Druckdatum: ${new Date().toLocaleDateString('de-DE')}</span>
+  </div>
+</body>
+</html>`);
+    doc.close();
+
+    setTimeout(() => {
+      try {
+        iframe.contentWindow?.focus();
+        iframe.contentWindow?.print();
+      } catch (err) {
+        console.error('Print error:', err);
+        window.print();
+      }
+    }, 150);
+  };
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && isOpen) {
         onClose();
+      } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'p' && isOpen) {
+        e.preventDefault();
+        handlePrintTextOnly();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
+  }, [isOpen, onClose, activeTab]);
 
   const handleTabChange = (tab: 'impressum' | 'privacy' | 'terms' | 'cancellation') => {
     setActiveTab(tab);
@@ -45,8 +213,8 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
 
   if (!isOpen) return null;
 
-  return (
-    <>
+  return createPortal(
+    <div id="apple-legal-modal-portal" className="apple-legal-portal-root">
       <style>{`
         @keyframes appleModalIn {
           from {
@@ -74,14 +242,24 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
         @media print {
           @page {
             size: A4 portrait;
-            margin: 15mm;
+            margin: 18mm 15mm 20mm 15mm;
           }
-          html, body, * {
-            -webkit-print-color-adjust: exact !important;
-            print-color-adjust: exact !important;
+          html, body {
+            background: #ffffff !important;
           }
-          header, nav, aside, footer, .tour-step-backdrop, button, .no-print {
+          #root, body > *:not(#apple-legal-modal-portal) {
             display: none !important;
+          }
+          .apple-legal-no-print {
+            display: none !important;
+          }
+          #apple-legal-modal-portal {
+            display: block !important;
+            position: static !important;
+            width: 100% !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            background: #ffffff !important;
           }
           .apple-legal-backdrop {
             position: static !important;
@@ -96,9 +274,26 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
             box-shadow: none !important;
             border: none !important;
             max-width: 100% !important;
+            width: 100% !important;
+            height: auto !important;
             max-height: none !important;
             overflow: visible !important;
             border-radius: 0 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            animation: none !important;
+          }
+          .apple-custom-scrollbar {
+            overflow: visible !important;
+            height: auto !important;
+            max-height: none !important;
+            padding: 0 !important;
+          }
+          .apple-legal-print-only-header {
+            display: block !important;
+            border-bottom: 2px solid #0f172a !important;
+            padding-bottom: 12pt !important;
+            margin-bottom: 18pt !important;
           }
         }
       `}</style>
@@ -138,7 +333,7 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
           }}
         >
           {/* Apple HIG Titlebar / Header */}
-          <div style={{
+          <div className="apple-legal-no-print" style={{
             padding: '18px 28px',
             borderBottom: '1px solid rgba(226, 232, 240, 0.8)',
             display: 'flex',
@@ -210,7 +405,7 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
           </div>
 
           {/* Apple HIG Segmented Control */}
-          <div style={{
+          <div className="apple-legal-no-print" style={{
             padding: '10px 28px',
             background: '#f8fafc',
             borderBottom: '1px solid rgba(226, 232, 240, 0.8)',
@@ -268,6 +463,24 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
             </div>
           </div>
 
+          {/* Print-Only Official Document Header */}
+          <div className="apple-legal-print-only-header" style={{ display: 'none' }}>
+            <div style={{ fontSize: '15pt', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em' }}>
+              Campus-Groovelab
+            </div>
+            <div style={{ fontSize: '12.5pt', fontWeight: 800, color: '#1e293b', margin: '4pt 0 5pt 0' }}>
+              {activeTab === 'impressum' && 'Impressum & Anbieterkennzeichnung'}
+              {activeTab === 'privacy' && 'Datenschutzerklärung nach Art. 13, 14 & 21 DSGVO'}
+              {activeTab === 'terms' && 'Allgemeine Geschäftsbedingungen (AGB) – Teil A (B2B) & Teil B (B2C)'}
+              {activeTab === 'cancellation' && 'Widerrufsbelehrung & Muster-Widerrufsformular (B2C)'}
+            </div>
+            <div style={{ fontSize: '8.5pt', color: '#64748b', display: 'flex', gap: '14pt', flexWrap: 'wrap' }}>
+              <span><strong>Stand:</strong> Schuljahr 2026/2027</span>
+              <span><strong>Geltungsbereich:</strong> DACH (DE, AT, CH)</span>
+              <span><strong>Rechtskonform:</strong> BGB, DSGVO, UrhG &amp; DSA</span>
+            </div>
+          </div>
+
           {/* Content Body (Apple Content Stage) */}
           <div 
             ref={contentRef}
@@ -303,11 +516,17 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
                 E-Mail: <a href="mailto:kontakt@campus-groovelab.de" style={{ color: '#34a853', fontWeight: 700 }}>kontakt@campus-groovelab.de</a><br />
                 Support &amp; Schulbetreuung: <a href="mailto:patrick.huber@musaek.de" style={{ color: '#34a853', fontWeight: 700 }}>patrick.huber@musaek.de</a><br />
                 <span style={{ fontSize: '0.80rem', color: '#475569', display: 'block', marginTop: '4px' }}>
-                  <strong>⚡ Elektronische Schnellkontakt-Garantie (BGH I ZR 238/14 / EuGH C-298/07):</strong> Anfragen über unsere E-Mail- &amp; Support-Kanäle werden an Werktagen (Mo–Fr 08:00–18:00 Uhr) garantiert <strong>innerhalb von maximal 60 Minuten</strong> beantwortet. Allen registrierten Musikschulen, Lehrkräften und Schülern steht zudem ein direktes In-App-Support- und Ticket-System im persönlichen Dashboard zur Verfügung.
+                  <strong>⚡ Elektronischer Schnellkontakt-Service (EuGH C-298/07 / BGH I ZR 238/14):</strong> Anfragen über unsere elektronischen Support-Kanäle werden an Werktagen (Mo–Fr 08:00–18:00 Uhr) <strong>in der Regel innerhalb von maximal 60 Minuten</strong> beantwortet. Allen registrierten Musikschulen, Lehrkräften und Schülern steht zudem ein direktes In-App-Support- und Ticket-System im persönlichen Dashboard zur Verfügung.
                 </span>
                 <span style={{ fontSize: '0.80rem', color: '#475569', display: 'block', marginTop: '2px' }}>
                   Website: <a href="https://campus-groovelab.de" target="_blank" rel="noopener noreferrer" style={{ color: '#34a853', fontWeight: 700 }}>campus-groovelab.de</a>
                 </span>
+              </div>
+
+              <div>
+                <strong style={{ color: '#0f172a' }}>Zentrale Kontaktstelle für Behörden und Nutzer gemäß Art. 11, 12 Digital Services Act (DSA):</strong><br />
+                E-Mail: <a href="mailto:kontakt@campus-groovelab.de" style={{ color: '#34a853', fontWeight: 700 }}>kontakt@campus-groovelab.de</a> / <a href="mailto:copyright@campus-groovelab.de" style={{ color: '#34a853', fontWeight: 700 }}>copyright@campus-groovelab.de</a><br />
+                <span style={{ fontSize: '0.80rem', color: '#475569' }}>Amtssprachen für behördliche und nutzerseitige Anfragen: Deutsch, Englisch.</span>
               </div>
 
               <div>
@@ -332,7 +551,7 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
               </div>
 
               <div style={{ fontSize: '0.82rem', color: '#64748b', lineHeight: 1.5, borderTop: '1px solid #e2e8f0', paddingTop: '12px' }}>
-                <strong>Haftung für Inhalte &amp; Links:</strong> Als Diensteanbieter sind wir gemäß § 7 Abs. 1 DDG / § 16 ECG für eigene Inhalte auf diesen Seiten nach den allgemeinen Gesetzen verantwortlich. Nach §§ 8 bis 10 DDG sind wir als Diensteanbieter jedoch nicht verpflichtet, übermittelte oder gespeicherte fremde Informationen zu überwachen. Verpflichtungen zur Entfernung oder Sperrung der Nutzung von Informationen nach den allgemeinen Gesetzen bleiben hiervon unberührt.
+                <strong style={{ color: '#0f172a' }}>Haftung für Inhalte &amp; Hosting-Immunität (DSA / DDG / ECG):</strong> Als Diensteanbieter sind wir gemäß § 7 Abs. 1 DDG / § 16 ECG für eigene Inhalte auf diesen Seiten nach den allgemeinen Gesetzen verantwortlich. Für übermittelte oder gespeicherte fremde Informationen sind wir als Host-Provider gemäß Art. 6 Verordnung (EU) 2022/2065 (Digital Services Act – DSA) i. V. m. § 7 Abs. 2 DDG nicht verpflichtet, diese proaktiv zu überwachen oder nach Umständen zu forschen, die auf eine rechtswidrige Tätigkeit hinweisen. Verpflichtungen zur Entfernung oder Sperrung der Nutzung von Informationen nach den allgemeinen Gesetzen ab dem Zeitpunkt der tatsächlichen Kenntnis einer konkreten Rechtsverletzung bleiben hiervon unberührt.
               </div>
             </div>
           )}
@@ -650,7 +869,7 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
         </div>
 
         {/* Apple HIG Footer Bar */}
-        <div style={{
+        <div className="apple-legal-no-print" style={{
           padding: '14px 28px',
           borderTop: '1px solid rgba(226, 232, 240, 0.8)',
           background: 'linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%)',
@@ -667,7 +886,7 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <button
               type="button"
-              onClick={() => window.print()}
+              onClick={handlePrintTextOnly}
               style={{
                 background: '#ffffff',
                 border: '1px solid #cbd5e1',
@@ -711,6 +930,7 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
         </div>
       </div>
     </div>
-  </>
+  </div>,
+  document.body
 );
 };
