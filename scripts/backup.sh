@@ -47,7 +47,7 @@ fi
 STORAGE_BOX_HOST="${STORAGE_BOX_HOST:-u664755.your-storagebox.de}"
 STORAGE_BOX_USER="${STORAGE_BOX_USER:-u664755}"
 STORAGE_BOX_PORT="${STORAGE_BOX_PORT:-23}"
-STORAGE_BOX_DEST="${STORAGE_BOX_DEST:-/backups}"
+STORAGE_BOX_DEST="${STORAGE_BOX_DEST:-backups}"
 
 echo "=============================================================================="
 echo "🛡️  Campus-Groovelab Tier-1 Enterprise+ Backup & Encryption Engine"
@@ -134,39 +134,39 @@ echo "☁️  3. Starte Offsite-Spiegelung zur Hetzner Storage Box (Port ${STORA
 SSH_TARGET="${STORAGE_BOX_USER}@${STORAGE_BOX_HOST}"
 SSH_OPTS="-p ${STORAGE_BOX_PORT} -o StrictHostKeyChecking=accept-new -o BatchMode=yes -o ConnectTimeout=10"
 
-# Prüfe, ob Storage Box per Key erreichbar ist
-if ssh ${SSH_OPTS} "${SSH_TARGET}" "echo ping" &>/dev/null; then
+# Prüfe, ob Storage Box per Key erreichbar ist (pwd im restricted shell)
+if ssh ${SSH_OPTS} "${SSH_TARGET}" "pwd" &>/dev/null; then
     echo "  ✓ Storage Box SSH-Handshake erfolgreich."
 
     # Zielordner auf der Storage Box anlegen
     ssh ${SSH_OPTS} "${SSH_TARGET}" "mkdir -p ${STORAGE_BOX_DEST}/db/hourly ${STORAGE_BOX_DEST}/db/daily ${STORAGE_BOX_DEST}/db/weekly ${STORAGE_BOX_DEST}/db/monthly ${STORAGE_BOX_DEST}/storage"
 
-    # 4.1 Synchronisiere Datenbank-Archive
+    # 4.1 Synchronisiere Datenbank-Archive nach GFS-Stufen
     echo "  ➔ Synchronisiere verschlüsselte GFS-Dumps nach ${STORAGE_BOX_DEST}/db/..."
-    rsync -avzP -e "ssh -p ${STORAGE_BOX_PORT}" \
-        "${LOCAL_BACKUP_ROOT}/" \
-        "${SSH_TARGET}:${STORAGE_BOX_DEST}/db/"
+    rsync -avz --delete -e "ssh -p ${STORAGE_BOX_PORT}" \
+        "${HOURLY_DIR}/" \
+        "${SSH_TARGET}:${STORAGE_BOX_DEST}/db/hourly/"
+    rsync -avz -e "ssh -p ${STORAGE_BOX_PORT}" \
+        "${DAILY_DIR}/" \
+        "${SSH_TARGET}:${STORAGE_BOX_DEST}/db/daily/"
+    rsync -avz -e "ssh -p ${STORAGE_BOX_PORT}" \
+        "${WEEKLY_DIR}/" \
+        "${SSH_TARGET}:${STORAGE_BOX_DEST}/db/weekly/"
+    rsync -avz -e "ssh -p ${STORAGE_BOX_PORT}" \
+        "${MONTHLY_DIR}/" \
+        "${SSH_TARGET}:${STORAGE_BOX_DEST}/db/monthly/"
+    echo "  ✓ GFS-Archive erfolgreich zur Storage Box repliziert."
 
     # 4.2 Spiegle Medien-Tresor (/mnt/cloud-volume/storage-data) inkrementell
     if [ -d "${LOCAL_STORAGE_DATA}" ]; then
         echo "  ➔ Spiegle Medien-Tresor (${LOCAL_STORAGE_DATA}/) nach ${STORAGE_BOX_DEST}/storage/..."
-        rsync -avzP --delete -e "ssh -p ${STORAGE_BOX_PORT}" \
+        rsync -avz --delete -e "ssh -p ${STORAGE_BOX_PORT}" \
             "${LOCAL_STORAGE_DATA}/" \
             "${SSH_TARGET}:${STORAGE_BOX_DEST}/storage/"
         echo "  ✓ Medien-Tresor erfolgreich gespiegelt."
     fi
-
-    # 4.3 Remote Retention Pruning auf der Storage Box
-    echo "  🧹 Bereinige veraltete Backups auf der Storage Box..."
-    ssh ${SSH_OPTS} "${SSH_TARGET}" "
-        find ${STORAGE_BOX_DEST}/db/hourly -type f -name '*.sql.gz.age*' -mtime +1 -delete 2>/dev/null || true
-        find ${STORAGE_BOX_DEST}/db/daily  -type f -name '*.sql.gz.age*' -mtime +30 -delete 2>/dev/null || true
-        find ${STORAGE_BOX_DEST}/db/weekly -type f -name '*.sql.gz.age*' -mtime +365 -delete 2>/dev/null || true
-    "
-    echo "  ✓ Remote-Bereinigung abgeschlossen."
 else
-    echo "  ℹ️  Storage Box aktuell nicht passwortlos erreichbar (Public Key noch nicht in Hetzner Console autorisiert)."
-    echo "      Dumps liegen sicher lokal verschlüsselt auf dem Cloud Volume: ${TARGET_HOURLY_DUMP}"
+    echo "  ℹ️  Storage Box aktuell nicht erreichbar. Dumps verbleiben lokal auf Cloud Volume."
 fi
 
 # ------------------------------------------------------------------------------
