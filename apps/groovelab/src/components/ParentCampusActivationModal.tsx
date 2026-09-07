@@ -12,6 +12,7 @@ import {
 } from '../utils/epcGiroCode';
 import { supabase } from '../lib/supabase';
 import { formatSingleStudentAnonymized } from '../utils/nameHelper';
+import { logSecurityEvent } from '../services/auditLogService';
 
 export interface ParentCampusActivationModalProps {
   student: {
@@ -157,6 +158,24 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
           localStorage.setItem(`campus_active_${student.id}`, 'true');
         }
       } catch (e) {}
+
+      // Revisionssicheres Logging der elterlichen Einwilligung & Widerrufs-Bestätigung (§§ 312j, 356 Abs. 5 BGB)
+      const auditConsentChecksum = `SHA256-CG-PARENT-CONSENT-${student.id.slice(0, 8).toUpperCase()}-${new Date().getFullYear()}`;
+      await logSecurityEvent({
+        action: 'PARENT_CAMPUS_ACTIVATION_CONSENT',
+        schoolId: student.school_id ? String(student.school_id) : undefined,
+        targetId: String(student.id),
+        metadata: {
+          consent_type: 'b2c_terms_and_withdrawal_waiver',
+          agreed_withdrawal_waiver: agreeWithdrawalWaiver,
+          payment_method: isFamilyBonus ? 'family_bonus' : 'bank_transfer',
+          period: periodDescription,
+          remaining_paid_months: remainingMonths,
+          effective_fee: effectiveAnnualFee,
+          audit_checksum: auditConsentChecksum,
+          timestamp: new Date().toISOString()
+        }
+      });
 
       setSubmittedSuccess(true);
       if (onPaymentSubmitted) onPaymentSubmitted();

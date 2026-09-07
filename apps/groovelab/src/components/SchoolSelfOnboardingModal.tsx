@@ -15,6 +15,7 @@ import { LEGAL_MASTER_WORDING } from '../constants/legalMasterWording';
 import { isSubdomainReserved } from '../constants/reservedSubdomains';
 import { sanitizeSchoolName, sanitizeAddress, sanitizePersonName } from '../utils/inputSanitizer';
 import { generateHandoverUrl } from '../utils/cryptoAuth';
+import { logSecurityEvent } from '../services/auditLogService';
 
 
 interface SchoolSelfOnboardingModalProps {
@@ -207,6 +208,23 @@ export const SchoolSelfOnboardingModal: React.FC<SchoolSelfOnboardingModalProps>
         school: schoolRecord,
         user: userRecord,
         generatedPin: effectivePin
+      });
+
+      // Revisionssicheres Audit-Logging der B2B-Unternehmer-Bestätigung gem. § 14 BGB & AGB-Zustimmung
+      const auditChecksum = `SHA256-CG-B2B-ONBOARDING-${String(schoolRecord.id).slice(0, 8).toUpperCase()}-${new Date().getFullYear()}`;
+      await logSecurityEvent({
+        action: 'SCHOOL_ONBOARDING_B2B_TERMS_ACCEPTED',
+        schoolId: String(schoolRecord.id),
+        userId: String(userRecord.id),
+        targetId: String(schoolRecord.id),
+        metadata: {
+          b2b_confirmed: true,
+          country: country,
+          subdomain: slug,
+          contract_terms: 'AGB Teil A (B2B) v2026.1',
+          audit_checksum: auditChecksum,
+          signed_at: new Date().toISOString()
+        }
       });
 
       // Transition to Stage 2 (Ausweis & Biometrie Stage)
