@@ -85,6 +85,41 @@ export function TrustSafetyTab() {
   const [actionSuccessToast, setActionSuccessToast] = useState<string | null>(null);
   const [copiedHashId, setCopiedHashId] = useState<string | null>(null);
 
+  // 🚨 Enterprise Trust & Safety: Fetch authoritative takedown registry from PostgreSQL
+  useEffect(() => {
+    let isMounted = true;
+    const fetchServerRecords = async () => {
+      try {
+        const { data, error } = await supabase.rpc('fetch_active_content_takedowns');
+        if (!error && Array.isArray(data) && data.length > 0 && isMounted) {
+          const mapped: TakedownRecord[] = data.map((d: any) => ({
+            id: d.id,
+            studentId: d.target_id,
+            studentName: d.student_name || 'Unbekannt',
+            schoolName: d.school_name || 'Unbekannt',
+            playlistId: d.playlist_id,
+            playlistTitle: undefined,
+            reportedUrl: d.reported_url || `https://app.campus-groovelab.de/bio/${d.target_id}`,
+            reason: d.reason,
+            timestamp: new Date(d.blocked_at).toLocaleString('de-DE', { timeZone: 'Europe/Berlin' }) + ' MESZ',
+            active: d.is_active,
+            sha256Hash: d.sha256_hash || '',
+            legalBasis: d.legal_basis || 'Art. 6 DSA / § 10 DDG / UrhDaG'
+          }));
+          setTakedownRegistry(prev => {
+            const ids = new Set(mapped.map(m => m.studentId + '_' + (m.playlistId || 'all')));
+            const filteredLocal = prev.filter(p => !ids.has(p.studentId + '_' + (p.playlistId || 'all')));
+            return [...mapped, ...filteredLocal];
+          });
+        }
+      } catch (e) {
+        // Fallback to local
+      }
+    };
+    fetchServerRecords();
+    return () => { isMounted = false; };
+  }, []);
+
   // Helper to format timestamps strictly in German Local Time (Europe/Berlin CEST/MESZ)
   const formatGermanTime = (dateObj: Date = new Date()) => {
     return dateObj.toLocaleString('de-DE', {
@@ -236,7 +271,7 @@ export function TrustSafetyTab() {
   };
 
   // 1-Click Takedown Execution
-  const handleExecuteTakedown = () => {
+  const handleExecuteTakedown = async () => {
     if (!resolvedResult) return;
 
     const timestamp = formatGermanTime();
@@ -257,6 +292,22 @@ export function TrustSafetyTab() {
       sha256Hash: hash,
       legalBasis: 'Art. 6 DSA / § 10 DDG / UrhDaG'
     };
+
+    // Authoritative Server-Side Persistence (Art. 6 & 16 DSA)
+    try {
+      await supabase.rpc('execute_content_takedown', {
+        p_student_id: resolvedResult.studentId,
+        p_student_name: resolvedResult.studentName,
+        p_school_name: resolvedResult.schoolName,
+        p_playlist_id: resolvedResult.playlistId || 'all',
+        p_playlist_title: resolvedResult.playlistTitle || null,
+        p_reported_url: inputUrl || `https://app.campus-groovelab.de/bio/${resolvedResult.studentId}`,
+        p_reason: selectedReason,
+        p_sha256: hash
+      });
+    } catch (err) {
+      console.warn('Backend takedown RPC error (fallback to local):', err);
+    }
 
     // Update localStorage specific and registry
     try {
@@ -281,7 +332,16 @@ export function TrustSafetyTab() {
   };
 
   // Revert / Restore Link Access
-  const handleRestoreAccess = (studentIdToRestore: string, playlistIdToRestore?: string) => {
+  const handleRestoreAccess = async (studentIdToRestore: string, playlistIdToRestore?: string) => {
+    try {
+      await supabase.rpc('restore_content_takedown', {
+        p_student_id: studentIdToRestore,
+        p_playlist_id: playlistIdToRestore || 'all'
+      });
+    } catch (err) {
+      console.warn('Backend restore takedown RPC error:', err);
+    }
+
     try {
       localStorage.removeItem(`campus_takedown_${studentIdToRestore}`);
     } catch {}

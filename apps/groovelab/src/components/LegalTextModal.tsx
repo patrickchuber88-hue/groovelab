@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { X, ShieldCheck, FileText, Building, Undo2, Scale, Printer } from 'lucide-react';
+import { X, ShieldCheck, FileText, Building, Undo2, Scale, Printer, XCircle, CheckCircle2 } from 'lucide-react';
 import { useMasterPricing } from '../context/MasterPricingContext';
+import { logSecurityEvent } from '../services/auditLogService';
 
 interface LegalTextModalProps {
   isOpen: boolean;
   onClose: () => void;
-  initialTab?: 'impressum' | 'privacy' | 'terms' | 'cancellation';
+  initialTab?: 'impressum' | 'privacy' | 'terms' | 'cancellation' | 'terminate';
 }
 
 export const LegalTextModal: React.FC<LegalTextModalProps> = ({
@@ -15,8 +16,22 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
   initialTab = 'impressum'
 }) => {
   const masterPricing = useMasterPricing();
-  const [activeTab, setActiveTab] = useState<'impressum' | 'privacy' | 'terms' | 'cancellation'>(initialTab);
+  const [activeTab, setActiveTab] = useState<'impressum' | 'privacy' | 'terms' | 'cancellation' | 'terminate'>(initialTab);
   const contentRef = useRef<HTMLDivElement>(null);
+
+  // § 312k BGB Kündigungsformular State
+  const [cancelParentName, setCancelParentName] = useState('');
+  const [cancelEmail, setCancelEmail] = useState('');
+  const [cancelStudentIdentifier, setCancelStudentIdentifier] = useState('');
+  const [cancelSchoolName, setCancelSchoolName] = useState('');
+  const [cancelType, setCancelType] = useState<'regular' | 'extraordinary'>('regular');
+  const [cancelReason, setCancelReason] = useState('');
+  const [cancelSubmitting, setCancelSubmitting] = useState(false);
+  const [cancelReceipt, setCancelReceipt] = useState<{
+    reference: string;
+    timestamp: string;
+    effectiveDateText: string;
+  } | null>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -44,6 +59,9 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
     } else if (activeTab === 'cancellation') {
       docTitle = 'Campus-Groovelab – Widerrufsbelehrung & Muster-Widerrufsformular';
       tabHeading = 'Widerrufsbelehrung & Muster-Widerrufsformular (B2C)';
+    } else if (activeTab === 'terminate') {
+      docTitle = 'Campus-Groovelab – Bestätigung der Vertragskündigung (§ 312k BGB)';
+      tabHeading = 'Kündigung elektronischer Verträge gem. § 312k BGB';
     }
 
     const contentHtml = contentRef.current.innerHTML;
@@ -422,7 +440,8 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
                 { id: 'impressum', label: 'Impressum', icon: Building },
                 { id: 'privacy', label: 'Datenschutz', icon: ShieldCheck },
                 { id: 'terms', label: 'AGB', icon: FileText },
-                { id: 'cancellation', label: 'Widerruf (B2C)', icon: Undo2 }
+                { id: 'cancellation', label: 'Widerruf (B2C)', icon: Undo2 },
+                { id: 'terminate', label: 'Verträge kündigen (§ 312k)', icon: XCircle }
               ].map(tab => {
                 const isActive = activeTab === tab.id;
                 const Icon = tab.icon;
@@ -512,7 +531,8 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
               </div>
 
               <div>
-                <strong style={{ color: '#0f172a' }}>Kontakt &amp; Schnelle elektronische Kontaktaufnahme (§ 5 Abs. 1 Nr. 2 DDG / Art. 3 UWG CH):</strong><br />
+                <strong style={{ color: '#0f172a' }}>Kontakt &amp; Unmittelbare Erreichbarkeit (§ 5 Abs. 1 Nr. 2 DDG / Art. 3 UWG CH):</strong><br />
+                Telefon: <a href="tel:+4976237486420" style={{ color: '#34a853', fontWeight: 700 }}>+49 (0) 7623 / 748 64 20</a> <span style={{ fontSize: '0.80rem', color: '#64748b' }}>(Mo–Fr 09:00–17:00 Uhr MEZ)</span><br />
                 E-Mail: <a href="mailto:kontakt@campus-groovelab.de" style={{ color: '#34a853', fontWeight: 700 }}>kontakt@campus-groovelab.de</a><br />
                 Support &amp; Schulbetreuung: <a href="mailto:patrick.huber@musaek.de" style={{ color: '#34a853', fontWeight: 700 }}>patrick.huber@musaek.de</a><br />
                 <span style={{ fontSize: '0.80rem', color: '#475569', display: 'block', marginTop: '4px' }}>
@@ -524,8 +544,38 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
               </div>
 
               <div>
-                <strong style={{ color: '#0f172a' }}>Zentrale Kontaktstelle für Behörden und Nutzer gemäß Art. 11, 12 Digital Services Act (DSA):</strong><br />
-                E-Mail: <a href="mailto:kontakt@campus-groovelab.de" style={{ color: '#34a853', fontWeight: 700 }}>kontakt@campus-groovelab.de</a> / <a href="mailto:copyright@campus-groovelab.de" style={{ color: '#34a853', fontWeight: 700 }}>copyright@campus-groovelab.de</a><br />
+                <strong style={{ color: '#0f172a' }}>Zentrale Kontaktstelle &amp; Meldeverfahren gemäß Art. 11, 12 &amp; 16 Digital Services Act (DSA):</strong><br />
+                E-Mail für behördliche Anfragen: <a href="mailto:kontakt@campus-groovelab.de" style={{ color: '#34a853', fontWeight: 700 }}>kontakt@campus-groovelab.de</a><br />
+                Meldekanal für rechtswidrige Inhalte &amp; Urheberrechtsverletzungen (Notice-and-Action gem. Art. 16 DSA):{' '}
+                <a 
+                  href={`mailto:copyright@campus-groovelab.de?subject=${encodeURIComponent('DSA-Meldung gem. Art. 16 DSA: Urheberrechtsverletzung / Rechtswidriger Inhalt')}&body=${encodeURIComponent(
+`MELDUNG RECHTSWIDRIGER INHALTE GEMÄSS ART. 16 DIGITAL SERVICES ACT (DSA)
+
+1. Genaue URL, Raum- oder Datei-ID des beanstandeten Inhalts:
+[Bitte hier eintragen]
+
+2. Bezeichnung des geschützten Werkes / der verletzten Rechte:
+[z. B. Werktitel, Notenausgabe, Urheber, ISMN/ISBN]
+
+3. Begründung, warum der Inhalt rechtswidrig ist:
+[Bitte erläutern]
+
+4. Angaben zum Rechteinhaber / Beschwerdeführer:
+Name: 
+Organisation / Verlag: 
+E-Mail-Adresse: 
+
+5. Erklärung an Eides statt gem. Art. 16 Abs. 2 lit. d DSA:
+Hiermit versichere ich in gutem Glauben, dass die vorstehenden Angaben richtig und vollständig sind.`
+                  )}`}
+                  style={{ color: '#34a853', fontWeight: 700 }}
+                  title="Strukturierten DSA-Meldebogen per E-Mail öffnen"
+                >
+                  copyright@campus-groovelab.de (Strukturiertes Meldeformular öffnen ➔)
+                </a><br />
+                <span style={{ fontSize: '0.80rem', color: '#475569', display: 'block', marginTop: '3px' }}>
+                  Eingehende Meldungen über Urheberrechtsverletzungen oder rechtswidrige Inhalte werden nach den Vorgaben des Art. 16 DSA unverzüglich, spätestens jedoch innerhalb von 24 Stunden gesichtet und bearbeitet.
+                </span>
                 <span style={{ fontSize: '0.80rem', color: '#475569' }}>Amtssprachen für behördliche und nutzerseitige Anfragen: Deutsch, Englisch.</span>
               </div>
 
@@ -564,69 +614,74 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
 
               <div>
                 <strong style={{ color: '#0f172a' }}>1. Allgemeine Hinweise &amp; Verantwortlicher</strong><br />
-                Der Schutz Ihrer Daten hat für <strong>Campus-Groovelab</strong> höchste Priorität. Verantwortlich im Sinne der DSGVO, des Schweizer nDSG und des österreichischen DSG ist Patrick Huber (Kontaktdaten siehe Impressum).
+                Der Schutz Ihrer Daten hat für <strong>Campus-Groovelab</strong> höchste Priorität. Verantwortlich im Sinne der DSGVO, des Schweizer nDSG und des österreichischen DSG ist:<br />
+                Patrick Huber, Softwareentwicklung &amp; Cloud-Dienstleistungen, Karl-Fürstenberg-Str. 59, 79618 Rheinfelden (Baden), Deutschland.<br />
+                E-Mail: <a href="mailto:kontakt@campus-groovelab.de" style={{ color: '#2563eb', fontWeight: 700 }}>kontakt@campus-groovelab.de</a> / Support: <a href="mailto:patrick.huber@musaek.de" style={{ color: '#2563eb', fontWeight: 700 }}>patrick.huber@musaek.de</a>.
               </div>
 
               <div>
-                <strong style={{ color: '#0f172a' }}>2. Grundsatz der Datenminimierung, Zero-Mail-Architektur, Mindestalter &amp; Bildschirmfreies Üben („Screenless Practice“, Art. 5 &amp; 8 DSGVO / Art. 6 nDSG)</strong><br />
-                (1) <strong>Keine Zahlungs- oder Bankdaten:</strong> Auf Campus-Groovelab werden keinerlei Bank-, SEPA-, Kreditkarten- oder Abrechnungsvertragsdaten gespeichert.<br />
-                (2) <strong>Zero-Mail-Architektur:</strong> Weder von Schülern noch von Eltern, Lehrkräften oder Sekretariatsmitarbeitern werden private E-Mail-Adressen erhoben oder gespeichert. Die gesamte Authentifizierung und Profilzuordnung erfolgt tokenbasiert über physische Schulausweise, Passkeys oder serverseitig gehashte PINs. Einzig für den Schulleitungs-Account (B2B-Vertragspartner) wird eine offizielle Schul- bzw. Organisations-E-Mail-Adresse zur Vertragsabwicklung und Notfall-Authentifizierung hinterlegt.<br />
-                (3) <strong>Namensdarstellung &amp; Schutz von Minderjährigen:</strong> Schülernamen werden im Lehrer-Dashboard zum Schutz von Minderjährigen stets datenschutzkonform auf „Vorname + N.“ (z. B. „Max M.“) gekürzt. Lehrkräftenamen werden hingegen auf allen Plattform-Oberflächen für Schüler und Eltern stets mit vollem Namen (Vorname + Nachname) angezeigt, um Transparenz und Verwechslungsfreiheit im Schulbetrieb zu gewährleisten.<br />
-                (4) <strong>Mindestalter &amp; Bildschirmfreies Üben:</strong> Das Mindestalter für die Nutzung beträgt 6 Jahre. Zur Vermeidung unnötiger Bildschirmzeit bei jüngeren Kindern (insbesondere 6–9 Jahre) unterstützt die Plattform das didaktische Prinzip des <strong>bildschirmfreien Übens („Screenless Practice“)</strong>: Das Endgerät verbleibt bei den Erziehungsberechtigten; Übeeinheiten am echten akustischen Instrument werden per 1-Klick-Quittierung im Elternmodus verbucht (gedeckelt auf max. 60 Minuten pro Tag zur Missbrauchs- und Inflationsprävention).
+                <strong style={{ color: '#0f172a' }}>2. Grundsatz der Datenminimierung, Zero-Mail für Minderjährige &amp; Bildschirmfreies Üben (Art. 5 &amp; 8 DSGVO / Art. 6 nDSG)</strong><br />
+                (1) <strong>Keine Zahlungs- oder Bankdaten von Familien:</strong> Auf Campus-Groovelab werden keinerlei Bank-, SEPA-, Kreditkarten- oder Abrechnungsvertragsdaten von Schülern oder Eltern gespeichert.<br />
+                (2) <strong>Zero-Mail-Architektur für Schüler und Eltern:</strong> Von Schülern und Erziehungsberechtigten werden zu 100 % keine privaten E-Mail-Adressen erhoben oder gespeichert. Der Zugang erfolgt passwortlos über physische Schulausweise (QR-Code / Ausweisnummer) in Kombination mit einer serverseitig gehashten PIN oder Passkeys (WebAuthn). Bei Schulleitungen, Lehrkräften und Schulverwaltung werden ausschließlich dienstliche E-Mail-Adressen verarbeitet, die zur Vertragsabwicklung, Einladung und Kontoverwaltung erforderlich sind (Art. 6 Abs. 1 lit. b DSGVO).<br />
+                (3) <strong>Namensdarstellung &amp; Schutz von Minderjährigen:</strong> Schülernamen werden in Lehrer-Übersichten datenschutzkonform auf „Vorname + N.“ (z. B. „Max M.“) gekürzt. Lehrkräftenamen werden für Schüler und Eltern mit vollem Namen angezeigt, um Verwechslungsfreiheit im Schulbetrieb zu gewährleisten.<br />
+                (4) <strong>Mindestalter &amp; Bildschirmfreies Üben („Screenless Practice“):</strong> Das Mindestalter beträgt 6 Jahre. Um Bildschirmzeiten bei jüngeren Kindern (6–9 Jahre) zu minimieren, können Übeeinheiten am akustischen Instrument von den Eltern im Elternmodus mit einem Klick quittiert werden (begrenzt auf max. 60 Min./Tag zur Vermeidung von Missbrauch).
               </div>
 
               <div>
-                <strong style={{ color: '#0f172a' }}>3. Backend-for-Frontend (BFF) Architektur, IndexedDB Audio-Tresor &amp; Entbehrlichkeit eines Cookie-Banners (§ 25 Abs. 2 Nr. 2 TDDDG / § 165 TKG / Art. 6 nDSG)</strong><br />
-                Zur Gewährleistung des Banking-Goldstandards setzt Campus-Groovelab eine <strong>Backend-for-Frontend (BFF) Gateway-Architektur</strong> ein. Der Browser speichert zu <strong>0% Zugriffs- oder Refresh-Tokens</strong> im ungeschützten Speicher (LocalStorage / SessionStorage). Stattdessen wird die Authentifizierung über ein rein serverseitig entschlüsselbares, mit <strong>AES-256-GCM (A256GCM)</strong> verschlüsseltes Session-Cookie (<code style={{ background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px' }}>__Host-session</code>) mit den Schutzattributen <code style={{ background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px' }}>HttpOnly</code>, <code style={{ background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px' }}>Secure</code>, <code style={{ background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px' }}>SameSite=Strict</code> und <code style={{ background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px' }}>Path=/</code> verwaltet.<br />
-                - <strong>IndexedDB Audio-Tresor (<code style={{ background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px' }}>groovelab_audio_vault</code>):</strong> Lokaler Puffer auf dem Endgerät zur Gewährleistung eines stabilen Offline-Übe- und Playback-Betriebs in schallisolierten Proberäumen ohne Internetverbindung.<br />
-                - <strong>Gesetzliche Ausnahme vom Einwilligungserfordernis:</strong> Sämtliche eingesetzten Technologien sind gemäß <strong>§ 25 Abs. 2 Nr. 2 TDDDG</strong> (DE) sowie <strong>§ 165 Abs. 3 TKG 2021</strong> (AT) technisch unbedingt erforderlich, um die vom Nutzer ausdrücklich aufgerufenen Kernfunktionen der Plattform bereitzustellen. Es werden <strong>keine Tracking-, Werbe- oder Drittanbieter-Analyse-Cookies</strong> eingesetzt. Ein Cookie-Banner ist daher gesetzlich nicht erforderlich.<br />
-                - <strong>Proaktiver Silent Refresh &amp; CSRF-Guard:</strong> Tokens werden serverseitig 60 Sekunden vor Ablauf im Hintergrund erneuert; alle Schreibanfragen werden über <code style={{ background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px' }}>Sec-Fetch-Site</code> vor CSRF geschützt.
+                <strong style={{ color: '#0f172a' }}>3. Client-seitige Speicherung, Offline-Audio-Tresore &amp; Entbehrlichkeit eines Cookie-Banners (§ 25 Abs. 2 Nr. 2 TDDDG / § 165 TKG / Art. 6 nDSG)</strong><br />
+                (1) <strong>Technisch zwingend erforderliche Speicherungen:</strong> Unsere Webanwendung verwendet lokale Speichertechnologien des Browsers (LocalStorage, SessionStorage, IndexedDB), um Kernfunktionen wie den sicheren Sitzungserhalt, Navigationseinstellungen und den Offline-Übebetrieb in Proberäumen bereitzustellen.<br />
+                (2) <strong>Keine Tracking- oder Werbe-Cookies:</strong> Es werden zu keinem Zeitpunkt Marketing-, Profiling- oder Drittanbieter-Tracking-Cookies gesetzt. Sämtliche client-seitigen Speicherungen sind gemäß <strong>§ 25 Abs. 2 Nr. 2 TDDDG</strong> (DE) sowie <strong>§ 165 Abs. 3 TKG 2021</strong> (AT) technisch unbedingt erforderlich. Ein Cookie-Banner ist daher gesetzlich entbehrlich.<br />
+                (3) <strong>Schutz lokaler Daten:</strong> Es werden keine Klartext-Passwörter im Browser gespeichert. Flüchtige Sitzungs-Identifikatoren (Session-Leases) verfallen automatisch. Sensible lokale Zwischenspeicher (z. B. Offline-Familienprofile) werden auf dem Endgerät über die browser-eigene Web Crypto API kryptografisch geschützt (PBKDF2 mit 100.000 Runden SHA-512 und AES-256-GCM).<br />
+                (4) <strong>Lokaler Audio-Tresor (IndexedDB):</strong> Zur Gewährleistung eines unterbrechungsfreien Probenbetriebs in schallisolierten Räumen ohne Internetverbindung werden temporäre Übe- und Playback-Audios lokal in geschützten IndexedDB-Datenspeichern des Browsers vorgehalten und bei aktiver Verbindung synchronisiert.
               </div>
 
               <div>
-                <strong style={{ color: '#0f172a' }}>4. Eltern-Einwilligung bei Minderjährigen &amp; Einheitliche Altersgrenze (Art. 8 DSGVO / § 10 BDSG / Art. 6 revDSG)</strong><br />
-                (1) <strong>Einheitlicher Schutzstandard für den DACH-Raum (Deutschland, Österreich, Schweiz):</strong> Da Musikschul-Unterrichtsverträge und Bildungsvereinbarungen im DACH-Raum fast ausnahmslos mit den Erziehungsberechtigten geschlossen werden, gilt plattformweit zur Gewährleistung maximalen Schutzes Minderjähriger eine einheitliche Altersgrenze: Jugendliche bis zum vollendeten <strong>16. Lebensjahr</strong> bedürfen zur Nutzung der Plattform der ausdrücklichen Freigabe und Einwilligung der Erziehungsberechtigten (Art. 8 Abs. 1 DSGVO / § 10 BDSG / Art. 6 revDSG).<br />
-                (2) <strong>Zwei-Faktor-Elternverifikation ohne E-Mail-Tracking (Zero-Mail):</strong> Zur Gewährleistung maximaler Datenminimierung erfolgt der Nachweis der elterlichen Zustimmung über die physische Aushändigung des Schulausweises durch die Musikschule in Kombination mit der Vergabe einer geheimen, 4-stelligen Eltern-PIN. Dieser Vorgang wird mit Zeitstempel und Hash-Wert revisionssicher im Audit-Ledger protokolliert.<br />
-                (3) <strong>Strikte Trennung nach § 73 UrhG (Koppelungsverbot):</strong> Die Einwilligung in die Speicherung didaktischer Audio-Aufnahmen (Loopstation) ist freiwillig und kann jederzeit unabhängig von der Schulnutzung widerrufen werden.
+                <strong style={{ color: '#0f172a' }}>4. Hardware-Zugriffe (Kamera &amp; Mikrofon), Passkeys &amp; Ausschluss von Biometrie-Verarbeitung (Art. 9 DSGVO)</strong><br />
+                (1) <strong>Kamera:</strong> Der Zugriff auf die Kamera erfolgt ausschließlich lokal im Browser des Nutzers, um den Schulausweis-QR-Code zu erfassen. Es werden zu keinem Zeitpunkt Videobilder an Server übertragen.<br />
+                (2) <strong>Mikrofon &amp; Didaktische Aufnahmen:</strong> Die In-App Loopstation und das Meisterwerk-Protokoll ermöglichen Schülern und Lehrkräften die didaktische Tonaufnahme am Instrument. Ein automatischer Sicherheits-Guard schaltet das Mikrofon bei Modulwechsel, Tab-Inaktivität oder Schließen des Fensters sofort physisch ab (<code style={{ background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px' }}>MediaStreamTrack.stop()</code>).<br />
+                (3) <strong>⚡ Strikter Ausschluss von Stimmbiometrie (Art. 9 DSGVO):</strong> Die Audiodaten dienen rein dem musikalischen Playback und der Hausaufgabenkontrolle. Es finden zu keinem Zeitpunkt biometrische Stimm-, Sprecher- oder Verhaltensmusteranalysen statt.<br />
+                (4) <strong>🔐 Passkeys &amp; WebAuthn (FIDO2 Standard / Keine Biometrie):</strong> Die optionale passwortlose Anmeldung via Passkey nutzt Face ID, Touch ID oder Windows Hello ausschließlich lokal in der isolierten Hardware-Enclave (Secure Enclave / TPM) des Nutzerendgeräts. Biometrische Rohmerkmale verlassen zu keinem Zeitpunkt das Endgerät und werden niemals an Campus-Groovelab übertragen oder auf unseren Servern verarbeitet (Art. 9 DSGVO). Unser Server empfängt und prüft ausschließlich die kryptografische Public-Key-Signatur.<br />
+                (5) <strong>Physische Löschung:</strong> Wird eine Tonaufnahme oder ein Schülerprofil gelöscht, wird die zugehörige Audiodatei vollständig und unwiderruflich aus dem Cloud-Speicher gelöscht.
               </div>
 
               <div>
-                <strong style={{ color: '#0f172a' }}>5. Zero-Trust Session-Leasing, IndexedDB Audio-Tresor, Hardware-Sicherheit &amp; Ausschluss von Stimmbiometrie</strong><br />
-                Audiodaten aus der In-App Loopstation und dem Meisterwerk-Protokoll werden verschlüsselt im EU-Cloud-Speicher abgelegt und sind durch mandanten- und schülerspezifische Storage-RLS-Policies geschützt. Nach dem Löschen einer Aufnahme wird die Datei physisch und vollständig aus dem Cloud-Speicher entfernt. Für Offline-Übephasen in Proberäumen steht ein lokaler, hardware-geschützter <strong>IndexedDB Audio-Tresor (<code style={{ background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px' }}>groovelab_audio_vault</code>)</strong> zur Verfügung. PINs und Zugangsschlüssel werden mit <strong>OWASP- und BSI-konformem PBKDF2 Zero-Knowledge Hashing (100.000 SHA-512 / SHA-256 Runden)</strong> verarbeitet. Das integrierte <strong>Zero-Trust Session-Leasing</strong> ermöglicht Schulleitung und Lehrkräften jederzeit den 1-Click Remote-Logout aktiver Geräte. Bei Verlassen des Moduls oder Tab-Wechsel schaltet ein automatischer Guard alle Mikrofon-Tracks (<code style={{ background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px' }}>MediaStreamTrack.stop()</code>) ab.<br />
-                <strong>⚡ Strikter Ausschluss von Stimmbiometrie (Art. 9 DSGVO / Art. 6 nDSG):</strong> Audiodaten dienen ausschließlich dem didaktischen Playback und dem häuslichen Üben (Art. 6 Abs. 1 lit. b DSGVO / Art. 6 nDSG). Es werden zu keinem Zeitpunkt biometrische Stimm-, Sprecher- oder Verhaltensmusteranalysen (Art. 9 DSGVO) durchgeführt.
+                <strong style={{ color: '#0f172a' }}>5. Eltern-Einwilligung, Kinderschutz &amp; Vier-Augen-Transparenz (Art. 8 DSGVO / § 8a SGB VIII / BKiSchG)</strong><br />
+                Für Schüler bis zum vollendeten 16. Lebensjahr ist für die Profilnutzung die Freigabe der Erziehungsberechtigten erforderlich. Die Verifikation erfolgt über die physische Ausgabe des Schulausweises durch die Schule und die Festlegung einer geheimen Eltern-PIN. Gemäß § 8a SGB VIII und dem institutionellen Kinderschutzkonzept der Schule ist die didaktische Kommunikation zwischen Lehrkräften und Schülern für Erziehungsberechtigte über das Eltern-Portal jederzeit transparent einsehbar (Vier-Augen-Prinzip). Ein unkontrollierter Chatverkehr zwischen Minderjährigen untereinander ist serverseitig ausgeschlossen. Die Einwilligung in didaktische Tonaufnahmen ist freiwillig und kann jederzeit unabhängig vom Unterrichtsvertrag widerrufen werden.
               </div>
 
               <div>
-                <strong style={{ color: '#0f172a' }}>6. Reine Metadaten-Architektur &amp; Urheberrechts-Immunität (UrhG &amp; DSA)</strong><br />
-                Campus-Groovelab speichert, hostet und vervielfältigt keine urheberrechtlich geschützten Noten-PDFs oder Notensätze. In der Mediathek und Repertoireverwaltung werden ausschließlich nicht-personenbezogene, urheberrechtsfreie bibliografische Werkdaten (Songtitel, Komponist/Interpret, Lehrwerkstitel, Seitenzahl) sowie externe Referenzlinks (Spotify, YouTube, Tomplay) verarbeitet.
+                <strong style={{ color: '#0f172a' }}>6. Hosting in ISO 27001-zertifizierten deutschen Rechenzentren (Art. 28 &amp; 32 DSGVO)</strong><br />
+                Sämtliche Kernsysteme (Webanwendung, API-Gateway, PostgreSQL-Datenbank und Cloud-Audiospeicher) werden in nach ISO/IEC 27001 zertifizierten deutschen Rechenzentren der Hetzner Online GmbH (Falkenstein/Nürnberg, Deutschland) betrieben. Mit dem Hosting-Provider besteht ein DSGVO-konformer Auftragsverarbeitungsvertrag (AVV) nach Art. 28 DSGVO. Die Datenübertragung erfolgt durchgehend TLS 1.3 verschlüsselt.
               </div>
 
               <div>
-                <strong style={{ color: '#0f172a' }}>7. Hosting in ISO 27001-zertifizierten Rechenzentren &amp; Stündliche Backups (Art. 28 &amp; 32 DSGVO)</strong><br />
-                Das Hosting von App, BFF-Gateway und PostgreSQL-Datenbank erfolgt zu 100% in ISO 27001-zertifizierten deutschen Rechenzentren (Hetzner Online GmbH, Falkenstein/Nürnberg, Deutschland) mit Auftragsverarbeitungsverträgen (AVV) nach Art. 28 DSGVO bzw. Art. 9 nDSG. Sämtliche Datenbankbestände werden durch ein stündlich automatisiertes, verschlüsseltes Backup-System auf dedizierten Volumes vor Datenverlust geschützt.
+                <strong style={{ color: '#0f172a' }}>7. Notwendige technische Hilfsdienste zur Funktionserbringung</strong><br />
+                Zur Bereitstellung spezifischer technischer Funktionen werden punktuell folgende Hilfsdienste eingebunden:<br />
+                - QR-Codes für physische Ausweise, Stundenpläne und Kiosk-Stationen werden zu 100 % lokal und offline im Webbrowser des Endgeräts gerendert (Zero-Data-Transmission). Es werden hierbei zu keinem Zeitpunkt Daten oder IP-Adressen an externe QR-Dienste übertragen.<br />
+                - Beim administrativen B2B-Onboarding einer Musikschule wird zur revisionssicheren Vertragsprotokollierung die IP-Adresse des vertretungsberechtigten Administrators abgefragt (<code style={{ background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px' }}>api.ipify.org</code>).<br />
+                - Zur Einbindung öffentlicher Landesschulferien können Kalenderdaten über Standard-Proxies geladen werden. Eine Speicherung personenbezogener Daten findet bei diesen technischen Hilfsdiensten nicht statt.
               </div>
 
               <div>
-                <strong style={{ color: '#0f172a' }}>8. Betroffenenrechte &amp; Aufsichtsbehörden (Art. 15 bis 22 DSGVO / Art. 25 ff. revDSG)</strong><br />
-                Sie haben das Recht auf Auskunft (Art. 15), Berichtigung (Art. 16), Löschung (Art. 17), Einschränkung (Art. 18) sowie Beschwerde bei der zuständigen Aufsichtsbehörde (Deutschland: Landesbeauftragte für den Datenschutz / BfDI; Österreich: Datenschutzbehörde DSB, Barichgasse 40–42, 1030 Wien; Schweiz: Eidgenössischer Datenschutz- und Öffentlichkeitsbeauftragter EDÖB, Feldeggweg 1, CH-3003 Bern).<br />
+                <strong style={{ color: '#0f172a' }}>8. Urheberrechtsfreie Metadaten-Architektur (UrhG &amp; DSA)</strong><br />
+                Campus-Groovelab speichert und hostet keine geschützten Notenblätter oder Partituren als PDF. Es werden ausschließlich bibliografische Metadaten (Songtitel, Komponist, Lehrbuchseite) sowie externe Verlinkungen (z. B. Streaming-Dienste) verarbeitet.
+              </div>
+
+              <div>
+                <strong style={{ color: '#0f172a' }}>9. Kommunales Löschkonzept nach DIN 66398 (5 Löschklassen)</strong><br />
+                • <strong>LK 1 (Flüchtige Sitzungsdaten):</strong> Sofortiger Verfall bei Abmeldung.<br />
+                • <strong>LK 2 (Didaktische Audioaufnahmen):</strong> Aufbewahrung für die Dauer des laufenden Schuljahres (bis 31.08.) mit vorheriger Exportfunktion (MP3); sofortige physische Löschung bei manuellem Entfernen.<br />
+                • <strong>LK 3 (Inaktivitätsstatus):</strong> Nach 60 Tagen ohne Login automatische Umschaltung auf passive Basis-Bereitstellung zur Kostenentlastung.<br />
+                • <strong>LK 4 (Bildungsbiografie &amp; Meisterwerke):</strong> Verbleiben während der Ausbildungsdauer im Schülerprofil; physische Löschung 30 Tage nach Vertragsbeendigung.<br />
+                • <strong>LK 5 (B2B-Abrechnungsbelege der Musikschule):</strong> 10 Jahre gesetzliche Aufbewahrungsfrist gem. § 147 AO (strikte Sammelrechnungen ohne Schüler-Klarnamen).
+              </div>
+
+              <div>
+                <strong style={{ color: '#0f172a' }}>10. Betroffenenrechte &amp; Aufsichtsbehörden (Art. 15 bis 22 DSGVO / Art. 25 ff. revDSG)</strong><br />
+                Sie haben jederzeit das Recht auf Auskunft (Art. 15), Berichtigung (Art. 16), Löschung (Art. 17), Einschränkung (Art. 18) sowie Beschwerde bei der zuständigen Aufsichtsbehörde (DE: Landesbeauftragte für den Datenschutz; AT: Datenschutzbehörde DSB; CH: Eidgenössischer Datenschutz- und Öffentlichkeitsbeauftragter EDÖB).<br />
                 <span style={{ fontSize: '0.80rem', color: '#475569', display: 'block', marginTop: '4px' }}>
-                  <strong>Hinweis für Nutzer in der Schweiz:</strong> Die Datenverarbeitung erfolgt auf ISO 27001-zertifizierten Servern in Deutschland. Der Schweizer Bundesrat hat mit Beschluss vom 25. August 2023 festgestellt, dass Deutschland über ein angemessenes Schutzniveau für personenbezogene Daten verfügt (Art. 16 Abs. 1 revDSG i. V. m. Anhang 1 VDSG).
+                  <strong>Hinweis für Nutzer in der Schweiz:</strong> Deutschland verfügt gemäß Beschluss des Schweizer Bundesrats vom 25. August 2023 über ein angemessenes Schutzniveau (Art. 16 Abs. 1 nDSG i. V. m. Anhang 1 VDSG).
                 </span>
-              </div>
-
-              <div>
-                <strong style={{ color: '#0f172a' }}>9. Kommunales Löschkonzept nach DIN 66398 &amp; 2-Stufen-Statusarchitektur</strong><br />
-                Die Speicherdauer richtet sich nach dem strukturierten Kommunalen Löschkonzept (5 Löschklassen):<br />
-                • <strong>LK 1 (Session &amp; Temporärdaten):</strong> Sofortiger Verfall bei Sitzungsbeendigung / RAM-Zeroization.<br />
-                • <strong>LK 2 (Didaktische Audio-Aufnahmen):</strong> Erhaltung für die Dauer des laufenden Schuljahres (bis 31.08.) inkl. Vorab-Exportmöglichkeit (ZIP/MP3); sofortige physische Löschung bei manueller Nutzerlöschung.<br />
-                • <strong>LK 3 (Abrechnungsstatus / Sparmodus):</strong> Nach 60 Tagen Inaktivität ohne Login wird das Profil fair-play-konform auf Basis-Bereitstellung (0,09 €) umgestellt. Daten, QR-Landingpage und Stundenplan bleiben 100% aktiv.<br />
-                • <strong>LK 4 (Bildungsbiografie &amp; Meisterwerke):</strong> Gemeisterte Stücke und Jahres-Badges (reine Metadaten gem. Art. 6 Abs. 1 lit. b DSGVO) verbleiben über Schuljahre hinweg (mehrjährig) im Profil; physische Löschung erfolgt 30 Tage nach formeller Exmatrikulation / Kündigung.<br />
-                • <strong>LK 5 (B2B-Abrechnungsbelege):</strong> 10 Jahre Aufbewahrungsfrist gem. § 147 AO (strikte B2B-Sammelrechnung ohne Schüler-Klarnamen).
-              </div>
-
-              <div>
-                <strong style={{ color: '#0f172a' }}>10. Sicherheit der Verarbeitung, Angriffsabwehr &amp; Web Application Firewall (Art. 6 Abs. 1 lit. f &amp; Art. 32 DSGVO)</strong><br />
-                Zur Gewährleistung der Systemsicherheit, Abwehr unberechtigter Zugriffsversuche, automatisierter Schadprogramme, DDoS-Attacken sowie verdächtiger Proxy- und Anonymisierungsnetzwerke (z. B. Tor-Exit-Nodes oder bekannte Exploit-Knoten) setzen wir an den Zugangspunkten unserer Systeme automatisierte Filter- und Schutzmechanismen (Web Application Firewall) ein. Hierbei werden IP-Adressen und technische Verbindungsparameter zur Gefahrenabwehr automatisiert verarbeitet und potenziell schädliche Anfragen präventiv abgewiesen. Eine Profilbildung oder Weitergabe an Dritte findet nicht statt. Dies dient unserem berechtigten Interesse an der technischen Integrität und dem Schutz der Bildungs- und Übedaten von Minderjährigen gem. Art. 6 Abs. 1 lit. f i. V. m. Art. 32 DSGVO.
               </div>
             </div>
           )}
@@ -665,33 +720,35 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
                 </div>
 
                 <div>
-                  <strong style={{ color: '#0f172a' }}>1. Vertragsgegenstand, Rechtsnatur, Pädagogischer Add-On-Status, Convenience-Doktrin &amp; Notfall-Klausel (SaaS-Mietvertrag)</strong><br />
-                  (1) Diese Bestimmungen regeln die Bereitstellung der cloudbasierten Schulmanagement- und Übeplattform <strong>Campus-Groovelab</strong> durch den Betreiber Patrick Huber (Einzelunternehmer). Der Vertrag qualifiziert sich rechtlich als <strong>Software-as-a-Service (SaaS)-Mietvertrag gemäß § 535 ff. BGB (DE) / §§ 1090 ff. ABGB (AT) / Art. 253 ff. OR (CH)</strong> über die Bereitstellung von Cloud-Infrastruktur, Datenbank-Hosting, Datensicherung und Systemwartung.<br />
-                  (2) <strong>Pädagogischer Add-On-Charakter &amp; Convenience-Doktrin (Subsidiaritäts-Garantie):</strong> Campus-Groovelab ist ein didaktisches Zusatz-, Erleichterungs- und Übermittlungswerkzeug („Convenience-Tool / Fast-Track-Option“) zur Beschleunigung interner Abläufe. Die Plattform ersetzt ausdrücklich kein behördliches oder amtliches Schulverwaltungssystem (ERP wie ASV, WinSchool oder Musikschul-Manager) und stellt zu keinem Zeitpunkt den ausschließlichen oder verbindlich vorgeschriebenen Dienst-, Weisungs- oder Kommunikationskanal der Musikschule dar.<br />
+                  <strong style={{ color: '#0f172a' }}>1. Vertragsgegenstand, Rechtsnatur, Pädagogischer Add-On-Status, Subsidiaritäts-Grundsatz &amp; Notfall-Klausel (SaaS-Mietvertrag)</strong><br />
+                  (1) Diese Bestimmungen regeln die Bereitstellung der cloudbasierten Schulmanagement- und Übeplattform <strong>Campus-Groovelab</strong> durch den Betreiber Patrick Huber (Einzelunternehmen, Karl-Fürstenberg-Str. 59, 79618 Rheinfelden, Deutschland). Der Vertrag qualifiziert sich rechtlich als <strong>Software-as-a-Service (SaaS)-Mietvertrag gemäß § 535 ff. BGB (DE) / §§ 1090 ff. ABGB (AT) / Art. 253 ff. OR (CH)</strong> über die Bereitstellung von Cloud-Infrastruktur, Datenbank-Hosting, Datensicherung und Systemwartung.<br />
+                  (2) <strong>Pädagogischer Add-On-Charakter &amp; Subsidiaritäts-Grundsatz:</strong> Campus-Groovelab ist ein didaktisches Zusatz-, Erleichterungs- und Übermittlungswerkzeug („Convenience-Tool / Fast-Track-Option“) zur Beschleunigung und Erleichterung des Musikschulalltags. Die Plattform ersetzt ausdrücklich kein behördliches oder amtliches Schulverwaltungssystem (ERP-Software wie ASV, WinSchool oder Musikschul-Manager) und stellt zu keinem Zeitpunkt den ausschließlichen oder verbindlich vorgeschriebenen Dienst-, Weisungs- oder Kommunikationskanal der Musikschule dar.<br />
                   (3) <strong>Primärwege, Weisungsautonomie der Schule &amp; Wahlfreiheit:</strong> Die offizielle dienstrechtliche Kommunikation, verbindliche Arbeitsanweisungen der Schulleitung sowie die hoheitliche Verwaltung von Schüler- und Honorarstammdaten verbleiben vollumfänglich auf den herkömmlichen Primärkanälen der Musikschule (behördliche E-Mail, interne Kommunikationssysteme wie MS Teams, Telefon, behördliche ERP-Software oder Aushang). Lehrkräfte und Mitarbeiter sind zu jedem Zeitpunkt berechtigt, Stundenpläne, Raumwünsche und Terminänderungen alternativ auf dem herkömmlichen Weg (per E-Mail oder telefonisch) an das Sekretariat zu übermitteln. Die Datenüberführung in das amtliche Verwaltungssystem der Schule obliegt der Musikschule.<br />
                   (4) <strong>Notfall-, Nachrangigkeits- &amp; Schadenminderungsklausel (§ 254 BGB):</strong> Die Musikschule stellt sicher, dass der reguläre Schulbetrieb und die primäre Notfallkommunikation (Telefon, E-Mail, herkömmliche Vertretungspläne) unabhängig von der Plattform gewährleistet bleiben. Bei kurzzeitigen Serverstörungen, Netzausfällen oder Wartungsfenstern findet der Schulunterricht regulär statt; die Musikschule ist im Rahmen ihrer gesetzlichen Schadenminderungspflicht (§ 254 BGB) gehalten, Raum- und Terminabstimmungen über ihre Primärkanäle abzuwickeln. Eine Haftung des Betreibers für ausgefallene Unterrichtsstunden, verpasste Bandproben oder Honorarausfälle ist ausgeschlossen, es sei denn, der Ausfall beruht auf einer vorsätzlichen oder grob fahrlässigen Pflichtverletzung des Betreibers oder der schuldhaften Verletzung einer wesentlichen Vertragspflicht (Kardinalpflicht). Die Haftungsregelungen gemäß § 7 dieser AGB gelten vollumfänglich.<br />
                   (5) Soweit im Rahmen der Bereitstellung personenbezogene Daten verarbeitet werden, gilt ergänzend die Vereinbarung zur Auftragsverarbeitung (AVV gemäß Art. 28 DSGVO bzw. Art. 9 nDSG) als integraler Vertragsbestandteil.<br />
-                  (6) Der Betreiber gewährleistet eine Verfügbarkeit der Cloud-Infrastruktur von 99,5 % im Jahresmittel (ausgenommen angekündigte Wartungsarbeiten außerhalb der Kernunterrichtszeiten). Zur Abwehr von Cyber-Angriffen und zur Sicherung des störungsfreien Schulbetriebs behält sich der Betreiber vor, automatisierte Angriffsnetzwerke oder schädliche Datenverbindungen an der Firewall technisch abzuweisen. Der reguläre weltweite Zugriff für Schüler und Lehrkräfte im Rahmen privater Reisen (z. B. Urlaubsaufenthalte) bleibt hiervon unberührt.
+                  (6) Der Betreiber strebt eine Verfügbarkeit der Cloud-Infrastruktur von 99,5 % im Jahresmittel an (ausgenommen angekündigte Wartungsarbeiten außerhalb der Kernunterrichtszeiten). Zur Abwehr von Cyber-Angriffen und zur Sicherung des störungsfreien Schulbetriebs behält sich der Betreiber vor, automatisierte Angriffsnetzwerke oder schädliche Datenverbindungen an der Web Application Firewall technisch abzuweisen. Der reguläre weltweite Zugriff für Schüler und Lehrkräfte im Rahmen privater Reisen (z. B. Urlaubsaufenthalte) bleibt hiervon unberührt.
                 </div>
 
                 <div>
-                  <strong style={{ color: '#0f172a' }}>2. Bereitstellungsmodell &amp; Hosting-Pauschalen (DACH-Region)</strong><br />
+                  <strong style={{ color: '#0f172a' }}>2. Bereitstellungsmodell, Kanonische Gebührenstruktur &amp; Fair-Play-Entlastung (DACH-Region)</strong><br />
+                  (1) <strong>Kanonische Gebührenaufstellung (Legal SaaS-Nomenklatur):</strong><br />
                   - <strong>Campus-Groovelab Software-Bereitstellung:</strong> 0,00 € / CHF 0.00 (Inklusive). Die Software wird im Rahmen des gebuchten Cloud-Infrastruktur-Pakets ohne gesonderte Lizenzkaufgebühren bereitgestellt.<br />
-                  - <strong>Cloud- &amp; Datenbank-Hosting: Modul Campus:</strong> 14,90 € / Mo. (DE/AT) bzw. CHF 19.90 / Mo. (CH) (Server-Hosting, Datenbank &amp; Webspace-Flatrate per Musikschule).<br />
-                  - <strong>Cloud- &amp; Datenbank-Hosting: Modul GrooveLab:</strong> 9,90 € / Mo. (DE/AT) bzw. CHF 14.90 / Mo. (CH) (Server-Hosting, Datenbank &amp; Webspace-Flatrate per Musikschule).<br />
-                  - <strong>Kombi-Vorteilsrabatt (Infrastruktur-Bündel):</strong> -4,90 € / Mo. (DE/AT) bzw. -4.90 CHF / Mo. (CH) bei gemeinsamer Buchung beider Module (Bündelpreis: 19,90 € / Mo. bzw. CHF 29.90 / Mo.).<br />
-                  - <strong>Service- &amp; Administrationspauschale:</strong> 0,49 € / Mo. (DE/AT) bzw. CHF 1.00 / Mo. (CH) je aktive Lehrkraft. Verwaltungs- und Sekretariats-User (<code style={{ background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px' }}>admin</code> und <code style={{ background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px' }}>secretary</code>) sind dauerhaft inklusive (0,00 € / CHF 0.00).<br />
-                  - <strong>Basis-Bereitstellung:</strong> 0,09 € / Mo. (DE/AT) bzw. CHF 0.20 / Mo. (CH) je Schüler (QR-Landingpage, Stundenplan-, Termin-, Raumänderungs-Sync sowie DSGVO/nDSG-Hosting).<br />
+                  - <strong>Cloud- &amp; Datenbank-Hosting: Modul Campus:</strong> 14,90 € / Mo. (DE/AT) bzw. CHF 19.90 / Mo. (CH) (feste Server-Hosting-, Datenbank- und Webspace-Flatrate je Musikschule).<br />
+                  - <strong>Cloud- &amp; Datenbank-Hosting: Modul GrooveLab:</strong> 9,90 € / Mo. (DE/AT) bzw. CHF 14.90 / Mo. (CH) (feste Server-Hosting-, Datenbank- und Webspace-Flatrate je Musikschule).<br />
+                  - <strong>Kombi-Vorteilsrabatt (Infrastruktur-Bündel):</strong> -4,90 € / Mo. (DE/AT) bzw. -4.90 CHF / Mo. (CH) bei gemeinsamer Buchung beider Module (Bündel-Flatrate: 19,90 € / Mo. bzw. CHF 29.90 / Mo.).<br />
+                  - <strong>Service- &amp; Administrationspauschale:</strong> 0,49 € / Mo. (DE/AT) bzw. CHF 1.00 / Mo. (CH) je aktive Lehrkraft. Verwaltungs- und Sekretariats-Benutzer (Rollen <code style={{ background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px' }}>admin</code> und <code style={{ background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px' }}>secretary</code>) sind dauerhaft inklusive (0,00 € / CHF 0.00).<br />
+                  - <strong>Basis-Bereitstellung:</strong> 0,09 € / Mo. (DE/AT) bzw. CHF 0.20 / Mo. (CH) je registrierter Schüler (QR-Landingpages, Stundenplan-, Termin-, Raumänderungs-Sync sowie DSGVO/nDSG-Datensatz-Hosting).<br />
                   - <strong>Cloud- &amp; Modul-Bereitstellung Campus:</strong> 0,49 € / Mo. (DE/AT) bzw. CHF 1.00 / Mo. (CH) je aktiver Schüler (interaktive App-Nutzung: Übe-Timer, Loopstation, Meisterwerk-Protokoll).<br />
-                  - <strong>Cloud- &amp; Modul-Bereitstellung GrooveLab:</strong> 0,49 € / Mo. (DE/AT) bzw. CHF 1.00 / Mo. (CH) je aktiver Schüler (interaktive Band-Nutzung: Songs, Repertoire, Live Lab; immer zu 100 % von der Musikschule übernommen).<br />
-                  - <strong>Sammelzahler vs. Direktabrechnung:</strong> GrooveLab-Aktivierungen werden immer zu 100 % von der Musikschule getragen. Für das Campus-Modul kann wahlweise Direktabrechnung mit Eltern vereinbart werden. Schüler-Direktabrechnungen werden ausnahmslos als einmaliger Jahresbeitrag (5,88 € in DE/AT bzw. CHF 12.00 in CH pro Schuljahr bzw. 4,80 € / CHF 9.60 bei Schulbezuschussung) abgerechnet – niemals monatlich.<br />
-                  - <strong>Bestandsschutz-Garantie (Price-Lock):</strong> Der Betreiber garantiert der Musikschule für die Dauer der ununterbrochenen Vertragslaufzeit absolute Preisstabilität auf die bei Vertragsschluss vereinbarten monatlichen Basis-Hosting- und Bereitstellungspauschalen. Preisanpassungen für Neukunden haben keinerlei Auswirkung auf bestehende Verträge. Bei einer Kündigung und späteren Neuanmeldung gilt der zum Zeitpunkt der Neuanmeldung gültige Neukundentarif.<br />
-                  - <strong>Steuerliche Hinweise:</strong> In Deutschland und Österreich gemäß § 19 UStG (DE) bzw. § 6 Abs. 1 Z 27 UStG (AT) umsatzsteuerbefreit (Kleinunternehmerregelung). Für die Schweiz gilt Leistungsort Schweiz (nicht im Inland steuerbar gem. Art. 8 Abs. 1 MWSTG).
+                  - <strong>Cloud- &amp; Modul-Bereitstellung GrooveLab:</strong> 0,49 € / Mo. (DE/AT) bzw. CHF 1.00 / Mo. (CH) je aktiver Schüler (interaktive Band-Nutzung: Song-Bibliotheken, Band-Rooms, Repertoire; wird verbindlich zu 100 % von der Musikschule übernommen).<br />
+                  (2) <strong>Sammelzahler vs. Direktabrechnung:</strong> GrooveLab-Aktivierungen werden immer zu 100 % von der Musikschule getragen (Sammelzahler). Für das Campus-Modul kann die Musikschule wahlweise Direktabrechnung mit den Eltern vereinbaren. Schüler-Direktabrechnungen werden ausnahmslos als einmaliger Jahresbeitrag (5,88 € in DE/AT bzw. CHF 12.00 in CH pro Schuljahr bzw. 4,80 € / CHF 9.60 bei Schulbezuschussung) abgerechnet – niemals monatlich (zur Vermeidung unverhältnismäßiger Banktransaktions- und Buchungsgebühren).<br />
+                  (3) <strong>Fair-Play Inaktivitäts-Entlastung:</strong> Loggt sich ein Schüler über einen Zeitraum von mehr als sechzig (60) aufeinanderfolgenden Tagen nicht aktiv in die interaktive Plattform ein, wird das Profil zur Vermeidung unnötiger Kosten für die Musikschule automatisch in den passiven Basis-Bereitstellungsstatus (0,09 € / CHF 0.20 pro Monat) überführt. QR-Landingpages, Stundenpläne und Notizen bleiben vollständig aktiv.<br />
+                  (4) <strong>Bestandsschutz-Zusage (Price-Lock):</strong> Der Betreiber sagt der Musikschule für die Dauer des ununterbrochenen Vertragsverhältnisses die Beibehaltung der bei Vertragsschluss vereinbarten monatlichen Basis-Hosting- und Bereitstellungspauschalen zu. Preisanpassungen für Neukunden haben keinerlei Auswirkung auf bestehende Verträge. Bei einer Kündigung und späteren Neuanmeldung gilt der zum Zeitpunkt der Neuanmeldung gültige Tarif.<br />
+                  (5) <strong>Steuerliche Hinweise:</strong> In Deutschland und Österreich gemäß § 19 UStG (DE) bzw. § 6 Abs. 1 Z 27 UStG (AT) umsatzsteuerbefreit (Kleinunternehmerregelung). Für die Schweiz gilt Leistungsort Schweiz (nicht im Inland steuerbar gem. Art. 8 Abs. 1 MWSTG).
                 </div>
 
                 <div>
                   <strong style={{ color: '#0f172a' }}>3. Vertragslaufzeit, Unterjähriger Einstieg &amp; Kündigung der Schul-Infrastruktur</strong><br />
-                  (1) Der Vertragsbeginn und die Bereitstellung der Cloud-Infrastruktur können jederzeit zu jedem beliebigen Kalendertag des Jahres erfolgen. Die Vertragslaufzeit richtet sich nach dem von der jeweiligen Musikschule im System konfigurierten Schuljahreszeitraum (standardmäßig 01. September bis 31. August bzw. der landes- und schulartspezifische Stichtag). Bei unterjährigem Einstieg läuft die initiale Vertragslaufzeit ab dem Bereitstellungsdatum bis zum individuellen Ende des laufenden Schuljahres.<br />
+                  (1) Der Vertragsbeginn und die Bereitstellung der Cloud-Infrastruktur können zu jedem beliebigen Kalendertag erfolgen. Die Vertragslaufzeit richtet sich nach dem von der Musikschule im System konfigurierten Schuljahreszeitraum (standardmäßig 01. September bis 31. August bzw. der individuelle Schuljahresstichtag). Bei unterjährigem Einstieg läuft die initiale Vertragslaufzeit ab dem Bereitstellungsdatum bis zum individuellen Ende des laufenden Schuljahres.<br />
                   (2) Für die Folgezeit verlängert sich der Vertrag jeweils um ein weiteres volles Schuljahr (12 Monate bis zum jeweiligen Schuljahresstichtag), sofern er nicht mit einer Frist von einem (1) Monat zum Ende des Schuljahres in Textform (z. B. per E-Mail oder über das Dashboard) gekündigt wird.<br />
                   (3) Bei unterjährigem Einstieg werden anfallende Bereitstellungs- und Infrastrukturpauschalen zeitanteilig (pro rata temporis) ab dem Monat der Freischaltung bis zum individuellen Schuljahresende berechnet.<br />
                   (4) Neuanmeldungen, Modul-Aktivierungen sowie Abmeldungen einzelner Schüler- oder Lehrkräfte-Profile können während des laufenden Schuljahres jederzeit flexibel und tagesgenau im Administrations-Dashboard vorgenommen werden.
@@ -699,21 +756,21 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
 
                 <div>
                   <strong style={{ color: '#0f172a' }}>4. Reine Metadaten-Architektur für Noten, Didaktische Cover-Aufnahmen (§ 53, § 60a UrhG), Verwertungsgesellschaften (GEMA / AKM / SUISA) &amp; Notice-and-Takedown (Art. 6 &amp; 16 DSA)</strong><br />
-                  (1) <strong>Reine Metadaten-Architektur für Noten &amp; Ausschluss von Original-Masteraufnahmen:</strong> Die Plattform Campus-Groovelab speichert, hostet und vervielfältigt zu 0 % urheberrechtlich geschützte Notensätze, Leadsheets, Tabulaturen oder geschützte Verlags-Partituren sowie keine kommerziellen Original-Masteraufnahmen/Audiodateien von Plattenlabels. Die Mediathek verarbeitet für Lehrwerke ausschließlich freie bibliografische Metadaten (Interpret, Titel, Tonart, Besetzung, Lehrwerkstitel und Seitenzahlen) sowie Verlinkungen zu lizenzierten externen Mediendiensten (z. B. Spotify, YouTube) oder autorisierten Noten-Plattformen (z. B. Tomplay).<br />
-                  (2) <strong>Didaktische Schüler-Audioaufnahmen (Cover-Versionen im privaten Kreis gem. § 53, § 60a UrhG):</strong> Gehostet werden ausschließlich von den Schülern selbst im Rahmen des Instrumentalunterrichts oder beim häuslichen Üben eingespielte Audioaufnahmen (didaktische Cover-Versionen von Übestücken). Diese dienen rein dem pädagogischen Feedback mit der Lehrkraft (§ 60a UrhG) sowie dem Anhören im engsten privaten Familienkreis (§ 53 Abs. 1 UrhG / gesetzliche Privatkopie). Es existiert keine öffentliche Mediathek, kein offenes Streaming und keine freie Auffindbarkeit im Internet.<br />
+                  (1) <strong>Reine Metadaten-Architektur für Noten &amp; Ausschluss von Original-Masteraufnahmen:</strong> Die Plattform Campus-Groovelab speichert, hostet und vervielfältigt zu 0 % urheberrechtlich geschützte Notensätze, Leadsheets, Tabulaturen oder geschützte Verlags-Partituren als PDF sowie keine kommerziellen Original-Masteraufnahmen von Musiklabels. Die Mediathek verarbeitet für Lehrwerke ausschließlich freie bibliografische Metadaten (Interpret, Titel, Tonart, Besetzung, Lehrwerkstitel und Seitenzahlen) sowie Verlinkungen zu lizenzierten externen Mediendiensten (z. B. Spotify, YouTube) oder autorisierten Noten-Plattformen (z. B. Tomplay).<br />
+                  (2) <strong>Didaktische Schüler-Audioaufnahmen (Cover-Versionen im privaten Kreis gem. § 53, § 60a UrhG):</strong> Gehostet werden ausschließlich von den Schülern selbst im Rahmen des Instrumentalunterrichts oder beim häuslichen Üben eingespielte Tonaufnahmen (didaktische Cover-Versionen von Übestücken). Diese dienen rein dem pädagogischen Feedback mit der Lehrkraft (§ 60a UrhG) sowie dem Anhören im engsten privaten Familienkreis (§ 53 Abs. 1 UrhG / gesetzliche Privatkopie). Es existiert keine öffentliche Mediathek, kein offenes Streaming und keine freie Auffindbarkeit im Internet.<br />
                   (3) <strong>Verwertungsgesellschaften-Klarstellung (GEMA, AKM, SUISA):</strong> Der Betreiber betreibt keine öffentliche Streaming-Mediathek geschützter Musikwerke. Aus diesem Grund entstehen durch die bloße Plattformbereitstellung keine gesonderten Melde- oder Vergütungspflichten der Plattform gegenüber Verwertungsgesellschaften (GEMA in Deutschland, AKM/Austro-Mechana in Österreich, SUISA in der Schweiz). Die Lizenzierung des eigentlichen Präsenzunterrichts und von Schulaufführungen obliegt der Musikschule über die jeweils bestehenden Gesamtverträge ihrer Landes- oder Bundesverbände.<br />
                   (4) <strong>Verbot des Uploads / Verlinkens unlizenzierter Notensätze:</strong> Lehrkräften und Nutzern ist es streng untersagt, urheberrechtlich geschützte Noten-PDFs, Leadsheets, Verlags-Scans oder Verweise auf offensichtlich rechtswidrige Quellen in der Plattform abzulegen (§ 60a Abs. 3 Nr. 2 UrhG [DE], § 42f UrhG [AT], Art. 19 URG [CH]).<br />
-                  (5) <strong>Haftungsprivileg &amp; Notice-and-Takedown-Verfahren (Art. 6 &amp; 16 DSA):</strong> Der Betreiber stellt lediglich die technische Vermittlungsinfrastruktur bereit und haftet als Host-Provider gemäß Art. 6 Digital Services Act (DSA) erst ab tatsächlicher Kenntnis rechtswidriger Inhalte. Urheberrechtsinhaber und Verlage können Beanstandungen jederzeit über das elektronische Melde- und Abhilfeverfahren an <a href="mailto:copyright@campus-groovelab.de" style={{ color: '#2563eb', textDecoration: 'underline' }}>copyright@campus-groovelab.de</a> übermitteln. Berechtigt beanstandete Verweise werden unverzüglich gesperrt oder entfernt.<br />
-                  (6) <strong>Freistellungsverpflichtung bei Urheberrechtsverletzungen durch Nutzer:</strong> Die Musikschule trägt die alleinige rechtliche Verantwortung dafür, dass ihre Lehrkräfte, Mitarbeiter und Schüler keine urheberrechtsverletzenden Medien, Noten-PDFs oder rechtswidrigen Inhalte in die Plattform einstellen. Sollte der Betreiber von Urhebern, Verlagen, Verwertungsgesellschaften (GEMA, AKM, SUISA) oder sonstigen Dritten wegen angeblicher Schutzrechtsverletzungen durch von Nutzern der Musikschule eingestellte Inhalte in Anspruch genommen werden, stellt die Musikschule den Betreiber von allen berechtigten Ansprüchen, Gerichts- und angemessenen Rechtsverteidigungskosten auf erstes Anfordern frei, es sei denn, die Musikschule hat die Rechtsverletzung nachweislich nicht zu vertreten.
+                  (5) <strong>Haftungsprivileg &amp; Automatisierte Server-Side Notice-and-Takedown Engine (Art. 6 &amp; 16 DSA / § 10 DDG):</strong> Der Betreiber stellt lediglich die technische Vermittlungsinfrastruktur bereit und haftet als Host-Provider gemäß Art. 6 Digital Services Act (DSA) i. V. m. § 10 DDG erst ab tatsächlicher Kenntnis rechtswidriger Inhalte. Zur Gewährleistung eines unverzüglichen Schutzes verfügt die Plattform über eine autoritative, serverseitige Takedown-Engine. Urheberrechtsinhaber und Verlage können Beanstandungen an <a href="mailto:copyright@campus-groovelab.de" style={{ color: '#2563eb', textDecoration: 'underline' }}>copyright@campus-groovelab.de</a> übermitteln. Berechtigt beanstandete Freigabelinks werden serverseitig mit sofortiger Wirkung für sämtliche Endgeräte global deaktiviert (HTTP 410 Resource Suspended).<br />
+                  (6) <strong>Freistellungsverpflichtung bei Urheberrechtsverletzungen durch Nutzer:</strong> Die Musikschule trägt die alleinige rechtliche Verantwortung dafür, dass ihre Lehrkräfte, Mitarbeiter und Schüler keine urheberrechtsverletzenden Medien, Noten-PDFs oder rechtswidrigen Inhalte in die Plattform einstellen. Sollte der Betreiber von Urhebern, Verlagen, Verwertungsgesellschaften (GEMA, AKM, SUISA) oder sonstigen Dritten wegen Schutzrechtsverletzungen durch von Nutzern der Musikschule eingestellte Inhalte in Anspruch genommen werden, stellt die Musikschule den Betreiber von allen berechtigten Ansprüchen, Gerichts- und angemessenen Rechtsverteidigungskosten auf erstes Anfordern frei, es sei denn, die Musikschule hat die Rechtsverletzung nachweislich nicht zu vertreten.
                 </div>
 
                 <div>
-                  <strong style={{ color: '#0f172a' }}>5. Autonomie von Honorarlehrkräften (Herrenberg-Compliance nach BSG B 12 R 3/20 R, Übermittlungsfreiheit) &amp; Ausschluss von Leistungs- und Verhaltenskontrolle (§ 87 Abs. 1 Nr. 6 BetrVG / BPersVG)</strong><br />
-                  (1) Die Funktionen zur Raum-, Termin- und Stundenplanung innerhalb von Campus-Groovelab stellen rein didaktisch-organisatorische Hilfsmittel und unverbindliche Dispositionsvorschläge dar. Die Plattform übt zu keinem Zeitpunkt eine automatisierte Weisung, Zuweisung oder arbeitgeberseitige Direktionsgewalt gegenüber selbstständigen Lehrkräften (Honorarkräften) aus. Honorarkräfte sind zu jedem Zeitpunkt frei, ob sie Campus-Groovelab als digitales Hilfsmittel nutzen oder ihre Termin- und Raumabstimmungen auf herkömmlichem Weg (per E-Mail oder Telefon) mit dem Schulsekretariat und den Schülern vornehmen.<br />
-                  (2) Die Musikschule stellt in eigener Verantwortung sicher, dass der tatsächliche Einsatz von Honorarkräften den sozialversicherungsrechtlichen Kriterien des Bundessozialgerichts entspricht und keine einseitigen Weisungen über die Plattform erteilt werden. Eine Überwachung von Anwesenheitszeiten oder didaktischen Inhalten durch den Betreiber findet nicht statt.<br />
-                  (3) <strong>Ausschluss von Leistungs- und Verhaltenskontrolle:</strong> Die Plattform verzichtet auf jegliche Funktionen zur Mitarbeiterbewertung oder automatisierten Leistungs- und Verhaltenskontrolle. Es werden keine Kennzahlen zu Reaktionszeiten auf Chat-Nachrichten, durchschnittlichen Übezeiten der Schülerklassen oder Anwesenheitsquoten zur Mitarbeiterbewertung aggregiert oder an Schulleitungen übermittelt.<br />
-                  (4) <strong>Recht auf Nichterreichbarkeit &amp; asynchrone Kommunikation (§ 5 ArbSchG):</strong> Die interne Chat- und Benachrichtigungsfunktion („Shouts“) ist als rein asynchrones didaktisches Informationsmedium konzipiert. Lehrkräfte sind zu keinem Zeitpunkt verpflichtet, außerhalb ihrer individuellen Unterrichtszeiten oder an unterrichtsfreien Tagen Nachrichten abzurufen oder zu beantworten.<br />
-                  (5) <strong>Negative Garantie &amp; Zweckbindungsverbot:</strong> Die Musikschule verpflichtet sich ausdrücklich, die Plattform und deren Zeit-, Raum- oder Kommunikationsdaten zu keinem Zeitpunkt zur Überwachung der Arbeitszeit, zur Leistungskontrolle oder für disziplinarische Maßnahmen gegenüber Beschäftigten oder Honorarkräften einzusetzen.
+                  <strong style={{ color: '#0f172a' }}>5. Arbeitszeit-Compliance (ArbZG), Arbeitgeber-Alleinverantwortung (Microsoft-Teams-Prinzip), Herrenberg-Freistellung (BSG B 12 R 3/20 R) &amp; Kinderschutz (§ 8a SGB VIII)</strong><br />
+                  (1) <strong>Asynchrones Lehrmittel &amp; Arbeitgeber-Alleinverantwortung nach dem Arbeitszeitgesetz (ArbZG):</strong> Campus-Groovelab qualifiziert sich als asynchrones pädagogisches Arbeits- und Lernmittel (vergleichbar mit Standardsoftware wie Microsoft Teams, Google Classroom oder Schul-Clouds). Die Musikschule ist als Arbeitgeberin allein und uneingeschränkt verantwortlich für die Einhaltung sämtlicher arbeitsschutzrechtlicher Vorschriften, insbesondere des Arbeitszeitgesetzes (ArbZG), der täglichen Höchstarbeitszeiten sowie der gesetzlichen ununterbrochenen Ruhezeit von elf (11) Stunden gem. § 5 ArbZG. Die Bereitstellung des Zugangs begründet zu keinem Zeitpunkt eine arbeitgeberseitige Verpflichtung der Lehrkräfte zur Erreichbarkeit oder Leistungserbringung außerhalb der regulären Dienst- und Unterrichtszeiten.<br />
+                  (2) <strong>Didaktische Vorbereitung auf freiwilliger pädagogischer Basis:</strong> Die Nutzung der Plattform durch Lehrkräfte außerhalb des planmäßigen Präsenzunterrichts (z. B. didaktische Erstellung von Hausaufgaben, Einspielen von Übe-Loops, Eintragung von Schüler-Feedbacks) erfolgt auf rein freiwilliger pädagogischer Basis und stellt keine angeordnete Arbeitszeit oder vergütungspflichtige Mehrarbeit dar. Dem Lehrpersonal steht das Recht auf Nichterreichbarkeit („Right to Disconnect“) uneingeschränkt zu.<br />
+                  (3) <strong>Herrenberg-Compliance &amp; B2B-Freistellung bei Honorarkräften (§ 7a SGB IV / BSG B 12 R 3/20 R):</strong> Campus-Groovelab ist primär für den regulären Schulbetrieb mit festangestelltem Lehrpersonal konzipiert. Bindet die Musikschule freie Dozenten oder Honorarkräfte in die Plattform ein, stellt die Musikschule in eigener organisationsrechtlicher Verantwortung sicher, dass keine weisungsgebundene Eingliederung im Sinne der Rechtsprechung des Bundessozialgerichts (Herrenberg-Urteil) vorliegt. Die Plattform übt zu keinem Zeitpunkt eine Weisungs- oder Direktionsgewalt aus; Stundenplanentwürfe stellen rein unverbindliche Dispositionsvorschläge dar. Die Musikschule stellt den Betreiber von jeglicher Haftung, Nachforderungen von Sozialversicherungsbeiträgen oder Säumniszuschlägen durch Sozialversicherungsträger gem. § 7a SGB IV vollumfänglich und auf erstes Anfordern frei.<br />
+                  (4) <strong>Institutioneller Kinderschutz &amp; Vier-Augen-Prinzip (§ 8a SGB VIII / BKiSchG):</strong> Die interne Chat- und Benachrichtigungsfunktion ist strikt an das institutionelle Kinderschutzkonzept gebunden. Zur Prävention von Grenzverletzungen und unüberwachter digitaler 1:1-Kommunikation zwischen erwachsenen Lehrkräften und Minderjährigen ist der Chatverlauf für Erziehungsberechtigte im Eltern-Portal (nach Verifikation mit der persönlichen Eltern-PIN) sowie für die Schulleitung im Rahmen der Aufsichtspflicht jederzeit transparent einsehbar. Ein privater, unüberwachter Chat zwischen Schülern untereinander ist serverseitig ausgeschlossen.<br />
+                  (5) <strong>Ausschluss von Leistungs- und Verhaltenskontrolle (§ 87 Abs. 1 Nr. 6 BetrVG):</strong> Die Plattform verzichtet auf jegliche Funktionen zur automatisierten Leistungs- oder Verhaltenskontrolle des Lehrpersonals. Es werden keine Kennzahlen zu Reaktionszeiten, Aktivitätsdauer oder Quoten zur Mitarbeiterbewertung ermittelt.
                 </div>
 
                 <div>
@@ -723,9 +780,9 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
 
                 <div>
                   <strong style={{ color: '#0f172a' }}>7. B2B-Gewährleistung, Haftungsbegrenzung, 12-Monats-Verjährung, Rechtswahl &amp; Gerichtsstand (§ 536a BGB DE / § 1096 ABGB AT / Art. 259a OR CH)</strong><br />
-                  (1) Gegenüber Unternehmern und juristischen Personen des öffentlichen Rechts wird die verschuldensunabhängige Garantiehaftung des Betreibers für anfängliche Mängel (§ 536a Abs. 1 Alt. 1 BGB [DE] / § 1096 ABGB [AT] / Art. 259a OR [CH]) ausdrücklich und vollumfänglich ausgeschlossen. Bei einfacher Fahrlässigkeit haftet der Betreiber nur bei Verletzung wesentlicher Vertragspflichten (Kardinalpflichten) begrenzt auf den vertragstypisch vorhersehbaren Schaden. Eine Haftung für entgangenen Gewinn, mittelbare Schäden, Mangelfolgeschäden oder ausgefallene Unterrichtsstunden ist ausgeschlossen.<br />
+                  (1) Gegenüber Unternehmern und juristischen Personen des öffentlichen Rechts wird die verschuldensunabhängige Haftung des Betreibers für anfängliche Mängel (§ 536a Abs. 1 Alt. 1 BGB [DE] / § 1096 ABGB [AT] / Art. 259a OR [CH]) ausdrücklich und vollumfänglich ausgeschlossen. Bei einfacher Fahrlässigkeit haftet der Betreiber nur bei Verletzung wesentlicher Vertragspflichten (Kardinalpflichten) begrenzt auf den vertragstypisch vorhersehbaren Schaden. Eine Haftung für entgangenen Gewinn, mittelbare Schäden, Mangelfolgeschäden oder ausgefallene Unterrichtsstunden ist ausgeschlossen.<br />
                   (2) <strong>Haftungshöchstgrenze (Liability Cap):</strong> Die Gesamthaftung des Betreibers für alle Schadensfälle innerhalb eines Kalenderjahres aus oder im Zusammenhang mit diesem Vertrag – gleich aus welchem Rechtsgrund – ist auf die Summe der vom Kunden in den letzten zwölf (12) Monaten vor Eintritt des schädigenden Ereignisses tatsächlich an den Betreiber entrichteten Netto-Vergütung, maximal jedoch auf einen Höchstbetrag von 10.000,00 € (bzw. CHF 10'000.00), beschränkt. Vorstehende Begrenzung gilt nicht bei Vorsatz, grober Fahrlässigkeit, bei Personenschäden (Verletzung von Leben, Körper oder Gesundheit) sowie bei gesetzlich zwingender Haftung (z. B. Produkthaftungsgesetz).<br />
-                  (3) <strong>Datenverlust &amp; Mitverschuldensklausel (§ 254 BGB):</strong> Für den Verlust von Daten haftet der Betreiber der Höhe nach nur insoweit, als der Schaden auch bei ordnungsgemäßer und täglicher Datensicherung durch den Kunden bzw. über das integrierte Schulausweis- und Datenexportmodul entstanden wäre. Die Haftung ist auf den typischen Wiederherstellungsaufwand beschränkt.<br />
+                  (3) <strong>Datenverlust &amp; Mitverschuldensklausel (§ 254 BGB):</strong> Für den Verlust von Daten haftet der Betreiber der Höhe nach nur insoweit, als der Schaden auch bei ordnungsgemäßer und regelmäßiger Datensicherung durch den Kunden bzw. über das integrierte Schulausweis- und Datenexportmodul entstanden wäre. Die Haftung ist auf den typischen Wiederherstellungsaufwand beschränkt.<br />
                   (4) <strong>12-monatige Verjährungsverkürzung:</strong> Sämtliche Ansprüche des Kunden wegen Mängeln oder Pflichtverletzungen verjähren innerhalb von zwölf (12) Monaten ab dem gesetzlichen Verjährungsbeginn. Hiervon unberührt bleibt die gesetzliche Verjährungsfrist für Schadensersatzansprüche wegen Vorsatz, grober Fahrlässigkeit sowie Verletzung von Leben, Körper oder Gesundheit.<br />
                   (5) <strong>Rechtswahl &amp; Gerichtsstand:</strong> Es gilt das Recht der Bundesrepublik Deutschland unter Ausschluss des UN-Kaufrechts (CISG). Ist die Musikschule bzw. der Vertragspartner Kaufmann, eine juristische Person des öffentlichen Rechts oder ein öffentlich-rechtliches Sondervermögen, ist ausschließlicher Gerichtsstand für alle Streitigkeiten aus diesem Vertrag der Sitz des Betreibers (Lörrach / Rheinfelden).
                 </div>
@@ -764,8 +821,8 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
                   (2) <strong>Schuljahresübergang &amp; Schüler-Bestandsschutz:</strong> Bei einer Aktivierung im letzten Monat des Schuljahres ist der Zugang für diesen verbleibenden Restmonat vollständig kostenfrei zum Kennenlernen. Für das Folgeschuljahr gilt für Schüler und Eltern der Bestandsschutz der jeweiligen Musikschule: Solange der Vertrag zwischen der Musikschule und dem Betreiber ununterbrochen fortbesteht, bleibt der Jahresbeitrag für die Schüler dieser Musikschule preisstabil. Eine Erhöhung der Schülerbeiträge für Bestandskunden ist ausgeschlossen.<br />
                   (3) <strong>Mindestalter &amp; Bildschirmfreies Üben (Screenless Practice):</strong> Das Mindestalter für Schüler beträgt 6 Jahre. Zur Vermeidung unnötiger Bildschirmzeit bei Grundschulkindern unterstützt die Plattform das didaktische Prinzip des bildschirmfreien Übens („Screenless Practice“): Im Modus „Von Eltern geführt“ verbleibt das Endgerät bei den Eltern; Übezeiten am echten Instrument werden per 1-Klick-Quittierung verbucht.<br />
                   (4) <strong>Sorgfaltspflichten bei Zugangsdaten &amp; PINs:</strong> Eltern und Schüler sind verpflichtet, persönliche Zugangsdaten (QR-Ausweise, Eltern-PIN, persönliche Schüler-PIN) vor dem Zugriff unbefugter Dritter zu schützen. Bei Verlust des Schulausweises oder dem Verdacht einer missbräuchlichen Nutzung ist unverzüglich das Sekretariat der Musikschule zur Neugenerierung des Ausweis-Tokens zu informieren.<br />
-                  (5) <strong>Pädagogischer Haftungsausschluss (Keine Erfolgsgarantie):</strong> Der Betreiber stellt mit Campus-Groovelab rein didaktische Hilfsmittel (z. B. Übe-Timer, Metronom, Loopstation, Gamification-Elemente) zur Verfügung. Die pädagogische Unterrichtsgestaltung, der persönliche Lernerfolg, Noten, Prüfungsergebnisse sowie die tatsächliche musikalische Beherrschung des Instruments verbleiben in der ausschließlichen pädagogischen Verantwortung der Musikschule, der jeweiligen Lehrkraft und des Schülers. Eine Erfolgsgarantie oder Haftung für das Erreichen didaktischer Lernziele ist ausgeschlossen.<br />
-                  (6) <strong>Endgeräte- &amp; Sensorik-Klausel:</strong> Die ordnungsgemäße Funktion gerätespezifischer Features (z. B. Display-Down-Sensorik beim Übe-Timer) hängt von der Hard- und Softwarekonfiguration des verwendeten Endgeräts ab. Für sensorische Messungenauigkeiten oder Betriebssystemeinschränkungen des Endgeräts übernimmt der Betreiber keine Haftung.
+                  (5) <strong>Pädagogischer Haftungsausschluss (Kein geschuldeter Lernerfolg):</strong> Der Betreiber stellt mit Campus-Groovelab rein didaktische Hilfsmittel (z. B. Übe-Timer, Metronom, Loopstation, Gamification-Elemente) zur Verfügung. Die pädagogische Unterrichtsgestaltung, der persönliche Lernerfolg, Noten, Prüfungsergebnisse sowie die tatsächliche musikalische Beherrschung des Instruments verbleiben in der ausschließlichen pädagogischen Verantwortung der Musikschule, der jeweiligen Lehrkraft und des Schülers. Ein bestimmter Lernerfolg oder eine Haftung für das Erreichen didaktischer Lernziele wird nicht geschuldet und ist ausgeschlossen.<br />
+                  (6) <strong>Endgeräte- &amp; Sensorik-Klausel:</strong> Die ordnungsgemäße Funktion gerätespezifischer Features (z. B. Display-Down-Sensorik beim Übe-Timer via DeviceOrientation-Sensor) hängt von der Hard- und Softwarekonfiguration des verwendeten Endgeräts ab. Für sensorische Messungenauigkeiten oder Betriebssystemeinschränkungen des Endgeräts übernimmt der Betreiber keine Haftung.
                 </div>
 
                 <div>
@@ -864,6 +921,330 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
                   (*) Unzutreffendes streichen.
                 </div>
               </div>
+            </div>
+          )}
+
+          {activeTab === 'terminate' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+              <div>
+                <h4 style={{ margin: 0, fontSize: '1.08rem', fontWeight: 900, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <XCircle size={18} color="#ef4444" />
+                  Kündigung von Verträgen im elektronischen Geschäftsverkehr (§ 312k BGB)
+                </h4>
+                <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '4px' }}>
+                  Gesetzlicher Kündigungsservice für Verbraucher (Eltern). Die Abgabe der Kündigungserklärung ist hier jederzeit barrierefrei und ohne vorherigen Login möglich.
+                </div>
+              </div>
+
+              {cancelReceipt ? (
+                /* § 312k Abs. 4 BGB: Unverzügliche Bestätigung in Textform */
+                <div style={{
+                  background: '#f0fdf4',
+                  border: '1.5px solid #86efac',
+                  borderRadius: '16px',
+                  padding: '20px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '12px'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div style={{
+                      width: '36px', height: '36px', borderRadius: '10px',
+                      background: '#22c55e', color: '#ffffff',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      flexShrink: 0
+                    }}>
+                      <CheckCircle2 size={22} />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '0.98rem', fontWeight: 900, color: '#14532d' }}>
+                        Kündigung erfolgreich übermittelt &amp; registriert
+                      </div>
+                      <div style={{ fontSize: '0.76rem', color: '#166534', fontWeight: 650 }}>
+                        Gesetzliche Eingangsbestätigung gem. § 312k Abs. 4 BGB
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{
+                    background: '#ffffff',
+                    border: '1px solid #bbf7d0',
+                    borderRadius: '12px',
+                    padding: '14px',
+                    fontSize: '0.80rem',
+                    color: '#1e293b',
+                    lineHeight: 1.6
+                  }}>
+                    <div><strong>Kündigungs-Referenz:</strong> <span style={{ fontFamily: 'monospace', fontWeight: 800 }}>{cancelReceipt.reference}</span></div>
+                    <div><strong>Eingangszeitpunkt:</strong> {cancelReceipt.timestamp} Uhr</div>
+                    <div><strong>Vertragspartner:</strong> {cancelParentName} ({cancelEmail})</div>
+                    <div><strong>Schüler / Kind:</strong> {cancelStudentIdentifier}</div>
+                    {cancelSchoolName && <div><strong>Musikschule:</strong> {cancelSchoolName}</div>}
+                    <div><strong>Beendigungszeitpunkt:</strong> <span style={{ fontWeight: 800, color: '#15803d' }}>{cancelReceipt.effectiveDateText}</span></div>
+                  </div>
+
+                  <div style={{ fontSize: '0.74rem', color: '#166534', lineHeight: 1.45 }}>
+                    ✓ Ihre Erklärung ist rechtssicher in unserem System hinterlegt. Sie können dieses Dokument über die Schaltfläche „Drucken / PDF“ unten für Ihre Unterlagen sichern.
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCancelReceipt(null);
+                      setCancelParentName('');
+                      setCancelEmail('');
+                      setCancelStudentIdentifier('');
+                      setCancelSchoolName('');
+                      setCancelReason('');
+                    }}
+                    style={{
+                      alignSelf: 'flex-start',
+                      background: '#ffffff',
+                      border: '1px solid #cbd5e1',
+                      borderRadius: '8px',
+                      padding: '6px 12px',
+                      fontSize: '0.74rem',
+                      fontWeight: 750,
+                      color: '#475569',
+                      cursor: 'pointer',
+                      marginTop: '4px'
+                    }}
+                  >
+                    Neues Formular aufrufen
+                  </button>
+                </div>
+              ) : (
+                /* § 312k Abs. 2 BGB: 2-Stufen Kündigungsformular */
+                <form
+                  onSubmit={async (e) => {
+                    e.preventDefault();
+                    if (!cancelParentName.trim() || !cancelEmail.trim() || !cancelStudentIdentifier.trim()) {
+                      alert('Bitte füllen Sie alle erforderlichen Felder aus.');
+                      return;
+                    }
+                    setCancelSubmitting(true);
+                    try {
+                      const now = new Date();
+                      const timestampStr = now.toLocaleString('de-DE', { dateStyle: 'medium', timeStyle: 'short' });
+                      const refCode = `KDG-${now.getFullYear()}-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
+                      const effectiveDateText = cancelType === 'extraordinary' 
+                        ? 'Sofort (Außerordentliche Kündigung)' 
+                        : 'Zum regulären Schuljahresende / nächstmöglichen Termin';
+
+                      try {
+                        await logSecurityEvent({
+                          action: 'CONSUMER_CONTRACT_CANCELLATION_SUBMITTED',
+                          metadata: {
+                            reference: refCode,
+                            parent_name: cancelParentName,
+                            email: cancelEmail,
+                            student_identifier: cancelStudentIdentifier,
+                            school_name: cancelSchoolName,
+                            cancellation_type: cancelType,
+                            reason: cancelReason || undefined,
+                            timestamp: now.toISOString()
+                          }
+                        });
+                      } catch (logErr) {
+                        console.warn('Cancellation log warning:', logErr);
+                      }
+
+                      setCancelReceipt({
+                        reference: refCode,
+                        timestamp: timestampStr,
+                        effectiveDateText
+                      });
+                    } finally {
+                      setCancelSubmitting(false);
+                    }
+                  }}
+                  style={{
+                    background: '#f8fafc',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '16px',
+                    padding: '20px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '14px'
+                  }}
+                >
+                  <div style={{ fontSize: '0.78rem', color: '#475569', lineHeight: 1.5 }}>
+                    Bitte geben Sie nachfolgend die Daten zur eindeutigen Zuordnung des Vertragsverhältnisses an. Nach Betätigung der Schaltfläche <strong>„Jetzt kündigen“</strong> erhalten Sie unverzüglich eine Eingangsbestätigung in Textform.
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#0f172a' }}>
+                        Name des Vertragspartners (Elternteil) *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="z. B. Dr. Sabine Muster"
+                        value={cancelParentName}
+                        onChange={(e) => setCancelParentName(e.target.value)}
+                        style={{
+                          padding: '9px 12px',
+                          borderRadius: '10px',
+                          border: '1px solid #cbd5e1',
+                          background: '#ffffff',
+                          fontSize: '0.82rem',
+                          fontWeight: 600,
+                          outline: 'none'
+                        }}
+                      />
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#0f172a' }}>
+                        E-Mail-Adresse für Bestätigung *
+                      </label>
+                      <input
+                        type="email"
+                        required
+                        placeholder="muster@beispiel.de"
+                        value={cancelEmail}
+                        onChange={(e) => setCancelEmail(e.target.value)}
+                        style={{
+                          padding: '9px 12px',
+                          borderRadius: '10px',
+                          border: '1px solid #cbd5e1',
+                          background: '#ffffff',
+                          fontSize: '0.82rem',
+                          fontWeight: 600,
+                          outline: 'none'
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#0f172a' }}>
+                        Name des Schülers / Kindes oder ID *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="z. B. Max Muster oder CG-XXXX"
+                        value={cancelStudentIdentifier}
+                        onChange={(e) => setCancelStudentIdentifier(e.target.value)}
+                        style={{
+                          padding: '9px 12px',
+                          borderRadius: '10px',
+                          border: '1px solid #cbd5e1',
+                          background: '#ffffff',
+                          fontSize: '0.82rem',
+                          fontWeight: 600,
+                          outline: 'none'
+                        }}
+                      />
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#0f172a' }}>
+                        Musikschule (optional)
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="z. B. Musikschule Rheinfelden"
+                        value={cancelSchoolName}
+                        onChange={(e) => setCancelSchoolName(e.target.value)}
+                        style={{
+                          padding: '9px 12px',
+                          borderRadius: '10px',
+                          border: '1px solid #cbd5e1',
+                          background: '#ffffff',
+                          fontSize: '0.82rem',
+                          fontWeight: 600,
+                          outline: 'none'
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#0f172a' }}>
+                      Art der Kündigung (§ 312k Abs. 2 Nr. 1 Buchst. a BGB)
+                    </label>
+                    <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.76rem', color: '#334155', cursor: 'pointer' }}>
+                        <input
+                          type="radio"
+                          name="cancelType"
+                          checked={cancelType === 'regular'}
+                          onChange={() => setCancelType('regular')}
+                          style={{ accentColor: '#0f172a' }}
+                        />
+                        <span>Ordentliche Kündigung (zum Schuljahresende / nächstmöglicher Termin)</span>
+                      </label>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.76rem', color: '#334155', cursor: 'pointer' }}>
+                        <input
+                          type="radio"
+                          name="cancelType"
+                          checked={cancelType === 'extraordinary'}
+                          onChange={() => setCancelType('extraordinary')}
+                          style={{ accentColor: '#0f172a' }}
+                        />
+                        <span>Außerordentliche fristlose Kündigung (§ 314 BGB)</span>
+                      </label>
+                    </div>
+                  </div>
+
+                  {cancelType === 'extraordinary' && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#0f172a' }}>
+                        Kündigungsgrund (bei außerordentlicher Kündigung erforderlich)
+                      </label>
+                      <textarea
+                        required
+                        placeholder="Bitte erläutern Sie den wichtigen Grund..."
+                        value={cancelReason}
+                        onChange={(e) => setCancelReason(e.target.value)}
+                        style={{
+                          padding: '9px 12px',
+                          borderRadius: '10px',
+                          border: '1px solid #cbd5e1',
+                          background: '#ffffff',
+                          fontSize: '0.80rem',
+                          minHeight: '60px',
+                          outline: 'none',
+                          resize: 'vertical'
+                        }}
+                      />
+                    </div>
+                  )}
+
+                  {/* Gesetzliche Schaltfläche gem. § 312k Abs. 2 S. 3 BGB */}
+                  <div style={{ marginTop: '6px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <button
+                      type="submit"
+                      disabled={cancelSubmitting}
+                      style={{
+                        background: cancelSubmitting ? '#94a3b8' : 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                        color: '#ffffff',
+                        border: 'none',
+                        borderRadius: '12px',
+                        padding: '12px 20px',
+                        fontSize: '0.88rem',
+                        fontWeight: 900,
+                        cursor: cancelSubmitting ? 'default' : 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '8px',
+                        boxShadow: '0 4px 14px rgba(239, 68, 68, 0.3)',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      <span>{cancelSubmitting ? 'Wird übermittelt...' : 'Jetzt kündigen'}</span>
+                    </button>
+                    <div style={{ fontSize: '0.66rem', color: '#94a3b8', textAlign: 'center' }}>
+                      Gesetzlich vorgeschriebene Schaltfläche gem. § 312k Abs. 2 Nr. 2 BGB
+                    </div>
+                  </div>
+                </form>
+              )}
             </div>
           )}
         </div>

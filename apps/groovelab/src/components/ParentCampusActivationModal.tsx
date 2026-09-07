@@ -13,6 +13,8 @@ import {
 import { supabase } from '../lib/supabase';
 import { formatSingleStudentAnonymized } from '../utils/nameHelper';
 import { logSecurityEvent } from '../services/auditLogService';
+import { LegalTextModal } from './LegalTextModal';
+import { generateLocalQrDataUrl } from '../utils/localQrGenerator';
 
 export interface ParentCampusActivationModalProps {
   student: {
@@ -59,6 +61,7 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
   }
 
   const [agreeWithdrawalWaiver, setAgreeWithdrawalWaiver] = useState(true);
+  const [legalModalTab, setLegalModalTab] = useState<'terms' | 'privacy' | 'impressum' | 'cancellation' | null>(null);
   const [linkedSiblings, setLinkedSiblings] = useState<LinkedSibling[]>(() => {
     if (typeof window === 'undefined') return [];
     try {
@@ -178,6 +181,13 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
       });
 
       setSubmittedSuccess(true);
+
+      // § 312f Abs. 2 BGB: Automatischer Download des offiziellen Vertrags- & Zahlungsbelegs (Dauerhafter Datenträger)
+      try {
+        handleDownloadPdfVoucher();
+      } catch (pdfErr) {
+        console.warn('Automatische PDF-Beleg-Erstellung:', pdfErr);
+      }
       if (onPaymentSubmitted) onPaymentSubmitted();
       setTimeout(() => {
         onClose();
@@ -284,6 +294,39 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
       doc.text(`3. Geben Sie als Verwendungszweck exakt ${referenceCode} an.`, 22, 192);
       doc.text('4. Sobald der Zahlungseingang verbucht ist, wird der Campus-Zugang vollautomatisch freigeschaltet.', 22, 199);
 
+      // Embed local EPC-GiroCode QR Code for instant mobile banking scan
+      try {
+        const qrDataUrl = await generateLocalQrDataUrl(epcPayload, 200);
+        if (qrDataUrl) {
+          doc.addImage(qrDataUrl, 'PNG', 145, 86, 36, 36);
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(6);
+          doc.setTextColor(100, 116, 139);
+          doc.text('EPC-GiroCode', 151, 126);
+        }
+      } catch (e) {}
+
+      // GoBD Cryptographic Seal (§§ 146, 147 AO)
+      let sha256Seal = '';
+      try {
+        const rawPayload = `${referenceCode}:${student.id}:${totalAmountStr}:${effectiveIban}:${periodDescription}`;
+        const hashBuffer = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(rawPayload));
+        sha256Seal = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+      } catch (e) {
+        sha256Seal = referenceCode;
+      }
+
+      doc.setFont('courier', 'normal');
+      doc.setFontSize(6.8);
+      doc.setTextColor(100, 116, 139);
+      doc.text(`Revisionssicheres GoBD-Prüfsiegel (§§ 146, 147 AO): SHA256-${sha256Seal.slice(0, 32)}...`, 22, 248);
+
+      // Statutory cancellation note
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(6.8);
+      doc.setTextColor(100, 116, 139);
+      doc.text('Gesetzliches Widerrufsrecht (§ 312d BGB / Art. 246a EGBGB): 14 Tage ab Vertragsschluss, im 1. Schnuppermonat jederzeit kostenfrei widerrufbar.', 22, 254);
+
       // Legal note
       doc.setFontSize(7.5);
       doc.setTextColor(148, 163, 184);
@@ -310,20 +353,25 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
       fontFamily: '"Outfit", -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
     }} className="animate-fade-in">
       
-      {/* 24px Apple Squircle Modal Stage */}
-      <div style={{
-        background: '#ffffff',
-        borderRadius: '24px',
-        width: '100%',
-        maxWidth: '560px',
-        maxHeight: '92vh',
-        overflowY: 'auto',
-        boxShadow: '0 20px 50px -10px rgba(0, 0, 0, 0.3)',
-        border: '1px solid rgba(255, 255, 255, 0.8)',
-        display: 'flex',
-        flexDirection: 'column',
-        position: 'relative'
-      }}>
+      {/* 24px Apple Squircle Modal Stage (BFSG & WCAG 2.1 AA Compliant) */}
+      <div 
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="parent-activation-title"
+        style={{
+          background: '#ffffff',
+          borderRadius: '24px',
+          width: '100%',
+          maxWidth: '560px',
+          maxHeight: '92vh',
+          overflowY: 'auto',
+          boxShadow: '0 20px 50px -10px rgba(0, 0, 0, 0.3)',
+          border: '1px solid rgba(255, 255, 255, 0.8)',
+          display: 'flex',
+          flexDirection: 'column',
+          position: 'relative'
+        }}
+      >
         
         {/* Modal Header */}
         <div style={{
@@ -345,21 +393,23 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
               alignItems: 'center',
               justifyContent: 'center',
               boxShadow: '0 6px 16px rgba(52, 168, 83, 0.3)'
-            }}>
+            }} aria-hidden="true">
               <QrCode size={22} />
             </div>
             <div>
               <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#059669', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                 Elternbereich • Direktaktivierung
               </span>
-              <h3 style={{ fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', margin: 0, letterSpacing: '-0.02em' }}>
+              <h3 id="parent-activation-title" style={{ fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', margin: 0, letterSpacing: '-0.02em' }}>
                 Campus-Modul aktivieren
               </h3>
             </div>
           </div>
 
           <button
+            type="button"
             onClick={onClose}
+            aria-label="Dialog schließen"
             style={{
               background: '#f1f5f9',
               border: 'none',
@@ -765,14 +815,57 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
               fontWeight: 700
             }}>
               <CheckCircle2 size={20} color="#10b981" />
-              <span>Überweisung registriert! Sobald die Buchung eingeht, schaltet sich die App automatisch frei.</span>
+              <div>
+                <div>Überweisung registriert! Sobald die Buchung eingeht, schaltet sich die App automatisch frei.</div>
+                <div style={{ fontSize: '0.74rem', color: '#047857', fontWeight: 600, marginTop: '2px' }}>
+                  ✓ Ihr offizieller Vertrags- &amp; Überweisungsbeleg (PDF gem. § 312f BGB) wurde automatisch heruntergeladen.
+                </div>
+              </div>
             </div>
           )}
 
           {/* Action CTAs */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '4px' }}>
             
-            {/* Legal Consent Checkbox for B2C (§§ 312j, 356 Abs. 5 BGB) */}
+            {/* § 312j Abs. 2 BGB Wesentliche Vertragsmerkmale & Preistransparenz */}
+            {!isThirdOrMoreChild && (
+              <div style={{
+                background: '#f8fafc',
+                border: '1px solid #e2e8f0',
+                borderRadius: '12px',
+                padding: '12px 14px',
+                fontSize: '0.78rem',
+                color: '#334155',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '4px'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontWeight: 700, color: '#0f172a' }}>
+                    1. Schnuppermonat ({schoolYearCalc.freeMonthName}):
+                  </span>
+                  <span style={{ fontWeight: 800, color: '#10b981' }}>{freeMonthDisplay} (Inklusive)</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontWeight: 700, color: '#0f172a' }}>
+                    Gesamtpreis ({periodDescription}):
+                  </span>
+                  <div style={{ textAlign: 'right' }}>
+                    <span style={{ fontWeight: 900, color: '#0f172a', fontSize: '0.86rem' }}>
+                      {isChf ? `CHF ${totalAmountStr}` : `${totalAmountStr} €`} einmalig
+                    </span>
+                    <span style={{ fontSize: '0.64rem', color: '#64748b', fontWeight: 600, display: 'block' }}>
+                      {taxDisclaimer}
+                    </span>
+                  </div>
+                </div>
+                <div style={{ fontSize: '0.70rem', color: '#64748b', marginTop: '2px', lineHeight: '1.4' }}>
+                  <strong>Transparenz-Garantie:</strong> Feste Schuljahresnutzung • Kein Abonnement • Keine automatische Verlängerung • Gesetzlicher Kündigungsbutton &amp; Widerruf jederzeit erreichbar (§ 312k BGB) • Endet automatisch zum Schuljahresende
+                </div>
+              </div>
+            )}
+
+            {/* Legal Consent Checkbox for B2C (§§ 312j, 356 Abs. 5 BGB & Minderjährigenrecht §§ 106-108 BGB) */}
             <label style={{
               display: 'flex',
               alignItems: 'flex-start',
@@ -790,9 +883,65 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
                 style={{ accentColor: '#10b981', marginTop: '2px', cursor: 'pointer' }}
               />
               <span>
-                Ich stimme den <strong>AGB</strong> zu und wünsche den sofortigen Beginn des kostenfreien Schnuppermonats ({schoolYearCalc.freeMonthName}) vor Ablauf der 14-tägigen Widerrufsfrist.
+                Ich bestätige als <strong>gesetzlicher Vertreter (Elternteil)</strong> meine Volljährigkeit und Geschäftsfähigkeit für die Autorisierung dieses Schuljahres-Beitrags. Ich stimme den{' '}
+                <button
+                  type="button"
+                  onClick={(e) => { e.preventDefault(); setLegalModalTab('terms'); }}
+                  style={{ background: 'none', border: 'none', padding: 0, color: '#0f172a', fontWeight: 800, textDecoration: 'underline', cursor: 'pointer', fontSize: 'inherit' }}
+                >
+                  AGB
+                </button>
+                {' '}und der{' '}
+                <button
+                  type="button"
+                  onClick={(e) => { e.preventDefault(); setLegalModalTab('privacy'); }}
+                  style={{ background: 'none', border: 'none', padding: 0, color: '#0f172a', fontWeight: 800, textDecoration: 'underline', cursor: 'pointer', fontSize: 'inherit' }}
+                >
+                  Datenschutzerklärung
+                </button>
+                {' '}zu. Ich verlange ausdrücklich, dass mit der Bereitstellung der Plattform vor Ablauf der 14-tägigen Widerrufsfrist begonnen wird. Mir ist bekannt, dass mein Widerrufsrecht bei vollständiger Bereitstellung erlischt (§ 356 Abs. 5 BGB).
               </span>
             </label>
+
+            {/* Statutory 14-day Right of Withdrawal notice (§ 312d BGB / Art. 246a § 1 Abs. 2 EGBGB) */}
+            <div style={{
+              fontSize: '0.72rem',
+              color: '#475569',
+              background: '#f8fafc',
+              padding: '10px 12px',
+              borderRadius: '12px',
+              border: '1px solid #e2e8f0',
+              lineHeight: '1.45',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '4px'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontWeight: 800, color: '#0f172a' }}>🛡️ Gesetzliches Widerrufsrecht</span>
+                <span style={{ fontSize: '0.66rem', color: '#059669', background: '#ecfdf5', padding: '1px 6px', borderRadius: '6px', fontWeight: 700 }}>
+                  § 312d BGB • Art. 246a EGBGB
+                </span>
+              </div>
+              <div>
+                Es gilt das gesetzliche 14-tägige Widerrufsrecht für Verbraucher (im 1. Schnuppermonat jederzeit vollständig kostenfrei ohne Angabe von Gründen widerrufbar). Hier einsehen:{' '}
+                <button
+                  type="button"
+                  onClick={() => setLegalModalTab('cancellation')}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    padding: 0,
+                    color: '#10b981',
+                    fontWeight: 800,
+                    textDecoration: 'underline',
+                    cursor: 'pointer',
+                    fontSize: 'inherit'
+                  }}
+                >
+                  Widerrufsbelehrung &amp; Muster-Widerrufsformular
+                </button>.
+              </div>
+            </div>
 
             {/* Primary confirmation CTA with strict § 312j BGB Compliance */}
             <button
@@ -820,7 +969,13 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
               onMouseOver={(e) => { if (!submittedSuccess && agreeWithdrawalWaiver) e.currentTarget.style.transform = 'translateY(-1px)'; }}
               onMouseOut={(e) => { e.currentTarget.style.transform = 'translateY(0)'; }}
             >
-              {isSubmitting ? 'Wird freigeschaltet...' : submittedSuccess ? '✓ Überweisung gemeldet' : `${isThirdOrMoreChild ? '🎁 Kostenlosen 3. Kind Zugang jetzt freischalten ➔' : `${schoolYearCalc.freeMonthName} gratis testen & zahlungspflichtig bestellen ➔`}`}
+              {isSubmitting 
+                ? 'Wird freigeschaltet...' 
+                : submittedSuccess 
+                  ? '✓ Überweisung gemeldet' 
+                  : isThirdOrMoreChild 
+                    ? 'Kostenlos freischalten' 
+                    : 'Zahlungspflichtig bestellen'}
             </button>
 
             {/* 2-Column secondary tools */}
@@ -922,6 +1077,13 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
 
         </div>
       </div>
+
+      {/* Embedded Legal Text & Cancellation Modal */}
+      <LegalTextModal
+        isOpen={!!legalModalTab}
+        onClose={() => setLegalModalTab(null)}
+        initialTab={legalModalTab || 'cancellation'}
+      />
     </div>
   );
 };

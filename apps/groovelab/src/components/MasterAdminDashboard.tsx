@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import QRCode from 'react-qr-code';
+import { generateLocalQrDataUrl } from '../utils/localQrGenerator';
 import { supabase } from '../lib/supabase';
 import { 
   Shield, ShieldAlert, Plus, Copy, Check, Trash2, Users, Monitor, 
@@ -1997,10 +1998,11 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
   };
 
   // 🖨️ Helper: Print Kiosk Master Badge PDF
-  const handlePrintMasterBadge = () => {
+  const handlePrintMasterBadge = async () => {
     const win = window.open('', '_blank');
     if (!win) return;
     const qrData = masterKioskToken || adminUser?.qr_token || 'ROOT_MASTER_ACCESS';
+    const localQrDataUrl = await generateLocalQrDataUrl(qrData, 200);
     win.document.write(`
       <!DOCTYPE html>
       <html>
@@ -2024,7 +2026,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
             <div class="title">Master Admin Pass</div>
             <div class="role-pill">🛡️ Root Superuser &amp; Kiosk Authority</div>
             <div class="qr-box">
-              <img src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${qrData}" width="180" height="180" alt="QR" />
+              <img src="${localQrDataUrl}" width="180" height="180" alt="QR" />
             </div>
             <div class="token-str">TOKEN: ${qrData}</div>
             <div class="footer">
@@ -7540,9 +7542,9 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                     </p>
 
                     <div style={{ padding: '14px', background: '#ffffff', borderRadius: '16px', border: '2px solid #16a34a' }}>
-                      <img 
-                        src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(getEpcGiroCodePayload())}`}
-                        alt="EPC GiroCode"
+                      <QRCode 
+                        value={getEpcGiroCodePayload()}
+                        size={150}
                         style={{ width: '150px', height: '150px', display: 'block' }}
                       />
                     </div>

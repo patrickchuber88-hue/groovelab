@@ -27,6 +27,7 @@ import {
 import { storeBlob, getBlob, deleteBlob } from '../../utils/blobStorage';
 import { broadcastPracticeUpdate } from '../../utils/studentProgressEngine';
 import { JuniorAudioBiographyWizard } from './JuniorAudioBiographyWizard';
+import { acquireAudioStream } from '../../services/audioPermissionService';
 import JSZip from 'jszip';
 
 
@@ -835,10 +836,8 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
   const [recordSeconds, setRecordSeconds] = useState<number>(0);
   const [isProcessingMastering, setIsProcessingMastering] = useState<boolean>(false);
   const [activeUploadModalMilestone, setActiveUploadModalMilestone] = useState<MilestoneData | null>(null);
-  const [uploadMode, setUploadMode] = useState<'mic' | 'file'>('mic');
   const [selectedProfile, setSelectedProfile] = useState<MasteringProfile>('acoustic_audiophile');
   const isDrumPadMode = selectedProfile === 'drums_percussion';
-  const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [tempSongTitle, setTempSongTitle] = useState<string>('');
   const [tempArtist, setTempArtist] = useState<string>('');
   const [tempNote, setTempNote] = useState<string>('');
@@ -991,7 +990,6 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
   const audioChunksRef = useRef<Blob[]>([]);
   const timerIntervalRef = useRef<any>(null);
   const countInIntervalRef = useRef<any>(null);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // 🛡️ Audio-Tresor Storage Add-on Access Gate
   const [tresorAccessLoading, setTresorAccessLoading] = useState<boolean>(true);
@@ -2108,9 +2106,7 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
     }
     setActiveUploadModalMilestone(ms);
     setRecordingPlaylistId(null);
-    setUploadMode('mic');
     setSelectedProfile('acoustic_audiophile');
-    setUploadFile(null);
     setTempSongTitle(ms.title || '');
     setTempArtist(student?.first_name || 'Eigenes Spiel');
     setTempNote(ms.personalNote || '');
@@ -2373,7 +2369,7 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
   const triggerRecordingCountIn = async () => {
     try {
       // 1. Mikrofon-Berechtigung ZUERST anfordern mit audiophilen Settings
-      const stream = await navigator.mediaDevices.getUserMedia({ 
+      const stream = await acquireAudioStream({ 
         audio: {
           echoCancellation: false,
           noiseSuppression: false,
@@ -2520,24 +2516,6 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
       }
     }
     // HINWEIS: activeMicStreamRef.current wird sicher in recorder.onstop gestoppt!
-  };
-
-  // File Upload Handling
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      if (!file.type.startsWith('audio/') && !file.name.match(/\.(mp3|wav|m4a|aac|webm|ogg)$/i)) {
-        alert('Bitte wähle eine gültige Audiodatei (mp3, wav, m4a, aac, webm).');
-        return;
-      }
-      setUploadFile(file);
-    }
-  };
-
-  const commitFileUpload = async () => {
-    if (!uploadFile) return;
-    setReverbWetSlider(8);
-    await processDualMasteringForModal(uploadFile, 0, selectedProfile, 8);
   };
 
   /**
@@ -2964,7 +2942,6 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
         setPendingDualResult(null);
         setRecordingMilestoneId(null);
         setRecordSeconds(0);
-        setUploadFile(null);
         setSaveProgress(null);
       }, 500);
     } 
@@ -3005,7 +2982,6 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
         setPendingDualResult(null);
         setRecordingMilestoneId(null);
         setRecordSeconds(0);
-        setUploadFile(null);
         setSaveProgress(null);
       }, 500);
     } else {
@@ -3013,7 +2989,6 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
         setPendingDualResult(null);
         setRecordingMilestoneId(null);
         setRecordSeconds(0);
-        setUploadFile(null);
         setSaveProgress(null);
       }, 500);
     }
@@ -9800,58 +9775,9 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
               </button>
             </div>
 
-            {/* Mode Switcher (Shown during capture) */}
+            {/* Instrument & Source Profile Selector (Shown during capture) */}
             {!isProcessingMastering && !pendingDualResult && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                <div style={{ display: 'flex', background: isLight ? '#f1f5f9' : 'rgba(0, 0, 0, 0.35)', borderRadius: '12px', padding: '4px', border: `1px solid ${isLight ? '#cbd5e1' : 'rgba(255,255,255,0.08)'}` }}>
-                  <button
-                    type="button"
-                    onClick={() => setUploadMode('mic')}
-                    style={{
-                      flex: 1,
-                      padding: '10px',
-                      borderRadius: '10px',
-                      border: 'none',
-                      background: uploadMode === 'mic' ? (isLight ? '#ffffff' : 'rgba(16, 185, 129, 0.25)') : 'transparent',
-                      color: uploadMode === 'mic' ? (isLight ? '#10b981' : '#34d399') : colors.textSecondary,
-                      fontWeight: 900,
-                      fontSize: '0.82rem',
-                      cursor: 'pointer',
-                      boxShadow: uploadMode === 'mic' && isLight ? '0 2px 6px rgba(0,0,0,0.08)' : 'none',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '6px'
-                    }}
-                  >
-                    <Mic size={15} />
-                    <span>Live-Mikrofon</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setUploadMode('file')}
-                    style={{
-                      flex: 1,
-                      padding: '10px',
-                      borderRadius: '10px',
-                      border: 'none',
-                      background: uploadMode === 'file' ? (isLight ? '#ffffff' : 'rgba(16, 185, 129, 0.25)') : 'transparent',
-                      color: uploadMode === 'file' ? (isLight ? '#10b981' : '#34d399') : colors.textSecondary,
-                      fontWeight: 900,
-                      fontSize: '0.82rem',
-                      cursor: 'pointer',
-                      boxShadow: uploadMode === 'file' && isLight ? '0 2px 6px rgba(0,0,0,0.08)' : 'none',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '6px'
-                    }}
-                  >
-                    <Upload size={15} />
-                    <span>Datei-Upload</span>
-                  </button>
-                </div>
-
                 {/* 🎛️ Audiophile Instrument & Source Profile Selector */}
                 <div style={{
                   display: 'grid',
@@ -10522,11 +10448,10 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                 </div>
               </div>
             ) : (
-              /* Capture Content (Live Mic or File Upload) */
+              /* Capture Content (Pure Live Mic Recording Stage) */
               <>
                 {/* Content: Live Mic Recording */}
-                {uploadMode === 'mic' ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', padding: '12px 0' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', padding: '12px 0' }}>
 
                     {countDown !== null ? (
                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
@@ -10655,63 +10580,6 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                       </>
                     )}
                   </div>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', padding: '10px 0' }}>
-                    <input
-                      type="file"
-                      ref={fileInputRef}
-                      onChange={handleFileSelect}
-                      accept="audio/*,.mp3,.wav,.m4a,.aac,.webm"
-                      style={{ display: 'none' }}
-                    />
-                    <div
-                      onClick={() => fileInputRef.current?.click()}
-                      style={{
-                        border: '2px dashed #10b981',
-                        borderRadius: '18px',
-                        padding: '24px',
-                        textAlign: 'center',
-                        background: isLight ? '#f0fdf4' : 'rgba(16, 185, 129, 0.08)',
-                        cursor: 'pointer'
-                      }}
-                      className="hover-scale"
-                    >
-                      <Upload size={32} color="#10b981" style={{ margin: '0 auto 8px auto' }} />
-                      <span style={{ fontSize: '0.9rem', fontWeight: 900, color: colors.textPrimary, display: 'block' }}>
-                        {uploadFile ? uploadFile.name : 'Audiodatei hier ablegen oder auswählen'}
-                      </span>
-                      <span style={{ fontSize: '0.76rem', color: colors.textSecondary, marginTop: '4px', display: 'block', fontWeight: 600 }}>
-                        Unterstützt MP3, WAV, M4A, AAC aus GarageBand, Logic oder Sprachmemos (max. 25 MB)
-                      </span>
-                    </div>
-
-                    {uploadFile && (
-                      <button
-                        type="button"
-                        onClick={commitFileUpload}
-                        style={{
-                          width: '100%',
-                          padding: '12px',
-                          borderRadius: '100px',
-                          border: 'none',
-                          background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                          color: 'white',
-                          fontWeight: 900,
-                          fontSize: '0.86rem',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '8px'
-                        }}
-                        className="hover-scale"
-                      >
-                        <Check size={16} strokeWidth={3} />
-                        <span>Audiodatei importieren & mastern</span>
-                      </button>
-                    )}
-                  </div>
-                )}
 
                 {/* Streamlined Mastering DSP Info Badge */}
                 <div style={{

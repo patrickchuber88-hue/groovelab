@@ -3,7 +3,7 @@ import {
   X, Mic, Square, Play, Pause, RotateCcw, Check, Loader2, Send, FileText, Plus, ChevronRight, Trash2, Zap, Sparkles, ArrowLeft, Music, Sliders, Volume2, VolumeX, Activity, Tag, Clock
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
-import { acquireAudioStream, releaseAudioStream } from '../../services/audioPermissionService';
+import { acquireAudioStream, releaseAudioStream, requestMicrophonePermissionOnce } from '../../services/audioPermissionService';
 import { processPureRawBlob } from '../../utils/audioMasteringEngine';
 import { capitalizeFirstLetter, formatSingleStudentAnonymized } from '../../utils/nameHelper';
 import { saveOfflineAudioRecord } from '../../utils/offlineAudioVault';
@@ -337,9 +337,13 @@ export const TagesplanQuickAudioModal: React.FC<TagesplanQuickAudioModalProps> =
   const studentDisplayName = formatSingleStudentAnonymized(studentFirstName, studentLastName, student.id, true);
 
   // 1. DICTATION LOGIC
-  const handleStartDictation = () => {
+  const handleStartDictation = async () => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechRecognition) return;
+
+    // 🛡️ Centralized One-Time Permission Gatekeeper (Unified Session Authorization)
+    const hasPermission = await requestMicrophonePermissionOnce();
+    if (!hasPermission) return;
 
     try {
       stopHardware();
@@ -358,7 +362,12 @@ export const TagesplanQuickAudioModal: React.FC<TagesplanQuickAudioModalProps> =
         }
       };
 
-      recognition.onerror = () => setIsDictating(false);
+      recognition.onerror = (err: any) => {
+        if (err?.error === 'not-allowed') {
+          localStorage.removeItem('campus_microphone_permission_granted');
+        }
+        setIsDictating(false);
+      };
       recognition.onend = () => setIsDictating(false);
 
       recognitionRef.current = recognition;

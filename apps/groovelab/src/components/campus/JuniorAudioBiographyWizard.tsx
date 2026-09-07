@@ -14,6 +14,7 @@ import {
 } from '../../utils/audioMasteringEngine';
 import { storeBlob } from '../../utils/blobStorage';
 import { MilestoneData, CustomPlaylist, CustomPlaylistTrack } from './AudioBiographyView';
+import { acquireAudioStream, STUDIO_AUDIO_CONSTRAINTS } from '../../services/audioPermissionService';
 
 interface JuniorAudioBiographyWizardProps {
   isOpen: boolean;
@@ -222,35 +223,12 @@ export const JuniorAudioBiographyWizard: React.FC<JuniorAudioBiographyWizardProp
     }
   };
 
-  // Start Count-In
-  const startRecordingCountIn = () => {
-    setIsCountingIn(true);
-    setCountInNumber(3);
-
-    countInIntervalRef.current = setInterval(() => {
-      setCountInNumber(prev => {
-        if (prev <= 1) {
-          clearInterval(countInIntervalRef.current);
-          setIsCountingIn(false);
-          startLiveRecording();
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-  };
-
-  // Start Live Audio Stream
-  const startLiveRecording = async () => {
+  // Start Count-In with Pre-Warmed Stream
+  const startRecordingCountIn = async () => {
     try {
       audioChunksRef.current = [];
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: false,
-          noiseSuppression: false,
-          autoGainControl: false
-        }
-      });
+      // 🌟 1. Request microphone permission FIRST before starting any visual countdown
+      const stream = await acquireAudioStream({ audio: STUDIO_AUDIO_CONSTRAINTS });
       streamRef.current = stream;
 
       const recorder = new MediaRecorder(stream);
@@ -267,14 +245,35 @@ export const JuniorAudioBiographyWizard: React.FC<JuniorAudioBiographyWizardProp
         await handleAudioProcessing(rawBlob);
       };
 
-      recorder.start(250);
-      setIsRecording(true);
-      setRecordSeconds(0);
+      // 🌟 2. Start 3-2-1 Countdown
+      setIsCountingIn(true);
+      setCountInNumber(3);
 
-      timerIntervalRef.current = setInterval(() => {
-        setRecordSeconds(s => s + 1);
+      countInIntervalRef.current = setInterval(() => {
+        setCountInNumber(prev => {
+          if (prev <= 1) {
+            clearInterval(countInIntervalRef.current);
+            setIsCountingIn(false);
+
+            // 🌟 3. Start recording precisely at 0 with zero latency!
+            try {
+              recorder.start(250);
+              setIsRecording(true);
+              setRecordSeconds(0);
+
+              timerIntervalRef.current = setInterval(() => {
+                setRecordSeconds(s => s + 1);
+              }, 1000);
+            } catch (startErr) {
+              console.error('Failed to start recorder:', startErr);
+            }
+            return 0;
+          }
+          return prev - 1;
+        });
       }, 1000);
     } catch (err) {
+      setIsCountingIn(false);
       alert('Mikrofon-Zugriff nicht möglich. Bitte erlaube den Mikrofon-Zugriff im Browser.');
     }
   };

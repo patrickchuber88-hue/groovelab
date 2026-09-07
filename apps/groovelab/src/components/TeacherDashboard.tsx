@@ -211,6 +211,18 @@ const getISOWeekRaw = (dateInput?: string | Date, lessonDay: number = 1): string
   return `${d.getUTCFullYear()}-W${String(weekNo).padStart(2, '0')}`;
 };
 
+const getItemWeek = (item: { topic_name: string; updated_at?: string }): string => {
+  if (item.topic_name?.startsWith('Hausaufgabe KW ')) {
+    const parts = item.topic_name.split('Hausaufgabe KW ');
+    const kwNum = parts[1]?.trim();
+    if (kwNum) {
+      const year = item.updated_at ? new Date(item.updated_at).getFullYear() : new Date().getFullYear();
+      return `${year}-W${kwNum.padStart(2, '0')}`;
+    }
+  }
+  return item.updated_at ? getISOWeekRaw(item.updated_at, 1) : '';
+};
+
 const getNormalizedRequiredInsts = (insts: Record<string, number> | null | undefined) => {
   const normalized: Record<string, number> = {};
   if (!insts) return normalized;
@@ -1885,7 +1897,7 @@ export function TeacherDashboard({
       }
 
       // Add available notice to system alerts
-      const alertMessage = `🟢 WIEDER IM DIENST: Lehrkraft ${formatTeacherFullName(profile)} hat die Abwesenheit beendet und steht wieder regulär zur Verfügung.`;
+      const alertMessage = `🟢 WIEDER VERFÜGBAR: Lehrkraft ${formatTeacherFullName(profile)} hat die Abwesenheit beendet und steht wieder regulär für den Unterricht zur Verfügung.`;
       await supabase
         .from('system_alerts')
         .insert({
@@ -3718,11 +3730,7 @@ export function TeacherDashboard({
 
         const currentWeekNotesItem = matrixItems.find(item => 
           item.topic_name.startsWith('Hausaufgabe KW ') && 
-          (item.is_current_homework || (item.updated_at && getISOWeekRaw(item.updated_at, 1) === currentWeekStr))
-        ) || matrixItems.find(item => 
-          item.is_current_homework && 
-          item.homework_notes && 
-          item.homework_notes.trim() !== ''
+          (getItemWeek(item) === currentWeekStr || (item.updated_at && getISOWeekRaw(item.updated_at, 1) === currentWeekStr))
         );
 
         const currentWeekNotes = currentWeekNotesItem ? parseHomeworkNotes(currentWeekNotesItem.homework_notes) : [];
@@ -4489,11 +4497,7 @@ export function TeacherDashboard({
 
             const currentWeekNotesItem = matrixItems.find(item => 
               item.topic_name.startsWith('Hausaufgabe KW ') && 
-              (item.is_current_homework || (item.updated_at && getISOWeekRaw(item.updated_at, 1) === currentWeekStr))
-            ) || matrixItems.find(item => 
-              item.is_current_homework && 
-              item.homework_notes && 
-              item.homework_notes.trim() !== ''
+              (getItemWeek(item) === currentWeekStr || (item.updated_at && getISOWeekRaw(item.updated_at, 1) === currentWeekStr))
             );
 
             const currentWeekNotes = currentWeekNotesItem ? parseHomeworkNotes(currentWeekNotesItem.homework_notes) : [];
@@ -13068,7 +13072,7 @@ useEffect(() => {
               </div>
               <div>
                 <span style={{ fontSize: '0.68rem', fontWeight: 900, background: '#ef4444', color: '#ffffff', padding: '2px 8px', borderRadius: '6px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  Dienstliche Pflichtmitteilung
+                  Wichtige Schulmitteilung
                 </span>
                 <h3 style={{ margin: '4px 0 0 0', fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em' }}>
                   {openCriticalDuty.title}

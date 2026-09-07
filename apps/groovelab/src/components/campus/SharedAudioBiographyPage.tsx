@@ -149,7 +149,7 @@ export const SharedAudioBiographyPage: React.FC<SharedAudioBiographyPageProps> =
   const targetKey = studentId || token || 'demo_student';
   const plKey = targetPlaylistId || 'all';
 
-  const [takedownInfo] = useState<{ isBlocked: boolean; reason?: string; timestamp?: string }>(() => {
+  const [takedownInfo, setTakedownInfo] = useState<{ isBlocked: boolean; reason?: string; timestamp?: string }>(() => {
     try {
       const specificTakedown = localStorage.getItem(`campus_takedown_${targetKey}`);
       if (specificTakedown) {
@@ -175,6 +175,32 @@ export const SharedAudioBiographyPage: React.FC<SharedAudioBiographyPageProps> =
     } catch {}
     return { isBlocked: false };
   });
+
+  // 🚨 Authoritative Server-Side Check (Art. 6 & 16 DSA / § 10 DDG / UrhDaG)
+  useEffect(() => {
+    let isMounted = true;
+    const verifyServerTakedown = async () => {
+      try {
+        const { data, error } = await supabase.rpc('check_content_takedown', {
+          p_target_id: String(targetKey),
+          p_playlist_id: String(plKey)
+        });
+        if (!error && data && data.is_blocked) {
+          if (isMounted) {
+            setTakedownInfo({
+              isBlocked: true,
+              reason: data.reason || 'Urheberrechtliche Prüfung gem. Art. 16 DSA',
+              timestamp: data.timestamp
+            });
+          }
+        }
+      } catch (e) {
+        // Fallback to local state if offline or RPC unavailable
+      }
+    };
+    verifyServerTakedown();
+    return () => { isMounted = false; };
+  }, [targetKey, plKey]);
 
   const [rememberDevice, setRememberDevice] = useState<boolean>(true);
   const [isUnlocked, setIsUnlocked] = useState<boolean>(() => {

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { CheckCircle, AlertCircle, Sparkles, Lock, Mail, Key, Download } from 'lucide-react';
 import QRCode from 'react-qr-code';
+import { downloadLocalQrCodePng } from '../utils/localQrGenerator';
 
 interface TeacherActivationProps {
   onSuccess: (userId: string) => void;
@@ -133,16 +134,12 @@ export function TeacherActivation({ onSuccess }: TeacherActivationProps) {
     setTimeout(() => setShake(false), 500);
   };
 
-  const downloadQrCode = () => {
+  const downloadQrCode = async () => {
     if (!teacherQrToken) return;
-    const url = `https://chart.googleapis.com/chart?chs=300x300&cht=qr&chl=${encodeURIComponent(`${window.location.origin}/qr/${teacherQrToken}`)}`;
-    const link = document.createElement('a');
-    link.href = url;
-    link.target = '_blank';
-    link.download = `groovelab_ausweis_${teacherName.replace(/\s+/g, '_')}.png`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    await downloadLocalQrCodePng(
+      `${window.location.origin}/qr/${teacherQrToken}`,
+      `groovelab_ausweis_${teacherName.replace(/\s+/g, '_')}.png`
+    );
   };
 
   return (

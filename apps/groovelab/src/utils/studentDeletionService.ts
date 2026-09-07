@@ -139,6 +139,19 @@ export async function deleteStudentFully(
       }
     };
 
+    const safeNullifyOrDelete = async (table: string, column: string) => {
+      try {
+        const { error } = await supabase.from(table).update({ [column]: null }).in(column, idsArray);
+        if (error) {
+          console.warn(`[studentDeletionService] Warning nullifying ${table}.${column} (falling back to delete if constraint active):`, error);
+          await safeDeleteIds(table, column);
+        }
+      } catch (err) {
+        console.warn(`[studentDeletionService] Error nullifying ${table}.${column}:`, err);
+        await safeDeleteIds(table, column);
+      }
+    };
+
     // Clean up references in all related tables
     await safeNullifyIds('bands', 'coach_id');
     await safeDeleteIds('user_song_skills', 'user_id');
@@ -150,12 +163,18 @@ export async function deleteStudentFully(
     await safeDeleteIds('band_shoutbox', 'user_id');
     await safeDeleteIds('band_song_slots', 'user_id');
     await safeDeleteIds('help_requests', 'user_id');
-    await safeDeleteIds('schedule_occurrences', 'student_id');
-    await safeDeleteIds('schedule_occurrences', 'teacher_id');
+
+    // 🛡️ Subventions- & Prüfungsschutz gem. DIN 66398 LK 5 und § 147 AO:
+    // Unterrichtsnachweise und historische Stundenplandaten (schedule_occurrences / schedules)
+    // werden bei Personenlöschung anonymisiert (student_id = null), anstatt physisch gelöscht zu werden.
+    // Hierdurch bleibt der Nachweis erteilter Jahreswochenstunden (JWS) für Landes- und Kommunalförderungen
+    // vollständig erhalten, während alle personenbezogenen Schülerdaten restlos getilgt sind.
+    await safeNullifyOrDelete('schedule_occurrences', 'student_id');
+    await safeNullifyOrDelete('schedule_occurrences', 'teacher_id');
     await safeDeleteIds('student_teachers', 'student_id');
     await safeDeleteIds('student_schedule_preferences', 'student_id');
-    await safeDeleteIds('schedules', 'student_id');
-    await safeDeleteIds('schedules', 'teacher_id');
+    await safeNullifyOrDelete('schedules', 'student_id');
+    await safeNullifyOrDelete('schedules', 'teacher_id');
     await safeDeleteIds('student_notes', 'student_id');
     await safeDeleteIds('student_logs', 'student_id');
     await safeDeleteIds('meisterwerk_documentation', 'student_id');

@@ -30,6 +30,7 @@ export interface DbUser {
   teacher_id?: string;
   group_id?: string;
   schools?: DbSchool;
+  employment_type?: 'employed' | 'freelance';
 }
 
 export interface DbBand {

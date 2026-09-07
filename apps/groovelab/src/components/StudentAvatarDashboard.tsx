@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback, lazy, Suspense } from 'react';
 import { supabase } from '../lib/supabase';
 import { storeBlob, getBlob, deleteBlob } from '../utils/blobStorage';
+import { validateMediaBlob } from '../utils/mediaSecurityValidator';
 import { subscribeUserToPush, unsubscribeUserFromPush } from '../utils/webPush';
 import { 
   Award, Lock, Smartphone, HelpCircle, Trophy, Sparkles, Star, Rocket,
@@ -4648,6 +4649,13 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       // 4. Background Cloud Storage & Database Sync (8s Timeout Guard)
       (async () => {
         try {
+          // 🛡️ Enterprise Media Security & Anti-Malware Ingestion Validation
+          const validation = await validateMediaBlob(saveBlob, 'audio', contentType);
+          if (!validation.isValid) {
+            console.warn('[StudentAvatarDashboard] Audio recording upload blocked by security validator:', validation.reason);
+            return;
+          }
+
           const uploadPromise = supabase.storage
             .from('campus-assets')
             .upload(filePath, saveBlob, { contentType, cacheControl: '3600' });
@@ -9836,6 +9844,14 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
 
     setIsUploadingCustomAvatar(true);
     try {
+      // 🛡️ Enterprise Media Security & Anti-Malware Ingestion Validation (strictly images only)
+      const validation = await validateMediaBlob(customAvatarFile, 'image');
+      if (!validation.isValid) {
+        alert(validation.reason || 'Sicherheitswarnung: Das Bildformat ist unzulässig oder enthält bedenkliche Binärstrukturen.');
+        setIsUploadingCustomAvatar(false);
+        return;
+      }
+
       const fileExt = customAvatarFile.name.split('.').pop();
       const fileName = `${studentId}_avatar_${Date.now()}.${fileExt}`;
       const filePath = `avatars/${fileName}`;

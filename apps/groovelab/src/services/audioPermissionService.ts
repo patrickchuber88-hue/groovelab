@@ -45,8 +45,9 @@ export async function checkMicrophonePermission(): Promise<'granted' | 'denied' 
 
 /**
  * Performs a 1-time pre-flight permission request:
- * Prompts the user once, immediately stops hardware tracks (DSGVO/Hardware light off),
- * and caches the approval for seamless future access across all modules.
+ * - If already granted in browser or cached in session, returns true immediately (0ms, zero flicker).
+ * - Otherwise prompts the user once, immediately stops hardware tracks (DSGVO/Hardware light off),
+ *   and caches the approval for seamless future access across all audio recordings and dictation.
  */
 export async function requestMicrophonePermissionOnce(): Promise<boolean> {
   if (typeof navigator === 'undefined' || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -54,6 +55,29 @@ export async function requestMicrophonePermissionOnce(): Promise<boolean> {
     return false;
   }
 
+  // 1. Fast-path: Check Web Permissions API (instant, no hardware activation)
+  if (navigator.permissions && navigator.permissions.query) {
+    try {
+      const status = await navigator.permissions.query({ name: 'microphone' as PermissionName });
+      if (status.state === 'granted') {
+        localStorage.setItem(STORAGE_KEY, 'true');
+        return true;
+      } else if (status.state === 'denied') {
+        localStorage.removeItem(STORAGE_KEY);
+        return false;
+      }
+    } catch (e) {
+      // Some browsers throw on querying 'microphone'
+    }
+  }
+
+  // 2. Fast-path: LocalStorage cache for current session / origin
+  const cached = localStorage.getItem(STORAGE_KEY);
+  if (cached === 'true') {
+    return true;
+  }
+
+  // 3. Pre-flight authorization request via user gesture
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ 
       audio: {
@@ -79,9 +103,33 @@ export async function requestMicrophonePermissionOnce(): Promise<boolean> {
 }
 
 /**
+ * Fast synchronous check whether microphone permission is cached as granted in local storage.
+ */
+export function isMicrophonePermissionCached(): boolean {
+  if (typeof window === 'undefined') return false;
+  return localStorage.getItem(STORAGE_KEY) === 'true';
+}
+
+/**
+ * Studio-Grade High-Fidelity Audio Constraints (Zero Compression, Zero Filter DSP Artifacts)
+ */
+export const STUDIO_AUDIO_CONSTRAINTS: MediaTrackConstraints = {
+  echoCancellation: false,
+  noiseSuppression: false,
+  autoGainControl: false,
+  googEchoCancellation: false,
+  googAutoGainControl: false,
+  googNoiseSuppression: false,
+  googHighpassFilter: false,
+  googTypingNoiseDetection: false,
+  channelCount: 1,
+  sampleRate: 48000
+} as any;
+
+/**
  * Seamlessly acquires an active audio stream for recording, tuner, or loopstation.
  */
-export async function acquireAudioStream(constraints: MediaStreamConstraints = { audio: true }): Promise<MediaStream> {
+export async function acquireAudioStream(constraints: MediaStreamConstraints = { audio: STUDIO_AUDIO_CONSTRAINTS }): Promise<MediaStream> {
   if (typeof navigator === 'undefined' || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
     throw new Error('Mikrofon-Zugriff wird von diesem Browser nicht unterstützt.');
   }

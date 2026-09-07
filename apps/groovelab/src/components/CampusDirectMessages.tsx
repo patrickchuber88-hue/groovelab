@@ -2646,6 +2646,28 @@ export function CampusDirectMessages({
                   return null;
                 })()}
 
+                {/* 🛡️ Institutional Child Protection & Four-Eyes Banner (§ 8a SGB VIII / BKiSchG) */}
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  background: 'linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%)',
+                  border: '1px solid #bbf7d0',
+                  borderRadius: '12px',
+                  padding: '6px 12px',
+                  marginBottom: '6px',
+                  fontSize: '0.71rem',
+                  color: '#166534',
+                  fontWeight: 650,
+                  width: '100%',
+                  boxSizing: 'border-box'
+                }}>
+                  <ShieldCheck size={14} color="#16a34a" style={{ flexShrink: 0 }} />
+                  <span style={{ flex: 1, lineHeight: 1.35 }}>
+                    <strong>Didaktischer Schul-Chat (Kinderschutz gem. § 8a SGB VIII):</strong> Alle Nachrichten dienen der Unterrichtskommunikation und sind für Erziehungsberechtigte im Eltern-Portal sowie die Schulleitung transparent einsehbar.
+                  </span>
+                </div>
+
                 {/* Apple HIG In-Field Send Composer */}
                 <form onSubmit={handleSend} style={{ display: 'flex', width: '100%', position: 'relative', alignItems: 'center' }}>
                   <input 

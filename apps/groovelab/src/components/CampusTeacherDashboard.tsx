@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import { ScheduleCalendarView } from './ScheduleCalendarView';
 import { subscribeUserToPush, unsubscribeUserFromPush } from '../utils/webPush';
 import { PushNotificationSoftPromptModal } from './ui/PushNotificationSoftPromptModal';
+import { requestMicrophonePermissionOnce } from '../services/audioPermissionService';
 import { 
   Clock, 
   Calendar, 
@@ -136,7 +137,7 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
   const [isListeningVoice, setIsListeningVoice] = useState(false);
 
   // Fast-Track Voice-to-Homework Diktat (Web Speech API)
-  const handleToggleVoiceRecognition = () => {
+  const handleToggleVoiceRecognition = async () => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechRecognition) {
       alert('Spracherkennung wird in diesem Browser leider nicht unterstützt. Bitte Chrome, Safari oder Edge verwenden.');
@@ -146,6 +147,13 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
       setIsListeningVoice(false);
       return;
     }
+
+    // 🛡️ Centralized One-Time Permission Gatekeeper (Unified Session Authorization)
+    const hasPermission = await requestMicrophonePermissionOnce();
+    if (!hasPermission) {
+      return;
+    }
+
     try {
       const recognition = new SpeechRecognition();
       recognition.lang = 'de-DE';
@@ -155,6 +163,9 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
       recognition.onend = () => setIsListeningVoice(false);
       recognition.onerror = (err: any) => {
         console.warn('[VoiceRec] Error:', err);
+        if (err.error === 'not-allowed') {
+          localStorage.removeItem('campus_microphone_permission_granted');
+        }
         setIsListeningVoice(false);
       };
       recognition.onresult = (event: any) => {
@@ -2621,6 +2632,102 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
                 </p>
               )}
 
+              <div style={{
+                background: 'rgba(255, 255, 255, 0.04)',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
+                borderRadius: '12px',
+                padding: '10px 14px',
+                fontSize: '0.74rem',
+                color: '#94a3b8',
+                lineHeight: '1.4'
+              }}>
+                ⚖️ <strong>Hinweis zur Unterrichtsdisposition:</strong> Diese Mitteilung dient der didaktischen Unterrichts- und Raumdisposition sowie der frühzeitigen Schülerinformation. Sie begründet keine arbeitgeberseitige Weisung oder Anwesenheitskontrolle.
+              </div>
+
+              {/* Notfall-Kontaktaufnahme (< 2h) zur Wahrung der elterlichen Aufsichtspflicht gem. § 832 BGB */}
+              {todaySchedules && todaySchedules.length > 0 && (
+                <div style={{
+                  background: 'rgba(239, 68, 68, 0.08)',
+                  border: '1.5px solid rgba(239, 68, 68, 0.3)',
+                  borderRadius: '16px',
+                  padding: '16px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '10px'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#f87171', fontWeight: 800, fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                      <span>🚨</span>
+                      <span>Notfall-Kontakte heute ({todaySchedules.length} Schüler)</span>
+                    </div>
+                    <span style={{ fontSize: '0.66rem', color: '#fca5a5', fontWeight: 700 }}>
+                      Empfohlen bei Ausfall &lt; 2h
+                    </span>
+                  </div>
+
+                  <p style={{ margin: 0, fontSize: '0.72rem', color: '#cbd5e1', lineHeight: '1.4' }}>
+                    Um sicherzustellen, dass minderjährige Schüler bei kurzfristigen Absagen nicht unbegleitet vor verschlossener Tür stehen (§ 832 BGB), finden Sie hier Ihre Schüler des heutigen Tages zur schnellen telefonischen Abstimmung:
+                  </p>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '180px', overflowY: 'auto' }}>
+                    {todaySchedules.map((s: any) => {
+                      const studentName = s.students 
+                        ? `${s.students.first_name} ${s.students.last_name ? s.students.last_name[0] + '.' : ''}`
+                        : s.student_name || 'Schüler';
+                      const phone = s.students?.phone || s.students?.parent_phone || s.parent_phone;
+                      return (
+                        <div 
+                          key={s.id}
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            background: 'rgba(15, 23, 42, 0.6)',
+                            border: '1px solid rgba(255, 255, 255, 0.06)',
+                            borderRadius: '10px',
+                            padding: '8px 12px',
+                            fontSize: '0.76rem'
+                          }}
+                        >
+                          <div style={{ display: 'flex', flexDirection: 'column' }}>
+                            <strong style={{ color: '#ffffff' }}>{studentName}</strong>
+                            <span style={{ color: '#94a3b8', fontSize: '0.68rem' }}>
+                              {s.time_slot || `${s.start_time || ''} - ${s.end_time || ''}`} {s.instrument ? `• ${s.instrument}` : ''}
+                            </span>
+                          </div>
+
+                          {phone ? (
+                            <a
+                              href={`tel:${phone}`}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                background: '#34a853',
+                                color: '#ffffff',
+                                textDecoration: 'none',
+                                padding: '6px 12px',
+                                borderRadius: '8px',
+                                fontSize: '0.72rem',
+                                fontWeight: 800,
+                                transition: 'all 0.15s'
+                              }}
+                            >
+                              <span>📞</span>
+                              <span>Anrufen</span>
+                            </a>
+                          ) : (
+                            <span style={{ fontSize: '0.68rem', color: '#64748b', fontStyle: 'italic' }}>
+                              Keine Tel. hinterlegt
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               <div className="space-y-4 pt-2">
                 {!showCustomStart ? (
                   <div className="space-y-2">
@@ -2697,7 +2804,7 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
                       className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-800 text-white font-black text-sm uppercase tracking-widest rounded-xl transition duration-200 shadow-lg shadow-emerald-900/20 flex items-center justify-center gap-2"
                     >
                       <Check size={18} />
-                      {reportingSick ? 'Melde wieder im Dienst...' : 'Wieder im Dienst melden'}
+                      {reportingSick ? 'Melde wieder verfügbar...' : 'Wieder als verfügbar melden'}
                     </button>
                   )}
                 </div>
@@ -3549,6 +3656,10 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
                     rows={3}
                     className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-xs text-white focus:outline-none focus:border-emerald-500 font-semibold"
                   />
+                  <div style={{ fontSize: '10px', color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>
+                    <span>⚖️</span>
+                    <span>Hinweis: Das Teilen urheberrechtlich geschützter Noteneditionen bedarf der Lizenzierung (z. B. VG Musikedition / VdM). Es gelten die AGB.</span>
+                  </div>
                 </div>
 
                 {/* 2-Column Action Bar: Save & Hybrid Print */}

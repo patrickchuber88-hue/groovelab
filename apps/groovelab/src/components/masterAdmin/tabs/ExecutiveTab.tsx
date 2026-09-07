@@ -1324,6 +1324,61 @@ export const ExecutiveTab: React.FC<ExecutiveTabProps> = ({
       )}
 
       {/* ═══════════════════════════════════════════════════════════════════════ */}
+      {/* ⚠️ § 19 UStG STEUER-FRÜHWARNUNG BEI ARR >= 20.000 €                     */}
+      {/* ═══════════════════════════════════════════════════════════════════════ */}
+      {totalArr >= 20000 && (
+        <div style={{
+          marginBottom: '16px',
+          background: totalArr >= 25000 ? '#fef2f2' : '#fffbeb',
+          border: `1.5px solid ${totalArr >= 25000 ? '#f87171' : '#f59e0b'}`,
+          borderRadius: '18px',
+          padding: '16px 20px',
+          display: 'flex',
+          alignItems: 'flex-start',
+          gap: '14px',
+          boxShadow: '0 4px 14px -2px rgba(0,0,0,0.04)'
+        }}>
+          <div style={{
+            background: totalArr >= 25000 ? '#dc2626' : '#d97706',
+            color: '#ffffff',
+            borderRadius: '12px',
+            padding: '8px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0
+          }}>
+            <AlertTriangle size={20} />
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: '0.90rem', fontWeight: 900, color: totalArr >= 25000 ? '#991b1b' : '#92400e' }}>
+                {totalArr >= 25000
+                  ? '🚨 Steuer-Warnung: Schwellenwert § 19 UStG überschritten (> 25.000 €)'
+                  : '⚠️ Steuer-Frühwarnsystem: Annäherung an Kleinunternehmergrenze (§ 19 UStG)'}
+              </span>
+              <span style={{
+                fontSize: '0.74rem',
+                fontWeight: 800,
+                background: totalArr >= 25000 ? '#fee2e2' : '#fef3c7',
+                color: totalArr >= 25000 ? '#b91c1c' : '#b45309',
+                padding: '3px 9px',
+                borderRadius: '8px',
+                fontVariantNumeric: 'tabular-nums'
+              }}>
+                Hochgerechneter ARR: {totalArr.toFixed(2).replace('.', ',')} € / 25.000 €
+              </span>
+            </div>
+            <p style={{ margin: '6px 0 0 0', fontSize: '0.80rem', lineHeight: 1.45, color: totalArr >= 25000 ? '#7f1d1d' : '#78350f' }}>
+              {totalArr >= 25000
+                ? 'Ihre jährliche Run-Rate hat die gesetzliche Kleinunternehmergrenze von 25.000 € überschritten. Die Inanspruchnahme der Steuerbefreiung nach § 19 UStG erlischt mit Ablauf des laufenden Kalenderjahres. Bitte stimmen Sie mit Ihrem Steuerberater umgehend den Wechsel zur Regelbesteuerung (19 % USt.-Ausweis auf B2B-Rechnungen & Vorsteuerabzugsberechtigung) ab.'
+                : 'Ihre jährliche Run-Rate liegt bei über 20.000 € und nähert sich der gesetzlichen Kleinunternehmergrenze von 25.000 € (§ 19 UStG). Wir empfehlen, frühzeitig Ihren Steuerberater bzgl. der Vorbereitung auf die Regelbesteuerung (19 % MwSt.-Ausweis auf Musikschul-Rechnungen) zu konsultieren.'}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════════════════ */}
       {/* 💳 ROW 1: 5 APPLE HIG UNIFIED EXECUTIVE METRIC CARDS                  */}
       {/* ═══════════════════════════════════════════════════════════════════════ */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '16px' }}>
@@ -1451,6 +1506,34 @@ export const ExecutiveTab: React.FC<ExecutiveTabProps> = ({
                 <HardDrive size={11} color="#64748b" /> {storageAddonArr.toFixed(2).replace('.', ',')} €
               </span>
             )}
+          </div>
+
+          {/* § 19 UStG Kleinunternehmer-Statusindikator */}
+          <div style={{
+            marginTop: '10px',
+            padding: '5px 9px',
+            borderRadius: '10px',
+            background: totalArr >= 25000 ? '#fef2f2' : totalArr >= 20000 ? '#fffbeb' : '#f8fafc',
+            border: `1px solid ${totalArr >= 25000 ? '#fecaca' : totalArr >= 20000 ? '#fde68a' : '#e2e8f0'}`,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '6px'
+          }}>
+            <span style={{
+              fontSize: '0.66rem',
+              fontWeight: 800,
+              color: totalArr >= 25000 ? '#dc2626' : totalArr >= 20000 ? '#b45309' : '#64748b',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px'
+            }}>
+              {totalArr >= 20000 && <AlertTriangle size={11} />}
+              § 19 UStG: {totalArr >= 25000 ? 'Regelbesteuerung (> 25k €)' : totalArr >= 20000 ? 'Frühwarnung (< 5k bis Limit)' : 'Kleinunternehmer (< 25k €)'}
+            </span>
+            <span style={{ fontSize: '0.64rem', fontWeight: 700, color: totalArr >= 20000 ? '#92400e' : '#94a3b8', fontVariantNumeric: 'tabular-nums' }}>
+              {Math.min(100, Math.round((totalArr / 25000) * 100))}%
+            </span>
           </div>
         </div>
 

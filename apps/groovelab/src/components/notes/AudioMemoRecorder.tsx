@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Mic, Square, Play, Pause, Trash2, Check, Lock, AlertCircle, Volume2 } from 'lucide-react';
 import { checkIsAudioTresorActive } from '../../domain/stickersAndTresor';
 import { supabase } from '../../lib/supabase';
+import { acquireAudioStream } from '../../services/audioPermissionService';
 
 interface AudioMemoRecorderProps {
   user: any;
@@ -57,7 +58,7 @@ export const AudioMemoRecorder: React.FC<AudioMemoRecorderProps> = ({
     if (!hasTresor) return;
     setErrorMsg(null);
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await acquireAudioStream({ audio: true });
       streamRef.current = stream;
 
       const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
@@ -269,8 +270,12 @@ export const AudioMemoRecorder: React.FC<AudioMemoRecorderProps> = ({
             <div style={{ fontSize: '0.82rem', fontWeight: 850, color: '#0f172a' }}>
               {isRecording ? 'Sprachmemo aufnehmen...' : audioUrl ? 'Sprachmemo bereit' : 'Audio-Memo aufnehmen'}
             </div>
-            <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>
-              {isRecording ? `${formatTime(recordSeconds)} / 2:00` : audioUrl ? `Dauer: ${formatTime(recordSeconds)}` : 'Max. 2 Minuten (Opus HQ)'}
+            <div style={{ fontSize: '0.70rem', color: isRecording ? '#dc2626' : '#64748b', fontWeight: 600 }}>
+              {isRecording 
+                ? `${formatTime(recordSeconds)} / 2:00 • Nur im gegenseitigen Einvernehmen (§ 201 StGB)` 
+                : audioUrl 
+                  ? `Dauer: ${formatTime(recordSeconds)} (Unterrichts-Memo)` 
+                  : 'Aufnahme nur im Einvernehmen aller Anwesenden (§ 201 StGB)'}
             </div>
           </div>
         </div>

@@ -731,6 +731,16 @@ Ihr Campus-Groovelab Abrechnungsteam`;
       // Invert amount for GoBD Cancellation Ledger
       const stornoAmount = -Math.abs(origInv.amount);
 
+      // 🛡️ GoBD-Storno-Snapshot mit SHA-256 Prüfsiegel gem. §§ 146, 147 AO
+      const stornoPayload = `${stornoId}:${origInv.id}:${school.schoolId}:${stornoAmount}:${today}`;
+      let stornoSha256Seal = '';
+      try {
+        const hashBuffer = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(stornoPayload));
+        stornoSha256Seal = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+      } catch (e) {
+        stornoSha256Seal = stornoId;
+      }
+
       // Insert storno record into database
       await supabase.from('invoices').insert({
         id: stornoId,
@@ -747,7 +757,16 @@ Ihr Campus-Groovelab Abrechnungsteam`;
             quantity: -1,
             unit: 'Storno',
             unitPrice: Math.abs(origInv.amount),
-            amount: stornoAmount
+            amount: stornoAmount,
+            gobd_snapshot: {
+              storno_id: stornoId,
+              original_invoice_id: origInv.id,
+              school_id: school.schoolId,
+              amount: stornoAmount,
+              reason: stornoReason,
+              sha256_seal: stornoSha256Seal,
+              created_at: new Date().toISOString()
+            }
           }
         ]
       });
@@ -1103,6 +1122,16 @@ Campus-Groovelab Mahnwesen & Rechtsabteilung`;
       due.setDate(due.getDate() + 14);
       const dueDate = due.toISOString().split('T')[0];
 
+      // 🛡️ GoBD-Beleg-Snapshot mit SHA-256 Prüfsiegel gem. §§ 146, 147 AO
+      const gobdPayload = `${invoiceId}:${schoolId}:${amount}:${today}:${dueDate}`;
+      let sha256Seal = '';
+      try {
+        const hashBuffer = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(gobdPayload));
+        sha256Seal = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+      } catch (e) {
+        sha256Seal = invoiceId;
+      }
+
       const { error } = await supabase.from('invoices').insert({
         id: invoiceId,
         school_id: schoolId,
@@ -1117,7 +1146,16 @@ Campus-Groovelab Mahnwesen & Rechtsabteilung`;
             quantity: 1,
             unit: 'Pauschale',
             unitPrice: amount,
-            amount: amount
+            amount: amount,
+            gobd_snapshot: {
+              invoice_id: invoiceId,
+              school_id: schoolId,
+              amount,
+              billing_date: today,
+              due_date: dueDate,
+              sha256_seal: sha256Seal,
+              created_at: new Date().toISOString()
+            }
           }
         ]
       });

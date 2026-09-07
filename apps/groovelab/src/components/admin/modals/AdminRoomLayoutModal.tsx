@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Check, ExternalLink, Tablet, X } from 'lucide-react';
+import QRCode from 'react-qr-code';
 
 export const getStationColor = (name: string | null | undefined, dbColor?: string | null) => {
   if (!name) return "#64748b";
@@ -590,9 +591,9 @@ export const AdminRoomLayoutModal: React.FC<AdminRoomLayoutModalProps> = ({
                     <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569', alignSelf: 'flex-start' }}>iPad Kiosk Setup</span>
                     
                     <div style={{ padding: '8px', border: '1px solid #e2e8f0', borderRadius: '16px', background: 'white' }}>
-                      <img 
-                        src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(getStationKioskUrl(activeStation.id))}`}
-                        alt="Kiosk Setup QR Code"
+                      <QRCode 
+                        value={getStationKioskUrl(activeStation.id)}
+                        size={180}
                         style={{ width: '180px', height: '180px', display: 'block' }}
                       />
                     </div>

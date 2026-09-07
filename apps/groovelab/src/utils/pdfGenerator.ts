@@ -1,5 +1,6 @@
 import { getParentOnboardingUrl, getTeacherLoginUrl } from './tenantUrlHelper';
 import { capitalizeFirstLetter, formatSongTitleCase } from './nameHelper';
+import { generateLocalQrDataUrl } from './localQrGenerator';
 
 export const generateConsentPDF = async (
   schoolName: string, 
@@ -981,21 +982,11 @@ export const generateParentQuickstartPDF = async (
   doc.setDrawColor(167, 243, 208);
   doc.roundedRect(qrX, qrY, qrSize + 4, qrSize + 6, 2, 2, 'FD');
 
-  // Fetch or render QR Code
+  // Render local offline QR Code (100% zero-network)
   try {
-    const qrFetchUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&format=png&margin=1&data=${encodeURIComponent(parentOnboardingUrl)}`;
-    const qrRes = await fetch(qrFetchUrl);
-    if (qrRes.ok) {
-      const qrBlob = await qrRes.blob();
-      const qrDataUrl = await new Promise<string>((resolve) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result as string);
-        reader.onerror = () => resolve('');
-        reader.readAsDataURL(qrBlob);
-      });
-      if (qrDataUrl) {
-        doc.addImage(qrDataUrl, 'PNG', qrX + 2, qrY + 2, qrSize, qrSize);
-      }
+    const qrDataUrl = await generateLocalQrDataUrl(parentOnboardingUrl, 300);
+    if (qrDataUrl) {
+      doc.addImage(qrDataUrl, 'PNG', qrX + 2, qrY + 2, qrSize, qrSize);
     }
   } catch {
     // Fallback QR Placeholder
@@ -2104,21 +2095,13 @@ export interface StudentHomeworkPDFParams {
   hasAudioRecordings?: boolean;
 }
 
-// Generates a crisp QR code PNG Data URL for PDF embedding
+// Generates a crisp QR code PNG Data URL for PDF embedding (100% local, zero-network)
 async function fetchQrDataUrl(text: string): Promise<string | null> {
   try {
-    const url = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&format=png&margin=1&data=${encodeURIComponent(text)}`;
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`QR API returned status ${res.status}`);
-    const blob = await res.blob();
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result as string);
-      reader.onerror = () => resolve(null);
-      reader.readAsDataURL(blob);
-    });
+    const dataUrl = await generateLocalQrDataUrl(text, 300);
+    return dataUrl || null;
   } catch (err) {
-    console.warn('[PDF] Could not fetch QR code image:', err);
+    console.warn('[PDF] Could not generate local QR code image:', err);
     return null;
   }
 }

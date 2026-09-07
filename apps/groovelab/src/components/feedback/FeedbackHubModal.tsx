@@ -14,6 +14,7 @@ import {
   formatSlaCountdown
 } from '../../config/feedbackConfig';
 import { CampusGroovelabText } from '../CampusGroovelabBrand';
+import { requestMicrophonePermissionOnce } from '../../services/audioPermissionService';
 
 const renderCategoryIcon = (iconName: string, size = 14, color = 'currentColor') => {
   switch (iconName) {
@@ -141,6 +142,7 @@ export const FeedbackHubModal: React.FC<FeedbackHubModalProps> = ({
           console.warn('Speech recognition error:', event.error);
           setIsRecording(false);
           if (event.error === 'not-allowed') {
+            localStorage.removeItem('campus_microphone_permission_granted');
             setSpeechError('Mikrofon-Zugriff verweigert. Bitte erlaube den Mikrofon-Zugriff in den Browser-Einstellungen.');
           }
         };
@@ -284,7 +286,7 @@ export const FeedbackHubModal: React.FC<FeedbackHubModalProps> = ({
     );
   };
 
-  const toggleDictation = () => {
+  const toggleDictation = async () => {
     if (!speechSupported) {
       alert('Sprachdiktat wird von diesem Browser leider nicht unterstützt. Bitte nutze die Tastatureingabe.');
       return;
@@ -299,6 +301,12 @@ export const FeedbackHubModal: React.FC<FeedbackHubModalProps> = ({
       }
       setIsRecording(false);
     } else {
+      // 🛡️ Centralized One-Time Permission Gatekeeper (Unified Session Authorization)
+      const hasPermission = await requestMicrophonePermissionOnce();
+      if (!hasPermission) {
+        setSpeechError('Mikrofon-Freigabe nicht erteilt.');
+        return;
+      }
       try {
         recognitionRef.current?.start();
         setIsRecording(true);

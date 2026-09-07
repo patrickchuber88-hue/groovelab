@@ -116,6 +116,7 @@ export interface MeisterwerkDocumentTabProps {
   handleToggleMatchMode: (...args: any[]) => any;
   handleTogglePresetChip: (...args: any[]) => any;
   hasTresorStorage: boolean;
+  hasTransferableHomework?: boolean;
   homeworkNotes: any;
   homeworkNotesList: any[];
   hubTab: any;
@@ -343,6 +344,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
     handleToggleMatchMode,
     handleTogglePresetChip,
     hasTresorStorage,
+    hasTransferableHomework = false,
     homeworkNotes,
     homeworkNotesList,
     hubTab,
@@ -5007,8 +5009,9 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                   {!readOnly && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
-                        <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1e293b' }}>
-                          🔒 Interne Notiz (nur für Lehrer)
+                        <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                          <span>🔒 Interne Notiz (nur für Lehrer)</span>
+                          <span style={{ fontSize: '0.66rem', color: '#64748b', fontWeight: 600 }}>• Didaktischer Verlauf (Keine Diagnosen gem. Art. 9 DSGVO)</span>
                         </label>
                         <SpeechDictationButton
                           onTranscript={(text) => {
@@ -5022,7 +5025,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                         />
                       </div>
                       <textarea
-                        placeholder="Interne Bemerkungen..."
+                        placeholder="Didaktischer Verlauf &amp; Notizen... (Hinweis: Keine Diagnosen oder Gesundheitsdaten gem. Art. 9 DSGVO erfassen)"
                         value={teacherNotes}
                         onChange={(e) => {
                           setTeacherNotes(e.target.value);
@@ -5340,8 +5343,9 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                       {!readOnly && (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
-                            <label style={{ fontSize: '0.86rem', fontWeight: 900, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                              🔒 Interne Notiz (nur für Lehrer):
+                            <label style={{ fontSize: '0.86rem', fontWeight: 900, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                              <span>🔒 Interne Notiz (nur für Lehrer):</span>
+                              <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 600 }}>• Didaktischer Verlauf (Keine Diagnosen gem. Art. 9 DSGVO)</span>
                             </label>
                             <SpeechDictationButton
                               onTranscript={(text) => {
@@ -5361,7 +5365,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                             />
                           </div>
                           <textarea
-                            placeholder="Interne Bemerkungen..."
+                            placeholder="Didaktischer Verlauf &amp; Songnotizen... (Hinweis: Keine Diagnosen oder Gesundheitsdaten gem. Art. 9 DSGVO erfassen)"
                             value={teacherNotes}
                             onChange={(e) => {
                               const val = e.target.value;
@@ -6400,37 +6404,41 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                     <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 550, maxWidth: '380px', lineHeight: 1.45 }}>
                                       {isPastWeek
                                         ? 'Unterrichtsfreie Zeit, Ferien oder keine Notizen hinterlegt.'
-                                        : 'Starte mit einer leeren Maske oder übertrage bestehende Aufgaben aus der Vorwoche.'}
+                                        : (hasTransferableHomework
+                                          ? 'Starte mit einer leeren Maske oder übertrage bestehende Aufgaben aus der Vorwoche.'
+                                          : 'Starte die neue Woche mit einem neuen Lehrwerk oder weise einen neuen Song zu.')}
                                     </span>
                                   </div>
 
                                   {/* Primary Transfer Action & Quick Shortcuts */}
                                   {!isPastWeek && !readOnly && (
                                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', marginTop: '6px' }}>
-                                      <button
-                                        type="button"
-                                        onClick={() => setIsTransferModalOpen(true)}
-                                        style={{
-                                          background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
-                                          color: '#ffffff',
-                                          border: 'none',
-                                          fontSize: '0.84rem',
-                                          fontWeight: 850,
-                                          padding: '9px 20px',
-                                          borderRadius: '100px',
-                                          cursor: 'pointer',
-                                          display: 'inline-flex',
-                                          alignItems: 'center',
-                                          gap: '8px',
-                                          boxShadow: '0 4px 14px rgba(22, 163, 74, 0.28)',
-                                          transition: 'all 0.15s ease'
-                                        }}
-                                        className="hover-scale"
-                                        title="Hausaufgaben aus der Vorwoche übernehmen, abhaken oder pausieren"
-                                      >
-                                        <ArrowRightLeft size={14} strokeWidth={2.4} />
-                                        <span>Hausaufgaben übertragen</span>
-                                      </button>
+                                      {hasTransferableHomework && (
+                                        <button
+                                          type="button"
+                                          onClick={() => setIsTransferModalOpen(true)}
+                                          style={{
+                                            background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
+                                            color: '#ffffff',
+                                            border: 'none',
+                                            fontSize: '0.84rem',
+                                            fontWeight: 850,
+                                            padding: '9px 20px',
+                                            borderRadius: '100px',
+                                            cursor: 'pointer',
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            gap: '8px',
+                                            boxShadow: '0 4px 14px rgba(22, 163, 74, 0.28)',
+                                            transition: 'all 0.15s ease'
+                                          }}
+                                          className="hover-scale"
+                                          title="Hausaufgaben aus der Vorwoche übernehmen, abhaken oder pausieren"
+                                        >
+                                          <ArrowRightLeft size={14} strokeWidth={2.4} />
+                                          <span>Hausaufgaben übertragen</span>
+                                        </button>
+                                      )}
 
                                       <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'center' }}>
                                         <button
@@ -7794,8 +7802,8 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                       width: '24px',
                                       height: '24px',
                                       borderRadius: '7px',
-                                      background: '#0f172a',
-                                      color: '#ffffff',
+                                      background: '#e6f4ea',
+                                      color: '#16a34a',
                                       display: 'flex',
                                       alignItems: 'center',
                                       justifyContent: 'center',
@@ -7810,6 +7818,23 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                   <span style={{ fontSize: '0.70rem', color: '#64748b', fontWeight: 650 }}>
                                     {hasTresorStorage ? 'Tresor aktiv (bis 7 Min.)' : 'Direktaufnahme (bis 60s)'}
                                   </span>
+                                </div>
+
+                                {/* § 60a Abs. 3 Nr. 2 UrhG Compliance Notice */}
+                                <div style={{
+                                  fontSize: '0.67rem',
+                                  color: '#64748b',
+                                  background: '#ffffff',
+                                  padding: '5px 10px',
+                                  borderRadius: '8px',
+                                  border: '1px solid #e2e8f0',
+                                  lineHeight: '1.35',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '6px'
+                                }}>
+                                  <span style={{ fontSize: '0.75rem' }}>⚖️</span>
+                                  <span><strong>UrhG-Hinweis:</strong> Das Teilen geschützter Verlagsnoten ist gem. § 60a Abs. 3 Nr. 2 UrhG gesetzlich unzulässig. Zulässig sind didaktische Eigenaufnahmen, Übungs-Tracks und gemeinfreie Werke.</span>
                                 </div>
 
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
@@ -7861,7 +7886,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                       }}
                                       className="hover-scale"
                                     >
-                                      <Mic size={14} />
+                                      <Mic size={14} color="#22c55e" strokeWidth={2.4} style={{ filter: 'drop-shadow(0 0 4px rgba(34, 197, 94, 0.35))' }} />
                                       <span>Aufnahme</span>
                                     </button>
                                   ) : (

@@ -10,6 +10,7 @@ import { GrooveTrainerStudioView } from './campus/GrooveTrainerStudioView';
 import type { CustomPlaylist, CustomPlaylistTrack } from './campus/AudioBiographyView';
 import { processPureRawBlob, processStudioMastering, TARGET_PURE_RAW_LUFS, TARGET_STUDIO_LUFS, TARGET_PEAK_DBTP, MAX_PURE_RAW_LIMITER_GR_DB } from '../utils/audioMasteringEngine';
 import { storeBlob, getBlob, deleteBlob } from '../utils/blobStorage';
+import { validateMediaBlob } from '../utils/mediaSecurityValidator';
 import { AudioTrackCarousel } from './AudioTrackCarousel';
 import { MeisterOhrSticker } from './MeisterOhrSticker';
 const AudioEditorModal = React.lazy(() => import('./campus/AudioEditorModal').then(m => ({ default: m.AudioEditorModal })));
@@ -25,6 +26,7 @@ import { AudioWaveformVisualizer } from './ui/AudioWaveformVisualizer';
 import { harmonizeAudioList, formatHarmonizedAudioTitle, cleanSongOrBookTitle, extractBaseTopic, formatAudioDate, getNextSequentialTakeNumber } from '../utils/audioNamingHelper';
 import { HomeworkTransferModal } from './campus/HomeworkTransferModal';
 import { broadcastPracticeUpdate } from '../utils/studentProgressEngine';
+import { acquireAudioStream, requestMicrophonePermissionOnce, STUDIO_AUDIO_CONSTRAINTS } from '../services/audioPermissionService';
 import { 
   ALL_STICKERS, 
   getUnifiedStickerStatus, 
@@ -345,6 +347,11 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   });
   const [generalHomeworkNotes, setGeneralHomeworkNotes] = useState<string>(() => {
     try {
+      const currentWeek = getISOWeek();
+      const cachedWeek = localStorage.getItem(`campus_homework_week_${student.id}`);
+      if (cachedWeek && cachedWeek !== currentWeek) {
+        return '';
+      }
       const cached = localStorage.getItem(`campus_homework_notes_${student.id}`);
       if (cached && cached.startsWith('[') && cached.endsWith(']')) {
         const parsed = JSON.parse(cached);
@@ -362,6 +369,11 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   const [homeworkNotes, setHomeworkNotes] = useState<string>('');
   const [homeworkNotesList, setHomeworkNotesList] = useState<string[]>(() => {
     try {
+      const currentWeek = getISOWeek();
+      const cachedWeek = localStorage.getItem(`campus_homework_week_${student.id}`);
+      if (cachedWeek && cachedWeek !== currentWeek) {
+        return [];
+      }
       const cached = localStorage.getItem(`campus_homework_notes_${student.id}`);
       if (cached && cached.startsWith('[') && cached.endsWith(']')) {
         return JSON.parse(cached);
@@ -1812,23 +1824,39 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   const [playAlongCountInRemaining, setPlayAlongCountInRemaining] = useState<number | null>(null);
   const [showPlayAlongMetronomePopup, setShowPlayAlongMetronomePopup] = useState<boolean>(false);
   const playAlongCountInIntervalRef = useRef<any>(null);
+  const pendingCountInStreamRef = useRef<MediaStream | null>(null);
+  const pendingCountInAudioCtxRef = useRef<AudioContext | null>(null);
+  const pendingCountInPreparedRef = useRef<any>(null);
 
   const cancelPlayAlongCountIn = useCallback(() => {
     if (playAlongCountInIntervalRef.current) {
       clearInterval(playAlongCountInIntervalRef.current);
       playAlongCountInIntervalRef.current = null;
     }
+    if (pendingCountInStreamRef.current) {
+      try {
+        pendingCountInStreamRef.current.getTracks().forEach(track => {
+          track.stop();
+          pendingCountInStreamRef.current?.removeTrack(track);
+        });
+      } catch (e) {}
+      pendingCountInStreamRef.current = null;
+    }
+    if (pendingCountInAudioCtxRef.current && pendingCountInAudioCtxRef.current.state !== 'closed') {
+      try {
+        pendingCountInAudioCtxRef.current.close().catch(() => {});
+      } catch (e) {}
+      pendingCountInAudioCtxRef.current = null;
+    }
+    pendingCountInPreparedRef.current = null;
     setPlayAlongCountInRemaining(null);
   }, []);
 
   useEffect(() => {
     return () => {
-      if (playAlongCountInIntervalRef.current) {
-        clearInterval(playAlongCountInIntervalRef.current);
-        playAlongCountInIntervalRef.current = null;
-      }
+      cancelPlayAlongCountIn();
     };
-  }, []);
+  }, [cancelPlayAlongCountIn]);
 
   const [activeNoteTarget, setActiveNoteTarget] = useState<'student' | 'teacher'>('student');
 
@@ -2008,7 +2036,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   };
 
   // Speech Recognition setup
-  const toggleSpeechRecognition = () => {
+  const toggleSpeechRecognition = async () => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechRecognition) {
       alert("Spracherkennung wird von Ihrem Browser leider nicht unterstützt (empfohlen: Google Chrome oder Safari).");
@@ -2021,6 +2049,13 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         (window as any).recognitionInstance.stop();
       }
     } else {
+      // 🛡️ Centralized One-Time Permission Gatekeeper (Unified Session Authorization)
+      const hasPermission = await requestMicrophonePermissionOnce();
+      if (!hasPermission) {
+        setIsListening(false);
+        return;
+      }
+
       setIsListening(true);
       accumulatedTranscriptRef.current = '';
       const recognition = new SpeechRecognition();
@@ -2042,6 +2077,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
       recognition.onerror = (event: any) => {
         console.error("Speech Recognition Error:", event.error);
+        if (event.error === 'not-allowed') {
+          localStorage.removeItem('campus_microphone_permission_granted');
+        }
         setIsListening(false);
       };
 
@@ -2059,7 +2097,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   };
 
   // Audio Recorder logic
-  const startRecordingAudio = async (overrideSongId?: string | React.MouseEvent, overrideLabel?: string, isMasterworkSong = false) => {
+  const prepareRecordingEngine = async (overrideSongId?: string | React.MouseEvent, overrideLabel?: string, isMasterworkSong = false) => {
     const rawSongId = typeof overrideSongId === 'string' ? overrideSongId : null;
     const targetSongId = rawSongId || selectedActiveSongId;
     const targetLabel = (typeof overrideLabel === 'string' ? overrideLabel : null) || audioLabel || '';
@@ -2086,7 +2124,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         (typeof window !== 'undefined' ? localStorage.getItem('campus_board_override_recordings') !== 'false' && localStorage.getItem('campus_allow_audio') !== 'false' : true);
       if (!isAudioAllowed) {
         alert('Die Aufnahme-Funktion für Schüler ist im Eltern-Kontrollzentrum aktuell deaktiviert.');
-        return;
+        return null;
       }
     } else {
       // 🛡️ Didaktische Audio-Memos der Lehrkraft (§ 73 UrhG / Art. 6 DSGVO)
@@ -2096,14 +2134,14 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         (localTeacherAudioKey !== null ? localTeacherAudioKey !== 'false' : true);
       if (!isTeacherAudioAllowed) {
         alert('Die Erziehungsberechtigten haben didaktische Audio-Aufnahmen durch die Lehrkraft (§ 73 UrhG) im Eltern-Kontrollzentrum deaktiviert.');
-        return;
+        return null;
       }
     }
 
     const audioNotesCount = homeworkNotesList.filter(note => note.startsWith("AUDIO:")).length;
     if (!hasTresorStorage && audioNotesCount >= 12) {
       alert("Limit erreicht! Du hast bereits 12 Sprachaufnahmen in diesem Protokoll. Bitte lösche eine alte Sprachaufnahme, bevor du eine neue aufnimmst.");
-      return;
+      return null;
     }
 
     // 🎙️ Check if school Audio-Tresor storage quota is exceeded
@@ -2118,26 +2156,13 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         const totalCapBytes = (1.0 + storageAddon) * 1024 * 1024 * 1024;
         if (storageUsed > 0 && storageUsed >= totalCapBytes) {
           alert('Der Audio-Tresor deiner Musikschule hat das Speichervolumen erreicht. Neue Aufnahmen sind vorübergehend pausiert. Bitte wende dich an die Schulleitung für eine Speichererweiterung oder lösche alte Aufnahmen.');
-          return;
+          return null;
         }
       } catch (e) {}
     }
     let durationInSeconds = 0;
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: false,
-          noiseSuppression: false,
-          autoGainControl: false,
-          googEchoCancellation: false,
-          googAutoGainControl: false,
-          googNoiseSuppression: false,
-          googHighpassFilter: false,
-          googTypingNoiseDetection: false,
-          channelCount: 1,
-          sampleRate: 48000
-        } as any
-      });
+      const stream = await acquireAudioStream({ audio: STUDIO_AUDIO_CONSTRAINTS });
 
       // 🌟 WebAudio Dual-Channel Center Bridge:
       // Takes raw microphone input and routes it 1:1 identically to Left and Right channels (100% centered stereo, 0 left-bias!)
@@ -2418,6 +2443,13 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             const fileName = `${student.id}_feedback_${timeStamp}.${fileExt}`;
             const filePath = `${schoolPathPrefix}recordings/${fileName}`;
 
+            // 🛡️ Enterprise Media Security & Anti-Malware Ingestion Validation
+            const validation = await validateMediaBlob(blob, 'audio', contentType);
+            if (!validation.isValid) {
+              console.warn('[Meisterwerk] Feedback audio upload blocked by security validator:', validation.reason);
+              return;
+            }
+
             // 8s Timeout Guard so hanging network never leaks resources
             const uploadPromise = supabase.storage
               .from('campus-assets')
@@ -2504,27 +2536,44 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         })();
       };
 
-      setAudioDuration(0);
-      setIsRecordingAudio(true);
-      recordStartTimeRef.current = Date.now();
-      recorder.start(100);
-      setMediaRecorderInstance(recorder);
-      mediaRecorderRef.current = recorder;
-      
-      const maxRecordSeconds = effectiveTresor ? 420 : 60;
-
-      recordingTimerRef.current = setInterval(() => {
-        const elapsed = Math.floor((Date.now() - recordStartTimeRef.current) / 1000);
-        durationInSeconds = elapsed;
-        setAudioDuration(elapsed);
-        if (elapsed >= maxRecordSeconds) {
-          stopRecordingAudio(recorder);
-        }
-      }, 500);
-      
+      return {
+        stream,
+        recordStream,
+        recordAudioCtx,
+        recorder,
+        effectiveTresor
+      };
     } catch (err) {
-      console.error("Failed to start recording:", err);
+      console.error("Failed to prepare recording engine:", err);
       alert("Mikrofonzugriff verweigert oder nicht verfügbar.");
+      return null;
+    }
+  };
+
+  const startRecordingWithEngine = (prep: { recorder: MediaRecorder; effectiveTresor: boolean }) => {
+    const { recorder, effectiveTresor } = prep;
+    setAudioDuration(0);
+    setIsRecordingAudio(true);
+    recordStartTimeRef.current = Date.now();
+    recorder.start(100);
+    setMediaRecorderInstance(recorder);
+    mediaRecorderRef.current = recorder;
+    
+    const maxRecordSeconds = effectiveTresor ? 420 : 60;
+
+    recordingTimerRef.current = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - recordStartTimeRef.current) / 1000);
+      setAudioDuration(elapsed);
+      if (elapsed >= maxRecordSeconds) {
+        stopRecordingAudio(recorder);
+      }
+    }, 500);
+  };
+
+  const startRecordingAudio = async (overrideSongId?: string | React.MouseEvent, overrideLabel?: string, isMasterworkSong = false) => {
+    const prep = await prepareRecordingEngine(overrideSongId, overrideLabel, isMasterworkSong);
+    if (prep) {
+      startRecordingWithEngine(prep);
     }
   };
 
@@ -2552,13 +2601,20 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     setActiveRecordingSongId(null);
   };
 
-  const handleStartPlayAlongRecording = () => {
+  const handleStartPlayAlongRecording = async () => {
+    // 🌟 Pre-warm microphone & audio graph BEFORE starting count-in
+    const prep = await prepareRecordingEngine();
+    if (!prep) return;
+
     if (!isCountInEnabled) {
-      startRecordingAudio();
+      startRecordingWithEngine(prep);
       return;
     }
 
     cancelPlayAlongCountIn();
+    pendingCountInStreamRef.current = prep.stream;
+    pendingCountInAudioCtxRef.current = prep.recordAudioCtx;
+    pendingCountInPreparedRef.current = prep;
 
     let count = 4;
     setPlayAlongCountInRemaining(count);
@@ -2571,8 +2627,16 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         setPlayAlongCountInRemaining(count);
         playMetronomeTick(false);
       } else {
-        cancelPlayAlongCountIn();
-        startRecordingAudio();
+        if (playAlongCountInIntervalRef.current) {
+          clearInterval(playAlongCountInIntervalRef.current);
+          playAlongCountInIntervalRef.current = null;
+        }
+        setPlayAlongCountInRemaining(null);
+        // Safely detach from pending so cancellation won't terminate active recording
+        pendingCountInStreamRef.current = null;
+        pendingCountInAudioCtxRef.current = null;
+        pendingCountInPreparedRef.current = null;
+        startRecordingWithEngine(prep);
       }
     }, intervalMs);
   };
@@ -2931,6 +2995,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     // Always backup to localStorage
     try {
       localStorage.setItem(`campus_homework_notes_${student.id}`, allNotesJson);
+      localStorage.setItem(`campus_homework_week_${student.id}`, currentWeek);
       localStorage.setItem(`campus_teacher_notes_${student.id}`, teacherNotes.trim());
     } catch (lsErr) {
       console.warn('[Meisterwerk] localStorage cache notice:', lsErr);
@@ -3248,8 +3313,6 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       const currentWeekHomework = (data || []).find(item => 
         item.topic_name.startsWith('Hausaufgabe KW ') && 
         (getItemWeek(item) === currentWeek || (item.updated_at && getISOWeek(item.updated_at) === currentWeek))
-      ) || (data || []).find(item => 
-        item.topic_name.startsWith('Hausaufgabe KW ')
       );
 
       let loadedHomeworkNotes = '';
@@ -3287,15 +3350,36 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       // Single source of truth for active weekly homework notes - Smart Merge preserving all AUDIO: attachments
       try {
         const cachedHW = localStorage.getItem(`campus_homework_notes_${student.id}`);
-        if (cachedHW) {
+        const cachedWeek = localStorage.getItem(`campus_homework_week_${student.id}`);
+        const isStaleWeekCache = Boolean(cachedWeek && cachedWeek !== currentWeek);
+
+        // If no homework exists in DB for currentWeek, detect whether cachedHW is legacy/stale content from a past week
+        if (!currentWeekHomework) {
+          const isPastWeekNotes = isStaleWeekCache || (cachedHW && (data || []).some(item => 
+            item.topic_name.startsWith('Hausaufgabe KW ') && 
+            item.homework_notes && (
+              item.homework_notes === cachedHW ||
+              (typeof cachedHW === 'string' && cachedHW.trim() !== '' && item.homework_notes.includes(cachedHW.trim()))
+            )
+          ));
+          if (isPastWeekNotes) {
+            try {
+              localStorage.removeItem(`campus_homework_notes_${student.id}`);
+              localStorage.setItem(`campus_homework_week_${student.id}`, currentWeek);
+            } catch {}
+          }
+        }
+
+        const effectiveCachedHW = localStorage.getItem(`campus_homework_notes_${student.id}`);
+        if (effectiveCachedHW) {
           let cachedList: string[] = [];
-          if (cachedHW.startsWith('[') && cachedHW.endsWith(']')) {
-            const parsed = JSON.parse(cachedHW);
+          if (effectiveCachedHW.startsWith('[') && effectiveCachedHW.endsWith(']')) {
+            const parsed = JSON.parse(effectiveCachedHW);
             if (Array.isArray(parsed)) {
               cachedList = parsed.map(String);
             }
-          } else if (cachedHW.trim()) {
-            cachedList = [cachedHW.trim()];
+          } else if (effectiveCachedHW.trim()) {
+            cachedList = [effectiveCachedHW.trim()];
           }
 
           if (cachedList.length > 0) {
@@ -3310,7 +3394,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 if (!alreadyExists) {
                   mergedList.push(cachedItem);
                 }
-              } else if (!mergedList.includes(cachedItem)) {
+              } else if (currentWeekHomework && !mergedList.includes(cachedItem)) {
                 if (cachedItem.trim()) {
                   mergedList.push(cachedItem);
                 }
@@ -3945,9 +4029,14 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       });
 
       setIsCurrentHomework(false);
+      setGeneralHomeworkNotes('');
+      setHomeworkNotes('');
+      setHomeworkNotesList([]);
       try {
         const currentIso = getTargetWeekIso(viewingWeekOffset);
         localStorage.removeItem(`week_transferred_${student.id}_${currentIso}`);
+        localStorage.removeItem(`campus_homework_notes_${student.id}`);
+        localStorage.removeItem(`campus_homework_week_${student.id}`);
       } catch (e) {}
       setSessionLogs(prev => [...prev, `🗑️ Alle aktiven Hausaufgaben zurückgesetzt`]);
       await fetchProgress();
@@ -4058,6 +4147,31 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
     return { sourceLW, sourceS, sourceA };
   }, [assignedLehrwerke, globalLehrwerke, progressItems, activeSongSkills, homeworkNotesList, student.id, topicName]);
+
+  // 🎯 Prüft, ob transferierbare Aufgaben aus der Vorwoche (Lehrwerke, Songs, Audios, Notizen) vorliegen
+  const hasTransferableHomework = useMemo(() => {
+    const hasLW = (sourceTransferData.sourceLW || []).length > 0;
+    const hasSongs = (sourceTransferData.sourceS || []).length > 0;
+    const hasAudios = (sourceTransferData.sourceA || []).length > 0;
+    
+    // Prüfen, ob didaktische Notizen vorliegen
+    const hasNotesInList = (homeworkNotesList || []).some(n => 
+      typeof n === 'string' && 
+      !isInternalMetadataNote(n) && 
+      !n.startsWith('AUDIO:') && 
+      !n.startsWith('STICKER:') && 
+      !n.startsWith('FEEDBACK:') && 
+      n.trim().length > 0
+    );
+    const hasGeneralNotes = Boolean(generalHomeworkNotes && generalHomeworkNotes.trim().length > 0);
+    const hasPreviousWeekSnapshot = (progressItems || []).some((item: any) => {
+      if (!item.is_current_homework && !item.topic_name?.startsWith('Hausaufgabe KW ')) return false;
+      const notes = item.homework_notes || item.teacher_notes || '';
+      return typeof notes === 'string' && notes.trim().length > 0;
+    });
+
+    return hasLW || hasSongs || hasAudios || hasNotesInList || hasGeneralNotes || hasPreviousWeekSnapshot;
+  }, [sourceTransferData, homeworkNotesList, generalHomeworkNotes, progressItems]);
 
   // ⚡ Atomare Ausführung des Hausaufgaben-Übertrags in eine neue Kalenderwoche
   const handleExecuteBatchTransfer = async (decisions: {
@@ -5129,6 +5243,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
     try {
       localStorage.setItem(`campus_homework_notes_${student.id}`, JSON.stringify(combined));
+      localStorage.setItem(`campus_homework_week_${student.id}`, getISOWeek());
     } catch {}
 
     syncHomeworkNotes(combined).catch(() => {});
@@ -5174,6 +5289,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
     try {
       localStorage.setItem(`campus_homework_notes_${student.id}`, JSON.stringify(combined));
+      localStorage.setItem(`campus_homework_week_${student.id}`, getISOWeek());
     } catch {}
 
     triggerImmediateAutoSave();
@@ -5283,6 +5399,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
     try {
       localStorage.setItem(`campus_homework_notes_${student.id}`, JSON.stringify(combined));
+      localStorage.setItem(`campus_homework_week_${student.id}`, getISOWeek());
     } catch {}
 
     if (t.skillKey) {
@@ -6895,6 +7012,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       if (!isLehrwerkPage && !isSong) {
         try {
           localStorage.setItem(`campus_homework_notes_${student.id}`, combinedHomeworkNotes);
+          localStorage.setItem(`campus_homework_week_${student.id}`, currentWeek);
           localStorage.setItem(`campus_teacher_notes_${student.id}`, effectiveTeacherNotes.trim());
         } catch (lsErr) {
           console.warn('[Meisterwerk] localStorage backup notice:', lsErr);
@@ -6939,6 +7057,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           try {
             if (!isLehrwerkPage && !isSong) {
               localStorage.setItem(`campus_homework_notes_${otherStud.id}`, combinedHomeworkNotes);
+              localStorage.setItem(`campus_homework_week_${otherStud.id}`, currentWeek);
             }
             const otherRow = {
               student_id: otherStud.id,
@@ -8836,6 +8955,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
               handleToggleMatchMode={handleToggleMatchMode}
               handleTogglePresetChip={handleTogglePresetChip}
               hasTresorStorage={hasTresorStorage}
+              hasTransferableHomework={hasTransferableHomework}
               homeworkNotes={homeworkNotes}
               homeworkNotesList={homeworkNotesList}
               hubTab={hubTab}

@@ -3195,17 +3195,17 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                   )}
                                 </div>
 
-                                {/* Barzahlung Spalte */}
-                                <div style={{ background: '#fcfaf2', border: '1px solid #f2e9cb', borderRadius: '18px', padding: '16px' }}>
-                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', borderBottom: '1px solid #f2e9cb', paddingBottom: '8px' }}>
-                                    <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#b45309', textTransform: 'uppercase', letterSpacing: '0.02em' }}>💵 Barzahlung / Rechnung</span>
-                                    <span style={{ background: '#fef3c7', color: '#b45309', fontSize: '0.68rem', fontWeight: 800, padding: '2px 8px', borderRadius: '100px' }}>
+                                {/* Banküberweisung Spalte (100% Bargeldlos gem. ZAG & GoBD) */}
+                                <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '18px', padding: '16px' }}>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', borderBottom: '1px solid #e2e8f0', paddingBottom: '8px' }}>
+                                    <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.02em' }}>🏛️ Banküberweisung (Direktabrechnung)</span>
+                                    <span style={{ background: '#e2e8f0', color: '#334155', fontSize: '0.68rem', fontWeight: 800, padding: '2px 8px', borderRadius: '100px' }}>
                                       {cashStudents.length} Schüler
                                     </span>
                                   </div>
                                   {cashStudents.length === 0 ? (
                                     <p style={{ margin: 0, fontSize: '0.7rem', color: '#64748b', fontStyle: 'italic', textAlign: 'center', padding: '20px 0' }}>
-                                      Keine Barzahler in diesem Monat.
+                                      Keine offenen Direktüberweisungen in diesem Monat.
                                     </p>
                                   ) : (
                                     <div style={{ maxHeight: '240px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px', paddingRight: '4px' }}>
@@ -3222,7 +3222,7 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                               padding: '8px 10px', 
                                               background: isPaid ? '#e6f4ea' : '#ffffff', 
                                               borderRadius: '10px', 
-                                              border: isPaid ? '1px solid #e6f4ea' : '1px solid #e2e8f0',
+                                              border: isPaid ? '1px solid #e6f4ea' : '1px solid #e2e8f0', 
                                               boxShadow: '0 2px 6px rgba(0,0,0,0.01)',
                                               transition: 'all 0.2s'
                                             }}
@@ -3251,14 +3251,14 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                                     s.student_billing_cash_paid = checked;
                                                     fetchDashboardData();
                                                   } catch (err: any) {
-                                                    console.error("Error updating cash paid status:", err);
+                                                    console.error("Error updating transfer status:", err);
                                                     alert("Fehler beim Speichern des Status: " + err.message);
                                                   }
                                                 }}
                                                 style={{ width: '14px', height: '14px', accentColor: '#34a853', cursor: 'pointer' }}
                                               />
                                               <span style={{ fontSize: '0.68rem', fontWeight: 700, color: isPaid ? '#34a853' : '#475569' }}>
-                                                {isPaid ? 'Bezahlt' : 'Ausstehend'}
+                                                {isPaid ? 'Verbucht' : 'Offen'}
                                               </span>
                                             </label>
                                           </div>
@@ -3266,6 +3266,9 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                       })}
                                     </div>
                                   )}
+                                  <div style={{ marginTop: '12px', paddingTop: '8px', borderTop: '1px solid #e2e8f0', fontSize: '0.66rem', color: '#64748b', lineHeight: '1.4' }}>
+                                    ⚖️ <strong>100% Bargeldlos (GoBD-Standard):</strong> Schüleraktivierungen erfolgen unbar per Banküberweisung. Der Haken bestätigt den Eingang auf dem Bankkonto.
+                                  </div>
                                 </div>
                               </div>
                             </div>

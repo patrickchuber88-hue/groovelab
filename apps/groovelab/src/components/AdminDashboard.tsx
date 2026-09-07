@@ -1106,7 +1106,14 @@ export function AdminDashboard({
   const [memberToSearch, setMemberToSearch] = useState('');
   
   const [showAddTeacher, setShowAddTeacher] = useState(false);
-  const [newTeacher, setNewTeacher] = useState({ firstName: '', lastName: '', isAdmin: false, instrument: '', photoUrl: '' });
+  const [newTeacher, setNewTeacher] = useState<{
+    firstName: string;
+    lastName: string;
+    isAdmin: boolean;
+    instrument: string;
+    photoUrl: string;
+    employment_type?: 'employed' | 'freelance';
+  }>({ firstName: '', lastName: '', isAdmin: false, instrument: '', photoUrl: '', employment_type: 'employed' });
 
   const op = schoolObj?.opening_hours || {};
   const teachersManageStudents = op.gl_setting_groovelab_teachers_manage_students === true;
@@ -3247,10 +3254,11 @@ export function AdminDashboard({
       last_name: newTeacher.lastName, 
       instrument: newTeacher.instrument || '',
       photo_url: isAdmOrSec ? '/campus_login_hero.png' : newTeacher.photoUrl,
+      employment_type: newTeacher.employment_type || 'employed',
       qr_token: crypto.randomUUID()
     }).select().single();
     if (error) alert('Fehler: ' + error.message);
-    else if (data) { setTeachers([...teachers, data]); setShowAddTeacher(false); setNewTeacher({ firstName: '', lastName: '', isAdmin: false, instrument: '', photoUrl: '' }); }
+    else if (data) { setTeachers([...teachers, data]); setShowAddTeacher(false); setNewTeacher({ firstName: '', lastName: '', isAdmin: false, instrument: '', photoUrl: '', employment_type: 'employed' }); }
   };
 
   const handleDeleteTeacher = async (id: string) => {
@@ -3304,7 +3312,8 @@ export function AdminDashboard({
       photo_url: isAdmOrSec ? '/campus_login_hero.png' : editingTeacher.photo_url,
       bio: editingTeacher.bio,
       expertise: editingTeacher.expertise,
-      bands: editingTeacher.bands
+      bands: editingTeacher.bands,
+      employment_type: editingTeacher.employment_type || 'employed'
     }).eq('id', editingTeacher.id);
     
     if (error) alert('Fehler: ' + error.message);
@@ -5181,6 +5190,46 @@ export function AdminDashboard({
               );
             })}
           </div>
+
+          {/* Herrenberg & DRV Audit Button */}
+          <button
+            type="button"
+            onClick={async () => {
+              try {
+                const { generateStaffCouncilDeclarationPDF } = await import('../utils/staffCouncilDeclarationGenerator');
+                await generateStaffCouncilDeclarationPDF({
+                  schoolName: schoolObj?.name || admin?.school_name,
+                  schoolAddress: schoolObj ? `${schoolObj.street || ''}, ${schoolObj.zip_code || ''} ${schoolObj.city || ''}`.trim() : undefined,
+                  schoolSigneeName: schoolObj?.avv_signee_name,
+                  schoolId: schoolObj?.id ? String(schoolObj.id) : admin?.school_id ? String(admin.school_id) : undefined
+                });
+              } catch (e) {
+                console.error('Herrenberg PDF Generation Error:', e);
+              }
+            }}
+            aria-label="Herrenberg- & DRV-Audit-Dossier herunterladen"
+            title="Offizielles Dossier zur Weisungsfreiheit freier Honorarkräfte (BSG B 12 R 3/20 R) für Betriebsprüfungen der Rentenversicherung"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              background: '#f8fafc',
+              color: '#334155',
+              border: '1.5px solid #cbd5e1',
+              padding: '10px 16px',
+              borderRadius: '16px',
+              fontSize: '0.78rem',
+              fontWeight: 800,
+              cursor: 'pointer',
+              transition: 'all 0.15s'
+            }}
+            className="focus-ring"
+            onMouseOver={(e) => { e.currentTarget.style.borderColor = '#94a3b8'; e.currentTarget.style.background = '#f1f5f9'; }}
+            onMouseOut={(e) => { e.currentTarget.style.borderColor = '#cbd5e1'; e.currentTarget.style.background = '#f8fafc'; }}
+          >
+            <span>🏛️</span>
+            <span>Herrenberg-Dossier (DRV)</span>
+          </button>
 
           {/* AVV Digital Sign Button */}
           <button

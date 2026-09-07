@@ -394,28 +394,32 @@ export async function generateDpoComplianceDossierPDF(options: DpoDossierOptions
       {
         t: '4. Verfahren zur regelmäßigen Überprüfung (Art. 32 Abs. 1 lit. d)',
         d: 'Automatisierte CI/CD Security Drift Guards (npm run security:check), Pre-Commit Secret-Scanner und WORM-Audit-Logging (Write Once Read Many) für alle administrativen Aktionen.'
+      },
+      {
+        t: '5. WebAuthn / Passkeys (Keine Biometrie gem. Art. 9 DSGVO)',
+        d: 'Optionale Passkey-Authentifizierung (FIDO2/WebAuthn) nutzt FaceID/TouchID ausschließlich lokal in der isolierten Hardware-Enclave (Secure Enclave/TPM) des Endgeräts. Biometrische Rohdaten verlassen niemals das Gerät; der Server empfängt und verifiziert lediglich eine Public-Key-Signatur (Zero Art. 9 Leakage).'
       }
     ];
 
     toms.forEach((tom) => {
       doc.setFillColor(lightBg[0], lightBg[1], lightBg[2]);
-      doc.roundedRect(margin, curY, contentWidth, 20, 2, 2, 'F');
+      doc.roundedRect(margin, curY, contentWidth, 18, 2, 2, 'F');
       doc.setDrawColor(borderGray[0], borderGray[1], borderGray[2]);
       doc.setLineWidth(0.4);
-      doc.roundedRect(margin, curY, contentWidth, 20, 2, 2, 'S');
+      doc.roundedRect(margin, curY, contentWidth, 18, 2, 2, 'S');
 
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(8.5);
+      doc.setFontSize(8.2);
       doc.setTextColor(darkSlate[0], darkSlate[1], darkSlate[2]);
-      doc.text(tom.t, margin + 4, curY + 6);
+      doc.text(tom.t, margin + 4, curY + 5.5);
 
       doc.setFont('helvetica', 'normal');
-      doc.setFontSize(7.2);
+      doc.setFontSize(7.0);
       doc.setTextColor(textGray[0], textGray[1], textGray[2]);
       const splitTom = doc.splitTextToSize(tom.d, contentWidth - 8);
-      doc.text(splitTom, margin + 4, curY + 11.5);
+      doc.text(splitTom, margin + 4, curY + 10.5);
 
-      curY += 23;
+      curY += 21;
     });
 
     curY += 4;

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { requestMicrophonePermissionOnce } from '../services/audioPermissionService';
 
 interface UseVoiceToTextOptions {
   lang?: string;
@@ -70,12 +71,20 @@ export const useVoiceToText = (options: UseVoiceToTextOptions = {}) => {
     };
   }, []);
 
-  const startListening = useCallback(() => {
+  const startListening = useCallback(async () => {
     if (typeof window === 'undefined') return;
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechRecognition) {
       setError('Spracherkennung wird von diesem Browser leider nicht unterstützt.');
       if (onError) onError('Speech recognition not supported');
+      return;
+    }
+
+    // 🛡️ Centralized One-Time Permission Gatekeeper (Unified Session Authorization)
+    const hasPermission = await requestMicrophonePermissionOnce();
+    if (!hasPermission) {
+      setError('Mikrofon-Freigabe wurde nicht erteilt.');
+      if (onError) onError('Microphone permission denied');
       return;
     }
 
@@ -123,7 +132,10 @@ export const useVoiceToText = (options: UseVoiceToTextOptions = {}) => {
 
       recognition.onerror = (event: any) => {
         console.warn('Speech recognition error:', event.error);
-        if (event.error !== 'no-speech') {
+        if (event.error === 'not-allowed') {
+          localStorage.removeItem('campus_microphone_permission_granted');
+          setError('Mikrofon-Zugriff wurde verweigert. Bitte in den Browser-Einstellungen erlauben.');
+        } else if (event.error !== 'no-speech') {
           setError(`Spracherkennungs-Hinweis: ${event.error}`);
           if (onError) onError(event.error);
         }

@@ -91,7 +91,10 @@ export default defineConfig({
           if (id.includes('ScheduleBoard') || id.includes('ScheduleCalendarView')) {
             return 'schedule-designer-suite';
           }
-          if (id.includes('BillingDashboard') || id.includes('SchoolDetailDrawer') || id.includes('MasterAdminDashboard') || id.includes('masterAdmin/')) {
+          if (id.includes('BillingDashboard')) {
+            return 'billing-dashboard-suite';
+          }
+          if (id.includes('SchoolDetailDrawer') || id.includes('MasterAdminDashboard') || id.includes('masterAdmin/')) {
             return 'master-admin-core';
           }
           if (id.includes('components/admin/')) {

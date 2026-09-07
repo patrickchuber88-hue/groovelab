@@ -1815,6 +1815,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
             <span style={{ cursor: 'pointer', fontWeight: 700 }} onClick={() => setActiveDocument('terms')}>AGB</span>
             <span style={{ cursor: 'pointer', fontWeight: 700 }} onClick={() => setActiveDocument('privacy')}>Datenschutz</span>
             <span style={{ cursor: 'pointer', fontWeight: 700 }} onClick={() => setActiveDocument('cancellation' as any)}>Widerruf</span>
+            <span style={{ cursor: 'pointer', fontWeight: 700 }} onClick={() => setActiveDocument('terminate' as any)}>Verträge hier kündigen</span>
             <span style={{ cursor: 'pointer', fontWeight: 700 }} onClick={() => setActiveDocument('impressum' as any)}>Impressum</span>
           </div>
         </div>
@@ -1822,7 +1823,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
       <LegalTextModal
         isOpen={activeDocument !== 'none'}
         onClose={() => setActiveDocument('none')}
-        initialTab={activeDocument === 'privacy' ? 'privacy' : activeDocument === 'terms' ? 'terms' : (activeDocument as any) === 'cancellation' ? 'cancellation' : 'impressum'}
+        initialTab={activeDocument === 'privacy' ? 'privacy' : activeDocument === 'terms' ? 'terms' : (activeDocument as any) === 'cancellation' ? 'cancellation' : (activeDocument as any) === 'terminate' ? 'terminate' : 'impressum'}
       />
 
       {/* 🛡️ Datenschutz & Sicherheitsstufen Modal */}

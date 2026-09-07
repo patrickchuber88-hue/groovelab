@@ -141,6 +141,51 @@ export const AdminTeachersView: React.FC<AdminTeachersViewProps> = ({
               </div>
             </div>
 
+            {/* Herrenberg Compliance § 7a SGB IV: Beschäftigungsstatus */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>
+                  Dozenten-Status (Herrenberg-Compliance § 7a SGB IV)
+                </label>
+                <span style={{ fontSize: '0.64rem', color: newTeacher.employment_type === 'freelance' ? '#2563eb' : '#059669', fontWeight: 700 }}>
+                  {newTeacher.employment_type === 'freelance' ? '✓ Freier Dozent (Autonom)' : '✓ Festanstellung (TVöD)'}
+                </span>
+              </div>
+              <div style={{ display: 'flex', background: '#e2e8f0', borderRadius: '12px', padding: '3px' }}>
+                <button
+                  type="button"
+                  onClick={() => setNewTeacher({ ...newTeacher, employment_type: 'employed' })}
+                  style={{
+                    flex: 1, padding: '8px', border: 'none', borderRadius: '10px',
+                    background: (newTeacher.employment_type !== 'freelance') ? '#ffffff' : 'transparent',
+                    color: (newTeacher.employment_type !== 'freelance') ? brandColor : '#64748b',
+                    fontSize: '0.82rem', fontWeight: 800, cursor: 'pointer', transition: 'all 0.2s',
+                    boxShadow: (newTeacher.employment_type !== 'freelance') ? '0 2px 4px rgba(0,0,0,0.05)' : 'none'
+                  }}
+                >
+                  Angestellt (TVöD / Fest)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setNewTeacher({ ...newTeacher, employment_type: 'freelance' })}
+                  style={{
+                    flex: 1, padding: '8px', border: 'none', borderRadius: '10px',
+                    background: (newTeacher.employment_type === 'freelance') ? '#ffffff' : 'transparent',
+                    color: (newTeacher.employment_type === 'freelance') ? brandColor : '#64748b',
+                    fontSize: '0.82rem', fontWeight: 800, cursor: 'pointer', transition: 'all 0.2s',
+                    boxShadow: (newTeacher.employment_type === 'freelance') ? '0 2px 4px rgba(0,0,0,0.05)' : 'none'
+                  }}
+                >
+                  Freier Mitarbeiter (Honorar)
+                </button>
+              </div>
+              {newTeacher.employment_type === 'freelance' && (
+                <div style={{ fontSize: '0.66rem', color: '#1e40af', background: '#eff6ff', padding: '6px 10px', borderRadius: '8px', border: '1px solid #bfdbfe', lineHeight: 1.35 }}>
+                  🛡️ <strong>Herrenberg-Schutz:</strong> Freie Dozenten nutzen die Software weisungsfrei. Keine Anwesenheitsüberwachung oder Weisungsbindung.
+                </div>
+              )}
+            </div>
+
             {!newTeacher.isAdmin && (
               <div>
                 <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '8px', display: 'block' }}>Instrumente (Icons anklicken):</label>
@@ -233,6 +278,51 @@ export const AdminTeachersView: React.FC<AdminTeachersViewProps> = ({
                   Lehrer (Admin)
                 </button>
               </div>
+            </div>
+
+            {/* Herrenberg Compliance § 7a SGB IV: Beschäftigungsstatus */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>
+                  Dozenten-Status (Herrenberg-Compliance § 7a SGB IV)
+                </label>
+                <span style={{ fontSize: '0.64rem', color: editingTeacher.employment_type === 'freelance' ? '#2563eb' : '#059669', fontWeight: 700 }}>
+                  {editingTeacher.employment_type === 'freelance' ? '✓ Freier Dozent (Autonom)' : '✓ Festanstellung (TVöD)'}
+                </span>
+              </div>
+              <div style={{ display: 'flex', background: '#e2e8f0', borderRadius: '12px', padding: '3px' }}>
+                <button
+                  type="button"
+                  onClick={() => setEditingTeacher({ ...editingTeacher, employment_type: 'employed' })}
+                  style={{
+                    flex: 1, padding: '8px', border: 'none', borderRadius: '10px',
+                    background: (editingTeacher.employment_type !== 'freelance') ? '#ffffff' : 'transparent',
+                    color: (editingTeacher.employment_type !== 'freelance') ? brandColor : '#64748b',
+                    fontSize: '0.82rem', fontWeight: 800, cursor: 'pointer', transition: 'all 0.2s',
+                    boxShadow: (editingTeacher.employment_type !== 'freelance') ? '0 2px 4px rgba(0,0,0,0.05)' : 'none'
+                  }}
+                >
+                  Angestellt (TVöD / Fest)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditingTeacher({ ...editingTeacher, employment_type: 'freelance' })}
+                  style={{
+                    flex: 1, padding: '8px', border: 'none', borderRadius: '10px',
+                    background: (editingTeacher.employment_type === 'freelance') ? '#ffffff' : 'transparent',
+                    color: (editingTeacher.employment_type === 'freelance') ? brandColor : '#64748b',
+                    fontSize: '0.82rem', fontWeight: 800, cursor: 'pointer', transition: 'all 0.2s',
+                    boxShadow: (editingTeacher.employment_type === 'freelance') ? '0 2px 4px rgba(0,0,0,0.05)' : 'none'
+                  }}
+                >
+                  Freier Mitarbeiter (Honorar)
+                </button>
+              </div>
+              {editingTeacher.employment_type === 'freelance' && (
+                <div style={{ fontSize: '0.66rem', color: '#1e40af', background: '#eff6ff', padding: '6px 10px', borderRadius: '8px', border: '1px solid #bfdbfe', lineHeight: 1.35 }}>
+                  🛡️ <strong>Herrenberg-Schutz:</strong> Freie Dozenten nutzen die Software weisungsfrei. Keine Anwesenheitsüberwachung oder Weisungsbindung.
+                </div>
+              )}
             </div>
 
             <div>
@@ -335,8 +425,21 @@ export const AdminTeachersView: React.FC<AdminTeachersViewProps> = ({
                     <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: isObserver ? '#94a3b8' : '#1e293b', margin: 0, transition: 'color 0.3s', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.first_name} {t.last_name}</h3>
                     {t.role === 'admin' && !isObserver && <Shield size={14} color="#f59e0b" />}
                   </div>
-                  <div style={{ fontSize: '0.75rem', fontWeight: 800, color: accentColor, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px', transition: 'color 0.3s' }}>
-                    {isObserver ? '👁 Hospitant' : 'Lehrer'}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginBottom: '6px' }}>
+                    <div style={{ fontSize: '0.75rem', fontWeight: 800, color: accentColor, textTransform: 'uppercase', letterSpacing: '0.05em', transition: 'color 0.3s' }}>
+                      {isObserver ? '👁 Hospitant' : 'Lehrer'}
+                    </div>
+                    <span style={{
+                      fontSize: '0.62rem',
+                      fontWeight: 700,
+                      padding: '1px 6px',
+                      borderRadius: '6px',
+                      background: t.employment_type === 'freelance' ? '#eff6ff' : '#ecfdf5',
+                      color: t.employment_type === 'freelance' ? '#1d4ed8' : '#15803d',
+                      border: `1px solid ${t.employment_type === 'freelance' ? '#bfdbfe' : '#bbf7d0'}`
+                    }}>
+                      {t.employment_type === 'freelance' ? 'Honorar (§ 7a SGB IV)' : 'Festangestellt (TVöD)'}
+                    </span>
                   </div>
 
                   {/* Lehrer / Hospitant Toggle */}

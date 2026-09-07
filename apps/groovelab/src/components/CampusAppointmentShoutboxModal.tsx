@@ -756,6 +756,25 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
           </button>
         </div>
 
+        {/* Child Protection & Supervisory Transparency Banner (§ 832 BGB / SGB VIII / Schutzkonzept) */}
+        <div style={{
+          background: '#f8fafc',
+          borderBottom: '1px solid #e2e8f0',
+          padding: '7px 20px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          fontSize: '0.69rem',
+          color: '#64748b',
+          lineHeight: '1.35',
+          flexShrink: 0
+        }}>
+          <ShieldCheck size={13} color="#15803d" style={{ flexShrink: 0 }} />
+          <span>
+            <strong>Schulischer Schutzraum:</strong> Kanal ausschließlich für didaktische Zwecke. Einsichtnahme durch Erziehungsberechtigte und Schulleitung im Rahmen des Schutzkonzepts vorbehalten.
+          </span>
+        </div>
+
         {/* Cancelled Alert Banner with In-Chat Reactivation */}
         {isCanceled && (
           <div style={{

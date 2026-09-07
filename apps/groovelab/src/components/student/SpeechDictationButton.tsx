@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Mic } from 'lucide-react';
+import { requestMicrophonePermissionOnce } from '../../services/audioPermissionService';
 
 export const SpeechDictationButton: React.FC<{
   onTranscript: (text: string) => void;
@@ -28,7 +29,7 @@ export const SpeechDictationButton: React.FC<{
     };
   }, []);
 
-  const toggleListening = () => {
+  const toggleListening = async () => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechRecognition) {
       alert("Spracherkennung wird von Ihrem Browser leider nicht unterstützt (empfohlen: Google Chrome, Safari oder Microsoft Edge).");
@@ -40,6 +41,12 @@ export const SpeechDictationButton: React.FC<{
       if (recognitionRef.current) {
         try { recognitionRef.current.stop(); } catch {}
       }
+      return;
+    }
+
+    // 🛡️ Centralized One-Time Permission Gatekeeper (Unified Session Authorization)
+    const hasPermission = await requestMicrophonePermissionOnce();
+    if (!hasPermission) {
       return;
     }
 
@@ -71,6 +78,9 @@ export const SpeechDictationButton: React.FC<{
 
       recognition.onerror = (event: any) => {
         console.warn("[SpeechDictation] Error:", event.error);
+        if (event.error === 'not-allowed') {
+          localStorage.removeItem('campus_microphone_permission_granted');
+        }
         setIsListening(false);
       };
 
