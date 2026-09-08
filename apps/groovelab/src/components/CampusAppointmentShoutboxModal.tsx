@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import {
   MessageSquare,
   X,
@@ -44,6 +45,44 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
   const [isSending, setIsSending] = useState(false);
   const [isActionLoading, setIsActionLoading] = useState(false);
   const chatMessagesEndRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const [windowWidth, setWindowWidth] = useState(() => (typeof window !== 'undefined' ? window.innerWidth : 1200));
+
+  useEffect(() => {
+    const handleResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const isMobile = useMemo(() => {
+    if (typeof window === 'undefined') return false;
+    const isInsideSim = typeof document !== 'undefined' && Boolean(document.querySelector('.sim-viewport-mobile, .sim-viewport-portrait, .sim-viewport-iphone14, [class*="sim-viewport-mobile"]'));
+    return windowWidth <= 768 || isInsideSim;
+  }, [windowWidth]);
+
+  // Lock body scroll when modal is open to prevent background scrolling
+  useEffect(() => {
+    if (!isOpen) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [isOpen]);
+
+  const simTarget = typeof document !== 'undefined'
+    ? (document.querySelector('.sim-viewport-mobile, .sim-viewport-portrait, .sim-viewport-iphone14, [class*="sim-viewport-mobile"]') as HTMLElement)
+    : null;
+  const isInsideSim = Boolean(simTarget);
+  const portalTarget = mounted
+    ? ((isMobile && simTarget) ? simTarget : (typeof document !== 'undefined' ? document.body : null))
+    : null;
 
   if (!isOpen || !occurrence) return null;
 
@@ -612,70 +651,85 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
         { label: 'Bis nachher!', text: 'Alles klar, bis nachher beim Unterricht!', icon: Check }
       ]);
 
-  return (
+  const content = (
     <div
+      ref={containerRef}
       onClick={onClose}
+      className="pwa-modal-drawer"
       style={{
-        position: 'fixed',
+        position: (isMobile && isInsideSim) ? 'absolute' : 'fixed',
         inset: 0,
-        zIndex: 1100,
-        background: 'rgba(15, 23, 42, 0.65)',
-        backdropFilter: 'blur(8px)',
-        WebkitBackdropFilter: 'blur(8px)',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        width: '100%',
+        height: '100%',
+        zIndex: 99999,
+        background: isMobile ? '#ffffff' : 'rgba(15, 23, 42, 0.65)',
+        backdropFilter: isMobile ? 'none' : 'blur(8px)',
+        WebkitBackdropFilter: isMobile ? 'none' : 'blur(8px)',
         display: 'flex',
-        alignItems: 'center',
+        alignItems: isMobile ? 'stretch' : 'center',
         justifyContent: 'center',
-        padding: '24px',
+        padding: isMobile ? 0 : '24px',
         animation: 'fadeIn 0.15s ease'
       }}
     >
       <div
         onClick={e => e.stopPropagation()}
+        className="pwa-modal-drawer"
         style={{
           background: '#ffffff',
-          borderRadius: '28px',
+          borderRadius: isMobile ? 0 : '28px',
           width: '100%',
-          maxWidth: '500px',
-          boxShadow: '0 32px 80px rgba(0,0,0,0.25)',
+          maxWidth: isMobile ? '100%' : '500px',
+          height: isMobile ? '100%' : 'auto',
+          maxHeight: isMobile ? '100%' : '85vh',
+          boxShadow: isMobile ? 'none' : '0 32px 80px rgba(0,0,0,0.25)',
           overflow: 'hidden',
           display: 'flex',
           flexDirection: 'column',
           position: 'relative',
-          maxHeight: '85vh',
           fontFamily: "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
         }}
       >
-        {/* iOS Sheet Grabber Pill */}
-        <div style={{
-          position: 'absolute',
-          top: '7px',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          width: '36px',
-          height: '4.5px',
-          borderRadius: '10px',
-          background: 'rgba(255, 255, 255, 0.4)',
-          zIndex: 10
-        }} />
+        {/* iOS Sheet Grabber Pill (Desktop modal only) */}
+        {!isMobile && (
+          <div style={{
+            position: 'absolute',
+            top: '7px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            width: '36px',
+            height: '4.5px',
+            borderRadius: '10px',
+            background: 'rgba(255, 255, 255, 0.4)',
+            zIndex: 10
+          }} />
+        )}
 
         {/* Header: Apple HIG Morphing Glass Stage */}
         <div style={{
           background: 'linear-gradient(135deg, #15803d 0%, #166534 100%)',
-          padding: '24px 22px 18px 22px',
+          padding: isMobile
+            ? 'calc(12px + env(safe-area-inset-top, 0px)) 16px 13px 16px'
+            : '24px 22px 18px 22px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
           gap: '12px',
           color: '#ffffff',
           boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 4px 16px rgba(0,0,0,0.06)',
-          transition: 'background 0.3s ease'
+          transition: 'background 0.3s ease',
+          flexShrink: 0
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '14px', minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '10px' : '14px', minWidth: 0, flex: 1 }}>
             {/* Apple Glas-Squircle */}
             <div style={{
-              width: '44px',
-              height: '44px',
-              borderRadius: '14px',
+              width: isMobile ? '38px' : '44px',
+              height: isMobile ? '38px' : '44px',
+              borderRadius: '13px',
               background: 'rgba(255, 255, 255, 0.18)',
               backdropFilter: 'blur(8px)',
               WebkitBackdropFilter: 'blur(8px)',
@@ -687,52 +741,71 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
               flexShrink: 0,
               boxShadow: '0 4px 12px rgba(0,0,0,0.08)'
             }}>
-              <MessageSquare size={22} strokeWidth={2.2} />
+              <MessageSquare size={isMobile ? 19 : 22} strokeWidth={2.2} />
             </div>
-            <div style={{ minWidth: 0 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'nowrap' }}>
                 <h3 style={{
                   margin: 0,
-                  fontSize: '1.18rem',
+                  fontSize: isMobile ? '1.08rem' : '1.18rem',
                   fontWeight: 900,
                   letterSpacing: '-0.02em',
                   color: '#ffffff',
-                  whiteSpace: 'nowrap'
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis'
                 }}>
-                  {titleText}
+                  {isMobile ? otherPartyDisplayName : titleText}
                 </h3>
                 {/* Translucent Status Badge */}
                 <span style={{
-                  padding: '3px 9px',
+                  padding: '2.5px 8px',
                   borderRadius: '100px',
-                  background: 'rgba(255, 255, 255, 0.22)',
+                  background: isCanceled ? 'rgba(220, 38, 38, 0.35)' : 'rgba(255, 255, 255, 0.22)',
                   backdropFilter: 'blur(6px)',
                   WebkitBackdropFilter: 'blur(6px)',
                   color: '#ffffff',
-                  border: '1px solid rgba(255, 255, 255, 0.3)',
-                  fontSize: '0.74rem',
+                  border: isCanceled ? '1px solid rgba(254, 202, 202, 0.4)' : '1px solid rgba(255, 255, 255, 0.3)',
+                  fontSize: isMobile ? '0.68rem' : '0.74rem',
                   fontWeight: 800,
                   display: 'inline-flex',
                   alignItems: 'center',
-                  gap: '4px'
+                  gap: '4px',
+                  whiteSpace: 'nowrap',
+                  flexShrink: 0
                 }}>
-                  {isCanceled ? <X size={11} strokeWidth={3} /> : (isReactivated ? <RotateCcw size={11} strokeWidth={2.5} /> : (isRescheduled ? <Clock size={11} strokeWidth={2.5} /> : <Check size={11} strokeWidth={3} />))}
+                  {isCanceled ? <X size={10} strokeWidth={3} /> : (isReactivated ? <RotateCcw size={10} strokeWidth={2.5} /> : (isRescheduled ? <Clock size={10} strokeWidth={2.5} /> : <Check size={10} strokeWidth={3} />))}
                   <span>{isCanceled ? 'Termin abgesagt' : (isReactivated ? 'Regulär (Reaktiviert)' : (isRescheduled ? 'Verschoben' : 'Regulär'))}</span>
                 </span>
               </div>
 
               <p style={{
-                margin: '3px 0 0 0',
-                color: 'rgba(255, 255, 255, 0.92)',
-                fontSize: '0.84rem',
+                margin: '2px 0 0 0',
+                color: 'rgba(255, 255, 255, 0.90)',
+                fontSize: isMobile ? '0.76rem' : '0.84rem',
                 fontWeight: 650,
                 display: 'flex',
                 alignItems: 'center',
-                gap: '6px'
+                gap: '6px',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis'
               }}>
-                <span>Termin am {formattedOccDate} um {timeLabel} Uhr</span>
+                <span>{weekdayShort}, {formattedOccDate}</span>
                 <span style={{ opacity: 0.6 }}>•</span>
-                <span style={{ color: '#ffffff', fontWeight: 800 }}>{otherPartyDisplayName}</span>
+                <span>{timeLabel} Uhr</span>
+                {!isMobile && (
+                  <>
+                    <span style={{ opacity: 0.6 }}>•</span>
+                    <span style={{ color: '#ffffff', fontWeight: 800 }}>{otherPartyDisplayName}</span>
+                  </>
+                )}
+                {isGroupOcc && (
+                  <>
+                    <span style={{ opacity: 0.6 }}>•</span>
+                    <span style={{ opacity: 0.9 }}>Gruppe</span>
+                  </>
+                )}
               </p>
             </div>
           </div>
@@ -741,6 +814,7 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
           <button
             type="button"
             onClick={onClose}
+            aria-label="Schließen"
             style={{
               border: '1px solid rgba(255, 255, 255, 0.25)',
               background: 'rgba(255, 255, 255, 0.18)',
@@ -748,8 +822,8 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
               WebkitBackdropFilter: 'blur(8px)',
               color: '#ffffff',
               borderRadius: '50%',
-              width: '32px',
-              height: '32px',
+              width: isMobile ? '34px' : '32px',
+              height: isMobile ? '34px' : '32px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -770,43 +844,46 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
           </button>
         </div>
 
-        {/* Child Protection Banner (§ 8a SGB VIII) */}
-        <div style={{
-          background: '#f8fafc',
-          borderBottom: '1px solid #e2e8f0',
-          padding: '7px 20px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          fontSize: '0.69rem',
-          color: '#64748b',
-          lineHeight: '1.35',
-          flexShrink: 0
-        }}>
-          <ShieldCheck size={13} color="#15803d" style={{ flexShrink: 0 }} />
-          <span>
-            <strong>Didaktischer Schul-Chat (§ 8a SGB VIII):</strong> Nur für Unterrichtszwecke • Für Erziehungsberechtigte transparent einsehbar.
-          </span>
-        </div>
+        {/* Child Protection Banner (§ 8a SGB VIII) - Desktop Only */}
+        {!isMobile && (
+          <div style={{
+            background: '#f8fafc',
+            borderBottom: '1px solid #e2e8f0',
+            padding: '7px 20px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            fontSize: '0.69rem',
+            color: '#64748b',
+            lineHeight: '1.35',
+            flexShrink: 0
+          }}>
+            <ShieldCheck size={13} color="#15803d" style={{ flexShrink: 0 }} />
+            <span>
+              <strong>Didaktischer Schul-Chat (§ 8a SGB VIII):</strong> Nur für Unterrichtszwecke • Für Erziehungsberechtigte transparent einsehbar.
+            </span>
+          </div>
+        )}
 
         {/* Cancelled Alert Banner with In-Chat Reactivation */}
         {isCanceled && (
           <div style={{
-            margin: '12px 20px 0 20px',
-            padding: '12px 16px',
+            margin: isMobile ? '10px 14px 0 14px' : '12px 20px 0 20px',
+            padding: isMobile ? '10px 14px' : '12px 16px',
             borderRadius: '16px',
             background: '#fff5f5',
             border: '1px solid #fecaca',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            gap: '12px',
-            boxShadow: '0 2px 8px rgba(239, 68, 68, 0.04)'
+            gap: '10px',
+            boxShadow: '0 2px 8px rgba(239, 68, 68, 0.04)',
+            flexShrink: 0
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
               <div style={{
-                width: '32px',
-                height: '32px',
+                width: isMobile ? '28px' : '32px',
+                height: isMobile ? '28px' : '32px',
                 borderRadius: '50%',
                 background: '#fee2e2',
                 color: '#dc2626',
@@ -815,15 +892,17 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
                 justifyContent: 'center',
                 flexShrink: 0
               }}>
-                <X size={16} strokeWidth={2.5} />
+                <X size={isMobile ? 14 : 16} strokeWidth={2.5} />
               </div>
-              <div>
-                <div style={{ fontSize: '0.86rem', fontWeight: 800, color: '#991b1b', letterSpacing: '-0.01em' }}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: isMobile ? '0.80rem' : '0.86rem', fontWeight: 800, color: '#991b1b', letterSpacing: '-0.01em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   Dieser Termin wurde abgesagt
                 </div>
-                <div style={{ fontSize: '0.74rem', color: '#b91c1c', fontWeight: 650, marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <Clock size={11} color="#b91c1c" strokeWidth={2.5} />
-                  <span>{cancelTimestampStr ? `Abgesagt am ${cancelTimestampStr} (${cancelledByLabel})` : 'Absage kann hier direkt rückgängig gemacht werden.'}</span>
+                <div style={{ fontSize: '0.70rem', color: '#b91c1c', fontWeight: 650, marginTop: '1px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <Clock size={10} color="#b91c1c" strokeWidth={2.5} />
+                  <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {cancelTimestampStr ? `Abgesagt am ${cancelTimestampStr} (${cancelledByLabel})` : 'Absage kann direkt reaktiviert werden.'}
+                  </span>
                 </div>
               </div>
             </div>
@@ -836,8 +915,8 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
                 color: isLessonPast ? '#94a3b8' : '#ffffff',
                 border: isLessonPast ? '1px solid #cbd5e1' : 'none',
                 borderRadius: '100px',
-                padding: '7px 15px',
-                fontSize: '0.80rem',
+                padding: '6px 13px',
+                fontSize: '0.76rem',
                 fontWeight: 850,
                 cursor: isLessonPast ? 'not-allowed' : 'pointer',
                 display: 'inline-flex',
@@ -845,12 +924,13 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
                 gap: '5px',
                 whiteSpace: 'nowrap',
                 boxShadow: isLessonPast ? 'none' : '0 2px 8px rgba(21, 128, 61, 0.25)',
-                transition: 'background 0.15s ease'
+                transition: 'background 0.15s ease',
+                flexShrink: 0
               }}
               onMouseEnter={e => { if (!isLessonPast) e.currentTarget.style.background = '#166534'; }}
               onMouseLeave={e => { if (!isLessonPast) e.currentTarget.style.background = '#15803d'; }}
             >
-              <RotateCcw size={13} strokeWidth={2.5} />
+              <RotateCcw size={12} strokeWidth={2.5} />
               <span>Reaktivieren</span>
             </button>
           </div>
@@ -860,14 +940,36 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
         <div style={{
           flex: 1,
           overflowY: 'auto',
-          padding: '20px 24px',
+          padding: isMobile ? '12px 14px' : '20px 24px',
           background: '#fafbfc',
           display: 'flex',
           flexDirection: 'column',
           gap: '12px',
-          minHeight: '260px',
-          maxHeight: '440px'
+          minHeight: isMobile ? '160px' : '260px',
+          maxHeight: isMobile ? 'none' : '440px'
         }} className="custom-scrollbar">
+          {/* Centered Child Protection Whisper Badge (Mobile Only) */}
+          {isMobile && (
+            <div style={{
+              alignSelf: 'center',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '4px 12px',
+              borderRadius: '100px',
+              background: 'rgba(241, 245, 249, 0.85)',
+              border: '1px solid #e2e8f0',
+              color: '#64748b',
+              fontSize: '0.68rem',
+              fontWeight: 650,
+              margin: '2px 0 6px 0',
+              textAlign: 'center',
+              maxWidth: '92%'
+            }}>
+              <ShieldCheck size={12} color="#15803d" style={{ flexShrink: 0 }} />
+              <span>Schul-Chat (§ 8a SGB VIII) • Für Erziehungsberechtigte einsehbar</span>
+            </div>
+          )}
           {isFrozen && (
             <div style={{ background: '#fef2f2', border: '1px solid #fee2f2', color: '#991b1b', padding: '8px 12px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'center', textAlign: 'center' }}>
               <Lock size={14} /> <span>Shoutbox eingefroren (Schreibschutz nach 48h aktiv)</span>
@@ -897,99 +999,61 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
               const isReactivation = msg.message_type === 'cancellation_reset' ||
                 (msg.content && (msg.content.includes('🔄') || msg.content.includes('reaktiviert') || msg.content.includes('zurückgenommen') || msg.content.includes('regulär statt') || msg.content.includes('zurückgesetzt')));
 
-              // 1. Reaktivierungs-Eventkarte (Audit-Proof & Monochrom)
+              // 1. Reaktivierungs-Eventpill (Monochrom & Apple HIG)
               if (isReactivation) {
-                const lines = cleanContent
-                  .replace(/[❌🔄🕒✅🔒⚠️]/gu, '')
-                  .split('\n')
-                  .map(l => l.trim())
-                  .filter(Boolean);
-                const mainMsg = lines[0] || 'Termin reaktiviert: Der Unterricht findet planmäßig statt.';
-                const timeLine = lines.find(l => l.toLowerCase().includes('reaktiviert am')) ||
-                  `Reaktiviert am ${new Date(msg.created_at).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })} um ${new Date(msg.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Uhr`;
+                const dateObj = new Date(msg.created_at);
+                const timeFormatted = dateObj.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+                const dateFormatted = dateObj.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
 
                 return (
-                  <div key={msg.id || idx} style={{ alignSelf: 'center', width: '100%', maxWidth: '96%', margin: '4px 0' }}>
+                  <div key={msg.id || idx} style={{ alignSelf: 'center', margin: '6px 0', maxWidth: '92%' }}>
                     <div style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '7px',
                       background: '#f0fdf4',
-                      border: '1.5px solid #86efac',
-                      borderRadius: '18px',
-                      padding: '12px 18px',
-                      boxShadow: '0 2px 8px rgba(34, 197, 94, 0.08)',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '8px'
+                      border: '1px solid #bbf7d0',
+                      borderRadius: '100px',
+                      padding: '5px 14px',
+                      boxShadow: '0 1px 3px rgba(34, 197, 94, 0.08)'
                     }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: '#dcfce7', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                          <RotateCcw size={14} color="#15803d" strokeWidth={2.5} />
-                        </div>
-                        <span style={{ fontSize: '0.86rem', fontWeight: 900, color: '#15803d', letterSpacing: '-0.01em' }}>
-                          Termin reaktiviert
-                        </span>
-                        <span style={{ marginLeft: 'auto', fontSize: '0.72rem', color: '#16a34a', fontWeight: 700 }}>
-                          {new Date(msg.created_at).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })}, {new Date(msg.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Uhr
-                        </span>
-                      </div>
-                      <div style={{ fontSize: '0.90rem', color: '#166534', fontWeight: 650, lineHeight: 1.45, wordBreak: 'break-word', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
-                          <RotateCcw size={13} color="#15803d" strokeWidth={2.4} style={{ flexShrink: 0, marginTop: '3px' }} />
-                          <span>{mainMsg}</span>
-                        </div>
-                        <div style={{ marginTop: '2px', fontSize: '0.76rem', color: '#166534', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px' }}>
-                          <Clock size={12} color="#166534" style={{ flexShrink: 0 }} />
-                          <span>{timeLine}</span>
-                        </div>
-                      </div>
+                      <RotateCcw size={12} color="#15803d" strokeWidth={2.6} style={{ flexShrink: 0 }} />
+                      <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#15803d' }}>
+                        Termin reaktiviert
+                      </span>
+                      <span style={{ fontSize: '0.72rem', color: '#16a34a', fontWeight: 650 }}>
+                        • {dateFormatted}, {timeFormatted} Uhr
+                      </span>
                     </div>
                   </div>
                 );
               }
 
-              // 2. Stornierungs-/Absage-Eventkarte (Audit-Proof & Monochrom)
+              // 2. Stornierungs-/Absage-Eventpill (Monochrom & Apple HIG)
               if (isCancellation) {
-                const lines = cleanContent
-                  .replace(/[❌🔄🕒✅🔒⚠️]/gu, '')
-                  .split('\n')
-                  .map(l => l.trim())
-                  .filter(Boolean);
-                const mainMsg = lines[0] || 'Dieser Termin wurde abgesagt.';
-                const timeLine = lines.find(l => l.toLowerCase().includes('abgemeldet am') || l.toLowerCase().includes('abgesagt am')) ||
-                  `Abgemeldet am ${new Date(msg.created_at).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })} um ${new Date(msg.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Uhr`;
+                const dateObj = new Date(msg.created_at);
+                const timeFormatted = dateObj.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+                const dateFormatted = dateObj.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
 
                 return (
-                  <div key={msg.id || idx} style={{ alignSelf: 'center', width: '100%', maxWidth: '96%', margin: '4px 0' }}>
+                  <div key={msg.id || idx} style={{ alignSelf: 'center', margin: '6px 0', maxWidth: '92%' }}>
                     <div style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '7px',
                       background: '#fef2f2',
-                      border: '1.5px dashed #fca5a5',
-                      borderRadius: '18px',
-                      padding: '12px 18px',
-                      boxShadow: '0 2px 8px rgba(239, 68, 68, 0.06)',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '8px'
+                      border: '1px solid #fecaca',
+                      borderRadius: '100px',
+                      padding: '5px 14px',
+                      boxShadow: '0 1px 3px rgba(239, 68, 68, 0.06)'
                     }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: '#fee2e2', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                          <X size={14} color="#dc2626" strokeWidth={2.5} />
-                        </div>
-                        <span style={{ fontSize: '0.86rem', fontWeight: 900, color: '#991b1b', letterSpacing: '-0.01em' }}>
-                          Termin abgesagt
-                        </span>
-                        <span style={{ marginLeft: 'auto', fontSize: '0.72rem', color: '#b91c1c', fontWeight: 700 }}>
-                          {new Date(msg.created_at).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })}, {new Date(msg.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Uhr
-                        </span>
-                      </div>
-                      <div style={{ fontSize: '0.90rem', color: '#991b1b', fontWeight: 650, lineHeight: 1.45, wordBreak: 'break-word', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
-                          <X size={13} color="#dc2626" strokeWidth={2.4} style={{ flexShrink: 0, marginTop: '3px' }} />
-                          <span>{mainMsg}</span>
-                        </div>
-                        <div style={{ marginTop: '2px', fontSize: '0.76rem', color: '#b91c1c', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px' }}>
-                          <Clock size={12} color="#b91c1c" style={{ flexShrink: 0 }} />
-                          <span>{timeLine}</span>
-                        </div>
-                      </div>
+                      <X size={12} color="#dc2626" strokeWidth={2.8} style={{ flexShrink: 0 }} />
+                      <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#991b1b' }}>
+                        Termin abgesagt
+                      </span>
+                      <span style={{ fontSize: '0.72rem', color: '#b91c1c', fontWeight: 650 }}>
+                        • {dateFormatted}, {timeFormatted} Uhr
+                      </span>
                     </div>
                   </div>
                 );
@@ -1048,14 +1112,17 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
 
         {/* Quick Reply Chips & Action Bar */}
         <div style={{
-          background: 'rgba(255, 255, 255, 0.95)',
+          background: 'rgba(255, 255, 255, 0.98)',
           backdropFilter: 'blur(16px)',
           WebkitBackdropFilter: 'blur(16px)',
           borderTop: '1px solid #f1f5f9',
           display: 'flex',
           flexDirection: 'column',
           gap: '8px',
-          padding: '10px 20px 14px 20px'
+          padding: isMobile
+            ? '10px 14px calc(12px + env(safe-area-inset-bottom, 0px)) 14px'
+            : '10px 20px 14px 20px',
+          flexShrink: 0
         }}>
           {/* Music Pedagogical Quick Reply Chips */}
           {!isFrozen && (
@@ -1069,8 +1136,8 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
               maskImage: 'linear-gradient(to right, black 94%, transparent 100%)',
               WebkitMaskImage: 'linear-gradient(to right, black 94%, transparent 100%)'
             }}>
-              {/* Reaktivieren Quick Action Chip when Cancelled */}
-              {isCanceled && (
+              {/* Primary Contextual Action Chip (Absagen or Reaktivieren) */}
+              {isCanceled ? (
                 <button
                   type="button"
                   disabled={isLessonPast || isActionLoading}
@@ -1082,8 +1149,8 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
                     background: isLessonPast ? '#f1f5f9' : '#f0fdf4',
                     border: isLessonPast ? '1.5px solid #cbd5e1' : '1.5px solid #86efac',
                     color: isLessonPast ? '#94a3b8' : '#15803d',
-                    fontSize: '0.82rem',
-                    fontWeight: 800,
+                    fontSize: '0.80rem',
+                    fontWeight: 850,
                     whiteSpace: 'nowrap',
                     cursor: isLessonPast ? 'not-allowed' : 'pointer',
                     opacity: isLessonPast ? 0.6 : 1,
@@ -1095,8 +1162,36 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
                   }}
                   className={isLessonPast ? '' : 'hover-scale'}
                 >
-                  <RotateCcw size={13} strokeWidth={2.5} />
+                  <RotateCcw size={12} strokeWidth={2.6} />
                   <span>Termin reaktivieren</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  disabled={isLessonPast || isActionLoading}
+                  onClick={handleCancel}
+                  style={{
+                    padding: '7px 13px',
+                    minHeight: '34px',
+                    borderRadius: '100px',
+                    background: isLessonPast ? '#f1f5f9' : '#fff5f5',
+                    border: isLessonPast ? '1.5px solid #cbd5e1' : '1.5px solid #fca5a5',
+                    color: isLessonPast ? '#94a3b8' : '#dc2626',
+                    fontSize: '0.80rem',
+                    fontWeight: 850,
+                    whiteSpace: 'nowrap',
+                    cursor: isLessonPast ? 'not-allowed' : 'pointer',
+                    opacity: isLessonPast ? 0.6 : 1,
+                    boxShadow: isLessonPast ? 'none' : '0 1px 3px rgba(220, 38, 38, 0.10)',
+                    flexShrink: 0,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px'
+                  }}
+                  className={isLessonPast ? '' : 'hover-scale'}
+                >
+                  <X size={12} strokeWidth={2.6} />
+                  <span>Termin absagen</span>
                 </button>
               )}
 
@@ -1114,7 +1209,7 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
                       background: '#ffffff',
                       border: '1px solid #e2e8f0',
                       color: '#334155',
-                      fontSize: '0.82rem',
+                      fontSize: '0.80rem',
                       fontWeight: 750,
                       whiteSpace: 'nowrap',
                       cursor: 'pointer',
@@ -1136,7 +1231,7 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
                       e.currentTarget.style.color = '#334155';
                     }}
                   >
-                    <IconComp size={13} color="#15803d" strokeWidth={2.4} />
+                    <IconComp size={12} color="#15803d" strokeWidth={2.4} />
                     <span>{phrase.label}</span>
                   </button>
                 );
@@ -1144,7 +1239,7 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
             </div>
           )}
 
-          {/* Input Row & Action Buttons */}
+          {/* Input Row - Full Width Text Field & Clean Send Button */}
           <form
             onSubmit={e => {
               e.preventDefault();
@@ -1165,6 +1260,7 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
               onChange={e => setChatTypedMessage(e.target.value)}
               style={{
                 flex: 1,
+                minWidth: 0,
                 padding: '11px 18px',
                 minHeight: '44px',
                 borderRadius: '100px',
@@ -1189,71 +1285,11 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
               }}
             />
 
-            {/* Contextual Action Button (Absagen / Reaktivieren) */}
-            {isCanceled ? (
-              <button
-                type="button"
-                disabled={isLessonPast || isActionLoading}
-                onClick={handleReactivate}
-                title={isLessonPast ? 'Termin liegt in der Vergangenheit' : 'Termin reaktivieren'}
-                style={{
-                  background: isLessonPast ? '#f1f5f9' : '#f0fdf4',
-                  color: isLessonPast ? '#94a3b8' : '#15803d',
-                  border: isLessonPast ? '1.5px solid #cbd5e1' : '1.5px solid #86efac',
-                  borderRadius: '100px',
-                  padding: '8px 15px',
-                  minHeight: '42px',
-                  fontSize: '0.82rem',
-                  fontWeight: 850,
-                  cursor: isLessonPast ? 'not-allowed' : 'pointer',
-                  opacity: isLessonPast ? 0.6 : 1,
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '5px',
-                  transition: 'all 0.15s ease',
-                  flexShrink: 0
-                }}
-                onMouseEnter={e => { if (!isLessonPast) e.currentTarget.style.background = '#dcfce7'; }}
-                onMouseLeave={e => { if (!isLessonPast) e.currentTarget.style.background = '#f0fdf4'; }}
-              >
-                <RotateCcw size={13} strokeWidth={2.5} />
-                <span>Reaktivieren</span>
-              </button>
-            ) : (
-              <button
-                type="button"
-                disabled={isLessonPast || isActionLoading}
-                onClick={handleCancel}
-                title={isLessonPast ? 'Termin liegt in der Vergangenheit' : 'Termin absagen...'}
-                style={{
-                  background: isLessonPast ? '#f1f5f9' : '#fee2e2',
-                  color: isLessonPast ? '#94a3b8' : '#dc2626',
-                  border: isLessonPast ? '1.5px solid #cbd5e1' : '1.5px solid #fca5a5',
-                  borderRadius: '100px',
-                  padding: '8px 15px',
-                  minHeight: '42px',
-                  fontSize: '0.82rem',
-                  fontWeight: 850,
-                  cursor: isLessonPast ? 'not-allowed' : 'pointer',
-                  opacity: isLessonPast ? 0.6 : 1,
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '5px',
-                  transition: 'all 0.15s ease',
-                  flexShrink: 0
-                }}
-                onMouseEnter={e => { if (!isLessonPast) e.currentTarget.style.background = '#fecaca'; }}
-                onMouseLeave={e => { if (!isLessonPast) e.currentTarget.style.background = '#fee2e2'; }}
-              >
-                <X size={13} strokeWidth={2.5} />
-                <span>Absagen</span>
-              </button>
-            )}
-
             {/* Send Message Button */}
             <button
               type="submit"
               disabled={isFrozen || isSending || !chatTypedMessage.trim()}
+              aria-label="Nachricht senden"
               style={{
                 background: isFrozen || !chatTypedMessage.trim() ? '#f1f5f9' : '#15803d',
                 color: isFrozen || !chatTypedMessage.trim() ? '#94a3b8' : '#ffffff',
@@ -1280,28 +1316,26 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
             </button>
           </form>
 
+          {/* Discreet 1-Line Legal Whisper Notice */}
           <div style={{
             display: 'flex',
-            flexDirection: 'column',
             alignItems: 'center',
-            gap: '2px',
+            justifyContent: 'center',
+            gap: '6px',
             textAlign: 'center',
-            fontSize: '0.67rem',
-            color: '#64748b',
-            lineHeight: 1.35
+            fontSize: '0.64rem',
+            color: '#94a3b8',
+            lineHeight: 1.3
           }}>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap', justifyContent: 'center' }}>
-              <Lock size={12} color="#64748b" style={{ flexShrink: 0 }} />
-              <span><strong>Bote für Unterrichtsabsprachen:</strong> Es gelten die Fristen deines Musikschulvertrags. Bitte keine Diagnosen oder sensiblen Attestdaten eintragen.</span>
-            </span>
-            <span style={{ fontSize: '0.63rem', color: '#94a3b8' }}>
-              DSGVO-konform · Ende-zu-Ende gesicherte Schulübermittlung · TLS 1.3
-            </span>
+            <Lock size={11} color="#94a3b8" style={{ flexShrink: 0 }} />
+            <span>Elektronischer Bote • Fristen des Musikschulvertrags beachten • TLS 1.3</span>
           </div>
         </div>
       </div>
     </div>
   );
+
+  return portalTarget ? createPortal(content, portalTarget) : content;
 };
 
 export default CampusAppointmentShoutboxModal;

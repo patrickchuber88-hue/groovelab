@@ -4758,18 +4758,22 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                     border: '1px solid rgba(255, 255, 255, 0.7)',
                     borderRadius: '30px',
                     display: 'flex',
+                    flexDirection: isMobile ? 'column' : 'row',
                     alignItems: 'stretch',
                     boxShadow: '0 20px 50px rgba(15, 23, 42, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.8)',
                     width: '100%',
+                    maxWidth: '100%',
                     boxSizing: 'border-box',
                     overflow: 'hidden',
                     position: 'relative',
-                    minHeight: '200px'
+                    minHeight: isMobile ? 'auto' : '200px'
                   }}>
                     <Music size={160} style={{ position: 'absolute', right: '5%', bottom: '-40px', opacity: 0.03, color: '#6366f1', pointerEvents: 'none' }} />
 
                     <div style={{
-                      width: '190px',
+                      width: isMobile ? '100%' : '190px',
+                      height: isMobile ? '160px' : 'auto',
+                      minHeight: isMobile ? '160px' : 'auto',
                       background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
                       display: 'flex',
                       alignItems: 'center',
@@ -4777,7 +4781,8 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                       zIndex: 2,
                       position: 'relative',
                       overflow: 'hidden',
-                      borderRight: '1px solid rgba(0, 0, 0, 0.1)'
+                      borderRight: isMobile ? 'none' : '1px solid rgba(0, 0, 0, 0.1)',
+                      borderBottom: isMobile ? '1px solid rgba(0, 0, 0, 0.1)' : 'none'
                     }}>
                       <div style={{
                         position: 'absolute',
@@ -4809,8 +4814,8 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                       />
                     </div>
 
-                    <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', minWidth: 0, flex: 1, zIndex: 2, padding: '24px 32px' }}>
-                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '12px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', minWidth: 0, flex: 1, zIndex: 2, padding: isMobile ? '16px 18px' : '24px 32px', boxSizing: 'border-box', maxWidth: '100%' }}>
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap' }}>
                         <div style={{
                           display: 'inline-flex',
                           alignItems: 'center',
@@ -4886,12 +4891,13 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
 
                       <h3 style={{ 
                         margin: 0, 
-                        fontSize: isMusicStandMode ? '32px' : '28px', 
+                        fontSize: isMobile ? '20px' : (isMusicStandMode ? '32px' : '28px'), 
                         fontWeight: 950, 
                         color: '#0f172a', 
                         fontFamily: "'Plus Jakarta Sans', sans-serif", 
-                        lineHeight: 1.1,
-                        letterSpacing: '-0.02em'
+                        lineHeight: 1.15,
+                        letterSpacing: '-0.02em',
+                        wordBreak: 'break-word'
                       }}>
                         Willkommen zurück{studentUser?.first_name ? `, ${studentUser.first_name}` : ''}! 👋
                       </h3>

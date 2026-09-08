@@ -642,7 +642,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
             boxShadow: 'none',
             borderRight: useNotebookLayout ? '1px dashed #e5e0d4' : '1px solid #e8e8ed',
             position: 'relative',
-            padding: isMobileView ? '16px 16px calc(280px + env(safe-area-inset-bottom, 40px)) 16px' : '0px',
+            padding: isMobileView ? '8px 4px calc(140px + env(safe-area-inset-bottom, 20px)) 4px' : '0px',
             boxSizing: 'border-box'
           }}>
             
@@ -4084,7 +4084,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
             height: isMobileView ? 'auto' : '100%',
             minHeight: '0',
             maxHeight: isMobileView ? 'none' : '100%',
-            padding: useNotebookLayout ? (isMobileView ? '16px 16px calc(280px + env(safe-area-inset-bottom, 40px)) 16px' : '24px 24px 24px 60px') : (isMobileView ? '16px 16px calc(280px + env(safe-area-inset-bottom, 40px)) 16px' : '24px'),
+            padding: useNotebookLayout ? (isMobileView ? '8px 4px calc(140px + env(safe-area-inset-bottom, 20px)) 4px' : '24px 24px 24px 60px') : (isMobileView ? '8px 4px calc(140px + env(safe-area-inset-bottom, 20px)) 4px' : '24px'),
             overflowY: isMobileView ? 'visible' : 'auto',
             display: isMobileView ? (mobileProtokollTab === 'homework' ? 'flex' : 'none') : 'flex',
             flexDirection: 'column',
@@ -5696,6 +5696,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                         let isAudioCarriedOver = false;
                         let isNotesCarriedOver = false;
                         let carriedOverWeekLabel = '';
+                        let pastBridgedQuestion: any = null;
 
                         const hasTransferredWeek = Boolean(
                           localStorage.getItem(`week_transferred_${student.id}_${viewingWeekIso}`) === 'true' ||
@@ -5891,6 +5892,12 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                 carriedOverWeekLabel = kwMatch ? `KW ${kwMatch[1]}` : 'Letzte Stunde';
 
                                 if (Array.isArray(parsedPastNotes)) {
+                                  // 0. Noch offene Schülerfrage aus jüngstem Snapshot übernehmen
+                                  const candidatePastQ = parseStudentQuestionFromNotes(parsedPastNotes);
+                                  if (candidatePastQ && candidatePastQ.hasQuestion) {
+                                    pastBridgedQuestion = candidatePastQ;
+                                  }
+
                                   // 1. Audio-Aufnahmen der Vorwoche übernehmen
                                   if (audioNotes.length === 0) {
                                     const pastAudios = parsedPastNotes
@@ -5917,20 +5924,12 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                     }
                                   }
 
-                                  // 2. Lehrkraft-Notiz der Vorwoche übernehmen, falls aktuell noch leer
+                                  // 2. Lehrkraft-Notiz der Vorwoche übernehmen (strikt ohne Rohcode / Metadaten)
                                   if (homeworkNoteItems.length === 0) {
                                     const pastNotes = parsedPastNotes
                                       .filter((n: string) => {
                                         if (typeof n !== 'string') return false;
-                                        const lower = n.toLowerCase();
-                                        return !n.startsWith('AUDIO:') && 
-                                               !n.startsWith('STICKER:') && 
-                                               !n.startsWith('LOOP:') &&
-                                               !lower.startsWith('latency:') && 
-                                               !lower.startsWith('latency_calibration:') && 
-                                               !n.startsWith('SYSTEM:') && 
-                                               !n.startsWith('FEEDBACK:') && 
-                                               !n.startsWith('STUDENT_NOTE_');
+                                        return !isInternalMetadataNote(n);
                                       })
                                       .map((s: string) => s.trim())
                                       .filter(Boolean);
@@ -5940,11 +5939,22 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                       isNotesCarriedOver = true;
                                     }
                                   }
-                                } else if (typeof parsedPastNotes === 'string' && homeworkNoteItems.length === 0) {
-                                  const pastNotes = getHomeworkNoteItems(parsedPastNotes);
-                                  if (pastNotes.length > 0) {
-                                    homeworkNoteItems = pastNotes;
-                                    isNotesCarriedOver = true;
+                                } else if (typeof parsedPastNotes === 'string') {
+                                  try {
+                                    const p = JSON.parse(parsedPastNotes);
+                                    if (Array.isArray(p)) {
+                                      const candidatePastQ = parseStudentQuestionFromNotes(p);
+                                      if (candidatePastQ && candidatePastQ.hasQuestion) {
+                                        pastBridgedQuestion = candidatePastQ;
+                                      }
+                                    }
+                                  } catch {}
+                                  if (homeworkNoteItems.length === 0) {
+                                    const pastNotes = getHomeworkNoteItems(parsedPastNotes);
+                                    if (pastNotes.length > 0) {
+                                      homeworkNoteItems = pastNotes;
+                                      isNotesCarriedOver = true;
+                                    }
                                   }
                                 }
                               } catch (bridgeErr) {
@@ -5988,17 +5998,47 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                   .filter((n: string) => {
                                     if (typeof n !== 'string') return false;
                                     const lower = n.toLowerCase();
-                                    return !n.startsWith('AUDIO:') && 
+                                    return !isInternalMetadataNote(n) &&
+                                           !n.startsWith('AUDIO:') && 
                                            !n.startsWith('STICKER:') && 
                                            !n.startsWith('LOOP:') &&
                                            !lower.startsWith('latency:') && 
                                            !lower.startsWith('latency_calibration:') && 
                                            !n.startsWith('SYSTEM:') && 
                                            !n.startsWith('FEEDBACK:') && 
-                                           !n.startsWith('STUDENT_NOTE_');
+                                           !n.startsWith('STUDENT_NOTE_') &&
+                                           !n.startsWith('SNAPSHOT_');
                                   })
                                   .map((s: string) => s.trim())
                                   .filter(Boolean);
+
+                                // 📦 1. Parse Lehrwerke-Snapshot aus Wochen-Snapshot
+                                const snapLwEntry = parsedNotes.find((n: string) => typeof n === 'string' && n.startsWith('SNAPSHOT_LEHRWERKE:'));
+                                if (snapLwEntry) {
+                                  try {
+                                    const rawJson = snapLwEntry.substring('SNAPSHOT_LEHRWERKE:'.length);
+                                    const parsedLw = JSON.parse(rawJson);
+                                    if (Array.isArray(parsedLw)) {
+                                      lehrwerkeList = parsedLw;
+                                    }
+                                  } catch (e) {
+                                    console.warn('Error parsing SNAPSHOT_LEHRWERKE:', e);
+                                  }
+                                }
+
+                                // 🎵 2. Parse Songs-Snapshot aus Wochen-Snapshot
+                                const snapSongEntry = parsedNotes.find((n: string) => typeof n === 'string' && n.startsWith('SNAPSHOT_SONGS:'));
+                                if (snapSongEntry) {
+                                  try {
+                                    const rawJson = snapSongEntry.substring('SNAPSHOT_SONGS:'.length);
+                                    const parsedSongs = JSON.parse(rawJson);
+                                    if (Array.isArray(parsedSongs)) {
+                                      otherHWs = parsedSongs;
+                                    }
+                                  } catch (e) {
+                                    console.warn('Error parsing SNAPSHOT_SONGS:', e);
+                                  }
+                                }
                               } else if (typeof parsedNotes === 'string') {
                                 homeworkNoteItems = getHomeworkNoteItems(parsedNotes);
                               }
@@ -6015,6 +6055,11 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                           });
 
                           const groupedHistLehrwerke: Record<string, { pages: number[]; notes: string[] }> = {};
+                          // Initialize with items from snapshot if already present
+                          lehrwerkeList.forEach(lw => {
+                            groupedHistLehrwerke[lw.title] = { pages: [...lw.pages], notes: [...(lw.notes || [])] };
+                          });
+
                           weekProgressItems.forEach((item: any) => {
                             if (item.topic_name && item.topic_name.includes(' - Seite ')) {
                               const parts = item.topic_name.split(' - Seite ');
@@ -6045,6 +6090,99 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                             info.pages.sort((a: number, b: number) => a - b);
                             return { title, pages: info.pages, notes: info.notes };
                           });
+
+                          // 🌉 INTELLIGENTE SELBSTHEILUNG & BRÜCKE FÜR VORWOCHEN:
+                          // Wenn in einer vergangenen Woche (z. B. KW 36) zwar ein Wochen-Snapshot (Hausaufgabe KW 36 mit Aufnahmen/Notizen)
+                          // vorliegt, aber Lehrwerke und Songs fehlen (weil sie zuvor via Übertrag in die Folgewoche verschoben wurden),
+                          // stellen wir Lehrwerk und Song aus den aktiven/übertragenen Hausaufgaben wieder her und sichern den Snapshot dauerhaft.
+                          if (histWeekItem && lehrwerkeList.length === 0 && otherHWs.length === 0) {
+                            const recoveredLwMap: Record<string, { pages: number[]; notes: string[] }> = {};
+                            (assignedLehrwerke || []).forEach((assignment: any) => {
+                              const book = globalLehrwerke.find(g => g.id === assignment.lehrwerkId);
+                              if (!book || !assignment.pageStates) return;
+                              Object.entries(assignment.pageStates).forEach(([pStr, pState]: [string, any]) => {
+                                if (pState?.status === 'homework' || pState?.isCurrentHomework) {
+                                  const pNum = parseInt(pStr, 10);
+                                  if (!isNaN(pNum)) {
+                                    if (!recoveredLwMap[book.title]) recoveredLwMap[book.title] = { pages: [], notes: [] };
+                                    if (!recoveredLwMap[book.title].pages.includes(pNum)) {
+                                      recoveredLwMap[book.title].pages.push(pNum);
+                                      const cleanNote = getCleanPageNotes(pState.homeworkNotes || pState.homework_notes);
+                                      if (cleanNote) recoveredLwMap[book.title].notes.push(`Seite ${pNum}: ${cleanNote}`);
+                                    }
+                                  }
+                                }
+                              });
+                            });
+
+                            const recoveredLw = Object.entries(recoveredLwMap).map(([title, info]) => {
+                              info.pages.sort((a: number, b: number) => a - b);
+                              return { title, pages: info.pages, notes: info.notes };
+                            });
+
+                            const recoveredSongs: any[] = [];
+                            (progressItems || []).forEach((item: any) => {
+                              if (item.is_current_homework && !item.topic_name?.includes(' - Seite ') && !item.topic_name?.startsWith('Hausaufgabe KW ')) {
+                                const cleanTopic = getNormalizedSongTitle(item);
+                                const canKey = getCanonicalSongKey(item);
+                                if (cleanTopic && !recoveredSongs.some(existing => getCanonicalSongKey(existing) === canKey || getNormalizedSongTitle(existing) === cleanTopic)) {
+                                  recoveredSongs.push({
+                                    ...item,
+                                    homework_notes: getCleanPageNotes(item.homework_notes)
+                                  });
+                                }
+                              }
+                            });
+
+                            (activeSongSkills || []).forEach((skill: any) => {
+                              const isHwInLs = localStorage.getItem(`song_hw_${student.id}_${skill.id}`) === 'true' ||
+                                               localStorage.getItem(`song_hw_${student.id}_${skill.song_id}`) === 'true';
+                              if (isHwInLs) {
+                                const cleanTopic = getNormalizedSongTitle(skill);
+                                const canKey = getCanonicalSongKey(skill);
+                                if (!recoveredSongs.some(x => getCanonicalSongKey(x) === canKey || getNormalizedSongTitle(x) === cleanTopic)) {
+                                  const songArtist = skill.songs?.artist || skill.artist || '';
+                                  const songTitle = skill.songs?.title || skill.title || skill.song_title || 'Song';
+                                  const songInstrument = skill.instrument ? ` (${skill.instrument})` : '';
+                                  const fullTitle = songArtist ? `${songArtist} - ${songTitle}${songInstrument}` : `${songTitle}${songInstrument}`;
+                                  recoveredSongs.push({
+                                    id: skill.id,
+                                    topic_name: fullTitle,
+                                    is_current_homework: true,
+                                    status: 'IN_PROGRESS',
+                                    homework_notes: skill.homework_notes || ''
+                                  });
+                                }
+                              }
+                            });
+
+                            if (recoveredLw.length > 0 || recoveredSongs.length > 0) {
+                              lehrwerkeList = recoveredLw;
+                              otherHWs = recoveredSongs;
+
+                              // Asynchron in Supabase Snapshot absichern, damit die Vorwoche dauerhaft geheilt bleibt
+                              if (histWeekItem?.id && !String(histWeekItem.id).startsWith('temp-')) {
+                                try {
+                                  const curNotes = typeof histWeekItem.homework_notes === 'string'
+                                    ? JSON.parse(histWeekItem.homework_notes)
+                                    : (Array.isArray(histWeekItem.homework_notes) ? histWeekItem.homework_notes : []);
+                                  const cleanBase = curNotes.filter((n: string) => 
+                                    typeof n === 'string' && !n.startsWith('SNAPSHOT_LEHRWERKE:') && !n.startsWith('SNAPSHOT_SONGS:')
+                                  );
+                                  const updatedWithSnap = [
+                                    ...cleanBase,
+                                    ...(recoveredLw.length > 0 ? [`SNAPSHOT_LEHRWERKE:${JSON.stringify(recoveredLw)}`] : []),
+                                    ...(recoveredSongs.length > 0 ? [`SNAPSHOT_SONGS:${JSON.stringify(recoveredSongs)}`] : [])
+                                  ];
+                                  supabase.from('progress_matrix').update({
+                                    homework_notes: JSON.stringify(updatedWithSnap)
+                                  }).eq('id', histWeekItem.id).then(() => {});
+                                } catch (patchErr) {
+                                  console.warn('[MeisterwerkDocumentTab] Error persisting healed snapshot:', patchErr);
+                                }
+                              }
+                            }
+                          }
                         }
 
                         const hasActiveItems = lehrwerkeList.length > 0 || otherHWs.length > 0 || audioNotes.length > 0 || homeworkNoteItems.length > 0;
@@ -6053,7 +6191,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                         const isSilentTime = currentHour >= 20 || currentHour < 7;
 
                         const effectiveViewingQuestion = isCurrentWeek 
-                          ? parsedStudentQuestion 
+                          ? (parsedStudentQuestion?.hasQuestion ? parsedStudentQuestion : (pastBridgedQuestion?.hasQuestion ? pastBridgedQuestion : parsedStudentQuestion))
                           : (histWeekItem && histWeekItem.homework_notes
                               ? (() => {
                                   try {
@@ -6067,6 +6205,8 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                 })()
                               : { hasQuestion: false, rawEntry: null, text: '', timestamp: null });
 
+                        const isCarriedOverPlan = isCurrentWeek && (isAudioCarriedOver || isNotesCarriedOver);
+
                         return (
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                             {/* ========================================================================= */}
@@ -6075,26 +6215,40 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                             <div style={{
                               background: '#ffffff',
                               border: '1px solid rgba(0, 0, 0, 0.08)',
-                              borderRadius: '24px',
-                              padding: '18px 20px',
+                              borderRadius: isMobileView ? '20px' : '24px',
+                              padding: isMobileView ? '14px 12px' : '18px 20px',
                               display: 'flex',
                               flexDirection: 'column',
-                              gap: '14px',
-                              boxShadow: '0 8px 24px -4px rgba(0, 0, 0, 0.04), 0 2px 6px -1px rgba(0, 0, 0, 0.02)'
+                              gap: isMobileView ? '10px' : '14px',
+                              boxShadow: '0 8px 24px -4px rgba(0, 0, 0, 0.04), 0 2px 6px -1px rgba(0, 0, 0, 0.02)',
+                              maxWidth: '100%',
+                              boxSizing: 'border-box',
+                              overflow: 'hidden'
                             }}>
-                              {/* 1. Pure 1-Line Header Bar (Harmonisierter Master-Standard) */}
+                              {/* 1. Responsive Header Bar (Desktop: 1-Line, Mobile: Adaptive Wrap) */}
                             <div style={{ 
                               display: 'flex', 
                               justifyContent: 'space-between', 
                               alignItems: 'center', 
-                              flexWrap: 'nowrap', 
-                              gap: '12px',
+                              flexWrap: isMobileView ? 'wrap' : 'nowrap', 
+                              gap: isMobileView ? '8px' : '12px',
                               width: '100%',
                               minWidth: 0,
+                              maxWidth: '100%',
+                              boxSizing: 'border-box',
                               flexShrink: 0
                             }}>
                               {/* 🍏 Left: Apple Segmented Week Pager Capsule & Navigation Hub */}
-                              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', minWidth: 0, flexShrink: 0, flexWrap: 'nowrap' }}>
+                              <div style={{ 
+                                display: 'inline-flex', 
+                                alignItems: 'center', 
+                                gap: '8px', 
+                                minWidth: 0, 
+                                width: isMobileView ? '100%' : 'auto',
+                                justifyContent: isMobileView ? 'space-between' : 'flex-start',
+                                flexShrink: 0, 
+                                flexWrap: 'nowrap' 
+                              }}>
                                 <div style={{
                                   display: 'inline-flex',
                                   alignItems: 'center',
@@ -6105,7 +6259,10 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                   height: '32px',
                                   boxSizing: 'border-box',
                                   gap: '2px',
-                                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)'
+                                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
+                                  flex: isMobileView ? 1 : undefined,
+                                  minWidth: 0,
+                                  justifyContent: isMobileView ? 'space-between' : 'flex-start'
                                 }}>
                                   <button
                                     type="button"
@@ -6135,19 +6292,21 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                   <span 
                                     title={`Kalenderwoche ${viewingWeekNum} (ISO 8601)`}
                                     style={{
-                                      fontSize: '0.84rem',
+                                      fontSize: isMobileView ? '0.78rem' : '0.84rem',
                                       fontWeight: 850,
                                       color: '#0f172a',
                                       letterSpacing: '-0.015em',
-                                      padding: '0 8px',
+                                      padding: '0 6px',
                                       whiteSpace: 'nowrap',
                                       display: 'inline-flex',
                                       alignItems: 'center',
-                                      gap: '6px'
+                                      gap: '4px',
+                                      minWidth: 0,
+                                      overflow: 'hidden'
                                     }}
                                   >
-                                    <span>{weekRange.label}</span>
-                                    <span style={{ fontSize: '0.74rem', fontWeight: 600, color: '#64748b' }}>
+                                    <span style={{ textOverflow: 'ellipsis', overflow: 'hidden' }}>{weekRange.label}</span>
+                                    <span style={{ fontSize: isMobileView ? '0.68rem' : '0.74rem', fontWeight: 600, color: '#64748b' }}>
                                       ({weekRange.dateSpan})
                                     </span>
                                   </span>
@@ -6214,7 +6373,10 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                 alignItems: 'center',
                                 gap: '8px',
                                 flexShrink: 0,
-                                marginLeft: 'auto'
+                                width: isMobileView ? '100%' : 'auto',
+                                justifyContent: isMobileView ? 'flex-end' : 'flex-end',
+                                marginLeft: isMobileView ? '0' : 'auto',
+                                boxSizing: 'border-box'
                               }}>
                                 {/* ❓ 1. Student Question Button / Teacher Live Status Pill */}
                                 {readOnly ? (
@@ -6472,6 +6634,28 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                 )}
                               </div>
                             </div>
+
+                            {/* 1.5 Globaler Übertrag-Statuskopf (Monolith Goldstandard: Gilt für alle Inhalte der Seite) */}
+                            {isCarriedOverPlan && (
+                              <div style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                alignSelf: 'flex-start',
+                                gap: '6px',
+                                background: '#f8fafc',
+                                border: '1px solid #cbd5e1',
+                                color: '#475569',
+                                borderRadius: '100px',
+                                padding: '3px 12px',
+                                fontSize: '0.74rem',
+                                fontWeight: 800,
+                                letterSpacing: '0.01em',
+                                boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)'
+                              }}>
+                                <RotateCcw size={11} color="#0284c7" strokeWidth={2.5} />
+                                <span>Fortlaufender Übeplan • Übertrag aus der Vorwoche</span>
+                              </div>
+                            )}
 
                             {/* 2. Silent Mode Banner (falls aktiv) */}
                             {isSilentTime && (
@@ -7520,6 +7704,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                         activeTopicContext={topicName}
                                         defaultExpanded={readOnly}
                                         isCarriedOver={isAudioCarriedOver}
+                                        hideCarriedOverBadge={true}
                                       />
                                     </div>
                                   )}
@@ -7536,6 +7721,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                       {homeworkNoteItems
                                         .filter(item => {
                                           if (!item || typeof item !== 'string') return false;
+                                          if (isInternalMetadataNote(item)) return false;
                                           const lower = item.toLowerCase();
                                           if (lower.startsWith('latency:') || lower.startsWith('latency_calibration:') || item.startsWith('SYSTEM:') || item.startsWith('STICKER:') || item.startsWith('AUDIO:') || item.startsWith('LOOP:')) return false;
 
@@ -7585,25 +7771,6 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                                 transition: 'opacity 0.15s ease'
                                               }}>
                                                 <FileText size={14} style={{ color: '#16a34a', flexShrink: 0 }} />
-
-                                                {/* Carried over badge from previous lesson */}
-                                                {isNotesCarriedOver && (
-                                                  <span style={{
-                                                    display: 'inline-flex',
-                                                    alignItems: 'center',
-                                                    gap: '3px',
-                                                    background: '#f8fafc',
-                                                    color: '#475569',
-                                                    border: '1px solid #cbd5e1',
-                                                    borderRadius: '8px',
-                                                    padding: '2px 7px',
-                                                    fontSize: '0.70rem',
-                                                    fontWeight: 800,
-                                                    flexShrink: 0
-                                                  }}>
-                                                    <span>Aus letzter Stunde</span>
-                                                  </span>
-                                                )}
                                                 
                                                 {/* Personal Badge if targeted to current student */}
                                                 {parsedAnn.isSpecificToCurrent && (

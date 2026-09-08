@@ -8580,7 +8580,7 @@ useEffect(() => {
                       flexDirection: 'column', 
                       gap: '20px', 
                       flex: (isWeekend || isFreeDay) && !isTourDemoScheduleActive ? '1 1 100%' : '1 1 350px', 
-                      minWidth: '300px',
+                      minWidth: (windowWidth < 768 || isMobileDevice) ? '100%' : '300px',
                       maxHeight: windowWidth >= 768 ? '700px' : undefined,
                       boxSizing: 'border-box'
                     }}>
@@ -8813,7 +8813,7 @@ useEffect(() => {
                       teacher?.sick_until && !bypassSickView ? (
                       <div style={{
                         flex: '1.2 1 450px',
-                        minWidth: '300px',
+                        minWidth: (windowWidth < 768 || isMobileDevice) ? '100%' : '300px',
                         background: 'linear-gradient(135deg, #fff1f2 0%, #fff5f5 100%)',
                         border: '1.5px solid #fecaca',
                         borderRadius: '20px',
@@ -8838,14 +8838,14 @@ useEffect(() => {
                     ) : (
                       <div style={{
                         flex: isFreeDay ? '0.8 1 300px' : '1.2 1 450px', 
-                        minWidth: '300px',
+                        minWidth: (windowWidth < 768 || isMobileDevice) ? '100%' : '300px',
                         display: 'flex',
                         flexDirection: 'column',
                         gap: '12px'
                       }}>
                         <div id="tour-teacher-schedule" className="google-card" style={{ 
                           width: '100%', 
-                          padding: '20px 24px', 
+                          padding: (windowWidth < 768 || isMobileDevice) ? '16px 14px' : '20px 24px', 
                           borderRadius: '20px', 
                           border: '1px solid #f1f5f9', 
                           boxShadow: '0 2px 12px rgba(0,0,0,0.04)', 
@@ -12126,12 +12126,12 @@ useEffect(() => {
       ) : (
         <div style={{ display: 'flex', gap: '32px', alignItems: 'flex-start', flexWrap: 'wrap', width: '100%' }}>
           {/* Main Column */}
-          <div style={{ flex: 3, minWidth: '400px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          <div style={{ flex: 3, minWidth: (windowWidth < 768 || isMobileDevice) ? '100%' : '400px', maxWidth: '100%', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: '24px' }}>
             <input 
               placeholder="Band suchen..." 
               value={bandSearch} 
               onChange={e => setBandSearch(e.target.value)} 
-              style={{ width: '100%', padding: '16px 20px', borderRadius: '24px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.9rem', outline: 'none' }} 
+              style={{ width: '100%', boxSizing: 'border-box', padding: '16px 20px', borderRadius: '24px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.9rem', outline: 'none' }} 
             />
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '20px' }}>
               {allBands.filter(b => b.name.toLowerCase().includes(bandSearch.toLowerCase())).map(band => (
@@ -12154,7 +12154,7 @@ useEffect(() => {
           </div>
 
           {/* Bands Right Sidebar */}
-          <aside style={{ flex: 1, minWidth: '300px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          <aside style={{ flex: 1, minWidth: (windowWidth < 768 || isMobileDevice) ? '100%' : '300px', maxWidth: '100%', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: '24px' }}>
             <div style={{ padding: '24px', background: 'white', borderRadius: '24px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}>
               <h3 style={{ margin: '0 0 16px 0', fontSize: '1.1rem', fontWeight: 900, color: '#1e293b' }}>
                 Band-Übersicht

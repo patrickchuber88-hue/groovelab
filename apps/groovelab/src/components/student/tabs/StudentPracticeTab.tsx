@@ -246,10 +246,12 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                     justifyContent: 'space-between',
                     gap: '14px',
                     background: '#ffffff',
-                    borderRadius: '24px',
-                    padding: isMusicStandMode ? '20px 28px' : '16px 24px',
+                    borderRadius: isMobile ? '20px' : '24px',
+                    padding: isMusicStandMode ? '20px 28px' : (isMobile ? '14px 14px' : '16px 24px'),
                     border: '1.5px solid #e2e8f0',
                     boxShadow: '0 12px 30px rgba(15, 23, 42, 0.04)',
+                    boxSizing: 'border-box',
+                    maxWidth: '100%',
                     flexWrap: 'wrap'
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
@@ -321,9 +323,9 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                   <div style={{
                     width: '100%',
                     background: 'linear-gradient(160deg, #090514 0%, #1e103a 35%, #2e1065 70%, #150928 100%)',
-                    borderRadius: '32px',
+                    borderRadius: isMobile ? '24px' : '32px',
                     border: '2px solid rgba(168, 85, 247, 0.35)',
-                    padding: isMusicStandMode ? '44px 32px' : '40px 28px',
+                    padding: isMusicStandMode ? '44px 32px' : (isMobile ? '28px 16px' : '40px 28px'),
                     boxShadow: '0 20px 50px -10px rgba(46, 16, 101, 0.5), 0 0 35px rgba(168, 85, 247, 0.15) inset',
                     display: 'flex',
                     flexDirection: 'column',
@@ -626,10 +628,12 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                     {/* Karte A: Deine Woche in Sternen ✨ (3D Münzen & Star Chime Audio) */}
                     <div style={{
                       background: '#ffffff',
-                      borderRadius: '32px',
+                      borderRadius: isMobile ? '24px' : '32px',
                       border: '2px solid #e2e8f0',
-                      padding: isMusicStandMode ? '32px' : '28px',
+                      padding: isMusicStandMode ? '32px' : (isMobile ? '18px 14px' : '28px'),
                       boxShadow: '0 12px 30px rgba(15, 23, 42, 0.04)',
+                      boxSizing: 'border-box',
+                      maxWidth: '100%',
                       display: 'flex',
                       flexDirection: 'column',
                       gap: '18px'
@@ -808,10 +812,12 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                     {/* Karte B: Dein nächster Sticker 🐝 (Holographic Card & Laser Bar) */}
                     <div style={{
                       background: 'linear-gradient(135deg, #ffffff 0%, #fdf4ff 100%)',
-                      borderRadius: '32px',
+                      borderRadius: isMobile ? '24px' : '32px',
                       border: '2px solid rgba(99, 102, 241, 0.25)',
-                      padding: isMusicStandMode ? '32px' : '28px',
+                      padding: isMusicStandMode ? '32px' : (isMobile ? '18px 14px' : '28px'),
                       boxShadow: '0 12px 30px rgba(15, 23, 42, 0.04)',
+                      boxSizing: 'border-box',
+                      maxWidth: '100%',
                       display: 'flex',
                       flexDirection: 'column',
                       justifyContent: 'space-between',

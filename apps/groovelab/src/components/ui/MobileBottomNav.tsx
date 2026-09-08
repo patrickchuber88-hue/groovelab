@@ -504,15 +504,21 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
         className="cg-mobile-bottom-nav" 
         role="navigation" 
         aria-label="Hauptnavigation Unten"
-        style={isSmartphone ? {
-          display: 'grid',
-          gridTemplateColumns: `repeat(${displayedTabs.length + 1}, 1fr)`,
-          gap: '2px',
-          padding: '0 4px calc(env(safe-area-inset-bottom, 0px) + 4px) 4px',
-          overflowX: 'hidden',
+        style={{
+          display: 'flex',
+          flexWrap: 'nowrap',
+          alignItems: 'center',
+          justifyContent: 'flex-start',
+          overflowX: 'auto',
+          overflowY: 'hidden',
+          WebkitOverflowScrolling: 'touch',
+          scrollbarWidth: 'none',
+          msOverflowStyle: 'none',
           width: '100%',
-          boxSizing: 'border-box'
-        } : undefined}
+          boxSizing: 'border-box',
+          gap: '6px',
+          padding: '0 12px calc(env(safe-area-inset-bottom, 0px) + 4px) 12px'
+        }}
       >
         {displayedTabs.map(item => {
           const TabIcon = item.icon;
@@ -531,9 +537,10 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
               className={`cg-bottom-nav-item ${isActive ? getActiveThemeClass() : ''}`}
               style={{
                 touchAction: 'manipulation',
-                minWidth: isSmartphone ? 0 : undefined,
-                width: isSmartphone ? '100%' : undefined,
-                padding: isSmartphone ? '6px 2px' : undefined
+                flex: '0 0 auto',
+                minWidth: '68px',
+                width: 'auto',
+                padding: '6px 8px'
               }}
               onClick={() => setActiveTab(item.id)}
             >

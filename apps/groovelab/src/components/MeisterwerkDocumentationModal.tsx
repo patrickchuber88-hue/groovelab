@@ -4200,7 +4200,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     return hasLW || hasSongs || hasAudios || hasNotesInList || hasGeneralNotes || hasPreviousWeekSnapshot;
   }, [sourceTransferData, homeworkNotesList, generalHomeworkNotes, progressItems]);
 
-  // ⚡ Atomare Ausführung des Hausaufgaben-Übertrags in eine neue Kalenderwoche
+  // ⚡ Atomare Ausführung des Hausaufgaben-Übertrags in eine neue Kalenderwoche (Echte Kopie statt destruktiver Mutation)
   const handleExecuteBatchTransfer = async (decisions: {
     lehrwerke: Record<string, 'master' | 'reactivate' | 'park'>;
     lehrwerkePages?: Record<string, Record<number, 'master' | 'reactivate' | 'park'>>;
@@ -4208,7 +4208,69 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     audios: Record<string, 'keep' | 'hide'>;
   }) => {
     try {
-      // 1. Lehrwerke (mit granularer Einzel-Seiten-Triage)
+      const targetIso = getTargetWeekIso(viewingWeekOffset);
+      const targetNum = targetIso.split('-W')[1] || '';
+      const prevTarget = getSimulatedNow();
+      prevTarget.setDate(prevTarget.getDate() + ((viewingWeekOffset - 1) * 7));
+      const sourceIso = getISOWeek(prevTarget);
+      const sourceNum = sourceIso.split('-W')[1] || '';
+      const activeTId = await getCurrentTeacherId();
+
+      // === 0. VORWOCHEN-INTEGRITÄT: Vorwochen-Snapshot vorab vollständig einfrieren ===
+      try {
+        const existingSourceSnap = progressItems.find(it => it.topic_name === `Hausaufgabe KW ${sourceNum}`);
+        const sourceAudios = (sourceTransferData.sourceA || []).map(a => 
+          `AUDIO:${a.url}|${a.duration || 0}|${a.date || new Date().toISOString()}|${a.label}|${(a as any).author || 'teacher'}|shared_with_teacher|${(a as any).uniqueRecId || ''}|${(a as any).songTag || ''}`
+        );
+
+        if (existingSourceSnap) {
+          let existingNotesList: string[] = [];
+          try {
+            const p = typeof existingSourceSnap.homework_notes === 'string' 
+              ? JSON.parse(existingSourceSnap.homework_notes) 
+              : existingSourceSnap.homework_notes;
+            if (Array.isArray(p)) existingNotesList = p;
+          } catch {}
+
+          const cleanExisting = existingNotesList.filter((n: string) => 
+            typeof n === 'string' && !n.startsWith('SNAPSHOT_LEHRWERKE:') && !n.startsWith('SNAPSHOT_SONGS:')
+          );
+          const enrichedSourceNotes = [
+            ...cleanExisting,
+            ...(sourceTransferData.sourceLW.length > 0 ? [`SNAPSHOT_LEHRWERKE:${JSON.stringify(sourceTransferData.sourceLW)}`] : []),
+            ...(sourceTransferData.sourceS.length > 0 ? [`SNAPSHOT_SONGS:${JSON.stringify(sourceTransferData.sourceS)}`] : [])
+          ];
+
+          await supabase
+            .from('progress_matrix')
+            .update({
+              homework_notes: JSON.stringify(enrichedSourceNotes)
+            })
+            .eq('id', existingSourceSnap.id);
+        } else {
+          const sourceSnapNotes = [
+            ...sourceAudios,
+            ...(sourceTransferData.sourceLW.length > 0 ? [`SNAPSHOT_LEHRWERKE:${JSON.stringify(sourceTransferData.sourceLW)}`] : []),
+            ...(sourceTransferData.sourceS.length > 0 ? [`SNAPSHOT_SONGS:${JSON.stringify(sourceTransferData.sourceS)}`] : [])
+          ];
+          await supabase
+            .from('progress_matrix')
+            .insert({
+              student_id: student.id,
+              teacher_id: activeTId,
+              topic_name: `Hausaufgabe KW ${sourceNum}`,
+              status: 'IN_PROGRESS',
+              is_current_homework: false,
+              teacher_notes: '',
+              homework_notes: JSON.stringify(sourceSnapNotes),
+              updated_at: prevTarget.toISOString()
+            });
+        }
+      } catch (snapErr) {
+        console.warn('[handleExecuteBatchTransfer] Notice preserving source snapshot:', snapErr);
+      }
+
+      // 1. Lehrwerke (mit granularer Einzel-Seiten-Triage als Kopie für Zielwoche)
       for (const [title, action] of Object.entries(decisions.lehrwerke)) {
         const bookPagesDecision = decisions.lehrwerkePages?.[title];
         if (bookPagesDecision && Object.keys(bookPagesDecision).length > 0) {
@@ -4220,7 +4282,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             } else if (pAction === 'park') {
               await handleRemoveSinglePageHomework(title, pageNum);
             } else if (pAction === 'reactivate') {
-              await handleReactivateSinglePageDirect(title, pageNum);
+              await handleReactivateSinglePageDirect(title, pageNum, targetIso);
             }
           }
         } else {
@@ -4229,12 +4291,12 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           } else if (action === 'park') {
             await handleRemoveBookHomework(title);
           } else if (action === 'reactivate') {
-            await handleReactivateBookDirect(title);
+            await handleReactivateBookDirect(title, targetIso);
           }
         }
       }
 
-      // 2. Songs
+      // 2. Songs (Triage als Kopie für Zielwoche)
       for (const [songKey, action] of Object.entries(decisions.songs)) {
         const songItem = sourceTransferData.sourceS.find(s => (s.id === songKey || s.topic_name === songKey));
         if (!songItem) continue;
@@ -4243,7 +4305,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         } else if (action === 'park') {
           await handleRemoveSongHomework(songItem);
         } else if (action === 'reactivate') {
-          await handleReactivateSongDirect(songItem);
+          await handleReactivateSongDirect(songItem, targetIso);
         }
       }
 
@@ -4258,17 +4320,35 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       }
 
       // 4. Mark target week as transferred in local storage
-      const targetIso = getTargetWeekIso(viewingWeekOffset);
-      const targetNum = targetIso.split('-W')[1] || '';
       localStorage.setItem(`week_transferred_${student.id}_${targetIso}`, 'true');
 
-      // 5. Create / update weekly snapshot in progress_matrix for the target week with harmonized titles
-      const activeTId = await getCurrentTeacherId();
+      // 5. Create / update weekly snapshot in progress_matrix for the target week with complete metadata
       const existingSnap = progressItems.find(it => it.topic_name === `Hausaufgabe KW ${targetNum}`);
       const keptAudios = sourceTransferData.sourceA
         .filter(a => decisions.audios[a.url] === 'keep')
         .map(a => `AUDIO:${a.url}|${a.duration || 0}|${new Date().toISOString()}|${a.label}|${(a as any).author || 'teacher'}|shared_with_teacher|${(a as any).uniqueRecId || ''}|${(a as any).songTag || ''}`);
-      const snapNotesJson = JSON.stringify([...keptAudios]);
+
+      const targetLwList = sourceTransferData.sourceLW
+        .map(lw => {
+          const pagesDecision = decisions.lehrwerkePages?.[lw.title];
+          const keptPages = pagesDecision 
+            ? lw.pages.filter(p => pagesDecision[p] === 'reactivate')
+            : (decisions.lehrwerke[lw.title] === 'reactivate' ? lw.pages : []);
+          return {
+            ...lw,
+            pages: keptPages
+          };
+        })
+        .filter(lw => lw.pages.length > 0);
+
+      const targetSongsList = sourceTransferData.sourceS.filter(s => decisions.songs[s.id || s.topic_name] === 'reactivate');
+
+      const targetSnapNotes = [
+        ...keptAudios,
+        ...(targetLwList.length > 0 ? [`SNAPSHOT_LEHRWERKE:${JSON.stringify(targetLwList)}`] : []),
+        ...(targetSongsList.length > 0 ? [`SNAPSHOT_SONGS:${JSON.stringify(targetSongsList)}`] : [])
+      ];
+      const snapNotesJson = JSON.stringify(targetSnapNotes);
 
       if (existingSnap) {
         await supabase
@@ -4540,7 +4620,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     }
   };
 
-  const handleReactivateSongDirect = async (songItemOrSkill: any) => {
+  const handleReactivateSongDirect = async (songItemOrSkill: any, targetWeekIso?: string) => {
     try {
       const matchingSkill = activeSongSkills.find(s => isSongMatch(s, songItemOrSkill));
       const skillId = matchingSkill?.id || songItemOrSkill?.id;
@@ -4553,14 +4633,47 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         }
       } catch (e) {}
 
-      const matchingItems = progressItems.filter(item => isSongMatch(item, songItemOrSkill));
-      const matchingIds = matchingItems.map(i => i.id).filter(id => id && !String(id).startsWith('temp-'));
+      const targetIso = targetWeekIso || getTargetWeekIso(viewingWeekOffset);
+      const songTopic = songItemOrSkill.topic_name || getNormalizedSongTitle(songItemOrSkill);
+      const activeTId = await getCurrentTeacherId();
 
-      if (matchingIds.length > 0) {
+      const existingInTargetWeek = progressItems.find(item => 
+        isSongMatch(item, songItemOrSkill) && 
+        item.updated_at && 
+        getISOWeek(item.updated_at) === targetIso
+      );
+
+      if (existingInTargetWeek?.id && !String(existingInTargetWeek.id).startsWith('temp-')) {
         await supabase
           .from('progress_matrix')
           .update({ is_current_homework: true, status: 'IN_PROGRESS', updated_at: new Date().toISOString() })
-          .in('id', matchingIds);
+          .eq('id', existingInTargetWeek.id);
+      } else {
+        // ECHTE KOPIE: Neuer Datensatz für Zielwoche einfügen
+        await supabase
+          .from('progress_matrix')
+          .insert({
+            student_id: student.id,
+            teacher_id: activeTId,
+            topic_name: songTopic,
+            status: 'IN_PROGRESS',
+            is_current_homework: true,
+            homework_notes: songItemOrSkill.homework_notes || '',
+            teacher_notes: '',
+            updated_at: new Date().toISOString()
+          });
+      }
+
+      // Historische Vorwochen-Datensätze behalten ihr original updated_at (KEIN Überschreiben des Zeitstempels!)
+      const pastMatching = progressItems.filter(item => 
+        isSongMatch(item, songItemOrSkill) && 
+        item.updated_at && 
+        getISOWeek(item.updated_at) !== targetIso && 
+        item.is_current_homework
+      );
+      const pastIds = pastMatching.map(i => i.id).filter(id => id && !String(id).startsWith('temp-'));
+      if (pastIds.length > 0) {
+        await supabase.from('progress_matrix').update({ is_current_homework: false }).in('id', pastIds);
       }
 
       if (selectedActiveSongId && matchingSkill && (selectedActiveSongId === matchingSkill.id || selectedActiveSongId === matchingSkill.song_id)) {
@@ -4639,7 +4752,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     }
   };
 
-  const handleReactivateBookDirect = async (bookTitle: string) => {
+  const handleReactivateBookDirect = async (bookTitle: string, targetWeekIso?: string) => {
     try {
       const book = globalLehrwerke.find(b => b.title === bookTitle);
       if (book) {
@@ -4667,13 +4780,44 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         loadLehrwerke();
       }
 
+      const targetIso = targetWeekIso || getTargetWeekIso(viewingWeekOffset);
+      const activeTId = await getCurrentTeacherId();
+
       const matchingItems = progressItems.filter(item => item.topic_name && item.topic_name.startsWith(`${bookTitle} - Seite `));
-      const matchingIds = matchingItems.map(i => i.id).filter(id => id && !String(id).startsWith('temp-'));
-      if (matchingIds.length > 0) {
+      const targetItems = matchingItems.filter(item => item.updated_at && getISOWeek(item.updated_at) === targetIso);
+      const targetIds = targetItems.map(i => i.id).filter(id => id && !String(id).startsWith('temp-'));
+
+      if (targetIds.length > 0) {
         await supabase
           .from('progress_matrix')
           .update({ is_current_homework: true, status: 'IN_PROGRESS', updated_at: new Date().toISOString() })
-          .in('id', matchingIds);
+          .in('id', targetIds);
+      } else {
+        const pagesToCopy = matchingItems.map(item => {
+          const parts = item.topic_name.split(' - Seite ');
+          return parts[1] ? parseInt(parts[1], 10) : NaN;
+        }).filter(p => !isNaN(p));
+        const uniquePages = Array.from(new Set(pagesToCopy));
+        
+        for (const pNum of uniquePages) {
+          await supabase.from('progress_matrix').insert({
+            student_id: student.id,
+            teacher_id: activeTId,
+            topic_name: `${bookTitle} - Seite ${pNum}`,
+            status: 'IN_PROGRESS',
+            is_current_homework: true,
+            homework_notes: '',
+            teacher_notes: '',
+            updated_at: new Date().toISOString()
+          });
+        }
+      }
+
+      // Historische Vorwochen-Datensätze behalten ihr original updated_at
+      const pastMatching = matchingItems.filter(item => item.updated_at && getISOWeek(item.updated_at) !== targetIso && item.is_current_homework);
+      const pastIds = pastMatching.map(i => i.id).filter(id => id && !String(id).startsWith('temp-'));
+      if (pastIds.length > 0) {
+        await supabase.from('progress_matrix').update({ is_current_homework: false }).in('id', pastIds);
       }
 
       setProgressItems(prev => prev.map(item => {
@@ -4743,7 +4887,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     }
   };
 
-  const handleReactivateSinglePageDirect = async (bookTitle: string, pageNum: number) => {
+  const handleReactivateSinglePageDirect = async (bookTitle: string, pageNum: number, targetWeekIso?: string) => {
     try {
       const book = globalLehrwerke.find(b => b.title === bookTitle);
       if (book) {
@@ -4769,14 +4913,47 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         loadLehrwerke();
       }
 
+      const targetIso = targetWeekIso || getTargetWeekIso(viewingWeekOffset);
       const pageTopic = `${bookTitle} - Seite ${pageNum}`;
-      const matchingItems = progressItems.filter(item => item.topic_name === pageTopic);
-      const matchingIds = matchingItems.map(i => i.id).filter(id => id && !String(id).startsWith('temp-'));
-      if (matchingIds.length > 0) {
+      const activeTId = await getCurrentTeacherId();
+
+      const existingInTargetWeek = progressItems.find(item => 
+        item.topic_name === pageTopic && 
+        item.updated_at && 
+        getISOWeek(item.updated_at) === targetIso
+      );
+
+      if (existingInTargetWeek?.id && !String(existingInTargetWeek.id).startsWith('temp-')) {
         await supabase
           .from('progress_matrix')
           .update({ is_current_homework: true, status: 'IN_PROGRESS', updated_at: new Date().toISOString() })
-          .in('id', matchingIds);
+          .eq('id', existingInTargetWeek.id);
+      } else {
+        // ECHTE KOPIE: Neuer Datensatz für Zielwoche einfügen
+        await supabase
+          .from('progress_matrix')
+          .insert({
+            student_id: student.id,
+            teacher_id: activeTId,
+            topic_name: pageTopic,
+            status: 'IN_PROGRESS',
+            is_current_homework: true,
+            homework_notes: '',
+            teacher_notes: '',
+            updated_at: new Date().toISOString()
+          });
+      }
+
+      // Historische Datensätze behalten ihr originales updated_at (KW der Vorwoche bleibt unangetastet!)
+      const pastMatching = progressItems.filter(item => 
+        item.topic_name === pageTopic && 
+        item.updated_at && 
+        getISOWeek(item.updated_at) !== targetIso && 
+        item.is_current_homework
+      );
+      const pastIds = pastMatching.map(i => i.id).filter(id => id && !String(id).startsWith('temp-'));
+      if (pastIds.length > 0) {
+        await supabase.from('progress_matrix').update({ is_current_homework: false }).in('id', pastIds);
       }
 
       setProgressItems(prev => prev.map(item => {
@@ -6969,6 +7146,14 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           finalNotesList.push(line);
         }
       });
+    }
+    if (!isLehrwerkPage && !isSong) {
+      if (sourceTransferData.sourceLW.length > 0) {
+        finalNotesList.push(`SNAPSHOT_LEHRWERKE:${JSON.stringify(sourceTransferData.sourceLW)}`);
+      }
+      if (sourceTransferData.sourceS.length > 0) {
+        finalNotesList.push(`SNAPSHOT_SONGS:${JSON.stringify(sourceTransferData.sourceS)}`);
+      }
     }
     const combinedHomeworkNotes = JSON.stringify(finalNotesList);
 

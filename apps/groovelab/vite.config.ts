@@ -57,6 +57,8 @@ export default defineConfig({
             dep.includes('schedule-designer') ||
             dep.includes('campus-events') ||
             dep.includes('audio-loopstation') ||
+            dep.includes('billing-dashboard') ||
+            dep.includes('vendor-confetti') ||
             dep.includes('vendor-charts') ||
             dep.includes('vendor-jspdf') ||
             dep.includes('vendor-canvas') ||

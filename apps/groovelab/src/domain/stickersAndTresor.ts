@@ -247,6 +247,8 @@ export const isInternalMetadataNote = (text: any): boolean => {
     clean.startsWith('frage für den unterricht:') ||
     clean.startsWith('hausaufgabe kw ') ||
     clean.startsWith('rhythm_score:') ||
+    clean.startsWith('snapshot_') ||
+    clean.startsWith('snapshot:') ||
     clean === 'inhalte in der premium-version freischalten' ||
     clean === 'null' ||
     clean === 'undefined' ||

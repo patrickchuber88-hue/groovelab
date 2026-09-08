@@ -66,8 +66,10 @@ export const StudentSongsTab: React.FC<StudentSongsTabProps> = ({
                 background: '#ffffff',
                 borderRadius: '24px',
                 border: '1.5px solid #dcfce7',
-                padding: '24px 30px',
+                padding: isMobile ? '16px 14px' : '24px 30px',
                 boxShadow: '0 8px 30px rgba(34, 197, 94, 0.04)',
+                boxSizing: 'border-box',
+                maxWidth: '100%',
                 display: 'flex',
                 flexDirection: 'column',
                 gap: '20px'
@@ -116,8 +118,11 @@ export const StudentSongsTab: React.FC<StudentSongsTabProps> = ({
             <div style={{
               display: 'grid',
               gridTemplateColumns: isMobile ? '1fr' : '1fr minmax(320px, 350px)',
-              gap: '24px',
-              alignItems: 'start'
+              gap: isMobile ? '16px' : '24px',
+              alignItems: 'start',
+              width: '100%',
+              maxWidth: '100%',
+              boxSizing: 'border-box'
             }}>
               {/* LEFT COLUMN: MAIN MEDIATHEK AREA */}
               <div 
@@ -125,10 +130,12 @@ export const StudentSongsTab: React.FC<StudentSongsTabProps> = ({
                 style={{ 
                   flex: 1,
                   background: 'white', 
-                  borderRadius: '20px', 
+                  borderRadius: isMobile ? '24px' : '20px', 
                   border: '1px solid rgba(0, 0, 0, 0.05)', 
-                  padding: '24px 30px', 
+                  padding: isMobile ? '16px 14px' : '24px 30px', 
                   boxShadow: '0 4px 20px -2px rgba(0, 0, 0, 0.02), 0 2px 8px -1px rgba(0, 0, 0, 0.01)',
+                  boxSizing: 'border-box',
+                  maxWidth: '100%',
                   display: 'flex', 
                   flexDirection: 'column', 
                   gap: '24px' 
@@ -678,8 +685,10 @@ export const StudentSongsTab: React.FC<StudentSongsTabProps> = ({
                 background: 'linear-gradient(180deg, #ffffff 0%, #fbfdfc 100%)',
                 border: '1px solid #e2e8f0',
                 borderRadius: '24px',
-                padding: '22px',
+                padding: isMobile ? '16px 14px' : '22px',
                 boxShadow: '0 8px 24px -4px rgba(15, 23, 42, 0.04)',
+                boxSizing: 'border-box',
+                maxWidth: '100%',
                 display: 'flex',
                 flexDirection: 'column',
                 gap: '18px'
