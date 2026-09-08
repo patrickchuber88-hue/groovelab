@@ -8,7 +8,7 @@ import { ALL_STICKERS, getUnifiedStickersMap } from '../../domain/stickersAndTre
 import { SimpleVoiceRecorder } from './SimpleVoiceRecorder';
 import { cleanHomeworkNotesText } from '../../utils/nameHelper';
 import { DEFAULT_FOKUS_LEVELS, getEngineEffectiveLevel } from '../../utils/studentProgressEngine';
-import { getAvatarLevelFrameStyle } from '../StudioAvatar';
+import { getAvatarLevelFrameStyle, getInstrumentAvatarUrl } from '../StudioAvatar';
 import { getSecureAudioUrl } from '../../utils/audioStorageHelper';
 
 interface CampusJuniorDashboardProps {
@@ -27,29 +27,6 @@ interface CampusJuniorDashboardProps {
   fokusLogs?: any[];
   schoolFokusLevels?: any;
 }
-
-const getInstrumentAvatarUrl = (instrument: string | null | undefined): string => {
-  if (!instrument) return '/avatars/gitarre_avatar_new.png';
-  const inst = instrument.toLowerCase().trim();
-  if (inst.includes('e-gitarre')) return '/avatars/egitarre_avatar.png';
-  if (inst.includes('guitar') || inst.includes('gitarre')) return '/avatars/gitarre_avatar_new.png';
-  if (inst.includes('e-bass')) return '/avatars/ebass_avatar.png';
-  if (inst.includes('kontrabass') || inst.includes('double bass')) return '/avatars/kontrabass_avatar.png';
-  if (inst.includes('bass')) return '/avatars/bass_avatar.png';
-  if (inst.includes('drum') || inst.includes('schlagzeug')) return '/avatars/schlagzeug_avatar.png';
-  if (inst.includes('piano') || inst.includes('keys') || inst.includes('klavier') || inst.includes('keyboard')) return '/avatars/klavier_avatar_new.png';
-  if (inst.includes('vocal') || inst.includes('gesang') || inst.includes('stimme') || inst.includes('singer')) return '/avatars/gesang_avatar.png';
-  if (inst.includes('trompete') || inst.includes('trumpet')) return '/avatars/trompete_avatar_new.png';
-  if (inst.includes('posaune') || inst.includes('trombone')) return '/avatars/posaune_avatar.png';
-  if (inst.includes('horn')) return '/avatars/horn_avatar_new.png';
-  if (inst.includes('cello')) return '/avatars/cello_avatar_new.png';
-  if (inst.includes('geige') || inst.includes('violin') || inst.includes('violine')) return '/avatars/violine_avatar_new.png';
-  if (inst.includes('klarinette') || inst.includes('clarinet')) return '/avatars/klarinette_avatar_new.png';
-  if (inst.includes('querflöte') || inst.includes('flute')) return '/avatars/querfloete_avatar.png';
-  if (inst.includes('saxofon') || inst.includes('saxophone') || inst.includes('sax')) return '/avatars/saxophon_avatar_new.png';
-  if (inst.includes('blockflöte') || inst.includes('recorder') || inst.includes('blockfloete')) return '/avatars/blockfloete_avatar.png';
-  return '/avatars/gitarre_avatar_new.png';
-};
 
 export const CampusJuniorDashboard: React.FC<CampusJuniorDashboardProps> = ({
   studentUser,
@@ -827,7 +804,7 @@ export const CampusJuniorDashboard: React.FC<CampusJuniorDashboardProps> = ({
         </div>
       </div>
 
-      {/* 5. MEISTERWERK PANINI-STICKER WAND (100% Einheitlich mit Level 3) */}
+      {/* 5. MEISTERWERK STICKER-WAND (100% Einheitlich mit Level 3) */}
       <div style={{
         background: '#ffffff',
         borderRadius: '30px',

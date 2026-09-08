@@ -548,7 +548,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                 ? '/campus_login_hero.png'
                                 : studentUser?.photo_url && studentUser.photo_url.includes('_avatar')
                                 ? studentUser.photo_url
-                                : getInstrumentAvatarUrl(studentUser?.resolved_instrument || studentUser?.instrument)
+                                : getInstrumentAvatarUrl(studentInstrumentName || studentUser?.resolved_instrument || studentUser?.instrument)
                             } 
                             alt="" 
                             style={{ 
@@ -1629,13 +1629,13 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
 
                                 <div>
                                   <div style={{ fontSize: isMusicStandMode ? '0.92rem' : '0.84rem', fontWeight: 900, color: '#d97706', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                                    Sticker-Album
+                                    Sammelalbum
                                   </div>
                                   <h3 style={{ margin: '4px 0 0 0', fontSize: isMusicStandMode ? '1.55rem' : '1.38rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em' }}>
                                     {nextLockedSticker ? `Nächster: ${nextLockedSticker.title}` : 'Alle Sticker gesammelt! 🌟'}
                                   </h3>
                                   <p style={{ margin: '4px 0 0 0', fontSize: isMusicStandMode ? '1.05rem' : '0.92rem', color: '#64748b', fontWeight: 650, lineHeight: 1.4 }}>
-                                    {nextStickerStatus?.progressText || nextLockedSticker?.desc || 'Öffne dein Panini-Album und entdecke deine Meilensteine!'}
+                                    {nextStickerStatus?.progressText || nextLockedSticker?.desc || 'Öffne dein Sammelalbum und entdecke deine Meilensteine!'}
                                   </p>
 
                                   {/* Progress bar (100% Synchron zu Karte B) */}
@@ -3384,7 +3384,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                             ? '/campus_login_hero.png'
                             : studentUser?.photo_url && studentUser.photo_url.includes('_avatar')
                             ? studentUser.photo_url
-                            : getInstrumentAvatarUrl(studentUser?.resolved_instrument || studentUser?.instrument)
+                            : getInstrumentAvatarUrl(studentInstrumentName || studentUser?.resolved_instrument || studentUser?.instrument)
                         } 
                         alt="" 
                         style={{ 
@@ -4799,7 +4799,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                             ? '/campus_login_hero.png'
                             : studentUser?.photo_url && studentUser.photo_url.includes('_avatar')
                             ? studentUser.photo_url
-                            : getInstrumentAvatarUrl(studentUser?.resolved_instrument || studentUser?.instrument)
+                            : getInstrumentAvatarUrl(studentInstrumentName || studentUser?.resolved_instrument || studentUser?.instrument)
                         } 
                         alt="" 
                         style={{ 

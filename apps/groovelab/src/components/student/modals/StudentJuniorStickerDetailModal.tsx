@@ -92,7 +92,7 @@ export const StudentJuniorStickerDetailModal: React.FC<StudentJuniorStickerDetai
           alignItems: 'center',
           gap: '6px'
         }}>
-          <Star size={12} fill="currentColor" /> {sticker.rarityLabel} • {sticker.category === 'ueben' ? 'Übe-Fleiß' : sticker.category === 'xp' ? 'Zauber-XP' : sticker.category === 'streaks' ? 'Streaks' : sticker.category === 'songs' ? 'Repertoire' : 'Spezial'}
+          <Star size={12} fill="currentColor" /> {sticker.rarityLabel} • {sticker.category === 'schuljahr' ? 'Schuljahr' : sticker.category === 'ueben' ? 'Übe-Fleiß' : sticker.category === 'xp' ? 'Zauber-XP' : sticker.category === 'streaks' ? 'Streaks' : sticker.category === 'songs' ? 'Repertoire' : 'Spezial'}
         </span>
 
         {/* Large 150px Full-Color Floating Sticker Card */}

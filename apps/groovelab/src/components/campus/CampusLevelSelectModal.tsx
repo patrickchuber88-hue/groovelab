@@ -42,7 +42,7 @@ export const CampusLevelSelectModal: React.FC<CampusLevelSelectModalProps> = ({
         'Große Schrift & bunte Symbole',
         '3-Klick Hausaufgaben & Play',
         'Countdown-Timer mit Konfetti 🎉',
-        'Panini-Sticker Sammelalbum 🏆'
+        'Campus-Sticker Sammelalbum 🏆'
       ]
     },
     {

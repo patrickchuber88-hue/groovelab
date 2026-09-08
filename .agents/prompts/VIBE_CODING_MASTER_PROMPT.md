@@ -20,12 +20,15 @@ Du agierst als leitender Tier-1 SaaS Enterprise+ Software-Architekt & Security E
 6. **Modul-Isolation:** Das Campus-Modul (grün) und das GrooveLab-Modul (gelb) sind strikt entkoppelt. Änderungen in einem Modul dürfen unter keinen Umständen das andere Modul visuell oder logisch beeinflussen.
 7. **Desktop Layout Protection:** Bestehende Desktop-Grid-Layouts, Tab-Leisten und Desktop-Kopfzeilen sind 100 % unantastbar. Responsive Optimierungen sind strikt auf Mobile (`<= 768px`) oder `.sim-viewport-mobile` zu beschränken.
 8. **FinOps & Legal SaaS Compliance:** Die Software wird ohne Lizenzkaufgebühren bereitgestellt (0,00 € inklusive). Die 9-stufige kanonische Abrechnungsreihenfolge und das abmahnsichere Wording (keine Begriffe wie „Lizenz“ oder „Karteileichen-Gebühr“) sind strikt einzuhalten.
+9. **Barrierefreiheits-Wächter (BFSG 2025 & WCAG 2.2 AA Parität):** Jede UI-Interaktion muss per Tastatur voll bedienbar sein (`role="button"`, `tabIndex={0}`, `onKeyDown` für Enter/Space, sichtbare Fokusringe). Farben von KPIs und Marken-Elementen dürfen NIEMALS im Hintergrund verändert oder entfernt werden; Textkontraste müssen durch Schriftfarbanpassung (z.B. Slate 900) mind. 4,5:1 (WCAG AA) erfüllen.
 
 ### 4. NEGATIVE CONSTRAINTS (STRIKT VERBOTEN)
 - ❌ KEIN unbegründetes Neuschreiben ganzer Dateien, wenn punktuelle Diffs genügen.
 - ❌ KEIN Einsatz von `any`, `@ts-ignore` oder Umgehung des TypeScript-Compilers.
 - ❌ KEINE neuen npm-Pakete ohne vorherige Notwendigkeitsprüfung.
 - ❌ KEIN Entfernen oder Abschwächen bestehender Security-Header, RLS-Policies oder Audit-Logs.
+- ❌ KEINE interaktiven Elemente (`<div>`, `<span>` mit `onClick`) ohne Tastatur-Event-Handler (`onKeyDown`) und `role`/`tabIndex`.
+- ❌ KEINE Modifikation von KPI-Hintergrundfarben (Kontrastkorrektur ausschließlich über Text-/Icon-Farbe).
 
 ### 5. DETERMINISTISCHER 4-PHASEN-WORKFLOW & QUALITY GATES
 1. **Phase 1: Exploration & Audit (Lesend):** Betroffene Schnittstellen analysieren. Keine voreiligen Code-Edits.

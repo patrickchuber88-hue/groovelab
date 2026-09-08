@@ -51,11 +51,25 @@
   4. *Zero-Trust & Server-RPCs*: Autorisierungs-, PIN- und sensible Datenprüfungen erfolgen ausnahmslos serverseitig über autoritative RPCs.
   5. *Desktop Layout Immunity*: Bestehende Desktop-Grid-Layouts und Navigationselemente sind unantastbar. Responsive Anpassungen bleiben strikt auf Mobile (`<= 768px`) beschränkt.
   6. *Proportions- & Typografie-Harmonie*: UI-Elemente folgen dem etablierten Goldstandard (Apple Squircle Radien, monochrome Icons, Plus Jakarta Sans Typografie).
+  7. *Barrierefreiheits-Integrität & BFSG / WCAG 2.2 AA Parität*: Keine UI-Änderung ohne Tastatur-Vollbedienbarkeit (`role="button"`, `tabIndex={0}`, `onKeyDown` für Enter/Space), Kontrast-Parität (mind. 4,5:1; Marken-KPI-Hintergründe 100% erhalten, Textfarben auf dunkle Kontraste Slate-900 angepasst) und WAI-ARIA Semantik.
 - **Kompaktes Reporting (Bedarfsgesteuert)**:
   - Wurde aktiv eingegriffen und veredelt: Ausgabe eines kurzen Abschnitts `### 🏛️ Monolith Goldstandard Delta` (Präzise Vorher/Nachher-Stichpunkte).
   - War bereits alles konform: Ein dezenter Vermerk (`🏛️ Monolith Goldstandard: Konform`) genügt.
 - **Verifikations-Abschluss**: Jede Veredelung muss zwingend mit `npm run gate` verifiziert werden (Exit-Code 0).
 
+## ♿ Barrierefreiheits-Wächter & BFSG 2025 / WCAG 2.2 AA Governance (Zero-Regression Directive)
+- **Automatischer Barrierefreiheits-Schutz (Wächter-Pflicht)**: Bei JEDER Modifikation an interaktiven UI-Komponenten, Buttons, Menüs, Karten, Formularen, Modals, Widgets oder Footern MUSS zwingend und ohne gesonderte Aufforderung geprüft werden, ob die digitale Barrierefreiheit nach dem Barrierefreiheitsstärkungsgesetz (BFSG 2025), BITV 2.0 und WCAG 2.2 Stufe AA gewahrt bleibt. Keine Code-Änderung darf die Barrierefreiheit einschränken oder herabsetzen.
+- **Tastatur-Vollbedienbarkeit (WCAG 2.1.1 & 2.4.7)**:
+  - Jedes klickbare Element (`onClick`), das kein natives `<button>` oder `<a>` ist (z. B. `<div>`, `<span>`), MUSS zwingend `role="button"`, `tabIndex={0}` und einen `onKeyDown`-Handler für `Enter` (`e.key === 'Enter'`) und `Leertaste` (`e.key === ' '`) besitzen.
+  - Fokussierte Bedienelemente müssen einen sichtbaren Tastaturfokusring erhalten (z. B. `boxShadow: '0 0 0 2px #3b82f6'`).
+- **Unantastbarkeit von Marken- & KPI-Hintergrundfarben (WCAG 1.4.3)**:
+  - Marken-, Modul- und KPI-Hintergrundfarben (insbesondere das GrooveLab-Gelb `#facc15` / `#eab308`, Campus-Grün `#34a853`, Admin-Rot `#ea4335`) dürfen NIEMALS aus Kontrastgründen im Hintergrund verändert, abgeschwächt oder entfernt werden.
+  - Das geforderte Mindestkontrastverhältnis von 4,5 : 1 (WCAG AA) MUSS AUSSCHLIESSLICH durch Anpassung der **Text- und Icon-Farbe** auf diesen Hintergründen erreicht werden (z. B. Slate 900 `#0f172a` auf Gelb für > 12:1 Kontrast).
+- **WAI-ARIA Dialog- & Tab-Architektur (WCAG 1.3.1 & 4.1.2)**:
+  - Modals müssen `role="dialog"`, `aria-modal="true"`, aussagekräftige `aria-label`s und einen Escape-Key-Listener (`e.key === 'Escape'`) besitzen.
+  - Tab-Navigationen müssen zwingend die W3C-WAI-ARIA Trias implementieren: `role="tablist"` auf der Leiste, `role="tab"` (mit `aria-selected`, `aria-controls`, `id`) auf den Reitern und `role="tabpanel"` (mit `aria-labelledby`, `tabIndex={0}`) auf den Inhaltsbereichen.
+- **Erklärungs-Schutz (Rechtskonformität nach BFSG 2025 & BITV 2.0)**:
+  - Die in `LegalTextModal.tsx` verankerte *Erklärung zur digitalen Barrierefreiheit* darf NIEMALS auf abmahnfähige Phrasen (wie „vollständig barrierefrei“ oder „größtenteils vereinbar“) zurückgesetzt werden. Der verbindliche juristische Status bleibt **„teilweise vereinbar“** mit den deklarierten Ausnahmen nach § 12a Abs. 6 BGG / § 16 BFSG (auditive Live-Inhalte und nutzergenerierte Uploads) und präziser Nennung der Landes-Schlichtungsstellen (L-BGG) und Marktüberwachungsbehörden.
 
 ## Platform Naming
 - Always refer to the platform as **Campus-Groovelab** in all UI elements, user communications, messages, and document descriptions.

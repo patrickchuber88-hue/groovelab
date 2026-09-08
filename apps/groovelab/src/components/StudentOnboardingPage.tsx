@@ -573,7 +573,7 @@ Deine Vorteile auf einen Blick:
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <span style={{ fontSize: '1.1rem' }}>{consentSaved ? '✅' : '📜'}</span>
             <div style={{ fontSize: '0.82rem', fontWeight: 800, color: consentSaved ? '#166534' : '#854d0e' }}>
-              {consentSaved ? 'Eltern-Einwilligung erteilt & datiert' : 'Einwilligung der Erziehungsberechtigten (Art. 8 DSGVO / § 73 UrhG)'}
+              {consentSaved ? 'Eltern-Einwilligung erteilt & datiert' : 'Einwilligung der Erziehungsberechtigten (Art. 8 DSGVO / Didaktik-Freigabe)'}
             </div>
           </div>
 
@@ -706,10 +706,10 @@ Deine Vorteile auf einen Blick:
                   <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', fontSize: '0.74rem', color: '#334155', fontWeight: 650, cursor: 'pointer', background: '#f8fafc', padding: '10px 12px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                       <input type="checkbox" checked={parentAllowTeacherAudio} onChange={e => setParentAllowTeacherAudio(e.target.checked)} style={{ accentColor: '#34a853', width: '16px', height: '16px', flexShrink: 0 }} />
-                      <span>🎧 Tonaufnahmen des Schülers durch die Lehrkraft (§ 201 StGB)</span>
+                      <span>🎧 Tonaufnahmen des Schülers durch die Lehrkraft (Lernanalyse)</span>
                     </div>
                     <span style={{ fontSize: '0.6rem', fontWeight: 800, color: '#64748b', background: '#f1f5f9', padding: '2px 6px', borderRadius: '6px', whiteSpace: 'nowrap' }}>
-                      Opt-In (§ 73 UrhG)
+                      Freiwilliges Opt-In
                     </span>
                   </label>
                 </div>

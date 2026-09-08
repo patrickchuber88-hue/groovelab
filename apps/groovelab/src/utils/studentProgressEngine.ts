@@ -14,6 +14,10 @@ export interface StudentProgressMetrics {
   streakFlame: number;
   totalFocusSeconds: number;
   totalFocusMinutes: number;
+  schoolYearFocusSeconds: number;
+  schoolYearFocusMinutes: number;
+  weekFocusSeconds: number;
+  weekFocusMinutes: number;
   todayFocusSeconds: number;
   todayExtraSeconds: number;
   todayTotalSeconds: number;
@@ -167,8 +171,11 @@ export const getMasteredSongsSet = (songSkills?: any[], progressMatrix?: any[]):
 
   (songSkills || []).forEach(skill => {
     if (skill.is_stage_ready || skill.progress_percent === 100 || skill.status === 'MASTERED') {
-      const title = skill.songs?.title || skill.title || skill.song_title;
-      if (title) masteredSongs.add(String(title).toLowerCase().trim());
+      const rawTitle = skill.songs?.title || skill.title || skill.song_title;
+      if (rawTitle) {
+        const cleanTitle = String(rawTitle).replace(/\s*\([^)]*\)\s*$/, '').trim().toLowerCase();
+        if (cleanTitle) masteredSongs.add(cleanTitle);
+      }
     }
   });
 
@@ -176,8 +183,8 @@ export const getMasteredSongsSet = (songSkills?: any[], progressMatrix?: any[]):
     const rawTopic = String(item.topic_name || item.title || '').trim();
     if (!rawTopic || rawTopic.includes(' - Seite ') || rawTopic.startsWith('Hausaufgabe KW ') || rawTopic.toLowerCase().startsWith('test')) return;
     if (item.status === 'MASTERED' || (item.progress_percent || 0) === 100) {
-      const cleanT = rawTopic.replace(/\s*\([^)]*\)\s*$/, '').trim();
-      if (cleanT) masteredSongs.add(cleanT.toLowerCase());
+      const cleanT = rawTopic.replace(/\s*\([^)]*\)\s*$/, '').trim().toLowerCase();
+      if (cleanT) masteredSongs.add(cleanT);
     }
   });
 
@@ -374,13 +381,46 @@ export function computeGroundTruthMetrics({
   const todayTotalSecs = todayFocusSecs + todayExtraSecs;
   const todayTotalMins = Math.round(todayTotalSecs / 60);
 
-  // 6. Compute total all-time focus seconds & minutes
+  // 6. Compute week practice seconds & minutes (Monday to Sunday)
+  const monday = new Date(now);
+  const dayOfWeek = (monday.getDay() + 6) % 7;
+  monday.setDate(monday.getDate() - dayOfWeek);
+  monday.setHours(0, 0, 0, 0);
+
+  const sunday = new Date(monday);
+  sunday.setDate(sunday.getDate() + 6);
+  sunday.setHours(23, 59, 59, 999);
+
+  // 7. Compute school year practice seconds & minutes (starts Sept 1st)
+  const currentSchoolYearStartYear = now.getMonth() >= 8 ? now.getFullYear() : now.getFullYear() - 1;
+  const schoolYearStartDate = new Date(currentSchoolYearStartYear, 8, 1, 0, 0, 0, 0);
+
+  let weekFocusSecs = 0;
+  let schoolYearFocusSecs = 0;
+
+  mergedLogs.forEach((log: any) => {
+    if (!log.created_at) return;
+    const logDate = new Date(log.created_at);
+    const secs = log.duration_seconds || ((log.duration_minutes || 0) * 60);
+
+    if (logDate >= monday && logDate <= sunday) {
+      weekFocusSecs += secs;
+    }
+    if (logDate >= schoolYearStartDate) {
+      schoolYearFocusSecs += secs;
+    }
+  });
+
+  const weekFocusMins = Math.round(weekFocusSecs / 60);
+  const schoolYearFocusMins = Math.round(schoolYearFocusSecs / 60);
+
+  // 8. Compute total all-time focus seconds & minutes
   const totalFocusSecs = mergedLogs.reduce((sum: number, log: any) => {
     return sum + (log.duration_seconds || ((log.duration_minutes || 0) * 60));
   }, 0);
   const totalFocusMins = Math.max(stats?.total_focus_minutes || 0, offlineTotalFocus, Math.round(totalFocusSecs / 60));
 
-  // 7. Check if daily target is completed
+  // 9. Check if daily target is completed
   const hasCompletedTargetToday = (
     todayFocusSecs >= targetMinutes * 60 ||
     todayLogs.some((l: any) => (l.duration_seconds || 0) >= targetMinutes * 60 || (l.duration_minutes || 0) >= targetMinutes) ||
@@ -392,6 +432,10 @@ export function computeGroundTruthMetrics({
     streakFlame: finalStreak,
     totalFocusSeconds: totalFocusSecs,
     totalFocusMinutes: totalFocusMins,
+    schoolYearFocusSeconds: schoolYearFocusSecs,
+    schoolYearFocusMinutes: schoolYearFocusMins,
+    weekFocusSeconds: weekFocusSecs,
+    weekFocusMinutes: weekFocusMins,
     todayFocusSeconds: todayFocusSecs,
     todayExtraSeconds: todayExtraSecs,
     todayTotalSeconds: todayTotalSecs,

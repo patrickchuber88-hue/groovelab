@@ -80,11 +80,11 @@ export const MeisterOhrSticker: React.FC<MeisterOhrStickerProps> = ({
         boxSizing: 'border-box',
         overflow: 'hidden',
         userSelect: 'none',
-        animation: isTier1 ? 'paniniGlow 3s ease-in-out infinite alternate' : 'none'
+        animation: isTier1 ? 'collectorGlow 3s ease-in-out infinite alternate' : 'none'
       }}
-      className="panini-sticker-foil"
+      className="collector-sticker-foil"
     >
-      {/* Holographic Panini Foil Sheen (Only for Tier 1 & 2) */}
+      {/* Holographic Foil Sheen (Only for Tier 1 & 2) */}
       {(isTier1 || isTier2) && (
         <div
           style={{
@@ -96,7 +96,7 @@ export const MeisterOhrSticker: React.FC<MeisterOhrStickerProps> = ({
             background: 'linear-gradient(45deg, transparent 40%, rgba(255, 255, 255, 0.45) 50%, transparent 60%)',
             transform: 'rotate(25deg)',
             pointerEvents: 'none',
-            animation: 'paniniShine 4s infinite linear'
+            animation: 'collectorShine 4s infinite linear'
           }}
         />
       )}

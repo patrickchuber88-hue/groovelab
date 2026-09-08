@@ -8,7 +8,7 @@ import { subscribeUserToPush } from './utils/webPush';
 import { StudioAvatar, getInstrumentAvatarUrl, getDefaultMusicianAvatarUrl, renderBandAvatar, resolveStudentInstrumentAsync, getEffectiveInstrument } from './components/StudioAvatar';
 import { reportClientError, initGlobalErrorListeners } from './lib/errorTelemetry';
 import { isDevEnvironment } from './utils/tenantUrlHelper';
-import { CampusGroovelabBrand, CampusGroovelabText, CampusGroovelabLogo } from './components/CampusGroovelabBrand';
+import { CampusGroovelabText } from './components/CampusGroovelabBrand';
 import { scrubSharedDeviceCache } from './utils/sharedDeviceScrubber';
 
 // Initialize global error interception
@@ -60,7 +60,6 @@ import { APP_INSTRUMENT_ICONS, APP_INSTRUMENT_COLORS, brandColor } from './const
 import ConfettiModal from './components/ConfettiModal';
 import { normalizeInstrument, renderInstrumentIcon } from './utils/instruments';
 import { getDistanceFromLatLonInM } from './utils/geo';
-import { ProfileSelector } from './components/ProfileSelector';
 import { flushOfflineSyncQueue } from './services/offlineSyncService';
 import { DeviceSimulator } from './components/ui/DeviceSimulator';
 import { MobileTopHeader } from './components/ui/MobileTopHeader';
@@ -1882,6 +1881,34 @@ function App() {
 
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(true);
   const [sidebarNotificationsCount, setSidebarNotificationsCount] = useState<number>(0);
+
+  // 🎼 Notenständer-Modus (Großschrift & Glanceability für 60–90 cm Distanz am Instrument)
+  const [isMusicStandMode, setIsMusicStandMode] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return localStorage.getItem('campus_music_stand_mode') === 'true';
+  });
+
+  useEffect(() => {
+    const handleSync = () => {
+      setIsMusicStandMode(localStorage.getItem('campus_music_stand_mode') === 'true');
+    };
+    window.addEventListener('campus_music_stand_mode_changed', handleSync);
+    window.addEventListener('storage', handleSync);
+    return () => {
+      window.removeEventListener('campus_music_stand_mode_changed', handleSync);
+      window.removeEventListener('storage', handleSync);
+    };
+  }, []);
+
+  const toggleMusicStandMode = () => {
+    setIsMusicStandMode(prev => {
+      const next = !prev;
+      localStorage.setItem('campus_music_stand_mode', String(next));
+      window.dispatchEvent(new Event('campus_music_stand_mode_changed'));
+      return next;
+    });
+  };
+
   const [selectedMatchingInsts, setSelectedMatchingInsts] = useState<Record<string, string>>({});
   const [activeBandSubTab, setActiveBandSubTab] = useState<'meine' | 'alle'>(() => {
     return (localStorage.getItem('groovelab_active_band_subtab') as 'meine' | 'alle') || 'meine';
@@ -6835,7 +6862,7 @@ function App() {
     );
   }
 
-  if (location.pathname === '/landingpage2' || location.pathname === '/startseite2' || location.pathname === '/starseite2') {
+  if (location.pathname === '/landingpage2' || location.pathname === '/startseite2') {
     return (
       <Suspense fallback={<DashboardLoader />}>
         <Startseite2 
@@ -8709,6 +8736,62 @@ function App() {
             </div>
           </button>
 
+          {/* Notenständer-Modus Toggle Button (Student Goldstandard) */}
+          {user.role?.toLowerCase() === 'student' && activePlatform === 'campus' && (
+            <button 
+              type="button"
+              onClick={toggleMusicStandMode}
+              style={{ 
+                width: '100%', 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'space-between',
+                padding: '11px 14px', 
+                borderRadius: '12px', 
+                border: isMusicStandMode ? '1.2px solid #bbf7d0' : '1px solid #e2e8f0', 
+                background: isMusicStandMode ? '#f0fdf4' : '#f8fafc', 
+                color: isMusicStandMode ? '#166534' : '#334155', 
+                fontWeight: 800, 
+                fontSize: '0.82rem',
+                cursor: 'pointer',
+                boxShadow: isMusicStandMode ? '0 2px 8px rgba(52, 168, 83, 0.12)' : '0 1px 3px rgba(0,0,0,0.02)',
+                transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
+              }}
+              className="hover-scale"
+              title="Großschrift & Glanceability für Notenständer & Distanz am Instrument (60–90 cm)"
+              onMouseEnter={(e) => {
+                if (!isMusicStandMode) {
+                  e.currentTarget.style.background = '#f1f5f9';
+                  e.currentTarget.style.color = '#0f172a';
+                  e.currentTarget.style.borderColor = '#cbd5e1';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!isMusicStandMode) {
+                  e.currentTarget.style.background = '#f8fafc';
+                  e.currentTarget.style.color = '#334155';
+                  e.currentTarget.style.borderColor = '#e2e8f0';
+                }
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Music size={16} color={isMusicStandMode ? '#166534' : '#64748b'} strokeWidth={2} />
+                <span>Notenständer-Modus</span>
+              </div>
+              <span style={{
+                background: isMusicStandMode ? '#34a853' : '#f1f5f9',
+                color: isMusicStandMode ? '#ffffff' : '#64748b',
+                fontSize: '0.68rem',
+                fontWeight: 950,
+                padding: '2px 7px',
+                borderRadius: '100px',
+                letterSpacing: '0.02em'
+              }}>
+                {isMusicStandMode ? 'AKTIV' : 'AUS'}
+              </span>
+            </button>
+          )}
+
           {/* Leitfäden & Akademie Button */}
           <button 
             type="button"
@@ -10299,15 +10382,55 @@ function App() {
                   gap: '12px'
                 }}>
                   <div style={{ display: 'flex', gap: '20px', fontSize: '0.85rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    <span onClick={() => setShowPrivacy(true)} style={{ cursor: 'pointer' }}>Datenschutz</span>
+                    <span 
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => setShowPrivacy(true)} 
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setShowPrivacy(true); } }}
+                      style={{ cursor: 'pointer', outline: 'none', borderRadius: '4px', padding: '2px 4px' }}
+                      onFocus={(e) => { e.currentTarget.style.color = '#334155'; }}
+                      onBlur={(e) => { e.currentTarget.style.color = '#94a3b8'; }}
+                    >Datenschutz</span>
                     <span style={{ opacity: 0.5 }}>•</span>
-                    <span onClick={() => setShowAgb(true)} style={{ cursor: 'pointer' }}>AGB</span>
+                    <span 
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => setShowAgb(true)} 
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setShowAgb(true); } }}
+                      style={{ cursor: 'pointer', outline: 'none', borderRadius: '4px', padding: '2px 4px' }}
+                      onFocus={(e) => { e.currentTarget.style.color = '#334155'; }}
+                      onBlur={(e) => { e.currentTarget.style.color = '#94a3b8'; }}
+                    >AGB</span>
                     <span style={{ opacity: 0.5 }}>•</span>
-                    <span onClick={() => setShowCancellation(true)} style={{ cursor: 'pointer' }}>Widerruf</span>
+                    <span 
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => setShowCancellation(true)} 
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setShowCancellation(true); } }}
+                      style={{ cursor: 'pointer', outline: 'none', borderRadius: '4px', padding: '2px 4px' }}
+                      onFocus={(e) => { e.currentTarget.style.color = '#334155'; }}
+                      onBlur={(e) => { e.currentTarget.style.color = '#94a3b8'; }}
+                    >Widerruf</span>
                     <span style={{ opacity: 0.5 }}>•</span>
-                    <span onClick={() => setShowImpressum(true)} style={{ cursor: 'pointer' }}>Impressum</span>
+                    <span 
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => setShowImpressum(true)} 
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setShowImpressum(true); } }}
+                      style={{ cursor: 'pointer', outline: 'none', borderRadius: '4px', padding: '2px 4px' }}
+                      onFocus={(e) => { e.currentTarget.style.color = '#334155'; }}
+                      onBlur={(e) => { e.currentTarget.style.color = '#94a3b8'; }}
+                    >Impressum</span>
                     <span style={{ opacity: 0.5 }}>•</span>
-                    <span onClick={() => setShowAccessibility(true)} style={{ cursor: 'pointer' }}>Barrierefreiheit</span>
+                    <span 
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => setShowAccessibility(true)} 
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setShowAccessibility(true); } }}
+                      style={{ cursor: 'pointer', outline: 'none', borderRadius: '4px', padding: '2px 4px' }}
+                      onFocus={(e) => { e.currentTarget.style.color = '#334155'; }}
+                      onBlur={(e) => { e.currentTarget.style.color = '#94a3b8'; }}
+                    >Barrierefreiheit</span>
                   </div>
                   <span style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 600 }}><CampusGroovelabText fontSize="0.7rem" fontWeight={600} /> © {new Date().getFullYear()}</span>
                 </div>
@@ -11622,15 +11745,55 @@ function App() {
                       gap: '12px'
                     }}>
                       <div style={{ display: 'flex', gap: '20px', fontSize: '0.85rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                        <span onClick={() => setShowPrivacy(true)} style={{ cursor: 'pointer' }}>Datenschutz</span>
+                        <span 
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => setShowPrivacy(true)} 
+                          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setShowPrivacy(true); } }}
+                          style={{ cursor: 'pointer', outline: 'none', borderRadius: '4px', padding: '2px 4px' }}
+                          onFocus={(e) => { e.currentTarget.style.color = '#334155'; }}
+                          onBlur={(e) => { e.currentTarget.style.color = '#94a3b8'; }}
+                        >Datenschutz</span>
                         <span style={{ opacity: 0.5 }}>•</span>
-                        <span onClick={() => setShowAgb(true)} style={{ cursor: 'pointer' }}>AGB</span>
+                        <span 
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => setShowAgb(true)} 
+                          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setShowAgb(true); } }}
+                          style={{ cursor: 'pointer', outline: 'none', borderRadius: '4px', padding: '2px 4px' }}
+                          onFocus={(e) => { e.currentTarget.style.color = '#334155'; }}
+                          onBlur={(e) => { e.currentTarget.style.color = '#94a3b8'; }}
+                        >AGB</span>
                         <span style={{ opacity: 0.5 }}>•</span>
-                        <span onClick={() => setShowCancellation(true)} style={{ cursor: 'pointer' }}>Widerruf</span>
+                        <span 
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => setShowCancellation(true)} 
+                          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setShowCancellation(true); } }}
+                          style={{ cursor: 'pointer', outline: 'none', borderRadius: '4px', padding: '2px 4px' }}
+                          onFocus={(e) => { e.currentTarget.style.color = '#334155'; }}
+                          onBlur={(e) => { e.currentTarget.style.color = '#94a3b8'; }}
+                        >Widerruf</span>
                         <span style={{ opacity: 0.5 }}>•</span>
-                        <span onClick={() => setShowImpressum(true)} style={{ cursor: 'pointer' }}>Impressum</span>
+                        <span 
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => setShowImpressum(true)} 
+                          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setShowImpressum(true); } }}
+                          style={{ cursor: 'pointer', outline: 'none', borderRadius: '4px', padding: '2px 4px' }}
+                          onFocus={(e) => { e.currentTarget.style.color = '#334155'; }}
+                          onBlur={(e) => { e.currentTarget.style.color = '#94a3b8'; }}
+                        >Impressum</span>
                         <span style={{ opacity: 0.5 }}>•</span>
-                        <span onClick={() => setShowAccessibility(true)} style={{ cursor: 'pointer' }}>Barrierefreiheit</span>
+                        <span 
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => setShowAccessibility(true)} 
+                          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setShowAccessibility(true); } }}
+                          style={{ cursor: 'pointer', outline: 'none', borderRadius: '4px', padding: '2px 4px' }}
+                          onFocus={(e) => { e.currentTarget.style.color = '#334155'; }}
+                          onBlur={(e) => { e.currentTarget.style.color = '#94a3b8'; }}
+                        >Barrierefreiheit</span>
                       </div>
                       <span style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 600 }}><CampusGroovelabText fontSize="0.7rem" fontWeight={600} /> © {new Date().getFullYear()}</span>
                     </div>

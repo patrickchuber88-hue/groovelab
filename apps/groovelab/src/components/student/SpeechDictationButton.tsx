@@ -116,7 +116,7 @@ export const SpeechDictationButton: React.FC<{
         color: isListening ? '#dc2626' : '#475569',
         boxShadow: isListening ? '0 0 12px rgba(239, 68, 68, 0.4)' : '0 1px 3px rgba(0,0,0,0.04)',
         transition: 'all 0.2s ease',
-        animation: isListening ? 'paniniGlow 1.2s infinite alternate' : 'none'
+        animation: isListening ? 'collectorGlow 1.2s infinite alternate' : 'none'
       }}
     >
       {isListening ? (

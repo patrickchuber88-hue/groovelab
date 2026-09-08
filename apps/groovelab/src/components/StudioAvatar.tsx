@@ -49,7 +49,10 @@ export const isGenericInstrument = (inst: string | null | undefined): boolean =>
 };
 
 export const getEffectiveInstrument = (user: any): string => {
-  if (!user) return 'Gitarre';
+  if (!user) return '';
+  if (user.main_instrument && !isGenericInstrument(user.main_instrument)) {
+    return String(user.main_instrument).split(',')[0].trim();
+  }
   if (user.resolved_instrument && !isGenericInstrument(user.resolved_instrument)) {
     return String(user.resolved_instrument).split(',')[0].trim();
   }
@@ -65,11 +68,11 @@ export const getEffectiveInstrument = (user: any): string => {
   if (user.teacher?.subject && !isGenericInstrument(user.teacher.subject)) {
     return String(user.teacher.subject).split(',')[0].trim();
   }
-  return 'Gitarre';
+  return '';
 };
 
 export const resolveStudentInstrumentAsync = async (user: any): Promise<string> => {
-  if (!user) return 'Gitarre';
+  if (!user) return '';
   if (user.resolved_instrument && !isGenericInstrument(user.resolved_instrument)) {
     return String(user.resolved_instrument).split(',')[0].trim();
   }
@@ -112,7 +115,7 @@ export const resolveStudentInstrumentAsync = async (user: any): Promise<string> 
     } catch (e) {}
   }
 
-  return 'Gitarre';
+  return '';
 };
 
 // ─── Dynamic Level Border & Halo Frame System ─────────────────────────────────

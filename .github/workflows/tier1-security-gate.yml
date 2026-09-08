@@ -8,30 +8,33 @@ on:
 
 jobs:
   security-audit:
-    name: 7-Layer Security Verification & Testing
+    name: "7-Layer Security Verification & Testing"
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Codebase
+      - name: "Checkout Codebase"
         uses: actions/checkout@v4
 
-      - name: Setup Node.js (LTS)
+      - name: "Setup Node.js (LTS)"
         uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: 'npm'
 
-      - name: Install Monorepo Dependencies
+      - name: "Install Monorepo Dependencies"
         run: npm ci
 
-      - name: Layer 5 & 6: Run Pre-Commit Secret Scanner
+      - name: "Layer 1-4: Security Drift Guard & FinOps Invariants"
+        run: npm run security:check
+
+      - name: "Layer 5 & 6: Run Pre-Commit Secret Scanner"
         run: bash scripts/pre_commit_secret_scanner.sh --all
 
-      - name: Layer 5: TypeScript Integrity Check
+      - name: "Layer 5: TypeScript Integrity Check"
         run: |
           npm --prefix packages/backend-core run build || true
           npm --prefix packages/bff-server run build
           npm --prefix apps/groovelab run build
 
-      - name: Layer 7: Execute Automated Tenant Isolation Tests
+      - name: "Layer 7: Execute Automated Tenant Isolation Tests"
         run: npm --prefix packages/backend-core test || true

@@ -3871,7 +3871,9 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
     const isActuallyEmpty = isEmpty ?? (trackCount !== undefined ? trackCount === 0 : false);
 
     return (
-      <div style={{
+      <div 
+        className="spotify-artwork-inner"
+        style={{
         width: '100%',
         height: '100%',
         background: gradient,
@@ -4060,33 +4062,33 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
         onClick={item.onOpen}
         style={{
           flex: '0 0 auto',
-          width: isMobileOrSim ? '150px' : '172px',
+          width: isMobileOrSim ? '152px' : '184px',
           scrollSnapAlign: 'start',
-          borderRadius: '14px',
+          borderRadius: isMobileOrSim ? '14px' : '16px',
           background: isLight ? '#ffffff' : 'rgba(30, 41, 59, 0.6)',
           border: `1.5px solid ${isPlaying ? item.accentColor : item.isSeasonFocus ? (item.seasonGlowColor || '#f59e0b') : (isLight ? '#e2e8f0' : 'rgba(255, 255, 255, 0.08)')}`,
-          padding: '10px',
+          padding: isMobileOrSim ? '10px' : '12px',
           display: 'flex',
           flexDirection: 'column',
-          gap: '8px',
+          gap: '10px',
           cursor: 'pointer',
           boxShadow: isPlaying 
-            ? `0 10px 24px ${item.accentColor}33` 
+            ? `0 12px 28px ${item.accentColor}33` 
             : item.isSeasonFocus
-              ? `0 0 16px 2px ${item.seasonGlowColor || '#f59e0b'}33, 0 4px 12px rgba(0, 0, 0, 0.06)`
-              : (isLight ? '0 3px 10px rgba(0, 0, 0, 0.04)' : '0 4px 16px rgba(0, 0, 0, 0.25)'),
+              ? `0 0 20px 2px ${item.seasonGlowColor || '#f59e0b'}33, 0 6px 16px rgba(0, 0, 0, 0.06)`
+              : (isLight ? '0 2px 8px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02)' : '0 4px 16px rgba(0, 0, 0, 0.25)'),
           position: 'relative',
           boxSizing: 'border-box',
           animation: item.isSeasonFocus && !isPlaying ? 'seasonalGlowPulse 3s ease-in-out infinite' : 'none'
         }}
-        className="spotify-card-hover"
+        className={`spotify-card-hover ${isLight ? 'spotify-card-hover-light' : 'spotify-card-hover-dark'}`}
       >
         {/* 1:1 Square Artwork Container */}
         <div style={{
           position: 'relative',
           width: '100%',
           aspectRatio: '1 / 1',
-          borderRadius: '10px',
+          borderRadius: isMobileOrSim ? '10px' : '12px',
           overflow: 'hidden'
         }}>
           {renderSpotifyCoverArtwork({
@@ -4151,16 +4153,18 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
 
         {/* Card Typography & Details: 2 clean minimalist Spotify-style lines */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '4px' }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '4px' }}>
             <h4 style={{
               margin: 0,
-              fontSize: '0.84rem',
+              fontSize: '0.86rem',
               fontWeight: 900,
               color: isPlaying ? '#10b981' : colors.textPrimary,
               lineHeight: 1.25,
-              whiteSpace: 'nowrap',
+              display: '-webkit-box',
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: 'vertical',
               overflow: 'hidden',
-              textOverflow: 'ellipsis',
+              minHeight: '2.25em',
               letterSpacing: '-0.01em',
               flex: 1
             }} title={item.title}>
@@ -4196,11 +4200,19 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
               color: item.trackCount === 0 ? (isLight ? '#059669' : '#34d399') : colors.textMuted,
               whiteSpace: 'nowrap',
               overflow: 'hidden',
-              textOverflow: 'ellipsis'
+              textOverflow: 'ellipsis',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px'
             }}>
-              {item.trackCount === 0 
-                ? '0 Tracks • Bereit' 
-                : `${item.trackCount} ${item.trackCount === 1 ? 'Track' : 'Tracks'}${item.totalDurationMin ? ` • ${item.totalDurationMin} Min.` : ''}`}
+              {item.trackCount === 0 ? (
+                <>
+                  <Mic size={11} color={isLight ? '#059669' : '#34d399'} />
+                  <span>Bereit für Songs • Aufnehmen</span>
+                </>
+              ) : (
+                `${item.trackCount} ${item.trackCount === 1 ? 'Track' : 'Tracks'}${item.totalDurationMin ? ` • ${item.totalDurationMin} Min.` : ''}`
+              )}
             </span>
 
             {item.isBoxsetFolder && (
@@ -5001,21 +5013,21 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                       : isSummerGlow 
                         ? '2px solid #f59e0b' 
                         : `1.5px solid ${isLight ? '#e2e8f0' : 'rgba(255, 255, 255, 0.08)'}`,
-                    padding: '10px',
+                    padding: '12px',
                     display: 'flex',
                     flexDirection: 'column',
-                    gap: '8px',
+                    gap: '10px',
                     cursor: 'pointer',
                     boxShadow: isGiftGlow
                       ? '0 8px 24px rgba(236, 72, 153, 0.22)'
                       : isSummerGlow
                         ? '0 8px 24px rgba(245, 158, 11, 0.22)'
-                        : (isLight ? '0 3px 10px rgba(0, 0, 0, 0.04)' : '0 4px 16px rgba(0, 0, 0, 0.25)'),
+                        : (isLight ? '0 2px 8px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02)' : '0 4px 16px rgba(0, 0, 0, 0.25)'),
                     position: 'relative',
                     boxSizing: 'border-box',
                     transition: 'all 0.2s ease'
                   }}
-                  className="spotify-card-hover hover-scale"
+                  className={`spotify-card-hover ${isLight ? 'spotify-card-hover-light' : 'spotify-card-hover-dark'}`}
                 >
                   {/* 1:1 Square Artwork Container with Spotify / Pro Artwork */}
                   <div style={{
@@ -5118,17 +5130,20 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                   </div>
 
                   {/* Card Typography below Artwork */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '4px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '4px' }}>
                       <h4 style={{
                         margin: 0,
                         fontSize: '0.86rem',
                         fontWeight: 900,
                         color: colors.textPrimary,
                         lineHeight: 1.25,
-                        whiteSpace: 'nowrap',
+                        display: '-webkit-box',
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: 'vertical',
                         overflow: 'hidden',
-                        textOverflow: 'ellipsis',
+                        minHeight: '2.25em',
+                        letterSpacing: '-0.01em',
                         flex: 1
                       }} title={pl.title}>
                         {pl.title}
@@ -5145,11 +5160,19 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                       color: trackCount > 0 ? (isGiftPl ? '#db2777' : '#059669') : '#059669',
                       whiteSpace: 'nowrap',
                       overflow: 'hidden',
-                      textOverflow: 'ellipsis'
+                      textOverflow: 'ellipsis',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px'
                     }}>
-                      {trackCount > 0 
-                        ? (isGiftPl ? `${trackCount} ${trackCount === 1 ? 'Geschenk' : 'Geschenke'} • Bereit` : `${trackCount} ${trackCount === 1 ? 'Track' : 'Tracks'} • ${totalDurationMin} Min.`)
-                        : '0 Tracks • Bereit'}
+                      {trackCount > 0 ? (
+                        isGiftPl ? `${trackCount} ${trackCount === 1 ? 'Geschenk' : 'Geschenke'} • Bereit` : `${trackCount} ${trackCount === 1 ? 'Track' : 'Tracks'} • ${totalDurationMin} Min.`
+                      ) : (
+                        <>
+                          <Mic size={11} color="#059669" />
+                          <span>Bereit für Songs • Aufnehmen</span>
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -5398,28 +5421,28 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
               onClick={handleOpenCreatePlaylist}
               style={{
                 flex: '0 0 auto',
-                width: isMobileOrSim ? '150px' : '172px',
+                width: isMobileOrSim ? '152px' : '184px',
                 scrollSnapAlign: 'start',
-                borderRadius: '14px',
+                borderRadius: isMobileOrSim ? '14px' : '16px',
                 border: `2px dashed ${isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.25)'}`,
                 background: isLight ? 'rgba(241, 245, 249, 0.5)' : 'rgba(255, 255, 255, 0.03)',
-                padding: '12px 10px',
+                padding: isMobileOrSim ? '10px' : '12px',
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
                 justifyContent: 'center',
                 textAlign: 'center',
                 gap: '8px',
-                minHeight: isMobileOrSim ? '200px' : '230px',
+                minHeight: isMobileOrSim ? '220px' : '256px',
                 cursor: 'pointer',
-                transition: 'all 0.2s ease',
+                transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
                 boxSizing: 'border-box'
               }}
-              className="hover-scale"
+              className={`spotify-card-hover ${isLight ? 'spotify-card-hover-light' : 'spotify-card-hover-dark'}`}
             >
               <div style={{
-                width: '42px',
-                height: '42px',
+                width: '46px',
+                height: '46px',
                 borderRadius: '50%',
                 background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
                 display: 'flex',
@@ -5428,10 +5451,10 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                 color: 'white',
                 boxShadow: '0 4px 14px rgba(245, 158, 11, 0.35)'
               }}>
-                <Plus size={20} strokeWidth={2.8} />
+                <Plus size={22} strokeWidth={2.8} />
               </div>
               <div>
-                <span style={{ fontSize: '0.82rem', fontWeight: 900, color: colors.textPrimary, display: 'block' }}>
+                <span style={{ fontSize: '0.84rem', fontWeight: 900, color: colors.textPrimary, display: 'block' }}>
                   Neue Playlist
                 </span>
                 <span style={{ fontSize: '0.68rem', color: colors.textMuted, marginTop: '2px', display: 'block' }}>
@@ -5460,9 +5483,11 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
 
                 const effectiveBadge = isSeasonFocus
                   ? seasonalFocus.badge
-                  : pl.tracks.length === 0
-                    ? '0 TRACKS • BEREIT'
-                    : presetConfig?.badge || `${pl.tracks.length} TRACKS`;
+                  : presetConfig?.badge 
+                    ? presetConfig.badge 
+                    : pl.tracks.length === 0
+                      ? 'STUDIO PLAYLIST'
+                      : `${pl.tracks.length} TRACKS`;
 
                 const isPlayingThis = isPlayingPlaylist && (currentAlbumMeta?.title === pl.title || (activeCustomPlaylist?.id === pl.id && isMiniPlayerPlaying));
 
@@ -5470,7 +5495,7 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                   id: pl.id,
                   title: pl.title,
                   subtitle: pl.tracks.length === 0 
-                    ? (isSeasonFocus ? seasonalFocus.seasonalText : 'Noch keine Songs • Jetzt aufnehmen') 
+                    ? (isSeasonFocus ? seasonalFocus.seasonalText : 'Bereit für Songs • Aufnehmen') 
                     : (pl.description || 'Studio Playlist'),
                   badge: effectiveBadge,
                   trackCount: pl.tracks.length,
@@ -6189,8 +6214,8 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
               <strong style={{ color: colors.textPrimary }}><CampusGroovelabText /></strong>
             </div>
             <div>
-              <span style={{ color: colors.textSecondary, display: 'block', fontWeight: 700 }}>Urheberschutz:</span>
-              <strong style={{ color: colors.textPrimary }}>§§ 15 Abs. 3, 53 UrhG (Privatgebrauch)</strong>
+              <span style={{ color: colors.textSecondary, display: 'block', fontWeight: 700 }}>Nutzungsbereich:</span>
+              <strong style={{ color: colors.textPrimary }}>Geschützter privater Familienkreis</strong>
             </div>
           </div>
 
@@ -7485,11 +7510,27 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
           }
         }
         .spotify-card-hover {
-          transition: transform 0.24s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.24s ease, box-shadow 0.24s ease !important;
+          transition: transform 0.26s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.26s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.26s ease, background-color 0.26s ease !important;
         }
         .spotify-card-hover:hover {
           transform: translateY(-4px) !important;
-          background-color: #242424 !important;
+        }
+        .spotify-card-hover-light:hover {
+          box-shadow: 0 16px 32px -4px rgba(0, 0, 0, 0.10), 0 4px 12px rgba(0, 0, 0, 0.04) !important;
+          border-color: rgba(16, 185, 129, 0.35) !important;
+          background-color: #ffffff !important;
+        }
+        .spotify-card-hover-dark:hover {
+          box-shadow: 0 18px 36px -4px rgba(0, 0, 0, 0.5), 0 4px 14px rgba(0, 0, 0, 0.3) !important;
+          border-color: rgba(255, 255, 255, 0.22) !important;
+          background-color: rgba(45, 55, 72, 0.85) !important;
+        }
+        .spotify-card-hover .spotify-artwork-inner {
+          transition: transform 0.34s cubic-bezier(0.16, 1, 0.3, 1) !important;
+          will-change: transform;
+        }
+        .spotify-card-hover:hover .spotify-artwork-inner {
+          transform: scale(1.028) !important;
         }
         .spotify-play-btn {
           opacity: 0;
@@ -11094,7 +11135,7 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
             }}>
               <Shield size={13} color="#10b981" style={{ flexShrink: 0 }} />
               <span style={{ fontSize: '0.66rem', color: '#64748b', lineHeight: 1.3 }}>
-                Geschützter Web-Stream für den privaten Familienkreis (§ 15 Abs. 3 UrhG).
+                Geschützter Web-Stream für den privaten Familienkreis.
               </span>
             </div>
           </div>

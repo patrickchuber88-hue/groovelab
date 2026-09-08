@@ -2112,15 +2112,69 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
             fontSize: '14px',
             color: '#7d7d82'
           }}>
-            <span style={{ cursor: 'pointer' }} onClick={() => scrollToSection('hero')}>Top</span>
-            <span style={{ cursor: 'pointer' }} onClick={() => scrollToSection('target-audiences')}>Zielgruppen</span>
-            <span style={{ cursor: 'pointer' }} onClick={() => scrollToSection('usps')}>Features</span>
-            <span style={{ cursor: 'pointer' }} onClick={() => scrollToSection('pricing')}>Preise</span>
-            <span style={{ cursor: 'pointer', fontWeight: 700 }} onClick={() => setActiveDocument('terms')}>AGB</span>
-            <span style={{ cursor: 'pointer', fontWeight: 700 }} onClick={() => setActiveDocument('privacy')}>Datenschutz</span>
-            <span style={{ cursor: 'pointer', fontWeight: 700 }} onClick={() => setActiveDocument('cancellation' as any)}>Widerruf</span>
-            <span style={{ cursor: 'pointer', fontWeight: 700 }} onClick={() => setActiveDocument('impressum' as any)}>Impressum</span>
-            <span style={{ cursor: 'pointer', fontWeight: 700 }} onClick={() => setActiveDocument('accessibility' as any)}>Barrierefreiheit</span>
+            <span 
+              role="button" 
+              tabIndex={0} 
+              style={{ cursor: 'pointer', outline: 'none', borderRadius: '4px', padding: '2px 4px' }} 
+              onClick={() => scrollToSection('hero')}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); scrollToSection('hero'); } }}
+            >Top</span>
+            <span 
+              role="button" 
+              tabIndex={0} 
+              style={{ cursor: 'pointer', outline: 'none', borderRadius: '4px', padding: '2px 4px' }} 
+              onClick={() => scrollToSection('target-audiences')}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); scrollToSection('target-audiences'); } }}
+            >Zielgruppen</span>
+            <span 
+              role="button" 
+              tabIndex={0} 
+              style={{ cursor: 'pointer', outline: 'none', borderRadius: '4px', padding: '2px 4px' }} 
+              onClick={() => scrollToSection('usps')}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); scrollToSection('usps'); } }}
+            >Features</span>
+            <span 
+              role="button" 
+              tabIndex={0} 
+              style={{ cursor: 'pointer', outline: 'none', borderRadius: '4px', padding: '2px 4px' }} 
+              onClick={() => scrollToSection('pricing')}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); scrollToSection('pricing'); } }}
+            >Preise</span>
+            <span 
+              role="button" 
+              tabIndex={0} 
+              style={{ cursor: 'pointer', fontWeight: 700, outline: 'none', borderRadius: '4px', padding: '2px 4px' }} 
+              onClick={() => setActiveDocument('terms')}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setActiveDocument('terms'); } }}
+            >AGB</span>
+            <span 
+              role="button" 
+              tabIndex={0} 
+              style={{ cursor: 'pointer', fontWeight: 700, outline: 'none', borderRadius: '4px', padding: '2px 4px' }} 
+              onClick={() => setActiveDocument('privacy')}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setActiveDocument('privacy'); } }}
+            >Datenschutz</span>
+            <span 
+              role="button" 
+              tabIndex={0} 
+              style={{ cursor: 'pointer', fontWeight: 700, outline: 'none', borderRadius: '4px', padding: '2px 4px' }} 
+              onClick={() => setActiveDocument('cancellation' as any)}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setActiveDocument('cancellation' as any); } }}
+            >Widerruf</span>
+            <span 
+              role="button" 
+              tabIndex={0} 
+              style={{ cursor: 'pointer', fontWeight: 700, outline: 'none', borderRadius: '4px', padding: '2px 4px' }} 
+              onClick={() => setActiveDocument('impressum' as any)}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setActiveDocument('impressum' as any); } }}
+            >Impressum</span>
+            <span 
+              role="button" 
+              tabIndex={0} 
+              style={{ cursor: 'pointer', fontWeight: 700, outline: 'none', borderRadius: '4px', padding: '2px 4px' }} 
+              onClick={() => setActiveDocument('accessibility' as any)}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setActiveDocument('accessibility' as any); } }}
+            >Barrierefreiheit</span>
           </div>
         </div>
       </footer>

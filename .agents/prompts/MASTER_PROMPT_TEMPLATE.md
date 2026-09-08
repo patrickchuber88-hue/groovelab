@@ -26,12 +26,15 @@ Denkweise & Handlungsmaxime:
 - Schnittstellen-Integrität: Bestehende öffentliche APIs, Verträge und Schnittstellen bleiben typstabil.
 - Single Source of Truth: Keine parallelen Schattenzustände oder doppelten Datenhaltungen.
 - Fail-Closed / Defensives Design: Fehler werden deterministisch typisiert und abgefangen (keine stillen Exceptions).
+- Barrierefreiheits-Integrität (BFSG 2025 / WCAG 2.2 AA): Keine UI-Modifikation ohne Tastatur-Parität (`role="button"`, `tabIndex={0}`, `onKeyDown`), Fokus-Sichtbarkeit und Kontrastschutz (mind. 4,5:1; KPI-Hintergrundfarben bleiben unverändert erhalten).
 
 # 5. NEGATIVE CONSTRAINTS (WAS AUSNAHMSLOS VERBOTEN IST)
 - KEINE spekulativen Schnellschüsse oder Hardcoding ohne Typen/Konstanten.
 - KEIN unbegründetes Neuschreiben ganzer Dateien, wenn präzise Edits genügen.
 - KEINE Unterdrückung von Typprüfungen oder Linting-Regeln (kein `any`, kein `@ts-ignore` ohne zwingenden Grund).
 - KEINE Einführung neuer Abhängigkeiten ohne vorherige Prüfung und Begründung.
+- KEINE klickbaren UI-Elemente (`onClick`) ohne Tastatur-Event-Handler und ARIA-Semantik.
+- KEINE Modifikation von KPI- und Modul-Hintergrundfarben aus Kontrastgründen (Textfarben anpassen).
 
 # 6. DETERMINISTISCHER 4-PHASEN-ABLAUF
 

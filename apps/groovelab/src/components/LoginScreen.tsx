@@ -15,35 +15,12 @@ import { registerClientSessionLease } from '../utils/sessionLeaseManager';
 import { setVaultItem } from '../utils/aesStorageVault';
 import { scrubSensitiveUrlParams } from '../utils/urlSecurityScrubber';
 import { CampusGroovelabBrand, CampusGroovelabText, CampusGroovelabLogo } from './CampusGroovelabBrand';
+import { getInstrumentAvatarUrl } from './StudioAvatar';
 
 
 
 const isIOS = typeof window !== 'undefined' && (/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
 const isStandalone = typeof window !== 'undefined' && (window.matchMedia('(display-mode: standalone)').matches || (navigator as any).standalone);
-
-const getInstrumentAvatarUrl = (instr: string) => {
-  const low = (instr || '').toLowerCase().trim();
-  if (low.includes('e-gitarre')) return '/avatars/egitarre_avatar.png';
-  if (low.includes('gitarre') || low.includes('guitar')) return '/avatars/gitarre_avatar_new.png';
-  if (low.includes('e-bass')) return '/avatars/ebass_avatar.png';
-  if (low.includes('kontrabass') || low.includes('double bass')) return '/avatars/kontrabass_avatar.png';
-  if (low.includes('bass')) return '/avatars/bass_avatar.png';
-  if (low.includes('drum') || low.includes('schlagzeug')) return '/avatars/schlagzeug_avatar.png';
-  if (low.includes('piano') || low.includes('keys') || low.includes('klavier') || low.includes('keyboard')) return '/avatars/klavier_avatar_new.png';
-  if (low.includes('vocal') || low.includes('gesang') || low.includes('stimme') || low.includes('singer')) return '/avatars/gesang_avatar.png';
-  if (low.includes('trompete') || low.includes('trumpet')) return '/avatars/trompete_avatar_new.png';
-  if (low.includes('posaune') || low.includes('trombone')) return '/avatars/posaune_avatar.png';
-  if (low.includes('horn')) return '/avatars/horn_avatar_new.png';
-  if (low.includes('cello')) return '/avatars/cello_avatar_new.png';
-  if (low.includes('geige') || low.includes('violin') || low.includes('violine')) return '/avatars/violine_avatar_new.png';
-  if (low.includes('klarinette') || low.includes('clarinet')) return '/avatars/klarinette_avatar_new.png';
-  if (low.includes('querflöte') || low.includes('flute') || low.includes('querfloete')) return '/avatars/querfloete_avatar.png';
-  if (low.includes('saxofon') || low.includes('saxophone') || low.includes('sax')) return '/avatars/saxophon_avatar_new.png';
-  if (low.includes('blockflöte') || low.includes('recorder') || low.includes('blockfloete')) return '/avatars/blockfloete_avatar.png';
-  if (low.includes('bariton') || low.includes('baritone')) return '/avatars/bariton_avatar.png';
-  if (low.includes('oboe')) return '/avatars/oboe_avatar.png';
-  return '/avatars/gitarre_avatar_new.png';
-};
 
 const formatInstrumentBadge = (instr?: string) => {
   const low = (instr || '').toLowerCase().trim();
@@ -7236,8 +7213,13 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         letterSpacing: '0.05em'
       }}>
         <span 
+          role="button"
+          tabIndex={0}
           onClick={() => setLegalModalTab('privacy')} 
-          style={{ cursor: 'pointer', transition: 'color 0.2s' }} 
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setLegalModalTab('privacy'); } }}
+          style={{ cursor: 'pointer', outline: 'none', borderRadius: '4px', padding: '2px 4px', transition: 'color 0.2s' }} 
+          onFocus={(e) => { e.currentTarget.style.color = isGroovelabKiosk ? '#713f12' : '#ffffff'; }}
+          onBlur={(e) => { e.currentTarget.style.color = isGroovelabKiosk ? '#854d0e' : '#4ade80'; }}
           onMouseOver={(e) => { e.currentTarget.style.color = isGroovelabKiosk ? '#713f12' : '#ffffff'; }}
           onMouseOut={(e) => { e.currentTarget.style.color = isGroovelabKiosk ? '#854d0e' : '#4ade80'; }}
         >
@@ -7245,8 +7227,13 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         </span>
         <span style={{ opacity: 0.4 }}>•</span>
         <span 
+          role="button"
+          tabIndex={0}
           onClick={() => setLegalModalTab('terms')} 
-          style={{ cursor: 'pointer', transition: 'color 0.2s' }} 
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setLegalModalTab('terms'); } }}
+          style={{ cursor: 'pointer', outline: 'none', borderRadius: '4px', padding: '2px 4px', transition: 'color 0.2s' }} 
+          onFocus={(e) => { e.currentTarget.style.color = isGroovelabKiosk ? '#713f12' : '#ffffff'; }}
+          onBlur={(e) => { e.currentTarget.style.color = isGroovelabKiosk ? '#854d0e' : '#4ade80'; }}
           onMouseOver={(e) => { e.currentTarget.style.color = isGroovelabKiosk ? '#713f12' : '#ffffff'; }}
           onMouseOut={(e) => { e.currentTarget.style.color = isGroovelabKiosk ? '#854d0e' : '#4ade80'; }}
         >
@@ -7254,8 +7241,13 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         </span>
         <span style={{ opacity: 0.4 }}>•</span>
         <span 
+          role="button"
+          tabIndex={0}
           onClick={() => setLegalModalTab('cancellation')} 
-          style={{ cursor: 'pointer', transition: 'color 0.2s' }} 
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setLegalModalTab('cancellation'); } }}
+          style={{ cursor: 'pointer', outline: 'none', borderRadius: '4px', padding: '2px 4px', transition: 'color 0.2s' }} 
+          onFocus={(e) => { e.currentTarget.style.color = isGroovelabKiosk ? '#713f12' : '#ffffff'; }}
+          onBlur={(e) => { e.currentTarget.style.color = isGroovelabKiosk ? '#854d0e' : '#4ade80'; }}
           onMouseOver={(e) => { e.currentTarget.style.color = isGroovelabKiosk ? '#713f12' : '#ffffff'; }}
           onMouseOut={(e) => { e.currentTarget.style.color = isGroovelabKiosk ? '#854d0e' : '#4ade80'; }}
         >
@@ -7263,8 +7255,13 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         </span>
         <span style={{ opacity: 0.4 }}>•</span>
         <span 
+          role="button"
+          tabIndex={0}
           onClick={() => setLegalModalTab('impressum')} 
-          style={{ cursor: 'pointer', transition: 'color 0.2s' }} 
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setLegalModalTab('impressum'); } }}
+          style={{ cursor: 'pointer', outline: 'none', borderRadius: '4px', padding: '2px 4px', transition: 'color 0.2s' }} 
+          onFocus={(e) => { e.currentTarget.style.color = isGroovelabKiosk ? '#713f12' : '#ffffff'; }}
+          onBlur={(e) => { e.currentTarget.style.color = isGroovelabKiosk ? '#854d0e' : '#4ade80'; }}
           onMouseOver={(e) => { e.currentTarget.style.color = isGroovelabKiosk ? '#713f12' : '#ffffff'; }}
           onMouseOut={(e) => { e.currentTarget.style.color = isGroovelabKiosk ? '#854d0e' : '#4ade80'; }}
         >
@@ -7272,8 +7269,13 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         </span>
         <span style={{ opacity: 0.4 }}>•</span>
         <span 
+          role="button"
+          tabIndex={0}
           onClick={() => setLegalModalTab('accessibility')} 
-          style={{ cursor: 'pointer', transition: 'color 0.2s' }} 
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setLegalModalTab('accessibility'); } }}
+          style={{ cursor: 'pointer', outline: 'none', borderRadius: '4px', padding: '2px 4px', transition: 'color 0.2s' }} 
+          onFocus={(e) => { e.currentTarget.style.color = isGroovelabKiosk ? '#713f12' : '#ffffff'; }}
+          onBlur={(e) => { e.currentTarget.style.color = isGroovelabKiosk ? '#854d0e' : '#4ade80'; }}
           onMouseOver={(e) => { e.currentTarget.style.color = isGroovelabKiosk ? '#713f12' : '#ffffff'; }}
           onMouseOut={(e) => { e.currentTarget.style.color = isGroovelabKiosk ? '#854d0e' : '#4ade80'; }}
         >

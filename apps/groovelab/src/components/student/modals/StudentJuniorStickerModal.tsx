@@ -131,6 +131,7 @@ export const StudentJuniorStickerModal: React.FC<StudentJuniorStickerModalProps>
           }}>
             {[
               { id: 'all', label: `Alle (${allStickers.length})` },
+              { id: 'schuljahr', label: '🎒 Schuljahre' },
               { id: 'ueben', label: '⏱️ Übe-Fleiß' },
               { id: 'xp', label: '⭐ Zauber-XP' },
               { id: 'streaks', label: '🔥 Streaks' },
@@ -165,7 +166,7 @@ export const StudentJuniorStickerModal: React.FC<StudentJuniorStickerModalProps>
           </div>
         </div>
 
-        {/* SCROLLABLE 3D PANINI STICKER GRID */}
+        {/* SCROLLABLE 3D COLLECTOR STICKER GRID */}
         <div style={{
           overflowY: 'auto',
           flex: 1,
@@ -236,7 +237,7 @@ export const StudentJuniorStickerModal: React.FC<StudentJuniorStickerModalProps>
                       {st.rarityLabel}
                     </span>
 
-                    {/* STICKER IMAGE CONTAINER - COLLECTIBLE PANINI BADGE */}
+                    {/* STICKER IMAGE CONTAINER - COLLECTIBLE BADGE */}
                     <div style={{
                       width: '92px',
                       height: '92px',

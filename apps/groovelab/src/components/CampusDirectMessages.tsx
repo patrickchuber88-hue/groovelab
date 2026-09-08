@@ -28,31 +28,7 @@ import {
   isQuietHoursActive, 
   ChatRespectValidationResult 
 } from '../utils/chatRespectGuard';
-
-const getInstrumentAvatarUrl = (instrument: string | null | undefined): string => {
-  if (!instrument) return '/avatars/gitarre_avatar_new.png';
-  const inst = instrument.toLowerCase();
-  if (inst.includes('e-gitarre')) return '/avatars/egitarre_avatar.png';
-  if (inst.includes('guitar') || inst.includes('gitarre')) return '/avatars/gitarre_avatar_new.png';
-  if (inst.includes('e-bass')) return '/avatars/ebass_avatar.png';
-  if (inst.includes('kontrabass') || inst.includes('double bass')) return '/avatars/kontrabass_avatar.png';
-  if (inst.includes('bass')) return '/avatars/bass_avatar.png';
-  if (inst.includes('drum') || inst.includes('schlagzeug')) return '/avatars/schlagzeug_avatar.png';
-  if (inst.includes('piano') || inst.includes('keys') || inst.includes('klavier') || inst.includes('keyboard')) return '/avatars/klavier_avatar_new.png';
-  if (inst.includes('vocal') || inst.includes('gesang') || inst.includes('stimme') || inst.includes('singer')) return '/avatars/gesang_avatar.png';
-  if (inst.includes('trompete') || inst.includes('trumpet')) return '/avatars/trompete_avatar_new.png';
-  if (inst.includes('posaune') || inst.includes('trombone')) return '/avatars/posaune_avatar.png';
-  if (inst.includes('horn')) return '/avatars/horn_avatar_new.png';
-  if (inst.includes('cello')) return '/avatars/cello_avatar_new.png';
-  if (inst.includes('geige') || inst.includes('violin') || inst.includes('violine')) return '/avatars/violine_avatar_new.png';
-  if (inst.includes('klarinette') || inst.includes('clarinet')) return '/avatars/klarinette_avatar_new.png';
-  if (inst.includes('querflöte') || inst.includes('flute')) return '/avatars/querfloete.png';
-  if (inst.includes('saxofon') || inst.includes('saxophone') || inst.includes('sax')) return '/avatars/saxophon_avatar.png';
-  if (inst.includes('blockflöte') || inst.includes('recorder') || inst.includes('blockfloete')) return '/avatars/blockfloete_avatar.png';
-  if (inst.includes('bariton') || inst.includes('baritone')) return '/avatars/bariton_avatar.png';
-  if (inst.includes('oboe')) return '/avatars/oboe_avatar.png';
-  return '/avatars/gitarre_avatar_new.png';
-};
+import { getInstrumentAvatarUrl } from './StudioAvatar';
 
 const resolveCampusAvatar = (u: any): string => {
   if (!u) return '/avatar_ghost.jpg';
@@ -62,7 +38,7 @@ const resolveCampusAvatar = (u: any): string => {
   // Teachers in Campus module must ALWAYS display their instrument avatar (per AGENTS.md)!
   const isTeacher = role === 'teacher' || roles.includes('teacher');
   if (isTeacher) {
-    return getInstrumentAvatarUrl(u.instrument || 'Gitarre');
+    return getInstrumentAvatarUrl(u.instrument);
   }
 
   if (role === 'admin' || role === 'secretary' || roles.includes('admin') || roles.includes('secretary')) {
@@ -70,10 +46,9 @@ const resolveCampusAvatar = (u: any): string => {
   }
   
   if (role === 'student') {
-    const studentInstrument = u.instrument || 'Nicht festgelegt';
-    return getInstrumentAvatarUrl(studentInstrument);
+    return getInstrumentAvatarUrl(u.instrument);
   }
-  return getInstrumentAvatarUrl(u.instrument || 'Gitarre');
+  return getInstrumentAvatarUrl(u.instrument);
 };
 
 const formatStudentDisplayName = (u: any): string => {

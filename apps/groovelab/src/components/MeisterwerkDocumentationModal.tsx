@@ -36,6 +36,7 @@ import {
   isInternalMetadataNote,
   checkIsAudioTresorActive,
   checkIsAudioTresorReadOnly,
+  calculateCampusSchoolYearNumber,
   type StickerUnlockContext,
   type StickerUnlockResult
 } from '../domain/stickersAndTresor';
@@ -1040,8 +1041,16 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   const [selectedStickerDetailIdx, setSelectedStickerDetailIdx] = useState<number | null>(null);
   const [isDevSimulationActive, setIsDevSimulationActive] = useState<boolean>(false);
   const [awardedStickerToAnimate, setAwardedStickerToAnimate] = useState<any | null>(null);
-  const [schoolName, setSchoolName] = useState<string>('Campus-Groovelab');
+  const [schoolName, setSchoolName] = useState<string>(() => (propSchoolName && propSchoolName !== 'Campus-Groovelab') ? propSchoolName : ((student as any)?.school_name || ''));
   const [shareCardLayout, setShareCardLayout] = useState<'dark' | 'light'>('dark');
+
+  useEffect(() => {
+    if (propSchoolName && propSchoolName !== 'Campus-Groovelab') {
+      setSchoolName(propSchoolName);
+    } else if (resolvedSchoolName && resolvedSchoolName !== 'Campus-Groovelab Musikschule' && resolvedSchoolName !== 'Campus-Groovelab') {
+      setSchoolName(resolvedSchoolName);
+    }
+  }, [propSchoolName, resolvedSchoolName]);
   const [sessionLogs, setSessionLogs] = useState<string[]>([]);
   const [lessonDay, setLessonDay] = useState<number>(1);
   const [activeModalTab, setActiveModalTab] = useState<'document' | 'logbook' | 'stickeralbum' | 'skillradar' | 'audiobiography'>(initialModalTab || 'document');
@@ -1079,6 +1088,32 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   const [simulatedStickers, setSimulatedStickers] = useState<Record<string, { count: number; details: { topic: string; date: string }[] }>>({});
   const currentSchoolYear = useMemo(() => getSchoolYearString(), []);
   const [selectedSchoolYear, setSelectedSchoolYear] = useState<string>(currentSchoolYear);
+
+  const availableSchoolYears = useMemo(() => {
+    const yearsSet = new Set<string>();
+    yearsSet.add(currentSchoolYear);
+
+    if (student?.created_at) {
+      yearsSet.add(getSchoolYearString(student.created_at));
+    }
+    if (student?.activated_at) {
+      yearsSet.add(getSchoolYearString(student.activated_at));
+    }
+    (progressItems || []).forEach(item => {
+      if (item.created_at) yearsSet.add(getSchoolYearString(item.created_at));
+      if (item.updated_at) yearsSet.add(getSchoolYearString(item.updated_at));
+    });
+
+    if (isDevSimulationActive || Object.keys(simulatedStickers).length > 0) {
+      const parts = currentSchoolYear.split('/').map(Number);
+      if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+        yearsSet.add(`${parts[0] - 1}/${parts[1] - 1}`);
+        yearsSet.add(`${parts[0] - 2}/${parts[1] - 2}`);
+      }
+    }
+
+    return Array.from(yearsSet).sort().reverse();
+  }, [currentSchoolYear, student?.created_at, student?.activated_at, progressItems, isDevSimulationActive, simulatedStickers]);
 
   const simulateMultiYearProgress = () => {
     setSimulatedStickers({
@@ -1503,43 +1538,36 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       return voices[0] || null;
     }
 
-    // 1. Moderne Microsoft Edge / Azure Neural Voices
-    const msNatural = germanVoices.find(v => 
-      v.name.includes('Online (Natural)') || 
-      (v.name.includes('Natural') && (v.name.includes('Katja') || v.name.includes('Amira') || v.name.includes('Conrad') || v.name.includes('Killian')))
-    );
-    if (msNatural) return msNatural;
+    // 🚀 Latenz-Optimierung: Bevorzuge lokale Offline-Stimmen (0 ms Netzwerklatenz)
+    // Cloud-/Online-Stimmen (z.B. Edge 'Online (Natural)', Chrome 'Google Deutsch') senden Audiodaten
+    // über das Internet, was eine Startverzögerung von 1,5 bis 3 Sekunden verursacht.
+    const isNetworkVoice = (v: SpeechSynthesisVoice) =>
+      v.localService === false ||
+      v.name.toLowerCase().includes('online') ||
+      v.name.toLowerCase().includes('network');
 
-    // 2. Apple Siri & Enhanced/Premium Stimmen
-    const siriOrPremium = germanVoices.find(v => 
-      v.name.toLowerCase().includes('siri') || 
-      v.name.toLowerCase().includes('premium') || 
+    const localVoices = germanVoices.filter(v => !isNetworkVoice(v));
+    const pool = localVoices.length > 0 ? localVoices : germanVoices;
+
+    // 1. Lokale System-Favoriten (Apple Anna, Helena, Petra, Markus, Martin, Siri, Microsoft Katja, Stefan, etc.)
+    const preferredNames = ['anna', 'helena', 'petra', 'markus', 'martin', 'siri', 'katja', 'amira', 'marlene', 'vicki', 'stefan', 'hedda'];
+    for (const name of preferredNames) {
+      const match = pool.find(v => v.name.toLowerCase().includes(name));
+      if (match) return match;
+    }
+
+    // 2. Lokale erweiterte / enhanced Stimmen
+    const enhanced = pool.find(v => 
       v.name.toLowerCase().includes('enhanced') || 
+      v.name.toLowerCase().includes('premium') || 
       v.name.toLowerCase().includes('erweitert')
     );
-    if (siriOrPremium) return siriOrPremium;
+    if (enhanced) return enhanced;
 
-    // 3. Apple Anna / Helena / Martin
-    const annaVoice = germanVoices.find(v => v.name.toLowerCase().includes('anna'));
-    if (annaVoice) return annaVoice;
-    const helenaVoice = germanVoices.find(v => v.name.toLowerCase().includes('helena'));
-    if (helenaVoice) return helenaVoice;
-    const martinVoice = germanVoices.find(v => v.name.toLowerCase().includes('martin'));
-    if (martinVoice) return martinVoice;
+    // 3. Beliebige erste lokale Stimme aus dem Pool
+    if (pool.length > 0) return pool[0];
 
-    // 4. Google Neural / Android Stimmen
-    const googleVoice = germanVoices.find(v => v.name.includes('Google') || v.name.includes('deg-network'));
-    if (googleVoice) return googleVoice;
-
-    // 5. Beliebte Synthesizer
-    const friendlyVoice = germanVoices.find(v => 
-      v.name.toLowerCase().includes('katja') || 
-      v.name.toLowerCase().includes('amira') || 
-      v.name.toLowerCase().includes('marlene') || 
-      v.name.toLowerCase().includes('vicki')
-    );
-    if (friendlyVoice) return friendlyVoice;
-
+    // 4. Letzter Fallback auf Cloud-/Online-Stimmen
     return germanVoices[0] || null;
   };
 
@@ -1548,6 +1576,10 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     stopNeuralSpeech();
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       window.speechSynthesis.cancel();
+      // 🚀 Chromium/WebKit Queue-Unfreeze: Sofort resume() aufrufen, um das 3-5s Einfrieren der Queue zu verhindern
+      try {
+        window.speechSynthesis.resume();
+      } catch {}
     }
     setIsTtsSpeaking(false);
     setActiveTtsKey(null);
@@ -1561,6 +1593,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       stopNeuralSpeech();
       if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
         window.speechSynthesis.cancel();
+        try {
+          window.speechSynthesis.resume();
+        } catch {}
       }
     };
   }, []);
@@ -1578,12 +1613,25 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       ? textOrPhrases.map(p => cleanTextForTts(p)).join(' ')
       : cleanTextForTts(textOrPhrases);
 
-    const phrases = normalizedInput
+    const rawPhrases = normalizedInput
       .split(/(?<=[.!?])\s+/)
       .map(p => p.trim())
       .filter(p => p.length > 0);
 
-    if (phrases.length === 0) return;
+    if (rawPhrases.length === 0) return;
+
+    // 🔗 Greeting-Fusion: Verschmelze kurze Eröffnungsphrasen (< 30 Zeichen, z.B. "Hallo!", "Super gemacht!"),
+    // damit die Begrüßung flüssig ohne störende Sprechpause in den ersten Satz übergeht.
+    const phrases: string[] = [];
+    for (let i = 0; i < rawPhrases.length; i++) {
+      const p = rawPhrases[i];
+      if (phrases.length === 0 && p.length < 30 && i < rawPhrases.length - 1) {
+        phrases.push(`${p} ${rawPhrases[i + 1]}`);
+        i++;
+      } else {
+        phrases.push(p);
+      }
+    }
 
     const currentSessionId = ++ttsSessionIdRef.current;
     setIsTtsSpeaking(true);
@@ -1599,53 +1647,69 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
     const bestVoice = selectBestGermanVoice();
 
-    // 🎵 Fröhlicher Chime
+    // 🎵 Fröhlicher Chime (startet parallel im Hintergrund – blockiert nicht die Sprach-Initialisierung)
     playMotivationalTtsIntroChime('cheerful');
-    await new Promise((r) => setTimeout(r, 220));
 
-    for (let i = 0; i < phrases.length; i++) {
-      if (ttsSessionIdRef.current !== currentSessionId) {
-        break; // Cancelled
+    // 💓 Heartbeat-Schutz gegen Chromium 15-Sekunden-Pause-Bug
+    const heartbeatInterval = setInterval(() => {
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        if (window.speechSynthesis.speaking && window.speechSynthesis.paused) {
+          window.speechSynthesis.resume();
+        }
       }
+    }, 3000);
 
-      const phrase = phrases[i];
-      await new Promise<void>((resolve) => {
-        const utterance = new SpeechSynthesisUtterance(phrase);
-        utterance.lang = 'de-DE';
-        
-        utterance.pitch = 1.04;
-        utterance.rate = 0.91;
-        utterance.volume = 0.65;
-
-        if (bestVoice) {
-          utterance.voice = bestVoice;
+    try {
+      for (let i = 0; i < phrases.length; i++) {
+        if (ttsSessionIdRef.current !== currentSessionId) {
+          break; // Cancelled
         }
 
-        utterance.onend = () => {
-          resolve();
-        };
+        const phrase = phrases[i];
+        await new Promise<void>((resolve) => {
+          const utterance = new SpeechSynthesisUtterance(phrase);
+          utterance.lang = 'de-DE';
+          
+          utterance.pitch = 1.04;
+          utterance.rate = 0.91;
+          utterance.volume = 0.65;
 
-        utterance.onerror = (e) => {
-          console.warn('[TTS] Phrase speech error:', e);
-          resolve();
-        };
+          if (bestVoice) {
+            utterance.voice = bestVoice;
+          }
 
-        window.speechSynthesis.speak(utterance);
-      });
+          utterance.onend = () => {
+            resolve();
+          };
 
-      if (ttsSessionIdRef.current !== currentSessionId) {
-        break; // Cancelled during utterance
+          utterance.onerror = (e) => {
+            console.warn('[TTS] Phrase speech error:', e);
+            resolve();
+          };
+
+          // Vor jedem Absenden Warteschlange entsperren
+          if (window.speechSynthesis.paused) {
+            window.speechSynthesis.resume();
+          }
+
+          window.speechSynthesis.speak(utterance);
+        });
+
+        if (ttsSessionIdRef.current !== currentSessionId) {
+          break; // Cancelled during utterance
+        }
+
+        if (i < phrases.length - 1) {
+          await new Promise((r) => setTimeout(r, 100));
+        }
       }
-
-      if (i < phrases.length - 1) {
-        await new Promise((r) => setTimeout(r, 260));
+    } finally {
+      clearInterval(heartbeatInterval);
+      if (ttsSessionIdRef.current === currentSessionId) {
+        setIsTtsSpeaking(false);
+        setActiveTtsKey(null);
+        setTtsStatusText(null);
       }
-    }
-
-    if (ttsSessionIdRef.current === currentSessionId) {
-      setIsTtsSpeaking(false);
-      setActiveTtsKey(null);
-      setTtsStatusText(null);
     }
   };
 
@@ -1909,8 +1973,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   useEffect(() => {
     if (propHasTresor === true || checkIsAudioTresorActive(student)) {
       setHasTresorStorage(true);
-    } else {
-      setHasTresorStorage(checkIsAudioTresorActive(student));
+    } else if (propHasTresor === false && !checkIsAudioTresorActive(student)) {
+      setHasTresorStorage(false);
     }
   }, [propHasTresor, student]);
 
@@ -2223,7 +2287,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       }
 
       // 256 kbps Crystal-Clear Studio Audio when Audio-Tresor is booked, else 128 kbps High-Quality Audio
-      const targetBitrate = hasTresorStorage ? 256000 : 128000;
+      const targetBitrate = effectiveTresor ? 256000 : 128000;
       let mimeType = 'audio/webm;codecs=opus';
       if (typeof MediaRecorder !== 'undefined') {
         if (!MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
@@ -3504,6 +3568,19 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           }
           if (knownSchoolName) {
             setSchoolName(knownSchoolName);
+            setResolvedSchoolName(knownSchoolName);
+          } else if (knownSchoolId) {
+            supabase
+              .from('schools')
+              .select('name')
+              .eq('id', knownSchoolId)
+              .maybeSingle()
+              .then(({ data: schoolData }) => {
+                if (schoolData && schoolData.name) {
+                  setSchoolName(schoolData.name);
+                  setResolvedSchoolName(schoolData.name);
+                }
+              });
           }
 
           // Query users and schools only if instrument or schoolId is missing
@@ -3641,206 +3718,416 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const medalCenterY = 410;
-    const tX = 160;
-    const tY = 80;
-    const tW = 880;
-    const tH = 1040;
+    const medalCenterY = 405;
+    const tX = 140;
+    const tY = 65;
+    const tW = 920;
+    const tH = 1070;
+    const cardRadius = 38;
 
     const isLegendary = sticker.rarity === 'legendary';
     const isEpic = sticker.rarity === 'epic';
+    const isRare = sticker.rarity === 'rare';
+    const isSchuljahr = sticker.category === 'schuljahr';
     const themeColor = sticker.color || '#34a853';
 
-    // 1. Draw premium dark studio gradient background
-    const bgGrad = ctx.createLinearGradient(0, 0, 1200, 1200);
-    bgGrad.addColorStop(0, '#090d16');
-    bgGrad.addColorStop(1, '#0f172a');
+    // 1. LAYER 1: Deep Studio Atmosphere & Radial Vignette
+    const bgGrad = ctx.createRadialGradient(600, 500, 60, 600, 600, 780);
+    bgGrad.addColorStop(0, '#0c1322');
+    bgGrad.addColorStop(0.55, '#070a14');
+    bgGrad.addColorStop(1, '#030509');
     ctx.fillStyle = bgGrad;
     ctx.fillRect(0, 0, 1200, 1200);
 
-    // 2. Ambient radial background glow behind card
-    const glowGrad = ctx.createRadialGradient(600, 600, 100, 600, 600, 550);
-    glowGrad.addColorStop(0, isLegendary ? 'rgba(234, 179, 8, 0.25)' : 'rgba(52, 168, 83, 0.22)');
-    glowGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
-    ctx.fillStyle = glowGrad;
+    // 1b. Concentric Guilloche / Acoustic Waveform Rings (Certificate Fine Art Security Lines)
+    ctx.save();
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.035)';
+    ctx.setLineDash([4, 8]);
+    [220, 290, 360, 440, 520].forEach(r => {
+      ctx.beginPath();
+      ctx.arc(600, medalCenterY, r, 0, Math.PI * 2);
+      ctx.stroke();
+    });
+    ctx.restore();
+
+    // 1c. Ambient Backlight Spotlight behind the card plaque
+    const ambientSpot = ctx.createRadialGradient(600, medalCenterY, 80, 600, medalCenterY, 520);
+    ambientSpot.addColorStop(0, isLegendary ? 'rgba(234, 179, 8, 0.28)' : isEpic ? 'rgba(168, 85, 247, 0.22)' : 'rgba(52, 168, 83, 0.24)');
+    ambientSpot.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    ctx.fillStyle = ambientSpot;
     ctx.fillRect(0, 0, 1200, 1200);
 
-    // 3. Draw rounded 3D Panini Collector Card Container
+    // 2. LAYER 2: 3D Collector Plaque Card Body (Deep Obsidian Core)
     ctx.save();
-    ctx.fillStyle = '#1e293b';
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
+    ctx.shadowBlur = 45;
+    ctx.shadowOffsetY = 24;
+
+    const cardBgGrad = ctx.createLinearGradient(tX, tY, tX, tY + tH);
+    cardBgGrad.addColorStop(0, '#131c2e');
+    cardBgGrad.addColorStop(0.4, '#0f1728');
+    cardBgGrad.addColorStop(1, '#090e1a');
+    ctx.fillStyle = cardBgGrad;
     ctx.beginPath();
     if (typeof (ctx as any).roundRect === 'function') {
-      (ctx as any).roundRect(tX, tY, tW, tH, 44);
+      (ctx as any).roundRect(tX, tY, tW, tH, cardRadius);
     } else {
       ctx.rect(tX, tY, tW, tH);
     }
     ctx.fill();
+    ctx.restore();
 
-    // 4. Draw Rainbow Holo-Foil diagonal stripes inside card for rare/epic/legendary stickers
-    if (isLegendary || isEpic || sticker.rarity === 'rare') {
+    // 2b. Rainbow Holographic Sheen inside card for rare/epic/legendary/schuljahr stickers
+    if (isLegendary || isEpic || isRare || isSchuljahr) {
       ctx.save();
-      ctx.clip(); // Clip inside card rounded bounds
+      ctx.beginPath();
+      if (typeof (ctx as any).roundRect === 'function') {
+        (ctx as any).roundRect(tX, tY, tW, tH, cardRadius);
+      } else {
+        ctx.rect(tX, tY, tW, tH);
+      }
+      ctx.clip();
       const holoGrad = ctx.createLinearGradient(tX, tY, tX + tW, tY + tH);
-      holoGrad.addColorStop(0, 'rgba(255, 0, 128, 0.15)');
-      holoGrad.addColorStop(0.25, 'rgba(0, 255, 255, 0.15)');
-      holoGrad.addColorStop(0.5, 'rgba(255, 255, 0, 0.15)');
-      holoGrad.addColorStop(0.75, 'rgba(0, 255, 128, 0.15)');
-      holoGrad.addColorStop(1, 'rgba(255, 0, 255, 0.15)');
+      holoGrad.addColorStop(0, 'rgba(255, 0, 128, 0.08)');
+      holoGrad.addColorStop(0.25, 'rgba(0, 255, 255, 0.08)');
+      holoGrad.addColorStop(0.5, 'rgba(255, 255, 0, 0.08)');
+      holoGrad.addColorStop(0.75, 'rgba(0, 255, 128, 0.08)');
+      holoGrad.addColorStop(1, 'rgba(255, 0, 255, 0.08)');
       ctx.fillStyle = holoGrad;
       ctx.fillRect(tX, tY, tW, tH);
       ctx.restore();
     }
 
-    // 5. Card Metallic Glowing Border
-    ctx.shadowColor = isLegendary ? '#eab308' : isEpic ? '#af52de' : themeColor;
-    ctx.shadowBlur = 30;
-    ctx.strokeStyle = isLegendary ? '#eab308' : isEpic ? '#af52de' : 'rgba(255, 255, 255, 0.2)';
-    ctx.lineWidth = isLegendary || isEpic ? 6 : 4;
+    // 3. LAYER 3: Precision Multi-Stage Metallic Border & Corner Ornaments
+    ctx.save();
+    // Outer Border
+    ctx.strokeStyle = isLegendary 
+      ? 'rgba(234, 179, 8, 0.85)' 
+      : isEpic 
+        ? 'rgba(168, 85, 247, 0.8)' 
+        : isSchuljahr
+          ? 'rgba(250, 204, 21, 0.75)'
+          : 'rgba(52, 168, 83, 0.75)';
+    ctx.lineWidth = 3;
     ctx.beginPath();
     if (typeof (ctx as any).roundRect === 'function') {
-      (ctx as any).roundRect(tX, tY, tW, tH, 44);
+      (ctx as any).roundRect(tX, tY, tW, tH, cardRadius);
     } else {
       ctx.rect(tX, tY, tW, tH);
     }
     ctx.stroke();
-    ctx.restore();
 
-    // 6. Header Rarity Tag & Schuljahr Stamp
-    ctx.save();
-    ctx.translate(600, tY + 50);
-    const syStr = getSchoolYearString();
-    const rarityText = `⭐ ${(sticker.rarityLabel || 'STANDARD').toUpperCase()} • SCHULJAHR ${syStr}`;
-    ctx.font = '900 19px "Helvetica Neue", Inter, sans-serif';
-    ctx.fillStyle = isLegendary ? '#facc15' : isEpic ? '#c084fc' : themeColor;
-    ctx.textAlign = 'center';
-    ctx.fillText(rarityText, 0, 0);
-    ctx.restore();
-
-    // 7. Header Action "GEMEISTERT!" Pill (slanted)
-    ctx.save();
-    ctx.translate(600, tY + 115);
-    ctx.rotate(-2 * Math.PI / 180);
-    ctx.fillStyle = themeColor;
-    const pillText = 'GEMEISTERT!';
-    ctx.font = '900 28px "Helvetica Neue", Arial, sans-serif';
-    const pillTextWidth = ctx.measureText(pillText).width;
-    const pillW = pillTextWidth + 44;
-    const pillH = 48;
+    // Inner Hairline Inset
+    const insetGap = 12;
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
+    ctx.lineWidth = 1;
     ctx.beginPath();
     if (typeof (ctx as any).roundRect === 'function') {
-      (ctx as any).roundRect(-pillW/2, -pillH/2, pillW, pillH, 24);
+      (ctx as any).roundRect(tX + insetGap, tY + insetGap, tW - insetGap * 2, tH - insetGap * 2, cardRadius - 8);
+    } else {
+      ctx.rect(tX + insetGap, tY + insetGap, tW - insetGap * 2, tH - insetGap * 2);
+    }
+    ctx.stroke();
+
+    // 4 Precision Artisan Corner Brackets
+    const bracketLen = 22;
+    const cornerInset = 20;
+    ctx.strokeStyle = isLegendary || isSchuljahr ? '#facc15' : themeColor;
+    ctx.lineWidth = 2.5;
+
+    // Top-Left
+    ctx.beginPath();
+    ctx.moveTo(tX + cornerInset, tY + cornerInset + bracketLen);
+    ctx.lineTo(tX + cornerInset, tY + cornerInset);
+    ctx.lineTo(tX + cornerInset + bracketLen, tY + cornerInset);
+    ctx.stroke();
+
+    // Top-Right
+    ctx.beginPath();
+    ctx.moveTo(tX + tW - cornerInset - bracketLen, tY + cornerInset);
+    ctx.lineTo(tX + tW - cornerInset, tY + cornerInset);
+    ctx.lineTo(tX + tW - cornerInset, tY + cornerInset + bracketLen);
+    ctx.stroke();
+
+    // Bottom-Left
+    ctx.beginPath();
+    ctx.moveTo(tX + cornerInset, tY + tH - cornerInset - bracketLen);
+    ctx.lineTo(tX + cornerInset, tY + tH - cornerInset);
+    ctx.lineTo(tX + cornerInset + bracketLen, tY + tH - cornerInset);
+    ctx.stroke();
+
+    // Bottom-Right
+    ctx.beginPath();
+    ctx.moveTo(tX + tW - cornerInset - bracketLen, tY + tH - cornerInset);
+    ctx.lineTo(tX + tW - cornerInset, tY + tH - cornerInset);
+    ctx.lineTo(tX + tW - cornerInset, tY + tH - cornerInset - bracketLen);
+    ctx.stroke();
+    ctx.restore();
+
+    // 4. LAYER 4: Header Ribbon, Rarity & Edition Tag
+    ctx.save();
+    // Micro Edition Header
+    ctx.font = '900 14px "Helvetica Neue", Arial, sans-serif';
+    ctx.fillStyle = '#64748b';
+    ctx.textAlign = 'center';
+    ctx.fillText('✦ OFFIZIELLES SAMMLER-ZERTIFIKAT • CAMPUS-GROOVELAB ✦', 600, tY + 44);
+
+    // Rarity & Stufe Stamp
+    const syStr = getSchoolYearString();
+    const yearNumberStr = sticker.id.replace('schuljahr-', '').padStart(2, '0');
+    const rarityText = isSchuljahr
+      ? `⭐ ${(sticker.rarityLabel || 'STANDARD').toUpperCase()} • AUSBILDUNGSSTUFE #${yearNumberStr}/15`
+      : `⭐ ${(sticker.rarityLabel || 'STANDARD').toUpperCase()} • SCHULJAHR ${selectedSchoolYear || syStr}`;
+    ctx.font = '900 18px "Helvetica Neue", Arial, sans-serif';
+    ctx.fillStyle = isLegendary || isSchuljahr ? '#facc15' : isEpic ? '#c084fc' : themeColor;
+    ctx.fillText(rarityText, 600, tY + 76);
+
+    // Slanted "GEMEISTERT!" Ribbon with 3D Bevel
+    ctx.translate(600, tY + 130);
+    ctx.rotate(-2 * Math.PI / 180);
+    const pillText = isSchuljahr ? 'ABSOLVIERT!' : 'GEMEISTERT!';
+    ctx.font = '900 26px "Helvetica Neue", Arial, sans-serif';
+    const pillTextWidth = ctx.measureText(pillText).width;
+    const pillW = pillTextWidth + 48;
+    const pillH = 46;
+
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
+    ctx.shadowBlur = 12;
+    ctx.shadowOffsetY = 4;
+
+    const ribbonGrad = ctx.createLinearGradient(0, -pillH / 2, 0, pillH / 2);
+    ribbonGrad.addColorStop(0, themeColor);
+    ribbonGrad.addColorStop(1, '#15803d');
+    ctx.fillStyle = isLegendary || isSchuljahr ? '#ca8a04' : ribbonGrad;
+    ctx.beginPath();
+    if (typeof (ctx as any).roundRect === 'function') {
+      (ctx as any).roundRect(-pillW/2, -pillH/2, pillW, pillH, 23);
     } else {
       ctx.rect(-pillW/2, -pillH/2, pillW, pillH);
     }
     ctx.fill();
+
+    ctx.shadowColor = 'transparent';
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
     ctx.fillStyle = '#ffffff';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(pillText, 0, 0);
     ctx.restore();
 
-    // 8. Student Details (Guaranteed ACTUAL student name, NEVER "Hausaufgabenheft")
+    // 5. LAYER 5: Student Details Typography
     let textY = tY + 630;
     ctx.fillStyle = '#ffffff';
-    ctx.font = '900 52px "Helvetica Neue", Inter, sans-serif';
+    ctx.font = '900 50px "Helvetica Neue", Arial, sans-serif';
     ctx.textAlign = 'center';
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+    ctx.shadowBlur = 10;
     ctx.fillText(actualStudentName, 600, textY);
+    ctx.shadowColor = 'transparent';
 
     if (studentInstrument) {
-      textY += 38;
+      textY += 36;
       ctx.fillStyle = '#94a3b8';
-      ctx.font = '900 22px "Helvetica Neue", Inter, sans-serif';
-      ctx.fillText(studentInstrument.toUpperCase(), 600, textY);
+      ctx.font = '900 20px "Helvetica Neue", Arial, sans-serif';
+      ctx.fillText(`✦ ${studentInstrument.toUpperCase()} • INSTRUMENTALAUSBILDUNG ✦`, 600, textY);
     }
 
     textY += 52;
-    ctx.fillStyle = themeColor;
-    ctx.font = 'italic 900 44px "Helvetica Neue", Arial, sans-serif';
+    ctx.fillStyle = isLegendary || isSchuljahr ? '#facc15' : themeColor;
+    ctx.font = 'italic 900 40px "Helvetica Neue", Arial, sans-serif';
     ctx.fillText(sticker.title.toUpperCase(), 600, textY);
 
     const cardTopic = topicOverride || (collectedStickers[sticker.id]?.details?.slice(-1)[0]?.topic);
 
     if (sticker.id === 'song-master' || cardTopic) {
-      textY += 46;
-      ctx.fillStyle = '#facc15';
-      ctx.font = '900 28px "Helvetica Neue", Inter, sans-serif';
+      textY += 44;
+      ctx.fillStyle = '#fde047';
+      ctx.font = '900 26px "Helvetica Neue", Arial, sans-serif';
       ctx.fillText(`🎵 ${cardTopic || 'Song gemeistert'}`, 600, textY);
     } else {
-      textY += 40;
+      textY += 38;
       ctx.fillStyle = '#cbd5e1';
-      ctx.font = 'bold 22px "Helvetica Neue", Inter, sans-serif';
+      ctx.font = 'bold 21px "Helvetica Neue", Arial, sans-serif';
       ctx.fillText(sticker.desc, 600, textY);
 
       if (sticker.equiv) {
-        textY += 36;
-        ctx.fillStyle = '#38bdf8'; // Sky blue highlight accent for tangible equivalencies
-        ctx.font = '900 20px "Helvetica Neue", Inter, sans-serif';
+        textY += 34;
+        ctx.fillStyle = '#38bdf8';
+        ctx.font = '900 19px "Helvetica Neue", Arial, sans-serif';
         ctx.fillText(sticker.equiv, 600, textY);
       }
     }
 
-    // 9. Translucent Badge Pill for School Name (dynamically positioned below text with zero overlap)
-    const badgeText = schoolName.toUpperCase();
-    ctx.font = 'bold 20px "Helvetica Neue", Inter, sans-serif';
-    const textWidth = ctx.measureText(badgeText).width;
-    const badgeW = textWidth + 60;
-    const badgeH = 50;
-    const badgeX = 600 - badgeW / 2;
-    const badgeY = Math.max(tY + 860, textY + 36);
+    // 6. LAYER 6: The Authoritative Music School Certification Seal
+    let authoritativeSchool = '';
+    const candidates = [
+      propSchoolName,
+      resolvedSchoolName,
+      schoolName,
+      student?.school_name,
+      (student as any)?.schools?.name,
+      Array.isArray((student as any)?.schools) ? (student as any)?.schools[0]?.name : null,
+      typeof window !== 'undefined' ? (localStorage.getItem('groovelab_school_name') || localStorage.getItem('campus_school_name') || sessionStorage.getItem('groovelab_ghost_school_name')) : null
+    ];
+    for (const c of candidates) {
+      if (c && typeof c === 'string') {
+        const trimmed = c.trim();
+        if (
+          trimmed && 
+          trimmed !== 'Campus-Groovelab' && 
+          trimmed.toLowerCase() !== 'musikschule' && 
+          trimmed !== 'Campus-Groovelab Musikschule' &&
+          trimmed !== 'Meine Musikschule'
+        ) {
+          authoritativeSchool = trimmed;
+          break;
+        }
+      }
+    }
+    if (!authoritativeSchool) {
+      authoritativeSchool = 'Campus-Groovelab Partner-Musikschule';
+    }
 
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+    let displaySchool = authoritativeSchool.toUpperCase();
+    if (!displaySchool.includes('MUSIK') && !displaySchool.includes('MUSÄK') && !displaySchool.includes('KONSERVATORIUM') && !displaySchool.includes('AKADEMIE') && !displaySchool.includes('SCHULE')) {
+      displaySchool = `MUSIKSCHULE • ${displaySchool}`;
+    }
+
+    ctx.font = '900 20px "Helvetica Neue", Arial, sans-serif';
+    const schoolTextW = ctx.measureText(displaySchool).width;
+    const badgeW = Math.min(840, Math.max(480, schoolTextW + 80));
+    const badgeH = 62;
+    const badgeX = 600 - badgeW / 2;
+    const badgeY = Math.max(tY + 865, textY + 34);
+
+    // Official Seal Container
+    ctx.save();
+    ctx.fillStyle = 'rgba(234, 179, 8, 0.07)';
+    ctx.strokeStyle = 'rgba(234, 179, 8, 0.38)';
     ctx.lineWidth = 1.5;
     ctx.beginPath();
     if (typeof (ctx as any).roundRect === 'function') {
-      (ctx as any).roundRect(badgeX, badgeY, badgeW, badgeH, 25);
+      (ctx as any).roundRect(badgeX, badgeY, badgeW, badgeH, 18);
     } else {
       ctx.rect(badgeX, badgeY, badgeW, badgeH);
     }
     ctx.fill();
     ctx.stroke();
 
-    ctx.fillStyle = '#ffffff';
+    // Inner dashed seal border
+    ctx.strokeStyle = 'rgba(234, 179, 8, 0.18)';
+    ctx.setLineDash([3, 4]);
+    ctx.beginPath();
+    if (typeof (ctx as any).roundRect === 'function') {
+      (ctx as any).roundRect(badgeX + 4, badgeY + 4, badgeW - 8, badgeH - 8, 14);
+    } else {
+      ctx.rect(badgeX + 4, badgeY + 4, badgeW - 8, badgeH - 8);
+    }
+    ctx.stroke();
+    ctx.restore();
+
+    // Seal Text
+    ctx.save();
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(badgeText, 600, badgeY + badgeH / 2);
+    ctx.fillStyle = '#ca8a04';
+    ctx.font = '900 12px "Helvetica Neue", Arial, sans-serif';
+    ctx.fillText('✦ OFFIZIELL ZERTIFIZIERT DURCH ✦', 600, badgeY + 18);
+
+    ctx.fillStyle = '#fef08a';
+    ctx.font = '900 21px "Helvetica Neue", Arial, sans-serif';
+    ctx.fillText(displaySchool, 600, badgeY + 42);
+    ctx.restore();
+
+    // 7. LAYER 7: Official Dual-Brand Logo & ASVS Security Hallmark
+    const logoY = badgeY + badgeH + 40;
+    ctx.font = '900 24px "Helvetica Neue", Arial, sans-serif';
+    const partCampus = 'Campus';
+    const partDash = '-';
+    const partGroove = 'Groovelab';
+    const partDomain = '.de';
+
+    const wCampus = ctx.measureText(partCampus).width;
+    const wDash = ctx.measureText(partDash).width;
+    const wGroove = ctx.measureText(partGroove).width;
+    const wDomain = ctx.measureText(partDomain).width;
+    const totalLogoW = wCampus + wDash + wGroove + wDomain;
+
+    let currentLogoX = 600 - totalLogoW / 2;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+
+    // Campus in Campus-Grün
+    ctx.fillStyle = '#34a853';
+    ctx.fillText(partCampus, currentLogoX, logoY);
+    currentLogoX += wCampus;
+
+    // Bindestrich in Slate
+    ctx.fillStyle = '#94a3b8';
+    ctx.fillText(partDash, currentLogoX, logoY);
+    currentLogoX += wDash;
+
+    // Groovelab in GrooveLab-Gelb
+    ctx.fillStyle = '#facc15';
+    ctx.fillText(partGroove, currentLogoX, logoY);
+    currentLogoX += wGroove;
+
+    // .de in dezentem Schiefergrau
+    ctx.fillStyle = '#64748b';
+    ctx.fillText(partDomain, currentLogoX, logoY);
     ctx.textBaseline = 'alphabetic'; // reset
 
-    // 10. Website URL footer (Campus-Groovelab Seal)
-    ctx.fillStyle = themeColor;
-    ctx.font = '900 24px "Helvetica Neue", Arial, sans-serif';
+    // Micro Hallmark Line (Variante 3: Musikalisches Sammler- & Akademie-Branding)
+    const cleanStickerId = sticker.id.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    const syDisplay = selectedSchoolYear || syStr;
+    ctx.font = '700 11px "Helvetica Neue", Arial, sans-serif';
+    ctx.fillStyle = '#64748b';
     ctx.textAlign = 'center';
-    ctx.fillText('campus-groovelab.de', 600, badgeY + badgeH + 42);
+    ctx.fillText(`✦ VERIFIZIERTE SAMMLER-EDITION • SCHULJAHR ${syDisplay} • ID: CG-${cleanStickerId} ✦`, 600, logoY + 28);
 
-    // Helper stenciled sticker asset loader
+    // 8. LAYER 8: Die-Cut Vinyl Sticker Presentation
     const drawStickerAsset = (imgOrEmoji: HTMLImageElement | string, isImg: boolean) => {
       ctx.save();
       ctx.translate(600, medalCenterY);
 
-      // Sticker drop shadow
-      ctx.shadowColor = 'rgba(0, 0, 0, 0.45)';
-      ctx.shadowBlur = 18;
-      ctx.shadowOffsetX = 0;
-      ctx.shadowOffsetY = 10;
-
-      // Circle sticker background
-      ctx.fillStyle = sticker.bg || 'rgba(52, 168, 83, 0.2)';
+      // Backlight Pedestal Glow
+      const pedestalGlow = ctx.createRadialGradient(0, 0, 30, 0, 0, 180);
+      pedestalGlow.addColorStop(0, isLegendary || isSchuljahr ? 'rgba(250, 204, 21, 0.3)' : isEpic ? 'rgba(192, 132, 252, 0.25)' : 'rgba(52, 168, 83, 0.25)');
+      pedestalGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = pedestalGlow;
       ctx.beginPath();
-      ctx.arc(0, 0, 150, 0, Math.PI * 2);
+      ctx.arc(0, 0, 180, 0, Math.PI * 2);
       ctx.fill();
 
-      // Outer sticker ring border
-      ctx.shadowColor = 'transparent';
-      ctx.strokeStyle = '#ffffff';
-      ctx.lineWidth = 8;
-      ctx.stroke();
-
       if (isImg) {
-        ctx.beginPath();
-        ctx.arc(0, 0, 146, 0, Math.PI * 2);
-        ctx.clip();
-        ctx.drawImage(imgOrEmoji as HTMLImageElement, -146, -146, 292, 292);
+        // Double-Stage 3D Studio Drop Shadow (Soft Ambient + Crisp Contact)
+        ctx.save();
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.65)';
+        ctx.shadowBlur = 35;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 18;
+        const sSize = 300;
+        ctx.drawImage(imgOrEmoji as HTMLImageElement, -sSize / 2, -sSize / 2, sSize, sSize);
+        ctx.restore();
       } else {
+        // Stenciled Coin Emblem for Emoji Fallback
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+        ctx.shadowBlur = 24;
+        ctx.shadowOffsetY = 12;
+        ctx.fillStyle = sticker.bg || 'rgba(52, 168, 83, 0.25)';
+        ctx.beginPath();
+        ctx.arc(0, 0, 140, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.shadowColor = 'transparent';
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 6;
+        ctx.stroke();
+
         ctx.font = '120px "Segoe UI Emoji", "Apple Color Emoji", sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
@@ -6146,18 +6433,37 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
   // Scan all database entries for awarded stickers & compute milestone stickers synchronously
   const collectedStickers = useMemo(() => {
+    const isArchivedYear = selectedSchoolYear !== currentSchoolYear;
+
+    let yearProgressItems = progressItems;
+    if (isArchivedYear) {
+      yearProgressItems = (progressItems || []).filter(item => {
+        const itemYear = getSchoolYearString(item.created_at || item.updated_at);
+        return itemYear === selectedSchoolYear;
+      });
+    }
+
+    // 🛡️ Deterministische Zählung: Ausbildungsjahre werden STRIKT ab Registrierungsdatum des Benutzers berechnet
+    const regDateStr = student?.activated_at || student?.created_at || (student as any)?.registered_at;
+    const studentCampusYearNum = calculateCampusSchoolYearNumber(regDateStr, selectedSchoolYear);
+
     return getUnifiedStickersMap({
-      practiceMinutes: studentPracticeMinutes,
-      xp: studentXP,
-      streakDays: studentStreak,
-      masteredSongsCount: effectiveMasteredSongsCount,
-      progressItems,
-      simulatedStickers
+      practiceMinutes: isArchivedYear ? 0 : studentPracticeMinutes,
+      xp: isArchivedYear ? 0 : studentXP,
+      streakDays: isArchivedYear ? 0 : studentStreak,
+      masteredSongsCount: isArchivedYear ? 0 : effectiveMasteredSongsCount,
+      progressItems: yearProgressItems,
+      simulatedStickers,
+      studentCreatedAt: student?.created_at,
+      activatedAt: student?.activated_at,
+      registeredAt: (student as any)?.registered_at,
+      activeSchoolYearsCount: studentCampusYearNum,
+      selectedSchoolYear
     });
-  }, [studentPracticeMinutes, studentXP, studentStreak, effectiveMasteredSongsCount, progressItems, simulatedStickers]);
+  }, [studentPracticeMinutes, studentXP, studentStreak, effectiveMasteredSongsCount, progressItems, simulatedStickers, selectedSchoolYear, currentSchoolYear, student?.created_at, student?.activated_at, (student as any)?.registered_at]);
 
   useEffect(() => {
-    if (!student.id || loading || progressItems.length === 0) return;
+    if (!student.id || loading || progressItems.length === 0 || selectedSchoolYear !== currentSchoolYear) return;
 
     const runAutoStickerCheck = async () => {
       const collectedIds = new Set(Object.keys(collectedStickers).filter(id => collectedStickers[id].count > 0));
@@ -7882,22 +8188,48 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   };
 
   const renderSchoolYearSelector = () => {
+    const isArchived = selectedSchoolYear !== currentSchoolYear;
     return (
-      <span style={{
-        background: '#f8fafc',
-        border: '1px solid #e2e8f0',
-        color: '#475569',
-        fontSize: '0.72rem',
-        fontWeight: 800,
-        padding: '3px 10px',
-        borderRadius: '20px',
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: '5px',
-        letterSpacing: '0.01em'
-      }}>
-        🎓 Schuljahr {currentSchoolYear}
-      </span>
+      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+        <select
+          value={selectedSchoolYear}
+          onChange={(e) => setSelectedSchoolYear(e.target.value)}
+          aria-label="Schuljahr auswählen"
+          style={{
+            background: isArchived ? '#fef3c7' : '#f8fafc',
+            border: isArchived ? '1.5px solid #f59e0b' : '1px solid #cbd5e1',
+            color: isArchived ? '#92400e' : '#334155',
+            fontSize: '0.74rem',
+            fontWeight: 800,
+            padding: '3px 10px',
+            borderRadius: '20px',
+            cursor: 'pointer',
+            outline: 'none',
+            letterSpacing: '0.01em',
+            boxShadow: isArchived ? '0 2px 6px rgba(245, 158, 11, 0.2)' : 'none',
+            transition: 'all 0.15s ease'
+          }}
+        >
+          {availableSchoolYears.map(year => (
+            <option key={year} value={year}>
+              {year === currentSchoolYear ? `🎓 Schuljahr ${year} (Aktuell)` : `📚 Schuljahr ${year} (Archiv)`}
+            </option>
+          ))}
+        </select>
+        {isArchived && (
+          <span style={{
+            fontSize: '0.66rem',
+            fontWeight: 850,
+            padding: '2px 8px',
+            background: '#fef3c7',
+            border: '1px solid #fde68a',
+            color: '#b45309',
+            borderRadius: '12px'
+          }}>
+            🏆 Archiv-Modus
+          </span>
+        )}
+      </div>
     );
   };
 
@@ -9353,6 +9685,10 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           actualStudentName={actualStudentName}
           studentInstrument={studentInstrument}
           shareCard={shareCard}
+          selectedSchoolYear={selectedSchoolYear}
+          currentSchoolYear={currentSchoolYear}
+          student={student}
+          schoolName={schoolName}
         />
       ) : activeModalTab === 'audiobiography' ? (
         /* AUDIO-BIOGRAFIE VIEW (AKUSTISCHES STAMMBAUCH & MEILENSTEINE) */
@@ -9817,7 +10153,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                     </div>
                     <div>
                       <h3 style={{ fontSize: '1.2rem', fontWeight: 950, color: '#0f172a', margin: 0 }}>
-                        Meisterwerke & Panini-Sticker
+                        Meisterwerke & Campus-Sammelsticker
                       </h3>
                       <span style={{ fontSize: '0.74rem', color: '#ca8a04', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                         Glänzende Auszeichnungen sammeln
@@ -9825,7 +10161,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                     </div>
                   </div>
                   <p style={{ fontSize: '0.88rem', color: '#475569', lineHeight: 1.6, margin: 0 }}>
-                    Für gemeisterte Songs und Meilensteine erhältst du glänzende <strong>Panini-Sticker</strong> für dein virtuelles Sammelalbum. Sammle seltene, epische & legendäre Sticker und teile deine Urkunden!
+                    Für gemeisterte Songs und Meilensteine erhältst du glänzende <strong>Campus-Sammelsticker</strong> für dein virtuelles Sammelalbum. Sammle seltene, epische & legendäre Sticker und teile deine Urkunden!
                   </p>
                   <div style={{ background: '#fefce8', borderRadius: '18px', padding: '16px', border: '1px dashed #fef08a', display: 'flex', alignItems: 'center', gap: '12px' }}>
                     <Star size={24} color="#eab308" />

@@ -706,6 +706,7 @@ export function processPureRawAudioBuffer(
     targetPeakDb?: number;
     maxLimiterGrDb?: number;
     isLoop?: boolean;
+    preserveDynamics?: boolean;
   }
 ): AudioBuffer {
   const sampleRate = audioBuffer.sampleRate;
@@ -717,6 +718,7 @@ export function processPureRawAudioBuffer(
   const targetPeakDb = options?.targetPeakDb ?? TARGET_PEAK_DBTP;  // Default: -1.0 dBTP
   const maxLimiterGrDb = options?.maxLimiterGrDb ?? MAX_PURE_RAW_LIMITER_GR_DB; // Default: 3.5 dB
   const isLoop = options?.isLoop ?? false;
+  const preserveDynamics = options?.preserveDynamics ?? false;
 
   // 1. 15 Hz Subsonic DC-Offset Blocker (IIR Filter across all channels)
   const R = 1.0 - (2.0 * Math.PI * 15.0) / sampleRate;
@@ -748,10 +750,11 @@ export function processPureRawAudioBuffer(
   }
 
   // 3. EBU R128 Dual-Constraint Loudness Normalization to TARGET_PURE_RAW_LUFS (-14.5 LUFS)
-  // Condition 1: Target -14.5 LUFS
-  // Condition 2: Max Limiter Gain Reduction (default 3.5 dB) to preserve 100% natural dynamics & transient punch
-  const currentLufs = calculateIntegratedLufs(audioBuffer);
-  if (currentLufs > -65 && currentLufs < 5) {
+  // When preserveDynamics is enabled (e.g. for multi-track loopstation recording), individual tracks retain
+  // their organic recording volume & noise floor without artificial amplification.
+  if (!preserveDynamics) {
+    const currentLufs = calculateIntegratedLufs(audioBuffer);
+    if (currentLufs > -65 && currentLufs < 5) {
     // Measure true sample peak across all channels after subsonic filtering
     let maxAbsSample = 0;
     for (let c = 0; c < numChannels; c++) {
@@ -780,6 +783,7 @@ export function processPureRawAudioBuffer(
         data[i] *= linearGain;
       }
     }
+  }
   }
 
   // 4. Fast Lookahead Soft-Clipper Peak Guard (-1.0 dBTP ceiling without volume loss)
@@ -854,6 +858,7 @@ export async function processStudioMasteringAudioBuffer(
 ): Promise<{
   masteredBlob: Blob;
   masteredUrl: string;
+  masteredBuffer?: AudioBuffer;
   originalLufs: number;
   finalLufs: number;
   detectedF0MinHz?: number;
@@ -1108,6 +1113,7 @@ export async function processStudioMasteringAudioBuffer(
   return {
     masteredBlob: wavBlob,
     masteredUrl,
+    masteredBuffer: renderedBuffer,
     originalLufs: Math.round(originalLufs * 10) / 10,
     finalLufs: targetLufs,
     detectedF0MinHz: f0MinHz,

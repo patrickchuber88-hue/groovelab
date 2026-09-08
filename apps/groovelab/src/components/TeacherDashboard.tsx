@@ -2830,6 +2830,27 @@ export function TeacherDashboard({
     return todayTagesplanStudentsRaw;
   }, [todayTagesplanStudentsRaw]);
 
+  // 🎸 Master Teacher Effective Instrument Resolver
+  const teacherEffectiveInstrument = useMemo(() => {
+    if (teacher?.instrument && teacher.instrument !== 'Musiker' && teacher.instrument !== 'Allgemein' && teacher.instrument !== 'Support-Lehrkraft') {
+      return teacher.instrument;
+    }
+    if ((teacher as any)?.main_instrument) {
+      return (teacher as any).main_instrument;
+    }
+    if ((teacher as any)?.subject) {
+      return (teacher as any).subject;
+    }
+    // Check first student or slot in today's tagesplan
+    const tagesplanInst = (todayTagesplanStudents || []).find((s: any) => s.instrument && s.instrument !== 'Musiker' && s.instrument !== 'Allgemein')?.instrument;
+    if (tagesplanInst) return tagesplanInst;
+
+    const timelineInst = (briefingData?.timeline || []).find((slot: any) => slot.instrument && slot.instrument !== 'Musiker' && slot.instrument !== 'Allgemein')?.instrument;
+    if (timelineInst) return timelineInst;
+
+    return teacher?.instrument || '';
+  }, [teacher?.instrument, (teacher as any)?.main_instrument, (teacher as any)?.subject, todayTagesplanStudents, briefingData?.timeline]);
+
   // 🏢 Raummängel der Musikschule für den Tagesplan (Gezielter Hinweis für Kollegium im selben Raum)
   const [schoolRoomIssues, setSchoolRoomIssues] = useState<UserNote[]>([]);
 
@@ -6890,6 +6911,19 @@ useEffect(() => {
     return (
       <div 
         className="sick-card-container hover-scale"
+        role={isSick ? undefined : "button"}
+        tabIndex={isSick ? undefined : 0}
+        aria-label={isSick ? undefined : "Krankmeldung erfassen"}
+        onKeyDown={(e) => {
+          if (!isSick && (e.key === 'Enter' || e.key === ' ')) {
+            e.preventDefault();
+            const today = new Date().toLocaleDateString('sv-SE');
+            setSickStartDate(today);
+            setSickUntilDate(today);
+            setQuickSickPreset('today');
+            setShowSickModal(true);
+          }
+        }}
         onClick={() => {
           if (!isSick) {
             const today = new Date().toLocaleDateString('sv-SE');
@@ -8348,7 +8382,7 @@ useEffect(() => {
                                 overflow: 'hidden'
                               }}>
                                 <img
-                                  src={getInstrumentAvatarUrl(teacher?.instrument)}
+                                  src={getInstrumentAvatarUrl(teacherEffectiveInstrument)}
                                   alt="Briefing Hero"
                                   style={{
                                     width: '100%',
@@ -8421,21 +8455,21 @@ useEffect(() => {
                               {/* Card 3: Tages-Pensum */}
                               <div style={{
                                 position: 'relative', overflow: 'hidden',
-                                background: 'linear-gradient(135deg, #facc15 0%, #eab308 100%)', color: 'white',
+                                background: 'linear-gradient(135deg, #facc15 0%, #eab308 100%)', color: '#0f172a',
                                 borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(234, 179, 8, 0.35)',
                                 display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '70px',
                                 padding: '16px', boxSizing: 'border-box',
                                 transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                                border: '1px solid rgba(255, 255, 255, 0.1)'
+                                border: '1px solid rgba(255, 255, 255, 0.2)'
                               }} className="hover-scale">
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                                  <span style={{ fontSize: '0.68rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Tages-Pensum</span>
-                                  <div style={{ background: 'rgba(255, 255, 255, 0.15)', padding: '6px', borderRadius: '10px' }}>
-                                    <Clock size={14} color="white" />
+                                  <span style={{ fontSize: '0.68rem', fontWeight: 850, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Tages-Pensum</span>
+                                  <div style={{ background: 'rgba(15, 23, 42, 0.12)', padding: '6px', borderRadius: '10px' }}>
+                                    <Clock size={14} color="#0f172a" />
                                   </div>
                                 </div>
                                 <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '8px' }}>
-                                  <span style={{ fontSize: '1.6rem', fontWeight: 950, letterSpacing: '-0.02em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{workloadHoursStr}</span>
+                                  <span style={{ fontSize: '1.6rem', fontWeight: 950, letterSpacing: '-0.02em', fontFamily: "'Plus Jakarta Sans', sans-serif", color: '#0f172a' }}>{workloadHoursStr}</span>
                                 </div>
                               </div>
 
@@ -8528,21 +8562,21 @@ useEffect(() => {
                       {/* Card 3: Tages-Pensum */}
                       <div style={{
                         position: 'relative', overflow: 'hidden',
-                        background: 'linear-gradient(135deg, #facc15 0%, #eab308 100%)', color: 'white',
+                        background: 'linear-gradient(135deg, #facc15 0%, #eab308 100%)', color: '#0f172a',
                         borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(234, 179, 8, 0.35)',
                         display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '70px',
                         padding: '16px', boxSizing: 'border-box',
                         transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                        border: '1px solid rgba(255, 255, 255, 0.1)'
+                        border: '1px solid rgba(255, 255, 255, 0.2)'
                       }} className="hover-scale">
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                          <span style={{ fontSize: '0.68rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Tages-Pensum</span>
-                          <div style={{ background: 'rgba(255, 255, 255, 0.15)', padding: '6px', borderRadius: '10px' }}>
-                            <Clock size={14} color="white" />
+                          <span style={{ fontSize: '0.68rem', fontWeight: 850, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Tages-Pensum</span>
+                          <div style={{ background: 'rgba(15, 23, 42, 0.12)', padding: '6px', borderRadius: '10px' }}>
+                            <Clock size={14} color="#0f172a" />
                           </div>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '8px' }}>
-                          <span style={{ fontSize: '1.6rem', fontWeight: 950, letterSpacing: '-0.02em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{workloadHoursStr}</span>
+                          <span style={{ fontSize: '1.6rem', fontWeight: 950, letterSpacing: '-0.02em', fontFamily: "'Plus Jakarta Sans', sans-serif", color: '#0f172a' }}>{workloadHoursStr}</span>
                         </div>
                       </div>
 
@@ -8621,7 +8655,7 @@ useEffect(() => {
                             className="hover-scale hero-avatar-container"
                             >
                               <img 
-                                src={getInstrumentAvatarUrl(teacher?.instrument)} 
+                                src={getInstrumentAvatarUrl(teacherEffectiveInstrument)} 
                                 alt="" 
                                 style={{ 
                                   width: '100%', 
@@ -13345,6 +13379,10 @@ useEffect(() => {
             userRole="teacher"
             activePlatform={activePlatform as any}
             schoolName={schoolData?.name || (teacher as any)?.school_name}
+            initialBoardId={activeTab || 'briefing'}
+            onNavigateBoard={(target) => {
+              if (target) setActiveTab(target as any);
+            }}
             onOpenFeedbackHub={() => {
               setIsHelpCenterOpen(false);
               setIsFeedbackModalOpen(true);

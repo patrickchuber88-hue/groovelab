@@ -954,6 +954,7 @@ export function CampusSetupScreen({
             onClose={() => setIsHelpCenterOpen(false)}
             userRole="admin"
             activePlatform="campus"
+            initialBoardId="setup"
             schoolName={effectiveSchool?.name || schoolName || ''}
             onOpenFeedbackHub={() => {
               setIsHelpCenterOpen(false);

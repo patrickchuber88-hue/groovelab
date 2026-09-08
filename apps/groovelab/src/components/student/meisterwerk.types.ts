@@ -45,6 +45,7 @@ export interface ProgressItem {
   is_current_homework: boolean;
   teacher_notes: string;
   homework_notes?: string;
+  created_at?: string;
   updated_at?: string;
   student_rating?: number | null;
   is_match_mode_enabled?: boolean;

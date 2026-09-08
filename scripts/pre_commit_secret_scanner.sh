@@ -11,13 +11,13 @@ echo "🔍 Führe automatisierten Pre-Commit Secret-Scan durch (Root: $REPO_ROOT
 
 # List of files staged for commit, or all files in tracking if running standalone
 if [ "$1" == "--all" ]; then
-    FILES=$(git ls-files 'apps/groovelab/src/*' 'supabase/migrations/*' 2>/dev/null || find apps/groovelab/src supabase/migrations -type f \( -name "*.ts" -o -name "*.tsx" -o -name "*.js" -o -name "*.sql" \))
+    FILES=$(git ls-files 'apps/groovelab/src/*' 'packages/*' 'scripts/*' 'supabase/migrations/*' 2>/dev/null | grep -v 'node_modules/' | grep -v '/dist/' || find apps/groovelab/src packages scripts supabase/migrations -type d \( -name node_modules -o -name dist -o -name .git \) -prune -o -type f \( -name "*.ts" -o -name "*.tsx" -o -name "*.js" -o -name "*.mjs" -o -name "*.sh" -o -name "*.sql" \) -print)
 else
-    FILES=$(git diff --cached --name-only --diff-filter=ACM 2>/dev/null | grep -E '^apps/groovelab/src/|^supabase/migrations/' || true)
+    FILES=$(git diff --cached --name-only --diff-filter=ACM 2>/dev/null | grep -E '^apps/groovelab/src/|^packages/|^scripts/|^supabase/migrations/' | grep -v 'node_modules/' | grep -v '/dist/' || true)
 fi
 
 if [ -z "$FILES" ]; then
-    echo "  ✓ Keine relevanten Frontend- oder Migrationsdateien verändert."
+    echo "  ✓ Keine relevanten Code-, Paket-, Skript- oder Migrationsdateien verändert."
     exit 0
 fi
 
@@ -33,6 +33,10 @@ PATTERNS=(
 )
 
 for file in $FILES; do
+    # Skip self, node_modules and build artifacts
+    if [[ "$file" == *"pre_commit_secret_scanner.sh" || "$file" == *"node_modules"* || "$file" == *"/dist/"* ]]; then
+        continue
+    fi
     if [ -f "$file" ]; then
         for pattern in "${PATTERNS[@]}"; do
             MATCHES=$(grep -nE -e "$pattern" "$file" 2>/dev/null || true)

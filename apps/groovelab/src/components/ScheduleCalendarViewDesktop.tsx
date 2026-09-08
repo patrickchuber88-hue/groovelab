@@ -8586,8 +8586,10 @@ return (
               <MeisterwerkDocumentationModal 
                 student={{
                   ...docStudent,
-                  school_id: schoolId || docStudent.school_id
+                  school_id: schoolId || docStudent.school_id,
+                  school_name: (docStudent as any)?.school_name || (docStudent.schools as any)?.name
                 }} 
+                schoolName={(docStudent as any)?.school_name || (docStudent.schools as any)?.name || ''}
                 onClose={() => {
                   setDocStudent(null);
                   if (occ?.student_id) {

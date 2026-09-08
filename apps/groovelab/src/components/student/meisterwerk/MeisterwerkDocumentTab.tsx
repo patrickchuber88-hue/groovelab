@@ -45,7 +45,7 @@ import {
 } from '../../../domain/stickersAndTresor';
 import { formatPageNumbersGerman } from '../../../services/neuralTtsService';
 import { getInstrumentAvatarUrl } from '../studentAvatars.constants';
-import { getSimulatedNow } from '../studentDateUtils';
+import { getSimulatedNow, getWeekDateRange } from '../studentDateUtils';
 
 export type MeisterwerkBrushType = 'NONE' | 'LOCKED' | 'HOMEWORK' | 'MASTERED' | 'THEORY' | 'STUDENT_FOCUS';
 export type MeisterwerkFeedbackStatus = 'beherrscht' | 'in_entwicklung' | 'wiederholen' | null;
@@ -711,10 +711,38 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                       const isSelected = selectedHistoryWeek === wk;
                       const weekNum = wk.split('-W')[1] || '';
                       
-                      // Count how many items were checked or active in this week
+                      // Count how many items were checked or active in this week (including snapshot fallback)
                       const weekItems = progressItems.filter(item => item.updated_at && getItemWeek(item) === wk);
-                      const homeworkItemsCount = weekItems.filter(item => item.is_current_homework && !item.topic_name.startsWith('Hausaufgabe KW ')).length;
+                      let homeworkItemsCount = weekItems.filter(item => item.is_current_homework && !item.topic_name.startsWith('Hausaufgabe KW ')).length;
+                      
+                      if (homeworkItemsCount === 0) {
+                        const snapItem = weekItems.find(item => item.topic_name?.startsWith('Hausaufgabe KW '));
+                        if (snapItem && snapItem.homework_notes) {
+                          try {
+                            const raw = typeof snapItem.homework_notes === 'string' ? JSON.parse(snapItem.homework_notes) : snapItem.homework_notes;
+                            if (Array.isArray(raw)) {
+                              const lw = raw.find((n: any) => typeof n === 'string' && n.startsWith('SNAPSHOT_LEHRWERKE:'));
+                              if (lw) {
+                                const parsedLw = JSON.parse(lw.substring('SNAPSHOT_LEHRWERKE:'.length));
+                                if (Array.isArray(parsedLw)) {
+                                  parsedLw.forEach((b: any) => {
+                                    homeworkItemsCount += (Array.isArray(b.pages) && b.pages.length > 0) ? b.pages.length : 1;
+                                  });
+                                }
+                              }
+                              const songs = raw.find((n: any) => typeof n === 'string' && n.startsWith('SNAPSHOT_SONGS:'));
+                              if (songs) {
+                                const parsedSongs = JSON.parse(songs.substring('SNAPSHOT_SONGS:'.length));
+                                if (Array.isArray(parsedSongs)) {
+                                  homeworkItemsCount += parsedSongs.length;
+                                }
+                              }
+                            }
+                          } catch {}
+                        }
+                      }
                       const isCompact = homeworkItemsCount === 0;
+                      const dateRangeStr = getWeekDateRange(wk);
                       
                       return (
                         <div
@@ -729,7 +757,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                             transition: 'all 0.15s ease',
                             display: 'flex',
                             flexDirection: 'column',
-                            gap: isCompact ? '0px' : '4px',
+                            gap: isCompact ? '2px' : '4px',
                             boxShadow: isSelected ? '0 4px 12px rgba(19, 115, 51, 0.08)' : '0 2px 4px rgba(0,0,0,0.01)'
                           }}
                           className="hover-scale"
@@ -756,16 +784,21 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                   </span>
                                 );
                               })()}
-                              <span style={{ fontSize: '0.68rem', background: isSelected ? '#34a853' : '#f1f5f9', color: isSelected ? 'white' : '#4b5563', padding: '2px 8px', borderRadius: '10px', fontWeight: 800 }}>
-                                {homeworkItemsCount} Aufgaben
+                              <span style={{ 
+                                fontSize: '0.68rem', 
+                                background: isSelected ? '#34a853' : homeworkItemsCount > 0 ? '#dcfce7' : '#f1f5f9', 
+                                color: isSelected ? 'white' : homeworkItemsCount > 0 ? '#15803d' : '#64748b', 
+                                padding: '2px 8px', 
+                                borderRadius: '10px', 
+                                fontWeight: 800 
+                              }}>
+                                {homeworkItemsCount} {homeworkItemsCount === 1 ? 'Aufgabe' : 'Aufgaben'}
                               </span>
                             </div>
                           </div>
-                          {!isCompact && (
-                            <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 500 }}>
-                              Dokumentiert in Woche {weekNum}
-                            </span>
-                          )}
+                          <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>
+                            {dateRangeStr ? `${dateRangeStr} · Woche ${weekNum}` : `Dokumentiert in Woche ${weekNum}`}
+                          </span>
 
                           {/* Inline Feedback Panel — only when selected and not readOnly */}
                           {isSelected && !readOnly && (
@@ -4171,46 +4204,135 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                   }
                 });
 
+                // 📦 Snapshot Fallback & Hydration for archived weeks (e.g. KW 36)
+                const snapshotItem = weekItems.find(item => item.topic_name?.startsWith('Hausaufgabe KW '));
+                if (snapshotItem && snapshotItem.homework_notes) {
+                  let parsedNotes: any[] = [];
+                  try {
+                    const raw = typeof snapshotItem.homework_notes === 'string'
+                      ? JSON.parse(snapshotItem.homework_notes)
+                      : snapshotItem.homework_notes;
+                    if (Array.isArray(raw)) parsedNotes = raw;
+                  } catch (e) {
+                    console.warn('Error parsing snapshot notes:', e);
+                  }
+
+                  // 1. Lehrwerke aus SNAPSHOT_LEHRWERKE hydrieren
+                  const snapLwEntry = parsedNotes.find((n: any) => typeof n === 'string' && n.startsWith('SNAPSHOT_LEHRWERKE:'));
+                  if (snapLwEntry) {
+                    try {
+                      const rawJson = snapLwEntry.substring('SNAPSHOT_LEHRWERKE:'.length);
+                      const parsedLw = JSON.parse(rawJson);
+                      if (Array.isArray(parsedLw)) {
+                        parsedLw.forEach((lw: { title: string; pages: number[]; notes?: any }) => {
+                          if (!groupedLehrwerke[lw.title]) {
+                            groupedLehrwerke[lw.title] = { pages: [] };
+                          }
+                          if (Array.isArray(lw.pages)) {
+                            lw.pages.forEach(p => {
+                              if (!groupedLehrwerke[lw.title].pages.includes(p)) {
+                                groupedLehrwerke[lw.title].pages.push(p);
+                              }
+                            });
+                          }
+                        });
+                      }
+                    } catch (e) {
+                      console.warn('Error hydrating SNAPSHOT_LEHRWERKE:', e);
+                    }
+                  }
+
+                  // 2. Songs aus SNAPSHOT_SONGS hydrieren
+                  const snapSongEntry = parsedNotes.find((n: any) => typeof n === 'string' && n.startsWith('SNAPSHOT_SONGS:'));
+                  if (snapSongEntry) {
+                    try {
+                      const rawJson = snapSongEntry.substring('SNAPSHOT_SONGS:'.length);
+                      const parsedSongs = JSON.parse(rawJson);
+                      if (Array.isArray(parsedSongs)) {
+                        parsedSongs.forEach((song: any) => {
+                          const songName = song.topic_name || song.title;
+                          if (songName && !otherHWs.some(existing => (existing.topic_name || existing.title) === songName)) {
+                            otherHWs.push(song);
+                          }
+                        });
+                      }
+                    } catch (e) {
+                      console.warn('Error hydrating SNAPSHOT_SONGS:', e);
+                    }
+                  }
+                }
+
                 // Sort pages for each textbook in ascending order
                 Object.keys(groupedLehrwerke).forEach(title => {
                   groupedLehrwerke[title].pages.sort((a, b) => a - b);
                 });
 
-                // Extract unique non-empty homework notes
+                // Extract unique clean homework notes & student questions
                 const uniqueHomeworkNotes: string[] = [];
+                const studentQuestions: Array<{ timestamp?: string; question: string }> = [];
+
                 weekItems.forEach(item => {
                   if (item.homework_notes && item.homework_notes.trim() !== '') {
+                    let noteLines: string[] = [];
                     try {
                       const parsed = JSON.parse(item.homework_notes);
                       if (Array.isArray(parsed)) {
-                        parsed.forEach((n: string) => {
-                          if (n.trim() !== '' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !uniqueHomeworkNotes.includes(n.trim())) {
-                            uniqueHomeworkNotes.push(n.trim());
-                          }
+                        parsed.forEach((n: any) => {
+                          if (typeof n === 'string') noteLines.push(n);
                         });
-                      } else if (typeof parsed === 'string' && parsed.trim() !== '' && !parsed.startsWith('AUDIO:') && !parsed.startsWith('STICKER:') && !uniqueHomeworkNotes.includes(parsed.trim())) {
-                        uniqueHomeworkNotes.push(parsed.trim());
+                      } else if (typeof parsed === 'string') {
+                        noteLines = parsed.split('\n');
                       }
-                    } catch (e) {
-                      const trimmed = item.homework_notes.trim();
-                      if (!trimmed.startsWith('AUDIO:') && !trimmed.startsWith('STICKER:') && !uniqueHomeworkNotes.includes(trimmed)) {
-                        uniqueHomeworkNotes.push(trimmed);
-                      }
+                    } catch {
+                      noteLines = item.homework_notes.split('\n');
                     }
+
+                    noteLines.forEach(line => {
+                      const trimmed = line.trim();
+                      if (!trimmed) return;
+
+                      // Extract student questions (STUDENT_QUESTION:timestamp|question)
+                      if (trimmed.startsWith('STUDENT_QUESTION:')) {
+                        const payload = trimmed.substring('STUDENT_QUESTION:'.length).trim();
+                        if (payload.includes('|')) {
+                          const [ts, q] = payload.split('|');
+                          if (q && q.trim()) {
+                            studentQuestions.push({ timestamp: ts.trim(), question: q.trim() });
+                          }
+                        } else {
+                          studentQuestions.push({ question: payload });
+                        }
+                        return;
+                      }
+
+                      // Guard: Filter out all internal metadata strings (SNAPSHOT_*, LATENCY:*, AUDIO:*, etc.)
+                      if (isInternalMetadataNote(trimmed)) {
+                        return;
+                      }
+
+                      const cleaned = trimmed.replace(/^[•\-\*\s]+/, '').trim();
+                      if (cleaned && !uniqueHomeworkNotes.includes(cleaned)) {
+                        uniqueHomeworkNotes.push(cleaned);
+                      }
+                    });
                   }
                 });
 
-                // Extract teacher notes
+                // Extract clean teacher notes
                 const weekTeacherNotes = weekItems
                   .map(item => item.teacher_notes)
-                  .filter(n => n && n.trim() !== '')
+                  .filter(n => n && n.trim() !== '' && !isInternalMetadataNote(n))
+                  .map(n => cleanNotesText(n))
+                  .filter(Boolean)
                   .join('\n\n');
+
+                const selectedDateRangeStr = getWeekDateRange(selectedHistoryWeek);
 
                 return (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', animation: 'fadeIn 0.25s ease', height: '100%' }}>
                     <div>
                       <span style={{ fontSize: '0.84rem', fontWeight: 900, color: '#09090b', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}><Calendar size={15} style={{ color: '#34a853', verticalAlign: 'middle', marginTop: '-2px' }} /> Details KW {weekNum}</span>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}><Calendar size={15} style={{ color: '#34a853', verticalAlign: 'middle', marginTop: '-2px' }} /> Details KW {weekNum} {selectedDateRangeStr ? `(${selectedDateRangeStr})` : ''}</span>
                       </span>
                       <p style={{ margin: '3px 0 0 0', fontSize: '0.76rem', color: '#71717a', fontWeight: 550, lineHeight: '1.3' }}>
                         Hausaufgaben und Notizen aus dieser Woche (Schreibgeschützt).
@@ -4366,9 +4488,60 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                           border: '1px solid #e2e8f0', fontSize: '0.88rem', fontWeight: 550, lineHeight: 1.5, background: '#fafafa', color: '#0f172a',
                           whiteSpace: 'pre-wrap'
                         }}>
-                          {uniqueHomeworkNotes.join('\n\n') || 'Keine Bemerkungen hinterlegt.'}
+                          {uniqueHomeworkNotes.length > 0 ? uniqueHomeworkNotes.join('\n\n') : 'Keine Bemerkungen hinterlegt.'}
                         </div>
                       </div>
+
+                      {/* Student question(s) */}
+                      {studentQuestions.length > 0 && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          <label style={{ fontSize: '0.84rem', fontWeight: 800, color: '#1e40af' }}>
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                              <HelpCircle size={15} style={{ color: '#2563eb', verticalAlign: 'middle', marginTop: '-2px' }} />
+                              Frage für den Unterricht
+                            </span>
+                          </label>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                            {studentQuestions.map((sq, idx) => {
+                              const formattedDate = (() => {
+                                if (!sq.timestamp) return null;
+                                try {
+                                  const d = new Date(sq.timestamp);
+                                  return isNaN(d.getTime()) ? null : d.toLocaleString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+                                } catch {
+                                  return null;
+                                }
+                              })();
+
+                              return (
+                                <div
+                                  key={idx}
+                                  style={{
+                                    padding: '12px 14px',
+                                    background: '#eff6ff',
+                                    borderRadius: '16px',
+                                    border: '1px solid #bfdbfe',
+                                    fontSize: '0.88rem',
+                                    fontWeight: 550,
+                                    lineHeight: 1.5,
+                                    color: '#1e3a8a',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: '4px'
+                                  }}
+                                >
+                                  {formattedDate && (
+                                    <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#3b82f6' }}>
+                                      {formattedDate} Uhr
+                                    </div>
+                                  )}
+                                  <div style={{ fontWeight: 600 }}>{sq.question}</div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
 
                       {/* Internal teacher notes */}
                       {!readOnly && (
@@ -8156,7 +8329,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                   gap: '6px'
                                 }}>
                                   <span style={{ fontSize: '0.75rem' }}>🎙️</span>
-                                  <span><strong>Didaktisches Hörbeispiel & Übungs-Track (§ 60a UrhG):</strong> Diese Aufnahme dient ausschließlich dem persönlichen 1:1-Übungsgebrauch dieses Schülers. Eine öffentliche Verbreitung oder Weitergabe ist unzulässig (§ 15 Abs. 3 UrhG).</span>
+                                  <span><strong>Didaktisches Hörbeispiel & Übungs-Track:</strong> Diese Aufnahme dient ausschließlich dem persönlichen 1:1-Übungsgebrauch dieses Schülers. Eine öffentliche Verbreitung oder Weitergabe im Internet ist unzulässig.</span>
                                 </div>
 
                                 {/* 🛡️ Eltern-Veto Schranke & Exkulpations-Banner (§ 201 StGB / Art. 8 DSGVO) */}

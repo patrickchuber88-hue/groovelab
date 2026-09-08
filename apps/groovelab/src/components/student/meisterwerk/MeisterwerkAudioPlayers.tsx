@@ -393,7 +393,11 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
   const audioRef = React.useRef<HTMLAudioElement | null>(null);
   const countInTimerRef = React.useRef<any>(null);
   const playerIdRef = React.useRef<string>(`player_${Math.random().toString(36).substring(2, 9)}_${Date.now()}`);
-  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' ? window.innerWidth < 768 : false);
+  const checkIsMobile = () => {
+    if (typeof window === 'undefined') return false;
+    return window.innerWidth < 768 || Boolean(typeof document !== 'undefined' && document.querySelector('.sim-viewport-mobile, .sim-viewport-portrait'));
+  };
+  const [isMobile, setIsMobile] = useState(checkIsMobile);
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
   const [isToolsOpen, setIsToolsOpen] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
@@ -421,7 +425,7 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
   };
 
   useEffect(() => {
-    const handleResize = () => setIsMobile(typeof window !== 'undefined' ? window.innerWidth < 768 : false);
+    const handleResize = () => setIsMobile(checkIsMobile());
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
@@ -706,34 +710,7 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
   const isIndigoPurple = themeColor && (themeColor === '#6d28d9' || themeColor === '#7c3aed' || themeColor === '#8b5cf6' || themeColor === '#6366f1');
   const isShared = isSharedWithTeacher !== undefined ? isSharedWithTeacher : (badge && (badge.includes('Für Lehrer') || badge.includes('Lehrer')));
 
-  return (
-    <div 
-      style={{
-        background: isPlaying 
-          ? (isShared ? '#dcfce7' : (isIndigoPurple ? '#faf5ff' : '#f0fdf4'))
-          : (isShared ? 'linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%)' : '#ffffff'),
-        borderRadius: '16px',
-        border: isPlaying 
-          ? (isShared ? '1.5px solid #22c55e' : (isIndigoPurple ? '1.5px solid #c4b5fd' : '1.5px solid #86efac'))
-          : (isShared ? '1.5px solid #86efac' : '1px solid #e2e8f0'),
-        padding: isMobile ? '8px 10px' : '8px 12px',
-        width: '100%',
-        boxShadow: isPlaying 
-          ? (isShared ? '0 4px 16px -2px rgba(22, 163, 74, 0.28)' : (isIndigoPurple ? '0 3px 12px -2px rgba(109, 40, 217, 0.2)' : '0 3px 12px -2px rgba(34, 197, 94, 0.2)'))
-          : (isShared ? '0 4px 14px -2px rgba(22, 163, 74, 0.16), 0 1px 3px rgba(0, 0, 0, 0.02)' : '0 1px 3px rgba(0, 0, 0, 0.03)'),
-        display: 'flex',
-        flexDirection: 'column',
-        gap: isToolsOpen ? '8px' : '0px',
-        boxSizing: 'border-box',
-        transition: 'all 0.15s ease',
-        position: 'relative'
-      }}
-    >
-      {/* 1. Main Row */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '8px' : '10px', width: '100%' }}>
-        <audio ref={audioRef} src={resolvedUrl} />
-
-        {/* Play/Pause Button or Count-In Overlay (iPad-optimiert: 38px) */}
+  const playButtonElement = (
         <button
           type="button"
           onClick={togglePlay}
@@ -776,11 +753,18 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
             <Play size={16} fill="currentColor" strokeWidth={0} style={{ marginLeft: '2px' }} />
           )}
         </button>
+  );
 
-        {/* Middle: Title, Badges, Waveform, Time */}
-        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '4px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0, flex: 1, position: 'relative' }}>
+  const renderTitleAndBadges = (isDesktop: boolean) => (
+    <div style={{
+      display: "flex",
+      alignItems: "center",
+      gap: "6px",
+      minWidth: 0,
+      flex: isDesktop ? "0 1 auto" : 1,
+      maxWidth: isDesktop ? "240px" : undefined,
+      position: "relative"
+    }}>
               {isEditingTitle ? (
                 <form
                   onSubmit={(e) => {
@@ -1098,9 +1082,6 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
                   </div>
                 </div>
               )}
-            </div>
-
-            {/* Status / Privacy Badge (z. B. 🔒 Nur für mich / 🚀 Für Lehrer) */}
             {badge && (
               <span 
                 onClick={onBadgeClick ? (e) => { e.stopPropagation(); onBadgeClick(); } : undefined}
@@ -1125,65 +1106,69 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
                 {badge}
               </span>
             )}
-          </div>
+    </div>
+  );
 
-          <span style={{
-            fontSize: '0.68rem',
-            fontWeight: 750,
-            color: '#64748b',
-            fontVariantNumeric: 'tabular-nums',
-            flexShrink: 0,
-            minWidth: '68px',
-            textAlign: 'right'
-          }}>
-            {formatTime(currentTime)} / {formatTime(duration)}
-          </span>
-        </div>
+  const renderWaveform = (isDesktop: boolean) => (
+    <div
+      onClick={(e) => {
+        const rect = e.currentTarget.getBoundingClientRect();
+        const clickX = e.clientX - rect.left;
+        const newRatio = Math.max(0, Math.min(1, clickX / rect.width));
+        const newTime = newRatio * (duration || 0);
+        setCurrentTime(newTime);
+        if (audioRef.current) audioRef.current.currentTime = newTime;
+      }}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: "2px",
+        height: "16px",
+        cursor: "pointer",
+        width: "100%",
+        maxWidth: isDesktop ? "160px" : "160px",
+        minWidth: isDesktop ? "70px" : undefined,
+        flex: isDesktop ? 1 : undefined
+      }}
+      title="Tippen zum Spulen"
+    >
+      {waveformHeights.slice(0, 16).map((h, i) => {
+        const barRatio = i / 16;
+        const isFilled = barRatio <= progressRatio;
+        return (
+          <div
+            key={i}
+            style={{
+              flex: 1,
+              minWidth: "2.5px",
+              height: `${Math.max(25, h)}%`,
+              borderRadius: "1.5px",
+              background: isFilled
+                ? (isIndigoPurple ? (isPlaying ? "#7c3aed" : "#6d28d9") : (isPlaying ? "#16a34a" : "#15803d"))
+                : (isShared ? "#bbf7d0" : "#e2e8f0"),
+              transition: "background 0.1s ease"
+            }}
+          />
+        );
+      })}
+    </div>
+  );
 
-        {/* Mini Waveform with Klick-zu-Position Scrubbing - 16 organic bars matching screenshot */}
-        <div 
-          onClick={(e) => {
-            const rect = e.currentTarget.getBoundingClientRect();
-            const clickX = e.clientX - rect.left;
-            const newRatio = Math.max(0, Math.min(1, clickX / rect.width));
-            const newTime = newRatio * (duration || 0);
-            setCurrentTime(newTime);
-            if (audioRef.current) audioRef.current.currentTime = newTime;
-          }}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '2px',
-            height: '16px',
-            cursor: 'pointer',
-            width: '100%',
-            maxWidth: '160px'
-          }}
-          title="Tippen zum Spulen"
-        >
-          {waveformHeights.slice(0, 16).map((h, i) => {
-            const barRatio = i / 16;
-            const isFilled = barRatio <= progressRatio;
-            return (
-              <div
-                key={i}
-                style={{
-                  flex: 1,
-                  minWidth: '2.5px',
-                  height: `${Math.max(25, h)}%`,
-                  borderRadius: '1.5px',
-                  background: isFilled 
-                    ? (isIndigoPurple ? (isPlaying ? '#7c3aed' : '#6d28d9') : (isPlaying ? '#16a34a' : '#15803d'))
-                    : (isShared ? '#bbf7d0' : '#e2e8f0'),
-                  transition: 'background 0.1s ease'
-                }}
-              />
-            );
-          })}
-        </div>
-      </div>
+  const renderTimeDisplay = (isDesktop: boolean) => (
+    <span style={{
+      fontSize: "0.68rem",
+      fontWeight: 750,
+      color: "#64748b",
+      fontVariantNumeric: "tabular-nums",
+      flexShrink: 0,
+      minWidth: isDesktop ? "64px" : "68px",
+      textAlign: "right"
+    }}>
+      {formatTime(currentTime)} / {formatTime(duration)}
+    </span>
+  );
 
-      {/* Action Buttons Group: Loop, Count-In, Tempo, Favorite, More (...) */}
+  const renderActionButtons = (
       <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '3px' : '5px', flexShrink: 0 }}>
         {/* 🔁 Loop Toggle (Icon only) */}
         <button
@@ -1368,7 +1353,57 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
           <MoreHorizontal size={isMobile ? 15 : 17} strokeWidth={isToolsOpen ? 2.6 : 2.2} />
         </button>
       </div>
+  );
 
+  return (
+    <div
+      style={{
+        background: isPlaying
+          ? (isShared ? "#dcfce7" : (isIndigoPurple ? "#faf5ff" : "#f0fdf4"))
+          : (isShared ? "linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%)" : "#ffffff"),
+        borderRadius: "16px",
+        border: isPlaying
+          ? (isShared ? "1.5px solid #22c55e" : (isIndigoPurple ? "1.5px solid #c4b5fd" : "1.5px solid #86efac"))
+          : (isShared ? "1.5px solid #86efac" : "1px solid #e2e8f0"),
+        padding: isMobile ? "8px 10px" : "8px 12px",
+        width: "100%",
+        boxShadow: isPlaying
+          ? (isShared ? "0 4px 16px -2px rgba(22, 163, 74, 0.28)" : (isIndigoPurple ? "0 3px 12px -2px rgba(109, 40, 217, 0.2)" : "0 3px 12px -2px rgba(34, 197, 94, 0.2)"))
+          : (isShared ? "0 4px 14px -2px rgba(22, 163, 74, 0.16), 0 1px 3px rgba(0, 0, 0, 0.02)" : "0 1px 3px rgba(0, 0, 0, 0.03)"),
+        display: "flex",
+        flexDirection: "column",
+        gap: isToolsOpen ? "8px" : (isMobile ? "6px" : "0px"),
+        boxSizing: "border-box",
+        transition: "all 0.15s ease",
+        position: "relative"
+      }}
+    >
+      <audio ref={audioRef} src={resolvedUrl} />
+
+      {/* 1. Main Row: On Desktop, single line with title, waveform, time and action buttons */}
+      {isMobile ? (
+        <div style={{ display: "flex", alignItems: "center", gap: "8px", width: "100%" }}>
+          {playButtonElement}
+          <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "4px" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "6px" }}>
+              {renderTitleAndBadges(false)}
+              {renderTimeDisplay(false)}
+            </div>
+            {renderWaveform(false)}
+          </div>
+        </div>
+      ) : (
+        <div style={{ display: "flex", alignItems: "center", gap: "10px", width: "100%", justifyContent: "space-between" }}>
+          {playButtonElement}
+          {renderTitleAndBadges(true)}
+          {renderWaveform(true)}
+          {renderTimeDisplay(true)}
+          {renderActionButtons}
+        </div>
+      )}
+
+      {/* Action Buttons Group (Only on Mobile as Row 2) */}
+      {isMobile && renderActionButtons}
       {/* 2. Expanded Studio Drawer (toggled via ...) */}
       {isToolsOpen && (
         <div

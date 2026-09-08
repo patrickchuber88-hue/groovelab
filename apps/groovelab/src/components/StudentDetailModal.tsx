@@ -14,6 +14,7 @@ import { IDBadgeCard } from './IDBadgeCard';
 import { StudentPinResetModal } from './StudentPinResetModal';
 import { getParentOnboardingUrl } from '../utils/tenantUrlHelper';
 import { invalidateBiometricProfile } from '../utils/webauthn';
+import { getInstrumentAvatarUrl, getDefaultMusicianAvatarUrl } from './StudioAvatar';
 
 const brandColor = 'var(--primary-color)';
 
@@ -67,45 +68,6 @@ interface StudentDetailModalProps {
   callerDashboard?: 'teacher' | 'secretary' | 'admin';
   onSwitchPlatform?: (newPlatform: 'campus' | 'groovelab') => void;
 }
-
-const getInstrumentAvatarUrl = (instrument: string | null | undefined): string => {
-  if (!instrument) return '/avatars/gitarre_avatar_new.png';
-  const inst = instrument.toLowerCase().trim();
-  if (inst.includes('e-gitarre')) return '/avatars/egitarre_avatar.png';
-  if (inst.includes('guitar') || inst.includes('gitarre')) return '/avatars/gitarre_avatar_new.png';
-  if (inst.includes('e-bass')) return '/avatars/ebass_avatar.png';
-  if (inst.includes('kontrabass') || inst.includes('double bass')) return '/avatars/kontrabass_avatar.png';
-  if (inst.includes('bass')) return '/avatars/bass_avatar.png';
-  if (inst.includes('drum') || inst.includes('schlagzeug')) return '/avatars/schlagzeug_avatar.png';
-  if (inst.includes('piano') || inst.includes('keys') || inst.includes('klavier') || inst.includes('keyboard')) return '/avatars/klavier_avatar_new.png';
-  if (inst.includes('vocal') || inst.includes('gesang') || inst.includes('stimme') || inst.includes('singer')) return '/avatars/gesang_avatar.png';
-  if (inst.includes('trompete') || inst.includes('trumpet')) return '/avatars/trompete_avatar_new.png';
-  if (inst.includes('posaune') || inst.includes('trombone')) return '/avatars/posaune_avatar.png';
-  if (inst.includes('horn')) return '/avatars/horn_avatar_new.png';
-  if (inst.includes('cello')) return '/avatars/cello_avatar_new.png';
-  if (inst.includes('geige') || inst.includes('violin') || inst.includes('violine')) return '/avatars/violine_avatar_new.png';
-  if (inst.includes('klarinette') || inst.includes('clarinet')) return '/avatars/klarinette_avatar_new.png';
-  if (inst.includes('querflöte') || inst.includes('flute')) return '/avatars/querfloete_avatar.png';
-  if (inst.includes('saxofon') || inst.includes('saxophone') || inst.includes('sax')) return '/avatars/saxophon_avatar_new.png';
-  if (inst.includes('blockflöte') || inst.includes('recorder') || inst.includes('blockfloete')) return '/avatars/blockfloete_avatar.png';
-  if (inst.includes('bariton') || inst.includes('baritone')) return '/avatars/bariton_avatar.png';
-  if (inst.includes('oboe')) return '/avatars/oboe_avatar.png';
-  return '/avatars/gitarre_avatar_new.png';
-};
-
-const getDefaultMusicianAvatarUrl = (instrument: string | null | undefined, role: string | null | undefined): string => {
-  const isTeacher = (role || '').toLowerCase() === 'teacher' || (role || '').toLowerCase() === 'admin';
-  if (isTeacher) return '/avatar_ghost.jpg';
-  
-  if (!instrument) return '/avatars/student_eguitar_1.png';
-  const inst = instrument.toLowerCase().trim();
-  if (inst.includes('guitar') || inst.includes('gitarre')) return '/avatars/student_boy_black_guitar.png';
-  if (inst.includes('bass')) return '/avatars/student_boy_black_bass.png';
-  if (inst.includes('drum') || inst.includes('schlagzeug')) return '/avatars/student_boy_black_drums.png';
-  if (inst.includes('piano') || inst.includes('keys') || inst.includes('klavier') || inst.includes('keyboard')) return '/avatars/student_boy_black_piano.png';
-  if (inst.includes('vocal') || inst.includes('gesang') || inst.includes('stimme') || inst.includes('singer')) return '/avatars/student_boy_red_vocals.png';
-  return '/avatars/student_eguitar_1.png';
-};
 
 export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ 
   student, 
@@ -1060,7 +1022,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
       } catch (auditErr) {}
 
       alert(targetAdult
-        ? `Schüler ${student.first_name || ''} wurde erfolgreich als volljährig (§ 2 BGB) markiert. Der elterliche Lesezugriff wurde zum Schutz der Privatsphäre deaktiviert.`
+        ? `Schüler ${student.first_name || ''} wurde erfolgreich als volljährig (18+) markiert. Der elterliche Lesezugriff wurde zum Schutz der Privatsphäre deaktiviert.`
         : `Volljährigkeits-Status für ${student.first_name || ''} wurde zurückgesetzt.`);
     } catch (err: any) {
       alert('Fehler beim Aktualisieren des Volljährigkeits-Status: ' + err.message);
@@ -4367,7 +4329,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
                     <div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                         <span style={{ fontSize: '0.84rem', fontWeight: 800, color: isAdult ? '#15803d' : '#1e293b' }}>
-                          Volljährigkeits-Status (§ 2 BGB)
+                          Volljährigkeits-Status (18+)
                         </span>
                         {isAdult && (
                           <span style={{ 
@@ -5453,8 +5415,12 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
             photo_url: student.photo_url || '/avatar_ghost.jpg',
             is_campus_active: student.is_campus_active,
             school_id: student.school_id,
-            schools: student.schools
+            schools: student.schools,
+            school_name: (student as any)?.school_name || (student.schools as any)?.name,
+            created_at: student.created_at,
+            activated_at: (student as any)?.activated_at
           }}
+          schoolName={(student as any)?.school_name || (student.schools as any)?.name || ''}
           onClose={() => setShowTageskompassModal(false)}
           teacherId={currentTeacherId}
           initialViewMode="document"

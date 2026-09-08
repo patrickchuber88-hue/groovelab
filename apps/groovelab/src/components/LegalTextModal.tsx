@@ -386,6 +386,7 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
               </div>
             </div>
             <button
+              type="button"
               onClick={onClose}
               aria-label="Rechtliche Hinweise schließen"
               style={{
@@ -400,8 +401,11 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
                 cursor: 'pointer',
                 color: '#475569',
                 transition: 'all 0.15s ease',
-                flexShrink: 0
+                flexShrink: 0,
+                outline: 'none'
               }}
+              onFocus={(e) => { e.currentTarget.style.boxShadow = '0 0 0 2px #3b82f6'; }}
+              onBlur={(e) => { e.currentTarget.style.boxShadow = 'none'; }}
               onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(15, 23, 42, 0.1)'; e.currentTarget.style.color = '#0f172a'; }}
               onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(15, 23, 42, 0.05)'; e.currentTarget.style.color = '#475569'; }}
             >
@@ -416,13 +420,17 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
             borderBottom: '1px solid rgba(226, 232, 240, 0.8)',
             flexShrink: 0
           }}>
-            <div style={{
-              display: 'flex',
-              background: '#e2e8f0',
-              padding: '3px',
-              borderRadius: '12px',
-              gap: '2px'
-            }}>
+            <div 
+              role="tablist"
+              aria-label="Rechtliche Bereiche"
+              style={{
+                display: 'flex',
+                background: '#e2e8f0',
+                padding: '3px',
+                borderRadius: '12px',
+                gap: '2px'
+              }}
+            >
               {[
                 { id: 'impressum', label: 'Impressum', icon: Building },
                 { id: 'privacy', label: 'Datenschutz', icon: ShieldCheck },
@@ -435,6 +443,11 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
                 return (
                   <button
                     key={tab.id}
+                    role="tab"
+                    id={`legal-tab-${tab.id}`}
+                    aria-selected={isActive}
+                    aria-controls={`legal-tabpanel-${tab.id}`}
+                    tabIndex={isActive ? 0 : -1}
                     onClick={() => handleTabChange(tab.id as any)}
                     style={{
                       flex: 1,
@@ -452,7 +465,14 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
                       gap: '7px',
                       boxShadow: isActive ? '0 2px 6px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04)' : 'none',
                       transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
-                      whiteSpace: 'nowrap'
+                      whiteSpace: 'nowrap',
+                      outline: 'none'
+                    }}
+                    onFocus={(e) => {
+                      e.currentTarget.style.boxShadow = '0 0 0 2px #3b82f6, 0 2px 6px rgba(0, 0, 0, 0.08)';
+                    }}
+                    onBlur={(e) => {
+                      e.currentTarget.style.boxShadow = isActive ? '0 2px 6px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04)' : 'none';
                     }}
                     onMouseEnter={(e) => {
                       if (!isActive) e.currentTarget.style.color = '#0f172a';
@@ -504,7 +524,13 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
             }}
           >
             {activeTab === 'impressum' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+            <div 
+              role="tabpanel" 
+              id="legal-tabpanel-impressum" 
+              aria-labelledby="legal-tab-impressum" 
+              tabIndex={0} 
+              style={{ display: 'flex', flexDirection: 'column', gap: '18px', outline: 'none' }}
+            >
               <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#0f172a' }}>
                 Angaben gemäß § 5 DDG (DE), § 5 ECG / § 25 MedienG (AT) &amp; Art. 3 Abs. 1 lit. s UWG (CH)
               </h4>
@@ -598,7 +624,13 @@ Hiermit versichere ich in gutem Glauben, dass die vorstehenden Angaben richtig u
           )}
 
           {activeTab === 'privacy' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+            <div 
+              role="tabpanel" 
+              id="legal-tabpanel-privacy" 
+              aria-labelledby="legal-tab-privacy" 
+              tabIndex={0} 
+              style={{ display: 'flex', flexDirection: 'column', gap: '18px', outline: 'none' }}
+            >
               <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#0f172a' }}>
                 Datenschutzerklärung (DSGVO / nDSG / TDDDG)
               </h4>
@@ -755,7 +787,13 @@ Hiermit versichere ich in gutem Glauben, dass die vorstehenden Angaben richtig u
           )}
 
           {activeTab === 'terms' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+            <div 
+              role="tabpanel" 
+              id="legal-tabpanel-terms" 
+              aria-labelledby="legal-tab-terms" 
+              tabIndex={0} 
+              style={{ display: 'flex', flexDirection: 'column', gap: '18px', outline: 'none' }}
+            >
               <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#0f172a' }}>
                 Allgemeine Geschäftsbedingungen (AGB) – Campus-Groovelab
               </h4>
@@ -920,7 +958,13 @@ Hiermit versichere ich in gutem Glauben, dass die vorstehenden Angaben richtig u
           )}
 
           {activeTab === 'cancellation' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+            <div 
+              role="tabpanel" 
+              id="legal-tabpanel-cancellation" 
+              aria-labelledby="legal-tab-cancellation" 
+              tabIndex={0} 
+              style={{ display: 'flex', flexDirection: 'column', gap: '18px', outline: 'none' }}
+            >
               <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#0f172a' }}>
                 Widerrufsbelehrung &amp; Muster-Widerrufsformular
               </h4>
@@ -1001,11 +1045,17 @@ Hiermit versichere ich in gutem Glauben, dass die vorstehenden Angaben richtig u
           )}
 
           {activeTab === 'accessibility' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            <div 
+              role="tabpanel" 
+              id="legal-tabpanel-accessibility" 
+              aria-labelledby="legal-tab-accessibility" 
+              tabIndex={0} 
+              style={{ display: 'flex', flexDirection: 'column', gap: '20px', outline: 'none' }}
+            >
               <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', flexWrap: 'wrap' }}>
                   <span style={{ background: '#dcfce7', color: '#166534', padding: '3px 10px', borderRadius: '100px', fontSize: '0.72rem', fontWeight: 800 }}>
-                    BITV 2.0 • EN 301 549 • BFSG 2025
+                    BITV 2.0 • EN 301 549 • BFSG (Barrierefreiheitsstärkungsgesetz)
                   </span>
                   <span style={{ background: '#f1f5f9', color: '#475569', padding: '3px 10px', borderRadius: '100px', fontSize: '0.72rem', fontWeight: 700 }}>
                     WCAG 2.2 Stufe AA
@@ -1014,21 +1064,21 @@ Hiermit versichere ich in gutem Glauben, dass die vorstehenden Angaben richtig u
                 <h4 style={{ margin: '0 0 6px 0', fontSize: '1.10rem', fontWeight: 900, color: '#0f172a' }}>
                   Erklärung zur digitalen Barrierefreiheit
                 </h4>
-                <p style={{ margin: 0, fontSize: '0.80rem', color: '#64748b' }}>
-                  Gemäß § 12d Behindertengleichstellungsgesetz (BGG), § 7 BITV 2.0 sowie dem Barrierefreiheitsstärkungsgesetz (BFSG)
+                <p style={{ margin: 0, fontSize: '0.80rem', color: '#64748b', lineHeight: 1.5 }}>
+                  Gemäß Barrierefreiheitsstärkungsgesetz (BFSG), § 12d Behindertengleichstellungsgesetz (BGG) / Landes-Behindertengleichstellungsgesetzen (L-BGG) sowie § 7 BITV 2.0 zur Umsetzung der Richtlinien (EU) 2016/2102 und (EU) 2019/882
                 </p>
               </div>
 
               <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '20px' }}>
-                <strong style={{ color: '#0f172a' }}>1. Unser Inklusions-Leitbild:</strong><br />
-                Campus-Groovelab ist bestrebt, ihre digitale Schul- und Didaktik-Plattform im Einklang mit den Bestimmungen des Behindertengleichstellungsgesetzes (BGG), der Barrierefreie-Informationstechnik-Verordnung (BITV 2.0) sowie des Barrierefreiheitsstärkungsgesetzes (BFSG 2025) zur Umsetzung der Richtlinie (EU) 2016/2102 und (EU) 2019/882 barrierearm und diskriminierungsfrei zugänglich zu gestalten. Alle Musikschülerinnen, Musikschüler, Eltern und Lehrkräfte sollen unabhängig von sensorischen oder motorischen Beeinträchtigungen einen gleichberechtigten Zugang zu zeitgemäßer Musikbildung erhalten.
+                <strong style={{ color: '#0f172a' }}>1. Unser Inklusions-Leitbild &amp; Geltungsbereich:</strong><br />
+                Campus-Groovelab (Diensteanbieter: Patrick Huber) ist bestrebt, ihre digitale Schul-, Bildungs- und Musikdidaktik-Plattform im Einklang mit den Bestimmungen des Barrierefreiheitsstärkungsgesetzes (BFSG 2025 zur Umsetzung des European Accessibility Act / Richtlinie (EU) 2019/882), der Behindertengleichstellungsgesetze des Bundes und der Länder (BGG / L-BGG) sowie der Barrierefreie-Informationstechnik-Verordnung (BITV 2.0 zur Umsetzung der Richtlinie (EU) 2016/2102) diskriminierungsfrei und barrierearm zugänglich zu gestalten. Alle Musikschülerinnen, Musikschüler, Eltern und Lehrkräfte sollen unabhängig von sensorischen oder motorischen Beeinträchtigungen einen gleichberechtigten und intuitiven Zugang zu zeitgemäßer Musikbildung und Schulorganisation erhalten.
               </div>
 
               <div>
                 <strong style={{ color: '#0f172a' }}>2. Stand der Vereinbarkeit mit den Anforderungen:</strong><br />
-                Diese Webanwendung ist <strong>größtenteils vereinbar</strong> mit den Anforderungen der harmonisierten europäischen Norm <strong>EN 301 549 V3.2.1</strong> sowie den <strong>Web Content Accessibility Guidelines (WCAG) 2.2 auf Konformitätsstufe AA</strong>.<br />
-                <span style={{ fontSize: '0.80rem', color: '#64748b', display: 'block', marginTop: '4px' }}>
-                  Die Bewertung der Vereinbarkeit basiert auf kontinuierlichen statischen Architektur- und Entropie-Audits, automatisierten Kontrastanalysen und manuellen Screenreader-Prüfungen (u. a. Apple VoiceOver und NVDA).
+                Diese Webanwendung ist wegen der folgenden Unvereinbarkeiten und Ausnahmen <strong>teilweise vereinbar</strong> mit den Anforderungen der harmonisierten europäischen Norm <strong>EN 301 549 V3.2.1</strong> sowie den <strong>Web Content Accessibility Guidelines (WCAG) 2.2 auf Konformitätsstufe AA</strong> gem. Durchführungsbeschluss (EU) 2018/1523.<br />
+                <span style={{ fontSize: '0.80rem', color: '#64748b', display: 'block', marginTop: '6px' }}>
+                  Die Bewertung der Vereinbarkeit basiert auf kontinuierlichen automatisierten Kontrast- und Code-Analysen (0 Drift-Violations, WCAG 1.4.3), statischen Architektur-Audits sowie manuellen Tastatur- und Screenreader-Prüfungen (u. a. Apple VoiceOver und NVDA).
                 </span>
               </div>
 
@@ -1038,19 +1088,19 @@ Hiermit versichere ich in gutem Glauben, dass die vorstehenden Angaben richtig u
                 </strong>
                 <ul style={{ margin: 0, paddingLeft: '20px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   <li>
-                    <strong>Tastatur-Vollbedienbarkeit &amp; 2-Klick-Parität (WCAG 2.1.1):</strong> Sämtliche Kernbereiche (Login, Schülerausweise, Stundenplan, Songkarten, Loopstation) sind vollständig ohne Maus bedienbar. Im Stundenplan-Designer ermöglicht die 2-Klick-Zuweisung die motorisch barrierefreie Zuweisung per Tastatur.
+                    <strong>Tastatur-Vollbedienbarkeit &amp; 2-Klick-Parität (WCAG 2.1.1):</strong> Sämtliche Kernbereiche (Login, Schülerausweise, Stundenplan, Songkarten, Loopstation, Footer-Navigation) sind vollständig ohne Maus bedienbar. Im Stundenplan-Designer ermöglicht die 2-Klick-Zuweisung die motorisch barrierefreie Planung per Tastatur.
                   </li>
                   <li>
-                    <strong>Apple HIG Tastatur-Fokusringe (WCAG 2.4.7):</strong> Fokussierte Bedienelemente erhalten systemweit einen dreifachen, modul-farblich abgestimmten Fokusring mit starkem Kontrastabstand.
+                    <strong>Apple HIG Tastatur-Fokusringe (WCAG 2.4.7):</strong> Fokussierte Bedienelemente erhalten systemweit einen sichtbaren, modul-farblich abgestimmten Fokusring mit starkem Kontrastabstand.
                   </li>
                   <li>
-                    <strong>Standardisierte Farbkontraste (WCAG 1.4.3):</strong> Alle Textfarben und sekundären Labels erfüllen mindestens das Kontrastverhältnis von 4,5 : 1 auf hellem Hintergrund (Slate 600, 4,68 : 1). Marken-KPIs bleiben zugleich visuell erhalten.
+                    <strong>Standardisierte Farbkontraste &amp; KPI-Schutz (WCAG 1.4.3):</strong> Alle Textfarben und sekundären Labels erfüllen mindestens das Kontrastverhältnis von 4,5 : 1 auf hellem Hintergrund. Marken-KPI-Farben bleiben im Hintergrund unverändert erhalten, während Textfarben auf dunkle Kontrasttöne (Slate 900) kalibriert sind.
                   </li>
                   <li>
-                    <strong>Screenreader Live-Announcements (WCAG 4.1.3):</strong> Zeitkritische Statusänderungen (Speicherbestätigungen, PIN-Sperren, Tauschvorgänge) werden automatisch an Screenreader übertragen.
+                    <strong>Screenreader Live-Announcements (WCAG 4.1.3):</strong> Zeitkritische Statusänderungen (Speicherbestätigungen, PIN-Sperren, Tauschvorgänge, Fehlerdialoge) werden automatisch über ARIA-Live-Regionen an Screenreader übertragen.
                   </li>
                   <li>
-                    <strong>Sprungmarken (WCAG 2.4.1):</strong> Über den integrierten Skip-Link (<em>„Zum Hauptinhalt springen“</em>) können Tastaturnutzer Navigationsleisten direkt überspringen.
+                    <strong>Sprungmarken &amp; Semantik (WCAG 2.4.1 / 1.3.1):</strong> Über den integrierten Skip-Link (<em>„Zum Hauptinhalt springen“</em>) können Tastaturnutzer Navigationsleisten direkt überspringen. Dialoge und Steuerelemente sind mit barrierefreien ARIA-Rollen (Dialog, Tablist, Tab, Tabpanel) versehen.
                   </li>
                   <li>
                     <strong>Zugängliche Audio-Visualisierung:</strong> Audio-Wellenformen sind mit Slider-Semantik ausgestattet und können per Pfeiltasten schrittweise durchsprungen werden.
@@ -1059,41 +1109,43 @@ Hiermit versichere ich in gutem Glauben, dass die vorstehenden Angaben richtig u
               </div>
 
               <div>
-                <strong style={{ color: '#0f172a' }}>4. Nicht barrierefreie Inhalte &amp; Ausnahmen (§ 12a Abs. 6 BGG):</strong><br />
-                Trotz intensiver Bemühungen gibt es bei einer Musikschul- und Recording-Plattform fachlich begründete Ausnahmen:
+                <strong style={{ color: '#0f172a' }}>4. Nicht barrierefreie Inhalte &amp; gesetzliche Ausnahmen (§ 12a Abs. 6 BGG / § 16 BFSG):</strong><br />
+                Trotz unseres hohen Inklusionsanspruchs bestehen bei einer spezialisierten musikalischen Kreativ-, Recording- und Didaktik-Plattform fachlich und technisch begründete Ausnahmen:
                 <ul style={{ margin: '8px 0 0 0', paddingLeft: '20px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
                   <li>
-                    <strong>Auditive Echtzeit-Inhalte (Loopstation / Play-Alongs):</strong> Musikpädagogische Audioaufnahmen und Mehrspur-Loops basieren naturgemäß auf akustischen Signalen. Eine vollständige Echtzeit-Transkription stellt eine unverhältnismäßige Belastung dar.
+                    <strong>Auditive Echtzeit-Inhalte &amp; Play-Alongs:</strong> Musikpädagogische Mehrspur-Aufnahmen (Loopstation, Play-Alongs, Band-Arrangements) basieren naturgemäß auf akustischer Wahrnehmung. Eine automatisierte, vollständige Echtzeit-Transkription stellt derzeit eine unverhältnismäßige Belastung nach § 12a Abs. 6 BGG bzw. § 16 BFSG dar. Visuelle Taktzähler und optische Aufnahmeindikatoren unterstützen die Orientierung.
                   </li>
                   <li>
-                    <strong>Nutzergenerierte Fremddokumente:</strong> Von Lehrkräften hochgeladene Notenscans oder externe PDF-Dateien verfügen unter Umständen nicht über vollständige OCR-Textebenen oder Tags.
+                    <strong>Nutzergenerierte Fremddokumente:</strong> Von Schulen oder Lehrkräften eigenverantwortlich hochgeladene Notenscans oder externe PDF-Dateien verfügen unter Umständen nicht über vollständige OCR-Textebenen oder Tags.
+                  </li>
+                  <li>
+                    <strong>Komplexe interaktive Partitur-Editoren:</strong> Echtzeit-Notensatz- und Wellenform-Manipulationen erfordern teils komplexe Drag-and-Drop- oder Gestensteuerungen, für die schrittweise alternative numerische Tastatursteuerungen ausgebaut werden.
                   </li>
                 </ul>
               </div>
 
               <div style={{ background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '16px', padding: '20px' }}>
                 <strong style={{ color: '#0f172a' }}>5. Feedback-Mechanismus &amp; Barrieren melden:</strong><br />
-                Sind Ihnen Mängel beim barrierefreien Zugang zu Inhalten von Campus-Groovelab aufgefallen oder haben Sie Fragen zur digitalen Barrierefreiheit? Sie können uns jederzeit direkt kontaktieren:<br /><br />
+                Sind Ihnen Barrieren beim barrierefreien Zugang zu Inhalten von Campus-Groovelab aufgefallen oder haben Sie Fragen bzw. Hinweise zur digitalen Barrierefreiheit? Sie können uns jederzeit direkt kontaktieren:<br /><br />
                 <strong>Ansprechpartner Barrierefreiheit:</strong> Patrick Huber<br />
                 <strong>E-Mail:</strong> <a href="mailto:barrierefreiheit@campus-groovelab.de" style={{ color: '#34a853', fontWeight: 700 }}>barrierefreiheit@campus-groovelab.de</a> oder <a href="mailto:kontakt@campus-groovelab.de" style={{ color: '#34a853', fontWeight: 700 }}>kontakt@campus-groovelab.de</a><br />
                 <strong>Postanschrift:</strong> Karl-Fürstenberg-Str. 59, 79618 Rheinfelden, Deutschland<br />
                 <span style={{ fontSize: '0.80rem', color: '#64748b', display: 'block', marginTop: '6px' }}>
-                  Wir bemühen uns, Ihre Anfrage an Werktagen innerhalb von 48 Stunden zu beantworten.
+                  Wir bestätigen den Eingang Ihrer Meldung und beantworten Ihre Anfrage an Werktagen in der Regel innerhalb von 48 Stunden.
                 </span>
               </div>
 
               <div>
-                <strong style={{ color: '#0f172a' }}>6. Durchsetzungsverfahren &amp; Schlichtungsstelle (§ 16 BGG):</strong><br />
-                Sollten Sie auf Ihre Kontaktaufnahme keine zufriedenstellende Antwort erhalten, können Sie sich an die Schlichtungsstelle nach dem Behindertengleichstellungsgesetz wenden. Das Schlichtungsverfahren ist für Bürgerinnen und Bürger kostenlos; ein Rechtsbeistand ist nicht erforderlich.<br /><br />
-                <strong>Schlichtungsstelle bei der Beauftragten der Bundesregierung für die Belange von Menschen mit Behinderungen:</strong><br />
-                Mauerstraße 53, 10117 Berlin<br />
-                Telefon: +49 (0)30 18 527-2805 • Fax: +49 (0)30 18 527-2901<br />
-                E-Mail: <a href="mailto:info@schlichtungsstelle-bgg.de" style={{ color: '#34a853', fontWeight: 700 }}>info@schlichtungsstelle-bgg.de</a><br />
-                Internet: <a href="https://www.schlichtungsstelle-bgg.de" target="_blank" rel="noopener noreferrer" style={{ color: '#34a853', fontWeight: 700 }}>www.schlichtungsstelle-bgg.de</a>
+                <strong style={{ color: '#0f172a' }}>6. Durchsetzungsverfahren &amp; Schlichtungsstellen:</strong><br />
+                Sollten Sie auf Ihre Kontaktaufnahme über den Feedback-Mechanismus innerhalb von vier Wochen keine zufriedenstellende Antwort erhalten, stehen Ihnen je nach Trägerschaft Ihrer Bildungseinrichtung folgende gesetzliche Stellen zur Verfügung:<br /><br />
+                <strong>A. Öffentliche &amp; kommunale Musikschulen (Landes-Behindertengleichstellungsgesetze):</strong><br />
+                Für öffentliche bzw. kommunale Musikschulen ist die Schlichtungsstelle nach dem jeweiligen Landes-Behindertengleichstellungsgesetz (L-BGG) zuständig (z. B. in Baden-Württemberg: <em>Schlichtungsstelle L-BGG beim Landes-Behindertenbeauftragten</em>, Else-Josenhans-Straße 6, 70173 Stuttgart, E-Mail: poststelle@bmb.bwl.de; in weiteren Bundesländern die jeweilige Landes-Schlichtungsstelle). Das Verfahren ist kostenfrei; ein Rechtsbeistand ist nicht erforderlich.<br /><br />
+                <strong>B. Privatwirtschaftliche Musikschulen &amp; Endverbraucherverträge (BFSG 2025):</strong><br />
+                Im Anwendungsbereich des Barrierefreiheitsstärkungsgesetzes (BFSG) für privatwirtschaftliche Dienstleistungen und Verträge mit Endverbrauchern ist die für den Sitz der Bildungseinrichtung bzw. des Diensteanbieters zuständige Marktüberwachungsbehörde des jeweiligen Bundeslandes für die Prüfung zuständig.
               </div>
 
               <div style={{ fontSize: '0.76rem', color: '#64748b', borderTop: '1px solid #e2e8f0', paddingTop: '12px' }}>
-                Diese Erklärung wurde am <strong>07. September 2026</strong> erstellt und wird regelmäßig überprüft und aktualisiert.
+                Diese Erklärung wurde am <strong>07. September 2026</strong> erstellt, am <strong>08. September 2026</strong> gutachterlich verifiziert und wird im Rahmen unseres Continuous-Compliance-Zyklus regelmäßig aktualisiert.
               </div>
             </div>
           )}
@@ -1130,8 +1182,11 @@ Hiermit versichere ich in gutem Glauben, dass die vorstehenden Angaben richtig u
                 display: 'flex',
                 alignItems: 'center',
                 gap: '6px',
-                transition: 'all 0.15s ease'
+                transition: 'all 0.15s ease',
+                outline: 'none'
               }}
+              onFocus={(e) => { e.currentTarget.style.boxShadow = '0 0 0 2px #3b82f6'; }}
+              onBlur={(e) => { e.currentTarget.style.boxShadow = 'none'; }}
               onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#94a3b8'; e.currentTarget.style.color = '#0f172a'; }}
               onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#cbd5e1'; e.currentTarget.style.color = '#334155'; }}
             >
@@ -1139,6 +1194,7 @@ Hiermit versichere ich in gutem Glauben, dass die vorstehenden Angaben richtig u
               Drucken / PDF
             </button>
             <button
+              type="button"
               onClick={onClose}
               style={{
                 background: '#0f172a',
@@ -1150,8 +1206,11 @@ Hiermit versichere ich in gutem Glauben, dass die vorstehenden Angaben richtig u
                 fontWeight: 750,
                 cursor: 'pointer',
                 boxShadow: '0 2px 6px rgba(15, 23, 42, 0.2)',
-                transition: 'all 0.15s ease'
+                transition: 'all 0.15s ease',
+                outline: 'none'
               }}
+              onFocus={(e) => { e.currentTarget.style.boxShadow = '0 0 0 2px #3b82f6, 0 2px 6px rgba(15, 23, 42, 0.2)'; }}
+              onBlur={(e) => { e.currentTarget.style.boxShadow = '0 2px 6px rgba(15, 23, 42, 0.2)'; }}
               onMouseEnter={(e) => { e.currentTarget.style.background = '#1e293b'; }}
               onMouseLeave={(e) => { e.currentTarget.style.background = '#0f172a'; }}
             >

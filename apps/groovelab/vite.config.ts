@@ -117,9 +117,6 @@ export default defineConfig({
           if (id.includes('SecretaryDashboard')) {
             return 'secretary-suite';
           }
-          if (id.includes('CampusTeacherDashboard')) {
-            return 'teacher-campus-suite';
-          }
           if (id.includes('components/teacher/')) {
             return 'teacher-subviews';
           }

@@ -305,10 +305,23 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     return localStorage.getItem('campus_music_stand_mode') === 'true';
   });
 
+  useEffect(() => {
+    const handleSync = () => {
+      setIsMusicStandMode(localStorage.getItem('campus_music_stand_mode') === 'true');
+    };
+    window.addEventListener('campus_music_stand_mode_changed', handleSync);
+    window.addEventListener('storage', handleSync);
+    return () => {
+      window.removeEventListener('campus_music_stand_mode_changed', handleSync);
+      window.removeEventListener('storage', handleSync);
+    };
+  }, []);
+
   const toggleMusicStandMode = () => {
     setIsMusicStandMode(prev => {
       const next = !prev;
       localStorage.setItem('campus_music_stand_mode', String(next));
+      window.dispatchEvent(new Event('campus_music_stand_mode_changed'));
       return next;
     });
   };
@@ -566,8 +579,8 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
   const isStandalone = typeof window !== 'undefined' && ((window.navigator as any).standalone === true || window.matchMedia('(display-mode: standalone)').matches);
 
   const [studentSchedules, setStudentSchedules] = useState<any[]>([]);
-  const [settingsSubTab, setSettingsSubTab] = useState<'notifications' | 'parent_controls' | 'security' | 'modules' | 'billing' | 'legal' | 'overview'>('parent_controls');
-  const [activeStudentSettingsModal, setActiveStudentSettingsModal] = useState<'notifications' | 'parent_controls' | 'security' | 'modules' | 'billing' | 'legal' | null>(null);
+  const [settingsSubTab, setSettingsSubTab] = useState<'notifications' | 'parent_controls' | 'screentime' | 'practice_report' | 'cancellations' | 'family_profiles' | 'security' | 'modules' | 'billing' | 'legal' | 'overview'>('parent_controls');
+  const [activeStudentSettingsModal, setActiveStudentSettingsModal] = useState<'notifications' | 'parent_controls' | 'screentime' | 'practice_report' | 'cancellations' | 'family_profiles' | 'security' | 'modules' | 'billing' | 'legal' | null>(null);
   const [showParentActivationModal, setShowParentActivationModal] = useState(false);
   const [showSoftLockModal, setShowSoftLockModal] = useState(false);
   const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false);
@@ -1699,10 +1712,10 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
   });
   const avatar = avatarFromDb || {
     avatar_style: 'standard',
-    instrument_type: studentUser?.instrument || 'Guitar',
+    instrument_type: studentUser?.resolved_instrument || studentUser?.instrument || 'Guitar',
     evolution_level: 1,
     xp: 0,
-    asset_path: getInstrumentAvatarUrl(studentUser?.instrument),
+    asset_path: getInstrumentAvatarUrl(studentUser?.resolved_instrument || studentUser?.instrument),
     streak_flame: 0
   };
 
@@ -4184,43 +4197,36 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     const germanVoices = voices.filter(v => v.lang && v.lang.toLowerCase().startsWith('de'));
     if (germanVoices.length === 0) return voices[0] || null;
 
-    // 1. Moderne Microsoft Edge / Azure Neural Voices
-    const msNatural = germanVoices.find(v => 
-      v.name.includes('Online (Natural)') || 
-      (v.name.includes('Natural') && (v.name.includes('Katja') || v.name.includes('Amira') || v.name.includes('Conrad') || v.name.includes('Killian')))
-    );
-    if (msNatural) return msNatural;
+    // 🚀 Latenz-Optimierung: Bevorzuge lokale Offline-Stimmen (0 ms Netzwerklatenz)
+    // Cloud-/Online-Stimmen (z.B. Edge 'Online (Natural)', Chrome 'Google Deutsch') senden Audiodaten
+    // über das Internet, was eine Startverzögerung von 1,5 bis 3 Sekunden verursacht.
+    const isNetworkVoice = (v: SpeechSynthesisVoice) =>
+      v.localService === false ||
+      v.name.toLowerCase().includes('online') ||
+      v.name.toLowerCase().includes('network');
 
-    // 2. Apple Siri & Enhanced/Premium Stimmen
-    const siriOrPremium = germanVoices.find(v => 
-      v.name.toLowerCase().includes('siri') || 
-      v.name.toLowerCase().includes('premium') || 
+    const localVoices = germanVoices.filter(v => !isNetworkVoice(v));
+    const pool = localVoices.length > 0 ? localVoices : germanVoices;
+
+    // 1. Lokale System-Favoriten (Apple Anna, Helena, Petra, Markus, Martin, Siri, Microsoft Katja, Stefan, etc.)
+    const preferredNames = ['anna', 'helena', 'petra', 'markus', 'martin', 'siri', 'katja', 'amira', 'marlene', 'vicki', 'stefan', 'hedda'];
+    for (const name of preferredNames) {
+      const match = pool.find(v => v.name.toLowerCase().includes(name));
+      if (match) return match;
+    }
+
+    // 2. Lokale erweiterte / enhanced Stimmen
+    const enhanced = pool.find(v => 
       v.name.toLowerCase().includes('enhanced') || 
+      v.name.toLowerCase().includes('premium') || 
       v.name.toLowerCase().includes('erweitert')
     );
-    if (siriOrPremium) return siriOrPremium;
+    if (enhanced) return enhanced;
 
-    // 3. Apple Anna / Helena / Martin
-    const annaVoice = germanVoices.find(v => v.name.toLowerCase().includes('anna'));
-    if (annaVoice) return annaVoice;
-    const helenaVoice = germanVoices.find(v => v.name.toLowerCase().includes('helena'));
-    if (helenaVoice) return helenaVoice;
-    const martinVoice = germanVoices.find(v => v.name.toLowerCase().includes('martin'));
-    if (martinVoice) return martinVoice;
+    // 3. Beliebige erste lokale Stimme aus dem Pool
+    if (pool.length > 0) return pool[0];
 
-    // 4. Google Neural / Android Stimmen
-    const googleVoice = germanVoices.find(v => v.name.includes('Google') || v.name.includes('deg-network'));
-    if (googleVoice) return googleVoice;
-
-    // 5. Beliebte Synthesizer (Katja, Marlene, Vicki, Hedda)
-    const friendlyVoice = germanVoices.find(v => 
-      v.name.toLowerCase().includes('katja') || 
-      v.name.toLowerCase().includes('amira') || 
-      v.name.toLowerCase().includes('marlene') || 
-      v.name.toLowerCase().includes('vicki')
-    );
-    if (friendlyVoice) return friendlyVoice;
-
+    // 4. Letzter Fallback auf Cloud-/Online-Stimmen
     return germanVoices[0] || null;
   }, [ttsAvailableVoices]);
 
@@ -4229,6 +4235,10 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     stopNeuralSpeech();
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       window.speechSynthesis.cancel();
+      // 🚀 Chromium/WebKit Queue-Unfreeze: Sofort resume() aufrufen, um das 3-5s Einfrieren der Queue zu verhindern
+      try {
+        window.speechSynthesis.resume();
+      } catch {}
     }
     setIsTtsSpeaking(false);
     setActiveTtsKey(null);
@@ -4241,6 +4251,9 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       stopNeuralSpeech();
       if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
         window.speechSynthesis.cancel();
+        try {
+          window.speechSynthesis.resume();
+        } catch {}
       }
     };
   }, []);
@@ -4266,12 +4279,25 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       ? textOrPhrases.map(p => cleanTextForTts(p)).join(' ')
       : cleanTextForTts(textOrPhrases);
 
-    const phrases = normalizedInput
+    const rawPhrases = normalizedInput
       .split(/(?<=[.!?])\s+/)
       .map(p => p.trim())
       .filter(p => p.length > 0);
 
-    if (phrases.length === 0) return;
+    if (rawPhrases.length === 0) return;
+
+    // 🔗 Greeting-Fusion: Verschmelze kurze Eröffnungsphrasen (< 30 Zeichen, z.B. "Hallo!", "Super gemacht!"),
+    // damit die Begrüßung flüssig ohne störende Sprechpause in den ersten Satz übergeht.
+    const phrases: string[] = [];
+    for (let i = 0; i < rawPhrases.length; i++) {
+      const p = rawPhrases[i];
+      if (phrases.length === 0 && p.length < 30 && i < rawPhrases.length - 1) {
+        phrases.push(`${p} ${rawPhrases[i + 1]}`);
+        i++;
+      } else {
+        phrases.push(p);
+      }
+    }
 
     const currentSessionId = ++ttsSessionIdRef.current;
     setIsTtsSpeaking(true);
@@ -4286,41 +4312,58 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
 
     const bestVoice = selectBestGermanVoice();
 
-    // 🎵 Fröhlicher Intro-Chime
+    // 🎵 Fröhlicher Intro-Chime (startet parallel im Hintergrund – blockiert nicht die Sprach-Initialisierung)
     playMotivationalTtsIntroChime('cheerful');
-    await new Promise((r) => setTimeout(r, 220));
 
-    for (let i = 0; i < phrases.length; i++) {
-      if (ttsSessionIdRef.current !== currentSessionId) break;
-
-      const phrase = phrases[i];
-      await new Promise<void>((resolve) => {
-        const utterance = new SpeechSynthesisUtterance(phrase);
-        utterance.lang = 'de-DE';
-        utterance.pitch = 1.04; // 🌟 Fröhliche, sympathisch modulierte Tonhöhe
-        utterance.rate = 0.88;  // 🌟 Kindgerechte, verständliche Vorlesegeschwindigkeit
-        utterance.volume = 0.72; // 🔉 Klare, angenehme Zimmerlautstärke
-
-        if (bestVoice) utterance.voice = bestVoice;
-        utterance.onend = () => resolve();
-        utterance.onerror = (e) => {
-          console.warn('[TTS] Phrase speech error:', e);
-          resolve();
-        };
-        window.speechSynthesis.speak(utterance);
-      });
-
-      if (ttsSessionIdRef.current !== currentSessionId) break;
-
-      if (i < phrases.length - 1) {
-        await new Promise((r) => setTimeout(r, 280));
+    // 💓 Heartbeat-Schutz gegen Chromium 15-Sekunden-Pause-Bug
+    const heartbeatInterval = setInterval(() => {
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        if (window.speechSynthesis.speaking && window.speechSynthesis.paused) {
+          window.speechSynthesis.resume();
+        }
       }
-    }
+    }, 3000);
 
-    if (ttsSessionIdRef.current === currentSessionId) {
-      setIsTtsSpeaking(false);
-      setActiveTtsKey(null);
-      setTtsStatusText(null);
+    try {
+      for (let i = 0; i < phrases.length; i++) {
+        if (ttsSessionIdRef.current !== currentSessionId) break;
+
+        const phrase = phrases[i];
+        await new Promise<void>((resolve) => {
+          const utterance = new SpeechSynthesisUtterance(phrase);
+          utterance.lang = 'de-DE';
+          utterance.pitch = 1.04; // 🌟 Fröhliche, sympathisch modulierte Tonhöhe
+          utterance.rate = 0.88;  // 🌟 Kindgerechte, verständliche Vorlesegeschwindigkeit
+          utterance.volume = 0.72; // 🔉 Klare, angenehme Zimmerlautstärke
+
+          if (bestVoice) utterance.voice = bestVoice;
+          utterance.onend = () => resolve();
+          utterance.onerror = (e) => {
+            console.warn('[TTS] Phrase speech error:', e);
+            resolve();
+          };
+
+          // Vor jedem Absenden Warteschlange entsperren
+          if (window.speechSynthesis.paused) {
+            window.speechSynthesis.resume();
+          }
+
+          window.speechSynthesis.speak(utterance);
+        });
+
+        if (ttsSessionIdRef.current !== currentSessionId) break;
+
+        if (i < phrases.length - 1) {
+          await new Promise((r) => setTimeout(r, 100));
+        }
+      }
+    } finally {
+      clearInterval(heartbeatInterval);
+      if (ttsSessionIdRef.current === currentSessionId) {
+        setIsTtsSpeaking(false);
+        setActiveTtsKey(null);
+        setTtsStatusText(null);
+      }
     }
   }, [isTtsSpeaking, activeTtsKey, handleStopSpeaking, selectBestGermanVoice, playMotivationalTtsIntroChime]);
 
@@ -6033,6 +6076,8 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
   const [rankingError, setRankingError] = useState<string | null>(null);
   const [monthlyFocusMinutes, setMonthlyFocusMinutes] = useState(0);
   const [totalFocusMinutes, setTotalFocusMinutes] = useState(0);
+  const [schoolYearFocusMinutes, setSchoolYearFocusMinutes] = useState(0);
+  const [engineWeekFocusMinutes, setEngineWeekFocusMinutes] = useState(0);
   const [classHighlights, setClassHighlights] = useState<any[]>([]);
   const [highlightsLoading, setHighlightsLoading] = useState(false);
   const [myWeeklyFocus, setMyWeeklyFocus] = useState(0);
@@ -7613,9 +7658,9 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       setAvatar((prev: any) => ({
         ...(prev || {
           avatar_style: 'standard',
-          instrument_type: studentUser?.instrument || 'Guitar',
+          instrument_type: studentUser?.resolved_instrument || studentUser?.instrument || 'Guitar',
           evolution_level: 1,
-          asset_path: getInstrumentAvatarUrl(studentUser?.instrument),
+          asset_path: getInstrumentAvatarUrl(studentUser?.resolved_instrument || studentUser?.instrument),
           id: `local-avatar-${studentId}`,
           user_id: studentId
         }),
@@ -8819,9 +8864,11 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       xp: avatar?.xp || 0,
       streakDays: avatar?.streak_flame || 0,
       masteredSongsCount: songStats?.masteredCount || 0,
-      progressItems: progressItems || []
+      progressItems: progressItems || [],
+      studentCreatedAt: studentUser?.created_at,
+      activatedAt: studentUser?.activated_at
     });
-  }, [effectivePracticeMinutes, avatar?.xp, avatar?.streak_flame, songStats?.masteredCount, progressItems]);
+  }, [effectivePracticeMinutes, avatar?.xp, avatar?.streak_flame, songStats?.masteredCount, progressItems, studentUser?.created_at, studentUser?.activated_at]);
 
   // Check and trigger sticker award celebration in Level 1 (Junior) Briefing Board
   useEffect(() => {
@@ -8891,7 +8938,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     ctx.fillStyle = glowGrad;
     ctx.fillRect(0, 0, 1200, 1200);
 
-    // 3. Draw rounded 3D Panini Collector Card Container
+    // 3. Draw rounded 3D Collector Card Container
     ctx.save();
     ctx.fillStyle = '#1e293b';
     ctx.beginPath();
@@ -9721,10 +9768,10 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
 
       let effectiveAvatar = avatarRecord ? { ...avatarRecord } : {
         avatar_style: 'standard',
-        instrument_type: user.instrument || 'Guitar',
+        instrument_type: user.resolved_instrument || user.instrument || 'Guitar',
         evolution_level: 1,
         xp: metrics.totalXp,
-        asset_path: getInstrumentAvatarUrl(user.instrument),
+        asset_path: getInstrumentAvatarUrl(user.resolved_instrument || user.instrument),
         streak_flame: metrics.streakFlame,
         id: `local-avatar-${studentId}`,
         user_id: studentId
@@ -9742,6 +9789,8 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
 
       setMonthlyFocusMinutes(metrics.totalFocusMinutes);
       setTotalFocusMinutes(metrics.totalFocusMinutes);
+      setSchoolYearFocusMinutes(metrics.schoolYearFocusMinutes);
+      setEngineWeekFocusMinutes(metrics.weekFocusMinutes);
 
       const localAnchor = (typeof window !== 'undefined' && studentId)
         ? (localStorage.getItem(`cg_practice_anchor_${studentId}`) || localStorage.getItem(`practice_anchor_${studentId}`) || null)
@@ -11264,80 +11313,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
         } : {})
       }}
     >
-      
-      {/* 🎼 Notenständer- & Typografie-Kontrollleiste */}
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        gap: '12px',
-        marginBottom: '16px',
-        flexWrap: 'wrap'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <button
-            type="button"
-            onClick={() => setShowLevelModal(true)}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              background: '#ffffff',
-              border: '1.5px solid #e2e8f0',
-              borderRadius: '100px',
-              padding: isMusicStandMode ? '8px 16px' : '6px 14px',
-              fontSize: isMusicStandMode ? '0.92rem' : '0.82rem',
-              fontWeight: 850,
-              color: '#1e293b',
-              cursor: 'pointer',
-              boxShadow: '0 2px 6px rgba(0,0,0,0.03)',
-              transition: 'all 0.2s ease'
-            }}
-            className="hover-scale"
-          >
-            <span>{studentUiLevel === 'junior' ? '🌟 Junior-Star (7–10 J.)' : (studentUiLevel === 'teen' ? '⚡ Teen-Flow (11–15 J.)' : '🎓 Pro-Studio (16+ J.)')}</span>
-            <ChevronRight size={14} color="#64748b" />
-          </button>
-        </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <button
-            type="button"
-            onClick={toggleMusicStandMode}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '8px',
-              background: isMusicStandMode ? '#ecfdf5' : '#ffffff',
-              border: isMusicStandMode ? '1.5px solid #34a853' : '1.5px solid #e2e8f0',
-              borderRadius: '100px',
-              padding: isMusicStandMode ? '8px 18px' : '6px 14px',
-              fontSize: isMusicStandMode ? '0.92rem' : '0.82rem',
-              fontWeight: 900,
-              color: isMusicStandMode ? '#15803d' : '#475569',
-              cursor: 'pointer',
-              boxShadow: isMusicStandMode ? '0 4px 14px rgba(52, 168, 83, 0.2)' : '0 2px 6px rgba(0,0,0,0.03)',
-              transition: 'all 0.2s ease'
-            }}
-            className="hover-scale"
-            title="Großschrift für Notenständer & Distanz am Instrument (60–90 cm)"
-          >
-            <span>🎼</span>
-            <span>Notenständer-Modus</span>
-            <span style={{
-              background: isMusicStandMode ? '#34a853' : '#f1f5f9',
-              color: isMusicStandMode ? '#ffffff' : '#64748b',
-              fontSize: '0.70rem',
-              fontWeight: 950,
-              padding: '2px 8px',
-              borderRadius: '100px',
-              letterSpacing: '0.02em'
-            }}>
-              {isMusicStandMode ? 'AKTIV (+25%)' : 'AUS'}
-            </span>
-          </button>
-        </div>
-      </div>
 
       {/* ⏱️ Floating Übungs-Pufferzeit Countdown Widget (5 Min. Toleranz bei aktiver Übung) */}
       {activePracticeGrace && (
@@ -11753,6 +11729,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
         isSongMastered={isSongMastered}
         localProgress={localProgress}
         activeSongSkills={activeSongSkills}
+        isMusicStandMode={isMusicStandMode}
       />
 
       <StudentCampusCupTab
@@ -11806,10 +11783,13 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                   school_id: studentUser?.school_id,
                   schoolId: studentUser?.school_id,
                   schools: studentUser?.schools,
-                  school_name: (Array.isArray(studentUser?.schools) ? studentUser?.schools[0]?.name : studentUser?.schools?.name) || studentUser?.school_name,
+                  school_name: resolvedSchoolName || (Array.isArray(studentUser?.schools) ? studentUser?.schools[0]?.name : studentUser?.schools?.name) || studentUser?.school_name,
                   instrument: studentUser?.instrument,
-                  teacher_id: studentUser?.teacher_id
+                  teacher_id: studentUser?.teacher_id,
+                  created_at: studentUser?.created_at,
+                  activated_at: studentUser?.activated_at
                 }}
+                schoolName={resolvedSchoolName}
                 onClose={() => handleTabChangeLocal('briefing')}
                 teacherId={studentUser ? studentUser.teacher_id : null}
                 readOnly={!isTeacherSession}
@@ -12136,6 +12116,8 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
         studentUiLevel={studentUiLevel}
         studentUser={studentUser}
         totalPracticeMinutes={totalPracticeMinutes}
+        weeklyPracticeMinutes={myWeeklyFocus || engineWeekFocusMinutes || 0}
+        schoolYearPracticeMinutes={schoolYearFocusMinutes || totalPracticeMinutes}
       />
       {/* Feedback & Ideenschmiede Modal */}
       {isFeedbackModalOpen && (
@@ -12413,6 +12395,10 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
             userRole="student"
             activePlatform={currentPlatform}
             schoolName={resolvedSchoolName || 'Meine Musikschule'}
+            initialBoardId={activeTab || 'briefing'}
+            onNavigateBoard={(target) => {
+              if (target) setActiveTab(target);
+            }}
           />
         </Suspense>
       )}

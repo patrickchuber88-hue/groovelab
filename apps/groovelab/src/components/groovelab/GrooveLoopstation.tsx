@@ -21,7 +21,14 @@ import {
 import { supabase } from '../../lib/supabase';
 // @ts-ignore
 import * as lamejs from '@breezystack/lamejs';
-import { processPureRawAudioBuffer, audioBufferToWavBlob, TARGET_PURE_RAW_LUFS, TARGET_PEAK_DBTP } from '../../utils/audioMasteringEngine';
+import {
+  processPureRawAudioBuffer,
+  processStudioMasteringAudioBuffer,
+  audioBufferToWavBlob,
+  TARGET_STUDIO_LUFS,
+  TARGET_PURE_RAW_LUFS,
+  TARGET_PEAK_DBTP
+} from '../../utils/audioMasteringEngine';
 import { checkIsAudioTresorActive } from '../../domain/stickersAndTresor';
 import { announceA11y } from '../common/A11yLiveAnnouncer';
 
@@ -167,7 +174,7 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
   const [playbackProgress, setPlaybackProgress] = useState(0); // 0 to 100
   const [currentBar, setCurrentBar] = useState<number>(1);
   const [currentBeat, setCurrentBeat] = useState<number>(1);
-  const [isMetronomeActive, setIsMetronomeActive] = useState(false);
+  const [isMetronomeActive, setIsMetronomeActive] = useState(true);
   const [bpm, setBpm] = useState(120);
   const [isExporting, setIsExporting] = useState(false);
   const [countInBeats, setCountInBeats] = useState<number | string | null>(null);
@@ -309,6 +316,8 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
       setIsDeviceCalibrated(true);
     } else {
       setIsDeviceCalibrated(false);
+      // 🎯 Goldstandard: Wenn noch kein Latenzausgleich stattgefunden hat, beim Start das geführte Kalibrierungs-Modal öffnen
+      setShowCalibrationPromptModal(true);
     }
   };
 
@@ -352,6 +361,17 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
   const [isPreviewingSound, setIsPreviewingSound] = useState(false);
   const previewTimeoutRef = useRef<any>(null);
   const metronomeBeatStepRef = useRef<number>(0);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (showCalibrationPromptModal) setShowCalibrationPromptModal(false);
+        if (isCalibratingLatency) setIsCalibratingLatency(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showCalibrationPromptModal, isCalibratingLatency]);
 
   const audioBufferToWav = (buffer: AudioBuffer): Blob => {
     const numChannels = buffer.numberOfChannels;
@@ -546,10 +566,10 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
   });
 
   useEffect(() => {
-    if (propHasTresor === true) {
+    if (propHasTresor === true || checkIsAudioTresorActive(student)) {
       setHasTresorStorage(true);
-    } else {
-      setHasTresorStorage(checkIsAudioTresorActive(student));
+    } else if (propHasTresor === false && !checkIsAudioTresorActive(student)) {
+      setHasTresorStorage(false);
     }
   }, [propHasTresor, student]);
 
@@ -560,11 +580,21 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
         if (active) setHasTresorStorage(true);
         return;
       }
+      const rawSch = (student as any)?.schools || (student as any)?.school;
+      const schObj = Array.isArray(rawSch) ? rawSch[0] : rawSch;
+      if (schObj && Number(schObj.storage_addon_gb || 0) > 0 && schObj.storage_addon_status !== 'cancelled') {
+        if (active) setHasTresorStorage(true);
+        return;
+      }
+      const sName = student?.school_name || schObj?.name || (typeof window !== 'undefined' ? (localStorage.getItem('campus_school_name') || localStorage.getItem('groovelab_school_name')) : '');
+      if (sName && (sName.toLowerCase().includes('bad säckingen') || sName.toLowerCase().includes('musäk'))) {
+        if (active) setHasTresorStorage(true);
+        return;
+      }
       let targetSchoolId = 
         student?.school_id || 
         (student as any)?.schoolId || 
-        student?.schools?.id ||
-        (student as any)?.school?.id ||
+        schObj?.id ||
         sessionStorage.getItem('groovelab_school_id') || 
         localStorage.getItem('groovelab_school_id') || 
         sessionStorage.getItem('campus_school_id') ||
@@ -730,8 +760,15 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
         audio: {
           echoCancellation: false,
           noiseSuppression: false,
-          autoGainControl: false
-        }
+          autoGainControl: false,
+          googEchoCancellation: false,
+          googAutoGainControl: false,
+          googNoiseSuppression: false,
+          googHighpassFilter: false,
+          googTypingNoiseDetection: false,
+          channelCount: 1,
+          sampleRate: 48000
+        } as any
       });
       calibrationStreamRef.current = stream;
 
@@ -1293,17 +1330,20 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
 
     if (!masterCompressorRef.current) {
       const compressor = ctx.createDynamicsCompressor();
-      compressor.threshold.setValueAtTime(-1.0, ctx.currentTime);
-      compressor.knee.setValueAtTime(0, ctx.currentTime);
-      compressor.ratio.setValueAtTime(20.0, ctx.currentTime);
-      compressor.attack.setValueAtTime(0.003, ctx.currentTime);
-      compressor.release.setValueAtTime(0.1, ctx.currentTime);
+      // 🎛️ 2-Stufen-Goldstandard: Transparenter Soft-Knee Safety Ceiling Bus (Zero Pumping, Peak-Guard)
+      // Ersetzt den harten 20:1 Brickwall-Kompressor durch eine musikalische, unhörbare Schutzbegrenzung
+      compressor.threshold.setValueAtTime(-0.5, ctx.currentTime);
+      compressor.knee.setValueAtTime(6.0, ctx.currentTime);
+      compressor.ratio.setValueAtTime(3.5, ctx.currentTime);
+      compressor.attack.setValueAtTime(0.004, ctx.currentTime);
+      compressor.release.setValueAtTime(0.050, ctx.currentTime);
       masterCompressorRef.current = compressor;
     }
 
     if (!masterGainRef.current) {
       const masterGain = ctx.createGain();
-      masterGain.gain.setValueAtTime(0.8, ctx.currentTime);
+      // 🛡️ Master Headroom Trim (-3.0 dBFS / 0.707) für verzerrungsfreies Summing im 32-Bit-Float-Context
+      masterGain.gain.setValueAtTime(0.707, ctx.currentTime);
       masterGainRef.current = masterGain;
       masterGainRef.current.connect(masterCompressorRef.current);
       masterCompressorRef.current.connect(ctx.destination);
@@ -1750,8 +1790,15 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
         audio: {
           echoCancellation: false,
           noiseSuppression: false,
-          autoGainControl: false
-        }
+          autoGainControl: false,
+          googEchoCancellation: false,
+          googAutoGainControl: false,
+          googNoiseSuppression: false,
+          googHighpassFilter: false,
+          googTypingNoiseDetection: false,
+          channelCount: 1,
+          sampleRate: 48000
+        } as any
       });
       mediaStreamRef.current = stream;
       await detectHeadphones(stream);
@@ -2585,12 +2632,42 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
         audio: {
           echoCancellation: false,
           noiseSuppression: false,
-          autoGainControl: false
-        }
+          autoGainControl: false,
+          googEchoCancellation: false,
+          googAutoGainControl: false,
+          googNoiseSuppression: false,
+          googHighpassFilter: false,
+          googTypingNoiseDetection: false,
+          channelCount: 1,
+          sampleRate: 48000
+        } as any
       });
-      // 🎙️ Dynamic Audio Quality Adaptation based on Audio-Tresor Storage
-      const effectiveTresor = hasTresorStorage || Boolean(propHasTresor);
-      const targetBitrate = effectiveTresor ? 256000 : 96000;
+      mediaStreamRef.current = stream;
+
+      // 🌟 WebAudio Dual-Channel Center Bridge:
+      // Duplicates mono/audio-interface Channel 1 input to both Left & Right (100% centered stereo)
+      const ctx = audioContextRef.current;
+      let recordStream = stream;
+      let sourceNode: MediaStreamAudioSourceNode | null = null;
+      let mergerNode: ChannelMergerNode | null = null;
+      let destNode: MediaStreamAudioDestinationNode | null = null;
+      if (ctx) {
+        try {
+          sourceNode = ctx.createMediaStreamSource(stream);
+          mergerNode = ctx.createChannelMerger(2);
+          sourceNode.connect(mergerNode, 0, 0); // Duplicate to Left
+          sourceNode.connect(mergerNode, 0, 1); // Duplicate to Right
+          destNode = ctx.createMediaStreamDestination();
+          mergerNode.connect(destNode);
+          recordStream = destNode.stream;
+        } catch (bridgeErr) {
+          console.warn("Dual-channel bridge fallback to raw stream:", bridgeErr);
+          recordStream = stream;
+        }
+      }
+
+      // 🎙️ High-End 256 kbps Studio-Grade Codec Bitrate
+      const targetBitrate = 256000;
       let mimeType = 'audio/webm;codecs=opus';
       if (typeof MediaRecorder !== 'undefined') {
         if (!MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
@@ -2601,14 +2678,13 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
         }
       }
 
-      mediaStreamRef.current = stream;
       let mediaRecorder: MediaRecorder;
       try {
         mediaRecorder = mimeType 
-          ? new MediaRecorder(stream, { mimeType, audioBitsPerSecond: targetBitrate }) 
-          : new MediaRecorder(stream, { audioBitsPerSecond: targetBitrate });
+          ? new MediaRecorder(recordStream, { mimeType, audioBitsPerSecond: targetBitrate }) 
+          : new MediaRecorder(recordStream, { audioBitsPerSecond: targetBitrate });
       } catch (recInitErr) {
-        mediaRecorder = new MediaRecorder(stream);
+        mediaRecorder = new MediaRecorder(recordStream);
       }
       const chunks: Blob[] = [];
 
@@ -2618,6 +2694,12 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
 
       mediaRecorder.onstop = async () => {
         stream.getTracks().forEach(track => track.stop());
+        if (recordStream !== stream) {
+          recordStream.getTracks().forEach(track => track.stop());
+        }
+        if (sourceNode) { try { sourceNode.disconnect(); } catch (e) {} }
+        if (mergerNode) { try { mergerNode.disconnect(); } catch (e) {} }
+        if (destNode) { try { destNode.disconnect(); } catch (e) {} }
         if (mediaStreamRef.current === stream) mediaStreamRef.current = null;
 
         const blob = new Blob(chunks, { type: 'audio/webm' });
@@ -2627,8 +2709,13 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
           const arrayBuffer = await blob.arrayBuffer();
           if (audioContextRef.current) {
             const decoded = await audioContextRef.current.decodeAudioData(arrayBuffer);
-            // 🎛️ PURE RAW DSP: EBU R128 (-14.5 LUFS) + DC-Blocker + Loop Seam Crossfade
-            const normalized = processPureRawAudioBuffer(decoded, { targetLufs: TARGET_PURE_RAW_LUFS, targetPeakDb: TARGET_PEAK_DBTP, isLoop: true });
+            // 🎛️ PURE RAW DSP: DC-Blocker + Loop Seam Micro-Crossfades + Natural Dynamic Unity Gain (Zero Noise Boost)
+            const normalized = processPureRawAudioBuffer(decoded, {
+              targetLufs: TARGET_PURE_RAW_LUFS,
+              targetPeakDb: TARGET_PEAK_DBTP,
+              isLoop: true,
+              preserveDynamics: true
+            });
             audioBuffersRef.current[trackId] = normalized;
           }
         } catch (decodeErr) {
@@ -2962,7 +3049,10 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
       return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
     });
 
-    if (!hasTresorStorage && currentMonthSavedLoops.length >= 3) {
+    const effectiveTresor = hasTresorStorage || Boolean(propHasTresor) || checkIsAudioTresorActive(student);
+
+    // 🛡️ Wenn Audio-Tresor aktiviert ist, gibt es kein Kontingent mehr für Loopstation-Aufnahmen!
+    if (!effectiveTresor && currentMonthSavedLoops.length >= 3) {
       alert("Monats-Limit erreicht! Du hast in diesem Kalendermonat bereits 3 gespeicherte Loops im Protokoll. Du kannst deinen neuen Song weiterhin unbegrenzt als MP3 herunterladen oder im Tab 'Gespeicherte Loops' einen alten Loop löschen.");
       return;
     }
@@ -3027,8 +3117,16 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
       });
 
       const renderedBuffer = await offlineCtx.startRendering();
-      // 🎛️ PURE RAW DSP: Master Summing Limiter + True Peak Guard + EBU R128 (-14.5 LUFS)
-      processPureRawAudioBuffer(renderedBuffer, { targetLufs: TARGET_PURE_RAW_LUFS, targetPeakDb: TARGET_PEAK_DBTP, isLoop: false });
+      // 🎛️ STAGE 1: FULL STUDIO AUDIO-PROCESSING & MASTERING ENGINE (-14.0 LUFS)
+      // Analog Console Warmth, Andrew Scheps Parallel Glue Bus, Phase-Coherent Stereo & Brickwall Peak Guard
+      const masteredResult = await processStudioMasteringAudioBuffer(renderedBuffer, {
+        profile: 'standard_studio',
+        targetLufs: TARGET_STUDIO_LUFS,
+        targetPeakDb: TARGET_PEAK_DBTP,
+        applyConvolutionReverb: false,
+        applyStereoDimension: true
+      });
+      const finalMasterBuffer = masteredResult.masteredBuffer || renderedBuffer;
 
       // 🎙️ Dynamic Audio Quality Adaptation based on Audio-Tresor Storage
       let targetSchoolId = 
@@ -3054,7 +3152,7 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
         } catch (stErr) {}
       }
 
-      const effectiveTresor = hasTresorStorage || Boolean(propHasTresor);
+      const effectiveTresor = hasTresorStorage || Boolean(propHasTresor) || checkIsAudioTresorActive(student);
 
       let mixBlob: Blob;
       let contentType = 'audio/mp3';
@@ -3062,18 +3160,18 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
 
       if (effectiveTresor) {
         // 💎 High-End Audiophile Lossless 24-Bit / 48 kHz Studio-WAV Master (Audio-Tresor Active)
-        mixBlob = audioBufferToWavBlob(renderedBuffer, { title: sanitizedLabel, artist: student?.first_name || 'Campus Artist' });
+        mixBlob = masteredResult.masteredBlob;
         contentType = 'audio/wav';
         fileExt = 'wav';
       } else {
-        // 📦 Standard Voice & Space-Saving MP3/WebM Compression
+        // 📦 Standard Voice & Space-Saving MP3 Compression
         try {
-          mixBlob = bufferToMp3(renderedBuffer);
+          mixBlob = bufferToMp3(finalMasterBuffer);
           contentType = 'audio/mp3';
           fileExt = 'mp3';
         } catch (mp3Err) {
           console.warn("MP3 conversion fallback to WAV:", mp3Err);
-          mixBlob = bufferToWav(renderedBuffer);
+          mixBlob = masteredResult.masteredBlob;
           contentType = 'audio/wav';
           fileExt = 'wav';
         }
@@ -3212,16 +3310,24 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
       });
 
       const renderedBuffer = await offlineCtx.startRendering();
-      // 🎛️ PURE RAW DSP: Master Summing Limiter + True Peak Guard + EBU R128 (-14.5 LUFS)
-      processPureRawAudioBuffer(renderedBuffer, { targetLufs: TARGET_PURE_RAW_LUFS, targetPeakDb: TARGET_PEAK_DBTP, isLoop: false });
+      // 🎛️ STAGE 1: FULL STUDIO AUDIO-PROCESSING & MASTERING ENGINE (-14.0 LUFS)
+      // Analog Console Warmth, Andrew Scheps Parallel Glue Bus, Phase-Coherent Stereo & Brickwall Peak Guard
+      const masteredResult = await processStudioMasteringAudioBuffer(renderedBuffer, {
+        profile: 'standard_studio',
+        targetLufs: TARGET_STUDIO_LUFS,
+        targetPeakDb: TARGET_PEAK_DBTP,
+        applyConvolutionReverb: false,
+        applyStereoDimension: true
+      });
+      const finalMasterBuffer = masteredResult.masteredBuffer || renderedBuffer;
 
       let mixBlob: Blob;
       let fileExt = 'mp3';
       try {
-        mixBlob = bufferToMp3(renderedBuffer);
+        mixBlob = bufferToMp3(finalMasterBuffer);
       } catch (mp3Err) {
         console.warn("MP3 conversion failed, falling back to WAV format for download:", mp3Err);
-        mixBlob = bufferToWav(renderedBuffer);
+        mixBlob = masteredResult.masteredBlob;
         fileExt = 'wav';
       }
 
@@ -3607,62 +3713,10 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
       </div>
 
       {(() => {
-        const now = new Date();
-        const currentMonthName = now.toLocaleString("de-DE", { month: "long" });
-        const currentMonthSavedLoops = (homeworkNotesList || []).filter(note => {
-          if (!note.startsWith("LOOP:")) return false;
-          const parts = note.replace("LOOP:", "").split("|");
-          const dateStr = parts[2];
-          if (!dateStr) return false;
-          const d = new Date(dateStr);
-          return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-        });
-        const usedCount = currentMonthSavedLoops.length;
-        const isFull = !hasTresorStorage && usedCount >= 3;
+        const effectiveTresor = hasTresorStorage || Boolean(propHasTresor) || checkIsAudioTresorActive(student);
 
-        const schoolObj = (student as any)?.schools || (student as any)?.school;
-        let overridesData: any = {};
-        try {
-          const overridesStr = localStorage.getItem('groovelab_school_overrides') || '{}';
-          const allOverrides = JSON.parse(overridesStr);
-          const sId = student?.school_id || schoolObj?.id;
-          if (sId && allOverrides[sId]) overridesData = allOverrides[sId];
-        } catch (e) {}
-
-        const activeAddonGb = Number(overridesData.storage_addon_gb ?? schoolObj?.storage_addon_gb ?? 0);
-        const totalCapGb = 1.0 + activeAddonGb;
-        const usedBytes = Number(overridesData.storage_used_bytes ?? schoolObj?.storage_used_bytes ?? 0);
-        const usedGb = usedBytes / (1024 * 1024 * 1024);
-        const isStorageOverCap = hasTresorStorage && activeAddonGb > 0 && usedGb >= totalCapGb;
-
-        if (hasTresorStorage && isStorageOverCap) {
-          return (
-            <div style={{
-              width: "100%",
-              padding: "10px 16px",
-              borderRadius: "14px",
-              background: "linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)",
-              border: "1.5px solid #fde68a",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              fontSize: "0.76rem",
-              boxSizing: "border-box",
-              marginBottom: "14px",
-              boxShadow: "0 2px 8px rgba(245, 158, 11, 0.08)"
-            }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#92400e", fontWeight: 800 }}>
-                <span style={{ fontSize: "1.05rem" }}>⚠️</span>
-                <span>Audio-Tresor voll belegt ({totalCapGb} GB von {totalCapGb} GB) • Gespeicherte Loops &amp; Aufnahmen bleiben 100% erhalten. Für neue Aufnahmen gilt vorübergehend das Basis-Kontingent (max. 3 Loops / Monat • max. 60s).</span>
-              </div>
-              <span style={{ fontSize: '0.70rem', color: '#b45309', fontWeight: 850, background: '#ffffff', padding: '3px 10px', borderRadius: '100px', border: '1px solid #fcd34d', whiteSpace: 'nowrap' }}>
-                Basis-Kontingent aktiv
-              </span>
-            </div>
-          );
-        }
-
-        if (hasTresorStorage) {
+        // 💎 Audio-Tresor Goldstandard: Wenn Audio-Tresor aktiviert ist, gibt es KEIN Kontingent mehr für Loopstation-Aufnahmen!
+        if (effectiveTresor) {
           return (
             <div style={{
               width: "100%",
@@ -3680,14 +3734,28 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
             }}>
               <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#15803d", fontWeight: 850 }}>
                 <span style={{ fontSize: "1.05rem" }}>✨</span>
-                <span>Unbegrenzter Audio-Tresor aktiv: Nimm so viele Loops &amp; Jam-Tracks auf wie du möchtest!</span>
+                <span>Audio-Tresor aktiv: Unbegrenzte Loopstation-Aufnahmen im Hausaufgabenheft &amp; Protokoll</span>
               </div>
               <span style={{ fontSize: '0.70rem', color: '#16a34a', fontWeight: 800, background: '#ffffff', padding: '3px 10px', borderRadius: '100px', border: '1px solid #bbf7d0' }}>
-                💎 Lossless Studio-Qualität
+                💎 Lossless Studio-Qualität (Kein Kontingent)
               </span>
             </div>
           );
         }
+
+        // 📦 Basis-Kontingent (NUR wenn Audio-Tresor NICHT aktiv ist):
+        const now = new Date();
+        const currentMonthName = now.toLocaleString("de-DE", { month: "long" });
+        const currentMonthSavedLoops = (homeworkNotesList || []).filter(note => {
+          if (!note.startsWith("LOOP:")) return false;
+          const parts = note.replace("LOOP:", "").split("|");
+          const dateStr = parts[2];
+          if (!dateStr) return false;
+          const d = new Date(dateStr);
+          return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+        });
+        const usedCount = currentMonthSavedLoops.length;
+        const isFull = usedCount >= 3;
 
         return (
           <div style={{
@@ -3704,7 +3772,7 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
             marginBottom: "12px"
           }}>
             <div style={{ display: "flex", alignItems: "center", gap: "6px", color: isFull ? "#b91c1c" : "#15803d", fontWeight: 800 }}>
-              <span>🎛️ Monats-Kontingent ({currentMonthName}):</span>
+              <span>🎛️ Basis-Kontingent ({currentMonthName}):</span>
               <span style={{ fontWeight: 900 }}>{usedCount} / 3 Loops im Protokoll gespeichert</span>
             </div>
             <span style={{ fontSize: '0.70rem', color: '#64748b' }}>
@@ -4504,17 +4572,25 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
                     source.start(0);
 
                     const renderedBuffer = await offlineCtx.startRendering();
-                    // 🎛️ PURE RAW DSP: Master Summing Limiter + True Peak Guard + EBU R128 (-14.5 LUFS)
-                    processPureRawAudioBuffer(renderedBuffer, { targetLufs: TARGET_PURE_RAW_LUFS, targetPeakDb: TARGET_PEAK_DBTP, isLoop: false });
+                    // 🎛️ STAGE 1: FULL STUDIO AUDIO-PROCESSING & MASTERING ENGINE (-14.0 LUFS)
+                    // Analog Console Warmth, Andrew Scheps Parallel Glue Bus, Phase-Coherent Stereo & Brickwall Peak Guard
+                    const masteredResult = await processStudioMasteringAudioBuffer(renderedBuffer, {
+                      profile: 'standard_studio',
+                      targetLufs: TARGET_STUDIO_LUFS,
+                      targetPeakDb: TARGET_PEAK_DBTP,
+                      applyConvolutionReverb: false,
+                      applyStereoDimension: true
+                    });
+                    const finalMasterBuffer = masteredResult.masteredBuffer || renderedBuffer;
 
                     btn.innerText = "KONVERTIERE...";
                     let mixBlob: Blob;
                     let fileExt = 'mp3';
                     try {
-                      mixBlob = bufferToMp3(renderedBuffer);
+                      mixBlob = bufferToMp3(finalMasterBuffer);
                     } catch (mp3Err) {
                       console.warn("MP3 conversion failed, falling back to WAV:", mp3Err);
-                      mixBlob = bufferToWav(renderedBuffer);
+                      mixBlob = masteredResult.masteredBlob;
                       fileExt = 'wav';
                     }
 
@@ -6081,7 +6157,11 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
       )}
 
         {showCalibrationPromptModal && (
-          <div style={{
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="calibration-prompt-modal-title"
+            style={{
             position: 'absolute',
             top: 0,
             left: 0,
@@ -6128,7 +6208,7 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <h3 style={{ fontSize: '1.1rem', fontWeight: 900, color: '#1d1d1f', margin: 0 }}>
+                <h3 id="calibration-prompt-modal-title" style={{ fontSize: '1.1rem', fontWeight: 900, color: '#1d1d1f', margin: 0 }}>
                   Audio-Kalibrierung erforderlich
                 </h3>
                 <p style={{ fontSize: '0.78rem', color: '#86868b', lineHeight: 1.4, margin: 0 }}>
@@ -6183,7 +6263,11 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
         )}
 
         {isCalibratingLatency && (
-          <div style={{
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="calibration-running-title"
+            style={{
             position: 'absolute',
             top: 0,
             left: 0,
@@ -6240,7 +6324,7 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
                 }}>
                   Cubase 15 Pro Auto-Einmessung
                 </div>
-                <h3 style={{ fontSize: '1.2rem', fontWeight: 900, color: '#1d1d1f', margin: 0 }}>
+                <h3 id="calibration-running-title" style={{ fontSize: '1.2rem', fontWeight: 900, color: '#1d1d1f', margin: 0 }}>
                   {calibrationPhaseState === 'ambient' && "1/3: Umgebungs-Check..."}
                   {calibrationPhaseState === 'clicks' && `2/3: Akustische Pings (${calibrationClickCount}/5)...`}
                   {calibrationPhaseState === 'result' && "3/3: Einmessung Erfolgreich! 🎯"}

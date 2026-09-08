@@ -1,7 +1,9 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, Suspense } from 'react';
 import QRCode from 'react-qr-code';
 import { generateLocalQrDataUrl } from '../utils/localQrGenerator';
 import { supabase } from '../lib/supabase';
+
+const HelpCenterModal = React.lazy(() => import('./help/HelpCenterModal').then(m => ({ default: m.HelpCenterModal })));
 import { 
   Shield, ShieldAlert, Plus, Copy, Check, Trash2, Users, Monitor, 
   MapPin, LogOut, RefreshCw, Layers, Award, Clock, Music, GraduationCap, BookOpen,
@@ -209,6 +211,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
   const [schoolSortOption, setSchoolSortOption] = useState<'students' | 'name' | 'newest'>('students');
   const [schoolModuleFilter, setSchoolModuleFilter] = useState<'all' | 'kombi' | 'campus' | 'groovelab'>('all');
   const [saveSuccessToast, setSaveSuccessToast] = useState<string | null>(null);
+  const [isAkademieOpen, setIsAkademieOpen] = useState(false);
   const [activePortalTab, setActivePortalTabRaw] = useState<'executive' | 'schools' | 'briefing' | 'billing' | 'telemetry' | 'pricing' | 'trust_safety' | 'operator' | 'maintenance' | 'backup' | 'feedback'>(() => {
     if (typeof window !== 'undefined') {
       const saved = sessionStorage.getItem('cg_master_active_portal_tab');
@@ -3421,6 +3424,53 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                 </div>
               </div>
             </div>
+
+            {/* 🏛️ Akademie & Handbuch Button (Master-Admin Leitfäden) */}
+            <button
+              type="button"
+              onClick={() => setIsAkademieOpen(true)}
+              style={{
+                width: '100%',
+                padding: '11px 14px',
+                borderRadius: '12px',
+                background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.04) 0%, rgba(234, 67, 53, 0.08) 100%)',
+                border: '1px solid rgba(234, 67, 53, 0.25)',
+                color: '#0f172a',
+                fontWeight: 800,
+                fontSize: '0.82rem',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '8px',
+                transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.03)'
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.background = 'linear-gradient(135deg, rgba(15, 23, 42, 0.08) 0%, rgba(234, 67, 53, 0.14) 100%)';
+                e.currentTarget.style.borderColor = 'rgba(234, 67, 53, 0.45)';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.background = 'linear-gradient(135deg, rgba(15, 23, 42, 0.04) 0%, rgba(234, 67, 53, 0.08) 100%)';
+                e.currentTarget.style.borderColor = 'rgba(234, 67, 53, 0.25)';
+              }}
+            >
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                <BookOpen size={16} color="#ea4335" />
+                <span>Akademie & Handbuch</span>
+              </span>
+              <span style={{
+                background: '#0f172a',
+                color: '#ffffff',
+                fontSize: '0.66rem',
+                fontWeight: 900,
+                padding: '2px 7px',
+                borderRadius: '6px',
+                letterSpacing: '0.04em'
+              }}>
+                ROOT
+              </span>
+            </button>
 
             <button
               type="button"
@@ -9055,6 +9105,23 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
             </form>
           </div>
         </div>
+      )}
+
+      {/* 🏛️ Campus-Groovelab Fullscreen-Akademie (Master-Admin Governance) */}
+      {isAkademieOpen && (
+        <Suspense fallback={null}>
+          <HelpCenterModal
+            isOpen={isAkademieOpen}
+            onClose={() => setIsAkademieOpen(false)}
+            userRole="master_admin"
+            activePlatform="campus"
+            initialBoardId={activePortalTab}
+            onNavigateBoard={(target) => {
+              if (target) setActivePortalTab(target as any);
+            }}
+            schoolName="Campus-Groovelab Platform Root"
+          />
+        </Suspense>
       )}
         </div>
       </div>

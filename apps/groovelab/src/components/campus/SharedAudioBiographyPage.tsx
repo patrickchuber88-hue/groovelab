@@ -785,7 +785,7 @@ export const SharedAudioBiographyPage: React.FC<SharedAudioBiographyPageProps> =
   const handleShareToApp = (platform?: 'share' | 'copy') => {
     const url = window.location.href;
     const pin = getExpectedPin();
-    const fullText = `🎵 Höre dir meine neuesten Songs aus der Musikschule an!\n\n1. Link öffnen: ${url}\n2. Familien-PIN eingeben: ${pin}\n\n🔒 WICHTIGER RECHTSHINWEIS (§ 15 Abs. 3 UrhG):\nDieser Link & PIN sind ausschließlich für den privaten Familienkreis bestimmt. Ein öffentliches Teilen (z. B. auf Social Media, Instagram, TikTok oder Websites) ist urheberrechtlich strengstens untersagt.`;
+    const fullText = `🎵 Höre dir meine neuesten Songs aus der Musikschule an!\n\n1. Link öffnen: ${url}\n2. Familien-PIN eingeben: ${pin}\n\n🔒 WICHTIGER HINWEIS:\nDieser Link & PIN sind ausschließlich für den privaten Familienkreis bestimmt. Ein öffentliches Teilen (z. B. auf Social Media, Instagram, TikTok oder Websites) ist unzulässig.`;
 
     if (platform === 'share' && navigator.share) {
       navigator.share({ title: 'Musikschule Playlist', text: fullText, url }).catch(() => {});
@@ -1367,7 +1367,7 @@ export const SharedAudioBiographyPage: React.FC<SharedAudioBiographyPageProps> =
           }}>
             <Shield size={16} color={currentTheme.accent} style={{ flexShrink: 0, marginTop: '2px' }} />
             <span style={{ fontSize: '0.67rem', color: '#94a3b8', lineHeight: 1.45 }}>
-              <strong style={{ color: '#ffffff' }}>Geschützter Familien-Zugang:</strong> Diese Audioaufnahmen dienen ausschließlich der internen pädagogischen Dokumentation im persönlichen Familien- und Freundeskreis (§ 15 Abs. 3, § 53 UrhG). Eine öffentliche Wiedergabe, Aufführung oder Verbreitung im Internet ist urheberrechtlich unzulässig.
+              <strong style={{ color: '#ffffff' }}>Geschützter Familien-Zugang:</strong> Diese Audioaufnahmen dienen ausschließlich der internen pädagogischen Dokumentation im persönlichen Familien- und Freundeskreis. Eine öffentliche Wiedergabe oder Verbreitung im Internet ist unzulässig.
             </span>
           </div>
         </div>
@@ -1880,7 +1880,7 @@ export const SharedAudioBiographyPage: React.FC<SharedAudioBiographyPageProps> =
             <Lock size={14} color="#10b981" />
           </div>
           <div style={{ flex: 1 }}>
-            <strong>Geschützter Familienkreis:</strong> Diese Tonaufnahme ist ein persönliches Unterrichtsdokument für Familie & enge Freunde. Eine Veröffentlichung im Internet oder auf Social-Media-Plattformen ist nicht gestattet (§ 53 UrhG / DSGVO).
+            <strong>Geschützter Familienkreis:</strong> Diese Tonaufnahme ist ein persönliches Unterrichtsdokument für Familie & enge Freunde. Eine Veröffentlichung im Internet oder auf Social-Media-Plattformen ist nicht gestattet.
           </div>
         </div>
 
@@ -2178,7 +2178,7 @@ export const SharedAudioBiographyPage: React.FC<SharedAudioBiographyPageProps> =
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <Shield size={12} color="#10b981" />
-            <span>DSGVO-konform • Geschützt nach §§ 15 Abs. 3, 53 UrhG</span>
+            <span>Geschützte Unterrichtsaufnahmen für den privaten Familienkreis</span>
           </div>
         </div>
       </div>

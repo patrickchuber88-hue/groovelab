@@ -1168,15 +1168,45 @@ export const Startseite: React.FC<StartseiteProps> = ({
         zIndex: 10,
         width: '100%'
       }}>
-        <div className="footer-link" onClick={() => triggerProtectedRegistration()}>
+        <div 
+          role="button"
+          tabIndex={0}
+          className="footer-link" 
+          onClick={() => triggerProtectedRegistration()}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); triggerProtectedRegistration(); } }}
+        >
           <School size={14} />
           Als Schule registrieren
         </div>
         <div style={{ width: '1px', height: '12px', background: 'rgba(255,255,255,0.12)' }}></div>
-        <div className="footer-link" onClick={() => onShowPrivacy?.()}>Datenschutz</div>
-        <div className="footer-link" onClick={() => onShowAgb?.()}>AGB</div>
-        <div className="footer-link" onClick={() => onShowImpressum?.()}>Impressum</div>
-        <div className="footer-link" onClick={() => onShowAccessibility ? onShowAccessibility() : onShowPrivacy?.()}>Barrierefreiheit</div>
+        <div 
+          role="button"
+          tabIndex={0}
+          className="footer-link" 
+          onClick={() => onShowPrivacy?.()}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onShowPrivacy?.(); } }}
+        >Datenschutz</div>
+        <div 
+          role="button"
+          tabIndex={0}
+          className="footer-link" 
+          onClick={() => onShowAgb?.()}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onShowAgb?.(); } }}
+        >AGB</div>
+        <div 
+          role="button"
+          tabIndex={0}
+          className="footer-link" 
+          onClick={() => onShowImpressum?.()}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onShowImpressum?.(); } }}
+        >Impressum</div>
+        <div 
+          role="button"
+          tabIndex={0}
+          className="footer-link" 
+          onClick={() => onShowAccessibility ? onShowAccessibility() : onShowPrivacy?.()}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onShowAccessibility ? onShowAccessibility() : onShowPrivacy?.(); } }}
+        >Barrierefreiheit</div>
       </footer>
 
       {/* Secret Master Admin Authentication Modal */}

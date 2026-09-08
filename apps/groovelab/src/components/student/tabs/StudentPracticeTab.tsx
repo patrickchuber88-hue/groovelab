@@ -4430,7 +4430,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                       </div>
 
                       <span style={{ fontSize: '0.68rem', color: '#94a3b8', textAlign: 'center', display: 'block' }}>
-                        § 53 Abs. 4 UrhG • Zero-PDF • Reines Audio- &amp; Metadatenprotokoll
+                        Geschütztes didaktisches Übeprotokoll deiner Musikschule
                       </span>
                     </div>
                   </div>

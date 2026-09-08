@@ -172,3 +172,20 @@ export const formatMins = (mins: number) => {
   const rem = Math.round(mins % 60);
   return rem > 0 ? `${hrs} Std. ${rem} Min.` : `${hrs} Std.`;
 };
+
+export const getWeekDateRange = (weekIso: string): string => {
+  if (!weekIso || !weekIso.includes('-W')) return '';
+  const [yearStr, wStr] = weekIso.split('-W');
+  const year = parseInt(yearStr, 10);
+  const week = parseInt(wStr, 10);
+  if (isNaN(year) || isNaN(week)) return '';
+
+  const jan4 = new Date(year, 0, 4);
+  const dayOfWeek = jan4.getDay() || 7;
+  const mondayWeek1 = new Date(year, 0, 4 - dayOfWeek + 1);
+  const targetMonday = new Date(mondayWeek1.getTime() + (week - 1) * 7 * 86400000);
+  const targetSunday = new Date(targetMonday.getTime() + 6 * 86400000);
+
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${pad(targetMonday.getDate())}.${pad(targetMonday.getMonth() + 1)}. – ${pad(targetSunday.getDate())}.${pad(targetSunday.getMonth() + 1)}.`;
+};

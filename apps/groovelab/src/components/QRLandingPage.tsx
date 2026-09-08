@@ -15,6 +15,7 @@ import { validateHandoverUrl } from '../utils/cryptoAuth';
 import { registerClientSessionLease } from '../utils/sessionLeaseManager';
 import { setVaultItem } from '../utils/aesStorageVault';
 import { verifyPinPbkdf2 } from '../utils/argonPinEngine';
+import { getInstrumentAvatarUrl as getStudioInstrumentAvatarUrl } from './StudioAvatar';
 
 
 
@@ -38,31 +39,6 @@ const isPairedForToken = (token: string): boolean => {
 
 const markPairedForToken = (token: string): void => {
   localStorage.setItem(`${DEVICE_KEY_PREFIX}${token}`, 'paired');
-};
-
-const getInstrumentAvatarUrl = (instrument: string | null | undefined): string => {
-  if (!instrument) return '/avatars/gitarre_avatar_new.png';
-  const inst = instrument.toLowerCase().trim();
-  if (inst.includes('e-gitarre')) return '/avatars/egitarre_avatar.png';
-  if (inst.includes('guitar') || inst.includes('gitarre')) return '/avatars/gitarre_avatar_new.png';
-  if (inst.includes('e-bass')) return '/avatars/ebass_avatar.png';
-  if (inst.includes('kontrabass') || inst.includes('double bass')) return '/avatars/kontrabass_avatar.png';
-  if (inst.includes('bass')) return '/avatars/bass_avatar.png';
-  if (inst.includes('drum') || inst.includes('schlagzeug')) return '/avatars/schlagzeug_avatar.png';
-  if (inst.includes('piano') || inst.includes('keys') || inst.includes('klavier') || inst.includes('keyboard')) return '/avatars/klavier_avatar_new.png';
-  if (inst.includes('vocal') || inst.includes('gesang') || inst.includes('stimme') || inst.includes('singer')) return '/avatars/gesang_avatar.png';
-  if (inst.includes('trompete') || inst.includes('trumpet')) return '/avatars/trompete_avatar_new.png';
-  if (inst.includes('posaune') || inst.includes('trombone')) return '/avatars/posaune_avatar.png';
-  if (inst.includes('horn')) return '/avatars/horn_avatar_new.png';
-  if (inst.includes('cello')) return '/avatars/cello_avatar_new.png';
-  if (inst.includes('geige') || inst.includes('violin') || inst.includes('violine')) return '/avatars/violine_avatar_new.png';
-  if (inst.includes('klarinette') || inst.includes('clarinet')) return '/avatars/klarinette_avatar_new.png';
-  if (inst.includes('querflöte') || inst.includes('flute')) return '/avatars/querfloete.png';
-  if (inst.includes('saxofon') || inst.includes('saxophone') || inst.includes('sax')) return '/avatars/saxophon_avatar_new.png';
-  if (inst.includes('blockflöte') || inst.includes('recorder') || inst.includes('blockfloete')) return '/avatars/blockfloete_avatar.png';
-  if (inst.includes('bariton') || inst.includes('baritone')) return '/avatars/bariton_avatar.png';
-  if (inst.includes('oboe')) return '/avatars/oboe_avatar.png';
-  return '/avatars/gitarre_avatar_new.png';
 };
 
 const getLehrwerkColor = (title: string, customLehrwerkeList?: any[]) => {
@@ -3128,7 +3104,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
       // 1. Try parent PIN verification (6 digits or explicit parent mode)
       if (pinToVerify.length === 6 || isParentPinMode) {
         if (profile?.is_adult && !profile?.adult_allow_parent_access) {
-          setPinError('Dieser Schüler ist volljährig (§ 2 BGB). Der elterliche Einblick wurde zum Schutz der Privatsphäre deaktiviert.');
+          setPinError('Dieser Schüler ist volljährig (18+). Der elterliche Einblick wurde zum Schutz der Privatsphäre deaktiviert.');
           setPinInput('');
           setPinLoading(false);
           return;
@@ -7757,7 +7733,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
               <div style={{position: 'absolute', top: '-20px', right: '-20px', width: '120px', height: '120px', background: 'rgba(255,255,255,0.08)', borderRadius: '50%', pointerEvents: 'none'}} />
               <div style={{display: 'flex', alignItems: 'center', gap: '16px'}}>
                 <div style={{width: '56px', height: '56px', borderRadius: '50%', background: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '3px solid rgba(255, 255, 255, 0.3)', flexShrink: 0, overflow: 'hidden'}}>
-                  <img src={getInstrumentAvatarUrl(profile.instrument)} alt="" style={{width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover'}} />
+                  <img src={getStudioInstrumentAvatarUrl(profile.instrument)} alt="" style={{width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover'}} />
                 </div>
                 <div style={{display: 'flex', flexDirection: 'column'}}>
                   <h2 style={{margin: 0, fontSize: '1.25rem', fontWeight: 900, textShadow: '0 1px 2px rgba(0,0,0,0.1)'}}>
@@ -8487,7 +8463,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
       // Profile avatar
       const profileAvatar = (profile.role === 'admin' || profile.role === 'secretary')
         ? '/campus_login_hero.png'
-        : (profile.photo_url || getInstrumentAvatarUrl(profile.instrument));
+        : (profile.photo_url || getStudioInstrumentAvatarUrl(profile.instrument));
 
       // Filter lessons for Kombi-Lehrer
       const filteredLessons = teacherTodayLessons.filter(lesson => {
