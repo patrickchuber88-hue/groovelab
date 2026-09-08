@@ -2295,6 +2295,9 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                                     ? 'Im Junior-Modus standardmäßig deaktiviert (Kinderschutz). Erlaubt bei Freigabe nur direkte Fragen zu Hausaufgaben.'
                                     : 'Erlaubt deinem Kind, im Chat Nachrichten und Fragen zu Hausaufgaben und Songs an die Lehrkraft zu senden.'}
                                 </div>
+                                <div style={{ fontSize: '0.70rem', color: '#0369a1', fontWeight: 650, marginTop: '4px' }}>
+                                  💬 Chatverlauf jederzeit im Menüpunkt „Nachrichten“ einsehbar.
+                                </div>
                               </div>
                               <input
                                 type="checkbox"

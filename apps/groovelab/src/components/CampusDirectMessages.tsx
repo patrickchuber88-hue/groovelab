@@ -2694,7 +2694,7 @@ export function CampusDirectMessages({
                 }}>
                   <ShieldCheck size={14} color="#16a34a" style={{ flexShrink: 0 }} />
                   <span style={{ flex: 1, lineHeight: 1.35 }}>
-                    <strong>Didaktischer Schul-Chat (Kinderschutz gem. § 8a SGB VIII):</strong> Alle Nachrichten dienen der Unterrichtskommunikation und sind für Erziehungsberechtigte im Eltern-Portal sowie die Schulleitung transparent einsehbar.
+                    <strong>Didaktischer Schul-Chat (§ 8a SGB VIII):</strong> Nur für Unterrichtszwecke • Für Erziehungsberechtigte transparent einsehbar.
                   </span>
                 </div>
 
