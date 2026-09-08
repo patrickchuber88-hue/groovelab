@@ -633,30 +633,42 @@ export const CampusTeenDashboard: React.FC<CampusTeenDashboardProps> = ({
             </div>
 
             {/* Presets based on school levels */}
-            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'center' }}>
+            <div style={{ 
+              display: 'grid', 
+              gridTemplateColumns: 'repeat(3, 1fr)', 
+              gap: '6px', 
+              width: '100%', 
+              maxWidth: '440px',
+              boxSizing: 'border-box'
+            }}>
               {presetMinutesOptions.map(opt => (
                 <button
                   key={opt.mins}
                   type="button"
                   onClick={() => selectPresetMins(opt.mins)}
                   style={{
-                    padding: '8px 14px',
+                    padding: '8px 4px',
+                    minHeight: '48px',
                     borderRadius: '12px',
                     border: targetMins === opt.mins ? '2px solid #0284c7' : '1px solid #cbd5e1',
                     background: targetMins === opt.mins ? '#0284c7' : '#ffffff',
                     color: targetMins === opt.mins ? '#ffffff' : '#334155',
                     fontWeight: 850,
-                    fontSize: '0.85rem',
+                    fontSize: '0.82rem',
                     cursor: 'pointer',
                     transition: 'all 0.2s ease',
                     display: 'flex',
+                    flexDirection: 'column',
                     alignItems: 'center',
-                    gap: '4px'
+                    justifyContent: 'center',
+                    gap: '2px',
+                    textAlign: 'center',
+                    touchAction: 'manipulation'
                   }}
                   className="hover-scale"
                 >
-                  <span>{opt.label}</span>
-                  <span style={{ opacity: 0.8, fontSize: '0.75rem' }}>({opt.mins}m)</span>
+                  <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>{opt.label}</span>
+                  <span style={{ opacity: 0.85, fontSize: '0.74rem', fontWeight: 800 }}>({opt.mins}m)</span>
                 </button>
               ))}
             </div>

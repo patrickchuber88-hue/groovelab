@@ -7350,7 +7350,8 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                     else if (key) handlePinDigit(key);
                   }}
                   style={{
-                    padding: '16px',
+                    padding: '14px',
+                    minHeight: '56px',
                     borderRadius: '16px',
                     border: 'none',
                     background: key === '⌫' ? '#fee2e2' : key === 'C' ? '#f1f5f9' : '#f8fafc',
@@ -7362,7 +7363,8 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                     boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
                     borderWidth: '1px',
                     borderStyle: 'solid',
-                    borderColor: key === '⌫' ? '#fecaca' : '#e2e8f0'
+                    borderColor: key === '⌫' ? '#fecaca' : '#e2e8f0',
+                    touchAction: 'manipulation'
                   }}
                   onMouseDown={e => e.currentTarget.style.transform = 'scale(0.92)'}
                   onMouseUp={e => e.currentTarget.style.transform = ''}
@@ -11241,7 +11243,7 @@ const styles = {
     alignItems: 'center',
     justifyContent: 'center',
     fontFamily: "'Outfit', 'Urbanist', -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', sans-serif",
-    padding: '20px',
+    padding: '20px 16px calc(24px + env(safe-area-inset-bottom, 16px)) 16px',
     overflowY: 'auto' as const,
   },
   card: {

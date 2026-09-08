@@ -151,7 +151,17 @@ const AppleSystemNotificationCard: React.FC<AppleSystemNotificationCardProps> = 
     (content && (content.includes('❌') || content.includes('Termin abgesagt') || content.includes('fällt aus') || content.includes('abgesagt') || content.includes('storniert') || content.includes('wurde abgesagt')));
 
   // 1. Reaktivierungs-Eventkarte (Audit-Proof, 100% identisch mit Shoutbox-Modal)
+  // 1. Reaktivierungs-Eventkarte (Audit-Proof & Monochrom)
   if (isReactivation) {
+    const lines = cleanContent
+      .replace(/[❌🔄🕒✅🔒⚠️]/gu, '')
+      .split('\n')
+      .map((l: string) => l.trim())
+      .filter(Boolean);
+    const mainMsg = lines[0] || 'Termin reaktiviert: Der Unterricht findet planmäßig statt.';
+    const timeLine = lines.find((l: string) => l.toLowerCase().includes('reaktiviert am')) ||
+      `Reaktiviert am ${new Date(msg.created_at).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })} um ${new Date(msg.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Uhr`;
+
     return (
       <div style={{ alignSelf: 'center', width: '100%', maxWidth: '96%', margin: '4px 0' }}>
         <div style={{
@@ -162,7 +172,7 @@ const AppleSystemNotificationCard: React.FC<AppleSystemNotificationCardProps> = 
           boxShadow: '0 2px 8px rgba(34, 197, 94, 0.08)',
           display: 'flex',
           flexDirection: 'column',
-          gap: '6px'
+          gap: '8px'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: '#dcfce7', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -175,22 +185,32 @@ const AppleSystemNotificationCard: React.FC<AppleSystemNotificationCardProps> = 
               {new Date(msg.created_at).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })}, {new Date(msg.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Uhr
             </span>
           </div>
-          <div style={{ fontSize: '0.92rem', color: '#166534', fontWeight: 650, lineHeight: 1.45, wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>
-            {cleanContent}
-            {!cleanContent.includes('Reaktiviert am') && (
-              <div style={{ marginTop: '6px', fontSize: '0.76rem', color: '#166534', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <Clock size={11} color="#166534" />
-                <span>Reaktiviert am {new Date(msg.created_at).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })} um {new Date(msg.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Uhr</span>
-              </div>
-            )}
+          <div style={{ fontSize: '0.90rem', color: '#166534', fontWeight: 650, lineHeight: 1.45, wordBreak: 'break-word', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
+              <RotateCcw size={13} color="#15803d" strokeWidth={2.4} style={{ flexShrink: 0, marginTop: '3px' }} />
+              <span>{mainMsg}</span>
+            </div>
+            <div style={{ marginTop: '2px', fontSize: '0.76rem', color: '#166534', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px' }}>
+              <Clock size={12} color="#166534" style={{ flexShrink: 0 }} />
+              <span>{timeLine}</span>
+            </div>
           </div>
         </div>
       </div>
     );
   }
 
-  // 2. Stornierungs-/Absage-Eventkarte (Audit-Proof, 100% identisch mit Shoutbox-Modal)
+  // 2. Stornierungs-/Absage-Eventkarte (Audit-Proof & Monochrom)
   if (isCancellation) {
+    const lines = cleanContent
+      .replace(/[❌🔄🕒✅🔒⚠️]/gu, '')
+      .split('\n')
+      .map((l: string) => l.trim())
+      .filter(Boolean);
+    const mainMsg = lines[0] || 'Dieser Termin wurde abgesagt.';
+    const timeLine = lines.find((l: string) => l.toLowerCase().includes('abgemeldet am') || l.toLowerCase().includes('abgesagt am')) ||
+      `Abgemeldet am ${new Date(msg.created_at).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })} um ${new Date(msg.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Uhr`;
+
     return (
       <div style={{ alignSelf: 'center', width: '100%', maxWidth: '96%', margin: '4px 0' }}>
         <div style={{
@@ -201,7 +221,7 @@ const AppleSystemNotificationCard: React.FC<AppleSystemNotificationCardProps> = 
           boxShadow: '0 2px 8px rgba(239, 68, 68, 0.06)',
           display: 'flex',
           flexDirection: 'column',
-          gap: '6px'
+          gap: '8px'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: '#fee2e2', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -214,14 +234,15 @@ const AppleSystemNotificationCard: React.FC<AppleSystemNotificationCardProps> = 
               {new Date(msg.created_at).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })}, {new Date(msg.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Uhr
             </span>
           </div>
-          <div style={{ fontSize: '0.92rem', color: '#991b1b', fontWeight: 650, lineHeight: 1.45, wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>
-            {cleanContent}
-            {!cleanContent.includes('Abgemeldet am') && !cleanContent.includes('Abgesagt am') && (
-              <div style={{ marginTop: '6px', fontSize: '0.76rem', color: '#b91c1c', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <Clock size={11} color="#b91c1c" />
-                <span>Abgemeldet am {new Date(msg.created_at).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })} um {new Date(msg.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Uhr</span>
-              </div>
-            )}
+          <div style={{ fontSize: '0.90rem', color: '#991b1b', fontWeight: 650, lineHeight: 1.45, wordBreak: 'break-word', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
+              <X size={13} color="#dc2626" strokeWidth={2.4} style={{ flexShrink: 0, marginTop: '3px' }} />
+              <span>{mainMsg}</span>
+            </div>
+            <div style={{ marginTop: '2px', fontSize: '0.76rem', color: '#b91c1c', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px' }}>
+              <Clock size={12} color="#b91c1c" style={{ flexShrink: 0 }} />
+              <span>{timeLine}</span>
+            </div>
           </div>
         </div>
       </div>
@@ -1409,7 +1430,7 @@ export function CampusDirectMessages({
         id: `synthetic-reactivate-${selectedOccTab.id}`,
         sender_id: user.role === 'teacher' ? user.id : (selectedRecipient?.id || user.id),
         recipient_id: user.role === 'teacher' ? (selectedRecipient?.id || user.id) : user.id,
-        content: `[Termin ${selectedOccTab.label}] 🔄 Termin reaktiviert: Der Unterricht findet planmäßig statt.`,
+        content: `[Termin ${selectedOccTab.label}] Termin reaktiviert: Der Unterricht findet planmäßig statt.`,
         message_type: 'cancellation_reset',
         created_at: reactivateIso,
         occurrence_id: selectedOccTab.id,
@@ -2195,23 +2216,27 @@ export function CampusDirectMessages({
                               displayedMessages.some((m: any) => m.message_type === 'cancellation_reset')
                             );
 
+                            let badgeIcon = <Check size={11} strokeWidth={3} />;
                             let badgeLabel = 'Planmäßiger Unterricht';
                             let badgeBg = '#dcfce7';
                             let badgeColor = '#15803d';
                             let badgeBorder = '1px solid #bbf7d0';
 
                             if (isCurrentlyCancelled) {
-                              badgeLabel = '❌ Termin abgesagt';
+                              badgeIcon = <X size={11} strokeWidth={3} />;
+                              badgeLabel = 'Termin abgesagt';
                               badgeBg = '#fef2f2';
                               badgeColor = '#991b1b';
                               badgeBorder = '1px solid #fecaca';
                             } else if (isReactivated) {
-                              badgeLabel = '🔄 Termin reaktiviert (Planmäßig)';
+                              badgeIcon = <RotateCcw size={11} strokeWidth={2.5} />;
+                              badgeLabel = 'Termin reaktiviert (Planmäßig)';
                               badgeBg = '#dcfce7';
                               badgeColor = '#15803d';
                               badgeBorder = '1px solid #86efac';
                             } else if (stammterminText) {
-                              badgeLabel = '🔄 Termin verschoben';
+                              badgeIcon = <Clock size={11} strokeWidth={2.5} />;
+                              badgeLabel = 'Termin verschoben';
                               badgeBg = '#fef3c7';
                               badgeColor = '#b45309';
                               badgeBorder = '1px solid #fde68a';
@@ -2230,7 +2255,8 @@ export function CampusDirectMessages({
                                 alignItems: 'center',
                                 gap: '4px'
                               }}>
-                                {badgeLabel}
+                                {badgeIcon}
+                                <span>{badgeLabel}</span>
                               </span>
                             );
                           })()}

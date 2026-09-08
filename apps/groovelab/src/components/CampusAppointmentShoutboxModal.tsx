@@ -234,7 +234,7 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
         id: `synthetic-reactivate-${targetOccId || targetDate}`,
         sender_id: occurrence.teacher_id || teacherId || currentUserId,
         recipient_id: occurrence.student_id || studentId,
-        content: `[Termin ${weekdayShort}., ${formattedOccDate}, ${timeLabel} Uhr] 🔄 Termin reaktiviert: Der Unterricht findet planmäßig statt.`,
+        content: `[Termin ${weekdayShort}., ${formattedOccDate}, ${timeLabel} Uhr] Termin reaktiviert: Der Unterricht findet planmäßig statt.`,
         message_type: 'cancellation_reset',
         created_at: reactivateIso,
         occurrence_id: targetOccId || (targetScheduleId ? `virtual-${targetScheduleId}-${targetDate}` : null),
@@ -422,7 +422,7 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
         }
 
         // 2. Insert unlöschbare Audit-Nachricht in campus_direct_messages
-        const cancelMsgContent = `❌ Terminabsage: Dein Unterrichtstermin am ${weekdayShort} ${formattedOccDate} um ${timeLabel} Uhr fällt aus.\n🕒 Abgemeldet am: ${execTimestampStr} durch ${actorName}.`;
+        const cancelMsgContent = `Terminabsage: Dein Unterrichtstermin am ${weekdayShort} ${formattedOccDate} um ${timeLabel} Uhr fällt aus.\nAbgemeldet am: ${execTimestampStr} durch ${actorName}.`;
         await supabase.from('campus_direct_messages').insert({
           sender_id: currentUserId,
           recipient_id: recipientId,
@@ -438,7 +438,7 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
             school_id: occurrence.school_id || currentUserProfile?.school_id || null,
             teacher_id: teacherId,
             type: 'Termin abgesagt',
-            message: `❌ Absage: ${actorName} hat den Termin am ${formattedOccDate} um ${timeLabel} Uhr abgesagt (Eingang: ${execTimestampStr}).`
+            message: `Absage: ${actorName} hat den Termin am ${formattedOccDate} um ${timeLabel} Uhr abgesagt (Eingang: ${execTimestampStr}).`
           });
         } catch (e) {}
 
@@ -541,7 +541,7 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
         }
 
         // 2. Insert unlöschbare Audit-Nachricht in campus_direct_messages
-        const reactivateMsgContent = `🔄 Termin reaktiviert: Dein Unterrichtstermin am ${weekdayShort} ${formattedOccDate} um ${timeLabel} Uhr findet regulär statt.\n🕒 Reaktiviert am: ${execTimestampStr} durch ${actorName}.`;
+        const reactivateMsgContent = `Termin reaktiviert: Dein Unterrichtstermin am ${weekdayShort} ${formattedOccDate} um ${timeLabel} Uhr findet regulär statt.\nReaktiviert am: ${execTimestampStr} durch ${actorName}.`;
         await supabase.from('campus_direct_messages').insert({
           sender_id: currentUserId,
           recipient_id: recipientId,
@@ -557,7 +557,7 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
             school_id: occurrence.school_id || currentUserProfile?.school_id || null,
             teacher_id: teacherId,
             type: 'Termin wiederhergestellt',
-            message: `✅ Reaktiviert: ${actorName} hat den Termin am ${weekdayShort} ${formattedOccDate} um ${timeLabel} Uhr wieder reaktiviert (Eingang: ${execTimestampStr}).`
+            message: `Reaktiviert: ${actorName} hat den Termin am ${weekdayShort} ${formattedOccDate} um ${timeLabel} Uhr wieder reaktiviert (Eingang: ${execTimestampStr}).`
           });
         } catch (e) {}
 
@@ -770,7 +770,7 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
           </button>
         </div>
 
-        {/* Child Protection & Supervisory Transparency Banner (§ 832 BGB / SGB VIII / Schutzkonzept) */}
+        {/* Child Protection Banner (§ 8a SGB VIII) */}
         <div style={{
           background: '#f8fafc',
           borderBottom: '1px solid #e2e8f0',
@@ -785,7 +785,7 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
         }}>
           <ShieldCheck size={13} color="#15803d" style={{ flexShrink: 0 }} />
           <span>
-            <strong>Schulischer Schutzraum:</strong> Kanal ausschließlich für didaktische Zwecke. Einsichtnahme durch Erziehungsberechtigte und Schulleitung im Rahmen des Schutzkonzepts vorbehalten.
+            <strong>Didaktischer Schul-Chat (§ 8a SGB VIII):</strong> Nur für Unterrichtszwecke • Für Erziehungsberechtigte transparent einsehbar.
           </span>
         </div>
 
@@ -897,8 +897,17 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
               const isReactivation = msg.message_type === 'cancellation_reset' ||
                 (msg.content && (msg.content.includes('🔄') || msg.content.includes('reaktiviert') || msg.content.includes('zurückgenommen') || msg.content.includes('regulär statt') || msg.content.includes('zurückgesetzt')));
 
-              // 1. Reaktivierungs-Eventkarte (Audit-Proof)
+              // 1. Reaktivierungs-Eventkarte (Audit-Proof & Monochrom)
               if (isReactivation) {
+                const lines = cleanContent
+                  .replace(/[❌🔄🕒✅🔒⚠️]/gu, '')
+                  .split('\n')
+                  .map(l => l.trim())
+                  .filter(Boolean);
+                const mainMsg = lines[0] || 'Termin reaktiviert: Der Unterricht findet planmäßig statt.';
+                const timeLine = lines.find(l => l.toLowerCase().includes('reaktiviert am')) ||
+                  `Reaktiviert am ${new Date(msg.created_at).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })} um ${new Date(msg.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Uhr`;
+
                 return (
                   <div key={msg.id || idx} style={{ alignSelf: 'center', width: '100%', maxWidth: '96%', margin: '4px 0' }}>
                     <div style={{
@@ -909,7 +918,7 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
                       boxShadow: '0 2px 8px rgba(34, 197, 94, 0.08)',
                       display: 'flex',
                       flexDirection: 'column',
-                      gap: '6px'
+                      gap: '8px'
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: '#dcfce7', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -922,22 +931,32 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
                           {new Date(msg.created_at).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })}, {new Date(msg.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Uhr
                         </span>
                       </div>
-                      <div style={{ fontSize: '0.92rem', color: '#166534', fontWeight: 650, lineHeight: 1.45, wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>
-                        {cleanContent}
-                        {!cleanContent.includes('Reaktiviert am') && (
-                          <div style={{ marginTop: '6px', fontSize: '0.76rem', color: '#166534', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <Clock size={11} color="#166534" />
-                            <span>Reaktiviert am {new Date(msg.created_at).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })} um {new Date(msg.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Uhr</span>
-                          </div>
-                        )}
+                      <div style={{ fontSize: '0.90rem', color: '#166534', fontWeight: 650, lineHeight: 1.45, wordBreak: 'break-word', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
+                          <RotateCcw size={13} color="#15803d" strokeWidth={2.4} style={{ flexShrink: 0, marginTop: '3px' }} />
+                          <span>{mainMsg}</span>
+                        </div>
+                        <div style={{ marginTop: '2px', fontSize: '0.76rem', color: '#166534', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px' }}>
+                          <Clock size={12} color="#166534" style={{ flexShrink: 0 }} />
+                          <span>{timeLine}</span>
+                        </div>
                       </div>
                     </div>
                   </div>
                 );
               }
 
-              // 2. Stornierungs-/Absage-Eventkarte (Audit-Proof)
+              // 2. Stornierungs-/Absage-Eventkarte (Audit-Proof & Monochrom)
               if (isCancellation) {
+                const lines = cleanContent
+                  .replace(/[❌🔄🕒✅🔒⚠️]/gu, '')
+                  .split('\n')
+                  .map(l => l.trim())
+                  .filter(Boolean);
+                const mainMsg = lines[0] || 'Dieser Termin wurde abgesagt.';
+                const timeLine = lines.find(l => l.toLowerCase().includes('abgemeldet am') || l.toLowerCase().includes('abgesagt am')) ||
+                  `Abgemeldet am ${new Date(msg.created_at).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })} um ${new Date(msg.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Uhr`;
+
                 return (
                   <div key={msg.id || idx} style={{ alignSelf: 'center', width: '100%', maxWidth: '96%', margin: '4px 0' }}>
                     <div style={{
@@ -948,7 +967,7 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
                       boxShadow: '0 2px 8px rgba(239, 68, 68, 0.06)',
                       display: 'flex',
                       flexDirection: 'column',
-                      gap: '6px'
+                      gap: '8px'
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: '#fee2e2', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -961,14 +980,15 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
                           {new Date(msg.created_at).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })}, {new Date(msg.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Uhr
                         </span>
                       </div>
-                      <div style={{ fontSize: '0.92rem', color: '#991b1b', fontWeight: 650, lineHeight: 1.45, wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>
-                        {cleanContent}
-                        {!cleanContent.includes('Abgemeldet am') && !cleanContent.includes('Abgesagt am') && (
-                          <div style={{ marginTop: '6px', fontSize: '0.76rem', color: '#b91c1c', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <Clock size={11} color="#b91c1c" />
-                            <span>Abgemeldet am {new Date(msg.created_at).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })} um {new Date(msg.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Uhr</span>
-                          </div>
-                        )}
+                      <div style={{ fontSize: '0.90rem', color: '#991b1b', fontWeight: 650, lineHeight: 1.45, wordBreak: 'break-word', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
+                          <X size={13} color="#dc2626" strokeWidth={2.4} style={{ flexShrink: 0, marginTop: '3px' }} />
+                          <span>{mainMsg}</span>
+                        </div>
+                        <div style={{ marginTop: '2px', fontSize: '0.76rem', color: '#b91c1c', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px' }}>
+                          <Clock size={12} color="#b91c1c" style={{ flexShrink: 0 }} />
+                          <span>{timeLine}</span>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -1270,8 +1290,9 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
             color: '#64748b',
             lineHeight: 1.35
           }}>
-            <span>
-              🔒 <strong>Bote für Unterrichtsabsprachen:</strong> Es gelten die Fristen deines Musikschulvertrags. Bitte keine Diagnosen oder sensiblen Attestdaten eintragen.
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap', justifyContent: 'center' }}>
+              <Lock size={12} color="#64748b" style={{ flexShrink: 0 }} />
+              <span><strong>Bote für Unterrichtsabsprachen:</strong> Es gelten die Fristen deines Musikschulvertrags. Bitte keine Diagnosen oder sensiblen Attestdaten eintragen.</span>
             </span>
             <span style={{ fontSize: '0.63rem', color: '#94a3b8' }}>
               DSGVO-konform · Ende-zu-Ende gesicherte Schulübermittlung · TLS 1.3

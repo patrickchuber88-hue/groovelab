@@ -691,31 +691,43 @@ export const CampusJuniorDashboard: React.FC<CampusJuniorDashboardProps> = ({
         </div>
 
         {/* Preset Buttons based on School Focus Levels */}
-        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', justifyContent: 'center' }}>
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(3, 1fr)', 
+          gap: '8px', 
+          width: '100%', 
+          maxWidth: '460px',
+          boxSizing: 'border-box'
+        }}>
           {presetMinutesOptions.map(opt => (
             <button
               key={opt.mins}
               type="button"
               onClick={() => startPresetTimer(opt.mins)}
               style={{
-                padding: '12px 18px',
+                padding: '10px 6px',
+                minHeight: '52px',
                 borderRadius: '16px',
                 border: selectedPresetMinutes === opt.mins ? '2px solid #34a853' : '1.5px solid #cbd5e1',
                 background: selectedPresetMinutes === opt.mins ? '#34a853' : '#ffffff',
                 color: selectedPresetMinutes === opt.mins ? '#ffffff' : '#334155',
                 fontWeight: 900,
-                fontSize: '0.95rem',
+                fontSize: '0.88rem',
                 cursor: 'pointer',
                 boxShadow: selectedPresetMinutes === opt.mins ? '0 4px 14px rgba(52, 168, 83, 0.25)' : '0 2px 6px rgba(0,0,0,0.03)',
                 transition: 'all 0.2s ease',
                 display: 'flex',
+                flexDirection: 'column',
                 alignItems: 'center',
-                gap: '6px'
+                justifyContent: 'center',
+                gap: '3px',
+                textAlign: 'center',
+                touchAction: 'manipulation'
               }}
               className="hover-scale"
             >
-              <span>{opt.label}</span>
-              <span style={{ opacity: 0.8, fontSize: '0.8rem' }}>({opt.mins}m)</span>
+              <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>{opt.label}</span>
+              <span style={{ opacity: 0.85, fontSize: '0.76rem', fontWeight: 800 }}>({opt.mins}m)</span>
             </button>
           ))}
         </div>

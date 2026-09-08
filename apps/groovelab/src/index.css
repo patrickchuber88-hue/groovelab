@@ -1597,6 +1597,23 @@ select option {
   }
 }
 
+/* Smartphone Grid Viewport (<= 768px) - Zero Horizontal Scroll */
+@media (max-width: 768px) {
+  .cg-mobile-bottom-nav {
+    display: grid !important;
+    grid-template-columns: repeat(5, 1fr) !important;
+    gap: 2px !important;
+    padding: 0 4px calc(env(safe-area-inset-bottom, 0px) + 4px) 4px !important;
+    overflow-x: hidden !important;
+    justify-content: stretch !important;
+  }
+  .cg-bottom-nav-item {
+    min-width: 0 !important;
+    width: 100% !important;
+    padding: 6px 2px !important;
+  }
+}
+
 /* Landscape Mode Compact Header (< 500px height) */
 @media (max-height: 500px) and (orientation: landscape) {
   .cg-mobile-top-header {

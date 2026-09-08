@@ -242,6 +242,30 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
 
   const primaryTabs: Array<{ id: string; label: string; icon: any; badge?: number }> = getPrimaryTabs();
 
+  const [isSmartphone, setIsSmartphone] = useState(() => {
+    if (typeof window === 'undefined') return true;
+    return window.innerWidth <= 768;
+  });
+
+  React.useEffect(() => {
+    const handleResize = () => {
+      setIsSmartphone(window.innerWidth <= 768);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const displayedTabs = isSmartphone ? primaryTabs : menuItems;
+
+  const isSecondaryActive = !primaryTabs.some(t => {
+    return activeTab === t.id || 
+      (t.id === 'briefing' && (activeTab === 'live' || activeTab === 'compass')) ||
+      (t.id === 'homework_book' && (activeTab === 'tasks' || activeTab === 'homework')) ||
+      (t.id === 'practice_board' && (activeTab === 'practice' || activeTab === 'focus_timer' || activeTab === 'loopstation')) ||
+      (t.id === 'events' && (activeTab === 'termine' || activeTab === 'all_appointments')) ||
+      (t.id === 'messages' && (activeTab === 'chat' || activeTab === 'inbox'));
+  });
+
   return (
     <>
       {/* Full Screen Slide-Over Drawer for "Menü" Tab */}
@@ -475,9 +499,22 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
         </div>
       )}
 
-      {/* Horizontal Scrollable Bottom Navigation Bar (All Menu Items in One Single Row) */}
-      <nav className="cg-mobile-bottom-nav" role="navigation" aria-label="Hauptnavigation Unten">
-        {menuItems.map(item => {
+      {/* Responsive Bottom Navigation Bar */}
+      <nav 
+        className="cg-mobile-bottom-nav" 
+        role="navigation" 
+        aria-label="Hauptnavigation Unten"
+        style={isSmartphone ? {
+          display: 'grid',
+          gridTemplateColumns: `repeat(${displayedTabs.length + 1}, 1fr)`,
+          gap: '2px',
+          padding: '0 4px calc(env(safe-area-inset-bottom, 0px) + 4px) 4px',
+          overflowX: 'hidden',
+          width: '100%',
+          boxSizing: 'border-box'
+        } : undefined}
+      >
+        {displayedTabs.map(item => {
           const TabIcon = item.icon;
           const isActive = activeTab === item.id || 
             (item.id === 'briefing' && (activeTab === 'live' || activeTab === 'compass')) ||
@@ -492,6 +529,12 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
               key={item.id}
               ref={el => { itemRefs.current[item.id] = el; }}
               className={`cg-bottom-nav-item ${isActive ? getActiveThemeClass() : ''}`}
+              style={{
+                touchAction: 'manipulation',
+                minWidth: isSmartphone ? 0 : undefined,
+                width: isSmartphone ? '100%' : undefined,
+                padding: isSmartphone ? '6px 2px' : undefined
+              }}
               onClick={() => setActiveTab(item.id)}
             >
               <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -513,20 +556,29 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
                   </span>
                 ) : null}
               </div>
-              <span>{item.label}</span>
+              <span style={isSmartphone ? { fontSize: '10.5px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' } : undefined}>
+                {item.label}
+              </span>
             </button>
           );
         })}
 
-        {/* Menü Drawer Button as the final item at the end of the scrollable row */}
+        {/* Menü Drawer Button as the final item at the end */}
         <button
-          className={`cg-bottom-nav-item ${drawerOpen ? getActiveThemeClass() : ''}`}
+          className={`cg-bottom-nav-item ${drawerOpen || (isSmartphone && isSecondaryActive) ? getActiveThemeClass() : ''}`}
+          style={{
+            touchAction: 'manipulation',
+            minWidth: isSmartphone ? 0 : undefined,
+            width: isSmartphone ? '100%' : undefined,
+            padding: isSmartphone ? '6px 2px' : undefined
+          }}
           onClick={() => setDrawerOpen(true)}
+          title="Gesamtes Menü öffnen"
         >
           <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <Menu size={20} color="currentColor" />
           </div>
-          <span>Menü</span>
+          <span style={isSmartphone ? { fontSize: '10.5px' } : undefined}>Menü</span>
         </button>
       </nav>
     </>

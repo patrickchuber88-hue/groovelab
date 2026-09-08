@@ -540,13 +540,15 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
         opacity: isFutureWeek ? 0.38 : 1,
         transition: 'opacity 0.15s ease'
       }}>
-        {/* Play/Pause Button or Count-In Overlay (iPad-optimiert: 38px) */}
+        {/* Play/Pause Button or Count-In Overlay (Mobile & Tablet ergonomisch: 42px) */}
         <button
           type="button"
           onClick={togglePlay}
           style={{
-            width: '38px',
-            height: '38px',
+            width: '42px',
+            height: '42px',
+            minWidth: '42px',
+            minHeight: '42px',
             borderRadius: '50%',
             background: countInStep !== null 
               ? '#f59e0b' 
@@ -566,7 +568,8 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
             transition: 'all 0.15s ease',
             padding: 0,
             fontSize: countInStep !== null ? '0.88rem' : undefined,
-            fontWeight: 900
+            fontWeight: 900,
+            touchAction: 'manipulation'
           }}
           className="hover-scale"
           title={countInStep !== null ? `Einzähler: ${countInStep}` : (isPlaying ? 'Pause' : 'Abspielen')}
@@ -1204,8 +1207,10 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
           type="button"
           onClick={togglePlay}
           style={{
-            width: '38px',
-            height: '38px',
+            width: '42px',
+            height: '42px',
+            minWidth: '42px',
+            minHeight: '42px',
             borderRadius: '50%',
             background: countInStep !== null
               ? '#f59e0b'
@@ -1226,7 +1231,8 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
             transform: isPlaying ? 'scale(0.96)' : 'scale(1)',
             padding: 0,
             fontSize: countInStep !== null ? '0.88rem' : undefined,
-            fontWeight: 900
+            fontWeight: 900,
+            touchAction: 'manipulation'
           }}
           className="hover-scale"
           title={countInStep !== null ? `Einzähler: ${countInStep}` : (isPlaying ? 'Pause' : 'Abspielen')}

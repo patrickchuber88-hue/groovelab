@@ -4770,7 +4770,10 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
 
 
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 10500, background: 'rgba(242, 242, 247, 0.65)', backdropFilter: 'blur(20px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+    <div 
+      className="student-detail-backdrop"
+      style={{ position: 'fixed', inset: 0, zIndex: 10500, background: 'rgba(242, 242, 247, 0.65)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}
+    >
       <style>{`
         @media (max-width: 900px) {
           .student-detail-grid {
@@ -4782,8 +4785,33 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
             gap: 16px !important;
           }
           .student-detail-panel {
-            padding: 16px !important;
+            padding: 20px 16px !important;
             border-radius: 24px !important;
+          }
+        }
+        @media (max-width: 768px) {
+          .student-detail-backdrop {
+            align-items: flex-end !important;
+            padding: 0 !important;
+          }
+          .student-detail-panel {
+            padding: 12px 16px calc(32px + env(safe-area-inset-bottom, 20px)) 16px !important;
+            border-radius: 28px 28px 0 0 !important;
+            max-width: 100% !important;
+            width: 100% !important;
+            max-height: 94dvh !important;
+            height: auto !important;
+            margin: 0 !important;
+            box-sizing: border-box !important;
+            background: #ffffff !important;
+            box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.25) !important;
+          }
+          .student-detail-close-btn {
+            top: 12px !important;
+            right: 12px !important;
+            width: 44px !important;
+            height: 44px !important;
+            touch-action: manipulation !important;
           }
         }
         .sim-viewport-mobile .student-detail-panel,
@@ -4807,11 +4835,12 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
         className="glass-panel student-detail-panel animation-slide-up" 
         style={{ background: 'rgba(255, 255, 255, 0.95)', padding: '32px', borderRadius: '32px', maxWidth: '920px', width: '100%', maxHeight: '90vh', overflowY: 'auto', position: 'relative', border: '1px solid rgba(0, 0, 0, 0.05)', boxShadow: '0 30px 60px rgba(0, 0, 0, 0.08)' }}
       >
+        <div className="cg-sheet-drag-handle" />
         <button 
           onClick={onClose} 
           aria-label="Schülerdetails schließen"
           style={{ position: 'absolute', top: 20, right: 20, background: 'rgba(0,0,0,0.05)', border: 'none', borderRadius: '50%', width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#64748b', transition: 'all 0.15s ease', zIndex: 10 }} 
-          className="hover-scale-mini" 
+          className="student-detail-close-btn hover-scale-mini" 
           title="Schließen"
         >
           <X size={20} />

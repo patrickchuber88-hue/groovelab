@@ -353,20 +353,26 @@ export const StudentMobileScheduleWizard: React.FC<StudentMobileScheduleWizardPr
   const activeColor = activePlatform === 'groovelab' ? '#eab308' : '#34a853';
 
   return (
-    <div style={{
-      position: 'fixed',
-      inset: 0,
-      zIndex: 9999,
-      background: 'radial-gradient(circle at center, #052e16 0%, #022c22 100%)',
-      backdropFilter: 'blur(16px)',
-      WebkitBackdropFilter: 'blur(16px)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: '16px'
-    }}>
+    <div 
+      className="cg-bottom-sheet-backdrop"
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        zIndex: 9999,
+        background: 'radial-gradient(circle at center, #052e16 0%, #022c22 100%)',
+        backdropFilter: 'blur(16px)',
+        WebkitBackdropFilter: 'blur(16px)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '16px'
+      }}
+    >
       <div 
-        className="glass-panel animate-scale-up"
+        className="glass-panel cg-mobile-bottom-sheet animate-scale-up"
         style={{
           width: '100%',
           maxWidth: '440px',
@@ -381,9 +387,12 @@ export const StudentMobileScheduleWizard: React.FC<StudentMobileScheduleWizardPr
           fontFamily: 'Inter, -apple-system, sans-serif'
         }}
       >
+        {/* Native Pull / Drag Indicator for Mobile */}
+        <div className="cg-sheet-drag-handle" />
+
         {/* Header */}
         <div style={{
-          padding: '20px 22px 16px 22px',
+          padding: '16px 22px 14px 22px',
           borderBottom: '1px solid #f1f5f9',
           display: 'flex',
           justifyContent: 'space-between',
@@ -814,7 +823,7 @@ export const StudentMobileScheduleWizard: React.FC<StudentMobileScheduleWizardPr
 
         {/* Footer Actions */}
         <div style={{
-          padding: '16px 22px',
+          padding: '16px 22px calc(16px + env(safe-area-inset-bottom, 12px)) 22px',
           borderTop: '1px solid #f1f5f9',
           background: '#ffffff',
           display: 'flex',
@@ -829,20 +838,22 @@ export const StudentMobileScheduleWizard: React.FC<StudentMobileScheduleWizardPr
               background: activeColor,
               color: activePlatform === 'groovelab' ? '#1e293b' : '#ffffff',
               border: 'none',
+              minHeight: '50px',
               padding: '12px',
-              borderRadius: '14px',
+              borderRadius: '16px',
               fontWeight: 800,
-              fontSize: '0.86rem',
+              fontSize: '0.92rem',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               gap: '8px',
+              touchAction: 'manipulation',
               boxShadow: `0 4px 14px ${activeColor}40`
             }}
             className="hover-scale"
           >
-            <Save size={16} />
+            <Save size={18} />
             <span>{saving ? 'Wird gespeichert...' : 'Wunschtermine speichern'}</span>
           </button>
 
