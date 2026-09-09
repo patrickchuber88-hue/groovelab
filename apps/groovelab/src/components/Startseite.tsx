@@ -246,10 +246,13 @@ export const Startseite: React.FC<StartseiteProps> = ({
 
       const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
       if (isLocalhost) {
-        window.location.href = `http://${window.location.hostname}:${window.location.port}/?school_id=${school.id}&subdomain=${school.subdomain}&platform=${targetPlatform}`;
-      } else {
+        window.location.href = `http://${window.location.hostname}:${window.location.port}/?school_id=${school.id}&subdomain=${school.subdomain || ''}&platform=${targetPlatform}`;
+      } else if (school.subdomain) {
         const baseDomain = window.location.hostname.replace('www.', ''); // e.g. campus-groovelab.de
         window.location.href = `${window.location.protocol}//${school.subdomain}.${baseDomain}/?school_id=${school.id}&platform=${targetPlatform}`;
+      } else {
+        // Schule ohne Subdomain: direkt mit school_id-Parameter auf der Hauptdomain anmelden
+        window.location.href = `${window.location.protocol}//${window.location.hostname}/?school_id=${school.id}&platform=${targetPlatform}`;
       }
     }
   };

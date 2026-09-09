@@ -4242,7 +4242,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             });
           }}
           style={{ 
-            fontSize: '32px', 
+            fontSize: schoolName ? '22px' : '32px', 
             fontWeight: 900, 
             color: isGroovelabKiosk ? '#062413' : '#ffffff', 
             marginBottom: '6px', 
@@ -4252,10 +4252,10 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             userSelect: 'none',
             textAlign: 'center',
             textShadow: isGroovelabKiosk ? 'none' : '0 2px 8px rgba(0,0,0,0.2)',
-            transition: 'color 0.5s ease'
+            transition: 'color 0.5s ease, font-size 0.3s ease'
           }}
         >
-          {isGroovelabKiosk ? 'Groovelab-Login' : 'Campus-Login'}
+          {isGroovelabKiosk ? 'Groovelab-Login' : 'Campus-Login'}{schoolName ? ` • ${schoolName}` : ''}
         </h1>
         <p style={{ 
           color: isGroovelabKiosk ? '#78350f' : (qrScanPrompt ? '#fde047' : '#e6f4ea'), 
@@ -4268,7 +4268,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           textShadow: isGroovelabKiosk ? 'none' : '0 1px 2px rgba(0,0,0,0.1)',
           transition: 'color 0.5s ease'
         }}>
-          {qrScanPrompt || (schoolName && !schoolData?.logo_url ? `für ${schoolName}` : `Halte deinen Ausweis vor die Kamera, um dich einzuloggen.`)}
+          {qrScanPrompt || (schoolName ? `für ${schoolName}` : `Halte deinen Ausweis vor die Kamera, um dich einzuloggen.`)}
         </p>
 
       {/* Main Standard QR-Scanner Card */}

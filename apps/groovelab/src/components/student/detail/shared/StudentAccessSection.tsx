@@ -24,9 +24,36 @@ export const StudentAccessSection: React.FC<StudentAccessSectionProps> = ({
   onOpenQrOverlay
 }) => {
   const [copiedLink, setCopiedLink] = useState(false);
+  const [generatingLink, setGeneratingLink] = useState(false);
   const [showPinResetModal, setShowPinResetModal] = useState(false);
   const [isResettingPin, setIsResettingPin] = useState(false);
   const [revokingSessions, setRevokingSessions] = useState(false);
+
+  // ── Rechtskonforme Einmaltoken-Generierung (DSGVO Art. 25 & 32) ──────────
+  // Der permanente qr_token des Schülers darf NIEMALS in einer URL erscheinen.
+  // Stattdessen wird ein serverseitiger Einmaltoken (30 Tage, single-use) generiert.
+  const handleCopyPwaLink = async () => {
+    const targetPlatform = isGroove ? 'groovelab' : 'campus';
+    try {
+      setGeneratingLink(true);
+      const { data, error } = await supabase.rpc('generate_student_onboarding_token', {
+        p_student_user_id: student.id
+      });
+      if (error || !data?.success || !data?.token) {
+        throw new Error(error?.message || 'Token konnte nicht generiert werden.');
+      }
+      const link = `${window.location.origin}/onboarding/${data.token}?platform=${targetPlatform}`;
+      await navigator.clipboard.writeText(link);
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 2000);
+    } catch (err: any) {
+      console.error('[Onboarding] Einmaltoken-Generierung fehlgeschlagen:', err);
+      alert('Fehler: ' + (err.message || 'Link konnte nicht erstellt werden.'));
+    } finally {
+      setGeneratingLink(false);
+    }
+  };
+
 
   const cardBg = isGroove
     ? 'linear-gradient(135deg, #fefce8 0%, #ffffff 100%)'
@@ -44,14 +71,6 @@ export const StudentAccessSection: React.FC<StudentAccessSectionProps> = ({
     ? 'Musiker-Avatar • GrooveLab PWA Link'
     : 'Instrument-Avatar • Campus PWA Link';
 
-  const handleCopyPwaLink = () => {
-    const targetPlatform = isGroove ? 'groovelab' : 'campus';
-    const effectiveToken = localQrToken || student.qr_token || student.id;
-    const link = `${window.location.origin}/onboarding/${effectiveToken}?platform=${targetPlatform}`;
-    navigator.clipboard.writeText(link);
-    setCopiedLink(true);
-    setTimeout(() => setCopiedLink(false), 2000);
-  };
 
   const handleResetStudentPin = async () => {
     try {

@@ -347,80 +347,11 @@ export const StudentOnboardingPage: React.FC<StudentOnboardingPageProps> = ({ to
           return;
         }
 
-        // 2. Fallback for pending students (stored in pending_students_decrypted view)
-        let userData: any = null;
-        if (token) {
-          try {
-            const { data: pendingData } = await supabase
-              .from('pending_students_decrypted')
-              .select('*')
-              .eq('id', token)
-              .maybeSingle();
+        // Fail-Closed: RPC fehlgeschlagen → kein direkter Tabellen-Fallback (Zero-Trust, DSGVO Art. 25)
+        // Der Onboarding-Link ist ungültig, abgelaufen oder bereits verwendet.
+        const errorMsg = rpcErr?.message || 'Ungültiger oder abgelaufener Einladungs-Link.';
+        throw new Error(errorMsg);
 
-            if (pendingData) {
-              userData = {
-                ...pendingData,
-                role: 'student',
-                isPendingOnboarding: true,
-                qr_token: pendingData.id
-              };
-            }
-          } catch (pe) {
-            console.warn('[Onboarding] Fallback pending_students_decrypted query warning:', pe);
-          }
-        }
-
-        if (!userData) {
-          throw new Error('Ungültiger Onboarding-Link oder Code nicht gefunden.');
-        }
-
-        let schoolObj = Array.isArray(userData.schools) ? userData.schools[0] : userData.schools;
-        if (!schoolObj && userData.school_id) {
-          const { data: sData } = await supabase
-            .from('schools')
-            .select('*')
-            .eq('id', userData.school_id)
-            .maybeSingle();
-          if (sData) {
-            schoolObj = sData;
-            userData.schools = sData;
-          }
-        }
-
-        setStudent(userData);
-        setSchool(schoolObj);
-        if (userData.parental_consent_given_at) {
-          setConsentSaved(true);
-          setParentalConsent(true);
-          if (userData.campus_usage_mode) setCampusUsageMode(userData.campus_usage_mode);
-        }
-
-        // Fetch schedule preference status
-        checkScheduleStatus(userData.id);
-
-        // Check if action parameter specifies schedule onboarding
-        const urlParams = new URLSearchParams(window.location.search);
-        if (urlParams.get('action') === 'schedule') {
-          setShowScheduleModal(true);
-        }
-
-        // Auto-save this profile to local profiles registry
-        if (typeof window !== 'undefined') {
-          const registry = JSON.parse(localStorage.getItem('groovelab_local_profiles') || '[]');
-          if (!registry.some((p: any) => p.id === userData.id)) {
-            registry.push({
-              id: userData.id,
-              first_name: userData.first_name,
-              last_name: userData.last_name,
-              photo_url: userData.photo_url,
-              role: userData.role,
-              school_id: userData.school_id,
-              qr_token: userData.qr_token
-            });
-            localStorage.setItem('groovelab_local_profiles', JSON.stringify(registry));
-            console.log('[Onboarding] Profile registered locally:', userData.first_name);
-          }
-        }
       } catch (err: any) {
         console.error('[Onboarding] Error:', err);
         setError(err.message || 'Verbindungsfehler beim Laden des Profils.');
