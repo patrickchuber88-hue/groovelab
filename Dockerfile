@@ -11,9 +11,10 @@ COPY apps/groovelab/package.json ./apps/groovelab/
 
 RUN npm ci
 
-# Copy the rest of the app source and packages
+# Copy the rest of the app source, packages, and build scripts
 COPY apps/groovelab/ ./apps/groovelab/
 COPY packages/ ./packages/
+COPY scripts/ ./scripts/
 
 # Build args for Supabase (injected by Coolify as env vars at build time)
 ARG VITE_SUPABASE_URL
@@ -55,6 +56,7 @@ RUN printf 'server {\n\
         add_header Cache-Control "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0";\n\
     }\n\
     location /assets/ {\n\
+        gzip_static on;\n\
         expires 1y;\n\
         add_header Cache-Control "public, immutable";\n\
         # Optimization: Turn off logging for static assets to drastically reduce disk I/O\n\

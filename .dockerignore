@@ -32,3 +32,4 @@ recovery_temp
 !apps/groovelab/src/**/*.tsx
 !apps/groovelab/tsconfig*.json
 !apps/groovelab/vite.config.ts
+!scripts/**
