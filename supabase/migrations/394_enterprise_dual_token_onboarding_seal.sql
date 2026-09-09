@@ -160,6 +160,10 @@ BEGIN
                 v_first_name := NULL;
             END;
 
+            IF v_first_name IS NULL OR v_first_name = '' THEN
+                v_first_name := COALESCE(v_user_rec.first_name, '');
+            END IF;
+
             SELECT name, logo_url, primary_color, subdomain
             INTO v_school_rec
             FROM public.schools
@@ -220,7 +224,9 @@ BEGIN
         u.is_groovelab_active,
         u.campus_ui_level,
         u.app_usage_mode,
-        u.photo_url
+        u.photo_url,
+        u.first_name,
+        u.last_name
     INTO v_user_rec
     FROM public.users_raw u
     WHERE u.id = v_target_user_id;
@@ -236,7 +242,9 @@ BEGIN
             false AS is_groovelab_active,
             'standard' AS campus_ui_level,
             'selbstnutzer' AS app_usage_mode,
-            NULL AS photo_url
+            NULL AS photo_url,
+            '' AS first_name,
+            '' AS last_name
         INTO v_user_rec
         FROM public.students s
         WHERE s.id = v_target_user_id;
@@ -257,6 +265,10 @@ BEGIN
         v_first_name := NULL;
     END;
 
+    IF v_first_name IS NULL OR v_first_name = '' THEN
+        v_first_name := COALESCE(v_user_rec.first_name, '');
+    END IF;
+
     BEGIN
         SELECT LEFT(sln.last_name, 1) || '.'
         INTO v_last_initial
@@ -266,6 +278,14 @@ BEGIN
     EXCEPTION WHEN OTHERS THEN
         v_last_initial := NULL;
     END;
+
+    IF v_last_initial IS NULL OR v_last_initial = '.' OR v_last_initial = '' THEN
+        IF v_user_rec.last_name IS NOT NULL AND v_user_rec.last_name <> '' THEN
+            v_last_initial := LEFT(v_user_rec.last_name, 1) || '.';
+        ELSE
+            v_last_initial := '';
+        END IF;
+    END IF;
 
     -- Schuldaten laden
     SELECT name, logo_url, primary_color, subdomain

@@ -29,36 +29,59 @@ export const StudentAccessSection: React.FC<StudentAccessSectionProps> = ({
   const [isResettingPin, setIsResettingPin] = useState(false);
   const [revokingSessions, setRevokingSessions] = useState(false);
 
+  // ── Universelle Safari- und iOS-sichere Zwischenablage-Funktion ─────────
+  const copyToClipboardSafely = async (text: string): Promise<boolean> => {
+    // 1. Primär: Moderne navigator.clipboard API
+    if (navigator?.clipboard?.writeText && window.isSecureContext) {
+      try {
+        await navigator.clipboard.writeText(text);
+        return true;
+      } catch (e) {
+        console.warn('[Clipboard] navigator.clipboard blockiert (Safari Async Policy), nutze execCommand:', e);
+      }
+    }
+    // 2. Sekundär: Bewährter document.execCommand Fallback für Safari / WebKit
+    try {
+      const textArea = document.createElement('textarea');
+      textArea.value = text;
+      textArea.style.position = 'fixed';
+      textArea.style.left = '-999999px';
+      textArea.style.top = '-999999px';
+      textArea.setAttribute('readonly', '');
+      document.body.appendChild(textArea);
+      textArea.select();
+      const successful = document.execCommand('copy');
+      document.body.removeChild(textArea);
+      return successful;
+    } catch (err) {
+      console.error('[Clipboard] execCommand fehlgeschlagen:', err);
+      return false;
+    }
+  };
+
   // ── Duale Token-Architektur (DSGVO Art. 25 & 32 / Zero-Downtime) ──────────
-  // Primär wird ein zeitlich begrenzter Einmal-Token für digitale Einladungen generiert.
-  // Sollte der Server-RPC temporär unerreichbar sein, greift ein transparenter Fallback
-  // auf das pseudonyme Ausweis-Token, damit Lehrkräfte niemals blockiert werden.
   const handleCopyPwaLink = async () => {
     const targetPlatform = isGroove ? 'groovelab' : 'campus';
     const effectiveToken = localQrToken || student.qr_token || student.id;
     let finalLink = `${window.location.origin}/onboarding/${effectiveToken}?platform=${targetPlatform}`;
 
+    setGeneratingLink(true);
     try {
-      setGeneratingLink(true);
       const { data, error } = await supabase.rpc('generate_student_onboarding_token', {
         p_student_user_id: student.id
       });
       if (!error && data?.success && data?.token) {
         finalLink = `${window.location.origin}/onboarding/${data.token}?platform=${targetPlatform}`;
       } else if (error || (data && !data.success)) {
-        console.warn('[Onboarding] Einmaltoken-Generierung fiel auf QR-Token zurück:', error?.message || data?.error);
+        console.warn('[Onboarding] Einmaltoken RPC fiel auf Ausweis-Token zurück:', error?.message || data?.error);
       }
     } catch (err: any) {
-      console.warn('[Onboarding] Einmaltoken RPC-Aufruf fehlgeschlagen, nutze Fallback:', err);
+      console.warn('[Onboarding] Einmaltoken RPC-Aufruf nicht erfolgreich, nutze Fallback:', err);
     } finally {
-      try {
-        await navigator.clipboard.writeText(finalLink);
-        setCopiedLink(true);
-        setTimeout(() => setCopiedLink(false), 2000);
-      } catch (clipboardErr) {
-        console.error('[Onboarding] Clipboard-Fehler:', clipboardErr);
-      }
+      await copyToClipboardSafely(finalLink);
+      setCopiedLink(true);
       setGeneratingLink(false);
+      setTimeout(() => setCopiedLink(false), 3000);
     }
   };
 
@@ -228,27 +251,41 @@ export const StudentAccessSection: React.FC<StudentAccessSectionProps> = ({
           <button
             type="button"
             onClick={handleCopyPwaLink}
+            disabled={generatingLink}
             style={{
               flex: 1,
-              background: copiedLink ? '#e6f4ea' : badgeBg,
-              color: copiedLink ? '#15803d' : '#ffffff',
+              background: copiedLink ? '#15803d' : (generatingLink ? '#64748b' : badgeBg),
+              color: '#ffffff',
               border: 'none',
               borderRadius: '14px',
               padding: '12px 14px',
               fontSize: '0.8rem',
               fontWeight: 800,
-              cursor: 'pointer',
+              cursor: generatingLink ? 'wait' : 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               gap: '6px',
-              transition: 'all 0.15s',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.06)'
+              transition: 'all 0.2s ease',
+              boxShadow: copiedLink ? '0 4px 14px rgba(21, 128, 61, 0.3)' : '0 2px 8px rgba(0,0,0,0.06)',
+              transform: copiedLink ? 'scale(1.02)' : 'none'
             }}
             className="hover-scale"
           >
-            {copiedLink ? <Check size={15} /> : <Copy size={15} />}
-            <span>{copiedLink ? 'Link kopiert! ✓' : `${badgeText} PWA Link`}</span>
+            {generatingLink ? (
+              <RefreshCw size={15} className="animate-spin" />
+            ) : copiedLink ? (
+              <Check size={16} />
+            ) : (
+              <Copy size={15} />
+            )}
+            <span>
+              {generatingLink
+                ? 'Erstelle Link...'
+                : copiedLink
+                ? 'Link kopiert! ✓'
+                : `${badgeText} PWA Link`}
+            </span>
           </button>
 
           {onOpenQrOverlay && (
@@ -278,6 +315,28 @@ export const StudentAccessSection: React.FC<StudentAccessSectionProps> = ({
             </button>
           )}
         </div>
+
+        {copiedLink && (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              background: '#f0fdf4',
+              border: '1.5px solid #86efac',
+              borderRadius: '14px',
+              padding: '10px 14px',
+              fontSize: '0.78rem',
+              fontWeight: 800,
+              color: '#15803d',
+              boxShadow: '0 4px 12px rgba(34, 197, 94, 0.12)'
+            }}
+          >
+            <Check size={16} color="#16a34a" />
+            <span>PWA-Zugangslink erfolgreich in die Zwischenablage kopiert!</span>
+          </div>
+        )}
       </section>
 
       {/* Face-to-Face PIN-Reset & Soforthilfe */}
