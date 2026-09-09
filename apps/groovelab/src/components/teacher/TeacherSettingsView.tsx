@@ -1,6 +1,6 @@
 import React from 'react';
 import {
-  BookOpen, Clock, Disc, Lightbulb, Moon, Radio, ShieldCheck, Sliders, Sparkles, X
+  BookOpen, Clock, Disc, Lightbulb, Moon, Radio, ShieldCheck, Sliders, Sparkles, Sun, X
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { DEFAULT_QUIET_HOURS_CONFIG, QuietHoursConfig } from '../../utils/chatRespectGuard';
@@ -789,12 +789,26 @@ export const TeacherSettingsView: React.FC<TeacherSettingsViewProps> = ({
                                   const { error } = await supabase.from('users').update({ personal_pin: val }).eq('id', teacher.id);
                                   if (error) throw error;
                                   setTeacher((prev: any) => ({ ...prev, personal_pin: val }));
-                                  alert('Coach-PIN erfolgreich aktualisiert! 🛡️');
+                                  alert('Coach-PIN erfolgreich aktualisiert!');
                                 } catch (e: any) {
                                   alert('Fehler beim Speichern: ' + e.message);
                                 }
                               }}
-                              style={{ padding: '10px 18px', borderRadius: '10px', background: '#eab308', color: '#1e293b', border: 'none', fontWeight: 800, fontSize: '0.82rem', cursor: 'pointer' }}
+                              style={{ 
+                                padding: '10px 18px', 
+                                minHeight: '44px',
+                                borderRadius: '10px', 
+                                background: '#eab308', 
+                                color: '#1e293b', 
+                                border: 'none', 
+                                fontWeight: 800, 
+                                fontSize: '0.82rem', 
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                touchAction: 'manipulation'
+                              }}
                               className="hover-scale"
                             >
                               PIN speichern
@@ -903,8 +917,9 @@ export const TeacherSettingsView: React.FC<TeacherSettingsViewProps> = ({
                           pointerEvents: isEnabled ? 'auto' : 'none'
                         }}>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                            <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#334155' }}>
-                              🌙 Beginn der Ruhezeit (abends):
+                            <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#334155', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <Moon size={14} color="#64748b" />
+                              <span>Beginn der Ruhezeit (abends):</span>
                             </label>
                             <input
                               type="time"
@@ -925,8 +940,9 @@ export const TeacherSettingsView: React.FC<TeacherSettingsViewProps> = ({
                           </div>
 
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                            <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#334155' }}>
-                              ☀️ Ende der Ruhezeit (morgens):
+                            <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#334155', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <Sun size={14} color="#f59e0b" />
+                              <span>Ende der Ruhezeit (morgens):</span>
                             </label>
                             <input
                               type="time"
@@ -1035,7 +1051,7 @@ export const TeacherSettingsView: React.FC<TeacherSettingsViewProps> = ({
                             Außerhalb deiner Unterrichts- und Dienstzeiten besteht keine Pflicht zur ständigen Erreichbarkeit. Im Chatfenster von Schülern wird dein Ruhezeit-Banner eingeblendet:
                             <br />
                             <em style={{ display: 'block', marginTop: '6px', padding: '8px 12px', background: '#ffffff', borderRadius: '8px', border: '1px solid #bbf7d0', color: '#166534' }}>
-                              „🌙 Ruhezeit von {teacher?.first_name ? `${teacher.first_name} ${teacher.last_name || ''}`.trim() : 'deiner Lehrkraft'}: Deine Nachricht wird zugestellt. Beachte bitte, dass Lehrkräfte außerhalb ihrer Unterrichtszeiten nicht zur Beantwortung verpflichtet sind. Dringende Absagen bitte per E-Mail an die Lehrkraft senden.“
+                              „<Moon size={13} color="#166534" style={{ display: 'inline', marginRight: '4px', verticalAlign: 'middle' }} />Ruhezeit von {teacher?.first_name ? `${teacher.first_name} ${teacher.last_name || ''}`.trim() : 'deiner Lehrkraft'}: Deine Nachricht wird zugestellt. Beachte bitte, dass Lehrkräfte außerhalb ihrer Unterrichtszeiten nicht zur Beantwortung verpflichtet sind. Dringende Absagen bitte per E-Mail an die Lehrkraft senden.“
                             </em>
                           </p>
                         </div>

@@ -1367,6 +1367,48 @@ export function ScheduleCalendarViewDesktop({
     setIsGroupModeActive(false);
   };
 
+  // Enterprise+ Goldstandard: Determine teacher's regular room and teaching time window on a given weekday
+  const getTeacherRegularWindowForDay = useCallback((targetDayOfWeek: number) => {
+    let regularRoomId: string | null = null;
+    let regMin = Infinity;
+    let regMax = -Infinity;
+
+    // 1. Primary: boards (Designer single source of truth)
+    if (boards && boards.length > 0) {
+      const mb = boards.find((b: any) => b.dayOfWeek === targetDayOfWeek);
+      if (mb) {
+        if (mb.roomId) regularRoomId = mb.roomId;
+        (mb.students || []).forEach((st: any) => {
+          const tStr = st.assignedTime || '';
+          if (tStr) {
+            const s = timeToMinutes(tStr);
+            const dur = st.duration || 30;
+            const e = s + dur;
+            if (s < regMin) regMin = s;
+            if (e > regMax) regMax = e;
+          }
+        });
+      }
+    }
+
+    // 2. Secondary fallback: cachedWeekSchedules
+    if (cachedWeekSchedules && cachedWeekSchedules.length > 0) {
+      cachedWeekSchedules.forEach((s: any) => {
+        if (s.day_of_week === targetDayOfWeek && s.teacher_id === userId) {
+          if (!regularRoomId && s.room_id) regularRoomId = s.room_id;
+          if (s.time_slot) {
+            const sStart = timeToMinutes(s.time_slot);
+            const sEnd = sStart + (s.duration || 45);
+            if (sStart < regMin) regMin = sStart;
+            if (sEnd > regMax) regMax = sEnd;
+          }
+        }
+      });
+    }
+
+    return { regularRoomId, regMin, regMax };
+  }, [boards, cachedWeekSchedules, userId]);
+
   const persistChangesDirectly = async (changesToSave: ScheduleOccurrence[]) => {
     setLoading(true);
     try {
@@ -1496,43 +1538,29 @@ export function ScheduleCalendarViewDesktop({
               .eq('start_time', oldStartTime);
           }
 
-          const origDateStr = change.original_date || (originalOcc ? originalOcc.date : change.date);
-          const origTimeStr = change.original_start_time || (originalOcc ? originalOcc.start_time : change.start_time);
-          const originalRoomId = originalOcc?.template_room_id !== undefined 
-            ? originalOcc.template_room_id 
-            : (originalOcc?.schedules?.room_id || null);
-          const currentRoomId = change.schedules?.room_id || null;
-
-           const timeChanged = change.date !== origDateStr || change.start_time.substring(0, 5) !== origTimeStr.substring(0, 5);
-          const roomChanged = originalRoomId !== currentRoomId;
-          const isCancelled = ['cancelled', 'canceled_by_student'].includes(change.status);
-
-          // Compute regular teaching range for this teacher in this room on target date's weekday
           const targetDate = new Date(change.date + 'T00:00:00');
           const targetDayOfWeek = targetDate.getDay() || 7; // 1=Mon … 7=Sun
-          let regMin = Infinity;
-          let regMax = -Infinity;
-          (cachedWeekSchedules || []).forEach((s: any) => {
-            if (s.day_of_week !== targetDayOfWeek) return;
-            if (s.teacher_id !== userId) return;
-            if (s.room_id !== currentRoomId) return; // Must be in the same room
-            const sStart = timeToMinutes(s.time_slot);
-            const sEnd = sStart + (s.duration || 45);
-            if (sStart < regMin) regMin = sStart;
-            if (sEnd > regMax) regMax = sEnd;
-          });
+          const { regularRoomId, regMin, regMax } = getTeacherRegularWindowForDay(targetDayOfWeek);
+
+          const currentRoomId = change.schedules?.room_id || null;
+          const effectiveTargetRoomId = currentRoomId || regularRoomId;
+          const isCancelled = ['cancelled', 'canceled_by_student'].includes(change.status);
 
           const occStartMinutes = timeToMinutes(change.start_time);
-          const occEndMinutes = occStartMinutes + (change.duration || 45);
+          const occEndMinutes = occStartMinutes + (change.duration || 30);
           const isInsideOwnRegularBlock = regMin !== Infinity && occStartMinutes >= regMin && occEndMinutes <= regMax;
+          const isDifferentRoom = Boolean(effectiveTargetRoomId && regularRoomId && effectiveTargetRoomId !== regularRoomId);
 
-          const needsRoomBooking = !isCancelled && currentRoomId && (timeChanged || roomChanged) && !isInsideOwnRegularBlock;
+          // Raumbuchungen dürfen NUR stattfinden:
+          // 1. wenn ein neuer Raum gebucht wird (isDifferentRoom), ODER
+          // 2. wenn der Termin außerhalb der regulären Unterrichtszeiten verschoben wurde (!isInsideOwnRegularBlock)
+          const needsRoomBooking = !isCancelled && Boolean(effectiveTargetRoomId) && (isDifferentRoom || !isInsideOwnRegularBlock);
 
-          const newBookingKey = `${currentRoomId}_${change.date}_${change.start_time.substring(0, 5)}`;
+          const newBookingKey = `${effectiveTargetRoomId}_${change.date}_${change.start_time.substring(0, 5)}`;
           if (needsRoomBooking && !processedBookings.has(`ins_${newBookingKey}`)) {
             processedBookings.add(`ins_${newBookingKey}`);
             const startMins = timeToMinutes(change.start_time);
-            const duration = change.duration || 45;
+            const duration = change.duration || 30;
             const endMins = startMins + duration;
             const eh = Math.floor(endMins / 60);
             const em = endMins % 60;
@@ -1542,7 +1570,7 @@ export function ScheduleCalendarViewDesktop({
 
             await supabase.from('room_bookings').insert({
               school_id: schoolId,
-              room_id: currentRoomId,
+              room_id: effectiveTargetRoomId,
               booked_by: userId,
               date: change.date,
               start_time: change.start_time.length === 5 ? `${change.start_time}:00` : change.start_time,
@@ -1990,7 +2018,7 @@ export function ScheduleCalendarViewDesktop({
         ] = await Promise.all([
           // 1. Unified Room Bookings for the school week (includes room name and user)
           supabase.from('room_bookings')
-            .select('room_id, date, start_time, end_time, booked_by, room:rooms(name), user:users(first_name, last_name)')
+            .select('id, room_id, date, start_time, end_time, booked_by, title, room:rooms(name), user:users(first_name, last_name)')
             .eq('school_id', schoolId)
             .gte('date', startDateStr)
             .lte('date', endDateStr)
@@ -2032,7 +2060,36 @@ export function ScheduleCalendarViewDesktop({
         ]);
 
         if (rbDataResult.data) {
-          roomBookings = rbDataResult.data.filter((b: any) => b.booked_by === userId);
+          let rbList = rbDataResult.data.filter((b: any) => b.booked_by === userId);
+
+          // Self-Healing Cleanup: Delete any spurious room bookings that fall inside teacher's regular schedule window in that room
+          try {
+            const spuriousBookings = rbList.filter((b: any) => {
+              if (b.booked_by !== userId) return false;
+              if (!b.title || !b.title.startsWith('Unterricht: ')) return false;
+              const bDate = new Date(b.date + 'T00:00:00');
+              const bDayOfWeek = bDate.getDay() || 7;
+              const { regularRoomId, regMin, regMax } = getTeacherRegularWindowForDay(bDayOfWeek);
+              if (!regularRoomId || b.room_id !== regularRoomId) return false;
+              const bStart = timeToMinutes(b.start_time);
+              const bEnd = b.end_time ? timeToMinutes(b.end_time) : bStart + 45;
+              return regMin !== Infinity && bStart >= regMin && bEnd <= regMax;
+            });
+
+            if (spuriousBookings.length > 0) {
+              const spuriousIds = spuriousBookings.map((b: any) => b.id);
+              supabase.from('room_bookings').delete().in('id', spuriousIds).then(({ error }) => {
+                if (!error) {
+                  window.dispatchEvent(new CustomEvent('refresh-bookings'));
+                }
+              });
+              rbList = rbList.filter((b: any) => !spuriousBookings.some((s: any) => s.id === b.id));
+            }
+          } catch (healErr) {
+            console.warn('Self-healing room bookings cleanup:', healErr);
+          }
+
+          roomBookings = rbList;
           setCachedWeekRoomBookings(rbDataResult.data);
         }
         
@@ -2640,20 +2697,13 @@ export function ScheduleCalendarViewDesktop({
 
                 // Check if this falls inside the teacher's regular block in that room on that weekday
                 const targetDayOfWeek = destDate.getDay() || 7; // 1=Mon … 7=Sun
-                let regMin = Infinity;
-                let regMax = -Infinity;
-                (cachedWeekSchedules || []).forEach((s: any) => {
-                  if (s.day_of_week !== targetDayOfWeek) return;
-                  if (s.teacher_id !== userId) return;
-                  if (s.room_id !== evt.activeRoomId) return;
-                  const sStart = timeToMinutes(s.time_slot);
-                  const sEnd = sStart + (s.duration || 45);
-                  if (sStart < regMin) regMin = sStart;
-                  if (sEnd > regMax) regMax = sEnd;
-                });
+                const { regularRoomId, regMin, regMax } = getTeacherRegularWindowForDay(targetDayOfWeek);
+                const effectiveRoomId = evt.activeRoomId || regularRoomId;
 
+                const isDifferentRoom = Boolean(effectiveRoomId && regularRoomId && effectiveRoomId !== regularRoomId);
                 const isInsideOwnRegularBlock = regMin !== Infinity && startMins >= regMin && endMins <= regMax;
-                if (isInsideOwnRegularBlock) {
+
+                if (!isDifferentRoom && isInsideOwnRegularBlock) {
                   return Promise.resolve();
                 }
 
@@ -2768,6 +2818,59 @@ export function ScheduleCalendarViewDesktop({
     return `${endYear}-07-31`;
   };
 
+  // Enterprise+ Goldstandard: Check if an occurrence matches its designer master slot
+  const checkIsOccurrenceAtMasterSlot = (occ: any): boolean => {
+    if (!occ || !occ.student_id || occ.student_id === 'vacant') return true;
+    let masterDayOfWeek: number | null = null;
+    let masterAssignedTime: string | null = null;
+
+    if (boards && boards.length > 0) {
+      for (const board of boards) {
+        const studentInBoard = board.students?.find((s: any) => {
+          if (occ.student_id && (s.id === occ.student_id || s.student_id === occ.student_id || s.studentId === occ.student_id)) return true;
+          if (s.groupStudents && Array.isArray(s.groupStudents)) {
+            if (s.groupStudents.some((gs: any) => gs.id === occ.student_id || gs.student_id === occ.student_id || gs.studentId === occ.student_id)) return true;
+          }
+          const occFn = (occ.student?.first_name || occ.first_name || '').trim().toLowerCase();
+          const occLn = (occ.student?.last_name || occ.last_name || '').trim().toLowerCase();
+          let sFn = (s.first_name || s.firstName || '').trim().toLowerCase();
+          let sLn = (s.last_name || s.lastName || '').trim().toLowerCase();
+          if (!sFn && (s.name || s.studentName)) {
+            const parts = (s.name || s.studentName).trim().split(' ');
+            sFn = (parts[0] || '').toLowerCase();
+            sLn = (parts.slice(1).join(' ') || '').toLowerCase();
+          }
+          if (sFn && occFn && (sFn === occFn || occFn.includes(sFn) || sFn.includes(occFn))) {
+            if (!sLn || !occLn || sLn === occLn || sLn.startsWith(occLn[0]) || occLn.startsWith(sLn[0])) {
+              return true;
+            }
+          }
+          return false;
+        });
+        if (studentInBoard) {
+          masterDayOfWeek = board.dayOfWeek;
+          masterAssignedTime = studentInBoard.assignedTime;
+          break;
+        }
+      }
+    }
+
+    if (masterDayOfWeek === null && cachedWeekSchedules) {
+      const studentSchedule = cachedWeekSchedules.find((s: any) => s.student_id === occ.student_id && s.teacher_id === userId);
+      if (studentSchedule) {
+        masterDayOfWeek = studentSchedule.day_of_week;
+        masterAssignedTime = studentSchedule.time_slot;
+      }
+    }
+
+    if (masterDayOfWeek === null || masterAssignedTime === null) return true;
+
+    const occDateObj = new Date(occ.date + 'T00:00:00');
+    const occDayOfWeek = occDateObj.getDay() || 7;
+    const occStartTimeSafe = (occ.start_time || '').substring(0, 5);
+    return masterDayOfWeek === occDayOfWeek && masterAssignedTime.substring(0, 5) === occStartTimeSafe;
+  };
+
   // Enterprise+ Goldstandard: Live Dry-Run Preview of reset impact
   const fetchResetImpactPreview = async () => {
     setResetImpact(prev => ({ ...prev, loading: true }));
@@ -2778,27 +2881,25 @@ export function ScheduleCalendarViewDesktop({
       weekEnd.setDate(weekEnd.getDate() + 6);
       const weekEndStr = toLocalYYYYMMDD(weekEnd);
       
-      const effectiveWeekStart = weekStartStr < todayStr ? todayStr : weekStartStr;
       const schoolYearEndStr = getSchoolYearEndStr(getSimulatedNow());
 
-      // 1. Fetch for visible week (guarded by today)
+      // 1. Fetch DB occurrences for visible week
       let weekOccs: any[] = [];
       if (weekEndStr >= todayStr) {
         const [wByDate, wByOrig] = await Promise.all([
           supabase.from('schedule_occurrences')
             .select('id, student_id, date, start_time, status, original_date, original_start_time')
             .eq('teacher_id', userId)
-            .gte('date', effectiveWeekStart)
+            .gte('date', weekStartStr)
             .lte('date', weekEndStr),
           supabase.from('schedule_occurrences')
             .select('id, student_id, date, start_time, status, original_date, original_start_time')
             .eq('teacher_id', userId)
-            .gte('original_date', effectiveWeekStart)
+            .gte('original_date', weekStartStr)
             .lte('original_date', weekEndStr)
         ]);
         const merged = [...(wByDate.data || []), ...(wByOrig.data || [])];
-        weekOccs = Array.from(new Map(merged.map(o => [o.id, o])).values())
-          .filter(o => !o.date || o.date >= todayStr);
+        weekOccs = Array.from(new Map(merged.map(o => [o.id, o])).values());
       }
 
       // 2. Fetch for rest of school year (>= todayStr && <= schoolYearEndStr)
@@ -2818,34 +2919,49 @@ export function ScheduleCalendarViewDesktop({
       const syUnique = Array.from(new Map(syMerged.map(o => [o.id, o])).values())
         .filter(o => !o.date || o.date >= todayStr);
 
-      // 3. Reflect unsaved pending local changes in current visible week
-      const pendingArr = Object.values(pendingChanges || {});
-      const pendingWeekAltered = pendingArr.filter((p: any) => {
-        const pDate = p.date || p.original_date;
-        return pDate && pDate >= effectiveWeekStart && pDate <= weekEndStr;
-      });
+      // 3. Inspect visible occurrences for deviations from designer master template, swaps, or pending state
+      const localDeviations: any[] = [];
+      (occurrences || []).forEach((occ: any) => {
+        if (!occ.student_id || occ.student_id === 'vacant') return;
+        const occDate = occ.date;
+        if (occDate < weekStartStr || occDate > weekEndStr) return;
 
-      const mergedWeekIds = new Set(weekOccs.map(o => o.id));
-      const weekStudents = new Set(weekOccs.map(o => o.student_id).filter(id => id && id !== 'vacant'));
-      
-      let extraPendingCount = 0;
-      pendingWeekAltered.forEach((p: any) => {
-        if (!mergedWeekIds.has(p.id)) {
-          extraPendingCount++;
-          if (p.student_id && p.student_id !== 'vacant') {
-            weekStudents.add(p.student_id);
-          }
+        const hasPendingEdit = Boolean(pendingChanges && (pendingChanges[occ.id] || Object.values(pendingChanges).some((p: any) => p.id === occ.id)));
+        const isSwapOcc = Boolean(
+          occ.is_swap || 
+          occ.isSwap || 
+          occ.notes?.startsWith('[Tauschtermin]') ||
+          (occ.notes && occ.notes.includes('[Tauschtermin]')) || 
+          occ.notes?.includes('Getauscht mit') ||
+          (swapLinks && swapLinks.some((link: any) => link.id1 === occ.id || link.id2 === occ.id))
+        );
+        const isStatusAltered = Boolean(occ.status && ['cancelled', 'canceled_by_student', 'teacher_sick', 'open_reschedule', 'pending_reschedule', 'rescheduled_confirmed'].includes(occ.status));
+        const isDateMoved = Boolean(occ.original_date && occ.original_date !== occ.date);
+        const isTimeMoved = Boolean(occ.original_start_time && occ.start_time && occ.original_start_time.substring(0, 5) !== occ.start_time.substring(0, 5));
+        const isAtMaster = checkIsOccurrenceAtMasterSlot(occ);
+
+        if (hasPendingEdit || isSwapOcc || isStatusAltered || isDateMoved || isTimeMoved || !isAtMaster) {
+          localDeviations.push(occ);
         }
       });
 
+      const mergedWeekMap = new Map<string, any>();
+      weekOccs.forEach(o => mergedWeekMap.set(o.id, o));
+      localDeviations.forEach(o => mergedWeekMap.set(o.id, o));
+
+      const allWeekAltered = Array.from(mergedWeekMap.values());
+      const weekStudents = new Set(allWeekAltered.map(o => o.student_id).filter(id => id && id !== 'vacant'));
+
       const syStudents = new Set(syUnique.map(o => o.student_id).filter(id => id && id !== 'vacant'));
+      const finalSyCount = Math.max(syUnique.length, allWeekAltered.length);
+      const finalSyStudentCount = Math.max(syStudents.size, weekStudents.size);
 
       setResetImpact({
         loading: false,
-        weekCount: weekOccs.length + extraPendingCount,
+        weekCount: allWeekAltered.length,
         weekStudentCount: weekStudents.size,
-        schoolYearCount: syUnique.length,
-        schoolYearStudentCount: syStudents.size
+        schoolYearCount: finalSyCount,
+        schoolYearStudentCount: finalSyStudentCount
       });
     } catch (err) {
       console.warn('Error fetching reset impact preview:', err);
@@ -2945,11 +3061,11 @@ export function ScheduleCalendarViewDesktop({
         const weekEndStr = toLocalYYYYMMDD(weekEnd);
 
         if (weekEndStr < todayStr) {
-          await showAlert('Historien-Schutz: Termine vor dem heutigen Tag sind geschützt und können nicht zurückgesetzt werden.');
+          await showAlert('Historien-Schutz: Vergangene Kalenderwochen können nicht zurückgesetzt werden, um die Unterrichtshistorie revisionssicher zu schützen.');
           setIsExecutingReset(false);
           return;
         }
-        startDateStr = weekStartStr < todayStr ? todayStr : weekStartStr;
+        startDateStr = weekStartStr;
         endDateStr = weekEndStr;
       } else {
         startDateStr = todayStr;
@@ -2963,12 +3079,15 @@ export function ScheduleCalendarViewDesktop({
         if (userId) localStorage.removeItem(`groovelab_pending_schedule_changes_${userId}`);
         localStorage.removeItem(`groovelab_calendar_active_occurrences_${userId}`);
         localStorage.removeItem('groovelab_calendar_active_occurrences_latest');
+        queryCache.clear();
       } catch (e) {}
 
+      setCachedWeekOccurrences([]);
+      setCachedWeekRoomBookings([]);
       setSwapLinks([]);
       setSwapSourceOcc(null);
 
-      // 2. Fetch occurrences to delete (guarded against past history)
+      // 2. Fetch occurrences to delete
       const [resByDate, resByOrigDate] = await Promise.all([
         supabase.from('schedule_occurrences')
           .select('id, date, start_time, student_id, status, original_date, original_start_time, student:users!schedule_occurrences_student_id_fkey(first_name, last_name)')
@@ -2987,8 +3106,11 @@ export function ScheduleCalendarViewDesktop({
         ...(resByOrigDate.data || [])
       ];
 
-      // Fail-closed history protection: Never delete any occurrence that took place prior to today
-      const validOccurrencesToDelete = occurrencesToDelete.filter(occ => !occ.date || occ.date >= todayStr);
+      // History protection: only delete records within the target reset range
+      const validOccurrencesToDelete = occurrencesToDelete.filter(occ => {
+        const occDate = occ.date || occ.original_date;
+        return occDate && occDate >= startDateStr && occDate <= endDateStr;
+      });
       const idsToDelete = Array.from(new Set(validOccurrencesToDelete.map(o => o.id)));
 
       if (idsToDelete.length > 0) {
@@ -3019,15 +3141,17 @@ export function ScheduleCalendarViewDesktop({
           for (let i = 0; i < bookingDeletions.length; i += 20) {
             await Promise.all(bookingDeletions.slice(i, i + 20));
           }
-          window.dispatchEvent(new CustomEvent('refresh-bookings'));
         } catch (roomErr) {
           console.warn('Error deleting room bookings on schedule reset:', roomErr);
         }
       }
 
+      setBaseOccurrences([]);
       setIsResetModalOpen(false);
       await loadOccurrences();
       await fetchAllOpenReschedules();
+      window.dispatchEvent(new Event('groovelab_schedule_changed'));
+      window.dispatchEvent(new CustomEvent('refresh-bookings'));
 
       if (scope === 'week') {
         await showAlert('Stammdaten für diese Kalenderwoche erfolgreich geladen & zurückgesetzt.');
@@ -6264,14 +6388,8 @@ export function ScheduleCalendarViewDesktop({
 
                   const occDateObj = new Date(occ.date + 'T00:00:00');
                   const occDayOfWeek = occDateObj.getDay() || 7;
-
                   const occStartTimeSafe = (occ.start_time || '').substring(0, 5);
-                  const isAtMasterSlot = Boolean(
-                    masterDayOfWeek !== null && 
-                    masterAssignedTime !== null && 
-                    masterDayOfWeek === occDayOfWeek && 
-                    masterAssignedTime.substring(0, 5) === occStartTimeSafe
-                  );
+                  const isAtMasterSlot = checkIsOccurrenceAtMasterSlot(occ);
                   
                   let isTimeOrDayMoved = false;
                   if (isAtMasterSlot) {
@@ -6285,7 +6403,7 @@ export function ScheduleCalendarViewDesktop({
                   }
 
                   const hasPendingEdit = Boolean(pendingChanges && (pendingChanges[occ.id] || Object.values(pendingChanges).some((p: any) => p.id === occ.id)));
-                  const isMovedFromMaster = Boolean(
+                  const isMovedFromMaster = !isAtMasterSlot && Boolean(
                     occ.status === 'pending_reschedule' ||
                     occ.status === 'rescheduled_confirmed' ||
                     (masterDayOfWeek !== null && masterAssignedTime !== null && (masterDayOfWeek !== occDayOfWeek || masterAssignedTime.substring(0, 5) !== occStartTimeSafe)) ||
@@ -6346,11 +6464,13 @@ export function ScheduleCalendarViewDesktop({
                         ? 'Freier Platz' 
                         : (`${fn} ${maskLastName(ln, showRealNames)}`.trim() || sanitizeFormattedGroupNames(occ.name || occ.student_name || '') || 'Unbekannt'));
 
-                  const isSwap = Boolean(
+                  const isSwap = !isAtMasterSlot && !hasPendingEdit ? false : Boolean(
                     (occ as any).is_swap ||
                     (occ as any).isSwap ||
                     occ.notes?.startsWith('[Tauschtermin]') ||
-                    occ.notes?.includes('Getauscht mit')
+                    (occ.notes && occ.notes.includes('[Tauschtermin]')) ||
+                    occ.notes?.includes('Getauscht mit') ||
+                    swapLinks.some(link => link.id1 === occ.id || link.id2 === occ.id)
                   );
 
                   const isGroupLesson = !isSwap && !occ.notes?.includes('[Tauschtermin]') && (isGroup || Boolean(displayNames && (displayNames.includes('&') || displayNames.includes(' & '))));

@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback, lazy, Suspense } from "react";
 import { createPortal } from "react-dom";
 import { 
-  Activity, Award, BookOpen, Calendar, CheckCircle, ChevronRight, Clock, 
-  Disc, FileText, Flame, GraduationCap, Headphones, Lightbulb, Music, 
-  Pause, Play, Rocket, Settings, Shield, ShieldCheck, Sparkles, Square, 
+  Activity, Award, Bell, BookOpen, Calendar, CheckCircle, ChevronRight, Clock, 
+  Disc, Edit3, FileText, Flame, GraduationCap, Headphones, Lightbulb, Moon, Music, 
+  Pause, Play, Rocket, Settings, Shield, ShieldCheck, Smartphone, Sparkles, Square, 
   Star, Target, Trophy, X, Zap 
 } from "lucide-react";
 import { CampusUiLevel } from "../../campus/CampusLevelSwitcher";
@@ -271,7 +271,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                       </div>
                       <div>
                         <h3 style={{ margin: 0, fontSize: isMusicStandMode ? '1.55rem' : '1.38rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em' }}>
-                          Mission Musik-Kosmos 🚀
+                          Mission Musik-Kosmos
                         </h3>
                         <p style={{ margin: '4px 0 0 0', fontSize: isMusicStandMode ? '1.05rem' : '0.92rem', color: '#64748b', fontWeight: 650, lineHeight: 1.4 }}>
                           Handy flach hinlegen, spielen &amp; Sterne sammeln!
@@ -386,13 +386,15 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                       onClick={() => setShowJuniorPracticeSettingsModal(true)}
                       style={{
                         position: 'absolute',
-                        top: '18px',
-                        right: '18px',
+                        top: isMobile ? '12px' : '18px',
+                        right: isMobile ? '12px' : '18px',
                         background: 'rgba(255, 255, 255, 0.12)',
                         backdropFilter: 'blur(10px)',
                         border: '1px solid rgba(199, 210, 254, 0.25)',
                         borderRadius: '14px',
-                        padding: '8px 14px',
+                        padding: isMobile ? '10px 14px' : '8px 14px',
+                        minHeight: isMobile ? '44px' : 'auto',
+                        touchAction: 'manipulation',
                         color: '#c7d2fe',
                         fontSize: isMusicStandMode ? '0.88rem' : '0.80rem',
                         fontWeight: 750,
@@ -581,6 +583,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                         borderRadius: '20px',
                         padding: isMusicStandMode ? '18px 44px' : '17px 38px',
                         minHeight: '52px',
+                        touchAction: 'manipulation',
                         fontSize: isMusicStandMode ? '1.18rem' : '1.12rem',
                         fontWeight: 950,
                         cursor: 'pointer',
@@ -610,11 +613,17 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                       justifyContent: 'center',
                       zIndex: 1
                     }}>
-                      <span>📱 Handy flach hinlegen</span>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                        <Smartphone size={13} color="#c7d2fe" /> Handy flach hinlegen
+                      </span>
                       <span>·</span>
-                      <span>🌙 Bildschirm wird dunkel</span>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                        <Moon size={13} color="#c7d2fe" /> Bildschirm wird dunkel
+                      </span>
                       <span>·</span>
-                      <span>🔔 Zaubertöne leiten dich</span>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                        <Bell size={13} color="#c7d2fe" /> Zaubertöne leiten dich
+                      </span>
                     </p>
                   </div>
 
@@ -764,7 +773,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                             border = '1px solid #e2e8f0';
                             textColor = '#94a3b8';
                             boxShadow = '0 2px 0 #cbd5e1';
-                            iconEl = <span style={{ fontSize: '0.85rem' }}>🌙</span>;
+                            iconEl = <Moon size={16} color="#94a3b8" />;
                             subText = 'Pause';
                           }
 
@@ -772,11 +781,19 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                             <div
                               key={idx}
                               className="junior-day-coin"
+                              role="button"
+                              tabIndex={0}
                               onMouseEnter={() => {
                                 if (d.hasMastered || d.isToday || d.dayState === 'shielded' || d.isJoker) playStarChimeSound();
                               }}
                               onClick={() => {
                                 playStarChimeSound();
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  e.preventDefault();
+                                  playStarChimeSound();
+                                }
                               }}
                               style={{
                                 background: bg,
@@ -791,7 +808,8 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                                 minHeight: '74px',
                                 boxShadow: boxShadow,
                                 animation: customAnimation,
-                                cursor: 'pointer'
+                                cursor: 'pointer',
+                                touchAction: 'manipulation'
                               }}
                             >
                               <span style={{ fontSize: '0.74rem', fontWeight: 900, color: textColor, textTransform: 'uppercase' }}>
@@ -1020,16 +1038,16 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                           <button
                             type="button"
                             onClick={() => setShowJuniorPracticeSettingsModal(false)}
-                            style={{ background: 'none', border: 'none', fontSize: '1.2rem', cursor: 'pointer', color: '#94a3b8' }}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '6px', minWidth: '36px', minHeight: '36px' }}
                           >
-                            ✕
+                            <X size={20} />
                           </button>
                         </div>
 
                         {/* Anker-Einstellung */}
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                          <span style={{ fontSize: '0.82rem', fontWeight: 850, color: '#1e293b' }}>
-                            ⚓ Dein persönlicher Übe-Anker:
+                          <span style={{ fontSize: '0.82rem', fontWeight: 850, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <Target size={15} color="#15803d" /> Dein persönlicher Übe-Anker:
                           </span>
                           <div style={{
                             background: '#f8fafc',
@@ -1051,43 +1069,48 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                               background: '#f1f5f9',
                               border: '1px solid #cbd5e1',
                               borderRadius: '10px',
-                              padding: '8px 12px',
+                              padding: '10px 14px',
                               fontSize: '0.78rem',
                               fontWeight: 800,
                               cursor: 'pointer',
-                              color: '#334155'
+                              color: '#334155',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              minHeight: '44px',
+                              touchAction: 'manipulation'
                             }}
                           >
-                            ✏️ Anker neu einstellen
+                            <Edit3 size={14} /> Anker neu einstellen
                           </button>
                         </div>
 
                         {/* Zaubertöne */}
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', borderTop: '1px solid #f1f5f9', paddingTop: '12px' }}>
-                          <span style={{ fontSize: '0.82rem', fontWeight: 850, color: '#1e293b' }}>
-                            🔔 Zaubertöne testen:
+                          <span style={{ fontSize: '0.82rem', fontWeight: 850, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <Bell size={15} color="#15803d" /> Zaubertöne testen:
                           </span>
                           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
                             <button
                               type="button"
                               onClick={() => playMilestoneSound(1)}
-                              style={{ background: '#e6f4ea', border: '1px solid #bbf7d0', borderRadius: '10px', padding: '8px', fontSize: '0.74rem', fontWeight: 800, cursor: 'pointer', color: '#15803d' }}
+                              style={{ background: '#e6f4ea', border: '1px solid #bbf7d0', borderRadius: '10px', padding: '10px 8px', fontSize: '0.74rem', fontWeight: 800, cursor: 'pointer', color: '#15803d', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '4px', minHeight: '44px', touchAction: 'manipulation' }}
                             >
-                              🔔 Glocke
+                              <Bell size={13} /> Glocke
                             </button>
                             <button
                               type="button"
                               onClick={() => playMilestoneSound(2)}
-                              style={{ background: '#e0e7ff', border: '1px solid #c7d2fe', borderRadius: '10px', padding: '8px', fontSize: '0.74rem', fontWeight: 800, cursor: 'pointer', color: '#4338ca' }}
+                              style={{ background: '#e0e7ff', border: '1px solid #c7d2fe', borderRadius: '10px', padding: '10px 8px', fontSize: '0.74rem', fontWeight: 800, cursor: 'pointer', color: '#4338ca', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '4px', minHeight: '44px', touchAction: 'manipulation' }}
                             >
-                              🎵 Harfe
+                              <Music size={13} /> Harfe
                             </button>
                             <button
                               type="button"
                               onClick={() => playMilestoneSound(3)}
-                              style={{ background: '#f3e8ff', border: '1px solid #e9d5ff', borderRadius: '10px', padding: '8px', fontSize: '0.74rem', fontWeight: 800, cursor: 'pointer', color: '#7e22ce' }}
+                              style={{ background: '#f3e8ff', border: '1px solid #e9d5ff', borderRadius: '10px', padding: '10px 8px', fontSize: '0.74rem', fontWeight: 800, cursor: 'pointer', color: '#7e22ce', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '4px', minHeight: '44px', touchAction: 'manipulation' }}
                             >
-                              🎹 Akkord
+                              <Sparkles size={13} /> Akkord
                             </button>
                           </div>
                         </div>
@@ -1101,10 +1124,12 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                             border: 'none',
                             borderRadius: '12px',
                             padding: '12px',
-                            fontSize: '0.85rem',
-                            fontWeight: 900,
+                            fontSize: '0.86rem',
+                            fontWeight: 850,
                             cursor: 'pointer',
-                            marginTop: '6px'
+                            marginTop: '6px',
+                            minHeight: '44px',
+                            touchAction: 'manipulation'
                           }}
                         >
                           Fertig
@@ -1748,7 +1773,9 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                                 „{missionInfo.teacherNote}“
                               </p>
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '6px', borderTop: '1px solid rgba(255,255,255,0.12)', fontSize: '0.84rem', color: '#a5b4fc' }}>
-                                <span>⏱️ Timer läuft weiter</span>
+                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                                  <Clock size={13} color="#a5b4fc" /> Timer läuft weiter
+                                </span>
                                 <button
                                   type="button"
                                   onClick={() => setShowJuniorCheatSheet(false)}
@@ -1757,13 +1784,19 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                                     border: '1.5px solid #818cf8',
                                     borderRadius: '100px',
                                     color: '#ffffff',
-                                    padding: '5px 16px',
+                                    padding: '6px 16px',
                                     fontSize: '0.86rem',
                                     fontWeight: 800,
-                                    cursor: 'pointer'
+                                    cursor: 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                    minHeight: '36px',
+                                    touchAction: 'manipulation'
                                   }}
                                 >
-                                  Verstanden 👍
+                                  <CheckCircle size={14} />
+                                  <span>Verstanden</span>
                                 </button>
                               </div>
                             </div>
@@ -1883,9 +1916,13 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                                   gap: '5px'
                                 }}>
                                   {!isGoalReached ? (
-                                    <span>🎯 Ziel: {String(targetMins).padStart(2, '0')}:00 Min.</span>
+                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                      <Target size={13} color="#e0e7ff" /> Ziel: {String(targetMins).padStart(2, '0')}:00 Min.
+                                    </span>
                                   ) : (
-                                    <span>⭐ Sternen-Ziel erreicht!</span>
+                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                      <Star size={13} fill="#fbbf24" color="#fbbf24" /> Sternen-Ziel erreicht!
+                                    </span>
                                   )}
                                 </div>
                               </div>
@@ -1901,7 +1938,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                                 lineHeight: 1.35,
                                 textShadow: '0 2px 8px rgba(0,0,0,0.7)'
                               }}>
-                                „{instrumentLabel} lädt den Sternenantrieb! Höre genau auf deine Töne 🎶“
+                                „{instrumentLabel} lädt den Sternenantrieb! Höre genau auf deine Töne“
                               </p>
                             </div>
                           </div>
@@ -1966,7 +2003,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                             <Pause size={34} />
                           </div>
                           <h3 style={{ margin: '0 0 8px 0', fontSize: '1.4rem', fontWeight: 950, color: '#ffffff' }}>
-                            Mission pausiert 🎸
+                            Mission pausiert
                           </h3>
                           <p style={{ margin: 0, maxWidth: '320px', fontSize: '0.96rem', color: '#cbd5e1', fontWeight: 650, lineHeight: 1.5 }}>
                             Bleib bei deinem Instrument! Der Übe-Timer wartet hier auf dich.
@@ -2170,9 +2207,9 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                             }}>
                               <Sparkles size={18} color="#c084fc" />
                               <span>
-                                {juniorMissionTier === 1 && 'Treibstoff gesammelt! Ein kleiner Probelauf 🚀'}
-                                {juniorMissionTier === 2 && 'Missions-Ziel erreicht! Kurs auf die Sterne! 🌌'}
-                                {juniorMissionTier === 3 && `INTERSTELLARER HYPERRAUM! +${juniorCelebrationSummary?.bonusMins || 0} Min. Bonus! 🚀✨`}
+                                {juniorMissionTier === 1 && 'Treibstoff gesammelt! Ein kleiner Probelauf'}
+                                {juniorMissionTier === 2 && 'Missions-Ziel erreicht! Kurs auf die Sterne!'}
+                                {juniorMissionTier === 3 && `INTERSTELLARER HYPERRAUM! +${juniorCelebrationSummary?.bonusMins || 0} Min. Bonus!`}
                               </span>
                             </div>
                           </div>
@@ -2249,9 +2286,9 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                                 color: '#0f172a',
                                 fontFamily: "'Plus Jakarta Sans', sans-serif"
                               }}>
-                                {juniorMissionTier === 1 && 'Fast geschafft! 🚀'}
-                                {juniorMissionTier === 2 && 'Missions-Ziel erreicht! ⭐'}
-                                {juniorMissionTier === 3 && 'INTERSTELLARER HYPERRAUM! 🌌'}
+                                {juniorMissionTier === 1 && 'Fast geschafft!'}
+                                {juniorMissionTier === 2 && 'Missions-Ziel erreicht!'}
+                                {juniorMissionTier === 3 && 'INTERSTELLARER HYPERRAUM!'}
                               </h3>
 
                               <p style={{
@@ -2297,7 +2334,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                                     boxShadow: '0 4px 14px rgba(245, 158, 11, 0.25)'
                                   }}>
                                     <Star size={15} fill="#f59e0b" color="#b45309" style={{ filter: 'drop-shadow(0 0 5px rgba(245, 158, 11, 0.7))' }} />
-                                    <span>Wochen-Stern entzündet ⭐</span>
+                                    <span>Wochen-Stern entzündet</span>
                                   </span>
                                 )}
                               </div>
@@ -2379,7 +2416,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
 
                         <div>
                           <h3 style={{ margin: '0 0 6px 0', fontSize: '1.4rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                            Kurze Verschnaufpause ⏸️
+                            Kurze Verschnaufpause
                           </h3>
                           <p style={{ margin: 0, fontSize: '0.94rem', color: '#64748b', fontWeight: 650, lineHeight: 1.45 }}>
                             Keine Eile! Dein Fortschritt ist sicher aufgehoben.
@@ -2409,9 +2446,13 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                             padding: '5px 12px',
                             borderRadius: '100px',
                             fontSize: '0.82rem',
-                            fontWeight: 900
+                            fontWeight: 900,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px'
                           }}>
-                            Noch {Math.max(1, Math.ceil((targetSeconds - elapsedSecs) / 60))} Min. bis ⭐
+                            <span>Noch {Math.max(1, Math.ceil((targetSeconds - elapsedSecs) / 60))} Min. bis</span>
+                            <Star size={12} fill="#6d28d9" color="#6d28d9" />
                           </span>
                         </div>
 
@@ -2436,7 +2477,9 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
-                              gap: '8px'
+                              gap: '8px',
+                              minHeight: '48px',
+                              touchAction: 'manipulation'
                             }}
                             className="hover-scale"
                           >
@@ -2460,7 +2503,9 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                               padding: '12px',
                               fontWeight: 850,
                               fontSize: '0.90rem',
-                              cursor: 'pointer'
+                              cursor: 'pointer',
+                              minHeight: '44px',
+                              touchAction: 'manipulation'
                             }}
                           >
                             Üben für heute beenden
@@ -2476,7 +2521,9 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                               fontSize: '0.82rem',
                               fontWeight: 750,
                               cursor: 'pointer',
-                              padding: '4px'
+                              padding: '8px',
+                              minHeight: '40px',
+                              touchAction: 'manipulation'
                             }}
                           >
                             Ohne Speichern verlassen
@@ -2513,7 +2560,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                         <Rocket size={32} />
                       </div>
                       <h3 style={{ margin: 0, color: '#ffffff', fontSize: '1.3rem', fontWeight: 900, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                        Bereit für die nächste Mission 🚀
+                        Bereit für die nächste Mission
                       </h3>
                       <button
                         type="button"

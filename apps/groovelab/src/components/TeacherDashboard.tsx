@@ -11,7 +11,7 @@ import { AvatarImage, getInstrumentAvatarUrl, getDefaultMusicianAvatarUrl, resol
 import { MUSIC_QUOTES, getQuotesForAudience, getDailyQuote } from '@groovelab/shared';
 import { usePremiumOnboardingTour, TourStartButton, TourStep } from './PremiumOnboardingTour';
 import { supabase, deleteUserStorageAssets } from '../lib/supabase';
-import { Monitor, Music, Award, Box, Plus, AlertCircle, AlertTriangle, User, Users, Star, TrendingUp, Shield, Zap, Play, Info, CheckCircle, Check, Search, Trash2, Bell, X, Clock, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, LayoutDashboard, LogOut, Flame, GraduationCap, UserPlus, Edit3, Calendar, Activity, CheckSquare, Mail, Copy, Sparkles, BookOpen, MessageSquare, Lock, Palmtree, Heart, Settings, Key, Sun, ThumbsUp, Building2, Hourglass, Eye, EyeOff, ShieldCheck, CheckCheck, CalendarX, Send, Lightbulb, Download, Sliders, Mic, Disc, Radio, Timer, ArrowRight, Headphones, FileText, DoorOpen, HelpCircle, RotateCcw, Phone } from 'lucide-react';
+import { Monitor, Music, Award, Box, Plus, AlertCircle, AlertTriangle, User, Users, Star, TrendingUp, Shield, Zap, Play, Info, CheckCircle, Check, Search, Trash2, Bell, X, Clock, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, LayoutDashboard, LogOut, Flame, GraduationCap, UserPlus, Edit3, Calendar, Activity, CheckSquare, Mail, Copy, Sparkles, BookOpen, MessageSquare, Lock, Palmtree, Heart, Settings, Key, Sun, ThumbsUp, Building2, Hourglass, Eye, EyeOff, ShieldCheck, CheckCheck, CalendarX, Send, Lightbulb, Download, Sliders, Mic, Disc, Radio, Timer, ArrowRight, Headphones, FileText, DoorOpen, HelpCircle, RotateCcw, Phone, Coffee } from 'lucide-react';
 import { notesService, UserNote } from '../services/notesService';
 import { formatCleanNoteContent } from './notes/notesConstants';
 import { checkIsAudioTresorActive, checkIsAudioTresorReadOnly } from '../domain/stickersAndTresor';
@@ -716,7 +716,7 @@ export function TeacherDashboard({
         console.log('[Realtime] Band founded broadcast received:', payload);
         const { bandName, songTitle } = payload.payload || {};
         if (bandName) {
-          setToastMessage(`Band gegründet: ${bandName}! 🎸🔥 (${songTitle})`);
+          setToastMessage(`Band gegründet: ${bandName}! (${songTitle})`);
         }
       })
       .subscribe();
@@ -785,18 +785,18 @@ export function TeacherDashboard({
     switch(activeTab) {
       case 'briefing':
         return [
-          { title: "Dein Briefing 👋", description: "Hier findest du eine Übersicht über deinen Tag und alle wichtigen Kennzahlen.", selector: "tour-teacher-briefing" },
-          { title: "Kennzahlen 📊", description: "Diese Karten zeigen dir auf einen Blick, wie viele Schüler du heute hast und wie viel deine Schüler im Schnitt diese Woche geübt haben.", selector: "tour-teacher-kpis" },
-          { title: "Dein Tagesplan 📅", description: "Hier siehst du deine anstehenden Unterrichtstermine für heute.", selector: "tour-teacher-schedule" }
+          { title: "Dein Briefing", description: "Hier findest du eine Übersicht über deinen Tag und alle wichtigen Kennzahlen.", selector: "tour-teacher-briefing" },
+          { title: "Kennzahlen", description: "Diese Karten zeigen dir auf einen Blick, wie viele Schüler du heute hast und wie viel deine Schüler im Schnitt diese Woche geübt haben.", selector: "tour-teacher-kpis" },
+          { title: "Dein Tagesplan", description: "Hier siehst du deine anstehenden Unterrichtstermine für heute.", selector: "tour-teacher-schedule" }
         ];
       case 'live':
         return [
-          { title: "Das Live Lab 🎸", description: "Hier siehst du den visuellen Raum und die Belegung der Stationen durch die Schüler.", selector: "tour-teacher-livelab" },
-          { title: "Räume verwalten 🚪", description: "Wähle hier einen Raum aus, um die interaktive Sitzverteilung und die angemeldeten Schüler zu sehen.", selector: "tour-teacher-livelab-rooms" }
+          { title: "Das Live Lab", description: "Hier siehst du den visuellen Raum und die Belegung der Stationen durch die Schüler.", selector: "tour-teacher-livelab" },
+          { title: "Räume verwalten", description: "Wähle hier einen Raum aus, um die interaktive Sitzverteilung und die angemeldeten Schüler zu sehen.", selector: "tour-teacher-livelab-rooms" }
         ];
       case 'bands':
         return [
-          { title: "Band-Verwaltung 🎤", description: "Hier kannst du neue Bands gründen, Mitglieder verwalten und euren Fortschritt verfolgen.", selector: "tour-teacher-bands" }
+          { title: "Band-Verwaltung", description: "Hier kannst du neue Bands gründen, Mitglieder verwalten und euren Fortschritt verfolgen.", selector: "tour-teacher-bands" }
         ];
       default:
         return [];
@@ -1340,26 +1340,26 @@ export function TeacherDashboard({
           if (status === 'approved') {
             triggerFallbackPush(
               sourceSlot.student.id,
-              'Unterricht verschoben 📅',
+              'Unterricht verschoben',
               `Hallo ${sourceSlot.student.name.split(' ')[0]}, dein Unterricht bei ${teacherName} wurde verschoben auf heute um ${targetSlot.timeSlot} Uhr.`,
               { schedule_id: draggedSchedId, type: 'rescheduled' }
             );
             triggerFallbackPush(
               targetConflict.student.id,
-              'Unterricht verschoben 📅',
+              'Unterricht verschoben',
               `Hallo ${targetConflict.student.name.split(' ')[0]}, dein Unterricht bei ${teacherName} wurde verschoben auf heute um ${sourceSlot.timeSlot} Uhr.`,
               { schedule_id: targetConflict.scheduleId, type: 'rescheduled' }
             );
           } else {
             triggerFallbackPush(
               sourceSlot.student.id,
-              'Terminänderung freigeben? 📅',
+              'Terminänderung freigeben?',
               `Hallo ${sourceSlot.student.name.split(' ')[0]}, dein Lehrer ${teacherName} möchte deinen Unterricht auf heute um ${targetSlot.timeSlot} Uhr verschieben. Bitte stimme dem Termin in der App zu.`,
               { schedule_id: draggedSchedId, type: 'pending_parent_approval' }
             );
             triggerFallbackPush(
               targetConflict.student.id,
-              'Terminänderung freigeben? 📅',
+              'Terminänderung freigeben?',
               `Hallo ${targetConflict.student.name.split(' ')[0]}, dein Lehrer ${teacherName} möchte deinen Unterricht auf heute um ${sourceSlot.timeSlot} Uhr verschieben. Bitte stimme dem Termin in der App zu.`,
               { schedule_id: targetConflict.scheduleId, type: 'pending_parent_approval' }
             );
@@ -1383,14 +1383,14 @@ export function TeacherDashboard({
           if (status === 'approved') {
             triggerFallbackPush(
               sourceSlot.student.id,
-              'Unterricht verschoben 📅',
+              'Unterricht verschoben',
               `Hallo ${sourceSlot.student.name.split(' ')[0]}, dein Unterricht bei ${teacherName} wurde verschoben auf heute um ${targetSlot.timeSlot} Uhr.`,
               { schedule_id: draggedSchedId, type: 'rescheduled' }
             );
           } else {
             triggerFallbackPush(
               sourceSlot.student.id,
-              'Terminänderung freigeben? 📅',
+              'Terminänderung freigeben?',
               `Hallo ${sourceSlot.student.name.split(' ')[0]}, dein Lehrer ${teacherName} möchte deinen Unterricht auf heute um ${targetSlot.timeSlot} Uhr verschieben. Bitte stimme dem Termin in der App zu.`,
               { schedule_id: draggedSchedId, type: 'pending_parent_approval' }
             );
@@ -1465,7 +1465,7 @@ export function TeacherDashboard({
         await supabase.from('crisis_notifications').insert(notifs);
       }
 
-      const alertMessage = `🚨 TERMINABSAGE: Lehrkraft ${formatTeacherFullName(teacherProfile)} hat sich für heute abgemeldet.`;
+      const alertMessage = `TERMINABSAGE: Lehrkraft ${formatTeacherFullName(teacherProfile)} hat sich für heute abgemeldet.`;
       await supabase.from('system_alerts').insert({
         school_id: teacherProfile.school_id,
         teacher_id: userId,
@@ -1503,7 +1503,7 @@ export function TeacherDashboard({
     const diffDays = Math.round((untilD.getTime() - startD.getTime()) / (24 * 3600 * 1000)) + 1;
     if (diffDays > MAX_SELF_REPORT_DAYS) {
       alert(
-        `⚠️ Abwesenheiten / Ausfälle von mehr als 4 Wochen (${diffDays} Tage) können nicht selbst eingetragen werden.\n\nBitte wende dich an die Verwaltung, damit diese die Abwesenheit für dich hinterlegt. Es gilt keine 30-Tage-Sperre für Verwaltungseinträge.`
+        `Abwesenheiten / Ausfälle von mehr als 4 Wochen (${diffDays} Tage) können nicht selbst eingetragen werden.\n\nBitte wende dich an die Verwaltung, damit diese die Abwesenheit für dich hinterlegt. Es gilt keine 30-Tage-Sperre für Verwaltungseinträge.`
       );
       return;
     }
@@ -1716,8 +1716,8 @@ export function TeacherDashboard({
 
       // Add Secretary alarm ticket
       const alertMessage = prevSickUntilStr
-        ? `🚨 TERMIN-ANPASSUNG: Lehrkraft ${formatTeacherFullName(profile)} hat den Abwesenheitszeitraum auf den ${new Date(sickUntilDate + 'T00:00:00').toLocaleDateString('de-DE')} geändert.`
-        : `🚨 TERMINABSAGE: Lehrkraft ${formatTeacherFullName(profile)} hat Termine bis zum ${new Date(sickUntilDate + 'T00:00:00').toLocaleDateString('de-DE')} abgesagt.`;
+        ? `TERMIN-ANPASSUNG: Lehrkraft ${formatTeacherFullName(profile)} hat den Abwesenheitszeitraum auf den ${new Date(sickUntilDate + 'T00:00:00').toLocaleDateString('de-DE')} geändert.`
+        : `TERMINABSAGE: Lehrkraft ${formatTeacherFullName(profile)} hat Termine bis zum ${new Date(sickUntilDate + 'T00:00:00').toLocaleDateString('de-DE')} abgesagt.`;
 
       await supabase
         .from('system_alerts')
@@ -2371,10 +2371,10 @@ export function TeacherDashboard({
           .eq('id', occId);
       }
       setMyChangedAppointments((prev: any[]) => prev.map((a: any) => (a.id === occ.id || a.id === occId) ? { ...a, student_acknowledged: true, studentAcknowledged: true, status: 'rescheduled_confirmed' } : a));
-      setToastMessage('✅ Termin als mündlich/telefonisch abgestimmt quittiert.');
+      setToastMessage('Termin als mündlich/telefonisch abgestimmt quittiert.');
     } catch (err) {
       console.error('Error acknowledging emergency appointment:', err);
-      setToastMessage('⚠️ Fehler beim Quittieren des Termins.');
+      setToastMessage('Fehler beim Quittieren des Termins.');
     }
   };
 
@@ -2395,10 +2395,10 @@ export function TeacherDashboard({
           .eq('id', occId);
       }
       setMyChangedAppointments((prev: any[]) => prev.map((a: any) => (a.id === occ.id || a.id === occId) ? { ...a, date: origDate, start_time: origStartTime, status: 'scheduled', student_acknowledged: true } : a));
-      setToastMessage('↩️ Termin auf ursprünglichen Stammtermin zurückgesetzt.');
+      setToastMessage('Termin auf ursprünglichen Stammtermin zurückgesetzt.');
     } catch (err) {
       console.error('Error resetting emergency appointment:', err);
-      setToastMessage('⚠️ Fehler beim Zurücksetzen des Termins.');
+      setToastMessage('Fehler beim Zurücksetzen des Termins.');
     }
   };
 
@@ -2448,9 +2448,13 @@ export function TeacherDashboard({
                   borderRadius: '100px',
                   letterSpacing: '0.05em',
                   textTransform: 'uppercase',
-                  border: '1px solid #fdba74'
+                  border: '1px solid #fdba74',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px'
                 }}>
-                  ⚡ 2h-Frühwarnung · Unbestätigte Verschiebung
+                  <Zap size={11} strokeWidth={2.4} />
+                  <span>2h-Frühwarnung · Unbestätigte Verschiebung</span>
                 </span>
                 <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#9a3412' }}>
                   {emergencyUnconfirmedAppointments.length === 1 ? '1 unbestätigter Termin' : `${emergencyUnconfirmedAppointments.length} unbestätigte Termine`}
@@ -2532,6 +2536,7 @@ export function TeacherDashboard({
                       border: 'none',
                       borderRadius: '12px',
                       padding: '9px 14px',
+                      minHeight: isMobileDevice ? '44px' : '36px',
                       fontSize: '0.82rem',
                       fontWeight: 850,
                       cursor: 'pointer',
@@ -2540,7 +2545,8 @@ export function TeacherDashboard({
                       justifyContent: 'center',
                       gap: '6px',
                       boxShadow: '0 2px 8px rgba(234, 88, 12, 0.25)',
-                      transition: 'all 0.15s ease'
+                      transition: 'all 0.15s ease',
+                      touchAction: 'manipulation'
                     }}
                     className="hover-scale-mini"
                     title="Terminverlegung zurückziehen und auf reguläre Stammzeit zurücksetzen"
@@ -2559,6 +2565,7 @@ export function TeacherDashboard({
                       border: '1px solid #cbd5e1',
                       borderRadius: '12px',
                       padding: '9px 12px',
+                      minHeight: isMobileDevice ? '44px' : '36px',
                       fontSize: '0.80rem',
                       fontWeight: 800,
                       cursor: 'pointer',
@@ -2566,7 +2573,8 @@ export function TeacherDashboard({
                       alignItems: 'center',
                       justifyContent: 'center',
                       gap: '6px',
-                      transition: 'all 0.15s ease'
+                      transition: 'all 0.15s ease',
+                      touchAction: 'manipulation'
                     }}
                     className="hover-scale-mini"
                     title="Termingekoppelte Shoutbox öffnen"
@@ -2585,6 +2593,7 @@ export function TeacherDashboard({
                       border: '1px solid #bbf7d0',
                       borderRadius: '12px',
                       padding: '9px 12px',
+                      minHeight: isMobileDevice ? '44px' : '36px',
                       fontSize: '0.80rem',
                       fontWeight: 850,
                       cursor: 'pointer',
@@ -2592,7 +2601,8 @@ export function TeacherDashboard({
                       alignItems: 'center',
                       justifyContent: 'center',
                       gap: '6px',
-                      transition: 'all 0.15s ease'
+                      transition: 'all 0.15s ease',
+                      touchAction: 'manipulation'
                     }}
                     className="hover-scale-mini"
                     title="Termin als telefonisch oder mündlich abgestimmt quittieren"
@@ -3141,28 +3151,113 @@ export function TeacherDashboard({
           allBookings = JSON.parse(stored);
         }
 
-        // Fetch room_bookings from database for the logged-in teacher
-        const { data: dbBookings } = await supabase
-          .from('room_bookings')
-          .select(`
-            id,
-            room_id,
-            date,
-            start_time,
-            end_time,
-            title,
-            rooms (
+        const toMinutes = (timeStr?: string | null) => {
+          if (!timeStr) return 0;
+          const [h, m] = timeStr.substring(0, 5).split(':');
+          return (parseInt(h) || 0) * 60 + (parseInt(m) || 0);
+        };
+
+        // Load teacher regular schedule to identify and clean up spurious bookings inside regular window
+        let teacherBoards: any[] = [];
+        try {
+          const storedBoards = localStorage.getItem(`groovelab_teacher_boards_${activePlatform}_${userId}`) || 
+                               localStorage.getItem(`groovelab_teacher_boards_${userId}`) ||
+                               localStorage.getItem(`groovelab_teacher_draft_state_${activePlatform}_${userId}`) ||
+                               localStorage.getItem(`groovelab_teacher_draft_state_campus_${userId}`);
+          if (storedBoards) {
+            const parsed = JSON.parse(storedBoards);
+            teacherBoards = Array.isArray(parsed) ? parsed : (parsed.boards || []);
+          }
+        } catch (e) {}
+
+        // Fetch room_bookings and regular schedules for the logged-in teacher
+        const [{ data: dbBookings }, { data: teacherSchedules }] = await Promise.all([
+          supabase
+            .from('room_bookings')
+            .select(`
               id,
-              name
-            )
-          `)
-          .eq('booked_by', userId);
+              room_id,
+              date,
+              start_time,
+              end_time,
+              title,
+              rooms (
+                id,
+                name
+              )
+            `)
+            .eq('booked_by', userId),
+          supabase
+            .from('schedules')
+            .select('room_id, time_slot, duration, day_of_week')
+            .eq('teacher_id', userId)
+        ]);
+
+        const getTeacherRegularWindow = (dayOfWeek: number) => {
+          let regularRoomId: string | null = null;
+          let regMin = Infinity;
+          let regMax = -Infinity;
+
+          if (teacherBoards && teacherBoards.length > 0) {
+            const mb = teacherBoards.find((b: any) => b.dayOfWeek === dayOfWeek);
+            if (mb) {
+              if (mb.roomId) regularRoomId = mb.roomId;
+              (mb.students || []).forEach((st: any) => {
+                const tStr = st.assignedTime || '';
+                if (tStr) {
+                  const s = toMinutes(tStr);
+                  const dur = st.duration || 30;
+                  const e = s + dur;
+                  if (s < regMin) regMin = s;
+                  if (e > regMax) regMax = e;
+                }
+              });
+            }
+          }
+
+          if (teacherSchedules && teacherSchedules.length > 0) {
+            teacherSchedules.forEach((s: any) => {
+              if (s.day_of_week === dayOfWeek) {
+                if (!regularRoomId && s.room_id) regularRoomId = s.room_id;
+                if (s.time_slot) {
+                  const sStart = toMinutes(s.time_slot);
+                  const sEnd = sStart + (s.duration || 45);
+                  if (sStart < regMin) regMin = sStart;
+                  if (sEnd > regMax) regMax = sEnd;
+                }
+              }
+            });
+          }
+
+          return { regularRoomId, regMin, regMax };
+        };
+
+        const spuriousBookingIds: string[] = [];
 
         if (dbBookings && dbBookings.length > 0) {
           dbBookings.forEach((db: any) => {
             const startTimeStr = db.start_time ? db.start_time.substring(0, 5) : '00:00';
             const endTimeStr = db.end_time ? db.end_time.substring(0, 5) : '00:00';
             
+            // Check if this booking is an automated "Unterricht: ..." booking that falls inside teacher's regular teaching window in that room
+            if (db.title && db.title.startsWith('Unterricht: ') && db.date) {
+              const bDate = new Date(db.date + 'T00:00:00');
+              const bDayOfWeek = bDate.getDay() || 7;
+              const { regularRoomId, regMin, regMax } = getTeacherRegularWindow(bDayOfWeek);
+              const bStart = toMinutes(startTimeStr);
+              const bEnd = toMinutes(endTimeStr);
+
+              const isInsideRegular = regMin !== Infinity && bStart >= regMin && bEnd <= regMax;
+              const isSameRoom = !regularRoomId || db.room_id === regularRoomId;
+
+              // If it's inside regular window and in the regular room, it is spurious:
+              // do NOT show in "Meine Buchungen" and delete from database!
+              if (isInsideRegular && isSameRoom) {
+                spuriousBookingIds.push(db.id);
+                return;
+              }
+            }
+
             const isDup = allBookings.some((b: any) => 
               b.date === db.date && 
               b.startTime === startTimeStr && 
@@ -3190,6 +3285,15 @@ export function TeacherDashboard({
               });
             }
           });
+
+          // Self-heal: delete spurious bookings asynchronously from room_bookings
+          if (spuriousBookingIds.length > 0) {
+            supabase.from('room_bookings').delete().in('id', spuriousBookingIds).then(({ error }) => {
+              if (!error) {
+                window.dispatchEvent(new CustomEvent('refresh-bookings'));
+              }
+            });
+          }
         }
 
         const { data: occurs } = await supabase
@@ -5181,7 +5285,7 @@ export function TeacherDashboard({
         const oldRec = payload.old as any;
         const newRec = payload.new as any;
         if (oldRec?.teacher_id === userId && newRec?.teacher_id !== userId) {
-          setToastMessage('ℹ️ Ein Schüler wurde neu zugewiesen.');
+          setToastMessage('Ein Schüler wurde neu zugewiesen.');
         }
         debouncedFetchData();
         setBriefingRefreshTicker(prev => prev + 1);
@@ -7690,8 +7794,8 @@ useEffect(() => {
             marginBottom: '16px',
             boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
           }}>
-            <span style={{ fontSize: '1.25rem' }}>
-              {teacherDunningStatus.isTeacherReadOnly ? '🚨' : '⚠️'}
+            <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              {teacherDunningStatus.isTeacherReadOnly ? <AlertCircle size={20} color="#991b1b" /> : <AlertTriangle size={20} color="#92400e" />}
             </span>
             <span style={{ lineHeight: 1.5 }}>
               {teacherDunningStatus.isTeacherReadOnly ? (
@@ -7713,8 +7817,18 @@ useEffect(() => {
             <div>
               {activeTab !== 'live' && (
                 <>
-                  <h2 style={{ fontSize: windowWidth < 768 ? '1.35rem' : '28px', fontWeight: 900, color: '#1e293b', margin: 0, wordBreak: 'break-word', maxWidth: '100%' }}>
-                    {activeTab === 'students' ? `🎓 Schülerverwaltung (${allStudents.filter(s => activePlatform === 'campus' ? true : (s.is_groovelab_active === true || s.isGroovelabActive === true)).length})` : `👥 Bands (${allBands.length})`}
+                  <h2 style={{ fontSize: windowWidth < 768 ? '1.35rem' : '28px', fontWeight: 900, color: '#1e293b', margin: 0, wordBreak: 'break-word', maxWidth: '100%', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    {activeTab === 'students' ? (
+                      <>
+                        <GraduationCap size={windowWidth < 768 ? 22 : 28} color="#1e293b" />
+                        <span>Schülerverwaltung ({allStudents.filter(s => activePlatform === 'campus' ? true : (s.is_groovelab_active === true || s.isGroovelabActive === true)).length})</span>
+                      </>
+                    ) : (
+                      <>
+                        <Users size={windowWidth < 768 ? 22 : 28} color="#1e293b" />
+                        <span>Bands ({allBands.length})</span>
+                      </>
+                    )}
                   </h2>
                   <p style={{ color: '#64748b', fontWeight: 600, fontSize: '0.85rem', marginTop: '4px' }}>
                     {teacher ? `${teacher.first_name} ${teacher.last_name} • ${teacher.instrument || 'Coach'}` : 'Zentrale'}
@@ -8378,17 +8492,24 @@ useEffect(() => {
                             color: 'white',
                             border: 'none',
                             padding: '12px 28px',
+                            minHeight: '44px',
                             borderRadius: '12px',
                             fontSize: '0.9rem',
                             fontWeight: 800,
                             cursor: 'pointer',
                             boxShadow: '0 4px 12px rgba(52, 168, 83, 0.2)',
-                            transition: 'all 0.2s'
+                            transition: 'all 0.2s',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '8px',
+                            touchAction: 'manipulation'
                           }}
                           onMouseOver={e => e.currentTarget.style.transform = 'translateY(-1px)'}
                           onMouseOut={e => e.currentTarget.style.transform = 'none'}
                         >
-                          Ich bin wieder gesund ☀️
+                          <Sun size={18} strokeWidth={2.4} />
+                          <span>Ich bin wieder gesund</span>
                         </button>
                       </div>
                     </div>
@@ -8838,8 +8959,8 @@ useEffect(() => {
                               {windowWidth >= 768 && (
                                 <p style={{ margin: (isWeekend && !isTourDemoScheduleActive) ? '14px 0 0 0' : '6px 0 0 0', fontSize: (isWeekend && !isTourDemoScheduleActive) ? '1rem' : '0.82rem', color: (isWeekend && !isTourDemoScheduleActive) ? '#4b5563' : '#64748b', fontWeight: 600, lineHeight: (isWeekend && !isTourDemoScheduleActive) ? 1.5 : 1.25, maxWidth: (isWeekend && !isTourDemoScheduleActive) ? '650px' : undefined }}>
                                   {(isWeekend && !isTourDemoScheduleActive)
-                                    ? 'Genieße deine wohlverdiente Pause! Keine Termine, kein Schulstress. Erhole dich gut und tanke Kraft für neue musikalische Abenteuer in der kommenden Woche. ✨'
-                                    : ((isFreeDay && !isTourDemoScheduleActive) ? 'Heute hast du frei! Genieße deinen freien Tag. ✨' : (isTourDemoScheduleActive ? 'Bereit für einen produktiven Tag? Hier ist deine Übersicht.' : dynamicGreeting.subtitle))
+                                    ? 'Genieße deine wohlverdiente Pause! Keine Termine, kein Schulstress. Erhole dich gut und tanke Kraft für neue musikalische Abenteuer in der kommenden Woche.'
+                                    : ((isFreeDay && !isTourDemoScheduleActive) ? 'Heute hast du frei! Genieße deinen freien Tag.' : (isTourDemoScheduleActive ? 'Bereit für einen produktiven Tag? Hier ist deine Übersicht.' : dynamicGreeting.subtitle))
                                   }
                                 </p>
                               )}
@@ -9618,7 +9739,11 @@ useEffect(() => {
                                            flexShrink: 0, 
                                            whiteSpace: 'nowrap'
                                          }}>
-                                           {isBirthday ? '🎂 ' : ''}{(() => {
+                                            {isBirthday && (
+                                              <span title="Hat heute Geburtstag!" style={{ display: 'inline-flex', alignItems: 'center', marginRight: '4px', verticalAlign: 'middle' }}>
+                                                <Sparkles size={13} color="#eab308" />
+                                              </span>
+                                            )}{(() => {
                                              const found = allStudents.find(s => s.id === slot.student?.id);
                                              const fn = slot.student?.first_name || found?.first_name || (slot.student?.name ? slot.student.name.split(' ')[0] : '');
                                              const ln = slot.student?.last_name || found?.last_name || (slot.student?.name ? slot.student.name.split(' ').slice(1).join(' ') : '');
@@ -9630,12 +9755,15 @@ useEffect(() => {
                                          </span>
                                        ) : isBreak ? (
                                          <span style={{ fontWeight: 700, color: '#b45309', fontSize: '0.85rem', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                                           <span>☕</span>
+                                           <Coffee size={14} color="#b45309" />
                                            <span>Freies Zeitfenster</span>
                                            <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#d97706' }}>({slot.duration || 30} Min.)</span>
                                          </span>
                                        ) : (
-                                         <span style={{ fontWeight: 700, color: '#78350f', fontSize: '0.85rem' }}>☕️ Pause ({slot.duration || 30} Min.)</span>
+                                         <span style={{ fontWeight: 700, color: '#78350f', fontSize: '0.85rem', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                           <Coffee size={14} color="#78350f" />
+                                           <span>Pause ({slot.duration || 30} Min.)</span>
+                                         </span>
                                        )}
 
                                       {/* ❓ Schülerfrage Badge (Desktop) */}
@@ -12317,8 +12445,9 @@ useEffect(() => {
       ) : activeTab === 'coaches' ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', width: '100%' }}>
           <div>
-            <h2 style={{ fontSize: '1.8rem', fontWeight: 1000, color: '#0f172a', margin: 0, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em', textAlign: 'left' }}>
-              🎓 Lehrerverwaltung
+            <h2 style={{ fontSize: '1.8rem', fontWeight: 1000, color: '#0f172a', margin: 0, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <GraduationCap size={24} color="#0f172a" />
+              <span>Lehrerverwaltung</span>
             </h2>
             <p style={{ margin: '6px 0 0 0', fontSize: '0.9rem', color: '#64748b', fontWeight: 600, textAlign: 'left' }}>
               Übersicht über alle aktiven Lehrkräfte und Coaches an deiner Musikschule.

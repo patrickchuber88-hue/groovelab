@@ -188,8 +188,16 @@ export const StudentRescheduleBottomSheetModal: React.FC<StudentRescheduleBottom
     }
   };
 
+  const isReactivation = Boolean(
+    occ?.status === 'reactivated' ||
+    occ?.is_reactivation ||
+    (occ?.status === 'scheduled' && occ?.original_date && occ?.date === occ?.original_date)
+  );
+
   const handleInquiry = () => {
-    const suggestedText = `Hallo ${resolvedTeacherName}, die vorgeschlagene Verschiebung am ${newDateStr} um ${newTimeStr} Uhr passt mir leider nicht. Hättest du eine alternative Zeit?`;
+    const suggestedText = isReactivation
+      ? `Hallo ${resolvedTeacherName}, der reaktivierte Termin am ${newDateStr} um ${newTimeStr} Uhr passt mir leider nicht. Kannst du mir bitte Bescheid geben?`
+      : `Hallo ${resolvedTeacherName}, die vorgeschlagene Verschiebung am ${newDateStr} um ${newTimeStr} Uhr passt mir leider nicht. Hättest du eine alternative Zeit?`;
     onOpenChatInquiry(occ.teacher, suggestedText);
     onClose();
   };
@@ -220,13 +228,17 @@ export const StudentRescheduleBottomSheetModal: React.FC<StudentRescheduleBottom
           maxWidth: '480px',
           background: '#ffffff',
           borderRadius: '28px 28px 0 0',
-          padding: '16px 20px 28px 20px',
+          paddingTop: '16px',
+          paddingLeft: 'max(20px, env(safe-area-inset-left))',
+          paddingRight: 'max(20px, env(safe-area-inset-right))',
+          paddingBottom: 'max(28px, env(safe-area-inset-bottom))',
           boxShadow: '0 -10px 40px rgba(0, 0, 0, 0.25)',
           display: 'flex',
           flexDirection: 'column',
           gap: '14px',
-          maxHeight: '90vh',
+          maxHeight: 'min(90dvh, 90vh)',
           overflowY: 'auto',
+          overflowX: 'hidden',
           boxSizing: 'border-box'
         }}
       >
@@ -243,7 +255,8 @@ export const StudentRescheduleBottomSheetModal: React.FC<StudentRescheduleBottom
             alignItems: 'center',
             justifyContent: 'center',
             textAlign: 'center',
-            gap: '14px'
+            gap: '14px',
+            minWidth: 0
           }}>
             <div style={{
               width: '68px',
@@ -258,30 +271,32 @@ export const StudentRescheduleBottomSheetModal: React.FC<StudentRescheduleBottom
             }}>
               <Check size={38} strokeWidth={3} />
             </div>
-            <h3 style={{ margin: '6px 0 0 0', fontSize: '1.28rem', fontWeight: 950, color: '#0f172a', letterSpacing: '-0.02em' }}>
-              Termin bestätigt! 📅
+            <h3 style={{ margin: '6px 0 0 0', fontSize: '1.28rem', fontWeight: 950, color: '#0f172a', letterSpacing: '-0.02em', overflowWrap: 'break-word' }}>
+              {isReactivation ? 'Termin quittiert!' : 'Termin bestätigt!'}
             </h3>
-            <p style={{ margin: 0, fontSize: '0.92rem', color: '#475569', fontWeight: 600, maxWidth: '320px', lineHeight: 1.45 }}>
-              In deinem Kalender aktualisiert. <strong style={{ color: '#0f172a' }}>{resolvedTeacherName}</strong> wurde automatisch benachrichtigt.
+            <p style={{ margin: 0, fontSize: '0.92rem', color: '#475569', fontWeight: 600, maxWidth: '320px', lineHeight: 1.45, overflowWrap: 'break-word' }}>
+              {isReactivation
+                ? `In deinem Kalender vermerkt. ${resolvedTeacherName} weiß Bescheid.`
+                : <>In deinem Kalender aktualisiert. <strong style={{ color: '#0f172a' }}>{resolvedTeacherName}</strong> wurde automatisch benachrichtigt.</>}
             </p>
           </div>
         ) : (
           <>
         {/* Header with Teacher Profile & Badge */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0, flex: 1 }}>
             <div style={{
               width: '44px',
               height: '44px',
               borderRadius: '14px',
-              background: '#fef3c7',
-              color: '#b45309',
+              background: isReactivation ? '#dcfce7' : '#fef3c7',
+              color: isReactivation ? '#16a34a' : '#b45309',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               overflow: 'hidden',
               flexShrink: 0,
-              boxShadow: '0 2px 8px rgba(217, 119, 6, 0.15)'
+              boxShadow: isReactivation ? '0 2px 8px rgba(22, 163, 74, 0.15)' : '0 2px 8px rgba(217, 119, 6, 0.15)'
             }}>
               {teacherAvatarUrl ? (
                 <img src={teacherAvatarUrl} alt={resolvedTeacherName} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -289,12 +304,31 @@ export const StudentRescheduleBottomSheetModal: React.FC<StudentRescheduleBottom
                 <Clock size={22} strokeWidth={2.4} />
               )}
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column' }}>
-              <span style={{ fontSize: '0.68rem', fontWeight: 900, color: '#b45309', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                🔔 Terminänderung
+            <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1 }}>
+              <span style={{
+                fontSize: '0.68rem',
+                fontWeight: 900,
+                color: isReactivation ? '#15803d' : '#b45309',
+                textTransform: 'uppercase',
+                letterSpacing: '0.04em',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}>
+                <Clock size={11} strokeWidth={2.5} />
+                {isReactivation ? 'Termin wieder aktiv' : 'Terminänderung'}
               </span>
-              <h3 style={{ margin: '1px 0 0 0', fontSize: '1.08rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em' }}>
-                Verschiebung durch Lehrkraft
+              <h3 style={{
+                margin: '1px 0 0 0',
+                fontSize: '1.08rem',
+                fontWeight: 900,
+                color: '#0f172a',
+                letterSpacing: '-0.02em',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap'
+              }}>
+                {isReactivation ? 'Unterricht findet regulär statt' : 'Verschiebung durch Lehrkraft'}
               </h3>
             </div>
           </div>
@@ -306,79 +340,102 @@ export const StudentRescheduleBottomSheetModal: React.FC<StudentRescheduleBottom
               background: '#f1f5f9',
               border: 'none',
               borderRadius: '50%',
-              width: '32px',
-              height: '32px',
+              width: '44px',
+              height: '44px',
+              minWidth: '44px',
+              minHeight: '44px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               color: '#64748b',
-              cursor: 'pointer'
+              cursor: 'pointer',
+              flexShrink: 0
             }}
           >
-            <X size={18} strokeWidth={2.2} />
+            <X size={18} strokeWidth={2.4} />
           </button>
         </div>
 
         {/* Schedule Comparison Card */}
         <div style={{
-          background: 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)',
-          border: '1.5px solid #fde68a',
+          background: isReactivation ? 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)' : 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)',
+          border: isReactivation ? '1.5px solid #bbf7d0' : '1.5px solid #fde68a',
           borderRadius: '20px',
           padding: '16px',
           display: 'flex',
           flexDirection: 'column',
-          gap: '10px'
+          gap: '10px',
+          minWidth: 0
         }}>
-          {/* New Date (Highlighted in Green) */}
+          {/* Main Date Card */}
           <div style={{
             background: '#ffffff',
             borderRadius: '14px',
             padding: '12px 14px',
-            border: '1.5px solid #86efac',
-            boxShadow: '0 2px 6px rgba(22, 163, 74, 0.08)'
+            border: isReactivation ? '1.5px solid #86efac' : '1.5px solid #86efac',
+            boxShadow: '0 2px 6px rgba(22, 163, 74, 0.08)',
+            minWidth: 0
           }}>
-            <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#15803d', textTransform: 'uppercase', letterSpacing: '0.03em', marginBottom: '3px' }}>
-              🟢 Neuer Vorschlag
+            <div style={{
+              fontSize: '0.72rem',
+              fontWeight: 800,
+              color: '#15803d',
+              textTransform: 'uppercase',
+              letterSpacing: '0.03em',
+              marginBottom: '3px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px'
+            }}>
+              <Check size={12} strokeWidth={3} />
+              {isReactivation ? 'Planmäßiger Unterricht' : 'Neuer Vorschlag'}
             </div>
-            <div style={{ fontSize: '1.05rem', fontWeight: 950, color: '#166534', letterSpacing: '-0.01em' }}>
+            <div style={{ fontSize: '1.05rem', fontWeight: 950, color: '#166534', letterSpacing: '-0.01em', overflowWrap: 'break-word' }}>
               {newDateStr}
             </div>
             <div style={{ fontSize: '1.18rem', fontWeight: 950, color: '#15803d', marginTop: '2px' }}>
               {newTimeStr} Uhr
             </div>
+            {isReactivation && (
+              <div style={{ fontSize: '0.78rem', color: '#166534', fontWeight: 600, marginTop: '6px', lineHeight: 1.35, overflowWrap: 'break-word' }}>
+                Die frühere Absage wurde aufgehoben. Dein Termin findet wie im Unterrichtsvertrag vereinbart regulär statt.
+              </div>
+            )}
           </div>
 
-          {/* Original Date (Strikethrough) */}
-          {(origDateStr || origTimeStr) && (
+          {/* Original Date (Strikethrough) - only if real reschedule */}
+          {!isReactivation && (origDateStr || origTimeStr) && (
             <div style={{
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
               padding: '6px 8px',
               background: 'rgba(255, 255, 255, 0.65)',
-              borderRadius: '10px'
+              borderRadius: '10px',
+              gap: '8px',
+              minWidth: 0
             }}>
-              <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700 }}>Ursprünglicher Termin:</span>
-              <span style={{ fontSize: '0.78rem', color: '#94a3b8', textDecoration: 'line-through', fontWeight: 600 }}>
+              <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700, flexShrink: 0 }}>Ursprünglicher Termin:</span>
+              <span style={{ fontSize: '0.78rem', color: '#94a3b8', textDecoration: 'line-through', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {origDateStr ? `${origDateStr}, ` : ''}{origTimeStr ? `${origTimeStr} Uhr` : ''}
               </span>
             </div>
           )}
 
           {/* Teacher & Room Meta */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '4px', fontSize: '0.76rem', color: '#78350f', fontWeight: 700 }}>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-              <User size={13} /> {resolvedTeacherName}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '4px', fontSize: '0.76rem', color: isReactivation ? '#166534' : '#78350f', fontWeight: 700, minWidth: 0, flexWrap: 'wrap', gap: '6px' }}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', minWidth: 0 }}>
+              <User size={13} /> <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{resolvedTeacherName}</span>
             </span>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-              <MapPin size={13} /> {roomName}
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', minWidth: 0 }}>
+              <MapPin size={13} /> <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{roomName}</span>
             </span>
           </div>
         </div>
 
-        {/* Mode Evaluation: Permission Allowed vs Read-Only */}
-        {parentAllowRescheduleConfirm ? (
-          /* Scenario A: Student is permitted to accept */
+        {/* Mode Evaluation: Reactivation OR Permission Allowed vs Read-Only */}
+        {(isReactivation || parentAllowRescheduleConfirm) ? (
+          /* Scenario A: Student is permitted to accept (always allowed for reactivation read-confirmation) */
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '4px' }}>
             <button
               type="button"
@@ -404,7 +461,11 @@ export const StudentRescheduleBottomSheetModal: React.FC<StudentRescheduleBottom
               }}
             >
               <Check size={20} strokeWidth={3} />
-              <span>{isConfirming ? 'Wird bestätigt...' : 'Neuen Termin annehmen'}</span>
+              <span>
+                {isConfirming 
+                  ? (isReactivation ? 'Wird quittiert...' : 'Wird bestätigt...') 
+                  : (isReactivation ? 'Zur Kenntnis genommen' : 'Neuen Termin annehmen')}
+              </span>
             </button>
 
             <button
@@ -427,7 +488,7 @@ export const StudentRescheduleBottomSheetModal: React.FC<StudentRescheduleBottom
               }}
             >
               <MessageSquare size={16} strokeWidth={2.4} />
-              <span>Rückfrage / Passt mir nicht</span>
+              <span>{isReactivation ? 'Rückfrage / Ich kann leider nicht' : 'Rückfrage / Passt mir nicht'}</span>
             </button>
           </div>
         ) : (
@@ -566,13 +627,18 @@ export const StudentRescheduleBottomSheetModal: React.FC<StudentRescheduleBottom
                         }}
                         style={{
                           padding: '12px',
+                          minHeight: '48px',
+                          minWidth: '48px',
                           borderRadius: '12px',
                           border: '1px solid #e2e8f0',
                           background: '#ffffff',
                           color: isClear ? '#ef4444' : isBack ? '#64748b' : '#0f172a',
                           fontSize: '1.1rem',
                           fontWeight: 800,
-                          cursor: 'pointer'
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center'
                         }}
                       >
                         {key}
@@ -591,7 +657,12 @@ export const StudentRescheduleBottomSheetModal: React.FC<StudentRescheduleBottom
                     fontSize: '0.78rem',
                     fontWeight: 700,
                     cursor: 'pointer',
-                    marginTop: '4px'
+                    marginTop: '4px',
+                    minHeight: '48px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '0 12px'
                   }}
                 >
                   PIN-Eingabe abbrechen

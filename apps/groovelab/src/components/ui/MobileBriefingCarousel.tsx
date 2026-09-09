@@ -115,6 +115,8 @@ export const MobileBriefingCarousel: React.FC<MobileBriefingCarouselProps> = ({
     >
       {/* Top Segment Pills Navigation (100% Zero-Scrollbar Apple Segmented Control) */}
       <div 
+        role="tablist"
+        aria-label="Briefing Navigation"
         className="no-scrollbar"
         style={{ 
           display: 'grid', 
@@ -143,11 +145,16 @@ export const MobileBriefingCarousel: React.FC<MobileBriefingCarouselProps> = ({
             <button
               key={tab.id}
               type="button"
+              role="tab"
+              id={`mobile-briefing-tab-${tab.id}`}
+              aria-controls={`mobile-briefing-panel-${tab.id}`}
+              aria-selected={isActive}
+              tabIndex={isActive ? 0 : -1}
               onClick={() => setActiveIndex(idx)}
               style={{
                 width: '100%',
                 minWidth: 0,
-                minHeight: '34px',
+                minHeight: '40px',
                 padding: '6px 3px',
                 borderRadius: '100px',
                 border: 'none',
@@ -162,7 +169,8 @@ export const MobileBriefingCarousel: React.FC<MobileBriefingCarouselProps> = ({
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: '4px',
-                boxSizing: 'border-box'
+                boxSizing: 'border-box',
+                touchAction: 'manipulation'
               }}
             >
               <IconComponent 
@@ -191,31 +199,49 @@ export const MobileBriefingCarousel: React.FC<MobileBriefingCarouselProps> = ({
           display: 'flex', 
           alignItems: 'center', 
           justifyContent: 'center', 
-          gap: '6px', 
+          gap: '4px', 
           padding: '2px 0 6px 0' 
         }}
       >
-        {tabs.map((_, idx) => (
+        {tabs.map((tab, idx) => (
           <button
             key={idx}
             type="button"
+            aria-label={`Gehe zu Tab ${tab.label}`}
             onClick={() => setActiveIndex(idx)}
             style={{
-              width: activeIndex === idx ? '18px' : '6px',
-              height: '6px',
-              borderRadius: '100px',
-              background: activeIndex === idx ? themeColor : '#cbd5e1',
+              minWidth: '24px',
+              minHeight: '24px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: 'transparent',
               border: 'none',
               cursor: 'pointer',
-              transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
-              padding: 0
+              padding: 0,
+              touchAction: 'manipulation'
             }}
-          />
+          >
+            <span
+              style={{
+                width: activeIndex === idx ? '18px' : '6px',
+                height: '6px',
+                borderRadius: '100px',
+                background: activeIndex === idx ? themeColor : '#cbd5e1',
+                transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
+                display: 'block'
+              }}
+            />
+          </button>
         ))}
       </div>
 
       {/* Swipeable Viewport */}
       <div
+        role="tabpanel"
+        id={`mobile-briefing-panel-${tabs[activeIndex]?.id}`}
+        aria-labelledby={`mobile-briefing-tab-${tabs[activeIndex]?.id}`}
+        tabIndex={0}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
@@ -224,7 +250,8 @@ export const MobileBriefingCarousel: React.FC<MobileBriefingCarouselProps> = ({
           maxWidth: '100%',
           position: 'relative',
           overflow: 'visible',
-          boxSizing: 'border-box'
+          boxSizing: 'border-box',
+          outline: 'none'
         }}
       >
         {tabs[activeIndex]?.content}

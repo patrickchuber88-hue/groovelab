@@ -5,7 +5,7 @@ import { getDailyQuote } from '@groovelab/shared';
 
 import {
   Activity, BookOpen, Calendar, Clock, Edit3, Flame,
-  Music, Sparkles, User, Users
+  Mic, Music, Sparkles, Sun, User, Users
 } from 'lucide-react';
 
 export interface TeacherHausaufgabenWidgetProps {
@@ -668,8 +668,9 @@ export const TeacherHausaufgabenWidget: React.FC<TeacherHausaufgabenWidgetProps>
                           if (creatorRole === 'student' && visibility === 'private') return null;
                           return (
                             <div key={`prev-note-${idx}`}>
-                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#fefce8', border: '1px solid rgba(234, 179, 8, 0.2)', padding: '4px 8px', borderRadius: '8px', fontSize: '0.74rem', color: '#854d0e', fontStyle: 'normal', fontWeight: 700 }}>
-                                🎵 {creatorRole === 'teacher' ? 'Lehrer-Loop' : 'Schüler-Loop'}: "{label}" ({duration}s)
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#fefce8', border: '1px solid rgba(234, 179, 8, 0.2)', padding: '4px 8px', borderRadius: '8px', fontSize: '0.74rem', color: '#854d0e', fontStyle: 'normal', fontWeight: 700 }}>
+                                <Music size={12} color="#854d0e" />
+                                <span>{creatorRole === 'teacher' ? 'Lehrer-Loop' : 'Schüler-Loop'}: "{label}" ({duration}s)</span>
                               </span>
                             </div>
                           );
@@ -686,8 +687,9 @@ export const TeacherHausaufgabenWidget: React.FC<TeacherHausaufgabenWidgetProps>
                           }, undefined, role === 'teacher');
                           return (
                             <div key={`prev-note-${idx}`}>
-                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#e6f4ea', border: '1px solid rgba(52, 168, 83, 0.2)', padding: '4px 8px', borderRadius: '8px', fontSize: '0.74rem', color: '#166534', fontStyle: 'normal', fontWeight: 700 }}>
-                                🎙️ {role === 'teacher' ? 'Lehrer-Aufnahme' : 'Schüler-Aufnahme'}: "{label}" ({duration}s)
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#e6f4ea', border: '1px solid rgba(52, 168, 83, 0.2)', padding: '4px 8px', borderRadius: '8px', fontSize: '0.74rem', color: '#166534', fontStyle: 'normal', fontWeight: 700 }}>
+                                <Mic size={12} color="#166534" />
+                                <span>{role === 'teacher' ? 'Lehrer-Aufnahme' : 'Schüler-Aufnahme'}: "{label}" ({duration}s)</span>
                               </span>
                             </div>
                           );
@@ -816,8 +818,9 @@ export const TeacherHausaufgabenWidget: React.FC<TeacherHausaufgabenWidgetProps>
                           if (creatorRole === 'student' && visibility === 'private') return null;
                           return (
                             <div key={`curr-note-${idx}`}>
-                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#fefce8', border: '1px solid rgba(234, 179, 8, 0.2)', padding: '4px 8px', borderRadius: '8px', fontSize: '0.74rem', color: '#854d0e', fontStyle: 'normal', fontWeight: 700 }}>
-                                🎵 {creatorRole === 'teacher' ? 'Lehrer-Loop' : 'Schüler-Loop'}: "{label}" ({duration}s)
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#fefce8', border: '1px solid rgba(234, 179, 8, 0.2)', padding: '4px 8px', borderRadius: '8px', fontSize: '0.74rem', color: '#854d0e', fontStyle: 'normal', fontWeight: 700 }}>
+                                <Music size={12} color="#854d0e" />
+                                <span>{creatorRole === 'teacher' ? 'Lehrer-Loop' : 'Schüler-Loop'}: "{label}" ({duration}s)</span>
                               </span>
                             </div>
                           );
@@ -834,8 +837,9 @@ export const TeacherHausaufgabenWidget: React.FC<TeacherHausaufgabenWidgetProps>
                           }, undefined, role === 'teacher');
                           return (
                             <div key={`curr-note-${idx}`}>
-                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#e6f4ea', border: '1px solid rgba(52, 168, 83, 0.2)', padding: '4px 8px', borderRadius: '8px', fontSize: '0.74rem', color: '#166534', fontStyle: 'normal', fontWeight: 700 }}>
-                                🎙️ {role === 'teacher' ? 'Lehrer-Aufnahme' : 'Schüler-Aufnahme'}: "{label}" ({duration}s)
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#e6f4ea', border: '1px solid rgba(52, 168, 83, 0.2)', padding: '4px 8px', borderRadius: '8px', fontSize: '0.74rem', color: '#166534', fontStyle: 'normal', fontWeight: 700 }}>
+                                <Mic size={12} color="#166534" />
+                                <span>{role === 'teacher' ? 'Lehrer-Aufnahme' : 'Schüler-Aufnahme'}: "{label}" ({duration}s)</span>
                               </span>
                             </div>
                           );
@@ -981,17 +985,18 @@ export const TeacherHausaufgabenWidget: React.FC<TeacherHausaufgabenWidgetProps>
 
                   <div style={{ position: 'relative', zIndex: 1 }}>
                     <div style={{ 
-                      background: 'linear-gradient(135deg, #a78bfa 0%, #7c3aed 100%)',
-                      WebkitBackgroundClip: 'text',
-                      WebkitTextFillColor: 'transparent',
                       fontSize: '1.35rem', 
                       fontWeight: 950, 
                       marginBottom: '10px',
                       letterSpacing: '-0.02em',
-                      display: 'inline-block',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      color: '#8b5cf6',
                       fontFamily: "'Plus Jakarta Sans', sans-serif"
                     }}>
-                      ☀️ Schönes Wochenende! ☀️
+                      <Sun size={20} color="#8b5cf6" />
+                      <span>Schönes Wochenende!</span>
                     </div>
                     <div style={{ fontSize: '0.86rem', fontWeight: 600, color: '#4b5563', lineHeight: '1.5' }}>
                       Genieße deine wohlverdiente Pause! Keine Termine, kein Schulstress. Erhole dich gut und tanke Kraft für neue musikalische Abenteuer in der kommenden Woche.
@@ -1052,17 +1057,18 @@ export const TeacherHausaufgabenWidget: React.FC<TeacherHausaufgabenWidgetProps>
 
                 <div style={{ position: 'relative', zIndex: 1 }}>
                   <div style={{ 
-                    background: 'linear-gradient(135deg, #facc15 0%, #eab308 100%)',
-                    WebkitBackgroundClip: 'text',
-                    WebkitTextFillColor: 'transparent',
                     fontSize: '1.35rem', 
                     fontWeight: 950, 
                     marginBottom: '10px',
                     letterSpacing: '-0.02em',
-                    display: 'inline-block',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    color: '#d97706',
                     fontFamily: "'Plus Jakarta Sans', sans-serif"
                   }}>
-                    ✨ Schönen Feierabend! ✨
+                    <Sparkles size={20} color="#d97706" />
+                    <span>Schönen Feierabend!</span>
                   </div>
                   <div style={{ fontSize: '0.86rem', fontWeight: 600, color: '#4b5563', lineHeight: '1.5' }}>
                     {dailyWish}

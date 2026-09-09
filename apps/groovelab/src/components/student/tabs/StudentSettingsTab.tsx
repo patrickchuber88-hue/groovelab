@@ -23,6 +23,7 @@ import { ParentPracticeReportSettingsView } from '../settings/ParentPracticeRepo
 import { ParentCancellationLogSettingsView } from '../settings/ParentCancellationLogSettingsView';
 import { ParentFamilyProfilesSettingsView } from '../settings/ParentFamilyProfilesSettingsView';
 import { ParentDataVaultSettingsView } from '../settings/ParentDataVaultSettingsView';
+import { ParentDevelopmentGridSettingsView } from '../settings/ParentDevelopmentGridSettingsView';
 
 export interface StudentSettingsTabProps {
   activeStudentSettingsModal: string | null;
@@ -1186,6 +1187,18 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                         gradient: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
                         shadowColor: 'rgba(59, 130, 246, 0.40)',
                         icon: Users
+                      },
+                      {
+                        id: 'skills_radar',
+                        title: (() => {
+                          const lvl = ((draftUiLevel ?? (studentUser as any)?.campus_ui_level ?? (typeof window !== 'undefined' ? localStorage.getItem('campus_student_ui_level') : null)) || 'junior');
+                          return lvl === 'junior' ? 'Musik-Stern & Raster' : (lvl === 'pro' ? 'Kompetenzen-Radar' : 'Skill-Radar & Raster');
+                        })(),
+                        subtitle: 'Didaktisches Entwicklungsraster (5 Säulen)',
+                        badge: '5 Dimensionen',
+                        gradient: 'linear-gradient(135deg, #ec4899 0%, #be185d 100%)',
+                        shadowColor: 'rgba(236, 72, 153, 0.40)',
+                        icon: Sparkles
                       }
                     ].map((module) => {
                       const IconComp = module.icon;
@@ -1647,6 +1660,10 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                             {activeStudentSettingsModal === 'practice_report' && 'Übe-Report & Insights'}
                             {activeStudentSettingsModal === 'cancellations' && 'Gemeldete Abwesenheiten'}
                             {activeStudentSettingsModal === 'family_profiles' && 'Familien-Profile'}
+                            {activeStudentSettingsModal === 'skills_radar' && (() => {
+                              const lvl = ((draftUiLevel ?? (studentUser as any)?.campus_ui_level ?? (typeof window !== 'undefined' ? localStorage.getItem('campus_student_ui_level') : null)) || 'junior');
+                              return lvl === 'junior' ? 'Musik-Stern & Raster' : (lvl === 'pro' ? 'Kompetenzen-Radar' : 'Skill-Radar & Raster');
+                            })()}
                             {activeStudentSettingsModal === 'notifications' && 'Mitteilungen & Push'}
                             {activeStudentSettingsModal === 'security' && (isAdultStudent ? 'PIN & Sicherheit' : 'PIN & Eltern-Schutz')}
                             {activeStudentSettingsModal === 'billing' && (isAdultStudent ? 'Vertrag & Belege' : 'Belege & Bereitstellung')}
@@ -1695,6 +1712,8 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                               ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)'
                               : activeStudentSettingsModal === 'family_profiles'
                               ? 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)'
+                              : activeStudentSettingsModal === 'skills_radar'
+                              ? 'linear-gradient(135deg, #ec4899 0%, #be185d 100%)'
                               : activeStudentSettingsModal === 'notifications'
                               ? 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)'
                               : activeStudentSettingsModal === 'security'
@@ -1713,6 +1732,7 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                             {activeStudentSettingsModal === 'practice_report' && <Clock size={20} color="#ffffff" />}
                             {activeStudentSettingsModal === 'cancellations' && <CalendarX size={20} color="#ffffff" />}
                             {activeStudentSettingsModal === 'family_profiles' && <Users size={20} color="#ffffff" />}
+                            {activeStudentSettingsModal === 'skills_radar' && <Sparkles size={20} color="#ffffff" />}
                             {activeStudentSettingsModal === 'notifications' && <Bell size={20} color="#ffffff" />}
                             {activeStudentSettingsModal === 'security' && <Lock size={20} color="#ffffff" />}
                             {activeStudentSettingsModal === 'billing' && <FileText size={20} color="#ffffff" />}
@@ -1726,6 +1746,10 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                               {activeStudentSettingsModal === 'practice_report' && 'Wöchentlicher Übe-Report & Fortschritt'}
                               {activeStudentSettingsModal === 'cancellations' && 'Gemeldete Abwesenheiten'}
                               {activeStudentSettingsModal === 'family_profiles' && 'Familien-Profile & Geschwister'}
+                              {activeStudentSettingsModal === 'skills_radar' && (() => {
+                                const lvl = ((draftUiLevel ?? (studentUser as any)?.campus_ui_level ?? (typeof window !== 'undefined' ? localStorage.getItem('campus_student_ui_level') : null)) || 'junior');
+                                return lvl === 'junior' ? 'Mein Musik-Stern · Entwicklungsraster' : (lvl === 'pro' ? 'Kompetenzen-Radar · Entwicklungsraster' : 'Skill-Radar & Entwicklungsraster');
+                              })()}
                               {activeStudentSettingsModal === 'notifications' && 'Mitteilungen & Benachrichtigungen'}
                               {activeStudentSettingsModal === 'security' && (isAdultStudent ? 'PIN & Account-Sicherheit' : 'PIN & Sicherheit')}
                               {activeStudentSettingsModal === 'billing' && (isAdultStudent ? 'Vertrag & Belege' : 'Belege & Bereitstellung')}
@@ -1738,6 +1762,7 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                               {activeStudentSettingsModal === 'practice_report' && '100% datenschutzkonforme Zusammenfassung der Übe-Einheiten zu Hause.'}
                               {activeStudentSettingsModal === 'cancellations' && 'Übersicht aller Unterrichtsstunden, die durch dein Kind oder die Familie abgesagt wurden.'}
                               {activeStudentSettingsModal === 'family_profiles' && 'Mehrere Kinder auf einem Gerät verwalten und per Fingertipp wechseln.'}
+                              {activeStudentSettingsModal === 'skills_radar' && 'Persönliche, behutsame Förderung durch die Musiklehrkraft (ohne Noten, ohne Leistungsdruck).'}
                               {activeStudentSettingsModal === 'notifications' && 'Passe an, worüber und wie wir dich informieren.'}
                               {activeStudentSettingsModal === 'security' && (isAdultStudent ? '4-stellige persönliche PIN für schnellen und sicheren Login.' : (securityPinTarget === 'parent' ? '6-stellige Eltern-PIN zum Schutz des Kontrollzentrums & der Ruhezeiten.' : '4-stellige Schüler-PIN für dein Kind (schützt Stundenplan & Profil).'))}
                               {activeStudentSettingsModal === 'billing' && (isAdultStudent ? 'Übersicht über deine gebuchten Module und Zahlungsnachweise.' : 'Übersicht über 100% freie App, Bereitstellung & Zahlungsnachweise.')}
@@ -1852,6 +1877,18 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                         setIsAddSiblingModalOpen={setIsAddSiblingModalOpen}
                       />
                     )}
+
+                    {activeStudentSettingsModal === 'skills_radar' && (() => {
+                      const currentLvlKey = ((draftUiLevel ?? (studentUser as any)?.campus_ui_level ?? (typeof window !== 'undefined' ? localStorage.getItem('campus_student_ui_level') : null)) || 'junior') as 'junior' | 'teen' | 'pro';
+                      return (
+                        <ParentDevelopmentGridSettingsView
+                          currentLvlKey={currentLvlKey}
+                          studentUser={studentUser}
+                          studentId={studentId}
+                          instrumentName={avatar?.instrument}
+                        />
+                      );
+                    })()}
 
                     {activeStudentSettingsModal === 'notifications' && (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>

@@ -8,7 +8,11 @@
 
 -- 1. Occurrence Push Trigger for Real-Time Teacher Confirmation Feedback
 CREATE OR REPLACE FUNCTION public.trigger_push_on_occurrence_confirmation()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER 
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp, extensions
+AS $$
 DECLARE
   v_title TEXT;
   v_body TEXT;
@@ -57,7 +61,7 @@ BEGIN
 
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$;
 
 -- Attach trigger to schedule_occurrences
 DROP TRIGGER IF EXISTS trg_push_on_occurrence_confirmation ON public.schedule_occurrences;
@@ -68,7 +72,11 @@ CREATE TRIGGER trg_push_on_occurrence_confirmation
 
 -- 2. Enhanced Schedule Push Trigger with Deep-Link URL
 CREATE OR REPLACE FUNCTION public.trigger_push_on_schedule_change()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER 
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp, extensions
+AS $$
 DECLARE
   v_title TEXT;
   v_body TEXT;
@@ -261,6 +269,6 @@ BEGIN
 
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$;
 
 NOTIFY pgrst, 'reload schema';

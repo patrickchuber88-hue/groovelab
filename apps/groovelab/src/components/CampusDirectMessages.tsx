@@ -19,7 +19,12 @@ import {
   CheckCheck, 
   ChevronDown,
   RotateCcw,
-  AlertTriangle
+  AlertTriangle,
+  ArrowRight,
+  Music,
+  HeartHandshake,
+  Moon,
+  Phone
 } from 'lucide-react';
 import { formatTeacherFullName, formatSingleStudentAnonymized, formatStudentPureFirstName } from '../utils/nameHelper';
 import { isUUID } from '../utils/uuidValidator';
@@ -395,30 +400,33 @@ const AppleSystemNotificationCard: React.FC<AppleSystemNotificationCardProps> = 
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            gap: '12px',
-            margin: '2px 0'
+            gap: '10px',
+            margin: '2px 0',
+            flexWrap: 'wrap',
+            minWidth: 0
           }}>
-            <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
               <span style={{ fontSize: '0.62rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>Bisher</span>
-              <span style={{ fontSize: '0.78rem', fontWeight: 600, color: '#475569' }}>{oldTime}</span>
+              <span style={{ fontSize: '0.78rem', fontWeight: 600, color: '#475569', overflowWrap: 'break-word' }}>{oldTime}</span>
             </div>
 
             <div style={{
               color: '#34a853',
-              fontWeight: 800,
-              fontSize: '0.85rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
               flexShrink: 0
             }}>
-              ➔
+              <ArrowRight size={14} strokeWidth={2.6} color="#34a853" />
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', textAlign: 'right' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', textAlign: 'right', minWidth: 0 }}>
               <span style={{ fontSize: '0.62rem', fontWeight: 700, color: '#15803d', textTransform: 'uppercase' }}>Neu</span>
-              <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#15803d' }}>{newTime}</span>
+              <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#15803d', overflowWrap: 'break-word' }}>{newTime}</span>
             </div>
           </div>
         ) : (
-          <p style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 500, margin: 0, lineHeight: 1.5, whiteSpace: 'pre-line' }}>
+          <p style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 500, margin: 0, lineHeight: 1.5, whiteSpace: 'pre-line', overflowWrap: 'break-word' }}>
             {note}
           </p>
         )}
@@ -455,7 +463,8 @@ const AppleSystemNotificationCard: React.FC<AppleSystemNotificationCardProps> = 
             gap: '8px', 
             marginTop: '2px', 
             paddingTop: '8px', 
-            borderTop: '1px solid #f8fafc' 
+            borderTop: '1px solid #f8fafc',
+            flexWrap: 'wrap'
           }}>
             <button
               type="button"
@@ -463,23 +472,26 @@ const AppleSystemNotificationCard: React.FC<AppleSystemNotificationCardProps> = 
               onClick={handleConfirm}
               style={{
                 flex: 1,
+                minWidth: '120px',
+                minHeight: '44px',
                 padding: '8px 14px',
                 borderRadius: '100px',
                 border: 'none',
                 background: '#34a853',
                 color: '#ffffff',
-                fontSize: '0.75rem',
+                fontSize: '0.78rem',
                 fontWeight: 700,
                 cursor: 'pointer',
                 display: 'inline-flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: '5px',
-                boxShadow: '0 2px 6px rgba(52, 168, 83, 0.15)'
+                boxShadow: '0 2px 6px rgba(52, 168, 83, 0.15)',
+                touchAction: 'manipulation'
               }}
               className="hover-scale"
             >
-              <Check size={12} color="#ffffff" />
+              <Check size={13} color="#ffffff" strokeWidth={2.5} />
               <span>{actionLoading ? 'Bestätige...' : 'Bestätigen'}</span>
             </button>
 
@@ -489,22 +501,25 @@ const AppleSystemNotificationCard: React.FC<AppleSystemNotificationCardProps> = 
               onClick={handleReject}
               style={{
                 flex: 1,
+                minWidth: '120px',
+                minHeight: '44px',
                 padding: '8px 14px',
                 borderRadius: '100px',
                 border: '1px solid #e2e8f0',
                 background: '#ffffff',
                 color: '#64748b',
-                fontSize: '0.75rem',
+                fontSize: '0.78rem',
                 fontWeight: 700,
                 cursor: 'pointer',
                 display: 'inline-flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: '5px'
+                gap: '5px',
+                touchAction: 'manipulation'
               }}
               className="hover-scale"
             >
-              <X size={12} color="#64748b" />
+              <X size={13} color="#64748b" strokeWidth={2.5} />
               <span>{actionLoading ? 'Lehne ab...' : 'Ablehnen'}</span>
             </button>
           </div>
@@ -627,6 +642,17 @@ export function CampusDirectMessages({
       setIsVerifyingPin(false);
     }
   };
+
+  useEffect(() => {
+    if (!showParentPinModal) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setShowParentPinModal(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showParentPinModal]);
 
 
   useEffect(() => {
@@ -1841,11 +1867,11 @@ export function CampusDirectMessages({
               {/* Status Badges */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0, whiteSpace: 'nowrap' }}>
                 <span style={{
-                  padding: '6px 14px',
+                  padding: isMobile ? '4px 10px' : '6px 14px',
                   borderRadius: '10px',
                   background: 'rgba(255, 255, 255, 0.22)',
                   color: '#ffffff',
-                  fontSize: '0.72rem',
+                  fontSize: isMobile ? '0.64rem' : '0.72rem',
                   fontWeight: 800,
                   border: '1px solid rgba(255, 255, 255, 0.38)',
                   display: 'inline-flex',
@@ -1855,8 +1881,8 @@ export function CampusDirectMessages({
                   whiteSpace: 'nowrap',
                   boxShadow: '0 2px 8px rgba(0,0,0,0.06)'
                 }}>
-                  <ShieldCheck size={14} color="#ffffff" />
-                  <span>DSGVO-konform • TLS 1.3 &amp; AES-256 verschlüsselt</span>
+                  <ShieldCheck size={14} color="#ffffff" style={{ flexShrink: 0 }} />
+                  <span>{isMobile ? 'DSGVO • Verschlüsselt' : 'DSGVO-konform • TLS 1.3 & AES-256 verschlüsselt'}</span>
                 </span>
               </div>
             </div>
@@ -2026,6 +2052,8 @@ export function CampusDirectMessages({
                         boxShadow: '0 12px 30px -4px rgba(0,0,0,0.18), 0 6px 12px -2px rgba(0,0,0,0.08)',
                         zIndex: 9999,
                         minWidth: '240px',
+                        maxWidth: 'calc(100vw - 32px)',
+                        boxSizing: 'border-box',
                         maxHeight: '280px',
                         overflowY: 'auto'
                       }} className="custom-scrollbar">
@@ -2145,17 +2173,19 @@ export function CampusDirectMessages({
                     background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.98) 0%, rgba(240, 253, 244, 0.92) 100%)',
                     border: '1px solid rgba(52, 168, 83, 0.3)',
                     borderRadius: '20px',
-                    padding: '16px 20px',
+                    padding: isMobile ? '14px' : '16px 20px',
                     marginBottom: '14px',
                     display: 'flex',
-                    alignItems: 'center',
+                    flexDirection: isMobile ? 'column' : 'row',
+                    alignItems: isMobile ? 'stretch' : 'center',
                     justifyContent: 'space-between',
-                    gap: '16px',
+                    gap: isMobile ? '14px' : '16px',
                     boxShadow: '0 10px 25px -5px rgba(52, 168, 83, 0.1), 0 4px 10px -2px rgba(0,0,0,0.03)',
-                    backdropFilter: 'blur(12px)'
+                    backdropFilter: 'blur(12px)',
+                    boxSizing: 'border-box'
                   }}>
                     {/* Left: Apple Calendar Tear-Off Badge & Details */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flex: 1 }}>
+                    <div style={{ display: 'flex', alignItems: isMobile ? 'flex-start' : 'center', gap: isMobile ? '12px' : '16px', flex: 1, minWidth: 0 }}>
                       {/* Apple Calendar Badge Block */}
                       <div style={{
                         width: '52px',
@@ -2198,7 +2228,7 @@ export function CampusDirectMessages({
                       </div>
 
                       {/* Event Information */}
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', minWidth: 0, flex: 1 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                           <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#15803d', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                             1:1 Termin-Shoutbox
@@ -2272,32 +2302,35 @@ export function CampusDirectMessages({
                             gap: '8px',
                             flexWrap: 'wrap',
                             marginTop: '4px',
-                            boxShadow: '0 2px 6px rgba(52, 168, 83, 0.05)'
+                            boxShadow: '0 2px 6px rgba(52, 168, 83, 0.05)',
+                            minWidth: 0
                           }}>
                             {/* Original Stammtermin Pill */}
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.78rem', color: '#64748b', fontWeight: 600 }}>
-                              <span style={{ fontSize: '0.64rem', fontWeight: 800, textTransform: 'uppercase', background: '#f1f5f9', color: '#475569', padding: '2px 6px', borderRadius: '4px' }}>Stammtermin</span>
-                              <span>{stammterminText}</span>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.78rem', color: '#64748b', fontWeight: 600, minWidth: 0 }}>
+                              <span style={{ fontSize: '0.64rem', fontWeight: 800, textTransform: 'uppercase', background: '#f1f5f9', color: '#475569', padding: '2px 6px', borderRadius: '4px', flexShrink: 0 }}>Stammtermin</span>
+                              <span style={{ overflowWrap: 'break-word' }}>{stammterminText}</span>
                             </div>
 
                             {/* Transition Arrow */}
-                            <div style={{ color: '#34a853', fontWeight: 900, fontSize: '0.85rem' }}>➔</div>
+                            <div style={{ color: '#34a853', display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+                              <ArrowRight size={13} color="#34a853" strokeWidth={2.6} />
+                            </div>
 
                             {/* New Rescheduled Date Pill */}
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.78rem', color: '#15803d', fontWeight: 800 }}>
-                              <span style={{ fontSize: '0.64rem', fontWeight: 900, textTransform: 'uppercase', background: '#34a853', color: '#ffffff', padding: '2px 6px', borderRadius: '4px' }}>Neu</span>
-                              <span>{neuFormattedText}</span>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.78rem', color: '#15803d', fontWeight: 800, minWidth: 0 }}>
+                              <span style={{ fontSize: '0.64rem', fontWeight: 900, textTransform: 'uppercase', background: '#34a853', color: '#ffffff', padding: '2px 6px', borderRadius: '4px', flexShrink: 0 }}>Neu</span>
+                              <span style={{ overflowWrap: 'break-word' }}>{neuFormattedText}</span>
                             </div>
                           </div>
                         ) : (
-                          <div style={{ fontSize: '0.98rem', color: '#0f172a', fontWeight: 850, letterSpacing: '-0.01em' }}>
+                          <div style={{ fontSize: '0.98rem', color: '#0f172a', fontWeight: 850, letterSpacing: '-0.01em', overflowWrap: 'break-word' }}>
                             {dayName}, {dateFormatted}
                           </div>
                         )}
 
                         {!stammterminText && (
                           <div style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <Clock size={12} color="#34a853" />
+                            <Clock size={12} color="#34a853" style={{ flexShrink: 0 }} />
                             <span>{timeFormatted ? `Start um ${timeFormatted} Uhr` : 'Terminzeit vereinbart'}</span>
                           </div>
                         )}
@@ -2335,9 +2368,14 @@ export function CampusDirectMessages({
                         cursor: 'pointer',
                         display: 'inline-flex',
                         alignItems: 'center',
+                        justifyContent: 'center',
                         gap: '6px',
                         boxShadow: stammterminText ? '0 3px 12px rgba(217, 119, 6, 0.3)' : '0 3px 12px rgba(52, 168, 83, 0.25)',
                         flexShrink: 0,
+                        width: isMobile ? '100%' : 'auto',
+                        minHeight: isMobile ? '44px' : undefined,
+                        boxSizing: 'border-box',
+                        touchAction: 'manipulation',
                         transition: 'all 0.2s ease'
                       }}
                       className="hover-scale"
@@ -2629,20 +2667,20 @@ export function CampusDirectMessages({
                 </button>
               </div>
             ) : (
-              <div style={{ borderTop: '1px solid #f1f5f9', background: '#f8fafc', padding: isMobile ? '8px 12px 12px 12px' : '12px 24px' }}>
-                {/* Quick Replies Pill Bar: Vetted Micro-Chips Suite (100% Harmonized & Neutral) */}
+              <div style={{ borderTop: '1px solid #f1f5f9', background: '#f8fafc', padding: isMobile ? '8px 12px max(12px, env(safe-area-inset-bottom)) 12px' : '12px 24px' }}>
+                {/* Quick Replies Pill Bar: Vetted Micro-Chips Suite (100% Harmonized & Monochrome) */}
                 {(() => {
                   const isUserTeacher = user?.role?.toLowerCase() === 'teacher' || user?.role?.toLowerCase() === 'admin' || user?.role?.toLowerCase() === 'secretary';
                   const vettedQuickChips = isUserTeacher ? [
-                    { label: '👍 Gesehen & notiert', text: 'Gesehen und notiert, vielen Dank für die Rückmeldung!' },
-                    { label: '🎵 Noten & Instrument dabei?', text: 'Bitte an das Notenheft und das Instrument für den Unterricht denken.' },
-                    { label: '⏱️ 5 Min. später vor Ort', text: 'Ich bin gleich da, verzögert sich um ca. 5 Minuten.' },
-                    { label: '🌱 Keine Sorge, alles gut!', text: 'Keine Sorge, alles in bester Ordnung!' }
+                    { icon: CheckCheck, label: 'Gesehen & notiert', text: 'Gesehen und notiert, vielen Dank für die Rückmeldung!' },
+                    { icon: Music, label: 'Noten & Instrument dabei?', text: 'Bitte an das Notenheft und das Instrument für den Unterricht denken.' },
+                    { icon: Clock, label: '5 Min. später vor Ort', text: 'Ich bin gleich da, verzögert sich um ca. 5 Minuten.' },
+                    { icon: Sparkles, label: 'Keine Sorge, alles gut!', text: 'Keine Sorge, alles in bester Ordnung!' }
                   ] : [
-                    { label: '👍 Gesehen & danke!', text: 'Gesehen und vielen Dank für die Information!' },
-                    { label: '⏱️ Bin ca. 5 Min. später da', text: 'Ich verspäte mich leider um ca. 5 Minuten, bin aber gleich da!' },
-                    { label: '🎵 Noten & Instrument dabei', text: 'Notenheft und Instrument sind eingepackt, alles bereit!' },
-                    { label: '🙏 Danke für das Verständnis!', text: 'Vielen Dank für das Verständnis und die Geduld!' }
+                    { icon: CheckCheck, label: 'Gesehen & danke!', text: 'Gesehen und vielen Dank für die Information!' },
+                    { icon: Clock, label: 'Bin ca. 5 Min. später da', text: 'Ich verspäte mich leider um ca. 5 Minuten, bin aber gleich da!' },
+                    { icon: Music, label: 'Noten & Instrument dabei', text: 'Notenheft und Instrument sind eingepackt, alles bereit!' },
+                    { icon: HeartHandshake, label: 'Danke für das Verständnis!', text: 'Vielen Dank für das Verständnis und die Geduld!' }
                   ];
 
                   return (
@@ -2674,11 +2712,14 @@ export function CampusDirectMessages({
                             flexShrink: 0,
                             display: 'inline-flex',
                             alignItems: 'center',
-                            gap: '5px',
+                            gap: '6px',
+                            minHeight: isMobile ? '38px' : '32px',
+                            touchAction: 'manipulation',
                             transition: 'all 0.15s ease'
                           }}
                           className="hover-scale"
                         >
+                          <chip.icon size={13} strokeWidth={2.4} color="#15803d" style={{ flexShrink: 0 }} />
                           <span>{chip.label}</span>
                         </button>
                       ))}
@@ -2709,8 +2750,9 @@ export function CampusDirectMessages({
                       }}>
                         <Clock size={15} color="#64748b" style={{ flexShrink: 0, marginTop: '2px' }} />
                         <div>
-                          <div style={{ fontWeight: 800, color: '#1e293b', marginBottom: '2px' }}>
-                            🌙 Ruhezeit von {teacherName}:
+                          <div style={{ fontWeight: 800, color: '#1e293b', marginBottom: '2px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                            <Moon size={14} color="#64748b" style={{ flexShrink: 0 }} />
+                            <span>Ruhezeit von {teacherName}:</span>
                           </div>
                           <div>
                             Deine Nachricht wird zugestellt. Beachte bitte, dass Lehrkräfte außerhalb ihrer Unterrichtszeiten nicht zur Beantwortung verpflichtet sind. Dringende Absagen bitte per E-Mail an die Lehrkraft senden.
@@ -2780,7 +2822,10 @@ export function CampusDirectMessages({
                         marginTop: '2px'
                       }}>
                         <span>Kostenlose & anonyme Nummer gegen Kummer:</span>
-                        <a href="tel:116111" style={{ color: '#b91c1c', textDecoration: 'underline', fontWeight: 900 }}>📞 116 111</a>
+                        <a href="tel:116111" style={{ color: '#b91c1c', textDecoration: 'underline', fontWeight: 900, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                          <Phone size={12} color="#dc2626" style={{ flexShrink: 0 }} />
+                          <span>116 111</span>
+                        </a>
                       </div>
                     )}
                   </div>
@@ -2826,24 +2871,27 @@ export function CampusDirectMessages({
                     aria-label="Nachricht senden"
                     style={{
                       position: 'absolute',
-                      right: '6px',
+                      right: '5px',
                       border: 'none',
                       background: !typedMessage.trim() ? '#f1f5f9' : 'linear-gradient(135deg, #15803d 0%, #16a34a 100%)',
                       color: !typedMessage.trim() ? '#94a3b8' : '#ffffff',
                       borderRadius: '50%',
-                      width: '32px',
-                      height: '32px',
+                      width: '36px',
+                      height: '36px',
+                      minWidth: '36px',
+                      minHeight: '36px',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
                       cursor: !typedMessage.trim() ? 'not-allowed' : 'pointer',
                       transition: 'all 0.15s ease',
                       boxShadow: !typedMessage.trim() ? 'none' : '0 2px 6px rgba(21, 128, 61, 0.25)',
-                      flexShrink: 0
+                      flexShrink: 0,
+                      touchAction: 'manipulation'
                     }}
                     className={typedMessage.trim() ? 'hover-scale' : ''}
                   >
-                    <Send size={15} strokeWidth={2.4} />
+                    <Send size={16} strokeWidth={2.4} />
                   </button>
                 </form>
               </div>
@@ -2996,6 +3044,9 @@ export function CampusDirectMessages({
       {/* Master PIN Gate Modal for Chat Unlock */}
       {showParentPinModal && (
         <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Eltern Master-PIN Eingabe"
           onClick={() => {
             setShowParentPinModal(false);
           }}
@@ -3008,7 +3059,7 @@ export function CampusDirectMessages({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            padding: '20px',
+            padding: '16px',
             animation: 'fadeIn 0.15s ease'
           }}
         >
@@ -3019,33 +3070,34 @@ export function CampusDirectMessages({
               borderRadius: '28px',
               maxWidth: '380px',
               width: '100%',
-              padding: '30px 24px',
+              padding: '28px 20px max(24px, env(safe-area-inset-bottom)) 20px',
               boxShadow: '0 25px 60px rgba(0,0,0,0.3)',
               textAlign: 'center',
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
-              gap: '16px'
+              gap: '14px',
+              boxSizing: 'border-box'
             }}
           >
             <div style={{
-              width: '60px',
-              height: '60px',
-              borderRadius: '20px',
+              width: '56px',
+              height: '56px',
+              borderRadius: '18px',
               background: '#e0f2fe',
               color: '#0284c7',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center'
             }}>
-              <Lock size={28} />
+              <Lock size={26} />
             </div>
 
             <div>
-              <h3 style={{ margin: '0 0 6px 0', fontSize: '1.2rem', fontWeight: 900, color: '#0f172a' }}>
+              <h3 style={{ margin: '0 0 6px 0', fontSize: '1.15rem', fontWeight: 900, color: '#0f172a' }}>
                 Eltern Master-PIN
               </h3>
-              <p style={{ margin: 0, fontSize: '0.8rem', color: '#64748b', lineHeight: 1.4, fontWeight: 500 }}>
+              <p style={{ margin: 0, fontSize: '0.80rem', color: '#64748b', lineHeight: 1.4, fontWeight: 500 }}>
                 Das Verfassen von Nachrichten ist durch den Elternbereich geschützt. Bitte gib deine 6-stellige Eltern-Master-PIN ein.
               </p>
             </div>
@@ -3069,7 +3121,7 @@ export function CampusDirectMessages({
               display: 'flex',
               gap: '10px',
               justifyContent: 'center',
-              margin: '8px 0'
+              margin: '6px 0'
             }}>
               {[0, 1, 2, 3, 4, 5].map(idx => {
                 const isFilled = parentPinInput.length > idx;
@@ -3096,7 +3148,7 @@ export function CampusDirectMessages({
               gridTemplateColumns: 'repeat(3, 1fr)',
               gap: '10px',
               width: '100%',
-              marginTop: '6px'
+              marginTop: '4px'
             }}>
               {['1', '2', '3', '4', '5', '6', '7', '8', '9', 'C', '0', '⌫'].map((key) => {
                 const isClear = key === 'C';
@@ -3121,6 +3173,7 @@ export function CampusDirectMessages({
                     }}
                     style={{
                       padding: '14px',
+                      minHeight: '50px',
                       borderRadius: '16px',
                       border: '1.5px solid #f1f5f9',
                       background: isClear || isBack ? '#f8fafc' : '#ffffff',
@@ -3129,7 +3182,8 @@ export function CampusDirectMessages({
                       fontWeight: 800,
                       cursor: 'pointer',
                       boxShadow: '0 2px 5px rgba(0,0,0,0.04)',
-                      transition: 'all 0.12s ease'
+                      transition: 'all 0.12s ease',
+                      touchAction: 'manipulation'
                     }}
                     className="hover-scale"
                   >
@@ -3146,14 +3200,16 @@ export function CampusDirectMessages({
               }}
               style={{
                 marginTop: '6px',
-                padding: '10px 18px',
+                padding: '12px 24px',
+                minHeight: '44px',
                 borderRadius: '100px',
                 background: '#f1f5f9',
                 color: '#64748b',
                 border: 'none',
-                fontSize: '0.8rem',
+                fontSize: '0.84rem',
                 fontWeight: 700,
-                cursor: 'pointer'
+                cursor: 'pointer',
+                touchAction: 'manipulation'
               }}
             >
               Abbrechen

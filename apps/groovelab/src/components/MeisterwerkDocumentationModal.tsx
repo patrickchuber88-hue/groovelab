@@ -9356,78 +9356,10 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
           </div>
 
-          {/* Bottom Row (mobile/tablet only) - Apple Native Dropdown Selection Menu + Left/Right Quick-Click Buttons */}
+          {/* Bottom Row (mobile/tablet only) - iOS Native Segmented Switch [ Module | Hausaufgaben ] */}
           {(() => {
-            const tabOptions = [
-              { value: 'modules', label: 'Module (Studio)' },
-              { value: 'protocol', label: isTeacherTools ? 'Aufgabenheft' : 'Schüler-Protokoll' },
-              ...(uiLevel !== 'junior' ? [{ value: 'loopstation', label: 'Audio-Loopstation' }] : []),
-              { value: 'practice', label: 'Übe-Begleiter' },
-              { value: 'recordings', label: 'Audio-Aufnahmen' },
-              { value: 'tuner', label: 'Stimmgerät (Tuner)' },
-              { value: 'groovetrainer', label: 'Groove-Trainer' },
-              { value: 'earlab', label: uiLevel === 'junior' ? 'Klang-Detektiv 🎧' : 'EarLab & Harmony 🎧' },
-              { value: 'radar', label: uiLevel === 'junior' ? 'Musik-Stern ⭐' : uiLevel === 'pro' ? 'Kompetenz-Radar' : 'Skill-Radar' },
-              ...(uiLevel === 'pro' ? [{ value: 'history', label: 'Archiv & Historie' }] : [])
-            ];
-
-            const currentTabValue = 
-              activeModalTab === 'skillradar' ? 'radar' :
-              activeModalTab === 'stickeralbum' ? 'stickers' :
-              activeModalTab === 'audiobiography' ? 'audiobiography' :
-              activeModalTab === 'logbook' ? 'meisterwerke' :
-              (activeModalTab === 'document' && activeSubView === 'history') ? 'history' :
-              (activeModalTab === 'document' && activeViewMode === 'document' && activeSubView === 'hub') ? (hubTab === 'modules' ? 'modules' : 'protocol') :
-              activeViewMode;
-
-            const handleTabSelect = (val: string) => {
-              if (isSoftLocked && !isTeacherMode && ['loopstation', 'practice', 'recordings', 'audiobiography', 'groovetrainer'].includes(val)) {
-                if (onTriggerSoftLock) {
-                  onTriggerSoftLock();
-                }
-                return;
-              }
-              if (val === 'modules') {
-                setActiveModalTab('document');
-                setActiveViewMode('document');
-                setActiveSubView('hub');
-                setHubTab('modules');
-              } else if (val === 'protocol') {
-                setActiveModalTab('document');
-                setActiveViewMode('document');
-                setActiveSubView('hub');
-                setHubTab('protocol');
-              } else if (val === 'radar') {
-                setActiveModalTab('skillradar');
-              } else if (val === 'stickers') {
-                setActiveModalTab('stickeralbum');
-                setActiveSubView('hub');
-              } else if (val === 'audiobiography') {
-                setActiveModalTab('audiobiography');
-                setActiveSubView('hub');
-              } else if (val === 'meisterwerke') {
-                setActiveModalTab('logbook');
-              } else if (val === 'history') {
-                setActiveModalTab('document');
-                setActiveSubView('history');
-              } else {
-                setActiveModalTab('document');
-                setActiveViewMode(val as any);
-                setActiveSubView('hub');
-              }
-            };
-
-            const currentIndex = tabOptions.findIndex(t => t.value === currentTabValue);
-
-            const handlePrevTab = () => {
-              const prevIdx = (currentIndex - 1 + tabOptions.length) % tabOptions.length;
-              handleTabSelect(tabOptions[prevIdx].value);
-            };
-
-            const handleNextTab = () => {
-              const nextIdx = (currentIndex + 1) % tabOptions.length;
-              handleTabSelect(tabOptions[nextIdx].value);
-            };
+            const isHausaufgabenActive = mobileProtokollTab === 'homework' && activeViewMode === 'document' && activeModalTab === 'document';
+            const isModulesActive = !isHausaufgabenActive;
 
             return (
               <div className="header-mobile-menu-row" style={{
@@ -9435,97 +9367,87 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 width: '100%',
                 marginTop: '4px',
                 justifyContent: 'center',
-                alignItems: 'center',
-                gap: '6px'
+                alignItems: 'center'
               }}>
-                {/* Left Arrow Quick-Click Button */}
-                <button
-                  type="button"
-                  onClick={handlePrevTab}
-                  title="Vorheriger Tab"
+                <div
+                  role="tablist"
+                  aria-label="Bereichsauswahl"
                   style={{
-                    width: '34px',
-                    height: '34px',
-                    borderRadius: '50%',
-                    background: 'rgba(255, 255, 255, 0.22)',
-                    backdropFilter: 'blur(16px)',
-                    WebkitBackdropFilter: 'blur(16px)',
-                    border: '1px solid rgba(255, 255, 255, 0.4)',
-                    color: '#ffffff',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    cursor: 'pointer',
-                    boxShadow: '0 2px 6px rgba(0, 0, 0, 0.12)',
-                    flexShrink: 0,
-                    outline: 'none'
+                    display: 'inline-flex',
+                    background: 'rgba(0, 0, 0, 0.22)',
+                    backdropFilter: 'blur(20px)',
+                    WebkitBackdropFilter: 'blur(20px)',
+                    padding: '3px',
+                    borderRadius: '100px',
+                    border: '1px solid rgba(255, 255, 255, 0.25)',
+                    boxShadow: '0 2px 10px rgba(0, 0, 0, 0.15)',
+                    width: '100%',
+                    maxWidth: '280px'
                   }}
                 >
-                  <ChevronLeft size={18} color="white" />
-                </button>
-
-                {/* Center Select Dropdown */}
-                <div style={{
-                  position: 'relative',
-                  width: '100%',
-                  maxWidth: '240px'
-                }}>
-                  <select
-                    value={currentTabValue}
-                    onChange={(e) => handleTabSelect(e.target.value)}
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={isModulesActive}
+                    onClick={() => {
+                      setActiveModalTab('document');
+                      setActiveViewMode('document');
+                      setActiveSubView('hub');
+                      setHubTab('modules');
+                      setMobileProtokollTab('repertoire');
+                    }}
                     style={{
-                      width: '100%',
-                      padding: '8px 32px 8px 14px',
+                      flex: 1,
+                      padding: '7px 14px',
                       borderRadius: '100px',
-                      background: 'rgba(255, 255, 255, 0.22)',
-                      backdropFilter: 'blur(16px)',
-                      WebkitBackdropFilter: 'blur(16px)',
-                      border: '1px solid rgba(255, 255, 255, 0.4)',
-                      color: '#ffffff',
-                      fontWeight: 800,
+                      border: 'none',
+                      background: isModulesActive ? '#ffffff' : 'transparent',
+                      color: isModulesActive ? '#0f172a' : '#ffffff',
+                      fontWeight: 850,
                       fontSize: '0.82rem',
-                      appearance: 'none',
-                      WebkitAppearance: 'none',
                       cursor: 'pointer',
-                      boxShadow: '0 2px 8px rgba(0, 0, 0, 0.12)',
-                      outline: 'none',
-                      textAlign: 'center'
+                      transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                      boxShadow: isModulesActive ? '0 2px 8px rgba(0, 0, 0, 0.18)' : 'none',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      outline: 'none'
                     }}
                   >
-                    {tabOptions.map(opt => (
-                      <option key={opt.value} value={opt.value} style={{ color: '#000', background: '#fff' }}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown size={15} color="white" style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
-                </div>
+                    Module
+                  </button>
 
-                {/* Right Arrow Quick-Click Button */}
-                <button
-                  type="button"
-                  onClick={handleNextTab}
-                  title="Nächster Tab"
-                  style={{
-                    width: '34px',
-                    height: '34px',
-                    borderRadius: '50%',
-                    background: 'rgba(255, 255, 255, 0.22)',
-                    backdropFilter: 'blur(16px)',
-                    WebkitBackdropFilter: 'blur(16px)',
-                    border: '1px solid rgba(255, 255, 255, 0.4)',
-                    color: '#ffffff',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    cursor: 'pointer',
-                    boxShadow: '0 2px 6px rgba(0, 0, 0, 0.12)',
-                    flexShrink: 0,
-                    outline: 'none'
-                  }}
-                >
-                  <ChevronRight size={18} color="white" />
-                </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={isHausaufgabenActive}
+                    onClick={() => {
+                      setActiveModalTab('document');
+                      setActiveViewMode('document');
+                      setActiveSubView('hub');
+                      setMobileProtokollTab('homework');
+                    }}
+                    style={{
+                      flex: 1,
+                      padding: '7px 14px',
+                      borderRadius: '100px',
+                      border: 'none',
+                      background: isHausaufgabenActive ? '#ffffff' : 'transparent',
+                      color: isHausaufgabenActive ? '#0f172a' : '#ffffff',
+                      fontWeight: 850,
+                      fontSize: '0.82rem',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                      boxShadow: isHausaufgabenActive ? '0 2px 8px rgba(0, 0, 0, 0.18)' : 'none',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      outline: 'none'
+                    }}
+                  >
+                    Hausaufgaben
+                  </button>
+                </div>
               </div>
             );
           })()}

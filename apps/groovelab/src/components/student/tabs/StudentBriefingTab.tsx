@@ -6587,10 +6587,10 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                       background: (occ.status === 'scheduled' && occ.original_date && occ.date === occ.original_date) ? '#34a853' : '#ef4444', 
                                       color: 'white', 
                                       border: 'none', 
-                                      minHeight: '36px',
-                                      padding: '6px 14px', 
-                                      borderRadius: '10px', 
-                                      fontSize: '0.80rem', 
+                                      minHeight: '40px',
+                                      padding: '8px 14px', 
+                                      borderRadius: '12px', 
+                                      fontSize: '0.82rem', 
                                       fontWeight: 800, 
                                       cursor: 'pointer',
                                       boxShadow: `0 2px 6px ${(occ.status === 'scheduled' && occ.original_date && occ.date === occ.original_date) ? 'rgba(52, 168, 83, 0.2)' : 'rgba(239, 68, 68, 0.2)'}`,
@@ -6600,7 +6600,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                       zIndex: 10,
                                       display: 'inline-flex',
                                       alignItems: 'center',
-                                      gap: '4px'
+                                      gap: '6px'
                                     }}
                                   >
                                     <Check size={13} strokeWidth={2.5} />
@@ -6629,21 +6629,21 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                         background: '#fef3c7',
                                         color: '#b45309',
                                         border: '1px solid #fde68a',
-                                        minHeight: '36px',
-                                        padding: '6px 14px',
-                                        borderRadius: '10px',
-                                        fontSize: '0.80rem',
+                                        minHeight: '40px',
+                                        padding: '8px 14px',
+                                        borderRadius: '12px',
+                                        fontSize: '0.82rem',
                                         fontWeight: 800,
                                         cursor: 'pointer',
                                         boxShadow: '0 2px 6px rgba(217, 119, 6, 0.15)',
                                         transition: 'all 0.2s',
                                         display: 'inline-flex',
                                         alignItems: 'center',
-                                        gap: '4px'
+                                        gap: '6px'
                                       }}
                                     >
-                                      <Calendar size={13} strokeWidth={2.4} />
-                                      <span>Termin prüfen 📱</span>
+                                      <Calendar size={14} strokeWidth={2.4} />
+                                      <span>Termin prüfen</span>
                                     </button>
                                   )}
                                   <button 
@@ -6656,10 +6656,10 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                       background: '#ef4444', 
                                       color: 'white', 
                                       border: 'none', 
-                                      minHeight: '36px',
-                                      padding: '6px 14px', 
-                                      borderRadius: '10px', 
-                                      fontSize: '0.80rem', 
+                                      minHeight: '40px',
+                                      padding: '8px 14px', 
+                                      borderRadius: '12px', 
+                                      fontSize: '0.82rem', 
                                       fontWeight: 800, 
                                       cursor: 'pointer',
                                       boxShadow: '0 2px 6px rgba(239, 68, 68, 0.2)',
@@ -6668,10 +6668,10 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                       zIndex: 10,
                                       display: 'inline-flex',
                                       alignItems: 'center',
-                                      gap: '4px'
+                                      gap: '6px'
                                     }}
                                   >
-                                    <X size={13} strokeWidth={2.5} />
+                                    <X size={14} strokeWidth={2.5} />
                                     <span>Ablehnen</span>
                                   </button>
                                   <button 
@@ -6684,10 +6684,10 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                       background: '#34a853', 
                                       color: 'white', 
                                       border: 'none', 
-                                      minHeight: '36px',
-                                      padding: '6px 14px', 
-                                      borderRadius: '10px', 
-                                      fontSize: '0.80rem', 
+                                      minHeight: '40px',
+                                      padding: '8px 14px', 
+                                      borderRadius: '12px', 
+                                      fontSize: '0.82rem', 
                                       fontWeight: 800, 
                                       cursor: 'pointer',
                                       boxShadow: '0 2px 6px rgba(52, 168, 83, 0.2)',
@@ -6696,10 +6696,10 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                       zIndex: 10,
                                       display: 'inline-flex',
                                       alignItems: 'center',
-                                      gap: '4px'
+                                      gap: '6px'
                                     }}
                                   >
-                                    {!isStudentRescheduleAllowed ? <Lock size={13} strokeWidth={2.5} /> : <Check size={13} strokeWidth={2.5} />}
+                                    {!isStudentRescheduleAllowed ? <Lock size={14} strokeWidth={2.5} /> : <Check size={14} strokeWidth={2.5} />}
                                     <span>{!isStudentRescheduleAllowed ? 'Bestätigen (Eltern-PIN)' : 'Bestätigen'}</span>
                                   </button>
                                 </div>

@@ -1,8 +1,9 @@
 import React, { useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Printer, Award, Sparkles, Music, ShieldCheck, Download, Loader2, Share2, Check } from 'lucide-react';
+import { X, Printer, Award, Sparkles, Music, ShieldCheck, Download, Loader2, Share2, Check, Eye } from 'lucide-react';
 import { toPng } from 'html-to-image';
 import { formatStudentPureFirstName } from '../../utils/nameHelper';
+import { PdfPreviewModal } from './PdfPreviewModal';
 
 export interface MeisterwerkCertificateProps {
   studentName: string;
@@ -28,6 +29,9 @@ export const MeisterwerkCertificateModal: React.FC<MeisterwerkCertificateProps> 
   const certificateRef = useRef<HTMLDivElement>(null);
   const [isExporting, setIsExporting] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
+  const [previewPdfBlob, setPreviewPdfBlob] = useState<Blob | null>(null);
+  const [showPdfPreview, setShowPdfPreview] = useState(false);
+  const [pdfFileName, setPdfFileName] = useState('');
 
   const formattedDate = masteredDate 
     ? new Date(masteredDate).toLocaleDateString('de-DE', { day: '2-digit', month: 'long', year: 'numeric' })
@@ -110,7 +114,12 @@ export const MeisterwerkCertificateModal: React.FC<MeisterwerkCertificateProps> 
       
       const cleanStudent = sanitizedStudentName.replace(/\s+/g, '_');
       const cleanSong = songTitle.replace(/\s+/g, '_');
-      pdf.save(`Meisterwerk_Urkunde_${cleanStudent}_${cleanSong}.pdf`);
+      const filename = `Meisterwerk_Urkunde_${cleanStudent}_${cleanSong}.pdf`;
+      const blob = pdf.output('blob');
+
+      setPdfFileName(filename);
+      setPreviewPdfBlob(blob);
+      setShowPdfPreview(true);
     } catch (err) {
       console.error('[MeisterwerkCertificateModal] PDF generation error:', err);
     } finally {
@@ -205,6 +214,7 @@ export const MeisterwerkCertificateModal: React.FC<MeisterwerkCertificateProps> 
               type="button"
               onClick={handleDownloadPdf}
               disabled={isExporting}
+              aria-label="Urkunde in PDF-Vorschau öffnen, drucken oder herunterladen"
               style={{
                 background: '#ca8a04',
                 color: '#ffffff',
@@ -220,10 +230,10 @@ export const MeisterwerkCertificateModal: React.FC<MeisterwerkCertificateProps> 
                 boxShadow: '0 2px 8px rgba(202, 138, 4, 0.3)',
                 opacity: isExporting ? 0.75 : 1
               }}
-              title="Urkunde als druckfähige PDF-Datei herunterladen"
+              title="Urkunde in Apple QuickLook PDF-Vorschau öffnen (mit Direkt-Druck und Download)"
             >
-              {isExporting ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}
-              <span>{isExporting ? 'PDF wird erstellt...' : 'PDF herunterladen'}</span>
+              {isExporting ? <Loader2 size={15} className="animate-spin" /> : <Eye size={15} />}
+              <span>{isExporting ? 'PDF wird vorbereitet...' : 'PDF-Vorschau'}</span>
             </button>
 
             <button
@@ -447,5 +457,18 @@ export const MeisterwerkCertificateModal: React.FC<MeisterwerkCertificateProps> 
     </div>
   );
 
-  return typeof document !== 'undefined' ? createPortal(modalContent, document.body) : modalContent;
+  return (
+    <>
+      {typeof document !== 'undefined' ? createPortal(modalContent, document.body) : modalContent}
+      {showPdfPreview && (
+        <PdfPreviewModal
+          isOpen={showPdfPreview}
+          onClose={() => setShowPdfPreview(false)}
+          title={`Meisterwerk-Urkunde: ${songTitle}`}
+          pdfBlob={previewPdfBlob}
+          fileName={pdfFileName}
+        />
+      )}
+    </>
+  );
 };

@@ -1,8 +1,8 @@
 import { formatCleanNoteContent } from '../notes/notesConstants';
 import React from 'react';
 import {
-  CalendarX, Check, Clock, DoorOpen, Eye, EyeOff,
-  HelpCircle, MessageSquare, Mic, Users
+  CalendarX, Check, Clock, Coffee, DoorOpen, Eye, EyeOff,
+  HelpCircle, MessageSquare, Mic, Sparkles, Users
 } from 'lucide-react';
 import { maskLastName, formatSingleStudentAnonymized } from '../../utils/nameHelper';
 
@@ -63,14 +63,17 @@ export const TeacherTourDemoSchedule: React.FC<TeacherTourDemoScheduleProps> = (
               border: 'none',
               background: showRealNames ? '#e6f4ea' : '#f1f5f9',
               color: showRealNames ? '#34a853' : '#64748b',
-              width: '28px',
-              height: '28px',
+              width: (windowWidth < 768) ? '36px' : '28px',
+              height: (windowWidth < 768) ? '36px' : '28px',
+              minWidth: (windowWidth < 768) ? '36px' : '28px',
+              minHeight: (windowWidth < 768) ? '36px' : '28px',
               borderRadius: '50%',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               cursor: 'pointer',
-              transition: 'all 0.2s'
+              transition: 'all 0.2s',
+              touchAction: 'manipulation'
             }}
           >
             {showRealNames ? <Eye size={14} /> : <EyeOff size={14} />}
@@ -648,14 +651,17 @@ export const TeacherTagesplanWidget: React.FC<TeacherTagesplanWidgetProps> = ({
                   border: 'none',
                   background: showRealNames ? '#e6f4ea' : '#f1f5f9',
                   color: showRealNames ? '#34a853' : '#64748b',
-                  width: '28px',
-                  height: '28px',
+                  width: (isMobileDevice || windowWidth < 768) ? '36px' : '28px',
+                  height: (isMobileDevice || windowWidth < 768) ? '36px' : '28px',
+                  minWidth: (isMobileDevice || windowWidth < 768) ? '36px' : '28px',
+                  minHeight: (isMobileDevice || windowWidth < 768) ? '36px' : '28px',
                   borderRadius: '50%',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   cursor: 'pointer',
-                  transition: 'all 0.2s'
+                  transition: 'all 0.2s',
+                  touchAction: 'manipulation'
                 }}
               >
                 {showRealNames ? <Eye size={14} /> : <EyeOff size={14} />}
@@ -1209,7 +1215,11 @@ export const TeacherTagesplanWidget: React.FC<TeacherTagesplanWidgetProps> = ({
                                        overflow: 'hidden',
                                        textOverflow: 'ellipsis'
                                      }}>
-                                       {isBirthday ? '🎂 ' : ''}{(() => {
+                                       {isBirthday && (
+                                         <span title="Hat heute Geburtstag!" style={{ display: 'inline-flex', alignItems: 'center', marginRight: '4px', verticalAlign: 'middle' }}>
+                                           <Sparkles size={13} color="#eab308" />
+                                         </span>
+                                       )}{(() => {
                                          const found = allStudents.find(s => s.id === slot.student?.id);
                                          const fn = slot.student?.first_name || found?.first_name || (slot.student?.name ? slot.student.name.split(' ')[0] : '');
                                          const ln = slot.student?.last_name || found?.last_name || (slot.student?.name ? slot.student.name.split(' ').slice(1).join(' ') : '');
@@ -1221,12 +1231,15 @@ export const TeacherTagesplanWidget: React.FC<TeacherTagesplanWidgetProps> = ({
                                      </span>
                                    ) : isBreak ? (
                                      <span style={{ fontWeight: 700, color: '#b45309', fontSize: '0.82rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                                       <span>☕</span>
+                                       <Coffee size={13} color="#b45309" />
                                        <span>Freies Zeitfenster</span>
                                        <span style={{ fontSize: '0.72rem', fontWeight: 600, color: '#d97706' }}>({slot.duration || 30} Min.)</span>
                                      </span>
                                    ) : (
-                                     <span style={{ fontWeight: 700, color: '#78350f', fontSize: '0.82rem' }}>☕️ Pause ({slot.duration || 30} Min.)</span>
+                                     <span style={{ fontWeight: 700, color: '#78350f', fontSize: '0.82rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                       <Coffee size={13} color="#78350f" />
+                                       <span>Pause ({slot.duration || 30} Min.)</span>
+                                     </span>
                                    )}
 
                                     {/* ❓ Schülerfrage Badge (Mobile/Shared) */}
@@ -1317,8 +1330,10 @@ export const TeacherTagesplanWidget: React.FC<TeacherTagesplanWidgetProps> = ({
                                          justifyContent: 'center',
                                          background: hasAudioToday ? '#e6f4ea' : '#ffffff',
                                          color: hasAudioToday ? '#15803d' : '#64748b',
-                                         width: '36px',
-                                         height: '36px',
+                                         width: (isMobileDevice || windowWidth < 768) ? '44px' : '36px',
+                                         height: (isMobileDevice || windowWidth < 768) ? '44px' : '36px',
+                                         minWidth: (isMobileDevice || windowWidth < 768) ? '44px' : '36px',
+                                         minHeight: (isMobileDevice || windowWidth < 768) ? '44px' : '36px',
                                          borderRadius: '10px',
                                          border: hasAudioToday ? '1px solid rgba(52, 168, 83, 0.3)' : '1px solid rgba(0,0,0,0.06)',
                                          cursor: 'pointer',
@@ -1327,7 +1342,8 @@ export const TeacherTagesplanWidget: React.FC<TeacherTagesplanWidgetProps> = ({
                                          boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
                                          marginLeft: slot.isGroup ? '4px' : 'auto',
                                          marginRight: '2px',
-                                         position: 'relative'
+                                         position: 'relative',
+                                         touchAction: 'manipulation'
                                        }}
                                      >
                                        <Mic size={16} color={hasAudioToday ? '#15803d' : '#64748b'} />
@@ -1373,15 +1389,18 @@ export const TeacherTagesplanWidget: React.FC<TeacherTagesplanWidgetProps> = ({
                                        justifyContent: 'center',
                                        background: '#ffffff',
                                        color: '#34a853',
-                                       width: '36px',
-                                       height: '36px',
+                                       width: (isMobileDevice || windowWidth < 768) ? '44px' : '36px',
+                                       height: (isMobileDevice || windowWidth < 768) ? '44px' : '36px',
+                                       minWidth: (isMobileDevice || windowWidth < 768) ? '44px' : '36px',
+                                       minHeight: (isMobileDevice || windowWidth < 768) ? '44px' : '36px',
                                        borderRadius: '10px',
                                        border: '1px solid rgba(0,0,0,0.06)',
                                        cursor: 'pointer',
                                        transition: 'all 0.2s',
                                        flexShrink: 0,
                                        boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
-                                       marginLeft: '4px'
+                                       marginLeft: '4px',
+                                       touchAction: 'manipulation'
                                      }}
                                    >
                                      <MessageSquare size={16} />

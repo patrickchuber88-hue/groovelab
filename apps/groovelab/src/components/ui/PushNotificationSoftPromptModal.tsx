@@ -33,18 +33,17 @@ export const PushNotificationSoftPromptModal: React.FC<PushNotificationSoftPromp
   const handleActivateSelected = async () => {
     setLoading(true);
     setErrorMsg(null);
-    try {
-      // 1. Request native browser / OS push permission
-      const success = await subscribeUserToPush(userId);
-      if (!success) {
-        setErrorMsg('Mitteilungen konnten nicht aktiviert werden. Bitte prüfe deine Browser-Berechtigungen.');
-        setLoading(false);
-        return;
-      }
 
-      // 2. Persist granular preferences and decision in Supabase database
-      const nowIso = new Date().toISOString();
-      const { error: dbError } = await supabase
+    // Failsafe safety timer: Under NO circumstances should the UI stay stuck for more than 4 seconds
+    const safetyTimer = setTimeout(() => {
+      setLoading(false);
+      if (onSuccess) onSuccess();
+      onClose();
+    }, 4000);
+
+    try {
+      // 1. Authoritative DB update for notification preferences (with 2.5s race timeout)
+      const dbPromise = supabase
         .from('users')
         .update({
           push_notifications_enabled: true,
@@ -56,22 +55,32 @@ export const PushNotificationSoftPromptModal: React.FC<PushNotificationSoftPromp
         })
         .eq('id', userId);
 
-      if (dbError) {
-        console.warn('Failed to update granular preferences in DB:', dbError);
-      }
+      await Promise.race([
+        dbPromise,
+        new Promise((resolve) => setTimeout(resolve, 2500))
+      ]);
 
       try {
         localStorage.setItem(`campus_push_decision_${userId}`, 'accepted');
         localStorage.removeItem(`campus_push_deferred_until_${userId}`);
       } catch (e) {}
 
+      // 2. Request browser Web Push in background with strict 2.5s timeout (never hang)
+      try {
+        await Promise.race([
+          subscribeUserToPush(userId),
+          new Promise((resolve) => setTimeout(resolve, 2500))
+        ]);
+      } catch (pushErr) {
+        console.warn('Browser push subscription could not be registered:', pushErr);
+      }
+    } catch (err: any) {
+      console.error('Error during soft-prompt subscription:', err);
+    } finally {
+      clearTimeout(safetyTimer);
       setLoading(false);
       if (onSuccess) onSuccess();
       onClose();
-    } catch (err: any) {
-      console.error('Error during soft-prompt subscription:', err);
-      setErrorMsg(err.message || 'Ein unerwarteter Fehler ist aufgetreten.');
-      setLoading(false);
     }
   };
 
@@ -79,7 +88,7 @@ export const PushNotificationSoftPromptModal: React.FC<PushNotificationSoftPromp
     setLoading(true);
     try {
       // Revisionssichere Speicherung: Ablehnung wird in DB und LocalStorage persistiert
-      await supabase
+      const dbUpdate = supabase
         .from('users')
         .update({
           push_notifications_enabled: false,
@@ -87,6 +96,11 @@ export const PushNotificationSoftPromptModal: React.FC<PushNotificationSoftPromp
           push_prompt_dismissed_at: new Date().toISOString()
         })
         .eq('id', userId);
+
+      await Promise.race([
+        dbUpdate,
+        new Promise((resolve) => setTimeout(resolve, 2500))
+      ]);
 
       try {
         localStorage.setItem(`campus_push_decision_${userId}`, 'declined');
@@ -106,13 +120,18 @@ export const PushNotificationSoftPromptModal: React.FC<PushNotificationSoftPromp
       // 14-Tage Cooldown: Speichere Timestamp in DB und LocalStorage
       const nowIso = new Date().toISOString();
       const deferUntil = Date.now() + 14 * 86400000;
-      await supabase
+      const dbUpdate = supabase
         .from('users')
         .update({
           push_prompt_decision: 'deferred',
           push_prompt_dismissed_at: nowIso
         })
         .eq('id', userId);
+
+      await Promise.race([
+        dbUpdate,
+        new Promise((resolve) => setTimeout(resolve, 2500))
+      ]);
 
       try {
         localStorage.setItem(`campus_push_decision_${userId}`, 'deferred');
@@ -128,6 +147,16 @@ export const PushNotificationSoftPromptModal: React.FC<PushNotificationSoftPromp
 
   return (
     <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Mitteilungen anpassen"
+      tabIndex={-1}
+      onKeyDown={(e) => {
+        if (e.key === 'Escape') {
+          setLoading(false);
+          onClose();
+        }
+      }}
       style={{
         position: 'fixed',
         inset: 0,
@@ -141,7 +170,10 @@ export const PushNotificationSoftPromptModal: React.FC<PushNotificationSoftPromp
         padding: '16px',
         animation: 'fadeIn 0.2s ease-out'
       }}
-      onClick={onClose}
+      onClick={() => {
+        setLoading(false);
+        onClose();
+      }}
     >
       <div
         style={{
@@ -160,8 +192,12 @@ export const PushNotificationSoftPromptModal: React.FC<PushNotificationSoftPromp
       >
         {/* Close button */}
         <button
-          onClick={onClose}
+          onClick={() => {
+            setLoading(false);
+            onClose();
+          }}
           type="button"
+          aria-label="Mitteilungen anpassen schließen"
           style={{
             position: 'absolute',
             top: '16px',
@@ -217,7 +253,16 @@ export const PushNotificationSoftPromptModal: React.FC<PushNotificationSoftPromp
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '20px' }}>
           {/* 1. Schedule Changes */}
           <div
+            role="button"
+            tabIndex={0}
+            aria-pressed={scheduleChanges}
             onClick={() => setScheduleChanges(!scheduleChanges)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                setScheduleChanges(!scheduleChanges);
+              }
+            }}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -274,7 +319,16 @@ export const PushNotificationSoftPromptModal: React.FC<PushNotificationSoftPromp
 
           {/* 2. Homework & Notes */}
           <div
+            role="button"
+            tabIndex={0}
+            aria-pressed={homework}
             onClick={() => setHomework(!homework)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                setHomework(!homework);
+              }
+            }}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -331,7 +385,16 @@ export const PushNotificationSoftPromptModal: React.FC<PushNotificationSoftPromp
 
           {/* 3. Streak Protection & School News */}
           <div
+            role="button"
+            tabIndex={0}
+            aria-pressed={streakAndNews}
             onClick={() => setStreakAndNews(!streakAndNews)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                setStreakAndNews(!streakAndNews);
+              }
+            }}
             style={{
               display: 'flex',
               alignItems: 'center',

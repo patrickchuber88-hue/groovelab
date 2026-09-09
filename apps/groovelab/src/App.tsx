@@ -9018,6 +9018,10 @@ function App() {
             />
           );
         })()}
+        {/* BFSG 2025 / WCAG 2.4.1 Skip-to-Content Navigation Link */}
+        <a href="#main-content" className="skip-to-content">
+          Zum Hauptinhalt springen
+        </a>
         <header className="header desktop-only-header" style={{ display: windowWidth <= 768 ? 'none' : 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 10px', height: '56px', background: 'transparent' }}>
           {/* App Switcher Tabs */}
           <div style={{ 
@@ -14088,7 +14092,9 @@ function App() {
             boxShadow: isActive 
               ? (activeClass === 'campus' ? '0 4px 12px rgba(52, 168, 83, 0.25)' : '0 4px 12px rgba(234, 179, 8, 0.25)') 
               : '0 2px 5px rgba(0,0,0,0.02)',
-            height: '38px',
+            height: '44px',
+            minHeight: '44px',
+            touchAction: 'manipulation',
             boxSizing: 'border-box' as const
           };
         };
@@ -14101,7 +14107,7 @@ function App() {
               justifyContent: 'flex-start',
               alignItems: 'center',
               gap: '8px',
-              padding: '10px 14px calc(14px + env(safe-area-inset-bottom)) 14px',
+              padding: '10px 14px max(14px, env(safe-area-inset-bottom)) 14px',
               overflowX: 'auto',
               overflowY: 'hidden',
               WebkitOverflowScrolling: 'touch',

@@ -1,9 +1,16 @@
-/* DSGVO-Compliant Native Apple & Swiss Modernist Font System (LG München I compliant, 0 External Server Calls) */
-*, body, button, input, select, textarea, h1, h2, h3, h4, h5, h6, div, span, p, a, strong, b, td, th {
-  font-family: "Helvetica Neue Light", "Helvetica Neue", -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", Helvetica, "Plus Jakarta Sans", "Inter", "Segoe UI", Roboto, Arial, sans-serif !important;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  letter-spacing: -0.011em;
+/* ==========================================================================
+   CASCADE LAYERS DEFINITION (Enterprise Modern Architecture)
+   ========================================================================== */
+@layer reset, tokens, base, components, utilities, mobile, print;
+
+@layer reset {
+  /* DSGVO-Compliant Native Apple & Swiss Modernist Font System (LG München I compliant, 0 External Server Calls) */
+  *, body, button, input, select, textarea, h1, h2, h3, h4, h5, h6, div, span, p, a, strong, b, td, th {
+    font-family: "Helvetica Neue Light", "Helvetica Neue", -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", Helvetica, "Plus Jakarta Sans", "Inter", "Segoe UI", Roboto, Arial, sans-serif !important;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    letter-spacing: -0.011em;
+  }
 }
 
 /* Swiss & Apple Typography Utility Classes */
@@ -37,7 +44,8 @@
   letter-spacing: -0.01em;
 }
 
-:root {
+@layer tokens {
+  :root {
   /* Safe Area Insets & Touch Targets */
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
@@ -47,6 +55,13 @@
   --bottom-nav-height: calc(60px + env(safe-area-inset-bottom, 0px));
   --mobile-header-height: calc(56px + env(safe-area-inset-top, 0px));
 
+  /* Canonical Mobile Architecture Tokens (<= 768px) */
+  --mobile-breakpoint: 768px;
+  --mobile-vh: 100dvh;
+  --mobile-header-h: calc(56px + env(safe-area-inset-top, 0px));
+  --mobile-bottom-nav-h: calc(64px + env(safe-area-inset-bottom, 0px));
+  --mobile-sheet-radius: 28px;
+
   /* Brand */
   --primary-color: #eab308;
   --brand-yellow: #eab308;
@@ -54,6 +69,26 @@
   --brand-green-dark: #34a853;
   --brand-green-light: rgba(52, 168, 83, 0.1);
   --brand-green-border: rgba(52, 168, 83, 0.2);
+  --brand-red: #ea4335;
+  --brand-red-dark: #c5221f;
+  --brand-red-light: rgba(234, 67, 53, 0.1);
+  --brand-red-border: rgba(234, 67, 53, 0.2);
+
+  /* Apple-Style Minimal Scrollbars */
+  --scrollbar-size: 6px;
+  --scrollbar-thumb: rgba(148, 163, 184, 0.4);
+  --scrollbar-thumb-hover: rgba(100, 116, 139, 0.7);
+  --scrollbar-track: transparent;
+
+  /* Fluid Typography Scale (Modern CSS clamp() Engine) */
+  --font-size-xs: clamp(0.75rem, 0.72rem + 0.12vw, 0.81rem);      /* 12px -> 13px: Micro-Copy, Timestamps (WCAG AA) */
+  --font-size-sm: clamp(0.81rem, 0.78rem + 0.15vw, 0.88rem);      /* 13px -> 14px: Badges, Pills, Secondary Info */
+  --font-size-base: clamp(0.95rem, 0.90rem + 0.25vw, 1.05rem);    /* 15.2px -> 16.8px: Body Text, Cards, Descriptions */
+  --font-size-md: clamp(1.05rem, 1.00rem + 0.30vw, 1.18rem);      /* 16.8px -> 18.8px: Card Headings, Subsections */
+  --font-size-lg: clamp(1.20rem, 1.10rem + 0.50vw, 1.38rem);      /* 19.2px -> 22px: Section Titles */
+  --font-size-xl: clamp(1.35rem, 1.15rem + 1.20vw, 1.75rem);      /* 21.6px -> 28px: Board Headings, H1 Magazin */
+  --font-size-button: clamp(0.95rem, 0.90rem + 0.30vw, 1.10rem);  /* 15.2px -> 17.6px: Primary Action Buttons */
+  --font-size-music-stand: 1.15rem;                                /* 18.4px: Notenständer Distanz-Modus */
 
   /* Swiss Neutral Palette - Zurich Card Vibe */
   --bg-color: #f3f3f6; /* Pure premium light gray canvas */
@@ -111,6 +146,201 @@
 
   /* Legacy */
   --surface-glass: rgba(255, 255, 255, 0.85);
+}
+}
+
+@layer base {
+  /* Apple-Style Minimal Scrollbars (Global) */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--scrollbar-thumb, rgba(148, 163, 184, 0.4)) transparent;
+  }
+  *::-webkit-scrollbar {
+    width: var(--scrollbar-size, 6px);
+    height: var(--scrollbar-size, 6px);
+  }
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  *::-webkit-scrollbar-thumb {
+    background: var(--scrollbar-thumb, rgba(148, 163, 184, 0.4));
+    border-radius: 9999px;
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background: var(--scrollbar-thumb-hover, rgba(100, 116, 139, 0.7));
+  }
+
+  /* WCAG 2.2 AA / BFSG 2025 Goldstandard Focus Ring */
+  button:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible,
+  [role="button"]:focus-visible,
+  [tabindex="0"]:focus-visible {
+    outline: 2px solid var(--primary-color, #eab308) !important;
+    outline-offset: 2px !important;
+  }
+
+  /* Suppress intrusive focus rings on mouse click */
+  button:focus:not(:focus-visible),
+  input:focus:not(:focus-visible),
+  select:focus:not(:focus-visible),
+  textarea:focus:not(:focus-visible),
+  [role="button"]:focus:not(:focus-visible) {
+    outline: none;
+  }
+
+  /* Graceful Degradation for Glassmorphism (Weak GPUs / Legacy Browsers) */
+  @supports not (backdrop-filter: blur(1px)) {
+    .master-glass-card,
+    .liquid-glass-card,
+    .liquid-glass-header,
+    .liquid-glass-sidebar,
+    .liquid-glass-modal {
+      background: rgba(255, 255, 255, 0.96) !important;
+    }
+  }
+
+  /* WCAG 2.3.3 / BFSG 2025 Prefers Reduced Motion System */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+
+  /* ==========================================================================
+     BFSG 2025 / BITV 2.0 / WCAG 2.2 AA ACCESSIBILITY NORMS SUITE
+     ========================================================================== */
+
+  /* 1. Skip-to-Content Navigation Link (WCAG 2.4.1 Bypass Blocks) */
+  .skip-link,
+  .skip-to-content {
+    position: fixed;
+    top: -120px;
+    left: 16px;
+    z-index: var(--z-system-critical-alert, 999999);
+    padding: 12px 20px;
+    background-color: #0f172a;
+    color: #ffffff !important;
+    font-weight: 800;
+    font-size: 0.95rem;
+    border-radius: 14px;
+    border: 2px solid var(--primary-color, #eab308);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+    text-decoration: none;
+    transition: top 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .skip-link:focus,
+  .skip-to-content:focus {
+    top: 16px;
+    outline: 2px solid #ffffff !important;
+    outline-offset: 2px !important;
+  }
+
+  /* 2. Screen Reader Only Utility (WCAG 1.3.1 & 4.1.2) */
+  .sr-only,
+  .visually-hidden {
+    position: absolute !important;
+    width: 1px !important;
+    height: 1px !important;
+    padding: 0 !important;
+    margin: -1px !important;
+    overflow: hidden !important;
+    clip: rect(0, 0, 0, 0) !important;
+    white-space: nowrap !important;
+    border-width: 0 !important;
+  }
+
+  /* 3. Form Validation Accessibility (WCAG 3.3.1 & 1.4.1) */
+  input[aria-invalid="true"],
+  select[aria-invalid="true"],
+  textarea[aria-invalid="true"] {
+    border: 2px solid var(--brand-red, #ea4335) !important;
+    background-color: rgba(234, 67, 53, 0.03);
+    box-shadow: 0 0 0 1px rgba(234, 67, 53, 0.2);
+  }
+  input[aria-invalid="true"]:focus-visible,
+  select[aria-invalid="true"]:focus-visible,
+  textarea[aria-invalid="true"]:focus-visible {
+    outline: 2px solid var(--brand-red, #ea4335) !important;
+    outline-offset: 2px !important;
+  }
+
+  /* 4. Text Spacing Immunity (WCAG 1.4.12) */
+  p, span, h1, h2, h3, h4, h5, h6, label, td, th {
+    overflow-wrap: break-word;
+    word-wrap: break-word;
+  }
+
+  /* 5. High-Contrast Mode & Windows Forced Colors (WCAG 1.4.3 & 1.4.6) */
+  @media (prefers-contrast: more) {
+    :root {
+      --border: #000000;
+      --text-muted: #1e293b;
+    }
+    .master-glass-card,
+    .liquid-glass-card,
+    .liquid-glass-header,
+    .liquid-glass-sidebar,
+    .liquid-glass-modal {
+      background: #ffffff !important;
+      border: 2px solid #000000 !important;
+      backdrop-filter: none !important;
+      -webkit-backdrop-filter: none !important;
+    }
+    button, [role="button"], a {
+      border: 1.5px solid currentColor;
+    }
+  }
+
+  @media (forced-colors: active) {
+    button, input, select, textarea, [role="button"] {
+      border: 2px solid ButtonText !important;
+    }
+    button:focus-visible, input:focus-visible, [role="button"]:focus-visible {
+      outline: 3px solid Highlight !important;
+    }
+  }
+
+  /* ==========================================================================
+     FLUID TYPOGRAPHY UTILITIES & MAGAZIN-SCALE
+     ========================================================================== */
+  .text-fluid-xs {
+    font-size: var(--font-size-xs) !important;
+    line-height: 1.35;
+  }
+  .text-fluid-sm {
+    font-size: var(--font-size-sm) !important;
+    line-height: 1.4;
+  }
+  .text-fluid-base {
+    font-size: var(--font-size-base) !important;
+    line-height: 1.5;
+  }
+  .text-fluid-md {
+    font-size: var(--font-size-md) !important;
+    line-height: 1.4;
+    letter-spacing: -0.015em;
+  }
+  .text-fluid-lg {
+    font-size: var(--font-size-lg) !important;
+    line-height: 1.3;
+    letter-spacing: -0.018em;
+  }
+  .text-fluid-xl {
+    font-size: var(--font-size-xl) !important;
+    line-height: 1.25;
+    letter-spacing: -0.022em;
+  }
+  .btn-fluid {
+    font-size: var(--font-size-button) !important;
+    font-weight: 900;
+  }
 }
 
 /* Ensure all interactive buttons satisfy WCAG 2.1/2.2 AA */
@@ -2609,5 +2839,220 @@ input[type="range"]::-moz-range-thumb {
   user-select: none;
 }
 
+/* ==========================================================================
+   MOBILE ARCHITECTURE LAYER (Enterprise Responsive & Touch Ergonomics)
+   Strictly isolated to <= 768px (Desktop Layout Immunity Invariant)
+   ========================================================================== */
+@layer mobile {
+  @media (max-width: 768px) {
+    /* 1. Viewport & Safe-Area Inset Management */
+    :root {
+      --bottom-nav-height: var(--mobile-bottom-nav-h);
+      --mobile-header-height: var(--mobile-header-h);
+    }
 
+    .mobile-app-shell,
+    .mobile-safe-container {
+      min-height: 100dvh;
+      min-height: -webkit-fill-available;
+      padding-top: env(safe-area-inset-top, 0px);
+      padding-bottom: var(--mobile-bottom-nav-h);
+      box-sizing: border-box;
+    }
 
+    /* 2. Fast-Tap Ergonomics (Zero 300ms Click Delay) */
+    button,
+    a,
+    input,
+    select,
+    textarea,
+    [role="button"],
+    .touch-interactive {
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    /* 3. WCAG 2.2 AA 48px Minimum Touch Targets with Hitbox Expander */
+    .mobile-touch-target {
+      min-width: 48px !important;
+      min-height: 48px !important;
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      position: relative;
+    }
+
+    /* 4. Scroll Containment (Prevents Page Rubberband Bouncing) */
+    .mobile-scroll-view,
+    .mobile-sheet-content,
+    .mobile-scroll-container {
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior-y: contain;
+      touch-action: pan-y;
+    }
+
+    /* 5. Apple Frosted-Glass Fixed Bottom Navigation */
+    .mobile-bottom-nav,
+    .mobile-fixed-bottom {
+      position: fixed !important;
+      bottom: 0 !important;
+      left: 0 !important;
+      right: 0 !important;
+      height: var(--mobile-bottom-nav-h) !important;
+      padding-bottom: env(safe-area-inset-bottom, 0px) !important;
+      background: rgba(255, 255, 255, 0.88) !important;
+      backdrop-filter: blur(20px) saturate(1.8) !important;
+      -webkit-backdrop-filter: blur(20px) saturate(1.8) !important;
+      border-top: 1px solid rgba(226, 232, 240, 0.8) !important;
+      z-index: var(--z-mobile-bottom-nav, 1000) !important;
+      transform: translateZ(0);
+      will-change: transform;
+    }
+
+    /* 6. Apple Bottom-Sheet Modal Drawer */
+    .mobile-bottom-sheet {
+      position: fixed !important;
+      bottom: 0 !important;
+      left: 0 !important;
+      right: 0 !important;
+      top: auto !important;
+      max-height: 88dvh !important;
+      border-radius: var(--mobile-sheet-radius) var(--mobile-sheet-radius) 0 0 !important;
+      padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)) !important;
+      box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.25) !important;
+      transform: translateZ(0);
+      animation: sheetSlideUp 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .mobile-sheet-handle {
+      width: 40px;
+      height: 5px;
+      border-radius: 999px;
+      background: #cbd5e1;
+      margin: 8px auto 14px auto;
+      flex-shrink: 0;
+    }
+
+    @keyframes sheetSlideUp {
+      from { transform: translateY(100%); }
+      to { transform: translateY(0); }
+    }
+
+    /* 7. Horizontal Snap-Scroller for Tabs & Repertoire */
+    .mobile-snap-scroller,
+    .mobile-snap-carousel {
+      display: flex !important;
+      overflow-x: auto !important;
+      scroll-snap-type: x mandatory !important;
+      -webkit-overflow-scrolling: touch !important;
+      scrollbar-width: none !important;
+      gap: 8px !important;
+      padding-left: 12px !important;
+      padding-right: 12px !important;
+    }
+    .mobile-snap-scroller::-webkit-scrollbar,
+    .mobile-snap-carousel::-webkit-scrollbar {
+      display: none !important;
+    }
+    .mobile-snap-item {
+      scroll-snap-align: start !important;
+      flex-shrink: 0 !important;
+    }
+
+    /* 8. iOS Safari Auto-Zoom Immunity (Inputs strictly min 16px) */
+    input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+    select,
+    textarea {
+      font-size: 16px !important;
+    }
+
+    /* 9. Audio Slider & Knobs Studio Touch-Lock */
+    .groovelab-fader,
+    .custom-range-slider,
+    .player-seek-slider,
+    .waveform-scrubber-container,
+    input[type="range"] {
+      touch-action: none !important;
+      user-select: none !important;
+      -webkit-user-select: none !important;
+    }
+  }
+
+  /* 10. Notenständer Landscape Mode (Orientation Landscape + Short Height) */
+  @media (max-width: 900px) and (orientation: landscape) and (max-height: 500px) {
+    :root {
+      --mobile-bottom-nav-h: calc(44px + env(safe-area-inset-bottom, 0px));
+      --mobile-header-h: calc(40px + env(safe-area-inset-top, 0px));
+    }
+    .mobile-compact-landscape {
+      padding-top: 4px !important;
+      padding-bottom: 4px !important;
+    }
+  }
+
+  /* 11. PWA Standalone Display Mode Optimization */
+  @media (display-mode: standalone) {
+    .mobile-bottom-nav {
+      padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 4px) !important;
+    }
+  }
+}
+
+/* ==========================================================================
+   PRINT LAYER (Enterprise Document & Sheet Music Printing)
+   ========================================================================== */
+@layer print {
+  @media print {
+    /* Hide interactive, navigation and screen-only elements */
+    header,
+    nav,
+    aside,
+    footer,
+    .no-print,
+    .liquid-glass-sidebar,
+    .liquid-glass-header,
+    .mobile-bottom-nav,
+    .campus-appointment-shoutbox,
+    .touch-target-44,
+    .player-seek-slider,
+    button:not(.print-keep) {
+      display: none !important;
+    }
+
+    /* Reset surfaces to pure paper-friendly white with high-contrast text */
+    body,
+    main,
+    .master-glass-card,
+    .liquid-glass-card,
+    .surface {
+      background: #ffffff !important;
+      color: #000000 !important;
+      box-shadow: none !important;
+      border: 1px solid #e2e8f0 !important;
+      backdrop-filter: none !important;
+      -webkit-backdrop-filter: none !important;
+    }
+
+    /* Enforce deep crisp black typography and avoid page splits in cards */
+    *,
+    *::before,
+    *::after {
+      color: #000000 !important;
+      text-shadow: none !important;
+    }
+
+    .master-glass-card,
+    .liquid-glass-card,
+    table,
+    tr {
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }
+
+    @page {
+      margin: 12mm 12mm 12mm 12mm;
+      size: auto;
+    }
+  }
+}

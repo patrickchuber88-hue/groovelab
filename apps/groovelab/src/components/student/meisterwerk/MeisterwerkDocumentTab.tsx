@@ -1,4 +1,4 @@
-import React, { Suspense, useState, useMemo, useCallback } from 'react';
+import React, { Suspense, useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { supabase } from '../../../lib/supabase';
 import {
   Activity, ArrowRightLeft, Award, BookOpen, Calendar, Check, ChevronDown, ChevronLeft,
@@ -513,6 +513,23 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
   }, [student]);
 
   const [teacherConsentRequested, setTeacherConsentRequested] = useState(false);
+  const [showMobileMoreMenu, setShowMobileMoreMenu] = useState(false);
+  const mobileMoreMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!showMobileMoreMenu) return;
+    const handleOutsideClick = (e: MouseEvent | TouchEvent) => {
+      if (mobileMoreMenuRef.current && !mobileMoreMenuRef.current.contains(e.target as Node)) {
+        setShowMobileMoreMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handleOutsideClick);
+    document.addEventListener('touchstart', handleOutsideClick);
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick);
+      document.removeEventListener('touchstart', handleOutsideClick);
+    };
+  }, [showMobileMoreMenu]);
 
   const handleRequestParentAudioConsent = useCallback(async () => {
     if (!student?.id) return;
@@ -546,85 +563,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
           
           {/* LEFT COLUMN: 🎯 FOKUS-ARBEITSPLATZ (Lehrwerke & Songs) */}
 
-          {/* MOBILE SEGMENTED CONTROL PILL-BAR FOR 2 SWIPE CARDS (Hidden for junior students for max focus) */}
-          {isMobileView && !(readOnly && uiLevel === 'junior') && (
-            <div style={{
-              width: '100%',
-              display: 'flex',
-              justifyContent: 'center',
-              alignItems: 'center',
-              padding: '6px 16px',
-              background: '#faf8f2',
-              borderBottom: '1px solid #e0dad0',
-              flexShrink: 0,
-              zIndex: 35
-            }}>
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                background: 'rgba(0, 0, 0, 0.06)',
-                borderRadius: '100px',
-                padding: '3px',
-                width: '100%',
-                maxWidth: '340px',
-                height: '38px',
-                boxSizing: 'border-box',
-                gap: '3px'
-              }}>
-                <button
-                  type="button"
-                  onClick={() => setMobileProtokollTab('repertoire')}
-                  style={{
-                    flex: 1,
-                    height: '32px',
-                    borderRadius: '100px',
-                    border: 'none',
-                    background: mobileProtokollTab === 'repertoire' ? '#ffffff' : 'transparent',
-                    color: mobileProtokollTab === 'repertoire' ? '#0f172a' : '#64748b',
-                    fontWeight: 800,
-                    fontSize: '0.76rem',
-                    cursor: 'pointer',
-                    boxShadow: mobileProtokollTab === 'repertoire' ? '0 2px 6px rgba(0,0,0,0.12)' : 'none',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '5px',
-                    whiteSpace: 'nowrap',
-                    transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
-                  }}
-                >
-                  <BookOpen size={13} style={{ color: mobileProtokollTab === 'repertoire' ? '#34a853' : '#64748b' }} />
-                  <span>Lehrwerke & Songs</span>
-                </button>
 
-                <button
-                  type="button"
-                  onClick={() => setMobileProtokollTab('homework')}
-                  style={{
-                    flex: 1,
-                    height: '32px',
-                    borderRadius: '100px',
-                    border: 'none',
-                    background: mobileProtokollTab === 'homework' ? '#ffffff' : 'transparent',
-                    color: mobileProtokollTab === 'homework' ? '#0f172a' : '#64748b',
-                    fontWeight: 800,
-                    fontSize: '0.76rem',
-                    cursor: 'pointer',
-                    boxShadow: mobileProtokollTab === 'homework' ? '0 2px 6px rgba(0,0,0,0.12)' : 'none',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '5px',
-                    whiteSpace: 'nowrap',
-                    transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
-                  }}
-                >
-                  <Edit3 size={13} style={{ color: mobileProtokollTab === 'homework' ? '#ea4335' : '#64748b' }} />
-                  <span>Hausaufgabe</span>
-                </button>
-              </div>
-            </div>
-          )}
 
           <div style={{
             flex: isMobileView ? 'none' : '1 1 0%',
@@ -5912,7 +5851,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                               display: 'flex', 
                               justifyContent: 'space-between', 
                               alignItems: 'center', 
-                              flexWrap: isMobileView ? 'wrap' : 'nowrap', 
+                              flexWrap: 'nowrap', 
                               gap: isMobileView ? '8px' : '12px',
                               width: '100%',
                               minWidth: 0,
@@ -5924,11 +5863,11 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                               <div style={{ 
                                 display: 'inline-flex', 
                                 alignItems: 'center', 
-                                gap: '8px', 
+                                gap: isMobileView ? '6px' : '8px', 
                                 minWidth: 0, 
-                                width: isMobileView ? '100%' : 'auto',
-                                justifyContent: isMobileView ? 'space-between' : 'flex-start',
-                                flexShrink: 0, 
+                                width: 'auto',
+                                justifyContent: 'flex-start',
+                                flexShrink: 1, 
                                 flexWrap: 'nowrap' 
                               }}>
                                 <div style={{
@@ -5942,9 +5881,9 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                   boxSizing: 'border-box',
                                   gap: '2px',
                                   boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
-                                  flex: isMobileView ? 1 : undefined,
+                                  flexShrink: 0,
                                   minWidth: 0,
-                                  justifyContent: isMobileView ? 'space-between' : 'flex-start'
+                                  justifyContent: 'flex-start'
                                 }}>
                                   <button
                                     type="button"
@@ -5978,7 +5917,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                       fontWeight: 850,
                                       color: '#0f172a',
                                       letterSpacing: '-0.015em',
-                                      padding: '0 6px',
+                                      padding: isMobileView ? '0 4px' : '0 6px',
                                       whiteSpace: 'nowrap',
                                       display: 'inline-flex',
                                       alignItems: 'center',
@@ -5988,9 +5927,11 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                     }}
                                   >
                                     <span style={{ textOverflow: 'ellipsis', overflow: 'hidden' }}>{weekRange.label}</span>
-                                    <span style={{ fontSize: isMobileView ? '0.68rem' : '0.74rem', fontWeight: 600, color: '#64748b' }}>
-                                      ({weekRange.dateSpan})
-                                    </span>
+                                    {!isMobileView && (
+                                      <span style={{ fontSize: '0.74rem', fontWeight: 600, color: '#64748b' }}>
+                                        ({weekRange.dateSpan})
+                                      </span>
+                                    )}
                                   </span>
 
                                   <button
@@ -6028,7 +5969,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                       border: '1px solid #e2e8f0',
                                       color: '#0f172a',
                                       borderRadius: '100px',
-                                      padding: '0 11px',
+                                      padding: isMobileView ? '0 8px' : '0 11px',
                                       height: '32px',
                                       boxSizing: 'border-box',
                                       fontSize: '0.75rem',
@@ -6036,9 +5977,10 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                       cursor: 'pointer',
                                       display: 'inline-flex',
                                       alignItems: 'center',
-                                      gap: '5px',
+                                      gap: '4px',
                                       whiteSpace: 'nowrap',
-                                      transition: 'all 0.15s ease'
+                                      transition: 'all 0.15s ease',
+                                      flexShrink: 0
                                     }}
                                     className="hover-scale-mini"
                                     title="Zurück zur aktuellen Woche"
@@ -6049,213 +5991,448 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                 )}
                               </div>
 
-                              {/* 🍏 Right: Apple Harmonized Trailing Action Hub */}
-                              <div style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '8px',
-                                flexShrink: 0,
-                                width: isMobileView ? '100%' : 'auto',
-                                justifyContent: isMobileView ? 'flex-end' : 'flex-end',
-                                marginLeft: isMobileView ? '0' : 'auto',
-                                boxSizing: 'border-box'
-                              }}>
-                                {/* ❓ 1. Student Question Button / Teacher Live Status Pill */}
-                                {readOnly ? (
+                              {/* 🍏 Right: Mobile 3-Dots Popover OR Desktop Action Hub */}
+                              {isMobileView ? (
+                                <div ref={mobileMoreMenuRef} style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', flexShrink: 0 }}>
+                                  <button
+                                    type="button"
+                                    onClick={() => setShowMobileMoreMenu(prev => !prev)}
+                                    aria-label="Weitere Optionen"
+                                    aria-expanded={showMobileMoreMenu}
+                                    style={{
+                                      background: showMobileMoreMenu ? '#e2e8f0' : '#f8fafc',
+                                      border: '1px solid #cbd5e1',
+                                      borderRadius: '100px',
+                                      width: '32px',
+                                      height: '32px',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      color: '#334155',
+                                      cursor: 'pointer',
+                                      boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)',
+                                      transition: 'all 0.15s ease'
+                                    }}
+                                    className="hover-scale-mini"
+                                  >
+                                    <MoreHorizontal size={16} strokeWidth={2.4} />
+                                    {effectiveViewingQuestion?.hasQuestion && (
+                                      <span style={{
+                                        position: 'absolute',
+                                        top: '-2px',
+                                        right: '-2px',
+                                        width: '8px',
+                                        height: '8px',
+                                        borderRadius: '50%',
+                                        background: '#eab308',
+                                        border: '1.5px solid #ffffff'
+                                      }} />
+                                    )}
+                                  </button>
+
+                                  {/* Popover Menu */}
+                                  {showMobileMoreMenu && (
+                                    <div style={{
+                                      position: 'absolute',
+                                      top: 'calc(100% + 6px)',
+                                      right: 0,
+                                      zIndex: 100,
+                                      background: '#ffffff',
+                                      border: '1px solid rgba(0,0,0,0.12)',
+                                      borderRadius: '16px',
+                                      padding: '6px',
+                                      minWidth: '210px',
+                                      boxShadow: '0 10px 30px -5px rgba(0,0,0,0.15), 0 4px 10px -2px rgba(0,0,0,0.05)',
+                                      display: 'flex',
+                                      flexDirection: 'column',
+                                      gap: '2px'
+                                    }}>
+                                      {/* Vorlesen Action */}
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setShowMobileMoreMenu(false);
+                                          if (isTtsSpeaking && activeTtsKey === 'global_homework') {
+                                            handleStopSpeaking();
+                                          } else {
+                                            const speechPhrases = buildCompleteWeeklyHomeworkSpeechPhrases(
+                                              viewingWeekNum,
+                                              lehrwerkeList,
+                                              otherHWs.map(s => ({
+                                                title: s.topic_name?.replace(/\s*\([^)]*\)\s*$/, '') || '',
+                                                note: getCleanPageNotes(s.homework_notes)
+                                              })),
+                                              audioNotes,
+                                              generalHomeworkNotes
+                                            );
+                                            handleSpeakText(speechPhrases, 'global_homework');
+                                          }
+                                        }}
+                                        style={{
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          gap: '10px',
+                                          width: '100%',
+                                          padding: '9px 12px',
+                                          borderRadius: '10px',
+                                          border: 'none',
+                                          background: (isTtsSpeaking && activeTtsKey === 'global_homework') ? '#fee2e2' : 'transparent',
+                                          color: (isTtsSpeaking && activeTtsKey === 'global_homework') ? '#dc2626' : '#1e293b',
+                                          fontSize: '0.84rem',
+                                          fontWeight: 700,
+                                          cursor: 'pointer',
+                                          textAlign: 'left'
+                                        }}
+                                      >
+                                        {isTtsSpeaking && activeTtsKey === 'global_homework' ? (
+                                          <>
+                                            <VolumeX size={15} color="#dc2626" strokeWidth={2.2} />
+                                            <span>Vorlesen stoppen</span>
+                                          </>
+                                        ) : (
+                                          <>
+                                            <Volume2 size={15} color="#475569" strokeWidth={2.2} />
+                                            <span>Wochenplan vorlesen</span>
+                                          </>
+                                        )}
+                                      </button>
+
+                                      {/* E-Mail Senden */}
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setShowMobileMoreMenu(false);
+                                          handleShareEmail();
+                                        }}
+                                        style={{
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          gap: '10px',
+                                          width: '100%',
+                                          padding: '9px 12px',
+                                          borderRadius: '10px',
+                                          border: 'none',
+                                          background: 'transparent',
+                                          color: '#1e293b',
+                                          fontSize: '0.84rem',
+                                          fontWeight: 700,
+                                          cursor: 'pointer',
+                                          textAlign: 'left'
+                                        }}
+                                      >
+                                        <Mail size={15} color="#16a34a" strokeWidth={2.2} />
+                                        <span>Per E-Mail senden</span>
+                                      </button>
+
+                                      {/* Wochenplan kopieren */}
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setShowMobileMoreMenu(false);
+                                          handleCopyShareLink();
+                                        }}
+                                        style={{
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          gap: '10px',
+                                          width: '100%',
+                                          padding: '9px 12px',
+                                          borderRadius: '10px',
+                                          border: 'none',
+                                          background: isLinkCopied ? '#f0fdf4' : 'transparent',
+                                          color: isLinkCopied ? '#16a34a' : '#1e293b',
+                                          fontSize: '0.84rem',
+                                          fontWeight: 700,
+                                          cursor: 'pointer',
+                                          textAlign: 'left'
+                                        }}
+                                      >
+                                        {isLinkCopied ? (
+                                          <>
+                                            <Check size={15} color="#16a34a" strokeWidth={2.5} />
+                                            <span>Kopiert!</span>
+                                          </>
+                                        ) : (
+                                          <>
+                                            <Copy size={15} color="#475569" strokeWidth={2.2} />
+                                            <span>Wochenplan kopieren</span>
+                                          </>
+                                        )}
+                                      </button>
+
+                                      {/* Frage stellen (falls Schüler) */}
+                                      {readOnly && (
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setShowMobileMoreMenu(false);
+                                            if (!isQuestionEditorOpen && effectiveViewingQuestion.hasQuestion) {
+                                              setQuestionDraftText(effectiveViewingQuestion.text);
+                                            }
+                                            setIsQuestionEditorOpen(prev => !prev);
+                                          }}
+                                          style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '10px',
+                                            width: '100%',
+                                            padding: '9px 12px',
+                                            borderRadius: '10px',
+                                            border: 'none',
+                                            background: effectiveViewingQuestion.hasQuestion ? '#fef9c3' : 'transparent',
+                                            color: effectiveViewingQuestion.hasQuestion ? '#854d0e' : '#1e293b',
+                                            fontSize: '0.84rem',
+                                            fontWeight: 700,
+                                            cursor: 'pointer',
+                                            textAlign: 'left'
+                                          }}
+                                        >
+                                          <HelpCircle size={15} strokeWidth={2.2} color={effectiveViewingQuestion.hasQuestion ? '#854d0e' : '#64748b'} />
+                                          <span>{effectiveViewingQuestion.hasQuestion ? '1 Frage notiert' : 'Frage stellen'}</span>
+                                        </button>
+                                      )}
+
+                                      {/* Leeren (falls Lehrer und Inhalte vorhanden) */}
+                                      {(progressItems.some(item => item.is_current_homework) || generalHomeworkNotes.trim() !== '') && !readOnly && (
+                                        <button
+                                          type="button"
+                                          onClick={async () => {
+                                            setShowMobileMoreMenu(false);
+                                            await handleResetAllCurrentHomework();
+                                            setGeneralHomeworkNotes('');
+                                          }}
+                                          style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '10px',
+                                            width: '100%',
+                                            padding: '9px 12px',
+                                            borderRadius: '10px',
+                                            border: 'none',
+                                            background: 'transparent',
+                                            color: '#ef4444',
+                                            fontSize: '0.84rem',
+                                            fontWeight: 700,
+                                            cursor: 'pointer',
+                                            textAlign: 'left',
+                                            borderTop: '1px solid #f1f5f9'
+                                          }}
+                                        >
+                                          <RotateCcw size={15} color="#ef4444" strokeWidth={2.2} />
+                                          <span>Hausaufgaben leeren</span>
+                                        </button>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              ) : (
+                                <div style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '8px',
+                                  flexShrink: 0,
+                                  width: 'auto',
+                                  justifyContent: 'flex-end',
+                                  marginLeft: 'auto',
+                                  boxSizing: 'border-box'
+                                }}>
+                                  {/* ❓ 1. Student Question Button / Teacher Live Status Pill */}
+                                  {readOnly ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        if (!isQuestionEditorOpen && effectiveViewingQuestion.hasQuestion) {
+                                          setQuestionDraftText(effectiveViewingQuestion.text);
+                                        }
+                                        setIsQuestionEditorOpen(prev => !prev);
+                                      }}
+                                      style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '6px',
+                                        padding: '0 12px',
+                                        minHeight: '32px',
+                                        borderRadius: '100px',
+                                        border: effectiveViewingQuestion.hasQuestion ? '1px solid #fde047' : '1px solid #e2e8f0',
+                                        background: effectiveViewingQuestion.hasQuestion ? '#fef9c3' : '#f8fafc',
+                                        color: effectiveViewingQuestion.hasQuestion ? '#854d0e' : '#475569',
+                                        fontSize: '0.80rem',
+                                        fontWeight: 750,
+                                        cursor: 'pointer',
+                                        boxShadow: '0 1px 2px rgba(0,0,0,0.02)',
+                                        transition: 'all 0.15s ease'
+                                      }}
+                                      className="hover-scale-mini"
+                                      title={effectiveViewingQuestion.hasQuestion ? "Deine Frage ansehen oder ändern" : `Frage an ${effectiveTeacherFullName} stellen`}
+                                    >
+                                      <HelpCircle size={13} strokeWidth={2.4} color={effectiveViewingQuestion.hasQuestion ? '#854d0e' : '#64748b'} />
+                                      <span>{effectiveViewingQuestion.hasQuestion ? '1 Frage notiert' : 'Frage stellen'}</span>
+                                    </button>
+                                  ) : (
+                                    <span style={{
+                                      fontSize: '0.76rem',
+                                      color: '#15803d',
+                                      background: '#dcfce7',
+                                      border: '1px solid #bbf7d0',
+                                      padding: '0 11px',
+                                      minHeight: '32px',
+                                      borderRadius: '100px',
+                                      fontWeight: 800,
+                                      letterSpacing: '0.02em',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '5px'
+                                    }}>
+                                      <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#16a34a' }} />
+                                      <span>Live-Schülersicht</span>
+                                    </span>
+                                  )}
+
+                                  {/* 🔊 2. Global TTS Audio Assistant Vorlese-Button */}
                                   <button
                                     type="button"
                                     onClick={() => {
-                                      if (!isQuestionEditorOpen && effectiveViewingQuestion.hasQuestion) {
-                                        setQuestionDraftText(effectiveViewingQuestion.text);
+                                      if (isTtsSpeaking && activeTtsKey === 'global_homework') {
+                                        handleStopSpeaking();
+                                      } else {
+                                        const speechPhrases = buildCompleteWeeklyHomeworkSpeechPhrases(
+                                          viewingWeekNum,
+                                          lehrwerkeList,
+                                          otherHWs.map(s => ({
+                                            title: s.topic_name?.replace(/\s*\([^)]*\)\s*$/, '') || '',
+                                            note: getCleanPageNotes(s.homework_notes)
+                                          })),
+                                          audioNotes,
+                                          generalHomeworkNotes
+                                        );
+                                        handleSpeakText(speechPhrases, 'global_homework');
                                       }
-                                      setIsQuestionEditorOpen(prev => !prev);
                                     }}
                                     style={{
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      gap: '6px',
+                                      background: (isTtsSpeaking && activeTtsKey === 'global_homework') 
+                                        ? '#ef4444' 
+                                        : '#f8fafc',
+                                      border: (isTtsSpeaking && activeTtsKey === 'global_homework') ? '1px solid #dc2626' : '1px solid #e2e8f0',
+                                      color: (isTtsSpeaking && activeTtsKey === 'global_homework') ? '#ffffff' : '#0f172a',
+                                      borderRadius: '100px',
                                       padding: '0 12px',
                                       minHeight: '32px',
-                                      borderRadius: '100px',
-                                      border: effectiveViewingQuestion.hasQuestion ? '1px solid #fde047' : '1px solid #e2e8f0',
-                                      background: effectiveViewingQuestion.hasQuestion ? '#fef9c3' : '#f8fafc',
-                                      color: effectiveViewingQuestion.hasQuestion ? '#854d0e' : '#475569',
                                       fontSize: '0.80rem',
                                       fontWeight: 750,
                                       cursor: 'pointer',
-                                      boxShadow: '0 1px 2px rgba(0,0,0,0.02)',
-                                      transition: 'all 0.15s ease'
-                                    }}
-                                    className="hover-scale-mini"
-                                    title={effectiveViewingQuestion.hasQuestion ? "Deine Frage ansehen oder ändern" : `Frage an ${effectiveTeacherFullName} stellen`}
-                                  >
-                                    <HelpCircle size={13} strokeWidth={2.4} color={effectiveViewingQuestion.hasQuestion ? '#854d0e' : '#64748b'} />
-                                    <span>{effectiveViewingQuestion.hasQuestion ? '1 Frage notiert' : 'Frage stellen'}</span>
-                                  </button>
-                                ) : (
-                                  <span style={{
-                                    fontSize: '0.76rem',
-                                    color: '#15803d',
-                                    background: '#dcfce7',
-                                    border: '1px solid #bbf7d0',
-                                    padding: '0 11px',
-                                    minHeight: '32px',
-                                    borderRadius: '100px',
-                                    fontWeight: 800,
-                                    letterSpacing: '0.02em',
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    gap: '5px'
-                                  }}>
-                                    <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#16a34a' }} />
-                                    <span>Live-Schülersicht</span>
-                                  </span>
-                                )}
-
-                                {/* 🔊 2. Global TTS Audio Assistant Vorlese-Button */}
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    if (isTtsSpeaking && activeTtsKey === 'global_homework') {
-                                      handleStopSpeaking();
-                                    } else {
-                                      const speechPhrases = buildCompleteWeeklyHomeworkSpeechPhrases(
-                                        viewingWeekNum,
-                                        lehrwerkeList,
-                                        otherHWs.map(s => ({
-                                          title: s.topic_name?.replace(/\s*\([^)]*\)\s*$/, '') || '',
-                                          note: getCleanPageNotes(s.homework_notes)
-                                        })),
-                                        audioNotes,
-                                        generalHomeworkNotes
-                                      );
-                                      handleSpeakText(speechPhrases, 'global_homework');
-                                    }
-                                  }}
-                                  style={{
-                                    background: (isTtsSpeaking && activeTtsKey === 'global_homework') 
-                                      ? '#ef4444' 
-                                      : '#f8fafc',
-                                    border: (isTtsSpeaking && activeTtsKey === 'global_homework') ? '1px solid #dc2626' : '1px solid #e2e8f0',
-                                    color: (isTtsSpeaking && activeTtsKey === 'global_homework') ? '#ffffff' : '#0f172a',
-                                    borderRadius: '100px',
-                                    padding: '0 12px',
-                                    minHeight: '32px',
-                                    fontSize: '0.80rem',
-                                    fontWeight: 750,
-                                    cursor: 'pointer',
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    gap: '6px',
-                                    transition: 'all 0.15s ease',
-                                    boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
-                                  }}
-                                  className="hover-scale-mini"
-                                  title={isTtsSpeaking && activeTtsKey === 'global_homework' ? "Vorlesen stoppen" : "Gesamte Hausaufgabe vorlesen lassen"}
-                                >
-                                  {isTtsSpeaking && activeTtsKey === 'global_homework' ? (
-                                    <>
-                                      <VolumeX size={13} />
-                                      <span>Stopp</span>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <Volume2 size={13} color="#475569" strokeWidth={2.2} />
-                                      <span>Vorlesen</span>
-                                    </>
-                                  )}
-                                </button>
-
-                                {/* ✉️ 3. Direct E-Mail Send Button & Quick-Copy Icon Button */}
-                                 <div ref={shareMenuRef} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                                   <button
-                                     type="button"
-                                     onClick={handleShareEmail}
-                                     style={{
-                                       background: '#f8fafc',
-                                       border: '1px solid #e2e8f0',
-                                       color: '#0f172a',
-                                       borderRadius: '100px',
-                                       padding: '0 12px',
-                                       minHeight: '32px',
-                                       fontSize: '0.80rem',
-                                       fontWeight: 750,
-                                       cursor: 'pointer',
-                                       display: 'inline-flex',
-                                       alignItems: 'center',
-                                       gap: '6px',
-                                       transition: 'all 0.15s ease',
-                                       boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
-                                     }}
-                                     className="hover-scale-mini"
-                                     title="Wochenplan per E-Mail versenden"
-                                   >
-                                     <Mail size={13} color="#16a34a" strokeWidth={2.2} />
-                                     <span>Per E-Mail senden</span>
-                                   </button>
-
-                                   <button
-                                     type="button"
-                                     onClick={handleCopyShareLink}
-                                     style={{
-                                       background: isLinkCopied ? '#f0fdf4' : '#f8fafc',
-                                       border: isLinkCopied ? '1px solid #86efac' : '1px solid #e2e8f0',
-                                       color: isLinkCopied ? '#16a34a' : '#475569',
-                                       borderRadius: '100px',
-                                       padding: '0 9px',
-                                       minHeight: '32px',
-                                       fontSize: '0.78rem',
-                                       fontWeight: 750,
-                                       cursor: 'pointer',
-                                       display: 'inline-flex',
-                                       alignItems: 'center',
-                                       gap: '4px',
-                                       transition: 'all 0.15s ease',
-                                       boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
-                                     }}
-                                     className="hover-scale-mini"
-                                     title={isLinkCopied ? 'In Zwischenablage kopiert!' : 'Wochenplan-Text in Zwischenablage kopieren'}
-                                   >
-                                     {isLinkCopied ? (
-                                       <>
-                                         <Check size={13} color="#16a34a" strokeWidth={2.5} />
-                                         <span style={{ fontSize: '0.74rem' }}>Kopiert!</span>
-                                       </>
-                                     ) : (
-                                       <Copy size={13} color="#475569" strokeWidth={2.2} />
-                                     )}
-                                   </button>
-                                 </div>
-
-                                {(progressItems.some(item => item.is_current_homework) || generalHomeworkNotes.trim() !== '') && !readOnly && (
-                                  <button 
-                                    type="button" 
-                                    onClick={async () => {
-                                      await handleResetAllCurrentHomework();
-                                      setGeneralHomeworkNotes('');
-                                    }}
-                                    style={{ 
-                                      border: 'none', 
-                                      background: 'transparent', 
-                                      color: '#94a3b8', 
-                                      fontSize: '0.76rem', 
-                                      fontWeight: 750, 
-                                      cursor: 'pointer', 
-                                      padding: '4px 6px',
-                                      borderRadius: '6px',
                                       display: 'inline-flex',
                                       alignItems: 'center',
-                                      gap: '4px',
-                                      transition: 'all 0.15s ease'
+                                      gap: '6px',
+                                      transition: 'all 0.15s ease',
+                                      boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
                                     }}
                                     className="hover-scale-mini"
-                                    title="Hausaufgaben für diese Woche zurücksetzen"
+                                    title={isTtsSpeaking && activeTtsKey === 'global_homework' ? "Vorlesen stoppen" : "Gesamte Hausaufgabe vorlesen lassen"}
                                   >
-                                    <RotateCcw size={11} />
-                                    <span>Leeren</span>
+                                    {isTtsSpeaking && activeTtsKey === 'global_homework' ? (
+                                      <>
+                                        <VolumeX size={13} />
+                                        <span>Stopp</span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Volume2 size={13} color="#475569" strokeWidth={2.2} />
+                                        <span>Vorlesen</span>
+                                      </>
+                                    )}
                                   </button>
-                                )}
-                              </div>
+
+                                  {/* ✉️ 3. Direct E-Mail Send Button & Quick-Copy Icon Button */}
+                                  <div ref={shareMenuRef} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                    <button
+                                      type="button"
+                                      onClick={handleShareEmail}
+                                      style={{
+                                        background: '#f8fafc',
+                                        border: '1px solid #e2e8f0',
+                                        color: '#0f172a',
+                                        borderRadius: '100px',
+                                        padding: '0 12px',
+                                        minHeight: '32px',
+                                        fontSize: '0.80rem',
+                                        fontWeight: 750,
+                                        cursor: 'pointer',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '6px',
+                                        transition: 'all 0.15s ease',
+                                        boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
+                                      }}
+                                      className="hover-scale-mini"
+                                      title="Wochenplan per E-Mail versenden"
+                                    >
+                                      <Mail size={13} color="#16a34a" strokeWidth={2.2} />
+                                      <span>Per E-Mail senden</span>
+                                    </button>
+
+                                    <button
+                                      type="button"
+                                      onClick={handleCopyShareLink}
+                                      style={{
+                                        background: isLinkCopied ? '#f0fdf4' : '#f8fafc',
+                                        border: isLinkCopied ? '1px solid #86efac' : '1px solid #e2e8f0',
+                                        color: isLinkCopied ? '#16a34a' : '#475569',
+                                        borderRadius: '100px',
+                                        padding: '0 9px',
+                                        minHeight: '32px',
+                                        fontSize: '0.78rem',
+                                        fontWeight: 750,
+                                        cursor: 'pointer',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '4px',
+                                        transition: 'all 0.15s ease',
+                                        boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
+                                      }}
+                                      className="hover-scale-mini"
+                                      title={isLinkCopied ? 'In Zwischenablage kopiert!' : 'Wochenplan-Text in Zwischenablage kopieren'}
+                                    >
+                                      {isLinkCopied ? (
+                                        <>
+                                          <Check size={13} color="#16a34a" strokeWidth={2.5} />
+                                          <span style={{ fontSize: '0.74rem' }}>Kopiert!</span>
+                                        </>
+                                      ) : (
+                                        <Copy size={13} color="#475569" strokeWidth={2.2} />
+                                      )}
+                                    </button>
+                                  </div>
+
+                                  {(progressItems.some(item => item.is_current_homework) || generalHomeworkNotes.trim() !== '') && !readOnly && (
+                                    <button 
+                                      type="button" 
+                                      onClick={async () => {
+                                        await handleResetAllCurrentHomework();
+                                        setGeneralHomeworkNotes('');
+                                      }}
+                                      style={{ 
+                                        border: 'none', 
+                                        background: 'transparent', 
+                                        color: '#94a3b8', 
+                                        fontSize: '0.76rem', 
+                                        fontWeight: 750, 
+                                        cursor: 'pointer', 
+                                        padding: '4px 6px',
+                                        borderRadius: '6px',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '4px',
+                                        transition: 'all 0.15s ease'
+                                      }}
+                                      className="hover-scale-mini"
+                                      title="Hausaufgaben für diese Woche zurücksetzen"
+                                    >
+                                      <RotateCcw size={11} />
+                                      <span>Leeren</span>
+                                    </button>
+                                  )}
+                                </div>
+                              )}
                             </div>
 
                             {/* 1.5 Globaler Übertrag-Statuskopf (Monolith Goldstandard: Gilt für alle Inhalte der Seite) */}
@@ -6303,14 +6480,14 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
 
                             {/* 3. Schülervorschau-Bühne (Master Stage Box: Der gerahmte Wochen-Fahrplan) */}
                             <div style={{
-                              minHeight: '140px',
+                              minHeight: isMobileView ? '100px' : '140px',
                               background: 'linear-gradient(180deg, #fcfdfe 0%, #f8fafc 100%)',
                               border: '1px solid #f1f5f9',
-                              borderRadius: '18px',
-                              padding: '16px 18px',
+                              borderRadius: isMobileView ? '14px' : '18px',
+                              padding: isMobileView ? '12px 10px' : '16px 18px',
                               display: 'flex',
                               flexDirection: 'column',
-                              gap: '12px',
+                              gap: isMobileView ? '8px' : '12px',
                               boxShadow: 'inset 0 1px 3px rgba(0, 0, 0, 0.02)'
                             }}>
                               {!hasActiveItems ? (
@@ -6319,14 +6496,14 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                   flexDirection: 'column',
                                   alignItems: 'center',
                                   justifyContent: 'center',
-                                  gap: '12px',
-                                  padding: '24px 12px',
+                                  gap: isMobileView ? '8px' : '12px',
+                                  padding: isMobileView ? '14px 8px' : '24px 12px',
                                   textAlign: 'center'
                                 }}>
                                   <div style={{
-                                    width: '44px',
-                                    height: '44px',
-                                    borderRadius: '14px',
+                                    width: isMobileView ? '38px' : '44px',
+                                    height: isMobileView ? '38px' : '44px',
+                                    borderRadius: isMobileView ? '12px' : '14px',
                                     background: '#ffffff',
                                     border: '1px solid #e2e8f0',
                                     display: 'flex',
@@ -6334,16 +6511,16 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                     justifyContent: 'center',
                                     boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
                                   }}>
-                                    <BookOpen size={20} color="#64748b" strokeWidth={1.75} />
+                                    <BookOpen size={isMobileView ? 17 : 20} color="#64748b" strokeWidth={1.75} />
                                   </div>
 
                                   <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
-                                    <span style={{ fontSize: '0.92rem', color: '#0f172a', fontWeight: 850, letterSpacing: '-0.01em' }}>
+                                    <span style={{ fontSize: isMobileView ? '0.86rem' : '0.92rem', color: '#0f172a', fontWeight: 850, letterSpacing: '-0.01em' }}>
                                       {isPastWeek
-                                        ? `Keine Hausaufgaben für ${weekRange.label.toLowerCase()} (${weekRange.dateSpan}) archiviert`
-                                        : `Leeres Hausaufgabenheft für ${weekRange.label.toLowerCase()} (${weekRange.dateSpan})`}
+                                        ? (isMobileView ? 'Keine Hausaufgaben archiviert' : `Keine Hausaufgaben für ${weekRange.label.toLowerCase()} (${weekRange.dateSpan}) archiviert`)
+                                        : (isMobileView ? 'Noch keine Hausaufgaben für diese Woche' : `Leeres Hausaufgabenheft für ${weekRange.label.toLowerCase()} (${weekRange.dateSpan})`)}
                                     </span>
-                                    <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 550, maxWidth: '380px', lineHeight: 1.45 }}>
+                                    <span style={{ fontSize: isMobileView ? '0.74rem' : '0.78rem', color: '#64748b', fontWeight: 550, maxWidth: isMobileView ? '280px' : '380px', lineHeight: 1.45 }}>
                                       {isPastWeek
                                         ? 'Unterrichtsfreie Zeit, Ferien oder keine Notizen hinterlegt.'
                                         : (hasTransferableHomework

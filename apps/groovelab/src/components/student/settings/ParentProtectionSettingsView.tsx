@@ -5,7 +5,6 @@ import {
 } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
 import { CAMPUS_AGE_STANDARDS } from '../studentAgeStandards';
-import { SKILL_TAGS } from '../meisterwerk.types';
 
 export interface ParentProtectionSettingsViewProps {
   studentUser: any;
@@ -92,20 +91,6 @@ export const ParentProtectionSettingsView: React.FC<ParentProtectionSettingsView
     curProposals !== standard.allowProposals ||
     curAudio !== standard.allowAudio ||
     curTts !== standard.allowTts;
-
-  const skillLevels = React.useMemo(() => {
-    try {
-      if (studentUser?.skill_radar_levels && typeof studentUser.skill_radar_levels === 'object') {
-        return studentUser.skill_radar_levels;
-      }
-      const saved = typeof window !== 'undefined' ? localStorage.getItem(`groovelab_skill_overrides_${studentId || studentUser?.id || 'default'}`) : null;
-      if (saved) return JSON.parse(saved);
-    } catch (e) {}
-    return {};
-  }, [studentUser?.skill_radar_levels, studentId, studentUser?.id]);
-
-  const activeWeeklyFocus = skillLevels?.weekly_focus && skillLevels.weekly_focus !== 'ausgeglichen' ? skillLevels.weekly_focus : null;
-  const radarTitle = currentLvlKey === 'junior' ? 'Mein Musik-Stern ⭐' : currentLvlKey === 'pro' ? 'Kompetenz-Radar 🏛️' : 'Skill-Radar ⚡';
 
   const handleSwitchAgeLevelWithStandard = async (targetLevelId: 'junior' | 'teen' | 'pro') => {
     if (targetLevelId === currentLvlKey) return;
@@ -447,113 +432,6 @@ export const ParentProtectionSettingsView: React.FC<ParentProtectionSettingsView
           </span>
         </div>
       )}
-
-      {/* 🌟 Musikalische Förderung & Pädagogisches Entwicklungsraster (5 Säulen) */}
-      <div style={{
-        background: '#ffffff',
-        border: '1.5px solid #e2e8f0',
-        borderRadius: '20px',
-        padding: '18px 20px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '14px',
-        boxShadow: '0 4px 16px -2px rgba(0, 0, 0, 0.04)'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <span style={{ fontSize: '1.25rem' }}>{currentLvlKey === 'junior' ? '⭐' : '📊'}</span>
-            <div>
-              <div style={{ fontSize: '0.94rem', fontWeight: 850, color: '#0f172a' }}>
-                {radarTitle} · Didaktisches Entwicklungsraster
-              </div>
-              <div style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 550, marginTop: '2px' }}>
-                Persönliche, behutsame Förderung durch die Musiklehrkraft (keine Noten, kein Leistungsdruck)
-              </div>
-            </div>
-          </div>
-          {activeWeeklyFocus ? (
-            <span style={{
-              fontSize: '0.74rem',
-              fontWeight: 800,
-              color: '#b45309',
-              background: '#fef3c7',
-              border: '1px solid #fde68a',
-              padding: '3px 10px',
-              borderRadius: '100px'
-            }}>
-              🎯 Wochenfokus aktiv
-            </span>
-          ) : (
-            <span style={{
-              fontSize: '0.74rem',
-              fontWeight: 800,
-              color: '#475569',
-              background: '#f1f5f9',
-              border: '1px solid #e2e8f0',
-              padding: '3px 10px',
-              borderRadius: '100px'
-            }}>
-              {currentLvlKey === 'junior' ? '⭐ Rundum-Zauber' : currentLvlKey === 'pro' ? '🏛️ Harmonische Balance' : '🌈 Ganzheitlich'}
-            </span>
-          )}
-        </div>
-
-        {/* 5 Pillars Summary */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '10px' }}>
-          {SKILL_TAGS.map(tag => {
-            const rawLvl = (skillLevels as any)[tag.key] ?? (tag.legacyKey ? (skillLevels as any)[tag.legacyKey] : undefined);
-            const level = typeof rawLvl === 'number' && rawLvl >= 1 && rawLvl <= 5 ? rawLvl : 1;
-            const isFocus = activeWeeklyFocus === tag.key || (tag.legacyKey && activeWeeklyFocus === tag.legacyKey);
-
-            return (
-              <div
-                key={tag.key}
-                style={{
-                  background: isFocus ? (tag.lightBg || '#fffbeb') : '#f8fafc',
-                  border: `1px solid ${isFocus ? (tag.border || '#fde68a') : '#f1f5f9'}`,
-                  borderRadius: '14px',
-                  padding: '10px 12px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '6px'
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span style={{ fontSize: '0.84rem', fontWeight: 800, color: tag.color || '#0f172a', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <span>{tag.icon}</span>
-                    <span>{tag.shortLabel}</span>
-                  </span>
-                  {isFocus ? (
-                    <span style={{ fontSize: '0.66rem', fontWeight: 850, color: '#b45309', background: '#fef3c7', padding: '1px 6px', borderRadius: '100px' }}>
-                      Fokus
-                    </span>
-                  ) : (
-                    <span style={{ fontSize: '0.70rem', color: '#64748b', fontWeight: 700 }}>
-                      Stufe {level}/5
-                    </span>
-                  )}
-                </div>
-
-                {/* 5 Dots Indicator */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  {[1, 2, 3, 4, 5].map(seg => (
-                    <span
-                      key={seg}
-                      style={{
-                        height: '6px',
-                        flex: 1,
-                        borderRadius: '3px',
-                        background: level >= seg ? (tag.dotColor || '#3b82f6') : '#e2e8f0',
-                        transition: 'all 0.15s ease'
-                      }}
-                    />
-                  ))}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
 
       {/* Granular Board & Feature Toggles with Reset to Age Standard */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>

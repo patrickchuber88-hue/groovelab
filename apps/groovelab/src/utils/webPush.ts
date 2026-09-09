@@ -13,13 +13,23 @@ function urlBase64ToUint8Array(base64String: string) {
   return outputArray;
 }
 
+function withTimeout<T>(promise: PromiseLike<T>, ms: number, fallbackValue: T): Promise<T> {
+  return Promise.race([
+    Promise.resolve(promise),
+    new Promise<T>((resolve) => setTimeout(() => resolve(fallbackValue), ms))
+  ]);
+}
+
 export async function registerServiceWorker(): Promise<ServiceWorkerRegistration | null> {
-  if ('serviceWorker' in navigator && 'PushManager' in window) {
+  if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
     try {
-      const registration = await navigator.serviceWorker.register('/sw.js', {
+      const regPromise = navigator.serviceWorker.register('/sw.js', {
         scope: '/'
       });
-      console.log('Service Worker registered successfully with scope:', registration.scope);
+      const registration = await withTimeout(regPromise, 3500, null);
+      if (registration) {
+        console.log('Service Worker registered successfully with scope:', registration.scope);
+      }
       return registration;
     } catch (error) {
       console.error('Service Worker registration failed:', error);
@@ -31,39 +41,72 @@ export async function registerServiceWorker(): Promise<ServiceWorkerRegistration
 
 export async function subscribeUserToPush(userId: string): Promise<boolean> {
   try {
-    const registration = await registerServiceWorker();
-    if (!registration) {
-      console.warn('Service Worker registration not available.');
+    if (typeof window === 'undefined' || !('Notification' in window)) {
+      console.warn('Notifications not supported in this environment.');
       return false;
     }
 
+    // 1. Request notification permission with Safari compatibility and timeout (3.5s)
     let permission = Notification.permission;
     if (permission !== 'granted') {
-      permission = await Notification.requestPermission();
+      const permPromise = new Promise<NotificationPermission>((resolve) => {
+        try {
+          const res = Notification.requestPermission((p) => resolve(p));
+          if (res && typeof (res as any).then === 'function') {
+            (res as Promise<NotificationPermission>).then(resolve).catch(() => resolve('denied'));
+          }
+        } catch (e) {
+          resolve('denied');
+        }
+      });
+      permission = await withTimeout(permPromise, 3500, Notification.permission);
     }
+
     if (permission !== 'granted') {
-      console.warn('Notification permission denied.');
+      console.warn('Notification permission not granted:', permission);
       return false;
     }
 
+    // 2. Service Worker registration with timeout (3.5s)
+    const registration = await registerServiceWorker();
+    if (!registration || !('pushManager' in registration)) {
+      console.warn('Service Worker or PushManager not available.');
+      return false;
+    }
+
+    // 3. Push subscription with timeout (3.5s)
     const subscribeOptions = {
       userVisibleOnly: true,
       applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
     };
 
-    let subscription = await registration.pushManager.getSubscription();
+    const subscriptionPromise = (async () => {
+      try {
+        let sub = await registration.pushManager.getSubscription();
+        if (!sub) {
+          sub = await registration.pushManager.subscribe(subscribeOptions);
+        }
+        return sub;
+      } catch (e) {
+        console.warn('pushManager.subscribe failed:', e);
+        return null;
+      }
+    })();
+
+    const subscription = await withTimeout(subscriptionPromise, 3500, null);
     if (!subscription) {
-      subscription = await registration.pushManager.subscribe(subscribeOptions);
+      console.warn('Could not establish push subscription.');
+      return false;
     }
 
-    // Convert keys to strings
+    // 4. Convert keys to strings
     const p256dh = subscription.getKey('p256dh');
     const auth = subscription.getKey('auth');
     const p256dhString = p256dh ? btoa(String.fromCharCode.apply(null, Array.from(new Uint8Array(p256dh)))) : '';
     const authString = auth ? btoa(String.fromCharCode.apply(null, Array.from(new Uint8Array(auth)))) : '';
 
-    // Save subscription in database
-    const { error } = await supabase
+    // 5. Save subscription in database (timeout 3.5s)
+    const dbSavePromise = supabase
       .from('push_subscriptions')
       .upsert({
         user_id: userId,
@@ -74,21 +117,15 @@ export async function subscribeUserToPush(userId: string): Promise<boolean> {
         onConflict: 'endpoint'
       });
 
-    if (error) {
-      console.error('Failed to save push subscription in database:', error);
-      return false;
-    }
+    await withTimeout(dbSavePromise, 3500, null as any);
 
-    // Enable push notifications flags for user
-    const { error: userError } = await supabase
+    // 6. Enable push notifications flag for user (timeout 3.5s)
+    const userUpdatePromise = supabase
       .from('users')
       .update({ push_notifications_enabled: true })
       .eq('id', userId);
 
-    if (userError) {
-      console.error('Failed to update users push enabled flag:', userError);
-      return false;
-    }
+    await withTimeout(userUpdatePromise, 3500, null as any);
 
     return true;
   } catch (err) {
@@ -99,35 +136,28 @@ export async function subscribeUserToPush(userId: string): Promise<boolean> {
 
 export async function unsubscribeUserFromPush(userId: string): Promise<boolean> {
   try {
-    const registration = await navigator.serviceWorker.getRegistration();
-    if (registration) {
-      const subscription = await registration.pushManager.getSubscription();
-      if (subscription) {
-        // Unsubscribe from browser PushManager
-        await subscription.unsubscribe();
-
-        // Delete from database
-        const { error } = await supabase
-          .from('push_subscriptions')
-          .delete()
-          .eq('endpoint', subscription.endpoint);
-
-        if (error) {
-          console.error('Failed to delete push subscription from database:', error);
+    if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+      const regPromise = navigator.serviceWorker.getRegistration();
+      const registration = await withTimeout(regPromise, 2500, null);
+      if (registration && 'pushManager' in registration) {
+        const subPromise = registration.pushManager.getSubscription();
+        const subscription = await withTimeout(subPromise, 2500, null);
+        if (subscription) {
+          await withTimeout(subscription.unsubscribe(), 2500, false);
+          await withTimeout(
+            supabase.from('push_subscriptions').delete().eq('endpoint', subscription.endpoint),
+            2500,
+            null as any
+          );
         }
       }
     }
 
-    // Disable push notifications flag in users table
-    const { error: userError } = await supabase
-      .from('users')
-      .update({ push_notifications_enabled: false })
-      .eq('id', userId);
-
-    if (userError) {
-      console.error('Failed to disable user push flag:', userError);
-      return false;
-    }
+    await withTimeout(
+      supabase.from('users').update({ push_notifications_enabled: false }).eq('id', userId),
+      2500,
+      null as any
+    );
 
     return true;
   } catch (err) {

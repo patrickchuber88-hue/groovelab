@@ -114,7 +114,9 @@ class HomeworkBookErrorBoundary extends React.Component<HomeworkBookErrorBoundar
           border: '1px solid #fecaca',
           textAlign: 'center'
         }}>
-          <div style={{ fontSize: '2.5rem', marginBottom: '16px' }}>📖</div>
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
+            <BookOpen size={42} color="#15803d" strokeWidth={2} />
+          </div>
           <h3 style={{ fontSize: '1.25rem', fontWeight: 900, color: '#1e293b', marginBottom: '8px' }}>
             Hausaufgabenheft konnte nicht geladen werden
           </h3>
@@ -11618,7 +11620,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       {activePracticeGrace && (
         <div style={{
           position: 'fixed',
-          top: '16px',
+          top: 'max(16px, env(safe-area-inset-top))',
           left: '50%',
           transform: 'translateX(-50%)',
           zIndex: 99998,
@@ -11626,42 +11628,50 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
           backdropFilter: 'blur(20px)',
           WebkitBackdropFilter: 'blur(20px)',
           border: '1.5px solid #f59e0b',
-          borderRadius: '100px',
-          padding: isMusicStandMode ? '10px 22px' : '8px 18px',
+          borderRadius: isMobile ? '20px' : '100px',
+          padding: isMusicStandMode ? '10px 22px' : isMobile ? '10px 14px' : '8px 18px',
+          maxWidth: 'calc(100% - 24px)',
+          width: isMobile ? 'calc(100% - 24px)' : 'max-content',
+          boxSizing: 'border-box',
           boxShadow: '0 10px 30px -4px rgba(245, 158, 11, 0.35), 0 4px 12px rgba(0,0,0,0.5)',
           display: 'flex',
+          flexDirection: isMobile ? 'column' : 'row',
           alignItems: 'center',
-          gap: '12px',
+          justifyContent: isMobile ? 'center' : 'space-between',
+          gap: isMobile ? '8px' : '12px',
           color: '#ffffff',
           animation: 'fadeIn 0.3s ease'
         }}>
-          <div style={{
-            width: '10px',
-            height: '10px',
-            borderRadius: '50%',
-            background: '#f59e0b',
-            boxShadow: '0 0 10px #f59e0b'
-          }} />
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span style={{ fontSize: isMusicStandMode ? '0.94rem' : '0.86rem', fontWeight: 800, color: '#fde68a' }}>
-              Übungs-Pufferzeit:
-            </span>
-            <span style={{
-              fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
-              fontSize: isMusicStandMode ? '1.15rem' : '1.02rem',
-              fontWeight: 900,
-              color: '#ffffff',
-              background: 'rgba(245, 158, 11, 0.2)',
-              padding: '2px 8px',
-              borderRadius: '6px',
-              border: '1px solid rgba(245, 158, 11, 0.3)'
-            }}>
-              {String(Math.floor(activePracticeGrace.secondsLeft / 60)).padStart(2, '0')}:
-              {String(activePracticeGrace.secondsLeft % 60).padStart(2, '0')}
-            </span>
-            <span style={{ fontSize: isMusicStandMode ? '0.90rem' : '0.82rem', color: '#cbd5e1', fontWeight: 600 }}>
-              {activePracticeGrace.targetName}
-            </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+            <div style={{
+              width: '10px',
+              height: '10px',
+              borderRadius: '50%',
+              background: '#f59e0b',
+              boxShadow: '0 0 10px #f59e0b',
+              flexShrink: 0
+            }} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: isMusicStandMode ? '0.94rem' : '0.86rem', fontWeight: 800, color: '#fde68a' }}>
+                Übungs-Pufferzeit:
+              </span>
+              <span style={{
+                fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+                fontSize: isMusicStandMode ? '1.15rem' : '1.02rem',
+                fontWeight: 900,
+                color: '#ffffff',
+                background: 'rgba(245, 158, 11, 0.2)',
+                padding: '2px 8px',
+                borderRadius: '6px',
+                border: '1px solid rgba(245, 158, 11, 0.3)'
+              }}>
+                {String(Math.floor(activePracticeGrace.secondsLeft / 60)).padStart(2, '0')}:
+                {String(activePracticeGrace.secondsLeft % 60).padStart(2, '0')}
+              </span>
+              <span style={{ fontSize: isMusicStandMode ? '0.90rem' : '0.82rem', color: '#cbd5e1', fontWeight: 600 }}>
+                {activePracticeGrace.targetName}
+              </span>
+            </div>
           </div>
 
           <button
@@ -11674,19 +11684,24 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
               color: '#0f172a',
               border: 'none',
               borderRadius: '100px',
-              padding: isMusicStandMode ? '8px 16px' : '6px 14px',
+              padding: isMusicStandMode ? '8px 16px' : '8px 16px',
+              minHeight: '44px',
+              width: isMobile ? '100%' : 'auto',
+              justifyContent: 'center',
+              boxSizing: 'border-box',
+              touchAction: 'manipulation',
               fontSize: isMusicStandMode ? '0.88rem' : '0.80rem',
               fontWeight: 900,
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
-              gap: '4px',
+              gap: '6px',
               boxShadow: '0 2px 8px rgba(245, 158, 11, 0.3)',
               transition: 'all 0.15s ease'
             }}
             className="hover-scale"
           >
-            <Check size={14} />
+            <Check size={15} strokeWidth={2.5} />
             <span>Jetzt sichern &amp; beenden</span>
           </button>
         </div>
@@ -11701,12 +11716,14 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
           borderRadius: '24px',
           marginBottom: '20px',
           display: 'flex',
-          alignItems: 'center',
+          flexDirection: isMobile ? 'column' : 'row',
+          alignItems: isMobile ? 'flex-start' : 'center',
           justifyContent: 'space-between',
           gap: '16px',
           boxShadow: '0 8px 24px -4px rgba(217, 119, 6, 0.12)',
           position: 'relative',
-          animation: 'fadeIn 0.4s ease'
+          animation: 'fadeIn 0.4s ease',
+          boxSizing: 'border-box'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
             <div style={{
@@ -11740,9 +11757,13 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
             border: '1px solid #fde68a',
             color: '#b45309',
             whiteSpace: 'nowrap',
-            boxShadow: '0 2px 6px rgba(217, 119, 6, 0.08)'
+            boxShadow: '0 2px 6px rgba(217, 119, 6, 0.08)',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px'
           }}>
-            Automatische Sicherung aktiv 🛡️
+            <span>Automatische Sicherung aktiv</span>
+            <ShieldCheck size={14} color="#b45309" strokeWidth={2.4} />
           </div>
         </div>
       )}
