@@ -93,7 +93,83 @@ export const downloadAppleWalletPass = (options: WalletPassOptions, filename?: s
     setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
     return true;
   } catch (err) {
-    console.error('[WalletPassGenerator] Failed to generate/download pass:', err);
+    console.error('[WalletPassGenerator] Failed to generate/download Apple Wallet pass:', err);
     return false;
   }
+};
+
+/**
+ * Generates an actionable Google Wallet / Android Pass payload.
+ * For Android users, this formats the digital ID into a Google Wallet Save payload or a standardized pass URI.
+ */
+export const generateGoogleWalletPassUrl = (options: WalletPassOptions): string => {
+  const {
+    schoolName,
+    userName,
+    userRole = 'Schüler',
+    instrument = 'Instrument',
+    qrToken,
+    isCampus = true
+  } = options;
+
+  // Build standard Google Wallet Generic Object payload structure
+  const genericPass = {
+    iss: 'campus-groovelab',
+    aud: 'google',
+    typ: 'savetowallet',
+    origins: [typeof window !== 'undefined' ? window.location.origin : 'https://campus-groovelab.de'],
+    payload: {
+      genericObjects: [
+        {
+          id: `campus_groovelab_${qrToken.slice(0, 16)}`,
+          classId: 'campus_groovelab_student_id_v1',
+          genericType: 'GENERIC_ID',
+          hexBackgroundColor: isCampus ? '#34a853' : '#eab308',
+          logo: {
+            sourceUri: {
+              uri: typeof window !== 'undefined' ? `${window.location.origin}/campus_login_hero.png` : 'https://campus-groovelab.de/campus_login_hero.png'
+            },
+            contentDescription: {
+              defaultValue: {
+                language: 'de',
+                value: 'Campus-Groovelab Logo'
+              }
+            }
+          },
+          cardTitle: {
+            defaultValue: {
+              language: 'de',
+              value: isCampus ? 'Campus-Groovelab Ausweis' : 'GrooveLab Pass'
+            }
+          },
+          header: {
+            defaultValue: {
+              language: 'de',
+              value: userName
+            }
+          },
+          subheader: {
+            defaultValue: {
+              language: 'de',
+              value: `${schoolName || 'Musikschule'} • ${instrument}`
+            }
+          },
+          barcode: {
+            type: 'QR_CODE',
+            value: qrToken,
+            alternateText: `${userRole}: ${userName}`
+          }
+        }
+      ]
+    }
+  };
+
+  // Safe base64url encoding of the payload
+  const jsonStr = JSON.stringify(genericPass);
+  const base64Payload = btoa(unescape(encodeURIComponent(jsonStr)))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
+
+  return `https://pay.google.com/gp/v/save/${base64Payload}`;
 };

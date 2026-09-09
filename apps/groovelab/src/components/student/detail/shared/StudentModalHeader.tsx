@@ -41,6 +41,11 @@ export const StudentModalHeader: React.FC<StudentModalHeaderProps> = ({
   const [editLast, setEditLast] = useState(lastName);
   const [isSaving, setIsSaving] = useState(false);
 
+  React.useEffect(() => {
+    setEditFirst(firstName);
+    setEditLast(lastName);
+  }, [firstName, lastName]);
+
   const handleStartEdit = () => {
     setEditFirst(firstName);
     setEditLast(lastName);

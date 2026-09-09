@@ -18,6 +18,7 @@ export const SmartAppInstallPrompt: React.FC<SmartAppInstallPromptProps> = ({
 }) => {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [isIOS, setIsIOS] = useState(false);
+  const [isAndroid, setIsAndroid] = useState(false);
   const [isStandalone, setIsStandalone] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [installed, setInstalled] = useState(false);
@@ -29,10 +30,12 @@ export const SmartAppInstallPrompt: React.FC<SmartAppInstallPromptProps> = ({
       window.matchMedia('(display-mode: standalone)').matches;
     setIsStandalone(standaloneCheck);
 
-    // 2. Detect iOS / iPadOS Safari
+    // 2. Detect OS (iOS / Android)
     const userAgent = window.navigator.userAgent.toLowerCase();
     const isIOSDevice = /iphone|ipad|ipod/.test(userAgent) && !(window as any).MSStream;
+    const isAndroidDevice = /android/.test(userAgent);
     setIsIOS(isIOSDevice);
+    setIsAndroid(isAndroidDevice);
 
     // 3. Android / Chrome beforeinstallprompt
     const handleBeforeInstall = (e: Event) => {
@@ -251,17 +254,21 @@ export const SmartAppInstallPrompt: React.FC<SmartAppInstallPromptProps> = ({
                   flexShrink: 0,
                   boxShadow: '0 2px 6px rgba(0,0,0,0.04)'
                 }}>
-                  <Share size={18} />
+                  {isAndroid ? <Smartphone size={18} /> : <Share size={18} />}
                 </div>
                 <div>
                   <span style={{ fontSize: '0.70rem', fontWeight: 800, color: isCampus ? '#16a34a' : '#ca8a04', textTransform: 'uppercase' }}>
                     Schritt 1
                   </span>
                   <div style={{ fontSize: '0.84rem', fontWeight: 750, color: '#0f172a' }}>
-                    Tippe in Safari auf das <strong>Teilen-Symbol</strong>
+                    {isAndroid ? (
+                      <>Tippe in Chrome oben rechts auf das <strong>Dreipunkt-Menü (⋮)</strong></>
+                    ) : (
+                      <>Tippe in Safari auf das <strong>Teilen-Symbol</strong></>
+                    )}
                   </div>
                   <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
-                    (Unten in der Menüleiste deines iPhones/iPads)
+                    {isAndroid ? '(Rechts neben der Adressleiste)' : '(Unten in der Menüleiste deines iPhones/iPads)'}
                   </span>
                 </div>
               </div>
@@ -296,10 +303,14 @@ export const SmartAppInstallPrompt: React.FC<SmartAppInstallPromptProps> = ({
                     Schritt 2
                   </span>
                   <div style={{ fontSize: '0.84rem', fontWeight: 750, color: '#0f172a' }}>
-                    Wähle <strong>„Zum Home-Bildschirm“</strong>
+                    {isAndroid ? (
+                      <>Wähle <strong>„App installieren“</strong> oder „Zum Startbildschirm hinzufügen“</>
+                    ) : (
+                      <>Wähle <strong>„Zum Home-Bildschirm“</strong></>
+                    )}
                   </div>
                   <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
-                    Scrolle etwas nach unten und tippe auf „Hinzufügen“
+                    {isAndroid ? 'Bestätige mit „Installieren“' : 'Scrolle etwas nach unten und tippe auf „Hinzufügen“'}
                   </span>
                 </div>
               </div>

@@ -4,13 +4,14 @@ import {
   Download, Sliders, Smartphone, Copy, Check, ArrowRight, X, Calendar, Clock, 
   CheckCircle2, AlertCircle, Edit3, Eye, EyeOff, Shield, ShieldCheck, BookOpen, 
   MessageSquare, Mic, Lock, ChevronRight, ChevronLeft, User, Users,
-  Headphones, Zap, Volume2, RotateCcw
+  Headphones, Zap, Volume2, RotateCcw, Fingerprint, Sparkles
 } from 'lucide-react';
 import QRCode from 'react-qr-code';
 import { getInstrumentAvatarUrl, getDefaultMusicianAvatarUrl, resolveCampusStudentAvatar } from './StudioAvatar';
 import { StudentMobileScheduleWizard } from './StudentMobileScheduleWizard';
 import { IDBadgeCard } from './IDBadgeCard';
-import { downloadAppleWalletPass } from '../utils/walletPassGenerator';
+import { downloadAppleWalletPass, generateGoogleWalletPassUrl } from '../utils/walletPassGenerator';
+import { isWebAuthnSupported, registerBiometrics } from '../utils/webauthn';
 import { SmartAppInstallPrompt } from './ui/SmartAppInstallPrompt';
 import { LegalTextModal } from './LegalTextModal';
 import { logSecurityEvent } from '../services/auditLogService';
@@ -46,6 +47,30 @@ export const StudentOnboardingPage: React.FC<StudentOnboardingPageProps> = ({ to
 
   // Apple HIG Onboarding Wizard State (1: Modus, 2: PIN & Kinderschutz, 3: Freigabe)
   const [onboardingStep, setOnboardingStep] = useState<1 | 2 | 3>(1);
+
+  // 📱 Smart OS & Hardware Biometrics Detection
+  const [isIOS, setIsIOS] = useState(false);
+  const [isAndroid, setIsAndroid] = useState(false);
+  const [isWebAuthnAvailable, setIsWebAuthnAvailable] = useState(false);
+  const [registeringBiometrics, setRegisteringBiometrics] = useState(false);
+  const [biometricsRegistered, setBiometricsRegistered] = useState(false);
+  const [biometricsError, setBiometricsError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const ua = window.navigator.userAgent.toLowerCase();
+      const isIOSDevice = /iphone|ipad|ipod/.test(ua) && !(window as any).MSStream;
+      const isAndroidDevice = /android/.test(ua);
+      setIsIOS(isIOSDevice);
+      setIsAndroid(isAndroidDevice);
+
+      if (window.PublicKeyCredential && typeof window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable === 'function') {
+        window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()
+          .then(res => setIsWebAuthnAvailable(Boolean(res)))
+          .catch(() => setIsWebAuthnAvailable(false));
+      }
+    }
+  }, []);
 
   // 🛡️ Granulare Kinderschutz-Freigaben (100% Privacy by Default / Opt-In gem. Art. 25 Abs. 2 DSGVO)
   // CLUSTER 1: Pädagogik & Unterricht (Didaktik)
@@ -407,27 +432,16 @@ export const StudentOnboardingPage: React.FC<StudentOnboardingPageProps> = ({ to
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault();
       setDeferredPrompt(e);
-      if (consentSaved) {
-        setShowNotification(true);
-      }
+      // Double banner eliminated: Floating notification is suppressed in post-activation
+      // as the dedicated install card is already prominently displayed
     };
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
 
-    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (navigator as any).standalone;
-    
-    let timer: any;
-    if (consentSaved && !isStandalone) {
-      timer = setTimeout(() => {
-        setShowNotification(true);
-      }, 1500);
-    }
-
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-      if (timer) clearTimeout(timer);
     };
-  }, [consentSaved]);
+  }, []);
 
   const handleInstallClick = async () => {
     if (deferredPrompt) {
@@ -463,6 +477,78 @@ export const StudentOnboardingPage: React.FC<StudentOnboardingPageProps> = ({ to
       qrToken: student.qr_token || student.id,
       isCampus: Boolean(isCampusMode)
     });
+  };
+
+  const handleGoogleWalletSave = () => {
+    if (!student || !consentSaved) return;
+    const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams();
+    const platformParam = urlParams.get('platform');
+    const isCampusMode = platformParam === 'campus' || (platformParam !== 'groovelab' && student.is_campus_active && !student.is_groovelab_active);
+
+    const saveUrl = generateGoogleWalletPassUrl({
+      schoolName: school?.name || 'Campus-Groovelab',
+      userName: `${student.first_name || ''} ${student.last_name || ''}`.trim() || 'Schüler',
+      userRole: 'Schüler',
+      instrument: student.instrument || 'Instrument',
+      qrToken: student.qr_token || student.id,
+      isCampus: Boolean(isCampusMode)
+    });
+
+    window.open(saveUrl, '_blank', 'noopener,noreferrer');
+  };
+
+  const handleRegisterParentBiometrics = async () => {
+    if (!student?.id) return;
+    if (parentPin6.length !== 6) {
+      setBiometricsError('Bitte gib zuerst deine 6-stellige Eltern-PIN ein.');
+      return;
+    }
+    setRegisteringBiometrics(true);
+    setBiometricsError(null);
+    try {
+      // 1. Authoritative challenge from server
+      const { data: chalData, error: chalErr } = await supabase.rpc('generate_webauthn_challenge', {
+        p_user_id: student.id,
+        p_type: 'register'
+      });
+
+      if (chalErr || !chalData?.challenge) {
+        throw new Error('Sicherheits-Challenge konnte nicht bezogen werden.');
+      }
+
+      const email = `eltern.${student.first_name?.toLowerCase() || 'schueler'}@campus-groovelab.local`;
+      const passkeyResult = await registerBiometrics(
+        email,
+        student.id,
+        chalData.challenge,
+        `Eltern-Gerät • ${student.first_name || 'Kind'}`
+      );
+
+      // 2. Authoritative server binding
+      const { data: regResult, error: regErr } = await supabase.rpc('register_webauthn_credential', {
+        p_user_id: student.id,
+        p_credential_id: passkeyResult.id,
+        p_public_key: JSON.stringify(passkeyResult.response),
+        p_device_name: isIOS ? 'Apple Face/Touch ID' : isAndroid ? 'Android Fingerprint/Passkey' : 'Eltern-Passkey',
+        p_challenge: chalData.challenge
+      });
+
+      if (regErr || !regResult?.success) {
+        throw new Error(regErr?.message || regResult?.error || 'Passkey-Registrierung fehlgeschlagen.');
+      }
+
+      setBiometricsRegistered(true);
+    } catch (err: any) {
+      console.warn('[Onboarding] Biometrics registration note:', err);
+      // User cancellation should not break onboarding
+      if (err.name === 'NotAllowedError') {
+        setBiometricsError('Einrichtung abgebrochen.');
+      } else {
+        setBiometricsError(err.message || 'Passkey konnte nicht eingerichtet werden.');
+      }
+    } finally {
+      setRegisteringBiometrics(false);
+    }
   };
 
   const handleDownloadJPEG = () => {
@@ -889,7 +975,7 @@ Deine Vorteile auf einen Blick:
                 <div style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 600, marginTop: '2px' }}>
                   {consentSaved 
                     ? 'Alle Funktionen und Ausweise sind ab sofort aktiv.' 
-                    : `Schritt ${onboardingStep} von 3: ${onboardingStep === 1 ? 'Nutzungsmodus' : onboardingStep === 2 ? 'PIN & Kinderschutz' : 'Freigabe'}`
+                    : `Schritt ${onboardingStep} von 3: ${onboardingStep === 1 ? 'Nutzungsmodus' : onboardingStep === 2 ? 'PIN & Eltern-Sicherheit' : 'Freigabe & Terminschutz'}`
                   }
                 </div>
               </div>
@@ -1030,62 +1116,58 @@ Deine Vorteile auf einen Blick:
                     }}
                     className="hover-scale"
                   >
-                    <span>Weiter: PIN &amp; Kinderschutz</span>
+                    <span>Weiter: PIN &amp; Eltern-Sicherheit</span>
                     <ChevronRight size={16} />
                   </button>
                 </div>
               )}
 
-              {/* SCHRITT 2: ELTERN-PIN & KINDERSCHUTZ */}
+              {/* SCHRITT 2: FOKUSSIERTE ELTERN-SICHERHEIT (PIN & PASSKEY) */}
               {onboardingStep === 2 && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                  {/* PIN Setup Card */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  {/* Master PIN Input Card */}
                   <div style={{
-                    background: '#f8fafc',
-                    padding: '14px',
-                    borderRadius: '16px',
-                    border: '1px solid #e2e8f0',
+                    background: '#ffffff',
+                    padding: '20px 16px',
+                    borderRadius: '20px',
+                    border: '1.5px solid #e2e8f0',
+                    boxShadow: '0 4px 16px rgba(0,0,0,0.03)',
                     display: 'flex',
                     flexDirection: 'column',
-                    gap: '8px'
+                    alignItems: 'center',
+                    gap: '12px'
                   }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <label htmlFor="parent-pin-input" style={{ fontSize: '0.78rem', fontWeight: 800, color: '#0f172a' }}>
-                        1. Deine 6-stellige Eltern-PIN:
-                      </label>
-                      <span style={{
-                        fontSize: '0.68rem',
-                        fontWeight: 800,
-                        color: parentPin6.length === 6 ? '#15803d' : '#64748b',
-                        background: parentPin6.length === 6 ? '#dcfce7' : '#e2e8f0',
-                        padding: '2px 8px',
-                        borderRadius: '8px'
-                      }}>
-                        {parentPin6.length} / 6 Ziffern
-                      </span>
+                    <div style={{ textAlign: 'center' }}>
+                      <div style={{ fontSize: '0.90rem', fontWeight: 900, color: '#0f172a' }}>
+                        6-stellige Eltern-PIN festlegen
+                      </div>
+                      <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '2px', maxWidth: '300px' }}>
+                        Schützt deinen Elternbereich (Verträge, Kündigung, Lehrer-Chat). Dein Kind nutzt später seine eigene 4-stellige PIN.
+                      </div>
                     </div>
 
                     {/* Apple Passcode Indicator Dots */}
-                    <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', margin: '4px 0 6px 0' }}>
+                    <div style={{ display: 'flex', justifyContent: 'center', gap: '10px', margin: '6px 0' }}>
                       {[0, 1, 2, 3, 4, 5].map((i) => {
                         const isFilled = parentPin6.length > i;
                         return (
                           <div
                             key={i}
                             style={{
-                              width: '12px',
-                              height: '12px',
+                              width: '14px',
+                              height: '14px',
                               borderRadius: '50%',
                               border: `2px solid ${isFilled ? '#15803d' : '#cbd5e1'}`,
                               background: isFilled ? '#15803d' : '#ffffff',
-                              transition: 'all 0.15s ease'
+                              transform: isFilled ? 'scale(1.1)' : 'scale(1)',
+                              transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)'
                             }}
                           />
                         );
                       })}
                     </div>
 
-                    <div style={{ position: 'relative', width: '100%' }}>
+                    <div style={{ position: 'relative', width: '100%', maxWidth: '280px' }}>
                       <input
                         id="parent-pin-input"
                         type={showParentPin ? 'text' : 'password'}
@@ -1093,6 +1175,7 @@ Deine Vorteile auf einen Blick:
                         pattern="[0-9]*"
                         maxLength={6}
                         value={parentPin6}
+                        autoFocus
                         onChange={(e) => {
                           const val = e.target.value.replace(/\D/g, '');
                           if (val.length <= 6) setParentPin6(val);
@@ -1100,17 +1183,18 @@ Deine Vorteile auf einen Blick:
                         placeholder="••••••"
                         style={{
                           width: '100%',
-                          padding: '10px 44px 10px 14px',
-                          borderRadius: '12px',
-                          border: `1.5px solid ${parentPin6.length === 6 ? '#15803d' : '#cbd5e1'}`,
-                          fontSize: '1.05rem',
-                          fontWeight: 800,
-                          letterSpacing: '0.25em',
+                          padding: '12px 44px 12px 14px',
+                          borderRadius: '14px',
+                          border: `2px solid ${parentPin6.length === 6 ? '#15803d' : '#cbd5e1'}`,
+                          fontSize: '1.2rem',
+                          fontWeight: 900,
+                          letterSpacing: '0.3em',
                           textAlign: 'center',
                           boxSizing: 'border-box',
-                          background: '#ffffff',
+                          background: '#f8fafc',
                           color: '#0f172a',
-                          outline: 'none'
+                          outline: 'none',
+                          transition: 'border-color 0.2s'
                         }}
                         className="focus-ring"
                       />
@@ -1137,136 +1221,100 @@ Deine Vorteile auf einen Blick:
                       </button>
                     </div>
 
-                    <div style={{ fontSize: '0.68rem', color: '#64748b', lineHeight: 1.4 }}>
-                      Master-PIN für den Elternbereich. Dein Kind wählt seine 4-stellige Schüler-PIN beim ersten Start selbst.
+                    <div style={{ fontSize: '0.68rem', fontWeight: 700, color: parentPin6.length === 6 ? '#15803d' : '#94a3b8' }}>
+                      {parentPin6.length === 6 ? '✓ 6 Ziffern vollständig' : `${parentPin6.length} von 6 Ziffern eingegeben`}
                     </div>
                   </div>
 
-                    {/* 2. FREIGABEN: TERMINSCHUTZ & KINDERSCHUTZ (STAGE 1) */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 2px' }}>
-                        <span style={{ fontSize: '0.80rem', fontWeight: 850, color: '#0f172a' }}>
-                          2. Terminschutz &amp; Autonomie
-                        </span>
-                        <span style={{ fontSize: '0.66rem', fontWeight: 700, color: '#166534', background: '#dcfce7', padding: '2px 8px', borderRadius: '8px' }}>
-                          100% Privacy by Default
-                        </span>
-                      </div>
-
-                      {/* Info-Kasten Inklusivleistungen */}
-                      <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px',
-                        fontSize: '0.72rem',
-                        color: '#166534',
-                        fontWeight: 700,
-                        background: '#f0fdf4',
-                        padding: '10px 12px',
-                        borderRadius: '12px',
-                        border: '1px solid #bbf7d0'
-                      }}>
-                        <BookOpen size={16} color="#15803d" style={{ flexShrink: 0 }} />
-                        <span>Hausaufgabenheft, alle Schuljahrestermine &amp; 1:1 Eltern-Lehrer-Chat sind kostenfrei inklusive.</span>
-                      </div>
-
-                      {/* CLUSTER: Termine & Vertragsschutz (§§ 106, 615 BGB) */}
-                      <div style={{
-                        background: '#ffffff',
-                        padding: '14px',
-                        borderRadius: '16px',
-                        border: '1px solid #e2e8f0',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '8px'
-                      }}>
-                        <div style={{ fontSize: '0.74rem', fontWeight: 800, color: '#7c3aed', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <Calendar size={13} color="#8b5cf6" />
-                          <span>Termine &amp; Verbindliche Absagen</span>
+                  {/* Optionaler Eltern-Passkey (Face ID / Fingerabdruck) */}
+                  {parentPin6.length === 6 && (
+                    <div style={{
+                      background: biometricsRegistered ? '#f0fdf4' : '#f8fafc',
+                      border: `1.5px solid ${biometricsRegistered ? '#bbf7d0' : '#e2e8f0'}`,
+                      borderRadius: '18px',
+                      padding: '14px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '10px',
+                      animation: 'fadeIn 0.2s ease'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <div style={{
+                          width: '36px',
+                          height: '36px',
+                          borderRadius: '10px',
+                          background: biometricsRegistered ? '#dcfce7' : '#ffffff',
+                          color: biometricsRegistered ? '#15803d' : '#475569',
+                          border: '1px solid #e2e8f0',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flexShrink: 0
+                        }}>
+                          <Fingerprint size={20} />
                         </div>
-
-                        {/* Toggle: Terminabsagen */}
-                        <label style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          gap: '12px',
-                          padding: '10px 12px',
-                          borderRadius: '12px',
-                          background: parentAllowAbsences ? '#f0fdf4' : '#f8fafc',
-                          border: parentAllowAbsences ? '1.5px solid #86efac' : '1px solid #f1f5f9',
-                          cursor: 'pointer',
-                          transition: 'all 0.2s ease'
-                        }}>
-                          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
-                            <div style={{ marginTop: '2px', color: parentAllowAbsences ? '#15803d' : '#64748b' }}>
-                              <Calendar size={16} />
-                            </div>
-                            <div>
-                              <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#0f172a' }}>
-                                Kind darf Termine selbstständig absagen
-                              </div>
-                              <div style={{ fontSize: '0.66rem', color: '#64748b', marginTop: '2px', lineHeight: 1.3 }}>
-                                Wenn deaktiviert, können Stunden nur durch Erziehungsberechtigte mit Eltern-PIN abgesagt werden (§ 106 BGB).
-                              </div>
-                            </div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: '0.80rem', fontWeight: 850, color: '#0f172a' }}>
+                            {isIOS ? 'Face ID / Touch ID für Elternbereich' : isAndroid ? 'Fingerabdruck für Elternbereich' : 'Biometrischer Passkey (Optional)'}
                           </div>
-                          <input
-                            type="checkbox"
-                            checked={parentAllowAbsences}
-                            onChange={(e) => setParentAllowAbsences(e.target.checked)}
-                            style={{ accentColor: '#15803d', width: '18px', height: '18px', cursor: 'pointer', flexShrink: 0 }}
-                          />
-                        </label>
-
-                        {/* Toggle: Ausweichtermine annehmen */}
-                        <label style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          gap: '12px',
-                          padding: '10px 12px',
-                          borderRadius: '12px',
-                          background: parentAllowReschedule ? '#f0fdf4' : '#f8fafc',
-                          border: parentAllowReschedule ? '1.5px solid #86efac' : '1px solid #f1f5f9',
-                          cursor: 'pointer',
-                          transition: 'all 0.2s ease'
-                        }}>
-                          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
-                            <div style={{ marginTop: '2px', color: parentAllowReschedule ? '#15803d' : '#64748b' }}>
-                              <RotateCcw size={16} />
-                            </div>
-                            <div>
-                              <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#0f172a' }}>
-                                Ausweichtermine eigenständig annehmen
-                              </div>
-                              <div style={{ fontSize: '0.66rem', color: '#64748b', marginTop: '2px', lineHeight: 1.3 }}>
-                                Erlaubt deinem Kind, Terminvorschläge der Lehrkraft direkt verbindlich zu bestätigen.
-                              </div>
-                            </div>
+                          <div style={{ fontSize: '0.68rem', color: '#64748b', lineHeight: 1.35, marginTop: '1px' }}>
+                            {biometricsRegistered 
+                              ? 'Passkey auf diesem Eltern-Gerät aktiv. Elternbereich öffnet ohne PIN-Eingabe.' 
+                              : 'Künftig ohne PIN-Tippen direkt mit 1 Blick/Finger in den Elternbereich.'}
                           </div>
-                          <input
-                            type="checkbox"
-                            checked={parentAllowReschedule}
-                            onChange={(e) => setParentAllowReschedule(e.target.checked)}
-                            style={{ accentColor: '#15803d', width: '18px', height: '18px', cursor: 'pointer', flexShrink: 0 }}
-                          />
-                        </label>
+                        </div>
                       </div>
 
-                      {/* Dezent-Hinweis auf spätere Pädagogik-Aktivierung */}
-                      <div style={{
-                        padding: '8px 12px',
-                        background: '#f8fafc',
-                        borderRadius: '12px',
-                        border: '1px solid #e2e8f0',
-                        fontSize: '0.68rem',
-                        color: '#64748b',
-                        lineHeight: 1.35
-                      }}>
-                        💡 <strong>Hinweis:</strong> Pädagogische Funktionen (wie Übe-Timer, Loopstation &amp; Schüler-Chat) greifen erst bei einer späteren Aktivierung der Campus-App.
+                      {!biometricsRegistered ? (
+                        <button
+                          type="button"
+                          onClick={handleRegisterParentBiometrics}
+                          disabled={registeringBiometrics}
+                          style={{
+                            width: '100%',
+                            background: '#0f172a',
+                            color: '#ffffff',
+                            border: 'none',
+                            borderRadius: '12px',
+                            padding: '10px',
+                            fontSize: '0.78rem',
+                            fontWeight: 800,
+                            cursor: registeringBiometrics ? 'wait' : 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '8px',
+                            transition: 'all 0.15s'
+                          }}
+                        >
+                          <Fingerprint size={16} />
+                          <span>{registeringBiometrics ? 'Wird gekoppelt...' : (isIOS ? 'Face ID / Touch ID aktivieren' : 'Fingerabdruck aktivieren')}</span>
+                        </button>
+                      ) : (
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          fontSize: '0.74rem',
+                          fontWeight: 800,
+                          color: '#166534'
+                        }}>
+                          <CheckCircle2 size={16} color="#16a34a" />
+                          <span>Dieses Gerät ist als vertrauenswürdiges Eltern-Gerät gekoppelt</span>
+                        </div>
+                      )}
+
+                      {biometricsError && (
+                        <div style={{ fontSize: '0.68rem', color: '#b91c1c', fontWeight: 700 }}>
+                          {biometricsError}
+                        </div>
+                      )}
+
+                      <div style={{ fontSize: '0.65rem', color: '#94a3b8', lineHeight: 1.3 }}>
+                        🔒 <strong>Schutzgrenze:</strong> Dein Kind nutzt auf seinem Gerät seine eigene 4-stellige PIN und hat keinen Zugriff auf den Elternbereich.
                       </div>
                     </div>
+                  )}
 
                   {/* Back & Next Buttons */}
                   <div style={{ display: 'flex', gap: '8px' }}>
@@ -1666,52 +1714,103 @@ Deine Vorteile auf einen Blick:
               </button>
             </div>
 
-            {/* 3. Wallet Buttons */}
-            <div style={{ display: 'flex', gap: '8px' }}>
+            {/* 3. Smarte geräte-adaptive Wallet & Ausweis-Optionen */}
+            {isAndroid ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <button 
+                  onClick={handleGoogleWalletSave}
+                  style={{ 
+                    width: '100%', 
+                    background: '#0f172a', 
+                    color: '#ffffff', 
+                    border: 'none', 
+                    borderRadius: '14px', 
+                    padding: '11px 14px', 
+                    fontSize: '0.80rem', 
+                    fontWeight: 800, 
+                    cursor: 'pointer', 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center', 
+                    gap: '8px',
+                    boxShadow: '0 4px 12px rgba(15, 23, 42, 0.15)'
+                  }}
+                  className="hover-scale"
+                >
+                  <Smartphone size={16} />
+                  <span>Zu Google Wallet hinzufügen</span>
+                </button>
+              </div>
+            ) : isIOS ? (
               <button 
                 onClick={handleAppleWalletPassDownload}
                 style={{ 
-                  flex: 1, 
+                  width: '100%', 
                   background: '#000000', 
                   color: '#ffffff', 
                   border: 'none', 
-                  borderRadius: '12px', 
-                  padding: '9px 12px', 
-                  fontSize: '0.74rem', 
+                  borderRadius: '14px', 
+                  padding: '11px 14px', 
+                  fontSize: '0.80rem', 
                   fontWeight: 800, 
                   cursor: 'pointer', 
                   display: 'flex', 
                   alignItems: 'center', 
                   justifyContent: 'center', 
-                  gap: '6px'
+                  gap: '8px',
+                  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)'
                 }}
+                className="hover-scale"
               >
-                <Download size={13} /> <span>Apple Wallet Pass</span>
+                <Download size={15} />
+                <span>Zu Apple Wallet hinzufügen (.pkpass)</span>
               </button>
+            ) : (
+              /* Desktop / Allgemein: Beide Optionen mit klarer Kennzeichnung */
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button 
+                  onClick={handleAppleWalletPassDownload}
+                  style={{ 
+                    flex: 1, 
+                    background: '#000000', 
+                    color: '#ffffff', 
+                    border: 'none', 
+                    borderRadius: '12px', 
+                    padding: '9px 12px', 
+                    fontSize: '0.74rem', 
+                    fontWeight: 800, 
+                    cursor: 'pointer', 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center', 
+                    gap: '6px'
+                  }}
+                >
+                  <Download size={13} /> <span>Apple Wallet</span>
+                </button>
 
-              <button 
-                onClick={() => {
-                  setWalletGuide(walletGuide === 'google' ? null : 'google');
-                }}
-                style={{ 
-                  flex: 1, 
-                  background: '#0f172a', 
-                  color: '#ffffff', 
-                  border: 'none', 
-                  borderRadius: '12px', 
-                  padding: '9px 12px', 
-                  fontSize: '0.74rem', 
-                  fontWeight: 800, 
-                  cursor: 'pointer', 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  justifyContent: 'center', 
-                  gap: '6px'
-                }}
-              >
-                <span>Google Wallet</span>
-              </button>
-            </div>
+                <button 
+                  onClick={handleGoogleWalletSave}
+                  style={{ 
+                    flex: 1, 
+                    background: '#0f172a', 
+                    color: '#ffffff', 
+                    border: 'none', 
+                    borderRadius: '12px', 
+                    padding: '9px 12px', 
+                    fontSize: '0.74rem', 
+                    fontWeight: 800, 
+                    cursor: 'pointer', 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center', 
+                    gap: '6px'
+                  }}
+                >
+                  <Smartphone size={13} /> <span>Google Wallet</span>
+                </button>
+              </div>
+            )}
 
             {/* 4. Smart App Install Prompt (PWA / Home Screen Guide) */}
             <div style={{ marginTop: '2px', width: '100%' }}>
