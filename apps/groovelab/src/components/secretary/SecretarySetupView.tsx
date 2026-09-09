@@ -1104,6 +1104,12 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
                               Hinzufügen
                             </button>
                           </div>
+                          
+                          {/* Datenschutz- & Souveränitätshinweis für externe Feeds */}
+                          <div style={{ marginTop: '10px', padding: '10px 12px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', fontSize: '0.74rem', color: '#64748b', lineHeight: 1.45, display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                            <span style={{ fontSize: '0.9rem', flexShrink: 0 }}>🛡️</span>
+                            <span><strong>Datenschutz-Hinweis (Art. 28 DSGVO):</strong> Externe Feeds (z.&nbsp;B. Google Calendar, Apple iCloud oder Schulserver) werden von Campus-Groovelab ausschließlich passiv und ohne Weitergabe von Schülerdaten an Dritte im deutschen Hetzner-Rechenzentrum verarbeitet. Bitte stellen Sie als verantwortliche Stelle sicher, dass in externen iCal-Feeds keine vertraulichen personenbezogenen Klarnamen oder Gesundheitsdaten enthalten sind, sofern hierfür keine gesonderte Rechtsgrundlage vorliegt.</span>
+                          </div>
                         </div>
                       </div>
                     )}
