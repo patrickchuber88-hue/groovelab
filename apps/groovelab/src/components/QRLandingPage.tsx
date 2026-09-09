@@ -5505,12 +5505,19 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
       const sName = profile?.first_name || 'Schüler';
       const sSchool = profile?.school_name || 'Campus-Groovelab';
       const lines: string[] = [];
-      lines.push(`🎵 Campus-Groovelab • ${sSchool}`);
-      lines.push(`Wochenplan (KW ${currentKw}) für ${sName}`);
+      const divider = '────────────────────────────────────────';
+
+      lines.push(`Hallo ${sName},`);
+      lines.push('');
+      lines.push('hier ist dein Wochenplan mit den aktuellen Übezielen aus unserem Unterricht:');
+      lines.push('');
+      lines.push(divider);
+      lines.push(`ÜBE-ZIELE • KW ${currentKw}`);
+      lines.push(divider);
       lines.push('');
 
       if (lehrwerkeList.length > 0) {
-        lines.push('📖 LEHRWERKE:');
+        lines.push('LEHRWERKE');
         lehrwerkeList.forEach((lw: any) => {
           const pagesStr = lw.pages && lw.pages.length > 0 ? ` (Seite ${lw.pages.join(', ')})` : '';
           lines.push(`• ${lw.title}${pagesStr}`);
@@ -5519,7 +5526,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
       }
 
       if (otherHWs.length > 0) {
-        lines.push('🎵 SONGS & THEMEN:');
+        lines.push('SONGS & REPERTOIRE');
         otherHWs.forEach((it: any) => {
           const t = (it.topic_name || it.title || '').replace(/\s*\([^)]*\)\s*$/, '');
           lines.push(`• ${t}`);
@@ -5528,15 +5535,27 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
       }
 
       if (notesList.length > 0) {
-        lines.push('📝 NOTIZEN:');
+        lines.push('NOTIZEN');
         notesList.forEach((n: string) => {
           lines.push(`• ${cleanHomeworkNotesText(n)}`);
         });
         lines.push('');
       }
 
-      lines.push('📱 Web-App & Aufnahmen:');
+      lines.push(divider);
+      lines.push('INTERAKTIVE WEB-APP');
+      lines.push('Unterrichtsaufnahmen, Song-Bibliothek und Übe-Timer:');
       lines.push(window.location.href);
+
+      const assignedTeacher = teachers.find(t => t.id === profile?.teacher_id);
+      const teacherName = formatTeacherFullName(assignedTeacher || (profile as any)?.teacher_name || (profile as any)?.teacher);
+      if (teacherName && teacherName !== 'Lehrkraft') {
+        lines.push('');
+        lines.push('Herzliche Grüße');
+        lines.push(teacherName);
+        const closingSchool = !sSchool.toLowerCase().includes('campus-groovelab') ? `${sSchool} • Campus-Groovelab` : sSchool;
+        lines.push(closingSchool);
+      }
 
       return lines.join('\n');
     };

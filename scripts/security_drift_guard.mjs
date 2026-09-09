@@ -116,7 +116,7 @@ function walkDir(dir, filterExt = ['.ts', '.tsx', '.js', '.jsx']) {
 }
 
 // 1. SCAN FRONTEND SOURCE CODE
-console.log('📂 [1/3] Scanning Frontend Source Code (apps/groovelab/src)...');
+console.log('📂 [1/4] Scanning Frontend Source Code (apps/groovelab/src)...');
 const frontendFiles = walkDir(SRC_DIR);
 
 for (const filePath of frontendFiles) {
@@ -141,7 +141,7 @@ for (const filePath of frontendFiles) {
 }
 
 // 2. SCAN SQL MIGRATIONS FOR RLS DEFICIENCIES & DML SHIELDS
-console.log('\n📂 [2/3] Scanning Database Migrations (supabase/migrations)...');
+console.log('\n📂 [2/4] Scanning Database Migrations (supabase/migrations)...');
 const migrationFiles = walkDir(MIGRATIONS_DIR, ['.sql']);
 
 let latestDmlMigration = null;
@@ -161,6 +161,25 @@ for (const filePath of migrationFiles) {
       if (num > highestDmlMigrationNum) {
         highestDmlMigrationNum = num;
         latestDmlMigration = { file: relPath, content, baseName };
+      }
+    }
+  }
+
+  // Future Migration Guard: Enforce search_path pinning on SECURITY DEFINER functions (OWASP ASVS V10.1)
+  const migNumberMatch = baseName.match(/^(\d+)_/);
+  if (migNumberMatch) {
+    const migNum = parseInt(migNumberMatch[1], 10);
+    if (migNum >= 392) {
+      const secDefinerMatches = content.match(/CREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION[\s\S]*?SECURITY\s+DEFINER[\s\S]*?(?:\$\$|BEGIN)/gi);
+      if (secDefinerMatches) {
+        for (const block of secDefinerMatches) {
+          if (!block.toLowerCase().includes('search_path') && !content.includes('SET search_path')) {
+            console.error(`\n❌ [VIOLATION] [CRITICAL] Unpinned SECURITY DEFINER function in new migration`);
+            console.error(`   File: ${relPath}`);
+            console.error(`   Details: Any new SECURITY DEFINER function must explicitly pin 'SET search_path = public, pg_temp, extensions' to prevent search_path hijacking.`);
+            violationsCount++;
+          }
+        }
       }
     }
   }
@@ -199,7 +218,7 @@ if (latestDmlMigration) {
 }
 
 // 3. FINOPS ARCHITECTURAL INVARIANT & MRR CONSISTENCY GUARD
-console.log('\n📂 [3/3] Running FinOps Determinism & Billing Invariant Test Suite...');
+console.log('\n📂 [3/4] Running FinOps Determinism & Billing Invariant Test Suite...');
 import { execSync } from 'child_process';
 try {
   execSync('npx tsx src/domain/__tests__/runBillingInvariantTests.ts', {
@@ -209,6 +228,20 @@ try {
   console.log('   ✅ FinOps Invariant Verified: 100% Deterministic (Live MRR 68.92 € / Mo., ARR 827.04 € / Jahr).');
 } catch (err) {
   console.error('   🚨 FinOps Invariant Check FAILED: Billing engine deviation detected!');
+  console.error(err.stdout || err.message);
+  violationsCount++;
+}
+
+// 4. FORENSIC RLS & SCHEMA CATALOG INVARIANT GUARD
+console.log('\n📂 [4/4] Running Forensic RLS & Schema Catalog Invariant Audit...');
+try {
+  execSync('npx tsx scripts/verify_rls_catalog_invariants.ts', {
+    cwd: ROOT_DIR,
+    encoding: 'utf-8'
+  });
+  console.log('   ✅ All 13 Forensic Architecture & Performance Invariants Verified: 100% Deterministic.');
+} catch (err) {
+  console.error('   🚨 Forensic RLS Catalog Invariant Check FAILED: Schema invariant violation detected!');
   console.error(err.stdout || err.message);
   violationsCount++;
 }

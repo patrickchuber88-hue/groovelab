@@ -20,7 +20,6 @@ import { usePremiumOnboardingTour, TourStartButton, TourStep } from './PremiumOn
 import { CampusGroovelabBrand, CampusGroovelabText, CampusGroovelabLogo } from './CampusGroovelabBrand';
 import QRCode from 'react-qr-code';
 import { getInstrumentAvatarUrl } from './StudioAvatar';
-import { QRCodeModal } from './QRCodeModal';
 import { UpdateAnnouncementHero } from './common/UpdateAnnouncementHero';
 import { ResponsiveContainer, PieChart as RechartsPieChart, Pie, Cell } from 'recharts';
 import { StudentToDelete } from './ConfirmDeleteStudentModal';
@@ -28,6 +27,7 @@ import { deleteStudentFully } from '../utils/studentDeletionService';
 import { getParentOnboardingUrl, isDevEnvironment } from '../utils/tenantUrlHelper';
 
 // Lazy load heavy auxiliary modals and views on demand
+const QRCodeModal = lazy(() => import('./QRCodeModal').then(m => ({ default: m.QRCodeModal })));
 const SecretaryAnnouncementsView = lazy(() => import('./secretary/SecretaryAnnouncementsView').then(m => ({ default: m.SecretaryAnnouncementsView })));
 const SecretaryCrisisView = lazy(() => import('./secretary/SecretaryCrisisView').then(m => ({ default: m.SecretaryCrisisView })));
 const SecretaryEquipmentView = lazy(() => import('./secretary/SecretaryEquipmentView').then(m => ({ default: m.SecretaryEquipmentView })));
@@ -52,11 +52,11 @@ const ConfirmDeleteStudentModal = lazy(() => import('./ConfirmDeleteStudentModal
 const BulkImportModal = lazy(() => import('./common/BulkImportModal').then(m => ({ default: m.BulkImportModal })));
 const GuidanceCenterModal = lazy(() => import('./modals/GuidanceCenterModal').then(m => ({ default: m.GuidanceCenterModal })));
 const ParentInfoSheetModal = lazy(() => import('./modals/ParentInfoSheetModal').then(m => ({ default: m.ParentInfoSheetModal })));
-import { LegalTextModal } from './LegalTextModal';
+const LegalTextModal = lazy(() => import('./LegalTextModal').then(m => ({ default: m.LegalTextModal })));
+const SchoolDunningPayModal = lazy(() => import('./secretary/SchoolDunningPayModal').then(m => ({ default: m.SchoolDunningPayModal })));
 import { calculateSchoolYearDirectBilling, calculateTransitionEffectiveDate } from '../utils/epcGiroCode';
 import { generateTariffReceiptPDF } from '../utils/tariffReceiptPdfGenerator';
 import { computeSchoolDunningStatus, SchoolDunningStatus, getDunningVisualConfig } from '../domain/schoolDunningEngine';
-import { SchoolDunningPayModal } from './secretary/SchoolDunningPayModal';
 import { 
   fetchSchoolRoster, 
   getTeacherRoster, 
@@ -13268,11 +13268,9 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                   <span style={{ fontSize: '0.92rem', fontWeight: 800, color: '#1d1d1f', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                     {teacherName}
                                   </span>
-                                  {t.email && (
-                                    <span style={{ fontSize: '0.74rem', color: '#86868b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                      {t.email}
-                                    </span>
-                                  )}
+                                  <span style={{ fontSize: '0.74rem', color: t.email ? '#86868b' : '#9ca3af', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                    {t.email || 'Keine E-Mail hinterlegt'}
+                                  </span>
                                 </div>
                               </div>
 
@@ -18472,7 +18470,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                               }}>
                                 <div style={{ display: 'flex', flexDirection: 'column' }}>
                                   <strong style={{ fontSize: '0.8rem', color: '#0f172a', fontFamily: 'Urbanist' }}>{name}</strong>
-                                  <span style={{ fontSize: '0.68rem', color: '#64748b', fontFamily: 'Inter' }}>{t.email} • {t.instrument || 'Kein Instrument'}</span>
+                                  <span style={{ fontSize: '0.68rem', color: '#64748b', fontFamily: 'Inter' }}>{t.email ? `${t.email} • ` : ''}{t.instrument || 'Kein Instrument'}</span>
                                 </div>
                                 <button
                                   type="button"
@@ -23400,33 +23398,39 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
 
       {/* Canonical Legal Text Modal (Single Source of Truth) */}
       {(showAgb || showPrivacy) && (
-        <LegalTextModal
-          isOpen={showAgb || showPrivacy}
-          onClose={() => {
-            setShowAgb(false);
-            setShowPrivacy(false);
-          }}
-          initialTab={showAgb ? 'terms' : 'privacy'}
-        />
+        <Suspense fallback={null}>
+          <LegalTextModal
+            isOpen={showAgb || showPrivacy}
+            onClose={() => {
+              setShowAgb(false);
+              setShowPrivacy(false);
+            }}
+            initialTab={showAgb ? 'terms' : 'privacy'}
+          />
+        </Suspense>
       )}
 
       {/* Modal: B2B Delinquency EPC-QR Sofortausgleich */}
-      <SchoolDunningPayModal
-        isOpen={showDunningPayModal}
-        onClose={() => setShowDunningPayModal(false)}
-        dunningStatus={dunningStatus}
-        schoolName={schoolName || currentSchoolProfile?.name || 'Musikschule'}
-        operatorCompany={operatorCompany}
-        operatorIban={operatorIban}
-        operatorBic={operatorBic}
-        onGoToLicenses={() => {
-          setActiveTab('secretary');
-          setSecretarySubTab('licenses');
-        }}
-        onActivateTrustExtension={() => {
-          setTrustRefreshToken(Date.now());
-        }}
-      />
+      {showDunningPayModal && (
+        <Suspense fallback={null}>
+          <SchoolDunningPayModal
+            isOpen={showDunningPayModal}
+            onClose={() => setShowDunningPayModal(false)}
+            dunningStatus={dunningStatus}
+            schoolName={schoolName || currentSchoolProfile?.name || 'Musikschule'}
+            operatorCompany={operatorCompany}
+            operatorIban={operatorIban}
+            operatorBic={operatorBic}
+            onGoToLicenses={() => {
+              setActiveTab('secretary');
+              setSecretarySubTab('licenses');
+            }}
+            onActivateTrustExtension={() => {
+              setTrustRefreshToken(Date.now());
+            }}
+          />
+        </Suspense>
+      )}
 
       {/* Floating Developer Reset Button (Dev Mode Only) */}
       {isDevEnvironment() && typeof window !== 'undefined' && localStorage.getItem('show_dev_reset_button') === 'true' && activeTab === 'secretary' && secretarySubTab === 'licenses' && (
@@ -23467,14 +23471,16 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
       )}
       {/* Modal: QR Code / Ausweis anzeigen */}
       {(showOwnQrModal || qrModalUser) && (
-        <QRCodeModal 
-          user={qrModalUser || currentUserProfile} 
-          activePlatform={qrModalUser ? "campus" : "secretary"} 
-          onClose={() => {
-            setShowOwnQrModal(false);
-            setQrModalUser(null);
-          }} 
-        />
+        <Suspense fallback={null}>
+          <QRCodeModal 
+            user={qrModalUser || currentUserProfile} 
+            activePlatform={qrModalUser ? "campus" : "secretary"} 
+            onClose={() => {
+              setShowOwnQrModal(false);
+              setQrModalUser(null);
+            }} 
+          />
+        </Suspense>
       )}
       {showPilotAgreementModalFromDashboard && userId && (
         <Suspense fallback={null}>

@@ -8529,6 +8529,7 @@ return (
                   }
                 }} 
                 teacherId={userId}
+                teacherName={formatTeacherFullName((occ as any)?.teacher || allSchoolTeachers?.find((t: any) => t.id === occ?.teacher_id || t.id === selectedTeacherId || t.id === userId))}
                 uiLevel={docStudent?.campus_ui_level || 'pro'}
                 hasTresorStorage={checkIsAudioTresorActive(docStudent)}
               />

@@ -549,6 +549,7 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
           e.stopPropagation();
           setIsLooping(!isLooping);
         }}
+        aria-label={isLooping ? 'Endlos-Schleife aktiv' : 'Endlos-Schleife aktivieren'}
         style={{
           border: isLooping ? '1.5px solid #16a34a' : '1px solid #cbd5e1',
           background: isLooping ? '#dcfce7' : '#ffffff',
@@ -578,6 +579,7 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
           e.stopPropagation();
           setCountInActive(!countInActive);
         }}
+        aria-label={countInActive ? '4-Beat Einzähler aktiv' : '4-Beat Einzähler aktivieren'}
         style={{
           border: countInActive ? '1.5px solid #16a34a' : '1px solid #cbd5e1',
           background: countInActive ? '#dcfce7' : '#ffffff',
@@ -611,6 +613,7 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
           const nextRate = rates[(rates.indexOf(playbackRate) + 1) % rates.length];
           setPlaybackRate(nextRate);
         }}
+        aria-label={`Wiedergabegeschwindigkeit ${Math.round(playbackRate * 100)} Prozent`}
         style={{
           border: playbackRate !== 1 ? '1.5px solid #16a34a' : '1px solid #cbd5e1',
           background: playbackRate !== 1 ? '#dcfce7' : '#ffffff',
@@ -650,6 +653,7 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
           e.stopPropagation();
           setIsEditorOpen(true);
         }}
+        aria-label="Studio Trimmer öffnen"
         style={{
           border: '1px solid #cbd5e1',
           background: '#ffffff',

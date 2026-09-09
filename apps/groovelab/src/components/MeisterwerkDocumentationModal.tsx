@@ -3,8 +3,6 @@ import { createPortal } from 'react-dom';
 import { X, Check, Award, Flame, AlertCircle, BookOpen, Music, History, Plus, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Book, Star, Sliders, RotateCcw, RotateCw, Mic, Square, Play, Pause, VolumeX, Volume2, Trash2, Headphones, Minimize2, Maximize2, Calendar, FileText, Zap, Clock, Info, Activity, ArrowLeft, Edit3, Disc, Search, Lock, Unlock, Share2, Sparkles, Radio, Download, Repeat, Timer, Scissors, Moon, Wrench, Hash, Filter, Target, User, Printer, MessageSquare, Mail, Copy, ExternalLink, HelpCircle, Hand, Lightbulb, MoreHorizontal, Pin, EyeOff, ArrowRightLeft } from 'lucide-react';
 import Confetti from 'react-confetti';
 import { supabase } from '../lib/supabase';
-// @ts-ignore
-import * as lamejs from '@breezystack/lamejs';
 import { GroovePracticeCompanion } from './groovelab/GroovePracticeCompanion';
 import { GrooveTrainerStudioView } from './campus/GrooveTrainerStudioView';
 import type { CustomPlaylist, CustomPlaylistTrack } from './campus/AudioBiographyView';
@@ -128,7 +126,12 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   parentPermissions: propParentPermissions,
   onSaveParentOverrides,
   isSoftLocked = false,
-  onTriggerSoftLock
+  onTriggerSoftLock,
+  initialLehrwerke,
+  initialSongs,
+  initialProgressItems,
+  initialLocalProgress,
+  onSongsUpdated
 }) => {
   const uiLevel: 'junior' | 'teen' | 'pro' = propUiLevel || (student as any)?.campus_ui_level || 'pro';
   const isSessionTeacher = typeof window !== 'undefined' && (() => {
@@ -300,7 +303,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
   const [studentInstrument, setStudentInstrument] = useState<string | null>(null);
   const [studentSchoolId, setStudentSchoolId] = useState<string | null>(null);
-  const [progressItems, setProgressItems] = useState<ProgressItem[]>([]);
+  const [progressItems, setProgressItems] = useState<ProgressItem[]>(() => initialProgressItems || []);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -400,10 +403,78 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     return parseStudentQuestionFromNotes(homeworkNotesList);
   }, [homeworkNotesList]);
 
+  const [resolvedTeacherName, setResolvedTeacherName] = useState<string>(() => {
+    if (propTeacherName && propTeacherName !== 'Lehrkraft' && propTeacherName !== 'deine Lehrkraft') {
+      return formatTeacherFullName(propTeacherName);
+    }
+    if ((student as any)?.teacher) {
+      const f = formatTeacherFullName((student as any).teacher);
+      if (f && f !== 'Lehrkraft') return f;
+    }
+    if ((student as any)?.teacher_name) {
+      const f = formatTeacherFullName((student as any).teacher_name);
+      if (f && f !== 'Lehrkraft') return f;
+    }
+    return '';
+  });
+
+  useEffect(() => {
+    if (propTeacherName && propTeacherName !== 'Lehrkraft' && propTeacherName !== 'deine Lehrkraft') {
+      setResolvedTeacherName(formatTeacherFullName(propTeacherName));
+      return;
+    }
+    if (!resolvedTeacherName) {
+      const cacheKeys = ['groovelab_cached_user', 'campus_cached_user', 'campus_user', 'groovelab_user'];
+      for (const k of cacheKeys) {
+        try {
+          const raw = sessionStorage.getItem(k) || localStorage.getItem(k);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (parsed && (parsed.role === 'teacher' || parsed.role === 'admin' || isTeacherMode)) {
+              const f = formatTeacherFullName(parsed);
+              if (f && f !== 'Lehrkraft') {
+                setResolvedTeacherName(f);
+                return;
+              }
+            }
+          }
+        } catch {}
+      }
+    }
+    const tid = teacherId || (student as any)?.teacher_id;
+    if (tid && tid !== 'teacher-self' && !resolvedTeacherName) {
+      supabase
+        .from('users')
+        .select('first_name, last_name')
+        .eq('id', tid)
+        .maybeSingle()
+        .then(
+          ({ data }) => {
+            if (data && (data.first_name || data.last_name)) {
+              const formatted = formatTeacherFullName(data);
+              if (formatted && formatted !== 'Lehrkraft') {
+                setResolvedTeacherName(formatted);
+              }
+            }
+          },
+          () => {}
+        );
+    }
+  }, [teacherId, (student as any)?.teacher_id, propTeacherName]);
+
   const effectiveTeacherFullName = useMemo(() => {
-    const raw = propTeacherName || (student as any)?.teacher_name || (student as any)?.teacher?.name || '';
-    return raw ? formatTeacherFullName(raw) : 'deine Lehrkraft';
-  }, [propTeacherName, student]);
+    if (resolvedTeacherName && resolvedTeacherName !== 'Lehrkraft') return resolvedTeacherName;
+    const raw = propTeacherName || (student as any)?.teacher_name || '';
+    if (raw) {
+      const f = formatTeacherFullName(raw);
+      if (f && f !== 'Lehrkraft') return f;
+    }
+    if ((student as any)?.teacher) {
+      const f = formatTeacherFullName((student as any).teacher);
+      if (f && f !== 'Lehrkraft') return f;
+    }
+    return 'Lehrkraft';
+  }, [resolvedTeacherName, propTeacherName, student]);
 
   const [isNotesFocused, setIsNotesFocused] = useState(false);
   const isNotesExpanded = isNotesFocused || !!generalHomeworkNotes.trim();
@@ -444,22 +515,68 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
   // Song catalog integration
   const [activeInputTab, setActiveInputTab] = useState<'free' | 'catalog' | 'lehrwerk_page' | 'active_song'>('free');
-  const [songs, setSongs] = useState<any[]>([]);
+  const [songs, setSongs] = useState<any[]>(() => initialSongs || []);
   const [songsLoading, setSongsLoading] = useState(false);
   const [songSearch, setSongSearch] = useState('');
   const [selectedSongId, setSelectedSongId] = useState<string>('');
   const [songPart, setSongPart] = useState('');
 
   // Lehrwerke assigned to student states
-  const [globalLehrwerke, setGlobalLehrwerke] = useState<any[]>([]);
-  const [assignedLehrwerke, setAssignedLehrwerke] = useState<any[]>([]);
+  const [globalLehrwerke, setGlobalLehrwerke] = useState<any[]>(() => initialLehrwerke || []);
+  const [assignedLehrwerke, setAssignedLehrwerke] = useState<any[]>(() => {
+    if (initialLocalProgress && Array.isArray(initialLocalProgress)) {
+      return initialLocalProgress.filter((item: any) => String(item.studentId) === String(student.id));
+    }
+    return [];
+  });
   const sortedAssignedLehrwerke = useMemo(() => {
-    return [...assignedLehrwerke].sort((a, b) => {
+    // 🛡️ Auto-healing: Merge any Lehrwerk found in progressItems or globalLehrwerke into assigned list and populate page states
+    const combined = assignedLehrwerke.map(a => ({ ...a, pageStates: { ...(a.pageStates || {}) } }));
+    (progressItems || []).forEach(item => {
+      if (item.topic_name && item.topic_name.includes(' - Seite ')) {
+        const parts = item.topic_name.split(' - Seite ');
+        const bookTitle = parts[0].trim();
+        const pageNum = parseInt(parts[1], 10);
+        const book = globalLehrwerke.find(g => (g.title || '').trim().toLowerCase() === bookTitle.toLowerCase());
+        const targetId = book?.id || `custom-${bookTitle.toLowerCase()}`;
+        let assignment = combined.find(a => String(a.lehrwerkId) === String(targetId) || ((a.bookTitle || a.lehrwerkTitle || '').trim().toLowerCase() === bookTitle.toLowerCase()));
+        if (!assignment) {
+          assignment = {
+            studentId: student.id,
+            lehrwerkId: targetId,
+            bookTitle: book?.title || bookTitle,
+            lehrwerkTitle: book?.title || bookTitle,
+            totalPages: book?.totalPages || book?.total_pages || 50,
+            assignedAt: item.created_at || item.updated_at || new Date().toISOString(),
+            pageStates: {}
+          };
+          combined.push(assignment);
+        }
+        if (!isNaN(pageNum) && assignment.pageStates) {
+          if (!assignment.pageStates[pageNum] || item.is_current_homework) {
+            let status: 'locked' | 'homework' | 'mastered' | 'purple' = 'locked';
+            if (item.status === 'MASTERED') status = 'mastered';
+            else if (item.status === 'THEORY_DONE') status = 'purple';
+            else if (item.is_current_homework) status = 'homework';
+
+            assignment.pageStates[pageNum] = {
+              ...(assignment.pageStates[pageNum] || {}),
+              status: assignment.pageStates[pageNum]?.status || status,
+              isCurrentHomework: Boolean(item.is_current_homework),
+              notes: item.teacher_notes || assignment.pageStates[pageNum]?.notes || '',
+              homework_notes: item.homework_notes || assignment.pageStates[pageNum]?.homework_notes || ''
+            };
+          }
+        }
+      }
+    });
+
+    return combined.sort((a, b) => {
       const timeA = a.assignedAt ? new Date(a.assignedAt).getTime() : 0;
       const timeB = b.assignedAt ? new Date(b.assignedAt).getTime() : 0;
       return timeB - timeA;
     });
-  }, [assignedLehrwerke]);
+  }, [assignedLehrwerke, progressItems, globalLehrwerke, student.id]);
   const [activeLehrwerkId, setActiveLehrwerkId] = useState<string | null>(null);
   const [activePageNumber, setActivePageNumber] = useState<number | null>(null);
   const [activeSubView, setActiveSubView] = useState<'hub' | 'lehrwerk' | 'song' | 'history'>('hub');
@@ -468,7 +585,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
   // Dual-Metacognition Match Model State
   const [studentRating, setStudentRating] = useState<number | null>(null);
-  const [isMatchModeEnabled, setIsMatchModeEnabled] = useState<boolean>(true);
+  const [isMatchModeEnabled, setIsMatchModeEnabled] = useState<boolean>(false);
   const [lastMatchedAt, setLastMatchedAt] = useState<string | null>(null);
   const [lastMatchedTeacherPercent, setLastMatchedTeacherPercent] = useState<number | null>(null);
   const [lastMatchedStudentPercent, setLastMatchedStudentPercent] = useState<number | null>(null);
@@ -852,7 +969,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   const [showAssignDropdown, setShowAssignDropdown] = useState(false);
 
   // Active Songs
-  const [activeSongSkills, setActiveSongSkills] = useState<any[]>([]);
+  const [activeSongSkills, setActiveSongSkills] = useState<any[]>(() => initialSongs || []);
   const [selectedActiveSongId, setSelectedActiveSongId] = useState<string>('');
   const [rhythmVal, setRhythmVal] = useState<number>(25);
   const [fingerVal, setFingerVal] = useState<number>(25);
@@ -3149,16 +3266,23 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       if (student.id && student.id !== 'teacher-self') {
         const { data: stUser } = await supabase.from('users').select('teacher_id').eq('id', student.id).maybeSingle();
         if (stUser?.teacher_id) return stUser.teacher_id;
+
+        // Also check student_teachers junction table
+        const { data: stRel } = await supabase.from('student_teachers').select('teacher_id').eq('student_id', student.id).maybeSingle();
+        if (stRel?.teacher_id) return stRel.teacher_id;
       }
       const { data: { user } } = await supabase.auth.getUser();
-      if (user) return user.id;
+      // 🛡️ Anti-Confuse: Only return user.id if logged in user is actually a teacher/admin (never when user is the student!)
+      if (user && user.id !== student.id && !readOnly) {
+        const { data: authU } = await supabase.from('users').select('role').eq('id', user.id).maybeSingle();
+        if (authU && authU.role !== 'student') return user.id;
+      }
 
-      // Fallback: Query first teacher in users table
-      const { data: teachers } = await supabase
-        .from('users')
-        .select('id')
-        .eq('role', 'teacher')
-        .limit(1);
+      // Fallback: Query first teacher in users table for this school
+      const schoolId = student?.school_id || (student as any)?.schoolId;
+      let tQuery = supabase.from('users').select('id').eq('role', 'teacher');
+      if (schoolId) tQuery = tQuery.eq('school_id', schoolId);
+      const { data: teachers } = await tQuery.limit(1);
       if (teachers && teachers.length > 0) {
         return teachers[0].id;
       }
@@ -3259,7 +3383,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             .eq('school_id', effectiveSchoolId)
             .eq('is_campus_active', true);
           
-          if (activeTId) {
+          if (activeTId && isTeacherTools) {
             sq = sq.eq('teacher_id', activeTId);
           }
           
@@ -3321,35 +3445,14 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
       let lehrwerkeData: any[] = [];
       
-      // 1. Primary Query: Try teacher's specific Lehrwerke first (100% same as Mediathek)
-      if (effectiveTeacherId && schoolId) {
-        const { data: tData, error: tErr } = await supabase
-          .from('lehrwerke')
-          .select('*')
-          .eq('school_id', schoolId)
-          .eq('teacher_id', effectiveTeacherId)
-          .order('title');
-        
-        if (!tErr && tData && tData.length > 0) {
-          lehrwerkeData = tData;
-        }
+      // 1. Unified Query: Fetch school-specific and global (school_id is null) Lehrwerke (100% same as StudentAvatarDashboard)
+      let query = supabase.from('lehrwerke').select('*');
+      if (schoolId) {
+        query = query.or(`school_id.eq.${schoolId},school_id.is.null`);
       }
-
-      // 2. Secondary / Fallback: If no teacher books, fetch school or global books
-      if (lehrwerkeData.length === 0) {
-        let query = supabase.from('lehrwerke').select('*');
-        let conditions: string[] = [];
-        if (schoolId) conditions.push(`school_id.eq.${schoolId}`);
-        if (effectiveTeacherId) conditions.push(`teacher_id.eq.${effectiveTeacherId}`);
-        conditions.push(`school_id.is.null`);
-
-        if (conditions.length > 0) {
-          query = query.or(conditions.join(','));
-        }
-        const { data: allData, error } = await query.order('title');
-        if (error) console.warn('Lehrwerke load note:', error);
-        if (allData) lehrwerkeData = allData;
-      }
+      const { data: allData, error } = await query.order('title');
+      if (error) console.warn('Lehrwerke load note:', error);
+      if (allData) lehrwerkeData = allData;
 
       let rawMapped: any[] = [];
       if (lehrwerkeData && lehrwerkeData.length > 0) {
@@ -3408,13 +3511,35 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       const mapped = Array.from(uniqueBooksMap.values());
       setGlobalLehrwerke(mapped);
 
-      const storedAssigned = localStorage.getItem('student_lehrwerke_progress');
-      if (storedAssigned) {
-        const parsedAssigned = JSON.parse(storedAssigned);
-        const filtered = parsedAssigned.filter((item: any) => String(item.studentId) === String(student.id));
-        setAssignedLehrwerke(filtered);
-      } else {
-        setAssignedLehrwerke([]);
+      // 5. Load assigned Lehrwerke from localStorage (both student_lehrwerke_progress and campus_lehrwerke_progress_${student.id})
+      let assignedFromStorage: any[] = [];
+      try {
+        const storedAssigned = localStorage.getItem('student_lehrwerke_progress');
+        if (storedAssigned) {
+          const parsedAssigned = JSON.parse(storedAssigned);
+          if (Array.isArray(parsedAssigned)) {
+            assignedFromStorage = parsedAssigned.filter((item: any) => String(item.studentId) === String(student.id));
+          }
+        }
+      } catch {}
+
+      try {
+        const targetId = student?.id;
+        const storedScoped = targetId && (localStorage.getItem(`campus_lehrwerke_progress_${targetId}`) || sessionStorage.getItem(`campus_lehrwerke_progress_${targetId}`));
+        if (storedScoped) {
+          const parsedScoped = JSON.parse(storedScoped);
+          if (Array.isArray(parsedScoped)) {
+            parsedScoped.forEach((item: any) => {
+              if (!assignedFromStorage.some(a => String(a.lehrwerkId) === String(item.lehrwerkId) || (a.bookTitle && item.bookTitle && a.bookTitle.toLowerCase() === item.bookTitle.toLowerCase()))) {
+                assignedFromStorage.push(item);
+              }
+            });
+          }
+        }
+      } catch {}
+
+      if (assignedFromStorage.length > 0) {
+        setAssignedLehrwerke(assignedFromStorage);
       }
     } catch (e) {
       console.error('Error loading Lehrwerke in modal:', e);
@@ -3433,15 +3558,15 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       
       if (error) throw error;
 
-      // Filter: In Campus Hausaufgabenheft, ONLY songs from the teacher's Campus Mediathek must be shown!
-      // GrooveLab module songs (is_campus_active: false/null) are strictly filtered out.
+      // Filter: In Campus Hausaufgabenheft, ONLY active Campus songs are shown!
+      // In student mode (readOnly or student viewing own), never filter out songs that belong to the student.
+      const isStudentViewingOwn = readOnly || !isTeacherTools || String(student.id) === String(activeTId);
       const filteredSkills = (skillsData || []).filter((skill: any) => {
         if (!skill.songs) return false;
         // 1. Must be active on Campus
         if (skill.songs.is_campus_active !== true) return false;
-        // 2. Must belong to current teacher if teacher is known
-        if (teacherId && skill.songs.teacher_id && skill.songs.teacher_id !== teacherId) return false;
-        if (activeTId && skill.songs.teacher_id && skill.songs.teacher_id !== activeTId) return false;
+        // 2. Only in explicit teacher-tools session (editing), check teacherId if supplied
+        if (!isStudentViewingOwn && teacherId && skill.songs.teacher_id && skill.songs.teacher_id !== teacherId) return false;
         return true;
       });
 
@@ -3455,7 +3580,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         }
       });
 
-      setActiveSongSkills(Array.from(uniqueMap.values()));
+      const loadedList = Array.from(uniqueMap.values());
+      setActiveSongSkills(loadedList);
+      onSongsUpdated?.(loadedList);
     } catch (e) {
       console.error('Error loading active songs in modal:', e);
     }
@@ -4293,11 +4420,17 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         if (bookProgressItems.length === 0) return;
 
         // Ensure the book is assigned locally if there are progress items for it in the DB
-        let assignmentIndex = parsed.findIndex((item: any) => item.studentId === student.id && item.lehrwerkId === book.id);
+        let assignmentIndex = parsed.findIndex((item: any) => 
+          String(item.studentId) === String(student.id) && 
+          (String(item.lehrwerkId) === String(book.id) || (item.bookTitle && item.bookTitle.toLowerCase() === book.title.toLowerCase()))
+        );
         if (assignmentIndex === -1) {
           const newAssignment = {
             studentId: student.id,
             lehrwerkId: book.id,
+            bookTitle: book.title,
+            lehrwerkTitle: book.title,
+            totalPages: book.totalPages || book.total_pages || 50,
             assignedAt: new Date().toISOString(),
             pageStates: {}
           };
@@ -4353,7 +4486,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
       if (hasChanges) {
         localStorage.setItem('student_lehrwerke_progress', JSON.stringify(parsed));
-        const filtered = parsed.filter((item: any) => item.studentId === student.id);
+        const filtered = parsed.filter((item: any) => String(item.studentId) === String(student.id));
         setAssignedLehrwerke(filtered);
       }
     } catch (err) {
@@ -6433,10 +6566,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       setIsCurrentHomework(isHw);
     }
 
-    // Load Dual Match Model State
-    const localMatchMode = localStorage.getItem(`song_match_mode_${student.id}_${skill.id}`);
-    const matchEnabled = localMatchMode !== null ? localMatchMode === 'true' : (skill.is_match_mode_enabled !== false);
-    setIsMatchModeEnabled(matchEnabled);
+    // Dual Match Model State (Parked on Roadmap)
+    setIsMatchModeEnabled(false);
 
     const localStudentRating = localStorage.getItem(`song_student_rating_${student.id}_${skill.id}`);
     const sRating = localStudentRating !== null && localStudentRating !== undefined ? parseInt(localStudentRating, 10) : (skill.student_rating ?? (dbItem?.student_rating ?? null));
@@ -7959,7 +8090,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       .select('*')
       .eq('school_id', schoolId)
       .eq('is_campus_active', true);
-    if (activeTId) {
+    if (activeTId && isTeacherTools) {
       sq = sq.eq('teacher_id', activeTId);
     }
     const { data: refreshedSongs } = await sq.order('title', { ascending: true });
@@ -8061,14 +8192,14 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       const normKey = getNormalizedSongTitle(item) || rawTopic.toLowerCase().trim();
       const existing = songsMap.get(normKey) || Array.from(songsMap.values()).find(s => isSongMatch(item, s));
 
-      if (existing) {
-        const localHw = localStorage.getItem(`song_hw_${student.id}_${item.id}`) ??
-                        (item.song_id ? localStorage.getItem(`song_hw_${student.id}_${item.song_id}`) : null);
-        const isHw = (localHw === 'true') || (localHw !== 'false' && Boolean(item.is_current_homework));
-        const localNote = localStorage.getItem(`song_note_${student.id}_${item.id}`) ||
-                          (item.song_id ? localStorage.getItem(`song_note_${student.id}_${item.song_id}`) : '') ||
-                          item.homework_notes;
+      const localHw = localStorage.getItem(`song_hw_${student.id}_${item.id}`) ??
+                      (item.song_id ? localStorage.getItem(`song_hw_${student.id}_${item.song_id}`) : null);
+      const isHw = (localHw === 'true') || (localHw !== 'false' && Boolean(item.is_current_homework));
+      const localNote = localStorage.getItem(`song_note_${student.id}_${item.id}`) ||
+                        (item.song_id ? localStorage.getItem(`song_note_${student.id}_${item.song_id}`) : '') ||
+                        item.homework_notes;
 
+      if (existing) {
         if (isHw) existing.is_current_homework = true;
         if (item.status === 'MASTERED') {
           existing.status = 'MASTERED';
@@ -8076,11 +8207,66 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           existing.progress_percent = 100;
         }
         if (localNote) existing.homework_notes = localNote;
+      } else {
+        const matchedCatalogSong = (songs || []).find((catSong: any) => 
+          catSong.id === item.song_id || isSongMatch(item, catSong)
+        );
+
+        let title = rawTopic.replace(/\s*\([^)]*\)\s*$/, '').trim();
+        let artist = 'Unbekannt';
+        if (matchedCatalogSong) {
+          title = matchedCatalogSong.title || title;
+          artist = matchedCatalogSong.artist || 'Unbekannt';
+        } else if (title.includes(' - ')) {
+          const parts = title.split(' - ');
+          artist = parts[0].trim();
+          title = parts.slice(1).join(' - ').trim();
+        }
+
+        const songId = item.song_id || matchedCatalogSong?.id || item.id;
+        songsMap.set(normKey, {
+          id: songId,
+          song_id: songId,
+          title,
+          artist,
+          progress_percent: item.progress_percent || (item.status === 'MASTERED' ? 100 : (item.score ? Math.min(100, item.score * 10) : 0)),
+          is_stage_ready: Boolean(item.status === 'MASTERED' || (item.score && item.score >= 10)),
+          status: item.status || (item.score && item.score >= 10 ? 'MASTERED' : 'IN_PROGRESS'),
+          is_current_homework: isHw,
+          homework_notes: localNote,
+          songs: matchedCatalogSong || { id: songId, title, artist, teacher_id: item.teacher_id }
+        });
+      }
+    });
+
+    // 3. From songs catalog / initialSongs (Campus active songs assigned to student)
+    (songs || []).forEach((s: any) => {
+      if (!s.title) return;
+      const normKey = (getNormalizedSongTitle(s) || s.title).toLowerCase().trim();
+      if (songsMap.has(normKey)) return;
+
+      const isAssigned = (progressItems || []).some((item: any) => isSongMatch(item, s));
+      if (isAssigned) {
+        const localHw = localStorage.getItem(`song_hw_${student.id}_${s.id}`) === 'true' || Boolean(s.is_current_homework);
+        const localNote = localStorage.getItem(`song_note_${student.id}_${s.id}`) || s.homework_notes || '';
+        songsMap.set(normKey, {
+          ...s,
+          id: s.id || normKey,
+          song_id: s.id || normKey,
+          title: s.title,
+          artist: s.artist || 'Unbekannt',
+          progress_percent: s.progress_percent || 0,
+          is_stage_ready: Boolean(s.is_stage_ready || s.progress_percent === 100),
+          status: s.status || 'IN_PROGRESS',
+          is_current_homework: localHw,
+          homework_notes: localNote,
+          songs: s
+        });
       }
     });
 
     return Array.from(songsMap.values());
-  }, [activeSongSkills, progressItems, student.id]);
+  }, [activeSongSkills, progressItems, songs, student.id]);
 
   // 🎵 Extrahierte Liste verfügbarer Schüler-Songs für das 1-Tap Song-Tagging (+Tag)
   // 🎵 Extrahierte Liste verfügbarer Schüler-Songs & Lehrwerke für das 1-Tap Tagging (+Zuordnen)
@@ -8373,18 +8559,36 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
   const getCurrentHomeworkSnapshot = () => {
     // 1. School & Teacher Names
-    let tName = propTeacherName || (student as any)?.teacher_name || (student as any)?.teacher?.name || '';
+    let tName = resolvedTeacherName || effectiveTeacherFullName || propTeacherName || '';
+    if (tName === 'Lehrkraft' || tName === 'deine Lehrkraft') {
+      tName = '';
+    }
+    if (!tName && (student as any)?.teacher) {
+      const f = formatTeacherFullName((student as any).teacher);
+      if (f && f !== 'Lehrkraft') tName = f;
+    }
+    if (!tName && (student as any)?.teacher_name) {
+      const f = formatTeacherFullName((student as any).teacher_name);
+      if (f && f !== 'Lehrkraft') tName = f;
+    }
     let sName = propSchoolName || (student as any)?.school_name || (student as any)?.schools?.name || '';
 
     try {
-      const storedTeacher = localStorage.getItem('groovelab_user') || localStorage.getItem('campus_user');
-      if (storedTeacher) {
-        const parsed = JSON.parse(storedTeacher);
-        if (!tName && parsed.first_name) {
-          tName = `${parsed.first_name} ${parsed.last_name || ''}`.trim();
-        }
-        if (!sName && parsed.school_name) {
-          sName = parsed.school_name;
+      const cacheKeys = ['groovelab_cached_user', 'campus_cached_user', 'campus_user', 'groovelab_user'];
+      for (const k of cacheKeys) {
+        if (tName && tName !== 'Lehrkraft' && sName) break;
+        const raw = sessionStorage.getItem(k) || localStorage.getItem(k);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (!tName && (parsed.role === 'teacher' || parsed.role === 'admin' || isTeacherMode)) {
+            const f = formatTeacherFullName(parsed);
+            if (f && f !== 'Lehrkraft') {
+              tName = f;
+            }
+          }
+          if (!sName && parsed.school_name) {
+            sName = parsed.school_name;
+          }
         }
       }
       if (!sName) {
@@ -8392,7 +8596,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       }
     } catch {}
 
-    const rawTeacher = tName || (student as any)?.teacher_name || (student as any)?.teacher?.name || 'Lehrkraft';
+    const rawTeacher = tName || (student as any)?.teacher_name || '';
     const finalTeacher = formatTeacherFullName(rawTeacher);
     const finalSchool = sName || 'Campus-Groovelab Musikschule';
     const finalInstrument = (student as any)?.instrument || (student as any)?.instrument_name || 'Gitarre';
@@ -8604,17 +8808,17 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     const snap = getCurrentHomeworkSnapshot();
     const sections: string[] = [];
 
-    // 1. Lehrwerke (mit Seiten)
+    // 1. Lehrwerke (mit Seiten & Hinweisen)
     const lehrwerke = snap.items.filter(it => it.type === 'lehrwerk');
     if (lehrwerke.length > 0) {
       const lwLines = lehrwerke.map(lw => {
         if (lw.notes) {
-          const cleanN = capitalizeFirstLetter(lw.notes.replace(/^📌\s*/, '').trim());
-          return `📖 *${lw.title}*\n   Notiz: ${cleanN}`;
+          const cleanN = capitalizeFirstLetter(lw.notes.replace(/^[📌📝•-]\s*/, '').trim());
+          return `• ${lw.title}\n  Hinweis: ${cleanN}`;
         }
-        return `📖 *${lw.title}*`;
+        return `• ${lw.title}`;
       });
-      sections.push(lwLines.join('\n\n'));
+      sections.push(`LEHRWERKE\n${lwLines.join('\n\n')}`);
     }
 
     // 2. Songs (mit Titel & Fahrplan)
@@ -8622,36 +8826,44 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     if (songs.length > 0) {
       const songLines = songs.map(s => {
         if (s.notes) {
-          const cleanF = capitalizeFirstLetter(s.notes.replace(/^📌\s*(Fahrplan:\s*)?/i, '').trim());
-          return `🎵 *${s.title}*\n📌 *Fahrplan:* ${cleanF}`;
+          const cleanF = capitalizeFirstLetter(s.notes.replace(/^[📌📝•-]\s*(Fahrplan:\s*)?/i, '').trim());
+          return `• ${s.title}\n  Fahrplan: ${cleanF}`;
         }
-        return `🎵 *${s.title}*`;
+        return `• ${s.title}`;
       });
-      sections.push(songLines.join('\n\n'));
+      sections.push(`SONGS & REPERTOIRE\n${songLines.join('\n\n')}`);
     }
 
     // 3. Zusatz-Notizen
     const notes = snap.items.filter(it => it.type === 'note');
     if (notes.length > 0) {
-      const noteLines = notes.map(n => `📝 ${capitalizeFirstLetter(n.title)}`);
-      sections.push(noteLines.join('\n'));
+      const noteLines = notes.map(n => `• ${capitalizeFirstLetter(n.title.replace(/^[📌📝•-]\s*/, '').trim())}`);
+      sections.push(`NOTIZEN\n${noteLines.join('\n')}`);
     }
 
-    // 4. Namentliche Unterrichtsaufnahmen mit Laufzeit
-    if (snap.audioRecordings && snap.audioRecordings.length > 0) {
-      const audioLines = snap.audioRecordings.map(a => {
-        const dur = a.duration ? ` (${a.duration})` : '';
-        return `• ${capitalizeFirstLetter(a.label)}${dur}`;
-      });
-      sections.push(`🎙️ *Unterrichtsaufnahmen (${snap.audioRecordings.length}):*\n${audioLines.join('\n')}`);
+    // 4. Unterrichtsaufnahmen (Reine Anzahl)
+    const audioCount = snap.audioRecordings ? snap.audioRecordings.length : 0;
+    if (audioCount > 0) {
+      const recordingLabel = audioCount === 1 ? '1 neue Aufnahme' : `${audioCount} neue Aufnahmen`;
+      sections.push(`UNTERRICHTSAUFNAHMEN\n• ${recordingLabel} in der Web-App hinterlegt`);
     }
 
     const tasksBlock = sections.length > 0 
       ? sections.join('\n\n') 
       : '• Aktuelle Übungen aus dem Unterricht wie besprochen fortführen.';
 
-    const shareSubject = `Hausaufgaben KW ${snap.weekNumber} - ${snap.schoolName}`;
-    const shareBody = `🎵 *Campus-Groovelab • ${snap.schoolName}*\n*Wochenplan (KW ${snap.weekNumber})*\n\nHallo ${snap.studentFirstName},\n\nHier sind deine Übe-Ziele für diese Woche:\n\n${tasksBlock}\n\n📱 *Unterrichtsaufnahmen & Fokus-Timer in der Web-App:*\n👉 ${snap.appUrl}\n\nViele Grüße,\n${snap.teacherName}`;
+    const divider = '────────────────────────────────────────';
+    const shareSubject = `Wochenplan KW ${snap.weekNumber} • ${snap.studentFirstName} • ${snap.schoolName}`;
+    const teacherSignOff = snap.teacherName && snap.teacherName !== 'Lehrkraft' && snap.teacherName !== 'deine Lehrkraft'
+      ? snap.teacherName 
+      : 'Deine Lehrkraft';
+
+    const cleanSchoolName = snap.schoolName || 'Campus-Groovelab';
+    const closingSchool = !cleanSchoolName.toLowerCase().includes('campus-groovelab')
+      ? `${cleanSchoolName} • Campus-Groovelab`
+      : cleanSchoolName;
+
+    const shareBody = `Hallo ${snap.studentFirstName},\n\nhier ist dein Wochenplan mit den aktuellen Übezielen aus unserem Unterricht:\n\n${divider}\nÜBE-ZIELE • KW ${snap.weekNumber}\n${divider}\n\n${tasksBlock}\n\n${divider}\nINTERAKTIVE WEB-APP\nUnterrichtsaufnahmen, Song-Bibliothek und Übe-Timer:\n${snap.appUrl}\n\nHerzliche Grüße\n${teacherSignOff}\n${closingSchool}`;
 
     return {
       shareSubject,
@@ -9510,7 +9722,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
               isTeacherTools={isTeacherTools}
               readOnly={readOnly}
               student={student}
-              activeSongSkills={activeSongSkills}
+              activeSongSkills={resolvedActiveSongs}
               audioDuration={audioDuration}
               audioLabel={audioLabel}
               audioSongTags={audioSongTags}
@@ -9603,7 +9815,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
               activeLehrwerkId={activeLehrwerkId}
               activeNoteTarget={activeNoteTarget}
               activePageNumber={activePageNumber}
-              activeSongSkills={activeSongSkills}
+              activeSongSkills={resolvedActiveSongs}
               activeSubView={activeSubView}
               activeTagPickerRowIndex={activeTagPickerRowIndex}
               activeTtsKey={activeTtsKey}
@@ -9870,7 +10082,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           student={student}
           assignedLehrwerke={assignedLehrwerke}
           globalLehrwerke={globalLehrwerke}
-          activeSongSkills={activeSongSkills}
+          activeSongSkills={resolvedActiveSongs}
           setActiveSongSkills={setActiveSongSkills}
           progressItems={progressItems}
           setProgressItems={setProgressItems}

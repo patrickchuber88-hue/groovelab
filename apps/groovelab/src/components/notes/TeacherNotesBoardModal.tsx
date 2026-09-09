@@ -1876,23 +1876,53 @@ export const TeacherNotesBoardModal: React.FC<TeacherNotesBoardModalProps> = ({
                     style={{ cursor: 'pointer' }}
                   />
                 </div>
-                <div onClick={() => handleToggleSort('status')} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                <div 
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => handleToggleSort('status')} 
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleToggleSort('status'); } }}
+                  style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px' }}
+                >
                   <span>Status</span>
                   {sortField === 'status' && (sortOrder === 'asc' ? <ArrowUp size={10} /> : <ArrowDown size={10} />)}
                 </div>
-                <div onClick={() => handleToggleSort('content')} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                <div 
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => handleToggleSort('content')} 
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleToggleSort('content'); } }}
+                  style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px' }}
+                >
                   <span>Notiz / Aufgabe</span>
                   {sortField === 'content' && (sortOrder === 'asc' ? <ArrowUp size={10} /> : <ArrowDown size={10} />)}
                 </div>
-                <div onClick={() => handleToggleSort('student')} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                <div 
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => handleToggleSort('student')} 
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleToggleSort('student'); } }}
+                  style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px' }}
+                >
                   <span>Schüler / Kontext</span>
                   {sortField === 'student' && (sortOrder === 'asc' ? <ArrowUp size={10} /> : <ArrowDown size={10} />)}
                 </div>
-                <div onClick={() => handleToggleSort('tag')} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                <div 
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => handleToggleSort('tag')} 
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleToggleSort('tag'); } }}
+                  style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px' }}
+                >
                   <span>Themen-Tag</span>
                   {sortField === 'tag' && (sortOrder === 'asc' ? <ArrowUp size={10} /> : <ArrowDown size={10} />)}
                 </div>
-                <div onClick={() => handleToggleSort('due_date')} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                <div 
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => handleToggleSort('due_date')} 
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleToggleSort('due_date'); } }}
+                  style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px' }}
+                >
                   <span>Fälligkeit</span>
                   {sortField === 'due_date' && (sortOrder === 'asc' ? <ArrowUp size={10} /> : <ArrowDown size={10} />)}
                 </div>

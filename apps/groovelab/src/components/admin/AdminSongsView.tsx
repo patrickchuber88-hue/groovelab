@@ -6,50 +6,8 @@ import {
 import { renderInstrumentIcon } from "../../utils/instruments";
 import { supabase } from "../../lib/supabase";
 
-  export const getLehrwerkColor = (title: string, lehrwerkeList: any[] = []) => {
-    const trimmed = (title || '').trim();
-    const sorted = [...lehrwerkeList].sort((a, b) => (a.title || '').localeCompare(b.title || ''));
-    const index = sorted.findIndex(b => (b.title || '').trim() === trimmed);
-    
-    if (index !== -1 && sorted.length > 0) {
-      const position = index % 26;
-      const hue = Math.round((position / 25) * 360);
-      return {
-        from: `hsl(${hue}, 85%, 94%)`,
-        to: `hsl(${hue}, 80%, 84%)`,
-        text: `hsl(${hue}, 90%, 25%)`,
-        shadowFrom: `hsla(${hue}, 85%, 50%, 0.2)`,
-        shadowTo: `hsla(${hue}, 80%, 40%, 0.15)`
-      };
-    }
-
-    const firstChar = trimmed.charAt(0).toUpperCase();
-    const charCode = firstChar.charCodeAt(0) || 65;
-    const clampedCode = Math.max(65, Math.min(90, charCode));
-    const hue = Math.round(((clampedCode - 65) / 25) * 360);
-    return {
-      from: `hsl(${hue}, 85%, 94%)`,
-      to: `hsl(${hue}, 80%, 84%)`,
-      text: `hsl(${hue}, 90%, 25%)`,
-      shadowFrom: `hsla(${hue}, 85%, 50%, 0.2)`,
-      shadowTo: `hsla(${hue}, 80%, 40%, 0.15)`
-    };
-  };
-
-  export const getSongColor = (title: string) => {
-    const trimmed = (title || '').trim();
-    const firstChar = trimmed.charAt(0).toUpperCase();
-    const charCode = firstChar.charCodeAt(0) || 65;
-    const clampedCode = Math.max(65, Math.min(90, charCode));
-    const hue = Math.round(((clampedCode - 65) / 25) * 360);
-    return {
-      from: `hsl(${hue}, 85%, 92%)`,
-      to: `hsl(${hue}, 80%, 82%)`,
-      text: `hsl(${hue}, 90%, 25%)`,
-      shadowFrom: `hsla(${hue}, 85%, 50%, 0.2)`,
-      shadowTo: `hsla(${hue}, 80%, 40%, 0.15)`
-    };
-  };
+import { getLehrwerkColor, getSongColor } from "../../utils/adminColorHelpers";
+export { getLehrwerkColor, getSongColor };
 
   export const renderSongVinylCover = (songColor: { from: string; to: string; text?: string }, size: 'sm' | 'md' | 'lg' = 'md') => {
     const isSm = size === 'sm';

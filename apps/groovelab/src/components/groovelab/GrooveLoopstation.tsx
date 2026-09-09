@@ -19,7 +19,6 @@ import {
   Layers
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
-// @ts-ignore
 import * as lamejs from '@breezystack/lamejs';
 import {
   processPureRawAudioBuffer,

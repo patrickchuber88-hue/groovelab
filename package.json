@@ -13,6 +13,7 @@
     "security:secrets": "npm run security:secrets -w apps/groovelab",
     "security:diff": "npm run security:diff -w apps/groovelab",
     "test:billing": "npm run test:billing -w apps/groovelab",
+    "verify:invariants": "tsx scripts/verify_rls_catalog_invariants.ts",
     "typecheck": "tsc -p apps/groovelab/tsconfig.json --noEmit",
     "gate": "npm run security:check && npm run security:secrets && npm run typecheck && npm run test:billing",
     "verify:enterprise": "npm run gate",

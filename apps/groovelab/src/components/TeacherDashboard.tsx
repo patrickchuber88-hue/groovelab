@@ -5299,40 +5299,50 @@ export function TeacherDashboard({
         localStorage.setItem('campus_teacher_briefing_sidebar_collapsed', String(tData.briefing_sidebar_collapsed));
       }
 
-      if (tData?.school_id) {
-        supabase.from('schools').select('*').eq('id', tData.school_id).single().then(({ data: sd }) => {
-          if (sd) {
-            setSchoolData(sd);
-            setInitialSchoolData(JSON.parse(JSON.stringify(sd)));
+      const applySchoolAndDunning = (sd: any) => {
+        if (!sd) return;
+        setSchoolData(sd);
+        setInitialSchoolData(JSON.parse(JSON.stringify(sd)));
 
-            // ─── ENTERPRISE B2B DELINQUENCY & GRACE PERIOD ARCHITECTURE ───
-            supabase
-              .from('invoices')
-              .select('id, type, amount, status, billing_date, due_date, items')
-              .eq('school_id', tData.school_id)
-              .then(({ data: invData }) => {
-                const status = computeSchoolDunningStatus(sd, invData || [], getSimulatedNow());
-                setTeacherDunningStatus(status);
-              });
-            if (Number(sd.storage_addon_gb || 0) > 0 && sd.storage_addon_status !== 'cancelled') {
-              localStorage.setItem('groovelab_storage_addon_active', 'true');
-              localStorage.setItem('campus_storage_addon_active', 'true');
-              localStorage.setItem('groovelab_storage_addon_gb', String(sd.storage_addon_gb));
-              localStorage.setItem('campus_storage_addon_gb', String(sd.storage_addon_gb));
-              localStorage.setItem(`groovelab_storage_addon_gb_${sd.id}`, String(sd.storage_addon_gb));
-              localStorage.setItem(`campus_storage_addon_gb_${sd.id}`, String(sd.storage_addon_gb));
-            } else {
-              localStorage.removeItem('groovelab_storage_addon_active');
-              localStorage.removeItem('campus_storage_addon_active');
-              localStorage.removeItem('groovelab_storage_addon_gb');
-              localStorage.removeItem('campus_storage_addon_gb');
-              localStorage.removeItem(`groovelab_storage_addon_gb_${sd.id}`);
-              localStorage.removeItem(`campus_storage_addon_gb_${sd.id}`);
-              localStorage.removeItem(`groovelab_storage_addon_active_${sd.id}`);
-              localStorage.removeItem(`campus_storage_addon_active_${sd.id}`);
+        // ─── ENTERPRISE B2B DELINQUENCY & GRACE PERIOD ARCHITECTURE ───
+        supabase
+          .from('invoices')
+          .select('id, type, amount, status, billing_date, due_date, items')
+          .eq('school_id', tData.school_id)
+          .then(({ data: invData }) => {
+            const status = computeSchoolDunningStatus(sd, invData || [], getSimulatedNow());
+            setTeacherDunningStatus(status);
+          });
+        if (Number(sd.storage_addon_gb || 0) > 0 && sd.storage_addon_status !== 'cancelled') {
+          localStorage.setItem('groovelab_storage_addon_active', 'true');
+          localStorage.setItem('campus_storage_addon_active', 'true');
+          localStorage.setItem('groovelab_storage_addon_gb', String(sd.storage_addon_gb));
+          localStorage.setItem('campus_storage_addon_gb', String(sd.storage_addon_gb));
+          localStorage.setItem(`groovelab_storage_addon_gb_${sd.id}`, String(sd.storage_addon_gb));
+          localStorage.setItem(`campus_storage_addon_gb_${sd.id}`, String(sd.storage_addon_gb));
+        } else {
+          localStorage.removeItem('groovelab_storage_addon_active');
+          localStorage.removeItem('campus_storage_addon_active');
+          localStorage.removeItem('groovelab_storage_addon_gb');
+          localStorage.removeItem('campus_storage_addon_gb');
+          localStorage.removeItem(`groovelab_storage_addon_gb_${sd.id}`);
+          localStorage.removeItem(`campus_storage_addon_gb_${sd.id}`);
+          localStorage.removeItem(`groovelab_storage_addon_active_${sd.id}`);
+          localStorage.removeItem(`campus_storage_addon_active_${sd.id}`);
+        }
+      };
+
+      if (tData?.school_id) {
+        const joinedSchool = Array.isArray(tData.schools) ? tData.schools[0] : tData.schools;
+        if (joinedSchool && joinedSchool.id === tData.school_id) {
+          applySchoolAndDunning(joinedSchool);
+        } else {
+          supabase.from('schools').select('*').eq('id', tData.school_id).single().then(({ data: sd }) => {
+            if (sd) {
+              applySchoolAndDunning(sd);
             }
-          }
-        });
+          });
+        }
         // Prepare Student Query: fetch assigned students in the school
         // Tier-1 Query Pruning: Selective column list prevents PostgreSQL from executing PGP decryption subquery on email
         let studentQuery = supabase.from('users')
@@ -5569,42 +5579,7 @@ export function TeacherDashboard({
         // 6. Bands
         setAllBands(bData || []);
 
-        // 7. Students
-        const deduplicateStudents = (students: any[]): any[] => {
-          if (!Array.isArray(students)) return [];
-          const seenIds = new Set<string>();
-          const studentMap = new Map<string, any>();
-
-          for (const student of students) {
-            if (!student) continue;
-            if (student.id && seenIds.has(student.id)) continue;
-
-            const fn = (student.first_name || '').trim().toLowerCase();
-            const ln = (student.last_name || '').trim().toLowerCase();
-            const nameKey = `${fn}_${ln}`;
-
-            if (nameKey !== '_') {
-              if (studentMap.has(nameKey)) {
-                const existing = studentMap.get(nameKey);
-                if (existing.isPendingOnboarding && !student.isPendingOnboarding) {
-                  if (existing.id) seenIds.delete(existing.id);
-                  studentMap.set(nameKey, student);
-                  if (student.id) seenIds.add(student.id);
-                }
-                continue;
-              }
-              studentMap.set(nameKey, student);
-            } else {
-              const fallbackKey = student.id || `anon_${Math.random()}`;
-              studentMap.set(fallbackKey, student);
-            }
-
-            if (student.id) seenIds.add(student.id);
-          }
-
-          return Array.from(studentMap.values());
-        };
-
+        // 7. Students (SSOT: deduplicateRoster from studentRosterService)
         const activePlat = activePlatform || (typeof window !== 'undefined' ? localStorage.getItem('groovelab_active_platform') : 'groovelab');
 
         let filteredStudData = (studData || []).filter((student: any) => {
@@ -5631,7 +5606,7 @@ export function TeacherDashboard({
             return endDate > limitDate;
           });
         }
-        const dedupedStudents = deduplicateStudents(filteredStudData);
+        const dedupedStudents = deduplicateRoster(filteredStudData);
         setAllStudents(dedupedStudents);
         if (typeof window !== 'undefined') {
           (window as any).__groovelabAllStudents = dedupedStudents;
@@ -7455,7 +7430,7 @@ useEffect(() => {
             }} 
             onClose={() => setDocStudent(null)} 
             teacherId={userId}
-            teacherName={teacher?.first_name ? `${teacher.first_name} ${teacher.last_name || ''}`.trim() : (teacher?.name || '')}
+            teacherName={formatTeacherFullName(teacher)}
             schoolName={schoolData?.name || ''}
             hasTresorStorage={Number(schoolData?.storage_addon_gb || 0) > 0 || checkIsAudioTresorActive(docStudent)}
             readOnly={teacherDunningStatus?.isTeacherReadOnly || false}
@@ -12386,12 +12361,12 @@ useEffect(() => {
                     <span style={{ color: '#64748b', fontWeight: 600 }}>Instrument:</span>
                     <span style={{ fontWeight: 800 }}>{coach.instrument || 'Allgemein'}</span>
                   </div>
-                  {coach.email && (
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ color: '#64748b', fontWeight: 600 }}>E-Mail:</span>
-                      <span style={{ fontWeight: 800, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '160px' }}>{coach.email}</span>
-                    </div>
-                  )}
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#64748b', fontWeight: 600 }}>E-Mail:</span>
+                    <span style={{ fontWeight: 800, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '160px', color: coach.email ? '#1e293b' : '#94a3b8' }}>
+                      {coach.email || 'Nicht hinterlegt'}
+                    </span>
+                  </div>
                 </div>
               </div>
             );

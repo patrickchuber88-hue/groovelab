@@ -2,28 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Check, ExternalLink, Tablet, X } from 'lucide-react';
 import QRCode from 'react-qr-code';
 
-export const getStationColor = (name: string | null | undefined, dbColor?: string | null) => {
-  if (!name) return "#64748b";
-  
-  const isStandardIpad = /^ipad\s*\d+/i.test(name);
-  if (dbColor && dbColor !== "#e5e7eb" && dbColor !== "#e2e8f0" && dbColor !== "#cbd5e1") {
-    if (isStandardIpad && dbColor === "#64748b") {
-      // Fall through to number-based standard color
-    } else {
-      return dbColor;
-    }
-  }
-
-  if (name.toLowerCase().includes("lehrer")) return "#34a853"; // Green
-  const matches = name.match(/\d+/g);
-  if (!matches) return "#64748b";
-  const num = parseInt(matches[matches.length - 1]);
-  if (num === 1 || num === 2) return "#eab308"; // Yellow
-  if (num === 3 || num === 4) return "#a855f7"; // Purple
-  if (num === 5 || num === 6) return "#3b82f6"; // Blue
-  if (num === 7 || num === 8) return "#eab308"; // Yellow
-  return "#64748b";
-};
+import { getStationColor } from '../../../utils/adminColorHelpers';
+export { getStationColor };
 
 export interface AdminRoomLayoutModalProps {
   room: any;

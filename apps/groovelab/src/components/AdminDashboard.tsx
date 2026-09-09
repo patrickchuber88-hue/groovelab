@@ -35,8 +35,7 @@ const AdminSongDetailModal = lazy(() => import('./admin/modals/AdminSongDetailMo
 const AdminTextbausteinModal = lazy(() => import('./admin/modals/AdminTextbausteinModal'));
 const AdminQRModal = lazy(() => import('./admin/modals/AdminQRModal'));
 const AdminRoomLayoutModal = lazy(() => import('./admin/modals/AdminRoomLayoutModal'));
-import { getStationColor } from './admin/modals/AdminRoomLayoutModal';
-import { getLehrwerkColor, getSongColor } from './admin/AdminSongsView';
+import { getStationColor, getLehrwerkColor, getSongColor } from '../utils/adminColorHelpers';
 const CampusEventsBoard = lazy(() => import('./CampusEventsBoard').then(m => ({ default: m.CampusEventsBoard })));
 const ConfirmDeleteStudentModal = lazy(() => import('./ConfirmDeleteStudentModal').then(m => ({ default: m.ConfirmDeleteStudentModal })));
 const AVVModal = lazy(() => import('./AVVModal').then(m => ({ default: m.AVVModal })));
@@ -1673,7 +1672,13 @@ export function AdminDashboard({
         groupStudentIds = (gsData || []).map(gs => gs.user_id).filter(Boolean);
       }
 
-      assignedStudentIds = Array.from(new Set([...schedStudentIds, ...occStudentIds, ...groupStudentIds]));
+      let stStudentIds: string[] = [];
+      try {
+        const { data: stData } = await supabase.from('student_teachers').select('student_id').eq('teacher_id', teacherId);
+        stStudentIds = (stData || []).map((s: any) => s.student_id).filter(Boolean);
+      } catch (e) {}
+
+      assignedStudentIds = Array.from(new Set([...schedStudentIds, ...occStudentIds, ...groupStudentIds, ...stStudentIds]));
     }
 
     const schoolRoster = await fetchSchoolRoster(schoolId, supabase);
@@ -5536,6 +5541,7 @@ export function AdminDashboard({
               setInitialLehrwerkIdForTageskompass(null);
             }}
             teacherId={userId}
+            teacherName={formatTeacherFullName(admin)}
             initialLehrwerkId={initialLehrwerkIdForTageskompass || undefined}
             hasTresorStorage={checkIsAudioTresorActive(selectedStudentForTageskompass) || checkIsAudioTresorActive(admin)}
             onProfileClick={(student) => {
@@ -5561,6 +5567,7 @@ export function AdminDashboard({
             }}
             onClose={() => setShowTeacherToolsModal(false)}
             teacherId={userId}
+            teacherName={formatTeacherFullName(admin)}
             isTeacherTools={true}
             hasTresorStorage={checkIsAudioTresorActive(admin)}
           />

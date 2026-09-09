@@ -13,6 +13,7 @@ import { getInstrumentAvatarUrl, getDefaultMusicianAvatarUrl, resolveCampusStude
 import { SkillRadarPentagon } from '../../common/SkillRadarPentagon';
 import { SKILL_TAGS } from '../meisterwerk.types';
 import QRCode from 'react-qr-code';
+import { formatTeacherFullName } from '../../../utils/nameHelper';
 
 const TEACHER_GREEN = '#34a853';
 const TEACHER_YELLOW = '#eab308';
@@ -1254,10 +1255,21 @@ export const TeacherStudentDetailModal: React.FC<TeacherStudentDetailModalProps>
                   📞 Notfallkontakt (Unterrichtsausfall / Notfall)
                 </h4>
                 <div style={{ fontSize: '0.78rem', color: '#64748b', lineHeight: 1.45 }}>
-                  Im Falle einer plötzlichen Erkrankndung oder eines Unfalls während der Unterrichtsstunde:
+                  Im Falle einer plötzlichen Erkrankung oder eines Unfalls während der Unterrichtsstunde:
                 </div>
                 <div style={{ background: '#f8fafc', padding: '12px 14px', borderRadius: '14px', border: '1px solid #e2e8f0', fontSize: '0.84rem', fontWeight: 800, color: '#0f172a' }}>
-                  {student.emergency_phone || student.parent_phone || 'Keine Notfall-Nummer im Schülerprofil hinterlegt.'}
+                  {(student.emergency_phone || student.parent_phone || student.phone) ? (
+                    <span>
+                      {student.emergency_phone || student.parent_phone || student.phone}
+                      {student.parent_name ? (
+                        <span style={{ marginLeft: '8px', color: '#64748b', fontWeight: 600, fontSize: '0.78rem' }}>
+                          ({student.parent_name})
+                        </span>
+                      ) : null}
+                    </span>
+                  ) : (
+                    'Keine Notfall-Nummer im Schülerprofil hinterlegt.'
+                  )}
                 </div>
               </section>
             </div>
@@ -1337,6 +1349,7 @@ export const TeacherStudentDetailModal: React.FC<TeacherStudentDetailModalProps>
       {showTageskompassModal && (
         <MeisterwerkDocumentationModal
           student={student}
+          teacherName={formatTeacherFullName(schedulesList?.[0]?.teacher || (student as any)?.teacher_name || (student as any)?.teacher)}
           onClose={() => setShowTageskompassModal(false)}
         />
       )}

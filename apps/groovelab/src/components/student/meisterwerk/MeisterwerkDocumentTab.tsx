@@ -9,7 +9,6 @@ import {
 } from 'lucide-react';
 import Confetti from 'react-confetti';
 import { AudioTrackCarousel } from '../../AudioTrackCarousel';
-import { MeisterOhrSticker } from '../../MeisterOhrSticker';
 import { SpeechDictationButton } from '../SpeechDictationButton';
 import { MechanicalMetronomeIcon } from './MeisterwerkAudioPlayers';
 import { Student } from '../meisterwerk.types';
@@ -1562,17 +1561,15 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                           von {skill.songs?.artist}
                         </p>
                         <span style={{ fontSize: '0.74rem', color: '#475569', fontWeight: 800 }}>
-                          {readOnly && isMatchModeEnabled && !isMatchRevealed
-                            ? (studentRating !== null ? `Dein Tipp: ${studentRating}%` : 'Tipp noch offen 🎵')
-                            : (readOnly && isMatchRevealed ? `Stand: ${progress}%` : `${progress}%`)}
+                          {progress}%
                         </span>
                         <div style={{ width: '100%', height: '7px', background: '#e8e8ed', borderRadius: '3.5px', marginTop: '6px', overflow: 'hidden' }}>
                           <div style={{
-                            width: `${readOnly && isMatchModeEnabled && !isMatchRevealed ? (studentRating ?? 0) : progress}%`,
+                            width: `${progress}%`,
                             height: '100%',
                             background: (status === 'MASTERED' || skill.is_stage_ready || progress === 100)
                               ? 'hsl(130, 65%, 82%)'
-                              : (readOnly && isMatchModeEnabled && !isMatchRevealed ? '#16a34a' : 'hsl(47, 85%, 84%)'),
+                              : 'hsl(47, 85%, 84%)',
                             transition: 'width 0.4s ease'
                           }} />
                         </div>
@@ -1672,37 +1669,8 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                           <span style={{ fontSize: '0.86rem', fontWeight: 900, color: songProgressPercent === 100 ? '#34a853' : '#0f172a', transition: 'color 0.3s ease' }}>
-                            {readOnly && isMatchModeEnabled
-                              ? (lastMatchedTeacherPercent !== null ? `Lehrer-Stand: ${lastMatchedTeacherPercent}%` : 'Fortschritt (Wird im Unterricht gematcht)')
-                              : `Fortschritt: ${songProgressPercent}%`}
+                            {`Fortschritt: ${songProgressPercent}%`}
                           </span>
-
-                          {/* Teacher's Match-Mode Toggle Pill */}
-                          {!readOnly && (
-                            <button
-                              type="button"
-                              onClick={handleToggleMatchMode}
-                              style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                                padding: '3px 8px',
-                                borderRadius: '99px',
-                                fontSize: '0.68rem',
-                                fontWeight: 800,
-                                border: isMatchModeEnabled ? '1px solid #bbf7d0' : '1px solid #e2e8f0',
-                                background: isMatchModeEnabled ? '#f0fdf4' : '#f8fafc',
-                                color: isMatchModeEnabled ? '#166534' : '#64748b',
-                                cursor: 'pointer',
-                                transition: 'all 0.15s ease'
-                              }}
-                              className="hover-scale"
-                              title={isMatchModeEnabled ? 'Match-Modus ist aktiv (Schüler schätzt heimlich mit)' : 'Match-Modus ist aus (Schüler sieht nur Read-Only)'}
-                            >
-                              <span>🎯 Match-Modus:</span>
-                              <span style={{ fontWeight: 900 }}>{isMatchModeEnabled ? 'Aktiv' : 'Aus'}</span>
-                            </button>
-                          )}
                         </div>
                         
                         {songProgressPercent === 100 ? (
@@ -1795,8 +1763,8 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                         </div>
                       )}
 
-                      {/* READ-ONLY FALLBACK (When Match-Modus is OFF for Student) */}
-                      {readOnly && !isMatchModeEnabled && (
+                      {/* READ-ONLY PROGRESS DISPLAY FOR STUDENT */}
+                      {readOnly && (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                             <input
@@ -1824,465 +1792,6 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                           </div>
                         </div>
                       )}
-
-                      {/* STUDENT SELF-ASSESSMENT SLIDER & COMMIT BUTTON (When Match-Modus is ACTIVE for Student) */}
-                      {readOnly && isMatchModeEnabled && (() => {
-                        const currentPct = studentRating ?? 0;
-                        const getProgressFeeling = (pct: number) => {
-                          if (pct <= 25) return { icon: '🐌', text: 'Aller Anfang' };
-                          if (pct <= 50) return { icon: '🧩', text: 'Einzelne Teile klappen' };
-                          if (pct <= 75) return { icon: '⚡', text: 'Läuft fast flüssig' };
-                          return { icon: '🚀', text: 'Bühnenreif!' };
-                        };
-                        const feeling = getProgressFeeling(currentPct);
-
-                        return (
-                          <div style={{
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: '14px',
-                            background: '#f8fafc',
-                            padding: '16px',
-                            borderRadius: '18px',
-                            border: isStudentRatingCommitted ? '2px solid #86efac' : '2px solid #fcd34d',
-                            boxShadow: isStudentRatingCommitted ? '0 4px 14px rgba(34, 197, 94, 0.08)' : '0 4px 14px rgba(245, 158, 11, 0.08)',
-                            transition: 'all 0.2s ease'
-                          }}>
-                            {/* Top Header Row */}
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '6px' }}>
-                              <span style={{ fontSize: '0.86rem', fontWeight: 900, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                🎧 Wie gut klappt es schon:
-                                <span style={{ color: currentPct > 0 ? '#15803d' : '#64748b', fontWeight: 950, fontSize: '0.94rem' }}>
-                                  {currentPct}% • {feeling.icon} {feeling.text}
-                                </span>
-                              </span>
-                              <span style={{ fontSize: '0.68rem', color: '#15803d', background: '#dcfce7', padding: '2px 8px', borderRadius: '99px', fontWeight: 800 }}>
-                                🔒 Lehrer-Wertung verdeckt
-                              </span>
-                            </div>
-
-                            {/* Interactive Slider */}
-                            <input
-                              type="range"
-                              min="0"
-                              max="100"
-                              value={studentRating ?? 0}
-                              onChange={(e) => {
-                                const val = parseInt(e.target.value, 10);
-                                handleStudentRatingChange(val);
-                              }}
-                              style={{
-                                width: '100%',
-                                accentColor: '#16a34a',
-                                height: '14px',
-                                borderRadius: '7px',
-                                cursor: 'pointer',
-                                touchAction: 'manipulation',
-                                pointerEvents: 'auto',
-                                background: currentPct > 0
-                                  ? `linear-gradient(to right, #16a34a 0%, #16a34a ${currentPct}%, #e2e8f0 ${currentPct}%, #e2e8f0 100%)`
-                                  : '#e2e8f0',
-                                WebkitAppearance: 'none',
-                                outline: 'none',
-                                transition: 'all 0.15s ease'
-                              }}
-                            />
-
-                            {/* Action & Status Row: Lifecycle-Aware Child-Friendly Commit Button */}
-                            {(() => {
-                              const isFullyCompleted = matchHistory.length >= 3;
-                              const targetMatchNum = Math.min(matchHistory.length + 1, 3);
-                              const hasFreshStudentRating = Boolean(
-                                studentRating !== null &&
-                                studentRating !== undefined &&
-                                studentRatingUpdatedAt &&
-                                (!lastMatchedAt || new Date(studentRatingUpdatedAt).getTime() > new Date(lastMatchedAt).getTime())
-                              );
-
-                              return (
-                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                    {isFullyCompleted ? (
-                                      <span style={{
-                                        display: 'inline-flex',
-                                        alignItems: 'center',
-                                        gap: '5px',
-                                        background: '#dcfce7',
-                                        color: '#15803d',
-                                        padding: '5px 12px',
-                                        borderRadius: '99px',
-                                        fontSize: '0.74rem',
-                                        fontWeight: 850
-                                      }}>
-                                        <span>🏆 Alle 3 Meilensteine gemeistert!</span>
-                                      </span>
-                                    ) : (hasFreshStudentRating && isStudentRatingCommitted) ? (
-                                      <span style={{
-                                        display: 'inline-flex',
-                                        alignItems: 'center',
-                                        gap: '5px',
-                                        background: '#dcfce7',
-                                        color: '#15803d',
-                                        padding: '5px 12px',
-                                        borderRadius: '99px',
-                                        fontSize: '0.74rem',
-                                        fontWeight: 850
-                                      }}>
-                                        <Check size={14} strokeWidth={3} />
-                                        <span>Tipp für Match {targetMatchNum} ist sicher bei deiner Lehrkraft!</span>
-                                      </span>
-                                    ) : (
-                                      <span style={{
-                                        display: 'inline-flex',
-                                        alignItems: 'center',
-                                        gap: '4px',
-                                        background: matchHistory.length > 0 ? '#f0fdf4' : '#fffbeb',
-                                        color: matchHistory.length > 0 ? '#15803d' : '#b45309',
-                                        padding: '4px 10px',
-                                        borderRadius: '99px',
-                                        fontSize: '0.72rem',
-                                        fontWeight: 800,
-                                        border: `1px solid ${matchHistory.length > 0 ? '#bbf7d0' : '#fde68a'}`
-                                      }}>
-                                        <span>{matchHistory.length > 0 ? `🌱 Tipp für Match ${targetMatchNum} einstellen (${currentPct}%)` : '⚠️ 1. Tipp noch nicht abgeschickt'}</span>
-                                      </span>
-                                    )}
-                                  </div>
-
-                                  <button
-                                    type="button"
-                                    onClick={handleCommitStudentRating}
-                                    disabled={isFullyCompleted || (hasFreshStudentRating && isStudentRatingCommitted)}
-                                    style={{
-                                      border: 'none',
-                                      background: (isFullyCompleted || (hasFreshStudentRating && isStudentRatingCommitted))
-                                        ? '#e2e8f0'
-                                        : 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
-                                      color: (isFullyCompleted || (hasFreshStudentRating && isStudentRatingCommitted)) ? '#475569' : '#ffffff',
-                                      padding: '9px 20px',
-                                      borderRadius: '99px',
-                                      fontSize: '0.78rem',
-                                      fontWeight: 900,
-                                      cursor: (isFullyCompleted || (hasFreshStudentRating && isStudentRatingCommitted)) ? 'default' : 'pointer',
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      gap: '6px',
-                                      boxShadow: (isFullyCompleted || (hasFreshStudentRating && isStudentRatingCommitted)) ? 'none' : '0 3px 10px rgba(22, 163, 74, 0.35)',
-                                      transition: 'all 0.15s ease'
-                                    }}
-                                    className={(isFullyCompleted || (hasFreshStudentRating && isStudentRatingCommitted)) ? '' : 'hover-scale'}
-                                  >
-                                    {isFullyCompleted ? (
-                                      <span>✓ Alle Matches abgeschlossen</span>
-                                    ) : (hasFreshStudentRating && isStudentRatingCommitted) ? (
-                                      <>
-                                        <Check size={14} strokeWidth={3} />
-                                        <span>Tipp {targetMatchNum} eingeloggt ({studentRating}%)</span>
-                                      </>
-                                    ) : (
-                                      <>
-                                        <Lock size={14} />
-                                        <span>🔒 Tipp für Match {targetMatchNum} abschicken ({currentPct}%)</span>
-                                      </>
-                                    )}
-                                  </button>
-                                </div>
-                              );
-                            })()}
-
-                            {/* 3 VISUAL REWARD TIERS (Kid-Friendly & Gamified) */}
-                            <div style={{ marginTop: '4px' }}>
-                              <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#475569', marginBottom: '4px' }}>
-                                🎁 Belohnungs-Stufen für dein nächstes Match:
-                              </div>
-                              <div style={{
-                                display: 'grid',
-                                gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
-                                gap: '8px'
-                              }}>
-                                <div style={{
-                                  background: '#fefce8',
-                                  border: '1.5px solid #fde047',
-                                  borderRadius: '12px',
-                                  padding: '8px 10px',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '8px'
-                                }}>
-                                  <span style={{ fontSize: '1.2rem' }}>🎯</span>
-                                  <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                    <span style={{ fontSize: '0.72rem', fontWeight: 900, color: '#854d0e' }}>Volltreffer (±10%)</span>
-                                    <span style={{ fontSize: '0.66rem', fontWeight: 750, color: '#a16207' }}>+50 XP & Meister-Ohr</span>
-                                  </div>
-                                </div>
-
-                                <div style={{
-                                  background: '#f0f9ff',
-                                  border: '1.5px solid #bae6fd',
-                                  borderRadius: '12px',
-                                  padding: '8px 10px',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '8px'
-                                }}>
-                                  <span style={{ fontSize: '1.2rem' }}>✨</span>
-                                  <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                    <span style={{ fontSize: '0.72rem', fontWeight: 900, color: '#0369a1' }}>Super Gehör (±20%)</span>
-                                    <span style={{ fontSize: '0.66rem', fontWeight: 750, color: '#0284c7' }}>+25 XP</span>
-                                  </div>
-                                </div>
-
-                                <div style={{
-                                  background: '#faf5ff',
-                                  border: '1.5px solid #e9d5ff',
-                                  borderRadius: '12px',
-                                  padding: '8px 10px',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '8px'
-                                }}>
-                                  <span style={{ fontSize: '1.2rem' }}>🚀</span>
-                                  <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                    <span style={{ fontSize: '0.72rem', fontWeight: 900, color: '#7e22ce' }}>Weiter-Rocker (&gt;20%)</span>
-                                    <span style={{ fontSize: '0.66rem', fontWeight: 750, color: '#9333ea' }}>+5 XP Mut-Bonus</span>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })()}
-
-                      {/* 1. DUAL-BALKEN SHOWDOWN RACE BOX (Animated 1.2s Comparison) */}
-                      {showdownState && (
-                        <div style={{
-                          background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
-                          borderRadius: '20px',
-                          padding: '16px 20px',
-                          color: '#ffffff',
-                          margin: '8px 0',
-                          boxShadow: '0 10px 30px rgba(0,0,0,0.25)',
-                          border: '1.5px solid rgba(255,255,255,0.12)',
-                          animation: 'fadeIn 0.25s ease'
-                        }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', fontWeight: 900, color: '#38bdf8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                              <span>🏁 LIVE-MATCH SHOWDOWN</span>
-                            </div>
-                            {showdownState.isRunning ? (
-                              <span style={{ fontSize: '0.72rem', color: '#facc15', fontWeight: 800, animation: 'pulse 1s infinite' }}>
-                                ⚡ Showdown läuft...
-                              </span>
-                            ) : (
-                              <span style={{ fontSize: '0.74rem', fontWeight: 900, color: '#86efac', background: 'rgba(34,197,94,0.2)', padding: '2px 8px', borderRadius: '99px' }}>
-                                Δ {Math.abs(showdownState.teacherTarget - showdownState.studentTarget)}% Differenz
-                              </span>
-                            )}
-                          </div>
-
-                          {/* Top Bar: Lehrkraft */}
-                          <div style={{ marginBottom: '10px' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', fontWeight: 800, color: '#cbd5e1', marginBottom: '4px' }}>
-                              <span>👨‍🏫 Lehrkraft:</span>
-                              <span style={{ color: '#4ade80', fontWeight: 900, fontVariantNumeric: 'tabular-nums' }}>
-                                {Math.round(showdownState.currentTeacherVal)}%
-                              </span>
-                            </div>
-                            <div style={{ width: '100%', height: '12px', background: 'rgba(255,255,255,0.1)', borderRadius: '99px', overflow: 'hidden' }}>
-                              <div style={{
-                                width: `${showdownState.currentTeacherVal}%`,
-                                height: '100%',
-                                background: 'linear-gradient(90deg, #16a34a, #4ade80)',
-                                borderRadius: '99px',
-                                transition: showdownState.isRunning ? 'none' : 'width 0.2s ease',
-                                boxShadow: '0 0 10px rgba(74, 222, 128, 0.4)'
-                              }} />
-                            </div>
-                          </div>
-
-                          {/* Bottom Bar: Schüler */}
-                          <div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', fontWeight: 800, color: '#cbd5e1', marginBottom: '4px' }}>
-                              <span>👧 {readOnly ? 'Dein Tipp:' : 'Schüler-Tipp:'}</span>
-                              <span style={{ color: '#facc15', fontWeight: 900, fontVariantNumeric: 'tabular-nums' }}>
-                                {Math.round(showdownState.currentStudentVal)}%
-                              </span>
-                            </div>
-                            <div style={{ width: '100%', height: '12px', background: 'rgba(255,255,255,0.1)', borderRadius: '99px', overflow: 'hidden' }}>
-                              <div style={{
-                                width: `${showdownState.currentStudentVal}%`,
-                                height: '100%',
-                                background: 'linear-gradient(90deg, #eab308, #fde047)',
-                                borderRadius: '99px',
-                                transition: showdownState.isRunning ? 'none' : 'width 0.2s ease',
-                                boxShadow: '0 0 10px rgba(250, 204, 21, 0.4)'
-                              }} />
-                            </div>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* TEACHER MATCH STATUS & ACTION BAR (Apple-Grade Lifecycle-Aware Single-Line) */}
-                      {!readOnly && isMatchModeEnabled && (() => {
-                        const targetMatchNum = Math.min(matchHistory.length + 1, 3);
-                        const isFullyCompleted = matchHistory.length >= 3;
-                        const latestMatch = matchHistory.length > 0 ? matchHistory[matchHistory.length - 1] : null;
-                        const diff = (lastMatchedTeacherPercent !== null && lastMatchedStudentPercent !== null)
-                          ? Math.abs(lastMatchedTeacherPercent - lastMatchedStudentPercent)
-                          : (studentRating !== null ? Math.abs(songProgressPercent - studentRating) : null);
-
-                        const hasFreshStudentRating = Boolean(
-                          studentRating !== null &&
-                          studentRating !== undefined &&
-                          studentRatingUpdatedAt &&
-                          (!lastMatchedAt || new Date(studentRatingUpdatedAt).getTime() > new Date(lastMatchedAt).getTime())
-                        );
-
-                        const canExecuteMatch = !isFullyCompleted && hasFreshStudentRating && !showdownState?.isRunning;
-
-                        return (
-                          <div style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            background: '#f8fafc',
-                            padding: '10px 14px',
-                            borderRadius: '14px',
-                            border: canExecuteMatch ? '1.5px solid #bbf7d0' : '1px solid #e2e8f0',
-                            gap: '10px',
-                            flexWrap: 'wrap',
-                            marginTop: '2px'
-                          }}>
-                            {/* Left Side: Student Tip Status, Compact Result Pill & 3-Dot Milestone Tracker */}
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                              {isFullyCompleted ? (
-                                <span style={{
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: '4px',
-                                  background: '#dcfce7',
-                                  color: '#15803d',
-                                  padding: '4px 10px',
-                                  borderRadius: '99px',
-                                  fontWeight: 900,
-                                  fontSize: '0.74rem'
-                                }}>
-                                  <span>🏆 Song komplett gematcht (3/3)</span>
-                                </span>
-                              ) : hasFreshStudentRating ? (
-                                <>
-                                  <span style={{
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    gap: '4px',
-                                    background: '#dcfce7',
-                                    color: '#15803d',
-                                    padding: '4px 10px',
-                                    borderRadius: '99px',
-                                    fontWeight: 900,
-                                    fontSize: '0.74rem'
-                                  }}>
-                                    <Check size={13} strokeWidth={3} />
-                                    <span>Tipp {targetMatchNum} liegt bereit: {studentRating}%</span>
-                                  </span>
-                                </>
-                              ) : matchHistory.length > 0 ? (
-                                <>
-                                  {latestMatch && (
-                                    <span style={{
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      gap: '4px',
-                                      background: latestMatch.tier === 'tier1' ? '#fef3c7' : (latestMatch.tier === 'tier2' ? '#e0f2fe' : '#f3e8ff'),
-                                      color: latestMatch.tier === 'tier1' ? '#92400e' : (latestMatch.tier === 'tier2' ? '#075985' : '#6b21a8'),
-                                      border: `1px solid ${latestMatch.tier === 'tier1' ? '#fde68a' : (latestMatch.tier === 'tier2' ? '#bae6fd' : '#e9d5ff')}`,
-                                      padding: '4px 9px',
-                                      borderRadius: '99px',
-                                      fontWeight: 850,
-                                      fontSize: '0.72rem'
-                                    }}>
-                                      <span>{latestMatch.tier === 'tier1' ? '🎯' : (latestMatch.tier === 'tier2' ? '✨' : '🚀')}</span>
-                                      <span>
-                                        Match #{matchHistory.length} beendet
-                                        {diff !== null && ` (Δ ${diff}%)`} • +{latestMatch.xp_amount} XP
-                                      </span>
-                                    </span>
-                                  )}
-                                  <span style={{ fontWeight: 700, color: '#64748b', fontSize: '0.74rem' }}>
-                                    ⏳ Wartet auf Schüler-Tipp für Match {targetMatchNum}
-                                  </span>
-                                </>
-                              ) : (
-                                <span style={{ fontWeight: 700, color: '#64748b', fontSize: '0.74rem' }}>
-                                  ⏳ Schüler-Tipp steht noch aus (Match 1/3)
-                                </span>
-                              )}
-
-                              {/* Apple-Style 3-Dot Milestone Tracker */}
-                              <div style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '5px',
-                                background: '#ffffff',
-                                border: '1px solid #e2e8f0',
-                                padding: '4px 8px',
-                                borderRadius: '99px'
-                              }} title={`Match ${matchHistory.length} von 3 belegt`}>
-                                {[0, 1, 2].map((idx) => (
-                                  <div
-                                    key={idx}
-                                    style={{
-                                      width: '7px',
-                                      height: '7px',
-                                      borderRadius: '50%',
-                                      background: idx < matchHistory.length
-                                        ? '#16a34a'
-                                        : (idx === matchHistory.length && hasFreshStudentRating ? '#38bdf8' : '#cbd5e1')
-                                    }}
-                                  />
-                                ))}
-                                <span style={{ fontSize: '0.66rem', fontWeight: 800, color: '#64748b', marginLeft: '2px' }}>
-                                  {matchHistory.length}/3
-                                </span>
-                              </div>
-                            </div>
-
-                            {/* Right Side: Action Button */}
-                            <button
-                              type="button"
-                              onClick={handleCheckMatch}
-                              disabled={!canExecuteMatch}
-                              style={{
-                                border: 'none',
-                                background: canExecuteMatch
-                                  ? 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)'
-                                  : '#cbd5e1',
-                                color: canExecuteMatch ? '#ffffff' : '#64748b',
-                                padding: '7px 16px',
-                                borderRadius: '99px',
-                                fontSize: '0.76rem',
-                                fontWeight: 900,
-                                cursor: canExecuteMatch ? 'pointer' : 'not-allowed',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '6px',
-                                boxShadow: canExecuteMatch ? '0 2px 8px rgba(22, 163, 74, 0.3)' : 'none',
-                                transition: 'all 0.15s ease'
-                              }}
-                              className={canExecuteMatch ? 'hover-scale' : ''}
-                            >
-                              <Sparkles size={13} />
-                              <span>
-                                {isFullyCompleted
-                                  ? '🏆 3/3 Meilensteine belegt'
-                                  : (!hasFreshStudentRating && matchHistory.length > 0)
-                                    ? `⏳ Wartet auf Tipp ${targetMatchNum}`
-                                    : `🎯 Match ${targetMatchNum} prüfen`}
-                              </span>
-                            </button>
-                          </div>
-                        );
-                      })()}
 
                       {/* Sub sliders (Rhythm, Finger, Expression) */}
                       {isSubSlidersExpanded && (
@@ -3227,7 +2736,10 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                     </div>
 
                     {sortedAssignedLehrwerke.map(assigned => {
-                      const book = globalLehrwerke.find(g => g.id === assigned.lehrwerkId) || {
+                      const book = globalLehrwerke.find(g => 
+                        String(g.id) === String(assigned.lehrwerkId) || 
+                        (g.title && (assigned.bookTitle || assigned.lehrwerkTitle) && g.title.toLowerCase().trim() === (assigned.bookTitle || assigned.lehrwerkTitle).toLowerCase().trim())
+                      ) || {
                         title: assigned.bookTitle || assigned.lehrwerkTitle || 'Lehrwerk',
                         emoji: '📚',
                         totalPages: assigned.totalPages || 50
@@ -3242,6 +2754,15 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                         <div
                           key={assigned.lehrwerkId}
                           onClick={() => selectTextbookPage(assigned.lehrwerkId, activePageNumber || 1)}
+                          role="button"
+                          tabIndex={0}
+                          aria-label={`Lehrwerk ${book.title}, ${total} Seiten, ${worked} gemeistert`}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              selectTextbookPage(assigned.lehrwerkId, activePageNumber || 1);
+                            }
+                          }}
                           style={{
                             flex: '0 0 auto',
                             width: '136px',
@@ -3330,7 +2851,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
 
                               {/* Mini Book Title on Cover */}
                               <span style={{
-                                fontSize: '0.56rem',
+                                fontSize: '0.62rem',
                                 fontWeight: 900,
                                 color: bookColor.text || '#ffffff',
                                 textAlign: 'center',
@@ -3350,14 +2871,14 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                               position: 'absolute',
                               top: '5px',
                               right: '5px',
-                              background: pct > 0 ? '#34a853' : 'rgba(0,0,0,0.4)',
+                              background: pct > 0 ? '#15803d' : 'rgba(15,23,42,0.65)',
                               backdropFilter: 'blur(6px)',
                               color: '#ffffff',
-                              fontSize: '0.60rem',
+                              fontSize: '0.68rem',
                               fontWeight: 900,
-                              padding: '2px 6px',
+                              padding: '2px 7px',
                               borderRadius: '100px',
-                              boxShadow: '0 1px 4px rgba(0,0,0,0.15)',
+                              boxShadow: '0 1px 4px rgba(0,0,0,0.18)',
                               zIndex: 5
                             }}>
                               {pct}%
@@ -3371,27 +2892,28 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                   e.stopPropagation();
                                   handleRemoveLehrwerk(assigned.lehrwerkId, e);
                                 }}
+                                aria-label={`Lehrwerk ${book.title} entfernen`}
                                 style={{
                                   position: 'absolute',
                                   top: '5px',
                                   left: '5px',
-                                  background: 'rgba(255, 255, 255, 0.92)',
+                                  background: 'rgba(255, 255, 255, 0.95)',
                                   border: 'none',
-                                  color: '#ef4444',
+                                  color: '#dc2626',
                                   cursor: 'pointer',
-                                  width: '20px',
-                                  height: '20px',
+                                  width: '24px',
+                                  height: '24px',
                                   borderRadius: '50%',
                                   display: 'flex',
                                   alignItems: 'center',
                                   justifyContent: 'center',
-                                  boxShadow: '0 1px 4px rgba(0,0,0,0.12)',
+                                  boxShadow: '0 1px 4px rgba(0,0,0,0.15)',
                                   transition: 'all 0.2s',
                                   zIndex: 10
                                 }}
                                 title="Lehrwerk entfernen"
                               >
-                                <X size={11} strokeWidth={2.5} />
+                                <X size={13} strokeWidth={2.5} />
                               </button>
                             )}
                           </div>
@@ -3400,7 +2922,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
                             <h4 style={{
                               margin: 0,
-                              fontSize: '0.82rem',
+                              fontSize: '0.84rem',
                               fontWeight: 900,
                               color: '#0f172a',
                               whiteSpace: 'nowrap',
@@ -3411,9 +2933,9 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                               {book.title}
                             </h4>
 
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.67rem', color: '#64748b', fontWeight: 700 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.74rem', color: '#475569', fontWeight: 750 }}>
                               <span>{total} S.</span>
-                              <span style={{ color: worked > 0 ? '#34a853' : '#94a3b8', fontWeight: 800 }}>{worked} gem.</span>
+                              <span style={{ color: worked > 0 ? '#15803d' : '#64748b', fontWeight: 800 }}>{worked} gem.</span>
                             </div>
 
                             {/* Subtle Progress Bar */}
@@ -3440,28 +2962,30 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                       </h3>
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={() => setShowCreateSongModal(!showCreateSongModal)}
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '5px',
-                        background: '#f0fdf4',
-                        border: '1.5px solid #bbf7d0',
-                        color: '#15803d',
-                        padding: '4px 10px',
-                        borderRadius: '100px',
-                        fontSize: '0.72rem',
-                        fontWeight: 800,
-                        cursor: 'pointer',
-                        transition: 'all 0.15s ease'
-                      }}
-                      className="hover-scale"
-                    >
-                      <Plus size={12} strokeWidth={3} />
-                      <span>Song anlegen</span>
-                    </button>
+                    {(!readOnly && isTeacherTools) && (
+                      <button
+                        type="button"
+                        onClick={() => setShowCreateSongModal(!showCreateSongModal)}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '5px',
+                          background: '#f0fdf4',
+                          border: '1.5px solid #bbf7d0',
+                          color: '#15803d',
+                          padding: '4px 10px',
+                          borderRadius: '100px',
+                          fontSize: '0.72rem',
+                          fontWeight: 800,
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease'
+                        }}
+                        className="hover-scale"
+                      >
+                        <Plus size={12} strokeWidth={3} />
+                        <span>Song anlegen</span>
+                      </button>
+                    )}
                   </div>
 
                   {(() => {
@@ -3490,15 +3014,26 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                       });
 
                       if (activeSongs.length === 0) {
+                        const canCreate = !readOnly && isTeacherTools;
                         return (
                           <div
-                            onClick={() => setShowCreateSongModal(true)}
+                            onClick={() => {
+                              if (canCreate) setShowCreateSongModal(true);
+                            }}
+                            role={canCreate ? 'button' : undefined}
+                            tabIndex={canCreate ? 0 : undefined}
+                            onKeyDown={canCreate ? (e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                setShowCreateSongModal(true);
+                              }
+                            } : undefined}
                             style={{
                               background: 'rgba(248, 250, 252, 0.7)',
                               borderRadius: '16px',
                               border: '2px dashed #cbd5e1',
                               padding: '20px 16px',
-                              cursor: 'pointer',
+                              cursor: canCreate ? 'pointer' : 'default',
                               display: 'flex',
                               flexDirection: 'column',
                               alignItems: 'center',
@@ -3508,7 +3043,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                               transition: 'all 0.2s',
                               flex: 1
                             }}
-                            className="hover-scale"
+                            className={canCreate ? "hover-scale" : undefined}
                           >
                             <div style={{
                               width: '34px',
@@ -3519,14 +3054,16 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
-                              color: '#34a853',
+                              color: canCreate ? '#34a853' : '#94a3b8',
                               boxShadow: '0 2px 6px rgba(0,0,0,0.04)'
                             }}>
-                              <Plus size={16} strokeWidth={2.5} />
+                              {canCreate ? <Plus size={16} strokeWidth={2.5} /> : <Music size={16} />}
                             </div>
                             <div>
                               <div style={{ fontSize: '0.80rem', fontWeight: 900, color: '#0f172a' }}>Noch kein aktives Song-Projekt</div>
-                              <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#64748b', marginTop: '2px' }}>+ Klicke hier, um deinen ersten Song anzulegen</div>
+                              <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#64748b', marginTop: '2px' }}>
+                                {canCreate ? '+ Klicke hier, um deinen ersten Song anzulegen' : 'Noch kein Song-Projekt von deiner Lehrkraft zugewiesen.'}
+                              </div>
                             </div>
                           </div>
                         );
@@ -3552,6 +3089,15 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                               <div
                                 key={skill.id}
                                 onClick={() => selectActiveSong(skill)}
+                                role="button"
+                                tabIndex={0}
+                                aria-label={`Song ${songTitle} von ${songArtist}, ${progress}% Fortschritt`}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter' || e.key === ' ') {
+                                    e.preventDefault();
+                                    selectActiveSong(skill);
+                                  }
+                                }}
                                 style={{
                                   background: isSelected ? 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)' : '#ffffff',
                                   borderRadius: '14px',
@@ -3588,7 +3134,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                   <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1 }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                       <span style={{
-                                        fontSize: '0.84rem',
+                                        fontSize: '0.86rem',
                                         fontWeight: 900,
                                         color: '#0f172a',
                                         whiteSpace: 'nowrap',
@@ -3599,12 +3145,12 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                       </span>
                                       {skill.songs?.teacher_id || skill.created_by_teacher ? (
                                         <span style={{
-                                          fontSize: '0.58rem',
+                                          fontSize: '0.68rem',
                                           fontWeight: 850,
                                           color: '#15803d',
                                           background: '#dcfce7',
-                                          padding: '1px 5px',
-                                          borderRadius: '4px',
+                                          padding: '2px 6px',
+                                          borderRadius: '6px',
                                           flexShrink: 0
                                         }}>
                                           Lehrer
@@ -3612,8 +3158,8 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                       ) : null}
                                     </div>
                                     <span style={{
-                                      fontSize: '0.68rem',
-                                      color: '#64748b',
+                                      fontSize: '0.74rem',
+                                      color: '#475569',
                                       fontWeight: 650,
                                       whiteSpace: 'nowrap',
                                       overflow: 'hidden',
@@ -3628,18 +3174,18 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
                                   {progressItems.some(item => isSongMatch(item, skill) && item.is_current_homework) && (
                                     <span style={{
-                                      fontSize: '0.62rem',
+                                      fontSize: '0.70rem',
                                       fontWeight: 850,
-                                      color: '#b45309',
-                                      background: '#fef3c7',
-                                      border: '1px solid #fde68a',
-                                      padding: '2px 7px',
+                                      color: '#9a3412',
+                                      background: '#ffedd5',
+                                      border: '1px solid #fed7aa',
+                                      padding: '2px 8px',
                                       borderRadius: '6px',
                                       display: 'flex',
                                       alignItems: 'center',
-                                      gap: '3px'
+                                      gap: '4px'
                                     }}>
-                                      <Pin size={11} strokeWidth={2.4} />
+                                      <Pin size={12} strokeWidth={2.4} />
                                       <span>Hausaufgabe</span>
                                     </span>
                                   )}
@@ -3650,9 +3196,9 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                     gap: '4px',
                                     background: progress >= 100 ? '#dcfce7' : '#f1f5f9',
                                     color: progress >= 100 ? '#15803d' : '#475569',
-                                    padding: '2px 8px',
+                                    padding: '3px 9px',
                                     borderRadius: '100px',
-                                    fontSize: '0.68rem',
+                                    fontSize: '0.72rem',
                                     fontWeight: 900,
                                     border: progress >= 100 ? '1px solid #bbf7d0' : '1px solid #e2e8f0'
                                   }}>
@@ -4090,7 +3636,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                       padding: isMobileOrSim ? '10px 6px' : '13px 10px',
                       borderRadius: '16px',
                       border: 'none',
-                      background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                      background: 'linear-gradient(135deg, #d97706 0%, #b45309 100%)',
                       color: 'white',
                       fontWeight: 900,
                       fontSize: isMobileOrSim ? '0.80rem' : '0.86rem',
@@ -5689,122 +5235,6 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                         </div>
                       )}
 
-                      {/* SCHÜLER TROPHÄEN- & MEILENSTEIN-PASS (Right Column Trophy Center for Apple Balance) */}
-                      {readOnly && (
-                        <div style={{
-                          background: '#ffffff',
-                          border: '1.5px solid #e2e8f0',
-                          borderRadius: '24px',
-                          padding: '18px 20px',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: '12px',
-                          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.03)'
-                        }}>
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                            <span style={{ fontSize: '0.84rem', fontWeight: 900, color: '#09090b', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                              <Sparkles size={16} style={{ color: '#f59e0b' }} />
-                              <span>Auszeichnungen & Meilenstein-Pass</span>
-                            </span>
-                            <span style={{ fontSize: '0.70rem', background: matchHistory.length >= 3 ? '#dcfce7' : '#f1f5f9', color: matchHistory.length >= 3 ? '#15803d' : '#475569', padding: '2px 8px', borderRadius: '99px', fontWeight: 850 }}>
-                              {matchHistory.length} von 3 Matches
-                            </span>
-                          </div>
-
-                          {/* Latest Hologram Sticker if at least 1 match exists */}
-                          {matchHistory.length > 0 && (() => {
-                            const latest = matchHistory[matchHistory.length - 1];
-                            return (
-                              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
-                                <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b' }}>
-                                  ✨ Dein neuester Sticker (Match #{matchHistory.length}):
-                                </div>
-                                <MeisterOhrSticker
-                                  matchedAt={latest.matched_at}
-                                  teacherPercent={latest.teacher_percent}
-                                  studentPercent={latest.student_percent}
-                                  xpAmount={latest.xp_amount}
-                                  isCompact={false}
-                                />
-                              </div>
-                            );
-                          })()}
-
-                          {/* 3 Horizontal Milestone Cards */}
-                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
-                            {[0, 1, 2].map((slotIdx) => {
-                              const entry = matchHistory[slotIdx];
-                              const slotNum = slotIdx + 1;
-                              if (entry) {
-                                const isGold = entry.tier === 'tier1';
-                                const isBlue = entry.tier === 'tier2';
-                                return (
-                                  <div key={slotIdx} style={{
-                                    background: isGold ? 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)' : (isBlue ? 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)' : 'linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%)'),
-                                    border: `1.5px solid ${isGold ? '#f59e0b' : (isBlue ? '#38bdf8' : '#c084fc')}`,
-                                    borderRadius: '14px',
-                                    padding: '10px',
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    gap: '4px',
-                                    boxShadow: '0 2px 6px rgba(0,0,0,0.04)'
-                                  }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                      <span style={{ fontSize: '0.66rem', fontWeight: 900, color: '#64748b' }}>
-                                        #{slotNum} Match
-                                      </span>
-                                      <span style={{ fontSize: '0.64rem', fontWeight: 750, color: '#94a3b8' }}>
-                                        {new Date(entry.matched_at).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })}
-                                      </span>
-                                    </div>
-
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.74rem', fontWeight: 900, color: '#0f172a' }}>
-                                      <span>{isGold ? '🎯' : (isBlue ? '✨' : '🚀')}</span>
-                                      <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                        {isGold ? 'Meister-Ohr' : (isBlue ? 'Super Gehör' : 'Weiter-Rocker')}
-                                      </span>
-                                    </div>
-
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '2px', fontSize: '0.68rem', color: '#475569' }}>
-                                      <span>L:{entry.teacher_percent}% • S:{entry.student_percent}%</span>
-                                      <span style={{ fontWeight: 900, color: '#16a34a', background: 'rgba(34,197,94,0.12)', padding: '1px 5px', borderRadius: '5px', fontSize: '0.64rem' }}>
-                                        +{entry.xp_amount} XP
-                                      </span>
-                                    </div>
-                                  </div>
-                                );
-                              } else {
-                                const isNextSlot = slotIdx === matchHistory.length;
-                                return (
-                                  <div key={slotIdx} style={{
-                                    border: isNextSlot ? '1.5px dashed #94a3b8' : '1.5px dashed #e2e8f0',
-                                    background: isNextSlot ? '#f8fafc' : '#ffffff',
-                                    borderRadius: '14px',
-                                    padding: '10px',
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    minHeight: '74px',
-                                    textAlign: 'center',
-                                    gap: '3px'
-                                  }}>
-                                    <span style={{ fontSize: '0.95rem', opacity: isNextSlot ? 1 : 0.4 }}>
-                                      {slotIdx === 0 ? '🌱' : (slotIdx === 1 ? '⚡' : '🏆')}
-                                    </span>
-                                    <span style={{ fontSize: '0.66rem', fontWeight: 800, color: isNextSlot ? '#475569' : '#94a3b8' }}>
-                                      {slotIdx === 0 ? '1. Match' : (slotIdx === 1 ? '2. Match' : '3. Finale')}
-                                    </span>
-                                    <span style={{ fontSize: '0.60rem', color: isNextSlot ? '#16a34a' : '#cbd5e1', fontWeight: 750 }}>
-                                      {isNextSlot ? 'Tipp abgeben 🔒' : 'Gesperrt'}
-                                    </span>
-                                  </div>
-                                );
-                              }
-                            })}
-                          </div>
-                        </div>
-                      )}
 
                       <div style={{ display: 'flex', gap: '12px', marginTop: '8px', paddingBottom: (isMobileView || isInsideSim || isFullscreen || isMobileOrSim) ? '180px' : '48px' }}>
                         <button
@@ -5958,12 +5388,15 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                               const parts = item.topic_name.split(' - Seite ');
                               const bookTitle = parts[0].trim();
                               const pageNum = parseInt(parts[1], 10);
-                              const book = globalLehrwerke.find(g => g.title === bookTitle);
+                              const book = globalLehrwerke.find(g => g.title === bookTitle || g.title?.toLowerCase().trim() === bookTitle.toLowerCase().trim());
                               if (book) {
-                                const assignment = assignedLehrwerke.find(a => a.lehrwerkId === book.id);
+                                const assignment = assignedLehrwerke.find(a => String(a.lehrwerkId) === String(book.id) || (a.bookTitle && a.bookTitle.toLowerCase().trim() === bookTitle.toLowerCase().trim()));
                                 const pageState = assignment?.pageStates?.[pageNum];
-                                return pageState?.status === 'homework' || pageState?.isCurrentHomework;
+                                if (pageState?.status === 'homework' || pageState?.isCurrentHomework) {
+                                  return true;
+                                }
                               }
+                              return Boolean(item.is_current_homework);
                             }
                             return Boolean(item.is_current_homework) && !item.topic_name?.startsWith('Hausaufgabe KW ');
                           });
@@ -5973,12 +5406,13 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                               const parts = item.topic_name.split(' - Seite ');
                               const bookTitle = parts[0].trim();
                               const pageNum = parseInt(parts[1], 10);
-                              const book = globalLehrwerke.find(g => g.title === bookTitle);
+                              const book = globalLehrwerke.find(g => g.title === bookTitle || g.title?.toLowerCase().trim() === bookTitle.toLowerCase().trim());
                               if (book) {
-                                const assignment = assignedLehrwerke.find(a => a.lehrwerkId === book.id);
+                                const assignment = assignedLehrwerke.find(a => String(a.lehrwerkId) === String(book.id) || (a.bookTitle && a.bookTitle.toLowerCase().trim() === bookTitle.toLowerCase().trim()));
                                 const pageState = assignment?.pageStates?.[pageNum];
-                                return pageState?.status === 'purple';
+                                if (pageState?.status === 'purple') return true;
                               }
+                              return item.status === 'THEORY_DONE';
                             }
                             return item.status === 'THEORY_DONE' && 
                                    item.updated_at && 
@@ -5990,21 +5424,22 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                           
                           // Process assignedLehrwerke page states
                           (assignedLehrwerke || []).forEach(assignment => {
-                            const book = globalLehrwerke.find(g => g.id === assignment.lehrwerkId);
-                            if (!book || !assignment.pageStates) return;
+                            const book = globalLehrwerke.find(g => String(g.id) === String(assignment.lehrwerkId) || (g.title && assignment.bookTitle && g.title.toLowerCase().trim() === assignment.bookTitle.toLowerCase().trim()));
+                            const resolvedTitle = book?.title || assignment.bookTitle || assignment.lehrwerkTitle;
+                            if (!resolvedTitle || !assignment.pageStates) return;
                             
                             Object.entries(assignment.pageStates).forEach(([pNumStr, pState]: [string, any]) => {
                               if (pState?.status === 'homework' || pState?.isCurrentHomework) {
                                 const pageNum = parseInt(pNumStr, 10);
                                 if (!isNaN(pageNum)) {
-                                  if (!groupedLehrwerke[book.title]) {
-                                    groupedLehrwerke[book.title] = { pages: [], notes: [] };
+                                  if (!groupedLehrwerke[resolvedTitle]) {
+                                    groupedLehrwerke[resolvedTitle] = { pages: [], notes: [] };
                                   }
-                                  if (!groupedLehrwerke[book.title].pages.includes(pageNum)) {
-                                    groupedLehrwerke[book.title].pages.push(pageNum);
+                                  if (!groupedLehrwerke[resolvedTitle].pages.includes(pageNum)) {
+                                    groupedLehrwerke[resolvedTitle].pages.push(pageNum);
                                     const cleanNote = getCleanPageNotes(pState.homeworkNotes || pState.homework_notes);
                                     if (cleanNote) {
-                                      groupedLehrwerke[book.title].notes.push(`Seite ${pageNum}: ${cleanNote}`);
+                                      groupedLehrwerke[resolvedTitle].notes.push(`Seite ${pageNum}: ${cleanNote}`);
                                     }
                                   }
                                 }
@@ -6017,9 +5452,9 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                             if (item.topic_name && item.topic_name.includes(' - Seite ')) {
                               const parts = item.topic_name.split(' - Seite ');
                               const bookTitle = parts[0].trim();
-                              const book = globalLehrwerke.find(g => g.title === bookTitle);
-                              const isBookAssigned = book && assignedLehrwerke.some(a => a.lehrwerkId === book.id);
-                              if (!isBookAssigned) return;
+                              const book = globalLehrwerke.find(g => g.title === bookTitle || g.title?.toLowerCase().trim() === bookTitle.toLowerCase().trim());
+                              const isBookAssigned = Boolean(book && assignedLehrwerke.some(a => String(a.lehrwerkId) === String(book.id) || (a.bookTitle && a.bookTitle.toLowerCase().trim() === bookTitle.toLowerCase().trim())));
+                              if (!isBookAssigned && !item.is_current_homework) return;
 
                               const pageNum = parseInt(parts[1], 10);
                               if (!groupedLehrwerke[bookTitle]) {
@@ -6052,7 +5487,8 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                           // Also check activeSongSkills with localStorage backup for instant sync
                           (activeSongSkills || []).forEach(skill => {
                             const isHwInLs = localStorage.getItem(`song_hw_${student.id}_${skill.id}`) === 'true' ||
-                                             localStorage.getItem(`song_hw_${student.id}_${skill.song_id}`) === 'true';
+                                             localStorage.getItem(`song_hw_${student.id}_${skill.song_id}`) === 'true' ||
+                                             Boolean(skill.is_current_homework);
                             if (isHwInLs) {
                               const cleanTopic = getNormalizedSongTitle(skill);
                               const canKey = getCanonicalSongKey(skill);
@@ -6065,7 +5501,8 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                 const songInstrument = skill.instrument ? ` (${skill.instrument})` : '';
                                 const fullTitle = songArtist ? `${songArtist} - ${songTitle}${songInstrument}` : `${songTitle}${songInstrument}`;
                                 const cachedNote = localStorage.getItem(`song_note_${student.id}_${skill.id}`) ||
-                                                   localStorage.getItem(`song_note_${student.id}_${skill.song_id}`) || '';
+                                                   localStorage.getItem(`song_note_${student.id}_${skill.song_id}`) ||
+                                                   skill.homework_notes || '';
                                 otherHWs.push({
                                   id: skill.id,
                                   topic_name: fullTitle,
@@ -6341,17 +5778,18 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                           if (histWeekItem && lehrwerkeList.length === 0 && otherHWs.length === 0) {
                             const recoveredLwMap: Record<string, { pages: number[]; notes: string[] }> = {};
                             (assignedLehrwerke || []).forEach((assignment: any) => {
-                              const book = globalLehrwerke.find(g => g.id === assignment.lehrwerkId);
-                              if (!book || !assignment.pageStates) return;
+                              const book = globalLehrwerke.find(g => String(g.id) === String(assignment.lehrwerkId) || (g.title && assignment.bookTitle && g.title.toLowerCase().trim() === assignment.bookTitle.toLowerCase().trim()));
+                              const bookTitle = book?.title || assignment.bookTitle || assignment.lehrwerkTitle;
+                              if (!bookTitle || !assignment.pageStates) return;
                               Object.entries(assignment.pageStates).forEach(([pStr, pState]: [string, any]) => {
                                 if (pState?.status === 'homework' || pState?.isCurrentHomework) {
                                   const pNum = parseInt(pStr, 10);
                                   if (!isNaN(pNum)) {
-                                    if (!recoveredLwMap[book.title]) recoveredLwMap[book.title] = { pages: [], notes: [] };
-                                    if (!recoveredLwMap[book.title].pages.includes(pNum)) {
-                                      recoveredLwMap[book.title].pages.push(pNum);
+                                    if (!recoveredLwMap[bookTitle]) recoveredLwMap[bookTitle] = { pages: [], notes: [] };
+                                    if (!recoveredLwMap[bookTitle].pages.includes(pNum)) {
+                                      recoveredLwMap[bookTitle].pages.push(pNum);
                                       const cleanNote = getCleanPageNotes(pState.homeworkNotes || pState.homework_notes);
-                                      if (cleanNote) recoveredLwMap[book.title].notes.push(`Seite ${pNum}: ${cleanNote}`);
+                                      if (cleanNote) recoveredLwMap[bookTitle].notes.push(`Seite ${pNum}: ${cleanNote}`);
                                     }
                                   }
                                 }
@@ -6379,7 +5817,8 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
 
                             (activeSongSkills || []).forEach((skill: any) => {
                               const isHwInLs = localStorage.getItem(`song_hw_${student.id}_${skill.id}`) === 'true' ||
-                                               localStorage.getItem(`song_hw_${student.id}_${skill.song_id}`) === 'true';
+                                               localStorage.getItem(`song_hw_${student.id}_${skill.song_id}`) === 'true' ||
+                                               Boolean(skill.is_current_homework);
                               if (isHwInLs) {
                                 const cleanTopic = getNormalizedSongTitle(skill);
                                 const canKey = getCanonicalSongKey(skill);
@@ -6727,125 +6166,66 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                   )}
                                 </button>
 
-                                {/* 🔗 3. Unified Share Action Hub (Kompakter Master-Standard: 'Teilen') */}
-                                <div ref={shareMenuRef} style={{ position: 'relative' }}>
-                                  <button
-                                    type="button"
-                                    onClick={() => setIsShareMenuOpen(prev => !prev)}
-                                    style={{
-                                      background: isShareMenuOpen ? '#ffffff' : '#f8fafc',
-                                      border: '1px solid #e2e8f0',
-                                      color: '#0f172a',
-                                      borderRadius: '100px',
-                                      padding: '0 12px',
-                                      minHeight: '32px',
-                                      fontSize: '0.80rem',
-                                      fontWeight: 750,
-                                      cursor: 'pointer',
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      gap: '5px',
-                                      transition: 'all 0.15s ease',
-                                      boxShadow: isShareMenuOpen ? '0 2px 8px rgba(0,0,0,0.06)' : '0 1px 2px rgba(0,0,0,0.02)'
-                                    }}
-                                    className="hover-scale-mini"
-                                    title="Hausaufgabe per E-Mail senden oder Text kopieren"
-                                  >
-                                    <Share2 size={12} color="#475569" strokeWidth={2.2} />
-                                    <span>Teilen</span>
-                                    <ChevronDown 
-                                      size={11} 
-                                      color="#64748b" 
-                                      style={{ 
-                                        transform: isShareMenuOpen ? 'rotate(180deg)' : 'none', 
-                                        transition: 'transform 0.18s cubic-bezier(0.16, 1, 0.3, 1)' 
-                                      }} 
-                                    />
-                                  </button>
+                                {/* ✉️ 3. Direct E-Mail Send Button & Quick-Copy Icon Button */}
+                                 <div ref={shareMenuRef} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                   <button
+                                     type="button"
+                                     onClick={handleShareEmail}
+                                     style={{
+                                       background: '#f8fafc',
+                                       border: '1px solid #e2e8f0',
+                                       color: '#0f172a',
+                                       borderRadius: '100px',
+                                       padding: '0 12px',
+                                       minHeight: '32px',
+                                       fontSize: '0.80rem',
+                                       fontWeight: 750,
+                                       cursor: 'pointer',
+                                       display: 'inline-flex',
+                                       alignItems: 'center',
+                                       gap: '6px',
+                                       transition: 'all 0.15s ease',
+                                       boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
+                                     }}
+                                     className="hover-scale-mini"
+                                     title="Wochenplan per E-Mail versenden"
+                                   >
+                                     <Mail size={13} color="#16a34a" strokeWidth={2.2} />
+                                     <span>Per E-Mail senden</span>
+                                   </button>
 
-                                  {isShareMenuOpen && (
-                                    <div
-                                      style={{
-                                        position: 'absolute',
-                                        top: 'calc(100% + 6px)',
-                                        right: 0,
-                                        zIndex: 9999,
-                                        minWidth: '230px',
-                                        background: '#ffffff',
-                                        borderRadius: '16px',
-                                        border: '1px solid #e2e8f0',
-                                        boxShadow: '0 16px 36px -4px rgba(15, 23, 42, 0.16), 0 4px 12px rgba(0,0,0,0.05)',
-                                        padding: '6px',
-                                        display: 'flex',
-                                        flexDirection: 'column',
-                                        gap: '2px',
-                                        animation: 'fadeIn 0.15s ease'
-                                      }}
-                                    >
-                                      {/* 1. E-Mail */}
-                                      <button
-                                        type="button"
-                                        onClick={handleShareEmail}
-                                        style={{
-                                          display: 'flex',
-                                          alignItems: 'center',
-                                          gap: '10px',
-                                          width: '100%',
-                                          padding: '8px 10px',
-                                          background: 'transparent',
-                                          border: 'none',
-                                          borderRadius: '10px',
-                                          cursor: 'pointer',
-                                          textAlign: 'left',
-                                          color: '#0f172a',
-                                          fontSize: '0.78rem',
-                                          fontWeight: 750,
-                                          transition: 'background 0.12s ease'
-                                        }}
-                                        className="hover-bg-slate"
-                                      >
-                                        <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: '#f0fdf4', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#16a34a', flexShrink: 0 }}>
-                                          <Mail size={14} strokeWidth={2.2} />
-                                        </div>
-                                        <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                          <span>Per E-Mail versenden</span>
-                                          <span style={{ fontSize: '0.65rem', fontWeight: 500, color: '#64748b' }}>Wochenplan als Nachricht</span>
-                                        </div>
-                                      </button>
-
-                                      {/* 2. Link & Text kopieren */}
-                                      <button
-                                        type="button"
-                                        onClick={handleCopyShareLink}
-                                        style={{
-                                          display: 'flex',
-                                          alignItems: 'center',
-                                          gap: '10px',
-                                          width: '100%',
-                                          padding: '8px 10px',
-                                          background: isLinkCopied ? '#f0fdf4' : 'transparent',
-                                          border: 'none',
-                                          borderRadius: '10px',
-                                          cursor: 'pointer',
-                                          textAlign: 'left',
-                                          color: isLinkCopied ? '#16a34a' : '#0f172a',
-                                          fontSize: '0.78rem',
-                                          fontWeight: 750,
-                                          transition: 'all 0.12s ease'
-                                        }}
-                                        className="hover-bg-slate"
-                                      >
-                                        <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: isLinkCopied ? '#dcfce7' : '#f0fdf4', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#16a34a', flexShrink: 0 }}>
-                                          {isLinkCopied ? <Check size={14} strokeWidth={2.5} /> : <Copy size={14} strokeWidth={2.2} />}
-                                        </div>
-                                        <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                          <span>{isLinkCopied ? 'Kopiert!' : 'Text & Link kopieren'}</span>
-                                      <span style={{ fontSize: '0.65rem', fontWeight: 500, color: isLinkCopied ? '#16a34a' : '#64748b' }}>In Zwischenablage legen</span>
-                                        </div>
-                                      </button>
-                                    </div>
-                                  )}
-                                </div>
+                                   <button
+                                     type="button"
+                                     onClick={handleCopyShareLink}
+                                     style={{
+                                       background: isLinkCopied ? '#f0fdf4' : '#f8fafc',
+                                       border: isLinkCopied ? '1px solid #86efac' : '1px solid #e2e8f0',
+                                       color: isLinkCopied ? '#16a34a' : '#475569',
+                                       borderRadius: '100px',
+                                       padding: '0 9px',
+                                       minHeight: '32px',
+                                       fontSize: '0.78rem',
+                                       fontWeight: 750,
+                                       cursor: 'pointer',
+                                       display: 'inline-flex',
+                                       alignItems: 'center',
+                                       gap: '4px',
+                                       transition: 'all 0.15s ease',
+                                       boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
+                                     }}
+                                     className="hover-scale-mini"
+                                     title={isLinkCopied ? 'In Zwischenablage kopiert!' : 'Wochenplan-Text in Zwischenablage kopieren'}
+                                   >
+                                     {isLinkCopied ? (
+                                       <>
+                                         <Check size={13} color="#16a34a" strokeWidth={2.5} />
+                                         <span style={{ fontSize: '0.74rem' }}>Kopiert!</span>
+                                       </>
+                                     ) : (
+                                       <Copy size={13} color="#475569" strokeWidth={2.2} />
+                                     )}
+                                   </button>
+                                 </div>
 
                                 {(progressItems.some(item => item.is_current_homework) || generalHomeworkNotes.trim() !== '') && !readOnly && (
                                   <button 
@@ -7367,18 +6747,25 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                             type="button"
                                             onClick={() => handleSpeakText(effectiveViewingQuestion.text, 'student_q')}
                                             title="Frage vorlesen"
+                                            aria-label="Frage vorlesen"
                                             style={{
-                                              border: 'none',
+                                              border: '1px solid #fde047',
                                               background: '#fef08a',
                                               color: '#854d0e',
-                                              borderRadius: '6px',
-                                              padding: '4px 6px',
+                                              borderRadius: '8px',
+                                              minWidth: '30px',
+                                              minHeight: '30px',
+                                              padding: '0 8px',
                                               cursor: 'pointer',
                                               display: 'flex',
-                                              alignItems: 'center'
+                                              alignItems: 'center',
+                                              justifyContent: 'center',
+                                              boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
+                                              transition: 'all 0.15s ease'
                                             }}
+                                            className="hover-scale-mini"
                                           >
-                                            <Volume2 size={13} />
+                                            <Volume2 size={15} />
                                           </button>
                                           <button
                                             type="button"
@@ -7387,35 +6774,49 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                               setIsQuestionEditorOpen(true);
                                             }}
                                             title="Frage bearbeiten"
+                                            aria-label="Frage bearbeiten"
                                             style={{
-                                              border: 'none',
+                                              border: '1px solid #fde047',
                                               background: '#fef08a',
                                               color: '#854d0e',
-                                              borderRadius: '6px',
-                                              padding: '4px 6px',
+                                              borderRadius: '8px',
+                                              minWidth: '30px',
+                                              minHeight: '30px',
+                                              padding: '0 8px',
                                               cursor: 'pointer',
                                               display: 'flex',
-                                              alignItems: 'center'
+                                              alignItems: 'center',
+                                              justifyContent: 'center',
+                                              boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
+                                              transition: 'all 0.15s ease'
                                             }}
+                                            className="hover-scale-mini"
                                           >
-                                            <Edit3 size={13} />
+                                            <Edit3 size={15} />
                                           </button>
                                           <button
                                             type="button"
                                             onClick={handleResolveStudentQuestion}
                                             title="Frage löschen oder als erledigt markieren"
+                                            aria-label="Frage löschen oder als erledigt markieren"
                                             style={{
-                                              border: 'none',
+                                              border: '1px solid #fecaca',
                                               background: '#fee2e2',
                                               color: '#dc2626',
-                                              borderRadius: '6px',
-                                              padding: '4px 6px',
+                                              borderRadius: '8px',
+                                              minWidth: '30px',
+                                              minHeight: '30px',
+                                              padding: '0 8px',
                                               cursor: 'pointer',
                                               display: 'flex',
-                                              alignItems: 'center'
+                                              alignItems: 'center',
+                                              justifyContent: 'center',
+                                              boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
+                                              transition: 'all 0.15s ease'
                                             }}
+                                            className="hover-scale-mini"
                                           >
-                                            <Trash2 size={13} />
+                                            <Trash2 size={15} />
                                           </button>
                                         </div>
                                       </div>
@@ -7428,8 +6829,8 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                       }}>
                                         „{effectiveViewingQuestion.text}“
                                       </div>
-                                      <div style={{ fontSize: '0.74rem', fontWeight: 650, color: '#a16207', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                                        <Sparkles size={11} color="#ca8a04" />
+                                      <div style={{ fontSize: '0.78rem', fontWeight: 650, color: '#854d0e', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                        <Sparkles size={13} color="#854d0e" />
                                         <span>{effectiveTeacherFullName} sieht diese Frage zu Beginn eurer nächsten Stunde!</span>
                                       </div>
                                     </div>

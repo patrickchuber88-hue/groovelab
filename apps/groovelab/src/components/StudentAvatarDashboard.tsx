@@ -33,7 +33,6 @@ import { synthesizeNeuralSpeech, playAudioBlob, stopNeuralSpeech, buildContinuou
 import { fetchHolidaysCached } from '../utils/holidayHelper';
 import { useParentSessionLock } from '../hooks/useParentSessionLock';
 import { AddSiblingModal } from './campus/AddSiblingModal';
-import { StudentPracticeTab } from './student/tabs/StudentPracticeTab';
 import { StudentSongDetailModal } from './student/modals/StudentSongDetailModal';
 import { StudentLehrwerkDetailModal } from './student/modals/StudentLehrwerkDetailModal';
 import { DigitalDetoxOverlay } from './student/modals/DigitalDetoxOverlay';
@@ -49,14 +48,15 @@ import { StudentJuniorStickerModal } from './student/modals/StudentJuniorSticker
 import { StudentJuniorStickerDetailModal } from './student/modals/StudentJuniorStickerDetailModal';
 import { StudentJuniorStickerAwardModal } from './student/modals/StudentJuniorStickerAwardModal';
 import { SiblingPinUnlockModal } from './student/modals/SiblingPinUnlockModal';
-import { StudentSongsTab } from './student/tabs/StudentSongsTab';
-import { StudentProfileTab } from './student/tabs/StudentProfileTab';
-import { StudentSettingsTab } from './student/tabs/StudentSettingsTab';
 import { StudentBriefingTab } from './student/tabs/StudentBriefingTab';
 import { StudentHeroTab } from './student/tabs/StudentHeroTab';
 import { CampusAppointmentShoutboxModal } from './CampusAppointmentShoutboxModal';
 
 // 🚀 High-Performance Lazy Loaded Sub-Suites & Heavy Modals
+const StudentPracticeTab = lazy(() => import('./student/tabs/StudentPracticeTab').then(m => ({ default: m.StudentPracticeTab })));
+const StudentSongsTab = lazy(() => import('./student/tabs/StudentSongsTab').then(m => ({ default: m.StudentSongsTab })));
+const StudentProfileTab = lazy(() => import('./student/tabs/StudentProfileTab').then(m => ({ default: m.StudentProfileTab })));
+const StudentSettingsTab = lazy(() => import('./student/tabs/StudentSettingsTab').then(m => ({ default: m.StudentSettingsTab })));
 const CampusEventsBoard = lazy(() => import('./CampusEventsBoard').then(m => ({ default: m.CampusEventsBoard })));
 const MeisterwerkDocumentationModal = lazy(() => import('./MeisterwerkDocumentationModal').then(m => ({ default: m.MeisterwerkDocumentationModal || (m as any).default })));
 const MeisterwerkCertificateModal = lazy(() => import('./ui/MeisterwerkCertificateModal').then(m => ({ default: m.MeisterwerkCertificateModal })));
@@ -3655,6 +3655,12 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       onTabChange(tab);
     }
   };
+  const [visitedTabs, setVisitedTabs] = useState<Set<string>>(() => new Set(['briefing', 'hero', activeTab]));
+  useEffect(() => {
+    if (activeTab && !visitedTabs.has(activeTab)) {
+      setVisitedTabs(prev => new Set(prev).add(activeTab));
+    }
+  }, [activeTab, visitedTabs]);
   const [homeworkBookTab, setHomeworkBookTab] = useState<'document' | 'logbook' | 'stickeralbum' | 'skillradar' | 'audiobiography'>('document');
   const [homeworkBookViewMode, setHomeworkBookViewMode] = useState<'document' | 'recordings' | 'loopstation' | 'practice'>('document');
   const [homeworkRetryKey, setHomeworkRetryKey] = useState<number>(0);
@@ -11797,86 +11803,94 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
         </button>
       </div>
 
-      <StudentPracticeTab
-        activeTab={activeTab}
-        studentUiLevel={studentUiLevel}
-        juniorMissionPhase={juniorMissionPhase}
-        preStartCountdown={preStartCountdown}
-        studentId={studentId}
-        studentUser={studentUser}
-        avatar={avatar}
-        effectivePracticeMinutes={effectivePracticeMinutes}
-        secondsElapsedRef={secondsElapsedRef}
-        isJuniorMissionPausedRef={isJuniorMissionPausedRef}
-        startJuniorMissionImmediately={startJuniorMissionImmediately}
-        handleFinishJuniorMission={handleFinishJuniorMission}
-        handleEmergencyExitJuniorMission={handleEmergencyExitJuniorMission}
-        handleCloseJuniorCelebration={handleCloseJuniorCelebration}
-        handleStartPracticeSession={handleStartPracticeSession}
-        finishPracticeSession={finishPracticeSession}
-        logParentGuidedPractice={logParentGuidedPractice}
-        handleOpenHomeworkBookWithView={handleOpenHomeworkBookWithView}
-        playMilestoneSound={playMilestoneSound}
-        playStarChimeSound={playStarChimeSound}
-        getDeterministicWeekMetrics={getDeterministicWeekMetrics}
-        getGroupedLogs={getGroupedLogs}
-        getJuniorMissionDetails={getJuniorMissionDetails}
-        getTargetMinutes={getTargetMinutes}
-        sessionActive={sessionActive}
-        secondsElapsed={secondsElapsed}
-        isMobile={isMobile}
-        isMusicStandMode={isMusicStandMode}
-        flamesActive={flamesActive}
-        xpActive={xpActive}
-        assignedCampusSongs={assignedCampusSongs}
-        lehrwerke={lehrwerke}
-        progressItems={progressItems}
-        fokusLogs={fokusLogs}
-        activeSongSkills={activeSongSkills}
-        showJuniorPracticeSettingsModal={showJuniorPracticeSettingsModal}
-        setShowJuniorPracticeSettingsModal={setShowJuniorPracticeSettingsModal}
-        showJuniorStickerModal={showJuniorStickerModal}
-        setShowJuniorStickerModal={setShowJuniorStickerModal}
-        practiceAnchor={practiceAnchor}
-        setPracticeAnchor={setPracticeAnchor}
-        juniorMissionTier={juniorMissionTier}
-        juniorMissionCountdown={juniorMissionCountdown}
-        isJuniorMissionPaused={isJuniorMissionPaused}
-        setIsJuniorMissionPaused={setIsJuniorMissionPaused}
-        showJuniorCheatSheet={showJuniorCheatSheet}
-        setShowJuniorCheatSheet={setShowJuniorCheatSheet}
-        juniorSelectedTrackIndex={juniorSelectedTrackIndex}
-        isJuniorTabPaused={isJuniorTabPaused}
-        juniorCelebrationSummary={juniorCelebrationSummary}
-        juniorLaunchStage={juniorLaunchStage}
-        expandedMonths={expandedMonths}
-        setExpandedMonths={setExpandedMonths}
-      />
+      {visitedTabs.has('practice_board') && (
+        <Suspense fallback={<div style={{ padding: '40px', textAlign: 'center', color: '#64748b', fontWeight: 600 }}>Lade Übepfad...</div>}>
+          <StudentPracticeTab
+            activeTab={activeTab}
+            studentUiLevel={studentUiLevel}
+            juniorMissionPhase={juniorMissionPhase}
+            preStartCountdown={preStartCountdown}
+            studentId={studentId}
+            studentUser={studentUser}
+            avatar={avatar}
+            effectivePracticeMinutes={effectivePracticeMinutes}
+            secondsElapsedRef={secondsElapsedRef}
+            isJuniorMissionPausedRef={isJuniorMissionPausedRef}
+            startJuniorMissionImmediately={startJuniorMissionImmediately}
+            handleFinishJuniorMission={handleFinishJuniorMission}
+            handleEmergencyExitJuniorMission={handleEmergencyExitJuniorMission}
+            handleCloseJuniorCelebration={handleCloseJuniorCelebration}
+            handleStartPracticeSession={handleStartPracticeSession}
+            finishPracticeSession={finishPracticeSession}
+            logParentGuidedPractice={logParentGuidedPractice}
+            handleOpenHomeworkBookWithView={handleOpenHomeworkBookWithView}
+            playMilestoneSound={playMilestoneSound}
+            playStarChimeSound={playStarChimeSound}
+            getDeterministicWeekMetrics={getDeterministicWeekMetrics}
+            getGroupedLogs={getGroupedLogs}
+            getJuniorMissionDetails={getJuniorMissionDetails}
+            getTargetMinutes={getTargetMinutes}
+            sessionActive={sessionActive}
+            secondsElapsed={secondsElapsed}
+            isMobile={isMobile}
+            isMusicStandMode={isMusicStandMode}
+            flamesActive={flamesActive}
+            xpActive={xpActive}
+            assignedCampusSongs={assignedCampusSongs}
+            lehrwerke={lehrwerke}
+            progressItems={progressItems}
+            fokusLogs={fokusLogs}
+            activeSongSkills={activeSongSkills}
+            showJuniorPracticeSettingsModal={showJuniorPracticeSettingsModal}
+            setShowJuniorPracticeSettingsModal={setShowJuniorPracticeSettingsModal}
+            showJuniorStickerModal={showJuniorStickerModal}
+            setShowJuniorStickerModal={setShowJuniorStickerModal}
+            practiceAnchor={practiceAnchor}
+            setPracticeAnchor={setPracticeAnchor}
+            juniorMissionTier={juniorMissionTier}
+            juniorMissionCountdown={juniorMissionCountdown}
+            isJuniorMissionPaused={isJuniorMissionPaused}
+            setIsJuniorMissionPaused={setIsJuniorMissionPaused}
+            showJuniorCheatSheet={showJuniorCheatSheet}
+            setShowJuniorCheatSheet={setShowJuniorCheatSheet}
+            juniorSelectedTrackIndex={juniorSelectedTrackIndex}
+            isJuniorTabPaused={isJuniorTabPaused}
+            juniorCelebrationSummary={juniorCelebrationSummary}
+            juniorLaunchStage={juniorLaunchStage}
+            expandedMonths={expandedMonths}
+            setExpandedMonths={setExpandedMonths}
+          />
+        </Suspense>
+      )}
 
-      <StudentSongsTab
-        activeTab={activeTab}
-        progressLoading={progressLoading}
-        assignedCampusSongs={assignedCampusSongs}
-        lehrwerke={lehrwerke}
-        isMobile={isMobile}
-        studentUser={studentUser}
-        studentId={studentId}
-        juniorMediathekFilter={juniorMediathekFilter}
-        setJuniorMediathekFilter={setJuniorMediathekFilter}
-        songSearch={songSearch}
-        setSongSearch={setSongSearch}
-        songSearchDebounced={songSearchDebounced}
-        progressItems={progressItems}
-        setSelectedTopic={setSelectedTopic}
-        handleTabChangeLocal={handleTabChangeLocal}
-        setSelectedSongForDetail={setSelectedSongForDetail}
-        setCertificateSong={setCertificateSong}
-        setSelectedLehrwerkForDetail={setSelectedLehrwerkForDetail}
-        isSongMastered={isSongMastered}
-        localProgress={localProgress}
-        activeSongSkills={activeSongSkills}
-        isMusicStandMode={isMusicStandMode}
-      />
+      {visitedTabs.has('songs') && (
+        <Suspense fallback={<div style={{ padding: '40px', textAlign: 'center', color: '#64748b', fontWeight: 600 }}>Lade Songs &amp; Repertoire...</div>}>
+          <StudentSongsTab
+            activeTab={activeTab}
+            progressLoading={progressLoading}
+            assignedCampusSongs={assignedCampusSongs}
+            lehrwerke={lehrwerke}
+            isMobile={isMobile}
+            studentUser={studentUser}
+            studentId={studentId}
+            juniorMediathekFilter={juniorMediathekFilter}
+            setJuniorMediathekFilter={setJuniorMediathekFilter}
+            songSearch={songSearch}
+            setSongSearch={setSongSearch}
+            songSearchDebounced={songSearchDebounced}
+            progressItems={progressItems}
+            setSelectedTopic={setSelectedTopic}
+            handleTabChangeLocal={handleTabChangeLocal}
+            setSelectedSongForDetail={setSelectedSongForDetail}
+            setCertificateSong={setCertificateSong}
+            setSelectedLehrwerkForDetail={setSelectedLehrwerkForDetail}
+            isSongMastered={isSongMastered}
+            localProgress={localProgress}
+            activeSongSkills={activeSongSkills}
+            isMusicStandMode={isMusicStandMode}
+          />
+        </Suspense>
+      )}
 
       {activeTab === 'campus_cup' && (
         <Suspense fallback={<div style={{ padding: '40px', textAlign: 'center', color: '#64748b', fontWeight: 600 }}>Lade Campus Cup...</div>}>
@@ -11942,6 +11956,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                 schoolName={resolvedSchoolName}
                 onClose={() => handleTabChangeLocal('briefing')}
                 teacherId={studentUser ? studentUser.teacher_id : null}
+                teacherName={formatTeacherFullName(briefingData?.todayLesson?.teacher_name || (studentUser as any)?.teacher_name || briefingData?.teacherName || (studentUser as any)?.teacher)}
                 readOnly={!isTeacherSession}
                 isTeacherTools={isTeacherSession}
                 isEmbed={true}
@@ -11958,6 +11973,21 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                 onSaveParentOverrides={(overrides) => applyAndSaveParentControls({ boardOverrides: overrides })}
                 isSoftLocked={isDirectBillingSoftLocked}
                 onTriggerSoftLock={() => setShowSoftLockModal(true)}
+                initialLehrwerke={lehrwerke}
+                initialSongs={assignedCampusSongs}
+                initialProgressItems={progressItems}
+                initialLocalProgress={localProgress}
+                onSongsUpdated={(updatedSkills) => {
+                  if (Array.isArray(updatedSkills) && updatedSkills.length > 0) {
+                    setActiveSongSkills(prev => {
+                      const prevMap = new Map((prev || []).map((s: any) => [String(s.song_id || s.id), s]));
+                      updatedSkills.forEach(s => {
+                        prevMap.set(String(s.song_id || s.id), s);
+                      });
+                      return Array.from(prevMap.values());
+                    });
+                  }
+                }}
               />
             </Suspense>
           </HomeworkBookErrorBoundary>
@@ -12105,170 +12135,178 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
         startTour={startTour}
       />
 
-      <StudentProfileTab
-        activeTab={activeTab}
-        studentUser={studentUser}
-        studentId={studentId}
-        avatar={avatar}
-        editingProfile={editingProfile}
-        setEditingProfile={setEditingProfile}
-        showEditProfile={showEditProfile}
-        setShowEditProfile={setShowEditProfile}
-        savingProfile={savingProfile}
-        handleSaveProfile={handleSaveProfile}
-        showAvatarSelector={showAvatarSelector}
-        setShowAvatarSelector={setShowAvatarSelector}
-        avatarCategoryFilter={avatarCategoryFilter}
-        setAvatarCategoryFilter={setAvatarCategoryFilter}
-        showSecondEmail={showSecondEmail}
-        setShowSecondEmail={setShowSecondEmail}
-        familyProfiles={familyProfiles}
-        handleSwitchFamilyStudent={handleSwitchFamilyStudent}
-        setIsAddSiblingModalOpen={setIsAddSiblingModalOpen}
-        showOwnQr={showOwnQr}
-        setShowOwnQr={setShowOwnQr}
-        studentSchedules={studentSchedules}
-        monthlyFocusMinutes={monthlyFocusMinutes}
-        fokusLogs={fokusLogs}
-        sessionActive={sessionActive}
-        secondsElapsed={secondsElapsed}
-        isMusicStandMode={isMusicStandMode}
-        flamesActive={flamesActive}
-        xpActive={xpActive}
-      />
+      {visitedTabs.has('profile') && (
+        <Suspense fallback={<div style={{ padding: '40px', textAlign: 'center', color: '#64748b', fontWeight: 600 }}>Lade Profil...</div>}>
+          <StudentProfileTab
+            activeTab={activeTab}
+            studentUser={studentUser}
+            studentId={studentId}
+            avatar={avatar}
+            editingProfile={editingProfile}
+            setEditingProfile={setEditingProfile}
+            showEditProfile={showEditProfile}
+            setShowEditProfile={setShowEditProfile}
+            savingProfile={savingProfile}
+            handleSaveProfile={handleSaveProfile}
+            showAvatarSelector={showAvatarSelector}
+            setShowAvatarSelector={setShowAvatarSelector}
+            avatarCategoryFilter={avatarCategoryFilter}
+            setAvatarCategoryFilter={setAvatarCategoryFilter}
+            showSecondEmail={showSecondEmail}
+            setShowSecondEmail={setShowSecondEmail}
+            familyProfiles={familyProfiles}
+            handleSwitchFamilyStudent={handleSwitchFamilyStudent}
+            setIsAddSiblingModalOpen={setIsAddSiblingModalOpen}
+            showOwnQr={showOwnQr}
+            setShowOwnQr={setShowOwnQr}
+            studentSchedules={studentSchedules}
+            monthlyFocusMinutes={monthlyFocusMinutes}
+            fokusLogs={fokusLogs}
+            sessionActive={sessionActive}
+            secondsElapsed={secondsElapsed}
+            isMusicStandMode={isMusicStandMode}
+            flamesActive={flamesActive}
+            xpActive={xpActive}
+          />
+        </Suspense>
+      )}
 
       {/* Settings Tab */}
-      <StudentSettingsTab
-        activeStudentSettingsModal={activeStudentSettingsModal}
-        activeTab={activeTab}
-        applyAndSaveParentControls={applyAndSaveParentControls}
-        avatar={avatar}
-        bedtimeEnd={bedtimeEnd}
-        bedtimeModeEnabled={bedtimeModeEnabled}
-        bedtimeStart={bedtimeStart}
-        cancelledSchoolYearOccurrences={cancelledSchoolYearOccurrences}
-        checkIsParentSessionActive={checkIsParentSessionActive}
-        currentPlatform={currentPlatform}
-        daytimeLockDays={daytimeLockDays}
-        daytimeLockEnabled={daytimeLockEnabled}
-        daytimeLockEnd={daytimeLockEnd}
-        daytimeLockStart={daytimeLockStart}
-        draftAllowAbsences={draftAllowAbsences}
-        draftAllowAudio={draftAllowAudio}
-        draftAllowChat={draftAllowChat}
-        draftAllowLeaderboard={draftAllowLeaderboard}
-        draftAllowProposals={draftAllowProposals}
-        draftAllowReschedule={draftAllowReschedule}
-        draftAllowTimer={draftAllowTimer}
-        draftAllowTts={draftAllowTts}
-        draftBoardOverrides={draftBoardOverrides}
-        draftUiLevel={draftUiLevel}
-        extendParentSession={extendParentSession}
-        familyProfiles={familyProfiles}
-        firstPinActiveField={firstPinActiveField}
-        firstPinShowMask={firstPinShowMask}
-        generateParentRecoveryKey={generateParentRecoveryKey}
-        getTargetMinutes={getTargetMinutes}
-        handleBiometricUnlock={handleBiometricUnlock}
-        handleCloseSettingsModal={handleCloseSettingsModal}
-        handleDownloadGoBdReceipt={handleDownloadGoBdReceipt}
-        handleExportGdprReport={handleExportGdprReport}
-        handleExportFullDataArchive={handleExportFullDataArchive}
-        handleOpenSettingsModule={handleOpenSettingsModule}
-        handleRemoveFamilyProfile={handleRemoveFamilyProfile}
-        handleSetInstantLock={handleSetInstantLock}
-        handleSwitchFamilyStudent={handleSwitchFamilyStudent}
-        handleUndoCancelOccurrence={handleUndoCancelOccurrence}
-        handleUpdateBedtime={handleUpdateBedtime}
-        handleUpdateDaytimeLock={handleUpdateDaytimeLock}
-        handleVerifyParentPinAttempt={handleVerifyParentPinAttempt}
-        hasCopiedRecoveryKey={hasCopiedRecoveryKey}
-        instantLockUntil={instantLockUntil}
-        isAddSiblingModalOpen={isAddSiblingModalOpen}
-        isAdultStudent={isAdultStudent}
-        isCurrentlyInInstantLock={isCurrentlyInInstantLock}
-        isIOS={isIOS}
-        isMobile={isMobile}
-        isParentGateShaking={isParentGateShaking}
-        isParentLockWarning={isParentLockWarning}
-        isParentUnlocked={isParentUnlocked}
-        isPremiumUser={isPremiumUser}
-        isSavingPin={isSavingPin}
-        isStandalone={isStandalone}
-        isVerifyingParentGate={isVerifyingParentGate}
-        isWebAuthnAvailable={isWebAuthnAvailable}
-        newGeneratedRecoveryKey={newGeneratedRecoveryKey}
-        onProfileUpdate={onProfileUpdate}
-        parentBriefingDismissed={parentBriefingDismissed}
-        parentControlsTab={parentControlsTab}
-        parentGateCooldownSeconds={parentGateCooldownSeconds}
-        parentGateError={parentGateError}
-        parentGatePinInput={parentGatePinInput}
-        parentLockRemainingSeconds={parentLockRemainingSeconds}
-        parentSetupConfirm={parentSetupConfirm}
-        parentSetupError={parentSetupError}
-        parentSetupPin={parentSetupPin}
-        parentSetupStep={parentSetupStep}
-        pinFormConfirm={pinFormConfirm}
-        pinFormError={pinFormError}
-        pinFormNew={pinFormNew}
-        pinFormSuccess={pinFormSuccess}
-        pushEnabled={pushEnabled}
-        pushNotifChat={pushNotifChat}
-        pushNotifHomework={pushNotifHomework}
-        pushNotifPracticeReminder={pushNotifPracticeReminder}
-        pushNotifScheduleChanges={pushNotifScheduleChanges}
-        pushNotifWeeklyDigest={pushNotifWeeklyDigest}
-        recentlyChangedDiff={recentlyChangedDiff}
-        renderParentGateModal={renderParentGateModal}
-        renderRecoveryKeyModal={renderRecoveryKeyModal}
-        scheduleOccurrences={scheduleOccurrences}
-        securityPinTarget={securityPinTarget}
-        setActiveStudentSettingsModal={setActiveStudentSettingsModal}
-        setFamilyProfiles={setFamilyProfiles}
-        setFirstPinActiveField={setFirstPinActiveField}
-        setFirstPinShowMask={setFirstPinShowMask}
-        setHasCopiedRecoveryKey={setHasCopiedRecoveryKey}
-        setIsAddSiblingModalOpen={setIsAddSiblingModalOpen}
-        setIsHelpCenterOpen={setIsHelpCenterOpen}
-        setIsSavingPin={setIsSavingPin}
-        setNewGeneratedRecoveryKey={setNewGeneratedRecoveryKey}
-        setParentBriefingDismissed={setParentBriefingDismissed}
-        setParentControlsTab={setParentControlsTab}
-        setParentGateError={setParentGateError}
-        setParentGatePinInput={setParentGatePinInput}
-        setParentSetupConfirm={setParentSetupConfirm}
-        setParentSetupError={setParentSetupError}
-        setParentSetupPin={setParentSetupPin}
-        setParentSetupStep={setParentSetupStep}
-        setPinFormConfirm={setPinFormConfirm}
-        setPinFormError={setPinFormError}
-        setPinFormNew={setPinFormNew}
-        setPinFormSuccess={setPinFormSuccess}
-        setPushEnabled={setPushEnabled}
-        setPushNotifChat={setPushNotifChat}
-        setPushNotifHomework={setPushNotifHomework}
-        setPushNotifPracticeReminder={setPushNotifPracticeReminder}
-        setPushNotifScheduleChanges={setPushNotifScheduleChanges}
-        setPushNotifWeeklyDigest={setPushNotifWeeklyDigest}
-        setRecentlyChangedDiff={setRecentlyChangedDiff}
-        setRecoveryKeyError={setRecoveryKeyError}
-        setRecoveryKeyInput={setRecoveryKeyInput}
-        setSecurityPinTarget={setSecurityPinTarget}
-        setSettingsSubTab={setSettingsSubTab}
-        setShowEmergencyKitModal={setShowEmergencyKitModal}
-        setShowParentActivationModal={setShowParentActivationModal}
-        setShowPushSoftPrompt={setShowPushSoftPrompt}
-        setShowRecoveryKeyModal={setShowRecoveryKeyModal}
-        setStudentUser={setStudentUser}
-        showEmergencyKitModal={showEmergencyKitModal}
-        studentId={studentId}
-        studentUiLevel={studentUiLevel}
-        studentUser={studentUser}
-        totalPracticeMinutes={totalPracticeMinutes}
-        weeklyPracticeMinutes={myWeeklyFocus || engineWeekFocusMinutes || 0}
-        schoolYearPracticeMinutes={schoolYearFocusMinutes || totalPracticeMinutes}
-      />
+      {visitedTabs.has('settings') && (
+        <Suspense fallback={<div style={{ padding: '40px', textAlign: 'center', color: '#64748b', fontWeight: 600 }}>Lade Einstellungen...</div>}>
+          <StudentSettingsTab
+            activeStudentSettingsModal={activeStudentSettingsModal}
+            activeTab={activeTab}
+            applyAndSaveParentControls={applyAndSaveParentControls}
+            avatar={avatar}
+            bedtimeEnd={bedtimeEnd}
+            bedtimeModeEnabled={bedtimeModeEnabled}
+            bedtimeStart={bedtimeStart}
+            cancelledSchoolYearOccurrences={cancelledSchoolYearOccurrences}
+            checkIsParentSessionActive={checkIsParentSessionActive}
+            currentPlatform={currentPlatform}
+            daytimeLockDays={daytimeLockDays}
+            daytimeLockEnabled={daytimeLockEnabled}
+            daytimeLockEnd={daytimeLockEnd}
+            daytimeLockStart={daytimeLockStart}
+            draftAllowAbsences={draftAllowAbsences}
+            draftAllowAudio={draftAllowAudio}
+            draftAllowChat={draftAllowChat}
+            draftAllowLeaderboard={draftAllowLeaderboard}
+            draftAllowProposals={draftAllowProposals}
+            draftAllowReschedule={draftAllowReschedule}
+            draftAllowTimer={draftAllowTimer}
+            draftAllowTts={draftAllowTts}
+            draftBoardOverrides={draftBoardOverrides}
+            draftUiLevel={draftUiLevel}
+            extendParentSession={extendParentSession}
+            familyProfiles={familyProfiles}
+            firstPinActiveField={firstPinActiveField}
+            firstPinShowMask={firstPinShowMask}
+            generateParentRecoveryKey={generateParentRecoveryKey}
+            getTargetMinutes={getTargetMinutes}
+            handleBiometricUnlock={handleBiometricUnlock}
+            handleCloseSettingsModal={handleCloseSettingsModal}
+            handleDownloadGoBdReceipt={handleDownloadGoBdReceipt}
+            handleExportGdprReport={handleExportGdprReport}
+            handleExportFullDataArchive={handleExportFullDataArchive}
+            handleOpenSettingsModule={handleOpenSettingsModule}
+            handleRemoveFamilyProfile={handleRemoveFamilyProfile}
+            handleSetInstantLock={handleSetInstantLock}
+            handleSwitchFamilyStudent={handleSwitchFamilyStudent}
+            handleUndoCancelOccurrence={handleUndoCancelOccurrence}
+            handleUpdateBedtime={handleUpdateBedtime}
+            handleUpdateDaytimeLock={handleUpdateDaytimeLock}
+            handleVerifyParentPinAttempt={handleVerifyParentPinAttempt}
+            hasCopiedRecoveryKey={hasCopiedRecoveryKey}
+            instantLockUntil={instantLockUntil}
+            isAddSiblingModalOpen={isAddSiblingModalOpen}
+            isAdultStudent={isAdultStudent}
+            isCurrentlyInInstantLock={isCurrentlyInInstantLock}
+            isIOS={isIOS}
+            isMobile={isMobile}
+            isParentGateShaking={isParentGateShaking}
+            isParentLockWarning={isParentLockWarning}
+            isParentUnlocked={isParentUnlocked}
+            isPremiumUser={isPremiumUser}
+            isSavingPin={isSavingPin}
+            isStandalone={isStandalone}
+            isVerifyingParentGate={isVerifyingParentGate}
+            isWebAuthnAvailable={isWebAuthnAvailable}
+            newGeneratedRecoveryKey={newGeneratedRecoveryKey}
+            onProfileUpdate={onProfileUpdate}
+            parentBriefingDismissed={parentBriefingDismissed}
+            parentControlsTab={parentControlsTab}
+            parentGateCooldownSeconds={parentGateCooldownSeconds}
+            parentGateError={parentGateError}
+            parentGatePinInput={parentGatePinInput}
+            parentLockRemainingSeconds={parentLockRemainingSeconds}
+            parentSetupConfirm={parentSetupConfirm}
+            parentSetupError={parentSetupError}
+            parentSetupPin={parentSetupPin}
+            parentSetupStep={parentSetupStep}
+            pinFormConfirm={pinFormConfirm}
+            pinFormError={pinFormError}
+            pinFormNew={pinFormNew}
+            pinFormSuccess={pinFormSuccess}
+            pushEnabled={pushEnabled}
+            pushNotifChat={pushNotifChat}
+            pushNotifHomework={pushNotifHomework}
+            pushNotifPracticeReminder={pushNotifPracticeReminder}
+            pushNotifScheduleChanges={pushNotifScheduleChanges}
+            pushNotifWeeklyDigest={pushNotifWeeklyDigest}
+            recentlyChangedDiff={recentlyChangedDiff}
+            renderParentGateModal={renderParentGateModal}
+            renderRecoveryKeyModal={renderRecoveryKeyModal}
+            scheduleOccurrences={scheduleOccurrences}
+            securityPinTarget={securityPinTarget}
+            setActiveStudentSettingsModal={setActiveStudentSettingsModal}
+            setFamilyProfiles={setFamilyProfiles}
+            setFirstPinActiveField={setFirstPinActiveField}
+            setFirstPinShowMask={setFirstPinShowMask}
+            setHasCopiedRecoveryKey={setHasCopiedRecoveryKey}
+            setIsAddSiblingModalOpen={setIsAddSiblingModalOpen}
+            setIsHelpCenterOpen={setIsHelpCenterOpen}
+            setIsSavingPin={setIsSavingPin}
+            setNewGeneratedRecoveryKey={setNewGeneratedRecoveryKey}
+            setParentBriefingDismissed={setParentBriefingDismissed}
+            setParentControlsTab={setParentControlsTab}
+            setParentGateError={setParentGateError}
+            setParentGatePinInput={setParentGatePinInput}
+            setParentSetupConfirm={setParentSetupConfirm}
+            setParentSetupError={setParentSetupError}
+            setParentSetupPin={setParentSetupPin}
+            setParentSetupStep={setParentSetupStep}
+            setPinFormConfirm={setPinFormConfirm}
+            setPinFormError={setPinFormError}
+            setPinFormNew={setPinFormNew}
+            setPinFormSuccess={setPinFormSuccess}
+            setPushEnabled={setPushEnabled}
+            setPushNotifChat={setPushNotifChat}
+            setPushNotifHomework={setPushNotifHomework}
+            setPushNotifPracticeReminder={setPushNotifPracticeReminder}
+            setPushNotifScheduleChanges={setPushNotifScheduleChanges}
+            setPushNotifWeeklyDigest={setPushNotifWeeklyDigest}
+            setRecentlyChangedDiff={setRecentlyChangedDiff}
+            setRecoveryKeyError={setRecoveryKeyError}
+            setRecoveryKeyInput={setRecoveryKeyInput}
+            setSecurityPinTarget={setSecurityPinTarget}
+            setSettingsSubTab={setSettingsSubTab}
+            setShowEmergencyKitModal={setShowEmergencyKitModal}
+            setShowParentActivationModal={setShowParentActivationModal}
+            setShowPushSoftPrompt={setShowPushSoftPrompt}
+            setShowRecoveryKeyModal={setShowRecoveryKeyModal}
+            setStudentUser={setStudentUser}
+            showEmergencyKitModal={showEmergencyKitModal}
+            studentId={studentId}
+            studentUiLevel={studentUiLevel}
+            studentUser={studentUser}
+            totalPracticeMinutes={totalPracticeMinutes}
+            weeklyPracticeMinutes={myWeeklyFocus || engineWeekFocusMinutes || 0}
+            schoolYearPracticeMinutes={schoolYearFocusMinutes || totalPracticeMinutes}
+          />
+        </Suspense>
+      )}
       {/* Feedback & Ideenschmiede Modal */}
       {isFeedbackModalOpen && (
         <Suspense fallback={null}>

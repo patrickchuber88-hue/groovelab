@@ -36,6 +36,11 @@ export interface MeisterwerkDocumentationModalProps {
   onSaveParentOverrides?: (overrides: Record<string, boolean>) => void;
   isSoftLocked?: boolean;
   onTriggerSoftLock?: () => void;
+  initialLehrwerke?: any[];
+  initialSongs?: any[];
+  initialProgressItems?: any[];
+  initialLocalProgress?: any[];
+  onSongsUpdated?: (updatedSkills: any[]) => void;
 }
 
 export interface ProgressItem {

@@ -488,21 +488,21 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
           }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <div style={{ fontWeight: 700, fontSize: '12px', color: '#7d7d82', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Funktionen</div>
-              <div onClick={() => scrollToSection('usps')} style={{ fontWeight: 600, fontSize: '16px', color: '#232326', paddingLeft: '8px' }}>Stundenplan-Designer</div>
-              <div onClick={() => scrollToSection('usps')} style={{ fontWeight: 600, fontSize: '16px', color: '#232326', paddingLeft: '8px' }}>Smart Room Engine</div>
-              <div onClick={() => scrollToSection('usps')} style={{ fontWeight: 600, fontSize: '16px', color: '#232326', paddingLeft: '8px' }}>Digitales Hausaufgabenheft</div>
+              <div role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); scrollToSection('usps'); setMobileMenuOpen(false); } }} onClick={() => { scrollToSection('usps'); setMobileMenuOpen(false); }} style={{ fontWeight: 600, fontSize: '16px', color: '#232326', paddingLeft: '8px', cursor: 'pointer' }}>Stundenplan-Designer</div>
+              <div role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); scrollToSection('usps'); setMobileMenuOpen(false); } }} onClick={() => { scrollToSection('usps'); setMobileMenuOpen(false); }} style={{ fontWeight: 600, fontSize: '16px', color: '#232326', paddingLeft: '8px', cursor: 'pointer' }}>Smart Room Engine</div>
+              <div role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); scrollToSection('usps'); setMobileMenuOpen(false); } }} onClick={() => { scrollToSection('usps'); setMobileMenuOpen(false); }} style={{ fontWeight: 600, fontSize: '16px', color: '#232326', paddingLeft: '8px', cursor: 'pointer' }}>Digitales Hausaufgabenheft</div>
             </div>
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <div style={{ fontWeight: 700, fontSize: '12px', color: '#7d7d82', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Zielgruppen</div>
-              <div onClick={() => scrollToSection('target-audiences')} style={{ fontWeight: 600, fontSize: '16px', color: '#ea4335', paddingLeft: '8px' }}>Für Schulleiter &amp; Admins</div>
-              <div onClick={() => scrollToSection('target-audiences')} style={{ fontWeight: 600, fontSize: '16px', color: '#34a853', paddingLeft: '8px' }}>Für Musiklehrer</div>
-              <div onClick={() => scrollToSection('target-audiences')} style={{ fontWeight: 600, fontSize: '16px', color: '#34a853', paddingLeft: '8px' }}>Für Schüler &amp; Eltern</div>
+              <div role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); scrollToSection('target-audiences'); setMobileMenuOpen(false); } }} onClick={() => { scrollToSection('target-audiences'); setMobileMenuOpen(false); }} style={{ fontWeight: 600, fontSize: '16px', color: '#ea4335', paddingLeft: '8px', cursor: 'pointer' }}>Für Schulleiter &amp; Admins</div>
+              <div role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); scrollToSection('target-audiences'); setMobileMenuOpen(false); } }} onClick={() => { scrollToSection('target-audiences'); setMobileMenuOpen(false); }} style={{ fontWeight: 600, fontSize: '16px', color: '#34a853', paddingLeft: '8px', cursor: 'pointer' }}>Für Musiklehrer</div>
+              <div role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); scrollToSection('target-audiences'); setMobileMenuOpen(false); } }} onClick={() => { scrollToSection('target-audiences'); setMobileMenuOpen(false); }} style={{ fontWeight: 600, fontSize: '16px', color: '#34a853', paddingLeft: '8px', cursor: 'pointer' }}>Für Schüler &amp; Eltern</div>
             </div>
 
-            <div onClick={() => { scrollToSection('pricing'); setMobileMenuOpen(false); }} style={{ fontWeight: 600, fontSize: '16px', color: '#232326', cursor: 'pointer' }}>Preise</div>
+            <div role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); scrollToSection('pricing'); setMobileMenuOpen(false); } }} onClick={() => { scrollToSection('pricing'); setMobileMenuOpen(false); }} style={{ fontWeight: 600, fontSize: '16px', color: '#232326', cursor: 'pointer' }}>Preise</div>
             
-            <div onClick={() => { setShowPrivacyAudits(true); setMobileMenuOpen(false); }} style={{ fontWeight: 650, fontSize: '16px', color: '#34a853', cursor: 'pointer' }}>🛡️ Datenschutz &amp; Sicherheit</div>
+            <div role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setShowPrivacyAudits(true); setMobileMenuOpen(false); } }} onClick={() => { setShowPrivacyAudits(true); setMobileMenuOpen(false); }} style={{ fontWeight: 650, fontSize: '16px', color: '#34a853', cursor: 'pointer' }}>🛡️ Datenschutz &amp; Sicherheit</div>
             
             <hr style={{ border: 'none', borderTop: '1px solid #e8e8ed' }} />
 

@@ -16,7 +16,7 @@ import { MaintenanceTab } from './masterAdmin/tabs/MaintenanceTab';
 import { SchoolsTab } from './masterAdmin/tabs/SchoolsTab';
 import { TrustSafetyTab } from './masterAdmin/tabs/TrustSafetyTab';
 import { FeedbackTab } from './masterAdmin/tabs/FeedbackTab';
-import { SchoolDetailDrawer } from './masterAdmin/drawers/SchoolDetailDrawer';
+const SchoolDetailDrawer = React.lazy(() => import('./masterAdmin/drawers/SchoolDetailDrawer').then(m => ({ default: m.SchoolDetailDrawer })));
 import { ClientErrorTelemetryPanel } from './masterAdmin/components/ClientErrorTelemetryPanel';
 import { generateResilienceAuditPDF } from '../utils/pdfGenerator';
 import { isMasterPasskeyRegistered, registerMasterPasskey, authenticateMasterPasskey, isWebAuthnSupported } from '../utils/webauthn';
@@ -121,7 +121,7 @@ export const LOAD_TIERS: LoadTier[] = [
   }
 ];
 
-import { BillingDashboard } from './BillingDashboard';
+const BillingDashboard = React.lazy(() => import('./BillingDashboard').then(m => ({ default: m.BillingDashboard })));
 import { useMasterPricing } from '../context/MasterPricingContext';
 import { ExecutiveTab } from './masterAdmin/tabs/ExecutiveTab';
 import { ReconciliationTab } from './masterAdmin/tabs/ReconciliationTab';
@@ -3163,14 +3163,14 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
     };
   };
 
-  const pendingStorageSchools = (schools || []).filter((s: any) => 
+  const pendingStorageSchools = useMemo(() => (schools || []).filter((s: any) => 
     s && 
     !s.name?.toLowerCase().includes('groove academy') && 
     (s.storage_addon_status === 'pending_activation' || 
      s.storage_addon_status === 'pending_provisioning' || 
      s.storage_addon_status === 'pending_hetzner' || 
      (s.storage_addon_pending_gb && Number(s.storage_addon_pending_gb) > 0))
-  );
+  ), [schools]);
 
   return (
     <div style={{
@@ -3921,7 +3921,9 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
 
           {activePortalTab === 'billing' && (
             <div className="animate-fade-in">
-              <BillingDashboard />
+              <Suspense fallback={<div className="p-8 text-center text-slate-400 font-medium">Lade Abrechnungs-Zentrale...</div>}>
+                <BillingDashboard />
+              </Suspense>
             </div>
           )}
 
@@ -5376,15 +5378,16 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
 
                     {/* Filter Pills */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#f1f5f9', padding: '3px', borderRadius: '10px' }}>
-                      {(['all', 'active', 'paused', 'archived'] as const).map(filterKey => {
+                      {(() => {
                         const cleanOffers = specialOffers.filter((o: any) => o && !String(o.id || '').startsWith('__cg_'));
-                        const count = filterKey === 'all' 
-                          ? cleanOffers.filter((o: any) => !o.is_archived).length 
-                          : filterKey === 'active' 
-                            ? cleanOffers.filter((o: any) => o.is_active && !o.is_archived).length 
-                            : filterKey === 'paused'
-                              ? cleanOffers.filter((o: any) => !o.is_active && !o.is_archived).length
-                              : cleanOffers.filter((o: any) => Boolean(o.is_archived)).length;
+                        return (['all', 'active', 'paused', 'archived'] as const).map(filterKey => {
+                          const count = filterKey === 'all' 
+                            ? cleanOffers.filter((o: any) => !o.is_archived).length 
+                            : filterKey === 'active' 
+                              ? cleanOffers.filter((o: any) => o.is_active && !o.is_archived).length 
+                              : filterKey === 'paused'
+                                ? cleanOffers.filter((o: any) => !o.is_active && !o.is_archived).length
+                                : cleanOffers.filter((o: any) => Boolean(o.is_archived)).length;
                         
                         const label = filterKey === 'all' 
                           ? 'Alle' 
@@ -5416,7 +5419,8 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                             {label} ({count})
                           </button>
                         );
-                      })}
+                      });
+                    })()}
                     </div>
                   </div>
 
@@ -7784,7 +7788,8 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
 
       {/* 🗂️ 360° Mandanten Detail Drawer */}
       {selectedSchool && (
-        <SchoolDetailDrawer
+        <Suspense fallback={<div className="p-8 text-center text-slate-400 font-medium">Lade Mandanten-Details...</div>}>
+          <SchoolDetailDrawer
           school={selectedSchool}
           schoolStats={schoolStats[selectedSchool.id]}
           masterPricing={masterPricing}
@@ -7863,6 +7868,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
             setSelectedSchool(null);
           }}
         />
+        </Suspense>
       )}
 
       {/* 👻 Apple HIG Ghost Support-Gate Modal (DSGVO Art. 28 / OWASP ASVS L3) */}

@@ -454,11 +454,9 @@ export const SecretaryEmployeesView: React.FC<SecretaryEmployeesViewProps> = ({
                                 <span style={{ fontSize: '0.92rem', fontWeight: 800, color: '#1d1d1f', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                   {empName}
                                 </span>
-                                {emp.email && (
-                                  <span style={{ fontSize: '0.74rem', color: '#86868b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                    {emp.email}
-                                  </span>
-                                )}
+                                <span style={{ fontSize: '0.74rem', color: emp.email ? '#86868b' : '#9ca3af', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                  {emp.email || 'Keine E-Mail hinterlegt'}
+                                </span>
                               </div>
                             </div>
 

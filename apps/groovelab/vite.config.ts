@@ -87,6 +87,17 @@ export default defineConfig({
             if (id.includes('confetti') || id.includes('canvas-confetti')) return 'vendor-confetti';
             if (id.includes('jsqr') || id.includes('jsQR') || id.includes('qrcode') || id.includes('react-qr-scanner') || id.includes('react-qr-code')) return 'vendor-qr';
           }
+          // Shared domain and calculation utilities (prevents cycles between master-admin, billing, and secretary)
+          if (id.includes('domain/pricingEngine') || id.includes('domain/schoolMetricsAggregator') || id.includes('domain/schoolDunningEngine') || id.includes('domain/billingCalculator') || id.includes('context/MasterPricingContext')) {
+            return 'domain-pricing-suite';
+          }
+          // Shared identity, user name formatting and badge helpers (prevents cycles between admin, secretary, and master-admin)
+          if (id.includes('utils/userDisplayName') || id.includes('utils/nameHelper') || id.includes('utils/adminColorHelpers')) {
+            return 'shared-identity-utils';
+          }
+          if (id.includes('components/IDBadgeCard')) {
+            return 'id-badge-card';
+          }
           if (id.includes('CampusEventsBoard')) {
             return 'campus-events-suite';
           }

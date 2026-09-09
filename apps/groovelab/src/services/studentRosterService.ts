@@ -77,10 +77,10 @@ export function isTestOrGenericStudent(firstName: string | null | undefined, las
  * 2. Deduplicates by ID.
  * 3. Deduplicates by normalized name key (registered user profile ALWAYS takes precedence over pending stub).
  */
-export function deduplicateRoster(students: RosterStudent[]): RosterStudent[] {
+export function deduplicateRoster<T extends Partial<RosterStudent> & { id?: string; first_name?: string; last_name?: string }>(students: T[]): T[] {
   if (!Array.isArray(students)) return [];
   const seenIds = new Set<string>();
-  const studentMap = new Map<string, RosterStudent>();
+  const studentMap = new Map<string, T>();
 
   for (const student of students) {
     if (!student) continue;
@@ -164,8 +164,7 @@ export const ROSTER_STUDENT_PROJECTION = [
   'exempt_from_direct_billing',
   'ausweis_nummer',
   'phone',
-  'campus_ui_level',
-  'skill_radar_levels'
+  'campus_ui_level'
 ].join(', ');
 
 /**
@@ -196,16 +195,35 @@ export async function fetchSchoolRoster(schoolId: string, supabaseClient: any, f
           .order('first_name'),
         supabaseClient
           .from('users')
-          .select('id, first_name, last_name, instrument, subject, expertise')
+          .select('id, first_name, last_name, instrument, expertise')
           .eq('school_id', schoolId)
           .in('role', ['teacher', 'admin', 'secretary'])
       ]);
 
       if (regUsersRes.error) {
-        console.error('[StudentRosterService] Error fetching registered students:', regUsersRes.error);
+        console.warn('[StudentRosterService] Primary student projection failed, activating resilient fallback:', regUsersRes.error);
+        const fallbackRes = await supabaseClient
+          .from('users')
+          .select('id, school_id, role, first_name, last_name, email, avatar_url, photo_url, qr_token, instrument, created_at, is_active, is_campus_active, is_groovelab_active, teacher_id, birth_date, group_id, sibling_group_id, lesson_duration, status, contract_ends_at, trial_ends_at, is_trial, exempt_from_direct_billing, ausweis_nummer')
+          .eq('school_id', schoolId)
+          .eq('role', 'student')
+          .order('first_name');
+        regUsers = fallbackRes.data || [];
+      } else {
+        regUsers = regUsersRes.data || [];
       }
-      regUsers = regUsersRes.data || [];
-      teachers = teachersRes.data || [];
+
+      if (teachersRes.error) {
+        console.warn('[StudentRosterService] Primary teachers query failed, activating fallback:', teachersRes.error);
+        const fbTeachers = await supabaseClient
+          .from('users')
+          .select('id, first_name, last_name, instrument')
+          .eq('school_id', schoolId)
+          .in('role', ['teacher', 'admin', 'secretary']);
+        teachers = fbTeachers.data || [];
+      } else {
+        teachers = teachersRes.data || [];
+      }
     } catch (e) {
       console.error('[StudentRosterService] Error fetching students/teachers:', e);
     }
