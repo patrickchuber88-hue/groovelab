@@ -27,6 +27,7 @@ export interface CampusAppointmentShoutboxModalProps {
   isParentUnlocked?: boolean;
   onRequestPinGate?: (action: () => Promise<void>) => void;
   onStatusChange?: (newStatus: 'scheduled' | 'cancelled' | 'canceled_by_student', updatedOcc?: any) => void;
+  initialDraftMessage?: string;
 }
 
 export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxModalProps> = ({
@@ -38,14 +39,21 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
   currentUserProfile,
   isParentUnlocked = false,
   onRequestPinGate,
-  onStatusChange
+  onStatusChange,
+  initialDraftMessage
 }) => {
   const [chatMessages, setChatMessages] = useState<any[]>([]);
-  const [chatTypedMessage, setChatTypedMessage] = useState('');
+  const [chatTypedMessage, setChatTypedMessage] = useState(initialDraftMessage || '');
   const [isSending, setIsSending] = useState(false);
   const [isActionLoading, setIsActionLoading] = useState(false);
   const chatMessagesEndRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (isOpen && initialDraftMessage) {
+      setChatTypedMessage(initialDraftMessage);
+    }
+  }, [isOpen, initialDraftMessage]);
 
   const [mounted, setMounted] = useState(false);
   useEffect(() => {

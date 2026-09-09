@@ -169,7 +169,7 @@
 
 /* ── Base ── */
 html {
-  overscroll-behavior-y: none;
+  overscroll-behavior-y: auto;
   overscroll-behavior-x: none;
 }
 
@@ -183,15 +183,25 @@ body {
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
   min-height: 100vh;
+  min-height: 100dvh;
   letter-spacing: -0.01em;
   line-height: 1.5;
-  overscroll-behavior-y: none;
+  overscroll-behavior-y: auto;
   overscroll-behavior-x: none;
 }
 
 #root {
-  overscroll-behavior-y: none;
+  min-height: 100vh;
+  min-height: 100dvh;
+  overscroll-behavior-y: auto;
   overscroll-behavior-x: none;
+}
+
+/* Universal Mobile Scroll Container Utility */
+.cg-mobile-scroll-container {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: auto;
+  scroll-behavior: smooth;
 }
 
 /* ── Typography (Urbanist & Inter) ── */

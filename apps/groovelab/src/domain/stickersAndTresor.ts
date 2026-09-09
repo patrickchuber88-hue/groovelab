@@ -405,10 +405,26 @@ export const checkIsAudioTresorActive = (studentObj?: any): boolean => {
   }
   const rawSch = studentObj?.schools || studentObj?.school;
   const sch = Array.isArray(rawSch) ? rawSch[0] : rawSch;
+
+  // 1. Authoritative Server/Database Status (Postgres SSOT)
+  if (sch) {
+    const gb = Number(sch.storage_addon_gb ?? sch.extra_storage_gb ?? 0);
+    const status = sch.storage_addon_status;
+    if (gb > 0 && status !== 'cancelled' && status !== 'none' && status !== 'inactive') {
+      return true;
+    }
+    if (gb === 0 || status === 'cancelled' || status === 'none' || status === 'inactive') {
+      return false;
+    }
+  }
+  if (studentObj && Number(studentObj.storage_addon_gb || 0) > 0 && studentObj.storage_addon_status !== 'cancelled') {
+    return true;
+  }
+
+  // 2. Offline / Client Fallback (Only active if no authoritative server record was present)
   const sId = studentObj?.school_id || (studentObj as any)?.schoolId || sch?.id || (typeof window !== 'undefined' ? (localStorage.getItem('groovelab_school_id') || localStorage.getItem('campus_school_id') || localStorage.getItem('groovelab_last_school_id')) : null);
 
   if (typeof window !== 'undefined') {
-    // 1. Direct school overrides (from live Secretary / Admin booking)
     try {
       const overridesStr = localStorage.getItem('groovelab_school_overrides') || localStorage.getItem('campus_school_overrides');
       if (overridesStr) {
@@ -420,18 +436,9 @@ export const checkIsAudioTresorActive = (studentObj?: any): boolean => {
             return true;
           }
         }
-        if (sId && overrides[sId] && Number(overrides[sId].storage_addon_gb || 0) === 0) {
-          return false;
-        }
-        const allEntries = Object.values(overrides) as any[];
-        const activeEntry = allEntries.find(e => Number(e.storage_addon_gb || 0) > 0 && e.storage_addon_status !== 'cancelled');
-        if (activeEntry && !sId) {
-          return true;
-        }
       }
     } catch (e) {}
 
-    // 2. Direct storage flags & school-specific storage keys
     if (localStorage.getItem('groovelab_storage_addon_active') === 'false' || localStorage.getItem('campus_storage_addon_active') === 'false') {
       return false;
     }
@@ -444,19 +451,6 @@ export const checkIsAudioTresorActive = (studentObj?: any): boolean => {
     }
     const storedGb = Number(localStorage.getItem('groovelab_storage_addon_gb') || localStorage.getItem('campus_storage_addon_gb') || 0);
     if (storedGb > 0) return true;
-  }
-
-  if (sch && Number(sch.storage_addon_gb || 0) > 0 && sch.storage_addon_status !== 'cancelled') {
-    return true;
-  }
-  if (studentObj && Number(studentObj.storage_addon_gb || 0) > 0 && studentObj.storage_addon_status !== 'cancelled') {
-    return true;
-  }
-
-  // 3. Invariant check: Flagship music schools (e.g. Musäk Bad Säckingen) have 20 GB Audio-Tresor booked by contract
-  const schoolName = (studentObj?.school_name || sch?.name || (typeof window !== 'undefined' ? (localStorage.getItem('campus_school_name') || localStorage.getItem('groovelab_school_name')) : '')) || '';
-  if (schoolName && (schoolName.toLowerCase().includes('bad säckingen') || schoolName.toLowerCase().includes('musäk'))) {
-    return true;
   }
 
   return false;

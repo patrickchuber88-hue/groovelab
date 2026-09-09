@@ -6644,7 +6644,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                                       0,49 € brutto / Mo.
                                     </div>
                                     <div style={{ fontSize: '0.68rem', color: '#166534', marginTop: '2px' }}>
-                                      (0,41 € netto + 0,08 € MwSt = 5,88 € / Jahr)
+                                      (0,41 € netto + 0,08 € MwSt; max. 11 × 0,49 € = 5,39 € / Schuljahr)
                                     </div>
                                   </div>
 

@@ -296,7 +296,7 @@ export const SmartAppInstallPrompt: React.FC<SmartAppInstallPromptProps> = ({
                   flexShrink: 0,
                   boxShadow: '0 2px 6px rgba(0,0,0,0.04)'
                 }}>
-                  <PlusSquare size={18} />
+                  {isAndroid ? <Smartphone size={18} /> : <PlusSquare size={18} />}
                 </div>
                 <div>
                   <span style={{ fontSize: '0.70rem', fontWeight: 800, color: isCampus ? '#16a34a' : '#ca8a04', textTransform: 'uppercase' }}>
@@ -304,13 +304,13 @@ export const SmartAppInstallPrompt: React.FC<SmartAppInstallPromptProps> = ({
                   </span>
                   <div style={{ fontSize: '0.84rem', fontWeight: 750, color: '#0f172a' }}>
                     {isAndroid ? (
-                      <>Wähle <strong>„App installieren“</strong> oder „Zum Startbildschirm hinzufügen“</>
+                      <>Wähle <strong>„Installieren und Verknüpfen“</strong> oder „App installieren“</>
                     ) : (
                       <>Wähle <strong>„Zum Home-Bildschirm“</strong></>
                     )}
                   </div>
                   <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
-                    {isAndroid ? 'Bestätige mit „Installieren“' : 'Scrolle etwas nach unten und tippe auf „Hinzufügen“'}
+                    {isAndroid ? 'Tippe auf den Eintrag mit dem Smartphone-Symbol (📲) und bestätige mit „Installieren“' : 'Scrolle etwas nach unten und tippe auf „Hinzufügen“'}
                   </span>
                 </div>
               </div>

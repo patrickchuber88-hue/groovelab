@@ -65,37 +65,45 @@ export function isTestUser(s: any): boolean {
  */
 export function deduplicateStudents(students: any[]): any[] {
   if (!Array.isArray(students)) return [];
-  const seenIds = new Set<string>();
-  const studentMap = new Map<string, any>();
+  
+  const registeredStudents: any[] = [];
+  const pendingStudents: any[] = [];
+  const seenRegisteredIds = new Set<string>();
+  const registeredNameKeys = new Set<string>();
 
-  for (const student of students) {
-    if (!student) continue;
-    if (student.id && seenIds.has(student.id)) continue;
-
-    const fn = (student.first_name || student.firstName || '').trim().toLowerCase();
-    const ln = (student.last_name || student.lastName || '').trim().toLowerCase();
-    const nameKey = `${fn}_${ln}`;
-
-    if (nameKey !== '_') {
-      if (studentMap.has(nameKey)) {
-        const existing = studentMap.get(nameKey);
-        if (existing.isPendingOnboarding && !student.isPendingOnboarding) {
-          if (existing.id) seenIds.delete(existing.id);
-          studentMap.set(nameKey, student);
-          if (student.id) seenIds.add(student.id);
-        }
-        continue;
-      }
-      studentMap.set(nameKey, student);
+  for (const s of students) {
+    if (!s) continue;
+    if (s.isPendingOnboarding) {
+      pendingStudents.push(s);
     } else {
-      const fallbackKey = student.id || `anon_${Math.random()}`;
-      studentMap.set(fallbackKey, student);
+      if (s.id && seenRegisteredIds.has(s.id)) continue;
+      registeredStudents.push(s);
+      if (s.id) seenRegisteredIds.add(s.id);
+      const fn = (s.first_name || s.firstName || '').trim().toLowerCase();
+      const ln = (s.last_name || s.lastName || '').trim().toLowerCase();
+      const nameKey = `${fn}_${ln}`;
+      if (nameKey !== '_') registeredNameKeys.add(nameKey);
     }
-
-    if (student.id) seenIds.add(student.id);
   }
 
-  return Array.from(studentMap.values());
+  const result = [...registeredStudents];
+  const seenPendingIds = new Set<string>();
+  const seenPendingNames = new Set<string>();
+
+  for (const ps of pendingStudents) {
+    if (ps.id && (seenRegisteredIds.has(ps.id) || seenPendingIds.has(ps.id))) continue;
+    const fn = (ps.first_name || ps.firstName || '').trim().toLowerCase();
+    const ln = (ps.last_name || ps.lastName || '').trim().toLowerCase();
+    const nameKey = `${fn}_${ln}`;
+    if (nameKey !== '_') {
+      if (registeredNameKeys.has(nameKey) || seenPendingNames.has(nameKey)) continue;
+      seenPendingNames.add(nameKey);
+    }
+    if (ps.id) seenPendingIds.add(ps.id);
+    result.push(ps);
+  }
+
+  return result;
 }
 
 /**
@@ -247,21 +255,24 @@ export function aggregateSchoolMetrics(
     ? 0 
     : resolveStorageAddonFee(storageAddonGb, school.storage_addon_monthly_fee);
   let storageUsedBytes = Number(school.storage_used_bytes || 0);
-  try {
-    if (typeof window !== 'undefined') {
-      const directKey = localStorage.getItem(`groovelab_storage_used_bytes_${schId}`);
-      if (directKey) {
-        storageUsedBytes = Math.max(storageUsedBytes, Number(directKey));
-      }
-      const overridesStr = localStorage.getItem('groovelab_school_overrides');
-      if (overridesStr) {
-        const overrides = JSON.parse(overridesStr);
-        if (overrides[schId]?.storage_used_bytes) {
-          storageUsedBytes = Math.max(storageUsedBytes, Number(overrides[schId].storage_used_bytes));
+  // Authoritative Postgres SSOT: Only consult localStorage if server data is unavailable (offline fallback)
+  if (storageUsedBytes === 0) {
+    try {
+      if (typeof window !== 'undefined') {
+        const directKey = localStorage.getItem(`groovelab_storage_used_bytes_${schId}`);
+        if (directKey) {
+          storageUsedBytes = Math.max(storageUsedBytes, Number(directKey));
+        }
+        const overridesStr = localStorage.getItem('groovelab_school_overrides');
+        if (overridesStr) {
+          const overrides = JSON.parse(overridesStr);
+          if (overrides[schId]?.storage_used_bytes) {
+            storageUsedBytes = Math.max(storageUsedBytes, Number(overrides[schId].storage_used_bytes));
+          }
         }
       }
-    }
-  } catch {}
+    } catch {}
+  }
 
   return {
     schoolId: schId,

@@ -1320,7 +1320,7 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
                                 // Direct Billing Governance: Secretariat cannot force B2C contract on parents.
                                 // It can grant Hardship Exemption (school pays) or book Cash/Office payment.
                                 const choice = window.confirm(
-                                  `🔒 Rechtssichere Eltern-Direktabrechnung (§ 312j BGB)\n\nFür ${sName} zahlen regulär die Eltern direkt per GiroCode / Überweisung im Schüler-Login (5,88 € / Jahr).\n\nMöchtest du diesen Schüler als beitragsfreien HÄRTEFALL freistellen (Kosten werden von der Musikschule getragen)?\n\n[OK] = Als Härtefall freistellen\n[Abbrechen] = Keine Änderung (Eltern aktivieren selbst)`
+                                  `🔒 Rechtssichere Eltern-Direktabrechnung (§ 312j BGB)\n\nFür ${sName} zahlen regulär die Eltern direkt per GiroCode / Überweisung im Schüler-Login (max. 11 × 0,49 € = 5,39 € / Schuljahr; 1. Monat kostenlos).\n\nMöchtest du diesen Schüler als beitragsfreien HÄRTEFALL freistellen (Kosten werden von der Musikschule getragen)?\n\n[OK] = Als Härtefall freistellen\n[Abbrechen] = Keine Änderung (Eltern aktivieren selbst)`
                                 );
                                 if (choice) {
                                   markAsHardship = true;

@@ -39,6 +39,8 @@ assert(isTestUser({ first_name: 'Max', last_name: 'T.' }), 'Max T. should be ide
 assert(!isTestUser({ first_name: 'Felix', last_name: 'Müller' }), 'Real user Felix Müller should NOT be identified as test user');
 console.log('✅ Test 1 passed\n');
 
+import { checkIsAudioTresorActive } from '../stickersAndTresor';
+
 // --- TEST 2: Student Deduplication across Tables ---
 console.log('Test 2: Deduplication across users & pending_students');
 const rawStudents = [
@@ -52,7 +54,24 @@ const deduped = deduplicateStudents(rawStudents.filter(s => !isTestUser(s)));
 assert(deduped.length === 2, `Expected 2 unique valid students, got ${deduped.length}`);
 assert(deduped.some(s => s.id === 'usr-1'), 'Should retain Anna Schmidt (user)');
 assert(deduped.some(s => s.id === 'usr-2'), 'Should retain Lukas Weber (user)');
-console.log('✅ Test 2 passed\n');
+
+// 2b: Two distinct registered accounts sharing the same name must both be preserved
+const sameNameStudents = [
+  { id: 'usr-10', first_name: 'Lukas', last_name: 'Weber', is_campus_active: true, isPendingOnboarding: false },
+  { id: 'usr-11', first_name: 'Lukas', last_name: 'Weber', is_campus_active: true, isPendingOnboarding: false },
+  { id: 'pend-10', first_name: 'Lukas', last_name: 'Weber', is_campus_active: false, isPendingOnboarding: true } // duplicate pending
+];
+const dedupedSameName = deduplicateStudents(sameNameStudents);
+assert(dedupedSameName.length === 2, `Expected 2 distinct registered Lukas Webers, got ${dedupedSameName.length}`);
+assert(dedupedSameName.some(s => s.id === 'usr-10'), 'Should retain usr-10');
+assert(dedupedSameName.some(s => s.id === 'usr-11'), 'Should retain usr-11');
+
+// 2c: Audio-Tresor is purely driven by database attributes, not hardcoded school names
+assert(checkIsAudioTresorActive({ school: { storage_addon_gb: 20, storage_addon_status: 'active' } }) === true, 'Storage addon active in school record must activate Tresor');
+assert(checkIsAudioTresorActive({ school: { storage_addon_gb: 0, storage_addon_status: 'none' } }) === false, '0 GB storage in school record must return false');
+assert(checkIsAudioTresorActive({ school: { storage_addon_gb: 20, storage_addon_status: 'cancelled' } }) === false, 'Cancelled storage addon must return false');
+
+console.log('✅ Test 2 passed (including same-name preservation & database Audio-Tresor invariants)\n');
 
 // --- TEST 3: Musäk Bad Säckingen Exact Reproduction ---
 console.log('Test 3: Musäk Bad Säckingen Exact Invariant (28 students, 2 teachers, 20GB storage)');

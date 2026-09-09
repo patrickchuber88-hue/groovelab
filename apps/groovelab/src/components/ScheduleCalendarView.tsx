@@ -177,6 +177,23 @@ export function ScheduleCalendarView({
     return getSimulatedNow();
   });
 
+  // Enterprise+ Goldstandard: Reset Schedule Modal & Dry-Run Impact State
+  const [isResetModalOpen, setIsResetModalOpen] = useState(false);
+  const [isExecutingReset, setIsExecutingReset] = useState(false);
+  const [resetImpact, setResetImpact] = useState<{
+    loading: boolean;
+    weekCount: number;
+    weekStudentCount: number;
+    schoolYearCount: number;
+    schoolYearStudentCount: number;
+  }>({
+    loading: false,
+    weekCount: 0,
+    weekStudentCount: 0,
+    schoolYearCount: 0,
+    schoolYearStudentCount: 0
+  });
+
   useEffect(() => {
     // When mounting or opening the Stundenplan board, always ensure the current week is shown and clean stale dates
     if (typeof window !== 'undefined') {
@@ -2815,82 +2832,227 @@ export function ScheduleCalendarView({
     document.body.removeChild(link);
   };
 
-  const handleResetWeek = async () => {
-    const confirmReset = await showConfirm(
-      'Möchtest du wirklich alle Terminänderungen, Verschiebungen und Ausfälle für diese Kalenderwoche auf die Stammdaten des Stundenplans zurücksetzen?'
-    );
-    if (!confirmReset) return;
+  // Enterprise+ Goldstandard: Helper for school year end (September 1 – July 31)
+  // Enterprise+ Goldstandard: Helper for school year end (September 1 – July 31)
+  const getSchoolYearEndStr = (refDate: Date = getSimulatedNow()): string => {
+    const year = refDate.getFullYear();
+    const month = refDate.getMonth(); // 0 = Jan, 6 = Jul, 7 = Aug, 8 = Sep
+    const endYear = month >= 7 ? year + 1 : year;
+    return `${endYear}-07-31`;
+  };
 
-    const weekStartStr = toLocalYYYYMMDD(weekStart);
-    const weekEnd = new Date(weekStart);
-    weekEnd.setDate(weekEnd.getDate() + 6);
-    const weekEndStr = toLocalYYYYMMDD(weekEnd);
-
-    // 1. Fully purge pending changes for this week and clear localStorage
-    setPendingChanges(prev => {
-      const next = { ...prev };
-      Object.keys(next).forEach(id => {
-        const occ = next[id];
-        if (!occ) {
-          delete next[id];
-          return;
-        }
-        const origDate = occ.original_date || occ.date;
-        if (!origDate || (origDate >= weekStartStr && origDate <= weekEndStr) || (occ.date >= weekStartStr && occ.date <= weekEndStr)) {
-          delete next[id];
-        }
-      });
-      return next;
-    });
-    setPendingChanges({});
-    
+  // Enterprise+ Goldstandard: Live Dry-Run Preview of reset impact
+  const fetchResetImpactPreview = async () => {
+    setResetImpact(prev => ({ ...prev, loading: true }));
     try {
-      localStorage.removeItem('groovelab_pending_schedule_changes');
-      localStorage.removeItem(`groovelab_calendar_active_occurrences_${userId}`);
-      localStorage.removeItem('groovelab_calendar_active_occurrences_latest');
-    } catch (e) {}
+      const todayStr = toLocalYYYYMMDD(getSimulatedNow());
+      const weekStartStr = toLocalYYYYMMDD(weekStart);
+      const weekEnd = new Date(weekStart);
+      weekEnd.setDate(weekEnd.getDate() + 6);
+      const weekEndStr = toLocalYYYYMMDD(weekEnd);
+      
+      const effectiveWeekStart = weekStartStr < todayStr ? todayStr : weekStartStr;
+      const schoolYearEndStr = getSchoolYearEndStr(getSimulatedNow());
 
-    setSwapLinks([]);
-    setSwapSourceOcc(null);
-
-    try {
-      setLoading(true);
-
-      // Notify students who had rescheduled/cancelled lessons in this week before deleting them
-      const DAYS_DE = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
-      const rescheduledOrCancelled = baseOccurrences.filter(occ => 
-        occ.student_id && 
-        occ.student_id !== 'vacant' && 
-        !occ.id.startsWith('mock-') && 
-        (['cancelled', 'canceled_by_student'].includes(occ.status) || (occ.original_date && (occ.original_date !== occ.date || occ.original_start_time !== occ.start_time)))
-      );
-
-      for (const occ of rescheduledOrCancelled) {
-        try {
-          const origDateStr = occ.original_date || occ.date;
-          const origTimeStr = occ.original_start_time || occ.start_time;
-          const origDate = new Date(origDateStr);
-          const origDayLabel = DAYS_DE[origDate.getDay()];
-          const origTimeLabel = origTimeStr.substring(0, 5);
-          const shortOrigDay = origDayLabel.substring(0, 2) + '.';
-          const shortOrigDate = `${String(origDate.getDate()).padStart(2, '0')}.${String(origDate.getMonth() + 1).padStart(2, '0')}.${String(origDate.getFullYear()).substring(2, 4)}`;
-
-          const notificationMessage = `Der verschobene oder abgesagte Termin wurde auf den regulären Termin zurückgesetzt:\n${shortOrigDay} ${shortOrigDate} um ${origTimeLabel} Uhr.`;
-          
-          await supabase.from('campus_direct_messages').insert({
-            sender_id: userId,
-            recipient_id: occ.student_id,
-            content: notificationMessage
-          });
-        } catch (err) {
-          console.warn('Error sending reset week notification:', err);
-        }
+      // 1. Fetch for visible week (guarded by today)
+      let weekOccs: any[] = [];
+      if (weekEndStr >= todayStr) {
+        const [wByDate, wByOrig] = await Promise.all([
+          supabase.from('schedule_occurrences')
+            .select('id, student_id, date, start_time, status, original_date, original_start_time')
+            .eq('teacher_id', userId)
+            .gte('date', effectiveWeekStart)
+            .lte('date', weekEndStr),
+          supabase.from('schedule_occurrences')
+            .select('id, student_id, date, start_time, status, original_date, original_start_time')
+            .eq('teacher_id', userId)
+            .gte('original_date', effectiveWeekStart)
+            .lte('original_date', weekEndStr)
+        ]);
+        const merged = [...(wByDate.data || []), ...(wByOrig.data || [])];
+        weekOccs = Array.from(new Map(merged.map(o => [o.id, o])).values())
+          .filter(o => !o.date || o.date >= todayStr);
       }
 
-      // Fetch occurrences about to be deleted so we can clean up their room bookings & DB records
+      // 2. Fetch for rest of school year (>= todayStr && <= schoolYearEndStr)
+      const [syByDate, syByOrig] = await Promise.all([
+        supabase.from('schedule_occurrences')
+          .select('id, student_id, date, start_time, status, original_date, original_start_time')
+          .eq('teacher_id', userId)
+          .gte('date', todayStr)
+          .lte('date', schoolYearEndStr),
+        supabase.from('schedule_occurrences')
+          .select('id, student_id, date, start_time, status, original_date, original_start_time')
+          .eq('teacher_id', userId)
+          .gte('original_date', todayStr)
+          .lte('original_date', schoolYearEndStr)
+      ]);
+      const syMerged = [...(syByDate.data || []), ...(syByOrig.data || [])];
+      const syUnique = Array.from(new Map(syMerged.map(o => [o.id, o])).values())
+        .filter(o => !o.date || o.date >= todayStr);
+
+      // 3. Reflect unsaved pending local changes in current visible week
+      const pendingArr = Object.values(pendingChanges || {});
+      const pendingWeekAltered = pendingArr.filter((p: any) => {
+        const pDate = p.date || p.original_date;
+        return pDate && pDate >= effectiveWeekStart && pDate <= weekEndStr;
+      });
+
+      const mergedWeekIds = new Set(weekOccs.map(o => o.id));
+      const weekStudents = new Set(weekOccs.map(o => o.student_id).filter(id => id && id !== 'vacant'));
+      
+      let extraPendingCount = 0;
+      pendingWeekAltered.forEach((p: any) => {
+        if (!mergedWeekIds.has(p.id)) {
+          extraPendingCount++;
+          if (p.student_id && p.student_id !== 'vacant') {
+            weekStudents.add(p.student_id);
+          }
+        }
+      });
+
+      const syStudents = new Set(syUnique.map(o => o.student_id).filter(id => id && id !== 'vacant'));
+
+      setResetImpact({
+        loading: false,
+        weekCount: weekOccs.length + extraPendingCount,
+        weekStudentCount: weekStudents.size,
+        schoolYearCount: syUnique.length,
+        schoolYearStudentCount: syStudents.size
+      });
+    } catch (err) {
+      console.warn('Error fetching reset impact preview:', err);
+      setResetImpact(prev => ({ ...prev, loading: false }));
+    }
+  };
+
+  // Enterprise+ Goldstandard: Consolidated, positive re-activation notifications (1 message per affected student)
+  const notifyReactivatedStudents = async (occurrences: any[]) => {
+    try {
+      const DAYS_DE = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
+
+      // Filter only occurrences that were actually altered or cancelled
+      const alteredOccurrences = occurrences.filter(occ => 
+        occ.student_id && 
+        occ.student_id !== 'vacant' && 
+        !String(occ.id).startsWith('mock-') && 
+        (
+          ['cancelled', 'canceled_by_student', 'teacher_sick', 'canceled_by_teacher_sick', 'open_reschedule', 'pending_reschedule'].includes(occ.status) ||
+          (occ.original_date && (occ.original_date !== occ.date || occ.original_start_time !== occ.start_time)) ||
+          occ.rescheduled
+        )
+      );
+
+      // Distinct student IDs
+      const uniqueStudentIds = Array.from(new Set(alteredOccurrences.map(o => o.student_id)));
+
+      for (const studentId of uniqueStudentIds) {
+        try {
+          let studentFirstName = '';
+          let regularDayName = '';
+          let regularTime = '';
+
+          // Look up in designer boards (single source of truth)
+          if (boards && boards.length > 0) {
+            for (const board of boards) {
+              const st = board.students?.find((s: any) => 
+                s.id === studentId || 
+                s.student_id === studentId || 
+                s.user_id === studentId
+              );
+              if (st) {
+                studentFirstName = (st.first_name || st.firstName || '').trim();
+                const dayIdx = board.dayOfWeek === 7 ? 0 : board.dayOfWeek;
+                regularDayName = DAYS_DE[dayIdx];
+                regularTime = (st.assignedTime || '').substring(0, 5);
+                break;
+              }
+            }
+          }
+
+          // Fallback first name lookup from occurrences
+          if (!studentFirstName) {
+            const occWithStudent = alteredOccurrences.find(o => o.student_id === studentId && o.student?.first_name);
+            if (occWithStudent) {
+              studentFirstName = occWithStudent.student.first_name;
+            }
+          }
+
+          const greeting = studentFirstName ? `Liebe/r ${studentFirstName}` : 'Hallo';
+          let notificationContent = '';
+          if (regularDayName && regularTime) {
+            notificationContent = `${greeting}, dein regulärer wöchentlicher Unterrichtstermin (${regularDayName} um ${regularTime} Uhr) wurde reaktiviert und findet wie im Stundenplan vereinbart statt.`;
+          } else {
+            notificationContent = `${greeting}, deine regulären Unterrichtstermine wurden reaktiviert und finden wie im Stundenplan vereinbart statt.`;
+          }
+
+          await supabase.from('campus_direct_messages').insert({
+            sender_id: userId,
+            recipient_id: studentId,
+            content: notificationContent
+          });
+        } catch (msgErr) {
+          console.warn(`Could not send re-activation direct message to student ${studentId}:`, msgErr);
+        }
+      }
+    } catch (err) {
+      console.warn('Error in notifyReactivatedStudents:', err);
+    }
+  };
+
+  // Enterprise+ Goldstandard: Execute reset with strict history protection
+  // (Designer master schedule remains 100% untouched)
+  const executeScheduleReset = async (scope: 'week' | 'school_year') => {
+    setIsExecutingReset(true);
+    try {
+      const todayStr = toLocalYYYYMMDD(getSimulatedNow());
+      const schoolYearEndStr = getSchoolYearEndStr(getSimulatedNow());
+
+      let startDateStr: string;
+      let endDateStr: string;
+
+      if (scope === 'week') {
+        const weekStartStr = toLocalYYYYMMDD(weekStart);
+        const weekEnd = new Date(weekStart);
+        weekEnd.setDate(weekEnd.getDate() + 6);
+        const weekEndStr = toLocalYYYYMMDD(weekEnd);
+
+        if (weekEndStr < todayStr) {
+          await showAlert('Historien-Schutz: Termine vor dem heutigen Tag sind geschützt und können nicht zurückgesetzt werden.');
+          setIsExecutingReset(false);
+          return;
+        }
+        startDateStr = weekStartStr < todayStr ? todayStr : weekStartStr;
+        endDateStr = weekEndStr;
+      } else {
+        startDateStr = todayStr;
+        endDateStr = schoolYearEndStr;
+      }
+
+      // 1. Purge pending changes and localStorage
+      setPendingChanges({});
+      try {
+        localStorage.removeItem('groovelab_pending_schedule_changes');
+        if (userId) localStorage.removeItem(`groovelab_pending_schedule_changes_${userId}`);
+        localStorage.removeItem(`groovelab_calendar_active_occurrences_${userId}`);
+        localStorage.removeItem('groovelab_calendar_active_occurrences_latest');
+      } catch (e) {}
+
+      setSwapLinks([]);
+      setSwapSourceOcc(null);
+
+      // 2. Fetch occurrences to delete (guarded against past history)
       const [resByDate, resByOrigDate] = await Promise.all([
-        supabase.from('schedule_occurrences').select('id, date, start_time').gte('date', weekStartStr).lte('date', weekEndStr),
-        supabase.from('schedule_occurrences').select('id, date, start_time').gte('original_date', weekStartStr).lte('original_date', weekEndStr)
+        supabase.from('schedule_occurrences')
+          .select('id, date, start_time, student_id, status, original_date, original_start_time, student:users!schedule_occurrences_student_id_fkey(first_name, last_name)')
+          .eq('teacher_id', userId)
+          .gte('date', startDateStr)
+          .lte('date', endDateStr),
+        supabase.from('schedule_occurrences')
+          .select('id, date, start_time, student_id, status, original_date, original_start_time, student:users!schedule_occurrences_student_id_fkey(first_name, last_name)')
+          .eq('teacher_id', userId)
+          .gte('original_date', startDateStr)
+          .lte('original_date', endDateStr)
       ]);
 
       const occurrencesToDelete = [
@@ -2898,42 +3060,68 @@ export function ScheduleCalendarView({
         ...(resByOrigDate.data || [])
       ];
 
-      const idsToDelete = Array.from(new Set(occurrencesToDelete.map(o => o.id)));
+      // Fail-closed history protection: Never delete any occurrence that took place prior to today
+      const validOccurrencesToDelete = occurrencesToDelete.filter(occ => !occ.date || occ.date >= todayStr);
+      const idsToDelete = Array.from(new Set(validOccurrencesToDelete.map(o => o.id)));
 
       if (idsToDelete.length > 0) {
-        const { error } = await supabase
-          .from('schedule_occurrences')
-          .delete()
-          .in('id', idsToDelete);
-        
-        if (error) throw error;
+        // 3. Notify affected students with consolidated re-activation messages
+        await notifyReactivatedStudents(validOccurrencesToDelete);
 
-        // Clean up corresponding room bookings
+        // 4. Delete occurrences from DB in safe batches of 50 (prevents HTTP 414 URI Too Large)
+        for (let i = 0; i < idsToDelete.length; i += 50) {
+          const batch = idsToDelete.slice(i, i + 50);
+          const { error } = await supabase
+            .from('schedule_occurrences')
+            .delete()
+            .in('id', batch);
+
+          if (error) throw error;
+        }
+
+        // 5. Clean up corresponding room bookings in safe batches
         try {
-          await Promise.all(
-            occurrencesToDelete.map(occ =>
-              supabase.from('room_bookings')
-                .delete()
-                .eq('booked_by', userId)
-                .eq('date', occ.date)
-                .eq('start_time', occ.start_time)
-            )
-          );
+          const bookingDeletions = validOccurrencesToDelete.map(occ => {
+            const timeNoSec = (occ.start_time || '').substring(0, 5);
+            return supabase.from('room_bookings')
+              .delete()
+              .eq('booked_by', userId)
+              .eq('date', occ.date)
+              .or(`start_time.eq.${occ.start_time},start_time.eq.${timeNoSec}:00`);
+          });
+          for (let i = 0; i < bookingDeletions.length; i += 20) {
+            await Promise.all(bookingDeletions.slice(i, i + 20));
+          }
           window.dispatchEvent(new CustomEvent('refresh-bookings'));
         } catch (roomErr) {
-          console.warn('Error deleting room bookings on reset week:', roomErr);
+          console.warn('Error deleting room bookings on schedule reset:', roomErr);
         }
       }
 
+      setIsResetModalOpen(false);
       await loadOccurrences();
       await fetchAllOpenReschedules();
-      await showAlert('Stammdaten für diese Kalenderwoche erfolgreich geladen & zurückgesetzt.');
+
+      if (scope === 'week') {
+        await showAlert('Stammdaten für diese Kalenderwoche erfolgreich geladen & zurückgesetzt.');
+      } else {
+        await showAlert(`Stammdaten für das gesamte restliche Schuljahr erfolgreich wiederhergestellt (${idsToDelete.length} abweichende Termine bereinigt).`);
+      }
     } catch (err) {
-      console.error('Error resetting saved occurrences for week:', err);
+      console.error('Error executing schedule reset:', err);
       await showAlert('Fehler beim Zurücksetzen der gespeicherten Termine');
     } finally {
-      setLoading(false);
+      setIsExecutingReset(false);
     }
+  };
+
+  const handleOpenResetModal = () => {
+    setIsResetModalOpen(true);
+    fetchResetImpactPreview();
+  };
+
+  const handleResetWeek = () => {
+    handleOpenResetModal();
   };
 
   useEffect(() => {
@@ -2967,19 +3155,22 @@ export function ScheduleCalendarView({
         }
       } else if (e.key === 'Escape') {
         e.preventDefault();
+        if (isResetModalOpen) {
+          setIsResetModalOpen(false);
+          return;
+        }
         if (isSwapModeActive) {
           setSwapSourceOcc(null);
           setIsSwapModeActive(false);
           showActionToast('Tauschmodus beendet.');
           return;
         }
-        handleResetWeek();
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [currentDate, occurrences, pendingChanges, weekStart]);
+  }, [currentDate, occurrences, pendingChanges, weekStart, isResetModalOpen, isSwapModeActive]);
 
   const cleanupDragGhost = () => {
     const ghost = document.getElementById('drag-preview-ghost');
@@ -4796,12 +4987,12 @@ export function ScheduleCalendarView({
               </button>
 
               <button
-                onClick={handleResetWeek}
+                onClick={handleOpenResetModal}
                 className="apple-btn"
                 style={{ color: '#ef4444' }}
-                title="Alle ungespeicherten Änderungen in dieser Woche verwerfen"
+                title="Stundenplan-Termine auf die Stammdaten des Stundenplan-Designers zurücksetzen"
               >
-                <Trash2 size={13} />
+                <RotateCcw size={13} />
                 <span>Zurücksetzen</span>
               </button>
             </div>
@@ -4848,7 +5039,10 @@ export function ScheduleCalendarView({
 
       {/* Smart Context-Sensitive Banner */}
       {(() => {
-        const hasAnySchedules = (cachedWeekSchedules || []).some((s: any) => (userId ? s.teacher_id === userId : true));
+        const hasAnyBoardsStudents = (boards || []).some((b: any) => Array.isArray(b.students) && b.students.length > 0);
+        const hasAnyOccurrences = (occurrences || []).length > 0;
+        const hasAnyCachedSchedules = (cachedWeekSchedules || []).some((s: any) => (userId ? s.teacher_id === userId : true));
+        const hasAnySchedules = hasAnyBoardsStudents || hasAnyOccurrences || hasAnyCachedSchedules;
         const isSelfView = !selectedTeacherId || selectedTeacherId === userId;
         const targetTeacher = teachers?.find((t: any) => t.id === (selectedTeacherId || userId));
         const teacherName = targetTeacher ? (targetTeacher.name || `${targetTeacher.first_name} ${targetTeacher.last_name}`.trim()) : 'Diese Lehrkraft';
@@ -4875,7 +5069,7 @@ export function ScheduleCalendarView({
                 <Sparkles size={16} color="#34a853" />
                 <span>
                   {isSelfView 
-                    ? 'Noch keine Unterrichtsstunden eingetragen. Nutze den Stundenplan-Designer, um deine ersten Unterrichtszeiten anzulegen.'
+                    ? 'Für das aktuelle Schuljahr sind noch keine Unterrichtszeiten hinterlegt. Du kannst deinen bisherigen Stundenplan im Designer übernehmen oder neu einreichen.'
                     : `Für ${teacherName} wurden noch keine Unterrichtsstunden im Stundenplan angelegt.`
                   }
                 </span>
@@ -7310,43 +7504,6 @@ return (
                 });
               })()
             }
-            {/* Rote Echtzeit-Linie (Current Time Indicator) */}
-            {(() => {
-              const todayStr = toLocalYYYYMMDD(currentDate);
-              if (dateStr === todayStr && currentMinutes >= dayBaselineMinutes) {
-                const topPosition = (currentMinutes - dayBaselineMinutes) * 2.5;
-                if (topPosition >= 0 && topPosition <= columnHeight) {
-                  return (
-                    <div 
-                      style={{
-                        position: 'absolute',
-                        left: 0,
-                        right: 0,
-                        top: `${topPosition}px`,
-                        borderTop: '2px solid #ef4444',
-                        zIndex: 20,
-                        pointerEvents: 'none',
-                        display: 'flex',
-                        alignItems: 'center'
-                      }}
-                    >
-                      <div 
-                        style={{
-                          width: '8px',
-                          height: '8px',
-                          borderRadius: '50%',
-                          background: '#ef4444',
-                          position: 'absolute',
-                          left: '-4px',
-                          boxShadow: '0 0 6px rgba(239, 68, 68, 0.4)'
-                        }} 
-                      />
-                    </div>
-                  );
-                }
-              }
-              return null;
-            })()}
               </div>
             </div>
           );
@@ -9627,12 +9784,312 @@ return (
             </div>
 
             <button
-              onClick={() => { handleResetWeek(); setShowMobileToolsSheet(false); }}
+              onClick={() => { handleOpenResetModal(); setShowMobileToolsSheet(false); }}
               style={{ padding: '12px', borderRadius: '14px', border: '1px solid #fecaca', background: '#fef2f2', color: '#dc2626', fontWeight: 800, fontSize: '0.82rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', width: '100%', marginTop: '4px', cursor: 'pointer' }}
             >
-              <Trash2 size={16} />
-              <span>Ungespeicherte Änderungen zurücksetzen</span>
+              <RotateCcw size={16} />
+              <span>Stundenplan zurücksetzen</span>
             </button>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* ========================================================================= */}
+    {/* ENTERPRISE+ GOLDSTANDARD: RESET SCHEDULE MODAL (WEEK & REST OF SCHOOL YEAR) */}
+    {/* ========================================================================= */}
+    {isResetModalOpen && (
+      <div
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(15, 23, 42, 0.55)',
+          backdropFilter: 'blur(8px)',
+          zIndex: 100000,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '20px'
+        }}
+        onClick={() => !isExecutingReset && setIsResetModalOpen(false)}
+      >
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="reset-modal-title"
+          onClick={e => e.stopPropagation()}
+          style={{
+            background: '#ffffff',
+            borderRadius: '28px',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.05)',
+            width: '560px',
+            maxWidth: '95vw',
+            padding: '32px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '20px',
+            boxSizing: 'border-box',
+            position: 'relative'
+          }}
+        >
+          {/* Header */}
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+              <div
+                style={{
+                  width: '46px',
+                  height: '46px',
+                  borderRadius: '16px',
+                  background: '#fef2f2',
+                  border: '1px solid #fee2e2',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#ef4444'
+                }}
+              >
+                <RotateCcw size={24} strokeWidth={2.5} />
+              </div>
+              <div>
+                <h3 id="reset-modal-title" style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em' }}>
+                  Stundenplan zurücksetzen
+                </h3>
+                <p style={{ margin: 0, fontSize: '0.82rem', color: '#64748b', fontWeight: 500 }}>
+                  Terminänderungen auf die Stammdaten des Designers zurücksetzen
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => !isExecutingReset && setIsResetModalOpen(false)}
+              disabled={isExecutingReset}
+              aria-label="Schließen"
+              style={{
+                background: '#f1f5f9',
+                border: 'none',
+                borderRadius: '12px',
+                width: '32px',
+                height: '32px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#64748b',
+                cursor: isExecutingReset ? 'not-allowed' : 'pointer'
+              }}
+            >
+              <X size={18} />
+            </button>
+          </div>
+
+          {/* History Protection & Designer Immutability Badges */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div
+              style={{
+                background: '#f0fdf4',
+                border: '1px solid #bbf7d0',
+                borderRadius: '14px',
+                padding: '10px 14px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px'
+              }}
+            >
+              <ShieldCheck size={18} color="#16a34a" style={{ flexShrink: 0 }} />
+              <div style={{ fontSize: '0.78rem', color: '#15803d', lineHeight: 1.45 }}>
+                <strong style={{ fontWeight: 800 }}>Historien-Schutz aktiv:</strong> Vergangene Termine vor heute ({(() => {
+                  const now = getSimulatedNow();
+                  return `${String(now.getDate()).padStart(2, '0')}.${String(now.getMonth() + 1).padStart(2, '0')}.${now.getFullYear()}`;
+                })()}) bleiben unberührt. Nachweise, Notizen & Hausaufgaben sind 100% geschützt.
+              </div>
+            </div>
+
+            <div
+              style={{
+                background: '#eff6ff',
+                border: '1px solid #bfdbfe',
+                borderRadius: '14px',
+                padding: '10px 14px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px'
+              }}
+            >
+              <BookOpen size={18} color="#2563eb" style={{ flexShrink: 0 }} />
+              <div style={{ fontSize: '0.78rem', color: '#1d4ed8', lineHeight: 1.45 }}>
+                <strong style={{ fontWeight: 800 }}>Stundenplan-Designer unberührt:</strong> Der Stundenplan-Designer bleibt als unveränderliche Single Source of Truth erhalten.
+              </div>
+            </div>
+          </div>
+
+          {/* Options */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {/* Option 1: Diese Woche */}
+            <div
+              role="button"
+              tabIndex={0}
+              onClick={() => !isExecutingReset && executeScheduleReset('week')}
+              onKeyDown={e => {
+                if ((e.key === 'Enter' || e.key === ' ') && !isExecutingReset) {
+                  executeScheduleReset('week');
+                }
+              }}
+              style={{
+                background: '#f8fafc',
+                border: '1.5px solid #e2e8f0',
+                borderRadius: '18px',
+                padding: '16px 18px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '16px',
+                cursor: isExecutingReset ? 'not-allowed' : 'pointer',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                <span style={{ fontSize: '0.92rem', fontWeight: 850, color: '#0f172a' }}>
+                  Nur diese Kalenderwoche (KW {getWeekNumber(weekStart)})
+                </span>
+                <span style={{ fontSize: '0.76rem', color: '#64748b' }}>
+                  {weekStart.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })} – {new Date(weekStart.getTime() + 6 * 86400000).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
+                  <span
+                    style={{
+                      background: resetImpact.weekCount > 0 ? '#fef3c7' : '#f1f5f9',
+                      color: resetImpact.weekCount > 0 ? '#b45309' : '#64748b',
+                      padding: '2px 8px',
+                      borderRadius: '6px',
+                      fontSize: '0.70rem',
+                      fontWeight: 700
+                    }}
+                  >
+                    {resetImpact.loading ? 'Prüfe Termine...' : `${resetImpact.weekCount} abweichende Termine (${resetImpact.weekStudentCount} Schüler)`}
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                disabled={isExecutingReset}
+                style={{
+                  background: '#ffffff',
+                  border: '1px solid #cbd5e1',
+                  borderRadius: '12px',
+                  padding: '8px 14px',
+                  fontSize: '0.80rem',
+                  fontWeight: 800,
+                  color: '#0f172a',
+                  cursor: isExecutingReset ? 'not-allowed' : 'pointer',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                Woche zurücksetzen
+              </button>
+            </div>
+
+            {/* Option 2: Restliches Schuljahr */}
+            <div
+              role="button"
+              tabIndex={0}
+              onClick={() => !isExecutingReset && executeScheduleReset('school_year')}
+              onKeyDown={e => {
+                if ((e.key === 'Enter' || e.key === ' ') && !isExecutingReset) {
+                  executeScheduleReset('school_year');
+                }
+              }}
+              style={{
+                background: '#fef2f2',
+                border: '1.5px solid #fecaca',
+                borderRadius: '18px',
+                padding: '16px 18px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '16px',
+                cursor: isExecutingReset ? 'not-allowed' : 'pointer',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '0.92rem', fontWeight: 850, color: '#991b1b' }}>
+                    Restliches Schuljahr (ab heute bis 31.07.)
+                  </span>
+                  <span
+                    style={{
+                      background: '#dc2626',
+                      color: '#ffffff',
+                      padding: '1px 6px',
+                      borderRadius: '6px',
+                      fontSize: '0.64rem',
+                      fontWeight: 900,
+                      textTransform: 'uppercase'
+                    }}
+                  >
+                    Serie
+                  </span>
+                </div>
+                <span style={{ fontSize: '0.76rem', color: '#7f1d1d' }}>
+                  Bereinigt alle zukünftigen Wochen und reaktiviert alle regulären Unterrichte
+                </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
+                  <span
+                    style={{
+                      background: resetImpact.schoolYearCount > 0 ? '#fee2e2' : '#f8fafc',
+                      color: resetImpact.schoolYearCount > 0 ? '#b91c1c' : '#64748b',
+                      padding: '2px 8px',
+                      borderRadius: '6px',
+                      fontSize: '0.70rem',
+                      fontWeight: 700
+                    }}
+                  >
+                    {resetImpact.loading ? 'Prüfe Termine...' : `${resetImpact.schoolYearCount} abweichende Termine (${resetImpact.schoolYearStudentCount} Schüler)`}
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                disabled={isExecutingReset}
+                style={{
+                  background: '#dc2626',
+                  border: 'none',
+                  borderRadius: '12px',
+                  padding: '8px 14px',
+                  fontSize: '0.80rem',
+                  fontWeight: 800,
+                  color: '#ffffff',
+                  cursor: isExecutingReset ? 'not-allowed' : 'pointer',
+                  boxShadow: '0 2px 6px rgba(220, 38, 38, 0.25)',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                {isExecutingReset ? 'Wird bereinigt...' : 'Schuljahr bereinigen'}
+              </button>
+            </div>
+          </div>
+
+          {/* Notification Info Notice */}
+          <div
+            style={{
+              fontSize: '0.75rem',
+              color: '#64748b',
+              background: '#f8fafc',
+              border: '1px solid #f1f5f9',
+              borderRadius: '14px',
+              padding: '10px 14px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}
+          >
+            <Info size={15} color="#3b82f6" style={{ flexShrink: 0 }} />
+            <span>
+              <strong>Smarte Benachrichtigung:</strong> Betroffene Schüler erhalten genau eine gebündelte Direktnachricht über die Reaktivierung ihres regulären Termins. Schüler ohne Änderungen erhalten keine Nachricht.
+            </span>
           </div>
         </div>
       </div>

@@ -51,6 +51,8 @@ import { SiblingPinUnlockModal } from './student/modals/SiblingPinUnlockModal';
 import { StudentBriefingTab } from './student/tabs/StudentBriefingTab';
 import { StudentHeroTab } from './student/tabs/StudentHeroTab';
 import { CampusAppointmentShoutboxModal } from './CampusAppointmentShoutboxModal';
+import { StudentRescheduleBottomSheetModal } from './student/modals/StudentRescheduleBottomSheetModal';
+import { getSanitizedRpId } from '../utils/webauthn';
 
 // 🚀 High-Performance Lazy Loaded Sub-Suites & Heavy Modals
 const StudentPracticeTab = lazy(() => import('./student/tabs/StudentPracticeTab').then(m => ({ default: m.StudentPracticeTab })));
@@ -829,12 +831,14 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
         chalData.challenge.match(/.{1,2}/g)?.map((byte: string) => parseInt(byte, 16)) || []
       ).buffer;
 
+      const rpId = getSanitizedRpId();
       // 2. Perform native WebAuthn get assertion
       const assertion = (await navigator.credentials.get({
         publicKey: {
           challenge: challengeBuffer,
           userVerification: 'required',
           timeout: 60000,
+          ...(rpId ? { rpId } : {})
         },
       })) as PublicKeyCredential;
 
@@ -858,13 +862,13 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       // 4. Authorized: Set verified session lease (180s)
       const siblingGroupId = (studentUser as any)?.sibling_group_id || (initialUser as any)?.sibling_group_id;
       sessionStorage.setItem(`groovelab_parent_session_${targetId}`, String(Date.now() + 180 * 1000));
-      if (studentId) sessionStorage.setItem(`groovelab_parent_session_${studentId}`, String(Date.now() + 180 * 1000));
-      sessionStorage.setItem(`groovelab_parent_unlocked_${targetId}`, 'true');
-      if (studentId) sessionStorage.setItem(`groovelab_parent_unlocked_${studentId}`, 'true');
-      sessionStorage.setItem('groovelab_parent_unlocked_global', 'true');
-      if (siblingGroupId) {
-        sessionStorage.setItem(`groovelab_family_unlocked_${siblingGroupId}`, 'true');
+      if (studentId) {
+        sessionStorage.setItem(`groovelab_parent_session_${studentId}`, String(Date.now() + 180 * 1000));
       }
+      if (siblingGroupId) {
+        sessionStorage.setItem(`groovelab_parent_session_sibling_${siblingGroupId}`, String(Date.now() + 180 * 1000));
+      }
+
       setIsParentUnlocked(true);
       setIsVerifyingParentGate(false);
       setParentGatePinInput('');
@@ -873,7 +877,9 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       setActiveStudentSettingsModal(null);
     } catch (e: any) {
       console.warn('[Biometrics] Unlock failed:', e);
-      setParentGateError(e.message || 'FaceID/TouchID Entsperrung fehlgeschlagen.');
+      if (e.name !== 'NotAllowedError' && e.name !== 'AbortError') {
+        setParentGateError(e.message || 'FaceID/TouchID Entsperrung fehlgeschlagen.');
+      }
     } finally {
       setIsVerifyingParentGate(false);
     }
@@ -1649,7 +1655,17 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       const sName = formatStudentPureFirstName(studentUser?.first_name, 'Schüler');
       const schoolName = studentUser?.schools?.name || 'Campus-Groovelab Partner-Musikschule';
       const isChf = studentUser?.schools?.currency === 'CHF';
-      const amountStr = isChf ? 'CHF 5.88' : '5,88 €';
+      const schoolStartMonth = Number((studentUser?.schools as any)?.school_year_start_month || 9);
+      const schoolStartDay = Number((studentUser?.schools as any)?.school_year_start_day || 1);
+      const schoolYearCalc = calculateSchoolYearDirectBilling(
+        undefined,
+        isChf ? 'CHF' : 'EUR',
+        undefined,
+        schoolStartMonth,
+        schoolStartDay,
+        (studentUser?.schools as any)?.direct_billing_effective_date
+      );
+      const amountStr = isChf ? `CHF ${schoolYearCalc.totalAmountStr}` : `${schoolYearCalc.totalAmountStr} €`;
 
       doc.setFillColor(248, 250, 252);
       doc.rect(0, 0, 210, 297, 'F');
@@ -3089,6 +3105,137 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       setIsVerifyingGlobalPin(false);
     }
   };
+
+  const handleVerifyGlobalParentPinAsync = async (inputPin: string): Promise<boolean> => {
+    if (!inputPin || inputPin.length !== 6) return false;
+    const cleanInput = inputPin.trim();
+    const targetId = studentId || (studentUser as any)?.id;
+    if (!targetId) return false;
+    try {
+      const { data: parentOk } = await supabase.rpc('verify_parent_pin', {
+        student_id: targetId,
+        input_pin: cleanInput
+      });
+      if (parentOk === true) {
+        inMemoryParentPinRef.current = cleanInput;
+        sessionStorage.setItem('groovelab_parent_unlocked_global', 'true');
+        sessionStorage.setItem(`groovelab_parent_unlocked_${targetId}`, 'true');
+        return true;
+      }
+      return false;
+    } catch {
+      return false;
+    }
+  };
+
+  // ── ⚡ Push-Notification Deep-Link Listener for Rescheduled Appointments ─────────
+  const [activeRescheduleBottomSheetOcc, setActiveRescheduleBottomSheetOcc] = useState<any | null>(null);
+  const [isRescheduleSheetOpen, setIsRescheduleSheetOpen] = useState<boolean>(false);
+  const [isRescheduleLoading, setIsRescheduleLoading] = useState<boolean>(false);
+  const [rescheduleChatDraft, setRescheduleChatDraft] = useState<string>('');
+
+  const closeRescheduleBottomSheet = () => {
+    setIsRescheduleSheetOpen(false);
+    setActiveRescheduleBottomSheetOcc(null);
+    setIsRescheduleLoading(false);
+    if (typeof window !== 'undefined') {
+      try {
+        sessionStorage.removeItem('pending_reschedule_id');
+        const url = new URL(window.location.href);
+        url.searchParams.delete('reschedule_id');
+        url.searchParams.delete('open_reschedule');
+        window.history.replaceState({}, document.title, url.pathname + (url.search ? url.search : ''));
+      } catch (e) {}
+    }
+  };
+
+  const resolveRescheduleOccurrence = async (rescheduleId: string) => {
+    setIsRescheduleSheetOpen(true);
+    // 1. First check in existing occurrences
+    if (scheduleOccurrences && scheduleOccurrences.length > 0) {
+      const match = scheduleOccurrences.find(
+        (occ: any) => String(occ.id) === rescheduleId || String(occ.schedule_id) === rescheduleId
+      );
+      if (match) {
+        setActiveRescheduleBottomSheetOcc(match);
+        setIsRescheduleLoading(false);
+        return;
+      }
+    }
+
+    // 2. Not found in current cache yet -> show skeleton while loading
+    setIsRescheduleLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('schedule_occurrences')
+        .select('*, teacher:users!schedule_occurrences_teacher_id_fkey(id, first_name, last_name, avatar_url, photo_url), schedule:schedules(*)')
+        .eq('id', rescheduleId)
+        .single();
+      
+      if (!error && data) {
+        setActiveRescheduleBottomSheetOcc(data);
+      } else if (scheduleOccurrences && scheduleOccurrences.length > 0) {
+        const match = scheduleOccurrences.find(
+          (occ: any) => String(occ.id) === rescheduleId || String(occ.schedule_id) === rescheduleId
+        );
+        if (match) setActiveRescheduleBottomSheetOcc(match);
+      }
+    } catch (e) {
+      console.warn('Could not fetch reschedule occurrence directly:', e);
+    } finally {
+      setIsRescheduleLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const urlParams = new URLSearchParams(window.location.search);
+    const rescheduleId = urlParams.get('reschedule_id') || urlParams.get('open_reschedule') || sessionStorage.getItem('pending_reschedule_id');
+    if (rescheduleId) {
+      resolveRescheduleOccurrence(rescheduleId);
+    }
+
+    // Service Worker postMessage Listener
+    const handleSwMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'PUSH_NOTIFICATION_CLICK' && event.data?.url) {
+        try {
+          const parsed = new URL(event.data.url, window.location.origin);
+          const rId = parsed.searchParams.get('reschedule_id') || parsed.searchParams.get('open_reschedule');
+          if (rId) {
+            resolveRescheduleOccurrence(rId);
+          }
+        } catch (err) {}
+      }
+    };
+
+    window.addEventListener('message', handleSwMessage);
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.addEventListener('message', handleSwMessage);
+    }
+    return () => {
+      window.removeEventListener('message', handleSwMessage);
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.removeEventListener('message', handleSwMessage);
+      }
+    };
+  }, []);
+
+  // When scheduleOccurrences loads or refreshes, re-resolve if sheet is open without occurrence
+  useEffect(() => {
+    if (isRescheduleSheetOpen && !activeRescheduleBottomSheetOcc && scheduleOccurrences && scheduleOccurrences.length > 0) {
+      const urlParams = new URLSearchParams(window.location.search);
+      const rescheduleId = urlParams.get('reschedule_id') || urlParams.get('open_reschedule') || (typeof window !== 'undefined' ? sessionStorage.getItem('pending_reschedule_id') : null);
+      if (rescheduleId) {
+        const match = scheduleOccurrences.find(
+          (occ: any) => String(occ.id) === rescheduleId || String(occ.schedule_id) === rescheduleId
+        );
+        if (match) {
+          setActiveRescheduleBottomSheetOcc(match);
+          setIsRescheduleLoading(false);
+        }
+      }
+    }
+  }, [scheduleOccurrences, isRescheduleSheetOpen, activeRescheduleBottomSheetOcc]);
 
   const handleTriggerConfirmReschedule = (occId: string) => {
     if (!isStudentRescheduleAllowed) {
@@ -9545,7 +9692,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       const [userRes, avatarRes, statsRes, briefingRes, emailRes, missionRes, pinsRes, logsRes, matrixRes, skillsRes] = await Promise.all([
         supabase
           .from('users')
-          .select('id, school_id, role, first_name, avatar_url, photo_url, instrument, teacher_id, is_active, is_campus_active, is_groovelab_active, campus_ui_level, briefing_sidebar_collapsed, parent_allow_chat, parent_allow_absences, parent_allow_reschedule_confirm, parent_allow_timer, parent_allow_leaderboard, parent_allow_proposals, parent_allow_audio, parent_allow_tts, has_parent_pin, has_personal_pin, parent_pin_configured, status, parent_permissions, joker_used_at, weekly_jokers_used, activated_at, is_pin_activated, created_at, push_notifications_enabled, push_notif_schedule_changes, push_notif_homework, push_notif_chat, push_notif_practice_reminder, push_notif_weekly_digest, push_notif_all_features, is_app_user, is_premium_user, subject, payment_status, student_billing_payment_method, student_billing_cash_paid, exempt_from_direct_billing, schools(*)')
+          .select('id, school_id, role, first_name, avatar_url, photo_url, instrument, teacher_id, is_active, is_campus_active, is_groovelab_active, campus_ui_level, briefing_sidebar_collapsed, parent_allow_chat, parent_allow_absences, parent_allow_reschedule_confirm, parent_allow_timer, parent_allow_leaderboard, parent_allow_proposals, parent_allow_audio, parent_allow_tts, has_parent_pin, has_personal_pin, parent_pin_configured, status, parent_permissions, joker_used_at, weekly_jokers_used, activated_at, is_pin_activated, created_at, push_notifications_enabled, push_notif_schedule_changes, push_notif_homework, push_notif_chat, push_notif_practice_reminder, push_notif_weekly_digest, push_notif_all_features, push_prompt_decision, push_prompt_dismissed_at, is_app_user, is_premium_user, subject, payment_status, student_billing_payment_method, student_billing_cash_paid, exempt_from_direct_billing, schools(*)')
           .eq('id', studentId)
           .single(),
         supabase
@@ -12049,6 +12196,11 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
         isRightSidebarCollapsed={isRightSidebarCollapsed}
         isStudentAbsenceAllowed={isStudentAbsenceAllowed}
         isStudentRescheduleAllowed={isStudentRescheduleAllowed}
+        onOpenRescheduleBottomSheet={(occ) => {
+          setActiveRescheduleBottomSheetOcc(occ);
+          setIsRescheduleSheetOpen(true);
+          setIsRescheduleLoading(false);
+        }}
         isTodayHoliday={isTodayHoliday}
         isTtsSpeaking={isTtsSpeaking}
         juniorActivePlayingAudioId={juniorActivePlayingAudioId}
@@ -12110,6 +12262,8 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
         unifiedStickersMap={unifiedStickersMap}
         unreadClassFeedCount={unreadClassFeedCount}
         xpActive={xpActive}
+        pushEnabled={pushEnabled}
+        setShowPushSoftPrompt={setShowPushSoftPrompt}
       />
       
       <StudentHeroTab
@@ -12467,9 +12621,44 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                 fetchStudentAndAvatar();
               }
             }}
+            initialDraftMessage={rescheduleChatDraft}
           />
         );
       })()}
+
+      {/* 📱 Mobile-First Reschedule Bottom-Sheet Modal */}
+      {isRescheduleSheetOpen && (
+        <StudentRescheduleBottomSheetModal
+          isOpen={isRescheduleSheetOpen}
+          onClose={closeRescheduleBottomSheet}
+          occurrence={activeRescheduleBottomSheetOcc}
+          isLoading={isRescheduleLoading}
+          parentAllowRescheduleConfirm={isStudentRescheduleAllowed}
+          studentUiLevel={studentUiLevel}
+          onConfirmReschedule={async (occId) => {
+            await handleConfirmReschedule(occId);
+            closeRescheduleBottomSheet();
+          }}
+          onOpenChatInquiry={(teacher, suggestedText) => {
+            const occ = activeRescheduleBottomSheetOcc;
+            if (!occ) return;
+            setRescheduleChatDraft(suggestedText);
+            setAppointmentChatData({
+              teacherId: teacher?.id || occ.teacher_id,
+              date: occ.date,
+              start_time: occ.start_time || '12:00',
+              label: `${occ.date} - ${occ.start_time || ''}`,
+              occurrenceId: occ.id,
+              status: occ.status
+            });
+            setShowAppointmentChat(true);
+            closeRescheduleBottomSheet();
+          }}
+          onVerifyParentPin={handleVerifyGlobalParentPinAsync}
+          teacherName={studentUser?.teacher_name || activeRescheduleBottomSheetOcc?.teacher?.first_name}
+          teacherAvatarUrl={activeRescheduleBottomSheetOcc?.teacher?.avatar_url || activeRescheduleBottomSheetOcc?.teacher?.photo_url}
+        />
+      )}
       
       {/* Global Master PIN Gate Modal for Student Absence & Chat Unlock */}
       <GlobalParentPinModal
@@ -12515,7 +12704,10 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
         <Suspense fallback={null}>
           <PushNotificationSoftPromptModal
             isOpen={showPushSoftPrompt}
-            onClose={() => setShowPushSoftPrompt(false)}
+            onClose={() => {
+              setShowPushSoftPrompt(false);
+              fetchStudentAndAvatar(true);
+            }}
             userId={studentId}
             initialScheduleChanges={pushNotifScheduleChanges}
             initialHomework={pushNotifHomework}

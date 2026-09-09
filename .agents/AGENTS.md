@@ -39,6 +39,7 @@
   npm run gate
   ```
   *(oder `npm run verify:enterprise`)*. Dieses Gate führt synchron den Security Drift Guard (0 Violations), den Secret-Scanner (0 Leaks), den TypeScript Typechecker (`tsc --noEmit`) und die FinOps Invariant Tests (`runBillingInvariantTests.ts`) aus. Ein Task gilt erst als erfolgreich, wenn dieses Gate mit Exit-Code 0 abschließt.
+- **Bypass-Befehl `#no` (Fast Iteration)**: Wenn der Benutzer in seiner Nachricht explizit `#no` schreibt, MUSS das zeitaufwändige Enterprise Quality Gate am Ende der Aufgabe übersprungen werden (für schnelle Iterations- und Feedbackschleifen). Standardmäßig ohne `#no` bleibt das Gate weiterhin Pflicht.
 
 ## 🏛️ Monolith Goldstandard Guardian & Positive Intervention Directive
 - **Automatische Wächter- & Veredelungsrolle**: Bei jeder Prompt-Ausführung übernimmt der Agent automatisch die Rolle des *Principal Monolith Architecture Guardians*. Alle im Rahmen des Prompts angefassten, erweiterten oder neu erzeugten Dateien werden aktiv auf Konformität mit dem Monolith-Goldstandard von Campus-Groovelab geprüft.
@@ -98,8 +99,8 @@
     - *Einmalige Komplett-Aktivierung zum Schuljahresstart (September) (20% Rabatt)*: The school activates all students at the school year start, billed once for the entire school year with a 20% discount.
   - **Direktabrechnung mit Eltern/Schülern (Zahlungsüberwachung)** (Direct billing with parents/students; only available for the Campus module; GrooveLab activations are always covered by the school):
     - **Ausschließliche Jahresbeitragszahlung**: Schüler-Direktabrechnungen dürfen **immer nur als Jahresbeitragszahlung (einmalige Schuljahresgebühr)** gebucht und eingezogen werden – **niemals monatlich** (zur Vermeidung von unverhältnismäßigen Banktransaktions- und Buchungsgebühren).
-    - *Vollständige Direktabrechnung*: Einmaliger Jahresbeitrag von 5,88 € / Jahr (DE/AT) bzw. CHF 12.00 / Jahr (CH) (umgerechnet 0,49 € / CHF 1.00 / Mo.). Schule wird um die passive Datenbankgebühr komplett entlastet (Schule zahlt 0,00 € / CHF 0.00).
-    - *Teilweise Direktabrechnung*: Einmaliger Jahresbeitrag von 4,80 € / Jahr (DE/AT) bzw. CHF 9.60 / Jahr (CH) (umgerechnet 0,40 € / CHF 0.80 / Mo.). Schule deckt den passiven Beitrag (0,09 € / CHF 0.20 / Mo.).
+    - *Vollständige Direktabrechnung*: Einmaliger Jahresbeitrag von maximal 5,39 € / Schuljahr (1 Monat kostenlos/Schnupperphase + bis zu 11 Monate × 0,49 € / Mo. DE/AT) bzw. maximal CHF 11.00 / Schuljahr (CH) (1 Monat kostenlos + bis zu 11 Monate × CHF 1.00 / Mo.). Schule wird für alle aktivierten Campus-Schüler um die passive Datenbankgebühr komplett entlastet (Schule zahlt 0,00 € / CHF 0.00).
+    - *Teilweise Direktabrechnung*: Einmaliger Jahresbeitrag von maximal 4,40 € / Schuljahr (1 Monat kostenlos + bis zu 11 Monate × 0,40 € / Mo. DE/AT) bzw. maximal CHF 8.80 / Schuljahr (CH) (1 Monat kostenlos + bis zu 11 Monate × CHF 0.80 / Mo.). Schule deckt den passiven Beitrag (0,09 € / CHF 0.20 / Mo.).
     - *Härtefälle & Geschwisterrabatte*: Individual students can be manually marked in the student administration to exempt them from direct billing (costs remain with the school, no contribution is collected).
 ## Canonical Billing Sequence & Legal SaaS Nomenclature (Verbindlicher Standard)
 - **Plattformweites Master-Wording**: Für alle Gebührenaufstellungen, Gebühren-Vorschauen, Ratenübersichten, Rechnungs-PDFs, Onboarding-Karten und Modals innerhalb der gesamten Plattform MUSS immer die exakt gleiche kanonische Reihenfolge und das gleiche juristisch wasserdichte Wording verwendet werden:

@@ -898,6 +898,9 @@ export const ParentProtectionSettingsView: React.FC<ParentProtectionSettingsView
             style={{ width: '20px', height: '20px', accentColor: '#0284c7', cursor: 'pointer' }}
           />
         </label>
+
+        {/* End-of-List Safe Area Spacer */}
+        <div style={{ height: 'calc(40px + env(safe-area-inset-bottom, 20px))', width: '100%', flexShrink: 0 }} />
       </div>
     </div>
   );

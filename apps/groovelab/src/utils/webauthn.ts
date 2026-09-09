@@ -39,12 +39,31 @@ function arrayBufferToBase64url(buffer: ArrayBuffer): string {
 }
 
 /**
- * Safely extracts and normalizes the Relying Party ID (FQDN hostname without port or path).
+ * Safely converts either a 64-char hex string or a Base64URL string into an ArrayBuffer.
  */
-export const getSanitizedRpId = (): string => {
+function challengeToArrayBuffer(challenge: string): ArrayBuffer {
+  const clean = challenge.trim();
+  if (/^[0-9a-fA-F]{64}$/.test(clean)) {
+    const bytes = new Uint8Array(32);
+    for (let i = 0; i < 32; i++) {
+      bytes[i] = parseInt(clean.substring(i * 2, i * 2 + 2), 16);
+    }
+    return bytes.buffer;
+  }
+  return base64urlToArrayBuffer(clean);
+}
+
+/**
+ * Safely extracts and normalizes the Relying Party ID (FQDN hostname without port or path).
+ * Per W3C WebAuthn spec § 5.4.3, an RP ID MUST NOT be an IP address.
+ */
+export const getSanitizedRpId = (): string | undefined => {
   if (typeof window === 'undefined') return 'campus-groovelab.de';
   const hostname = window.location.hostname;
-  return hostname || 'campus-groovelab.de';
+  if (!hostname || /^(\d{1,3}\.){3}\d{1,3}$/.test(hostname) || hostname.includes(':')) {
+    return undefined;
+  }
+  return hostname;
 };
 
 /**
@@ -61,14 +80,15 @@ export const registerBiometrics = async (
     throw new Error('WebAuthn is not supported on this device/browser.');
   }
 
+  const rpId = getSanitizedRpId();
   const publicKeyCredentialCreationOptions: PublicKeyCredentialCreationOptions = {
-    challenge: base64urlToArrayBuffer(challengeFromServer),
+    challenge: challengeToArrayBuffer(challengeFromServer),
     rp: {
       name: 'Campus-Groovelab',
-      id: getSanitizedRpId(),
+      ...(rpId ? { id: rpId } : {}),
     },
     user: {
-      id: base64urlToArrayBuffer(userId),
+      id: new TextEncoder().encode(userId).buffer,
       name: userName,
       displayName: displayName || userName,
     },
@@ -118,9 +138,10 @@ export const authenticateBiometrics = async (
     throw new Error('WebAuthn is not supported on this device/browser.');
   }
 
+  const rpId = getSanitizedRpId();
   const publicKeyCredentialRequestOptions: PublicKeyCredentialRequestOptions = {
-    challenge: base64urlToArrayBuffer(challengeFromServer),
-    rpId: getSanitizedRpId(),
+    challenge: challengeToArrayBuffer(challengeFromServer),
+    ...(rpId ? { rpId } : {}),
     allowCredentials: allowedCredentialIds.map((id) => ({
       id: base64urlToArrayBuffer(id),
       type: 'public-key',

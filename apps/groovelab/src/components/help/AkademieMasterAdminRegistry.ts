@@ -126,7 +126,7 @@ export const MASTER_ADMIN_GUIDES: AkademieBoardGuide[] = [
       }
     ],
     proTips: [
-      'Nutze die Filterfunktion, um Zahlungen nach Schule oder Betrag (5,88 € bzw. CHF 12.00) zu sortieren.',
+      'Nutze die Filterfunktion, um Zahlungen nach Schule oder Betrag (z. B. 5,39 € bzw. CHF 11.00) zu sortieren.',
       'Sammelüberweisungen für Geschwisterkinder werden anhand des Elternnamens intelligent zusammengeführt.'
     ],
     invariants: [

@@ -212,7 +212,7 @@ export const ReconciliationTab: React.FC<ReconciliationTabProps> = ({
       while ((entryMatch = entryRegex.exec(rawText)) !== null) {
         const entryBlock = entryMatch[1];
         const amtMatch = entryBlock.match(/<Amt[^>]*>([\d.,]+)<\/Amt>/);
-        const amount = amtMatch ? `${amtMatch[1]} €` : '5,88 €';
+        const amount = amtMatch ? `${amtMatch[1]} €` : '5,39 €';
 
         const ustrdMatches = Array.from(entryBlock.matchAll(/<Ustrd>([\s\S]*?)<\/Ustrd>/g));
         for (const uMatch of ustrdMatches) {
@@ -225,7 +225,7 @@ export const ReconciliationTab: React.FC<ReconciliationTabProps> = ({
       for (const line of lines) {
         if (!line.trim()) continue;
         const amtMatch = line.match(/(\d+[.,]\d{2})\s*(?:EUR|€)?/i);
-        const amount = amtMatch ? `${amtMatch[1].replace('.', ',')} €` : '5,88 €';
+        const amount = amtMatch ? `${amtMatch[1].replace('.', ',')} €` : '5,39 €';
         matchTextToStudent(line, amount, results, seenIds);
       }
     }
@@ -359,10 +359,10 @@ export const ReconciliationTab: React.FC<ReconciliationTabProps> = ({
       const ref = getReferenceCode(u);
       const date = u.created_at ? new Date(u.created_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
       const status = u.is_campus_active ? 'Bezahlt_Aktiv' : (u.is_hardship_exempt ? 'Befreit_Haertefall' : 'Offen_Ausstehend');
-      const gross = '5.88';
-      const net = '4.94';
+      const gross = '5.39';
+      const net = '4.53';
       const vatRate = '19';
-      const vat = '0.94';
+      const vat = '0.86';
       const schoolName = (school?.name || 'Musikschule').replace(/;/g, ',');
       const bookingText = `Campus-Groovelab Jahresbeitrag ${ref} ${schoolName}`;
 
@@ -458,24 +458,24 @@ export const ReconciliationTab: React.FC<ReconciliationTabProps> = ({
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(51, 65, 85);
       doc.text('Cloud- & Modul-Bereitstellung: Campus', 16, 132);
-      doc.text('Jahresbeitrag', 110, 132);
+      doc.text('Jahresbeitrag (11 Mon.)', 110, 132);
       doc.text('19%', 145, 132);
-      doc.text('5,88 EUR', 170, 132);
+      doc.text('5,39 EUR', 170, 132);
 
       doc.line(16, 140, 194, 140);
 
       doc.setFontSize(9);
       doc.setTextColor(100, 116, 139);
       doc.text('Nettobetrag:', 130, 150);
-      doc.text('4,94 EUR', 170, 150);
+      doc.text('4,53 EUR', 170, 150);
 
       doc.text('USt. (19%):', 130, 157);
-      doc.text('0,94 EUR', 170, 157);
+      doc.text('0,86 EUR', 170, 157);
 
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(15, 23, 42);
       doc.text('Gesamtbetrag (Brutto):', 130, 166);
-      doc.text('5,88 EUR', 170, 166);
+      doc.text('5,39 EUR', 170, 166);
 
       doc.setDrawColor(16, 185, 129);
       doc.setFillColor(240, 253, 244);
@@ -1003,7 +1003,7 @@ export const ReconciliationTab: React.FC<ReconciliationTabProps> = ({
                           {getAnonymizedName(u)}
                         </strong>
                         <span style={{ fontSize: '0.76rem', fontWeight: 800, color: u.is_campus_active ? '#15803d' : '#d97706' }}>
-                          5,88 € / J.
+                          5,39 € / J.
                         </span>
                       </div>
 
@@ -1218,15 +1218,15 @@ export const ReconciliationTab: React.FC<ReconciliationTabProps> = ({
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b' }}>
                   <span>Abrechnungsintervall</span>
-                  <strong style={{ color: '#0f172a' }}>Jahresbeitrag (12 Monate)</strong>
+                  <strong style={{ color: '#0f172a' }}>Jahresbeitrag (11 Monate, 1. Mo. frei)</strong>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b' }}>
                   <span>Nettobetrag (19% MwSt.)</span>
-                  <strong style={{ color: '#0f172a' }}>4,94 € Netto + 0,94 € USt.</strong>
+                  <strong style={{ color: '#0f172a' }}>4,53 € Netto + 0,86 € USt.</strong>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #e2e8f0', paddingTop: '8px', fontSize: '0.90rem' }}>
                   <span style={{ fontWeight: 800, color: '#0f172a' }}>Gesamtbetrag Überweisung</span>
-                  <strong style={{ fontWeight: 900, color: '#0f172a', fontFamily: '"Outfit", sans-serif' }}>5,88 €</strong>
+                  <strong style={{ fontWeight: 900, color: '#0f172a', fontFamily: '"Outfit", sans-serif' }}>5,39 €</strong>
                 </div>
               </div>
 
@@ -1354,7 +1354,7 @@ export const ReconciliationTab: React.FC<ReconciliationTabProps> = ({
                   setCsvText(e.target.value);
                   parseBankData(e.target.value);
                 }}
-                placeholder="Beispiel: 2026-08-13; Überweisung; 5,88 EUR; Verwendungszweck: CG-F63B8EDE-2607..."
+                placeholder="Beispiel: 2026-08-13; Überweisung; 5,39 EUR; Verwendungszweck: CG-F63B8EDE-2607..."
                 rows={4}
                 style={{
                   width: '100%',
@@ -1387,7 +1387,7 @@ export const ReconciliationTab: React.FC<ReconciliationTabProps> = ({
                           </span>
                         )}
                       </div>
-                      <span style={{ fontWeight: 800 }}>{r.amount || '5,88 €'}</span>
+                      <span style={{ fontWeight: 800 }}>{r.amount || '5,39 €'}</span>
                     </div>
                   ))}
                 </div>

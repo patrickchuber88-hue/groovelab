@@ -20,7 +20,7 @@ export function generateEpcGiroCodePayload(params: EpcGiroCodeParams): string {
   const sanitizedIban = (params.iban || '').replace(/\s+/g, '').toUpperCase();
   const sanitizedBic = (params.bic || '').replace(/\s+/g, '').toUpperCase();
   const sanitizedRecipient = (params.recipientName || 'Campus-Groovelab').slice(0, 70);
-  const amountStr = params.amount ? Number(params.amount).toFixed(2) : '5.88';
+  const amountStr = params.amount ? Number(params.amount).toFixed(2) : '5.39';
   const remittance = (params.referenceCode || '').slice(0, 140);
 
   const lines = [
@@ -237,9 +237,9 @@ export function calculateSchoolYearDirectBilling(
   let finalEndMonthName = paidEndMonthName;
 
   // If registration is in the final month of the current school year,
-  // the paid period starts with the new school year and runs for a full 12 months.
+  // the paid period starts with the new school year and runs for max 11 months (1st month free).
   if (remainingPaidMonths <= 0) {
-    remainingPaidMonths = 12;
+    remainingPaidMonths = 11;
     const followingStartDate = new Date(nextStartYear + 1, startMonth - 1, startDay);
     const followingEndDate = new Date(followingStartDate.getTime() - 24 * 60 * 60 * 1000);
     finalEndDay = followingEndDate.getDate();

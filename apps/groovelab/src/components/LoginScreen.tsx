@@ -5,7 +5,7 @@ import { downloadLocalQrCodePng } from '../utils/localQrGenerator';
 import { supabase } from '../lib/supabase';
 import { Music, Tablet, ShieldCheck, FileText, X, Check, School, AlertCircle, ArrowRight, Download, User, Upload, Key, KeyRound, RotateCw, HelpCircle, Lock, Calendar, Clock, ArrowLeft, Mail, Users, Plus, Fingerprint, Timer, Trophy, Smartphone, Camera, CameraOff, Unlink, SwitchCamera, Star, Ban, Sparkles, Pencil } from 'lucide-react';
 import { getDistanceFromLatLonInM } from '../utils/geo';
-import { isWebAuthnSupported, registerBiometrics, authenticateUserBiometrics, getStoredBiometricProfiles, saveBiometricProfile, removeBiometricProfile, BiometricVaultProfile } from '../utils/webauthn';
+import { isWebAuthnSupported, registerBiometrics, authenticateUserBiometrics, getStoredBiometricProfiles, saveBiometricProfile, removeBiometricProfile, BiometricVaultProfile, getSanitizedRpId } from '../utils/webauthn';
 import { StudentMobileScheduleWizard } from './StudentMobileScheduleWizard';
 import { LegalTextModal } from './LegalTextModal';
 import { DpoAuditPortal } from './DpoAuditPortal';
@@ -1569,6 +1569,16 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
   const [schoolData, setSchoolData] = useState<any>(null);
   const [logoTheme, setLogoTheme] = useState<'light' | 'dark'>('light');
 
+  // Preserve reschedule deep-link across login screens for seamless cold boot
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const rId = params.get('reschedule_id') || params.get('open_reschedule');
+    if (rId) {
+      sessionStorage.setItem('pending_reschedule_id', rId);
+    }
+  }, []);
+
   // Tenant-Scoped Family Profiles (Strict Multi-Tenancy: Only show students belonging to the currently selected school)
   const scopedFamilyProfiles = useMemo(() => {
     if (!schoolData?.id) return [];
@@ -1907,7 +1917,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             if (user.role === 'student') {
               const tokenToUse = user.qr_token || user.ausweis_nummer || user.id;
               sessionStorage.setItem('groovelab_user_id', user.id);
-              window.location.replace(`${window.location.origin}/qr/${tokenToUse}`);
+              window.location.replace(`${window.location.origin}/qr/${tokenToUse}?notice=inactive_landing`);
               setLoading(false);
               return;
             } else {
@@ -3082,12 +3092,14 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         chalData.challenge.match(/.{1,2}/g)?.map((byte: string) => parseInt(byte, 16)) || []
       ).buffer;
 
+      const rpId = getSanitizedRpId();
       // 2. Fetch the resident credential assertion
       const assertion = (await navigator.credentials.get({
         publicKey: {
           challenge: challengeBuffer,
           userVerification: 'required',
           timeout: 60000,
+          ...(rpId ? { rpId } : {})
         },
       })) as PublicKeyCredential;
 
@@ -3118,7 +3130,9 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
     } catch (err: any) {
       console.error('Biometrics login failed:', err);
-      alert(err.message || 'Anmeldung per Fingerabdruck/FaceID fehlgeschlagen.');
+      if (err.name !== 'NotAllowedError' && err.name !== 'AbortError') {
+        alert(err.message || 'Anmeldung per Fingerabdruck/FaceID fehlgeschlagen.');
+      }
       setLoading(false);
     }
   };

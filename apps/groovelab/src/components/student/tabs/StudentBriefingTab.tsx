@@ -4,7 +4,7 @@ import {
   Clock, Timer, Flame, BookOpen, Play, Pause, Square, RotateCcw, Volume2, VolumeX, X,
   Zap, Music, School, Calendar, CalendarX, Check, Target, MessageSquare, Pencil, User,
   Phone, Users, Shield, Palmtree, Settings, FileText, ThumbsUp, Heart, AlertTriangle,
-  Mic, Disc, Download, Key, Headphones, Sliders
+  Mic, Disc, Download, Key, Headphones, Sliders, Bell
 } from 'lucide-react';
 import { ALL_STICKERS } from '../../../domain/stickersAndTresor';
 import { UpdateAnnouncementHero } from '../../common/UpdateAnnouncementHero';
@@ -129,11 +129,15 @@ export interface StudentBriefingTabProps {
   unifiedStickersMap: any;
   unreadClassFeedCount: number;
   xpActive: boolean;
+  pushEnabled?: boolean;
+  setShowPushSoftPrompt?: (val: boolean) => void;
+  onOpenRescheduleBottomSheet?: (occ: any) => void;
 }
 
 export function StudentBriefingTab(props: StudentBriefingTabProps) {
   const {
     studentId,
+    onOpenRescheduleBottomSheet,
     DEFAULT_FOKUS_LEVELS,
     activeSongSkills,
     activeTab,
@@ -246,7 +250,9 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
     totalUnreadDirectMessages,
     unifiedStickersMap,
     unreadClassFeedCount,
-    xpActive
+    xpActive,
+    pushEnabled,
+    setShowPushSoftPrompt
   } = props;
 
   const activeWeeklyFocusKey = useMemo(() => {
@@ -413,6 +419,101 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
               {/* Community Update & Helden-Moment Hero */}
               <UpdateAnnouncementHero userId={studentId} activePlatform={currentPlatform} />
+              
+              {/* Quick-Action: Push-Nachrichten Aktivierung Banner (nur wenn noch keine finale Entscheidung vorliegt & kein Cooldown aktiv ist) */}
+              {(() => {
+                if (pushEnabled || !setShowPushSoftPrompt) return null;
+
+                // 1. Check user record in database
+                const dbDecision = studentUser?.push_prompt_decision;
+                if (dbDecision === 'accepted' || dbDecision === 'declined') {
+                  return null;
+                }
+
+                // 2. Check localStorage cache for decision
+                const localDecision = typeof window !== 'undefined' ? localStorage.getItem(`campus_push_decision_${studentId}`) : null;
+                if (localDecision === 'accepted' || localDecision === 'declined') {
+                  return null;
+                }
+
+                // 3. Check 14-day deferral cooldown (both DB and LocalStorage)
+                const localDeferredUntil = typeof window !== 'undefined' ? Number(localStorage.getItem(`campus_push_deferred_until_${studentId}`)) : 0;
+                if (localDeferredUntil && Date.now() < localDeferredUntil) {
+                  return null;
+                }
+
+                if (studentUser?.push_prompt_dismissed_at) {
+                  const dismissedTime = new Date(studentUser.push_prompt_dismissed_at).getTime();
+                  if (!isNaN(dismissedTime) && Date.now() - dismissedTime < 14 * 86400000) {
+                    return null;
+                  }
+                }
+
+                return (
+                  <div 
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => setShowPushSoftPrompt(true)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        setShowPushSoftPrompt(true);
+                      }
+                    }}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: '16px',
+                      padding: '16px 20px',
+                      background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
+                      border: '1.5px solid #bfdbfe',
+                      borderRadius: '20px',
+                      cursor: 'pointer',
+                      boxShadow: '0 4px 14px -2px rgba(59, 130, 246, 0.12)',
+                      transition: 'all 0.2s ease',
+                    }}
+                    className="hover-scale"
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                      <div style={{
+                        width: '42px',
+                        height: '42px',
+                        borderRadius: '14px',
+                        background: '#3b82f6',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: 'white',
+                        flexShrink: 0,
+                        boxShadow: '0 4px 10px rgba(59, 130, 246, 0.3)'
+                      }}>
+                        <Bell size={22} />
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#1e3a8a', letterSpacing: '-0.01em' }}>
+                          Push-Nachrichten aktivieren
+                        </div>
+                        <div style={{ fontSize: '0.82rem', fontWeight: 600, color: '#3b82f6', marginTop: '2px' }}>
+                          Erhalte Terminänderungen, Hausaufgaben & Chat-Nachrichten sofort aufs Smartphone
+                        </div>
+                      </div>
+                    </div>
+                    <div style={{
+                      padding: '8px 16px',
+                      background: '#2563eb',
+                      color: '#ffffff',
+                      borderRadius: '12px',
+                      fontSize: '0.84rem',
+                      fontWeight: 800,
+                      whiteSpace: 'nowrap',
+                      boxShadow: '0 2px 6px rgba(37, 99, 235, 0.3)'
+                    }}>
+                      Aktivieren
+                    </div>
+                  </div>
+                );
+              })()}
               
               {/* ========================================================================= */}
               {/* LEVEL 1: JUNIOR (6-10 JAHRE) - RADIKAL AUFGERÄUMT IM ANTON-STIL          */}
@@ -6515,8 +6616,36 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                             </div>
                             
                             {isReschedule && (
-                              <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '4px' }}>
-                                <div style={{ display: 'flex', gap: '8px' }}>
+                              <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '4px', flexWrap: 'wrap' }}>
+                                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                                  {onOpenRescheduleBottomSheet && (
+                                    <button
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        onOpenRescheduleBottomSheet(occ);
+                                      }}
+                                      style={{
+                                        background: '#fef3c7',
+                                        color: '#b45309',
+                                        border: '1px solid #fde68a',
+                                        minHeight: '36px',
+                                        padding: '6px 14px',
+                                        borderRadius: '10px',
+                                        fontSize: '0.80rem',
+                                        fontWeight: 800,
+                                        cursor: 'pointer',
+                                        boxShadow: '0 2px 6px rgba(217, 119, 6, 0.15)',
+                                        transition: 'all 0.2s',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '4px'
+                                      }}
+                                    >
+                                      <Calendar size={13} strokeWidth={2.4} />
+                                      <span>Termin prüfen 📱</span>
+                                    </button>
+                                  )}
                                   <button 
                                     onClick={(e) => {
                                       e.preventDefault();

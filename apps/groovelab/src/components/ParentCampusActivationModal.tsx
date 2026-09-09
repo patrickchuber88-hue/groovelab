@@ -36,7 +36,7 @@ export interface ParentCampusActivationModalProps {
   masterBillingIban?: string;
   masterBillingBic?: string;
   masterBillingCompany?: string;
-  annualFee?: number; // default 5.88 (0.49 * 12)
+  annualFee?: number; // default 5.39 (0.49 * 11)
   isParentUnlocked?: boolean;
   onClose: () => void;
   onPaymentSubmitted?: () => void;
@@ -48,7 +48,7 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
   masterBillingIban = 'DE89 3704 0044 0532 9482 11',
   masterBillingBic = 'GENODEFFXXX',
   masterBillingCompany = 'Campus-Groovelab Plattformbetrieb',
-  annualFee = 5.88,
+  annualFee = 5.39,
   isParentUnlocked = false,
   onClose,
   onPaymentSubmitted
@@ -117,7 +117,7 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
     schoolStartDay, 
     schoolData?.direct_billing_effective_date
   );
-  const effectiveAnnualFee = annualFee !== 5.88 && annualFee !== 12.00 && annualFee !== 9.60 ? annualFee : schoolYearCalc.totalAmount;
+  const effectiveAnnualFee = annualFee !== 5.39 && annualFee !== 5.88 && annualFee !== 11.00 && annualFee !== 12.00 && annualFee !== 9.60 && annualFee !== 8.80 ? annualFee : schoolYearCalc.totalAmount;
   const totalAmountStr = schoolYearCalc.totalAmountStr;
   const monthlyRate = isChf ? 'CHF 1.00' : '0,49 €';
   const freeMonthDisplay = isChf ? 'CHF 0.00' : '0,00 €';

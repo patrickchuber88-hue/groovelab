@@ -189,7 +189,7 @@ export const MeisterwerkStickerAlbumTab: React.FC<MeisterwerkStickerAlbumTabProp
             }
             @media (max-width: 580px) {
               .collector-row-grid {
-                grid-template-columns: repeat(2, 1fr);
+                grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
                 gap: 10px;
               }
             }
@@ -207,8 +207,12 @@ export const MeisterwerkStickerAlbumTab: React.FC<MeisterwerkStickerAlbumTabProp
             }
             @media (max-width: 600px) {
               .journey-3x3-grid {
-                grid-template-columns: 1fr;
-                gap: 12px;
+                grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
+                gap: 10px;
+              }
+              .collector-sticker-card {
+                min-height: 230px !important;
+                padding: 14px 10px 10px 10px !important;
               }
             }
             .hall-of-fame-grid {
@@ -225,8 +229,8 @@ export const MeisterwerkStickerAlbumTab: React.FC<MeisterwerkStickerAlbumTabProp
             }
             @media (max-width: 600px) {
               .hall-of-fame-grid {
-                grid-template-columns: 1fr;
-                gap: 12px;
+                grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
+                gap: 10px;
               }
             }
           `}} />
@@ -2606,7 +2610,8 @@ export const MeisterwerkStickerAlbumTab: React.FC<MeisterwerkStickerAlbumTabProp
             </div>
           )}
 
-
+          {/* Safe-Area Spacer for Mobile / Gestures Bar */}
+          <div style={{ height: 'calc(84px + env(safe-area-inset-bottom, 24px))', width: '100%', flexShrink: 0 }} />
         </div>
   );
 };

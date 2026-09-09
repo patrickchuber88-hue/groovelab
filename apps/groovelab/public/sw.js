@@ -84,9 +84,13 @@ self.addEventListener('push', function(event) {
         body: payload.body,
         icon: payload.icon || '/pwa-icon.png',
         badge: payload.badge || '/pwa-icon.png',
-        vibrate: [100, 50, 100],
-        tag: 'campus-notification',
+        image: payload.image || undefined,
+        vibrate: payload.vibrate || [80, 40, 80],
+        tag: payload.tag || 'campus-notification',
         renotify: true,
+        actions: payload.actions || [
+          { action: 'review', title: 'Termin prüfen 📱' }
+        ],
         data: {
           url: safeUrl,
           notificationId: payload.notificationId || null,
@@ -104,7 +108,8 @@ self.addEventListener('push', function(event) {
           body: event.data.text(),
           icon: '/pwa-icon.png',
           badge: '/pwa-icon.png',
-          vibrate: [100, 50, 100]
+          vibrate: [80, 40, 80],
+          actions: [{ action: 'review', title: 'Termin prüfen 📱' }]
         })
       );
     }
@@ -168,6 +173,11 @@ function focusOrOpenWindow(targetUrl) {
       if ('focus' in client) {
         if ('navigate' in client && client.url !== absoluteUrl) {
           client.navigate(absoluteUrl);
+        }
+        if ('postMessage' in client) {
+          try {
+            client.postMessage({ type: 'PUSH_NOTIFICATION_CLICK', url: absoluteUrl });
+          } catch (e) {}
         }
         return client.focus();
       }

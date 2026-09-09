@@ -11,6 +11,7 @@ import { CampusAppointmentShoutboxModal } from './CampusAppointmentShoutboxModal
 import { useMasterPricing } from '../context/MasterPricingContext';
 import { computeGroundTruthMetrics, broadcastPracticeUpdate, DEFAULT_FOKUS_LEVELS, getEngineEffectiveLevel, getEngineTargetMinutes, getEngineFlameCategory } from '../utils/studentProgressEngine';
 import { ParentCampusActivationModal } from './ParentCampusActivationModal';
+import { calculateSchoolYearDirectBilling } from '../utils/epcGiroCode';
 import { LegalTextModal } from './LegalTextModal';
 import { validateHandoverUrl } from '../utils/cryptoAuth';
 import { registerClientSessionLease } from '../utils/sessionLeaseManager';
@@ -249,6 +250,12 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
     const isCampusActive = Boolean(schoolHasCampus && userData.is_campus_active);
     const isGroovelabActive = Boolean(schoolHasGroove && userData.is_groovelab_active);
 
+    // Fail-Closed: Inactive students are strictly blocked from entering the WebApp dashboard!
+    if (!isCampusActive && !isGroovelabActive && userData.role === 'student') {
+      setShowActivationInfoModal(true);
+      return;
+    }
+
     if (isCampusActive) {
       // 1. Campus Modul -> Briefing Board
       sessionStorage.setItem('groovelab_active_platform', 'campus');
@@ -256,6 +263,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
     } else if (isGroovelabActive) {
       // 2. GrooveLab Modul -> Live Lab Board
       sessionStorage.setItem('groovelab_active_platform', 'groovelab');
+      sessionStorage.setItem('campus_active_tab', 'live');
       sessionStorage.setItem('groovelab_active_tab', 'live');
     } else {
       // 3. Gar kein Modul aktiviert -> QR Landingpage
@@ -312,6 +320,18 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
   // Biometrics Onboarding Modal State
   const [showBiometricsModal, setShowBiometricsModal] = useState(false);
   const [biometricsLoading, setBiometricsLoading] = useState(false);
+
+  // Notice Handler for Inactive Student Redirect
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('notice') === 'inactive_landing') {
+        showToastMsg('Willkommen auf deiner Schüler-Landingpage. Für das interaktive Dashboard ist eine Aktivierung erforderlich.', 'success');
+        const newUrl = window.location.pathname;
+        window.history.replaceState({}, '', newUrl);
+      }
+    }
+  }, []);
 
   useEffect(() => {
     if (profile && profile.id && isWebAuthnSupported()) {
@@ -4972,27 +4992,51 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
             <Shield size={13} color="#34a853" /> PIN-geschützt
           </span>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <button
-              type="button"
-              onClick={handleOpenFullWebApp}
-              style={{
-                background: '#e6f4ea',
-                color: '#288d45',
-                border: '1px solid #ceebd6',
-                borderRadius: '10px',
-                padding: '5px 10px',
-                fontSize: '0.74rem',
-                fontWeight: 800,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
-                transition: 'all 0.2s'
-              }}
-            >
-              In WebApp öffnen <ExternalLink size={12} />
-            </button>
+            {(!profile?.is_campus_active && !profile?.is_groovelab_active) ? (
+              <button
+                type="button"
+                onClick={() => setShowActivationInfoModal(true)}
+                style={{
+                  background: '#e6f4ea',
+                  color: '#288d45',
+                  border: '1px solid #bbf7d0',
+                  borderRadius: '10px',
+                  padding: '5px 10px',
+                  fontSize: '0.74rem',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
+                  transition: 'all 0.2s'
+                }}
+              >
+                <Sparkles size={12} color="#16a34a" /> Interaktive App aktivieren
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleOpenFullWebApp}
+                style={{
+                  background: '#e6f4ea',
+                  color: '#288d45',
+                  border: '1px solid #ceebd6',
+                  borderRadius: '10px',
+                  padding: '5px 10px',
+                  fontSize: '0.74rem',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
+                  transition: 'all 0.2s'
+                }}
+              >
+                In WebApp öffnen <ExternalLink size={12} />
+              </button>
+            )}
             {profile?.has_parent_pin && (
               <button
                 type="button"
@@ -5046,62 +5090,71 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         )}
 
         {/* Activation Banner for Inactive Profiles */}
-        {!isCampusActive && (
-          <div 
-            onClick={() => setShowActivationInfoModal(true)}
-            style={{
-              background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
-              border: '1.5px solid #bbf7d0',
-              borderRadius: '20px',
-              padding: '16px 18px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: '12px',
-              cursor: 'pointer',
-              boxShadow: '0 4px 12px rgba(52, 168, 83, 0.1)',
-              marginTop: '4px'
-            }}
-            className="hover-scale"
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <div style={{
-                width: '38px',
-                height: '38px',
-                borderRadius: '12px',
-                background: '#ffffff',
-                border: '1px solid #bbf7d0',
+        {!isCampusActive && (() => {
+          const isExempt = profile?.exempt_from_direct_billing === true;
+          const isBypass = Boolean(schoolData?.subscription_bypass);
+          const opt = schoolData?.student_billing_option;
+          const isSchoolCovered = isBypass || isExempt || !opt || opt === 'school_covered' || opt === 'sammelzahler' || opt === 'school_pays' || opt === 'option1' || opt === 'both';
+
+          return (
+            <div 
+              onClick={() => setShowActivationInfoModal(true)}
+              style={{
+                background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
+                border: '1.5px solid #bbf7d0',
+                borderRadius: '20px',
+                padding: '16px 18px',
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'center',
-                flexShrink: 0
+                justifyContent: 'space-between',
+                gap: '12px',
+                cursor: 'pointer',
+                boxShadow: '0 4px 12px rgba(52, 168, 83, 0.1)',
+                marginTop: '4px'
+              }}
+              className="hover-scale"
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{
+                  width: '38px',
+                  height: '38px',
+                  borderRadius: '12px',
+                  background: '#ffffff',
+                  border: '1px solid #bbf7d0',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0
+                }}>
+                  <Sparkles size={18} color="#16a34a" />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                  <span style={{ fontSize: '0.84rem', fontWeight: 800, color: '#0f172a' }}>
+                    {isSchoolCovered ? 'Interaktive Campus App aktivieren' : 'Interaktiven Campus-Zugang aktivieren'}
+                  </span>
+                  <span style={{ fontSize: '0.74rem', color: '#16a34a', fontWeight: 650 }}>
+                    {isSchoolCovered
+                      ? '100% kostenfrei durch deine Musikschule übernommen • Schaltet Übe-Timer, Loopstation & Meisterwerk-Protokoll frei'
+                      : '1. Monat kostenfrei • Danach max. 11 × 0,49 € (5,39 € / Schuljahr als Einmalzahlung, kein Abo)'}
+                  </span>
+                </div>
+              </div>
+              <div style={{
+                padding: '6px 14px',
+                borderRadius: '100px',
+                background: '#ffffff',
+                border: '1.5px solid #86efac',
+                color: '#15803d',
+                fontWeight: 900,
+                fontSize: '0.76rem',
+                whiteSpace: 'nowrap',
+                boxShadow: '0 2px 4px rgba(0,0,0,0.03)'
               }}>
-                <Sparkles size={18} color="#16a34a" />
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                <span style={{ fontSize: '0.84rem', fontWeight: 800, color: '#0f172a' }}>
-                  Alle Termine des Schuljahres freischalten
-                </span>
-                <span style={{ fontSize: '0.74rem', color: '#16a34a', fontWeight: 650 }}>
-                  Basis-Bereitstellung: Zeigt 4 Termine • Hier tippen für vollen Campus-Zugriff
-                </span>
+                {isSchoolCovered ? 'Kostenfrei freischalten' : 'Aktivierung starten'}
               </div>
             </div>
-            <div style={{
-              padding: '6px 12px',
-              borderRadius: '100px',
-              background: '#ffffff',
-              border: '1px solid #bbf7d0',
-              color: '#15803d',
-              fontWeight: 800,
-              fontSize: '0.74rem',
-              whiteSpace: 'nowrap',
-              boxShadow: '0 2px 4px rgba(0,0,0,0.03)'
-            }}>
-              Aktivieren
-            </div>
-          </div>
-        )}
+          );
+        })()}
 
         {/* Vergangene Termine section */}
         {sortedPastMonthKeys.length > 0 && (
@@ -5152,6 +5205,9 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
             )}
           </div>
         )}
+
+        {/* End-of-List Safe Area Spacer (Verhindert Überlappung durch Gesten- & Navigationsbalken) */}
+        <div style={{ height: 'calc(84px + env(safe-area-inset-bottom, 24px))', width: '100%', flexShrink: 0 }} />
       </div>
     );
   };
@@ -6226,6 +6282,9 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
             </span>
           </div>
         </div>
+
+        {/* End-of-List Safe Area Spacer (Verhindert Überlappung durch Gesten- & Navigationsbalken) */}
+        <div style={{ height: 'calc(84px + env(safe-area-inset-bottom, 24px))', width: '100%', flexShrink: 0 }} />
       </div>
     );
   };
@@ -6401,7 +6460,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           background: '#ffffff',
           border: '1.5px solid #e2e8f0',
           borderRadius: '28px',
-          padding: '32px 20px',
+          padding: '28px 14px calc(28px + env(safe-area-inset-bottom, 20px)) 14px',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
@@ -6488,7 +6547,8 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
             gridTemplateColumns: 'repeat(3, 1fr)',
             gap: '10px',
             width: '100%',
-            maxWidth: '300px'
+            maxWidth: '340px',
+            touchAction: 'pan-y'
           }}>
             {['1', '2', '3', '4', '5', '6', '7', '8', '9', 'C', '0', 'back'].map((key) => {
               const isSpecial = key === 'C' || key === 'back';
@@ -6588,7 +6648,8 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                     }
                   }}
                   style={{
-                    padding: '14px 0',
+                    minHeight: '50px',
+                    padding: '12px 0',
                     borderRadius: '16px',
                     border: '1px solid #e2e8f0',
                     background: isSpecial ? '#f8fafc' : '#ffffff',
@@ -6600,7 +6661,8 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                     alignItems: 'center',
                     justifyContent: 'center',
                     boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
-                    transition: 'all 0.1s'
+                    transition: 'all 0.1s',
+                    touchAction: 'pan-y'
                   }}
                   className="hover-scale"
                 >
@@ -6609,6 +6671,9 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
               );
             })}
           </div>
+
+          {/* Safe-Area Bottom Spacer */}
+          <div style={{ height: 'calc(24px + env(safe-area-inset-bottom, 16px))', width: '100%', flexShrink: 0 }} />
         </div>
       );
     }
@@ -8621,7 +8686,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
             <div style={{fontSize: '0.85rem', color: '#334155', lineHeight: '1.5', background: '#e6f4ea', padding: '16px', borderRadius: '16px', border: '1px solid #e6f4ea'}}>
               Die Aktivierung des Campus-Zugangs (Hausaufgabenheft, Übe-Timer, Loopstation &amp; Audio-Tresor) erfolgt für das laufende Schuljahr.
               <div style={{ marginTop: '8px', fontWeight: 900, color: '#34a853', fontSize: '0.98rem' }}>
-                Bereitstellungsgebühr: {price ? price.toFixed(2).replace('.', ',') : '5,88'} € (0,49 € / Monat für 12 Monate)
+                Bereitstellungsgebühr: {price ? price.toFixed(2).replace('.', ',') : '5,39'} € (1. Monat kostenlos, max. 11 × 0,49 € für das Schuljahr)
               </div>
               <span style={{ fontSize: '0.7rem', color: '#047857', display: 'block', marginTop: '4px', fontWeight: 600 }}>
                 Transparentes Cloud-Hosting statt teurer Software-Lizenzen • Keine Einrichtungsgebühr, keine Lizenzkaufgebühren.
@@ -9469,8 +9534,10 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         justifyContent: timerRunning ? 'center' : 'flex-start',
         boxSizing: 'border-box',
         overflowY: 'auto',
+        overscrollBehaviorY: 'auto',
         WebkitOverflowScrolling: 'touch',
-        padding: timerRunning ? 0 : '24px 16px 48px 16px',
+        minHeight: '100dvh',
+        padding: timerRunning ? 0 : 'max(10px, env(safe-area-inset-top, 10px)) 10px calc(88px + env(safe-area-inset-bottom, 24px)) 10px',
         fontFamily: "'Outfit', 'Urbanist', -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif",
         transition: 'background 0.5s ease'
       }}>
@@ -9508,8 +9575,11 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           @media (max-width: 640px) {
             .qr-pass-card {
               max-width: 100% !important;
-              border-radius: 28px !important;
+              border-radius: 24px !important;
               margin: 0 !important;
+            }
+            .qr-pass-main-content {
+              padding: 14px 10px !important;
             }
             button, [role="button"] {
               -webkit-tap-highlight-color: transparent;
@@ -10453,10 +10523,21 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
 
                     // Option 2: Partial or Full direct billing
                     const isPartial = opt === 'student_partial';
-                    const baseStudentRate = masterPricing.priceStudent || 0.49;
+                    const isChf = schoolData?.currency === 'CHF' || schoolData?.country === 'CH' || schoolData?.country === 'Schweiz';
+                    const activeCurrency: 'EUR' | 'CHF' = isChf ? 'CHF' : 'EUR';
+                    const baseStudentRate = isChf ? 1.00 : (masterPricing.priceStudent || 0.49);
                     const monthlyPriceNum = isPartial ? Number((baseStudentRate * 0.8163).toFixed(2)) : baseStudentRate;
-                    const monthlyPrice = `${monthlyPriceNum.toFixed(2).replace('.', ',')} €`;
-                    const annualPrice = `${(monthlyPriceNum * 12).toFixed(2).replace('.', ',')} €`;
+                    const schoolYearCalc = calculateSchoolYearDirectBilling(
+                      undefined,
+                      activeCurrency,
+                      monthlyPriceNum,
+                      Number(schoolData?.school_year_start_month || 9),
+                      Number(schoolData?.school_year_start_day || 1),
+                      schoolData?.direct_billing_effective_date
+                    );
+                    const monthlyPrice = isChf ? `CHF ${monthlyPriceNum.toFixed(2)}` : `${monthlyPriceNum.toFixed(2).replace('.', ',')} €`;
+                    const annualPrice = isChf ? `CHF ${schoolYearCalc.totalAmountStr}` : `${schoolYearCalc.totalAmountStr} €`;
+                    const remainingMonths = schoolYearCalc.remainingPaidMonths;
 
                     return (
                       <div style={{
@@ -10483,13 +10564,13 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                             {annualPrice} <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#64748b' }}>/ Schuljahr</span>
                           </span>
                           <span style={{ fontSize: '0.78rem', color: '#475569', fontWeight: 700 }}>
-                            (Einmalzahlung, entspricht {monthlyPrice} / Monat)
+                            (Einmalzahlung für {remainingMonths} Monate; 1. Monat 100% kostenfrei)
                           </span>
                         </div>
                         <span style={{ fontSize: '0.75rem', color: '#64748b', lineHeight: 1.35, fontWeight: 500 }}>
                           {isPartial 
-                            ? 'Deine Musikschule bezuschusst deinen Zugang. Die Cloud-Bereitstellung wird als transparente Einmalzahlung für das Schuljahr abgerechnet (keine automatische Verlängerung, keine gesonderten Lizenzkaufgebühren).' 
-                            : 'Cloud- & Modul-Bereitstellung für deinen vollen Campus-Zugang (Einmalzahlung für das Schuljahr, keine automatische Verlängerung, keine gesonderten Lizenzkaufgebühren).'}
+                            ? 'Deine Musikschule bezuschusst deinen Zugang. Die Cloud-Bereitstellung wird als transparente Einmalzahlung für das Schuljahr abgerechnet (1. Monat kostenlos, keine automatische Verlängerung, keine gesonderten Lizenzkaufgebühren).' 
+                            : 'Cloud- & Modul-Bereitstellung für deinen vollen Campus-Zugang (1. Monat kostenlos, Einmalzahlung für das Schuljahr, keine automatische Verlängerung, keine gesonderten Lizenzkaufgebühren).'}
                         </span>
 
                         {/* 🛡️ Treue-Preisgarantie Badge */}
@@ -10509,7 +10590,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                           </span>
                         </div>
 
-                        {/* 🟢 30-Tage Gratis-Testphase Info-Pill */}
+                        {/* 🟢 1. Monat Gratis-Schnupperphase Info-Pill */}
                         <div style={{
                           marginTop: '6px',
                           padding: '10px 12px',
@@ -10522,7 +10603,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                         }}>
                           <Sparkles size={16} color="#22c55e" style={{ flexShrink: 0, marginTop: '2px' }} />
                           <span style={{ fontSize: '0.72rem', color: '#475569', lineHeight: 1.35 }}>
-                            <strong style={{ color: '#0f172a' }}>30 Tage kostenfrei testen:</strong> Die ersten 30 Tage sind 100% kostenfrei (0,00 €). Sie können die Testphase jederzeit im Dashboard mit 1 Klick beenden.
+                            <strong style={{ color: '#0f172a' }}>1. Monat 100% kostenfrei:</strong> Der Einstiegsmonat ist vollständig kostenlos (0,00 €). Sie zahlen für das gesamte Schuljahr maximal 11 × {monthlyPrice}. Keine automatische Verlängerung.
                           </span>
                         </div>
                       </div>
@@ -10530,94 +10611,146 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                   })()}
 
                   {/* Footer Actions */}
-                  <div style={{
-                    padding: '16px 24px 24px',
-                    borderTop: '1px solid #f1f5f9',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '10px',
-                    background: '#ffffff',
-                    borderRadius: '0 0 28px 28px'
-                  }}>
-                    {profile?.is_campus_active ? (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setShowActivationInfoModal(false);
-                          setPinPurpose('unlock_app');
-                          setPageState('pin_required');
-                        }}
-                        style={{
-                          width: '100%',
-                          padding: '14px',
-                          borderRadius: '14px',
-                          background: 'linear-gradient(135deg, #34a853 0%, #248a3d 100%)',
-                          color: '#ffffff',
-                          border: 'none',
-                          fontWeight: 800,
-                          fontSize: '0.92rem',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '8px',
-                          boxShadow: '0 4px 14px rgba(52, 168, 83, 0.35)'
-                        }}
-                      >
-                        <Lock size={16} color="#ffffff" />
-                        <span>Jetzt PIN eingeben & WebApp freischalten</span>
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          alert('Wende dich einfach an dein Sekretariat oder deinen Lehrer, um den Vollzugriff für dein Profil freischalten zu lassen!');
-                        }}
-                        style={{
-                          width: '100%',
-                          padding: '14px',
-                          borderRadius: '14px',
-                          background: 'linear-gradient(135deg, #34a853 0%, #248a3d 100%)',
-                          color: '#ffffff',
-                          border: 'none',
-                          fontWeight: 800,
-                          fontSize: '0.92rem',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '8px',
-                          boxShadow: '0 4px 14px rgba(52, 168, 83, 0.35)'
-                        }}
-                      >
-                        <span>📩 Bei der Musikschule anfragen</span>
-                      </button>
-                    )}
+                  {(() => {
+                    const isExempt = profile?.exempt_from_direct_billing === true;
+                    const isBypass = Boolean(schoolData?.subscription_bypass);
+                    const opt = schoolData?.student_billing_option;
+                    const isSchoolCovered = isBypass || isExempt || !opt || opt === 'school_covered' || opt === 'sammelzahler' || opt === 'school_pays' || opt === 'option1' || opt === 'both';
 
-                    <button
-                      type="button"
-                      onClick={() => setShowActivationInfoModal(false)}
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        color: '#94a3b8',
-                        fontSize: '0.8rem',
-                        fontWeight: 600,
-                        cursor: 'pointer',
-                        padding: '4px 0',
-                        textAlign: 'center'
-                      }}
-                    >
-                      Vielleicht später
-                    </button>
-                  </div>
+                    return (
+                      <div style={{
+                        padding: '16px 24px 24px',
+                        borderTop: '1px solid #f1f5f9',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '10px',
+                        background: '#ffffff',
+                        borderRadius: '0 0 28px 28px'
+                      }}>
+                        {profile?.is_campus_active ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowActivationInfoModal(false);
+                              setPinPurpose('unlock_app');
+                              setPageState('pin_required');
+                            }}
+                            style={{
+                              width: '100%',
+                              padding: '14px',
+                              borderRadius: '14px',
+                              background: 'linear-gradient(135deg, #34a853 0%, #248a3d 100%)',
+                              color: '#ffffff',
+                              border: 'none',
+                              fontWeight: 800,
+                              fontSize: '0.92rem',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '8px',
+                              boxShadow: '0 4px 14px rgba(52, 168, 83, 0.35)'
+                            }}
+                          >
+                            <Lock size={16} color="#ffffff" />
+                            <span>Jetzt PIN eingeben & WebApp freischalten</span>
+                          </button>
+                        ) : isSchoolCovered ? (
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              setShowActivationInfoModal(false);
+                              await handleActivateContract();
+                            }}
+                            style={{
+                              width: '100%',
+                              padding: '14px',
+                              borderRadius: '14px',
+                              background: 'linear-gradient(135deg, #34a853 0%, #248a3d 100%)',
+                              color: '#ffffff',
+                              border: 'none',
+                              fontWeight: 800,
+                              fontSize: '0.92rem',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '8px',
+                              boxShadow: '0 4px 14px rgba(52, 168, 83, 0.35)'
+                            }}
+                          >
+                            <Sparkles size={16} color="#ffffff" />
+                            <span>Kostenfrei freischalten</span>
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowActivationInfoModal(false);
+                              setShowGiroCodeModal(true);
+                            }}
+                            style={{
+                              width: '100%',
+                              padding: '14px',
+                              borderRadius: '14px',
+                              background: 'linear-gradient(135deg, #34a853 0%, #248a3d 100%)',
+                              color: '#ffffff',
+                              border: 'none',
+                              fontWeight: 800,
+                              fontSize: '0.92rem',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '8px',
+                              boxShadow: '0 4px 14px rgba(52, 168, 83, 0.35)'
+                            }}
+                          >
+                            <CreditCard size={16} color="#ffffff" />
+                            <span>Aktivierung starten</span>
+                          </button>
+                        )}
+
+                        <button
+                          type="button"
+                          onClick={() => setShowActivationInfoModal(false)}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: '#94a3b8',
+                            fontSize: '0.8rem',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            padding: '4px 0',
+                            textAlign: 'center'
+                          }}
+                        >
+                          Vielleicht später
+                        </button>
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
             );
           })()}
 
+          {/* Parent Campus EPC GiroCode Activation Modal */}
+          {showGiroCodeModal && profile && (
+            <ParentCampusActivationModal
+              student={profile}
+              schoolData={schoolData}
+              isParentUnlocked={parentUnlocked}
+              onClose={() => setShowGiroCodeModal(false)}
+              onPaymentSubmitted={() => {
+                setAgreedToTerms(true);
+                handleActivateContract();
+              }}
+            />
+          )}
+
           {/* Main Content Area */}
-          <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div className="qr-pass-main-content" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
             
             {loadingDashboard ? (
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '40px 0', gap: '12px' }}>

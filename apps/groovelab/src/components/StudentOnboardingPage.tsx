@@ -10,7 +10,7 @@ import QRCode from 'react-qr-code';
 import { getInstrumentAvatarUrl, getDefaultMusicianAvatarUrl, resolveCampusStudentAvatar } from './StudioAvatar';
 import { StudentMobileScheduleWizard } from './StudentMobileScheduleWizard';
 import { IDBadgeCard } from './IDBadgeCard';
-import { downloadAppleWalletPass, generateGoogleWalletPassUrl } from '../utils/walletPassGenerator';
+import { downloadAppleWalletPass } from '../utils/walletPassGenerator';
 import { isWebAuthnSupported, registerBiometrics } from '../utils/webauthn';
 import { SmartAppInstallPrompt } from './ui/SmartAppInstallPrompt';
 import { LegalTextModal } from './LegalTextModal';
@@ -30,8 +30,6 @@ export const StudentOnboardingPage: React.FC<StudentOnboardingPageProps> = ({ to
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [showNotification, setShowNotification] = useState(false);
   const passCardRef = useRef<HTMLDivElement>(null);
-  // State for Wallet guide (Apple / Google Wallet modal toggle)
-  const [walletGuide, setWalletGuide] = useState<'apple' | 'google' | null>(null);
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [scheduleCompleted, setScheduleCompleted] = useState(false);
   const [campusUsageMode, setCampusUsageMode] = useState<'selbstnutzer' | 'eltern_geführt'>('selbstnutzer');
@@ -479,23 +477,6 @@ export const StudentOnboardingPage: React.FC<StudentOnboardingPageProps> = ({ to
     });
   };
 
-  const handleGoogleWalletSave = () => {
-    if (!student || !consentSaved) return;
-    const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams();
-    const platformParam = urlParams.get('platform');
-    const isCampusMode = platformParam === 'campus' || (platformParam !== 'groovelab' && student.is_campus_active && !student.is_groovelab_active);
-
-    const saveUrl = generateGoogleWalletPassUrl({
-      schoolName: school?.name || 'Campus-Groovelab',
-      userName: `${student.first_name || ''} ${student.last_name || ''}`.trim() || 'Schüler',
-      userRole: 'Schüler',
-      instrument: student.instrument || 'Instrument',
-      qrToken: student.qr_token || student.id,
-      isCampus: Boolean(isCampusMode)
-    });
-
-    window.open(saveUrl, '_blank', 'noopener,noreferrer');
-  };
 
   const handleRegisterParentBiometrics = async () => {
     if (!student?.id) return;
@@ -516,7 +497,11 @@ export const StudentOnboardingPage: React.FC<StudentOnboardingPageProps> = ({ to
         throw new Error('Sicherheits-Challenge konnte nicht bezogen werden.');
       }
 
-      const email = `eltern.${student.first_name?.toLowerCase() || 'schueler'}@campus-groovelab.local`;
+      const safeFirstName = (student.first_name || 'schueler')
+        .toLowerCase()
+        .replace(/[äöüß]/g, (m: string) => ({ 'ä': 'ae', 'ö': 'oe', 'ü': 'ue', 'ß': 'ss' }[m] || m))
+        .replace(/[^a-z0-9]/g, '');
+      const email = `eltern.${safeFirstName || 'kind'}@campus-groovelab.local`;
       const passkeyResult = await registerBiometrics(
         email,
         student.id,
@@ -541,7 +526,7 @@ export const StudentOnboardingPage: React.FC<StudentOnboardingPageProps> = ({ to
     } catch (err: any) {
       console.warn('[Onboarding] Biometrics registration note:', err);
       // User cancellation should not break onboarding
-      if (err.name === 'NotAllowedError') {
+      if (err.name === 'NotAllowedError' || err.name === 'AbortError') {
         setBiometricsError('Einrichtung abgebrochen.');
       } else {
         setBiometricsError(err.message || 'Passkey konnte nicht eingerichtet werden.');
@@ -707,7 +692,7 @@ ${link}
 
 Deine Vorteile auf einen Blick:
 📅 1. Stundenplan-Wunschzeiten in 2 Min. übermitteln
-💳 2. Digitalen Schülerausweis (Apple & Google Wallet) speichern
+💳 2. Digitalen Schülerausweis (Apple Wallet & Fotogalerie) speichern
 🏷️ 3. Anonymen QR-Sticker für dein Notenheft herunterladen & am Kiosk einchecken
 📚 4. Hausaufgabenheft & Übe-Timer direkt nutzen`
       : `Hallo ${student.first_name}! 🎶
@@ -716,7 +701,7 @@ Hier ist dein persönlicher GrooveLab Zugang:
 ${link}
 
 Deine Vorteile auf einen Blick:
-💳 1. Digitalen Pass (Apple & Google Wallet) speichern
+💳 1. Digitalen Pass (Apple Wallet & Fotogalerie) speichern
 🏷️ 2. Anonymen QR-Sticker für dein Instrument/Notenheft herunterladen & am Kiosk einchecken
 🎸 3. Band-Repertoire, Songs & Skills in GrooveLab freischalten`;
 
@@ -975,7 +960,7 @@ Deine Vorteile auf einen Blick:
                 <div style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 600, marginTop: '2px' }}>
                   {consentSaved 
                     ? 'Alle Funktionen und Ausweise sind ab sofort aktiv.' 
-                    : `Schritt ${onboardingStep} von 3: ${onboardingStep === 1 ? 'Nutzungsmodus' : onboardingStep === 2 ? 'PIN & Eltern-Sicherheit' : 'Freigabe & Terminschutz'}`
+                    : `Schritt ${onboardingStep} von 3: ${onboardingStep === 1 ? 'Nutzungsmodus' : onboardingStep === 2 ? 'PIN & Kinderschutz' : 'Freigabe & Terminschutz'}`
                   }
                 </div>
               </div>
@@ -1116,7 +1101,7 @@ Deine Vorteile auf einen Blick:
                     }}
                     className="hover-scale"
                   >
-                    <span>Weiter: PIN &amp; Eltern-Sicherheit</span>
+                    <span>Weiter: PIN &amp; Kinderschutz</span>
                     <ChevronRight size={16} />
                   </button>
                 </div>
@@ -1316,6 +1301,174 @@ Deine Vorteile auf einen Blick:
                     </div>
                   )}
 
+                  {/* Kinderschutz & Autonomie (Rechtevergabe durch Eltern) */}
+                  <div style={{
+                    background: '#ffffff',
+                    padding: '16px',
+                    borderRadius: '20px',
+                    border: '1.5px solid #e2e8f0',
+                    boxShadow: '0 4px 16px rgba(0,0,0,0.03)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '12px'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <div style={{
+                          width: '28px',
+                          height: '28px',
+                          borderRadius: '8px',
+                          background: '#f0fdf4',
+                          color: '#15803d',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }}>
+                          <Shield size={16} strokeWidth={2.4} />
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '0.84rem', fontWeight: 900, color: '#0f172a' }}>
+                            Rechte &amp; Kinderschutz
+                          </div>
+                          <div style={{ fontSize: '0.68rem', color: '#64748b', marginTop: '1px' }}>
+                            Bestimme die Autonomie für {student?.first_name || 'dein Kind'}
+                          </div>
+                        </div>
+                      </div>
+                      <span style={{
+                        fontSize: '0.65rem',
+                        fontWeight: 800,
+                        color: '#166534',
+                        background: '#dcfce7',
+                        padding: '3px 8px',
+                        borderRadius: '100px'
+                      }}>
+                        Privacy by Default
+                      </span>
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {/* Toggle 1: Terminabsagen */}
+                      <label style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: '12px',
+                        padding: '10px 12px',
+                        borderRadius: '14px',
+                        background: parentAllowAbsences ? '#f0fdf4' : '#f8fafc',
+                        border: `1.5px solid ${parentAllowAbsences ? '#86efac' : '#f1f5f9'}`,
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                          <div style={{ marginTop: '2px', color: parentAllowAbsences ? '#15803d' : '#64748b' }}>
+                            <Calendar size={16} />
+                          </div>
+                          <div>
+                            <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#0f172a' }}>
+                              Termine selbstständig absagen
+                            </div>
+                            <div style={{ fontSize: '0.66rem', color: '#64748b', marginTop: '1px', lineHeight: 1.3 }}>
+                              {parentAllowAbsences
+                                ? `${student?.first_name || 'Kind'} darf Musikstunden eigenständig absagen.`
+                                : `Standard: Nur Erziehungsberechtigte mit Eltern-PIN (§ 106 BGB).`}
+                            </div>
+                          </div>
+                        </div>
+                        <input
+                          type="checkbox"
+                          checked={parentAllowAbsences}
+                          onChange={(e) => setParentAllowAbsences(e.target.checked)}
+                          style={{ accentColor: '#15803d', width: '18px', height: '18px', cursor: 'pointer', flexShrink: 0 }}
+                        />
+                      </label>
+
+                      {/* Toggle 2: Ausweichtermine annehmen */}
+                      <label style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: '12px',
+                        padding: '10px 12px',
+                        borderRadius: '14px',
+                        background: parentAllowReschedule ? '#f0fdf4' : '#f8fafc',
+                        border: `1.5px solid ${parentAllowReschedule ? '#86efac' : '#f1f5f9'}`,
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                          <div style={{ marginTop: '2px', color: parentAllowReschedule ? '#15803d' : '#64748b' }}>
+                            <RotateCcw size={16} />
+                          </div>
+                          <div>
+                            <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#0f172a' }}>
+                              Ausweichtermine eigenständig annehmen
+                            </div>
+                            <div style={{ fontSize: '0.66rem', color: '#64748b', marginTop: '1px', lineHeight: 1.3 }}>
+                              {parentAllowReschedule
+                                ? `Ersatztermine der Lehrkraft können direkt gebucht werden.`
+                                : `Standard: Ausweichtermine erfordern elterliche Freigabe (§ 615 BGB).`}
+                            </div>
+                          </div>
+                        </div>
+                        <input
+                          type="checkbox"
+                          checked={parentAllowReschedule}
+                          onChange={(e) => setParentAllowReschedule(e.target.checked)}
+                          style={{ accentColor: '#15803d', width: '18px', height: '18px', cursor: 'pointer', flexShrink: 0 }}
+                        />
+                      </label>
+
+                      {/* Toggle 3: Direkt-Chat mit Lehrkraft */}
+                      <label style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: '12px',
+                        padding: '10px 12px',
+                        borderRadius: '14px',
+                        background: parentAllowChat ? '#f0fdf4' : '#f8fafc',
+                        border: `1.5px solid ${parentAllowChat ? '#86efac' : '#f1f5f9'}`,
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                          <div style={{ marginTop: '2px', color: parentAllowChat ? '#15803d' : '#64748b' }}>
+                            <MessageSquare size={16} />
+                          </div>
+                          <div>
+                            <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#0f172a' }}>
+                              1:1 Direkt-Chat mit der Lehrkraft
+                            </div>
+                            <div style={{ fontSize: '0.66rem', color: '#64748b', marginTop: '1px', lineHeight: 1.3 }}>
+                              {parentAllowChat
+                                ? `Fachlicher Austausch zu Hausaufgaben & Noten freigegeben.`
+                                : `Deaktiviert: Kommunikation läuft ausschließlich über Eltern.`}
+                            </div>
+                          </div>
+                        </div>
+                        <input
+                          type="checkbox"
+                          checked={parentAllowChat}
+                          onChange={(e) => setParentAllowChat(e.target.checked)}
+                          style={{ accentColor: '#15803d', width: '18px', height: '18px', cursor: 'pointer', flexShrink: 0 }}
+                        />
+                      </label>
+                    </div>
+
+                    <div style={{
+                      fontSize: '0.66rem',
+                      color: '#64748b',
+                      background: '#f8fafc',
+                      padding: '8px 10px',
+                      borderRadius: '10px',
+                      lineHeight: 1.35
+                    }}>
+                      💡 <strong>Elterliche Kontrolle:</strong> Du kannst jede dieser Freigaben später im geschützten Elternbereich mit einem Klick anpassen oder widerrufen.
+                    </div>
+                  </div>
+
                   {/* Back & Next Buttons */}
                   <div style={{ display: 'flex', gap: '8px' }}>
                     <button
@@ -1451,6 +1604,14 @@ Deine Vorteile auf einen Blick:
                             <span style={{ background: '#ecfdf5', border: '1px solid #a7f3d0', color: '#059669', fontWeight: 800, padding: '2px 8px', borderRadius: '100px', fontSize: '0.70rem' }}>✦ Selbstständig</span>
                           ) : (
                             <span style={{ background: '#fef3c7', border: '1px solid #fde68a', color: '#92400e', fontWeight: 800, padding: '2px 8px', borderRadius: '100px', fontSize: '0.70rem' }}>🔒 Eltern-PIN nötig</span>
+                          )}
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ color: '#475569', fontWeight: 600 }}>Direkt-Chat Kind &amp; Lehrer:</span>
+                          {parentAllowChat ? (
+                            <span style={{ background: '#ecfdf5', border: '1px solid #a7f3d0', color: '#059669', fontWeight: 800, padding: '2px 8px', borderRadius: '100px', fontSize: '0.70rem' }}>✦ Freigegeben</span>
+                          ) : (
+                            <span style={{ background: '#f1f5f9', border: '1px solid #e2e8f0', color: '#64748b', fontWeight: 800, padding: '2px 8px', borderRadius: '100px', fontSize: '0.70rem' }}>🔒 Nur über Eltern</span>
                           )}
                         </div>
                       </div>
@@ -1718,7 +1879,7 @@ Deine Vorteile auf einen Blick:
             {isAndroid ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 <button 
-                  onClick={handleGoogleWalletSave}
+                  onClick={handleDownloadJPEG}
                   style={{ 
                     width: '100%', 
                     background: '#0f172a', 
@@ -1737,8 +1898,8 @@ Deine Vorteile auf einen Blick:
                   }}
                   className="hover-scale"
                 >
-                  <Smartphone size={16} />
-                  <span>Zu Google Wallet hinzufügen</span>
+                  <Download size={16} />
+                  <span>Schülerausweis in Fotogalerie sichern (JPEG)</span>
                 </button>
               </div>
             ) : isIOS ? (
@@ -1790,7 +1951,7 @@ Deine Vorteile auf einen Blick:
                 </button>
 
                 <button 
-                  onClick={handleGoogleWalletSave}
+                  onClick={handleDownloadJPEG}
                   style={{ 
                     flex: 1, 
                     background: '#0f172a', 
@@ -1807,7 +1968,7 @@ Deine Vorteile auf einen Blick:
                     gap: '6px'
                   }}
                 >
-                  <Smartphone size={13} /> <span>Google Wallet</span>
+                  <Download size={13} /> <span>Ausweis (JPEG)</span>
                 </button>
               </div>
             )}

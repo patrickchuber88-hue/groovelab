@@ -54,7 +54,7 @@ export const LEGAL_MASTER_WORDING = {
     studentBaseFee: 'Basis-Bereitstellung: 0,09 € / Mo. (DE/AT) bzw. CHF 0.20 / Mo. (CH) je Schüler (QR-Landingpage, Stundenplan & DSGVO/nDSG-Hosting)',
     studentCampusFee: 'Cloud- & Modul-Bereitstellung Campus: 0,49 € / Mo. (DE/AT) bzw. CHF 1.00 / Mo. (CH) je aktiver Schüler',
     studentGroovelabFee: 'Cloud- & Modul-Bereitstellung GrooveLab: 0,49 € / Mo. (DE/AT) bzw. CHF 1.00 / Mo. (CH) je aktiver Schüler (immer 100% von der Schule übernommen)',
-    directBillingAnnualOnly: 'Schüler-Direktabrechnungen mit Eltern/Schülern erfolgen ausnahmslos als einmaliger Jahresbeitrag (5,88 € in DE/AT bzw. CHF 12.00 in CH pro Schuljahr) – niemals als monatliche Einzelbuchung.'
+    directBillingAnnualOnly: 'Schüler-Direktabrechnungen mit Eltern/Schülern erfolgen ausnahmslos als einmaliger Jahresbeitrag (max. 11 × 0,49 € = 5,39 € in DE/AT bzw. 11 × CHF 1.00 = CHF 11.00 in CH pro Schuljahr; 1. Monat 100% kostenfrei) – niemals als monatliche Einzelbuchung.'
   },
 
   // 4. Rechtshinweise & AGB

@@ -327,7 +327,7 @@ export const AKADEMIE_GUIDES_DATABASE: AkademieBoardGuide[] = [
       },
       {
         title: '3. Eltern-Direktabrechnung zur vollständigen Entlastung',
-        desc: 'Wird Direktabrechnung für Campus vereinbart, zahlen Eltern den Jahresbeitrag von 5,88 € / Jahr (CHF 12.00 / Jahr). Die Schule zahlt für diese Schüler 0,00 €.',
+        desc: 'Wird Direktabrechnung für Campus vereinbart, zahlen Eltern den Jahresbeitrag von maximal 5,39 € / Schuljahr (CHF 11.00 / Schuljahr; 1. Monat 100% kostenfrei). Die Schule zahlt für diese Schüler 0,00 €.',
         actionLabel: 'Tarife einsehen',
         actionTarget: 'billing'
       }

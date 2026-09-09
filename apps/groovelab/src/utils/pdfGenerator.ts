@@ -42,13 +42,13 @@ export const generateConsentPDF = async (
   let costDetailText = 'Die Nutzung dieser App ist für Sie und Ihr Kind vollständig kostenlos. Sämtliche Hosting- und Bereitstellungsgebühren werden im Rahmen des Schulbetriebs zu 100% von der Musikschule getragen. Es entstehen Ihnen keine versteckten Kosten.';
 
   if (studentBillingOption === 'student_full') {
-    costTitle = '5,88 € / SCHULJAHR';
-    costDesc = 'Jahres-Einmalbeitrag für die Cloud-Bereitstellung (entspricht 0,49 € / Monat; keine Lizenzkaufgebühren).';
-    costDetailText = 'Für die Cloud- und Datenbank-Bereitstellung fällt ein transparenter Jahresbeitrag von 5,88 € inkl. MwSt. für das gesamte Schuljahr an (entspricht 0,49 € / Monat; keine gesonderten Lizenzkaufgebühren). Die Abrechnung erfolgt als Einmalzahlung direkt mit den Erziehungsberechtigten gemäß den Vorgaben der Musikschule (keine automatische Verlängerung).';
+    costTitle = '5,39 € / SCHULJAHR';
+    costDesc = 'Jahres-Einmalbeitrag für die Cloud-Bereitstellung (1. Monat kostenlos, max. 11 × 0,49 €; keine Lizenzkaufgebühren).';
+    costDetailText = 'Für die Cloud- und Datenbank-Bereitstellung fällt ein transparenter Jahresbeitrag von maximal 5,39 € inkl. MwSt. für das Schuljahr an (1. Monat 100% kostenfrei, danach 11 × 0,49 € / Monat; keine gesonderten Lizenzkaufgebühren). Die Abrechnung erfolgt als Einmalzahlung direkt mit den Erziehungsberechtigten gemäß den Vorgaben der Musikschule (keine automatische Verlängerung).';
   } else if (studentBillingOption === 'student_partial') {
-    costTitle = '4,80 € / SCHULJAHR';
-    costDesc = 'Eigenanteil für die Cloud-Bereitstellung (entspricht 0,40 € / Monat; Schule bezuschusst; keine Lizenzkaufgebühren).';
-    costDetailText = 'Für die Cloud-Bereitstellung fällt für Sie ein reduzierter Jahresbeitrag von 4,80 € inkl. MwSt. für das gesamte Schuljahr an (entspricht 0,40 € / Monat; die verbleibenden 0,09 € monatlich übernimmt die Musikschule als Zuschuss; keine gesonderten Lizenzkaufgebühren). Die Abrechnung erfolgt als Einmalzahlung (keine automatische Verlängerung).';
+    costTitle = '4,40 € / SCHULJAHR';
+    costDesc = 'Eigenanteil für die Cloud-Bereitstellung (1. Monat kostenlos, max. 11 × 0,40 €; Schule bezuschusst; keine Lizenzkaufgebühren).';
+    costDetailText = 'Für die Cloud-Bereitstellung fällt für Sie ein reduzierter Jahresbeitrag von 4,40 € inkl. MwSt. für das Schuljahr an (1. Monat 100% kostenfrei, danach 11 × 0,40 € / Monat; die verbleibenden 0,09 € monatlich übernimmt die Musikschule als Zuschuss; keine gesonderten Lizenzkaufgebühren). Die Abrechnung erfolgt als Einmalzahlung (keine automatische Verlängerung).';
   }
 
   // GrooveLab is always covered by the school, override if platform is solely GrooveLab
@@ -1011,9 +1011,9 @@ export const generateParentQuickstartPDF = async (
     : '100% KOSTENLOS: Die Musikschule übernimmt alle Cloud- & Bereitstellungsgebühren für Schüler und Eltern.';
   if (activePlatform !== 'groovelab') {
     if (studentBillingOption === 'student_full') {
-      pricingText = 'KOSTENTRANSPARENZ: Jahresbeitrag für die Cloud-Bereitstellung: 0,49 € / Mo. (5,88 € / Schuljahr; keine Lizenzkaufgebühren).';
+      pricingText = 'KOSTENTRANSPARENZ: Jahresbeitrag für die Cloud-Bereitstellung: 0,49 € / Mo. (1. Monat kostenlos, max. 11 × 0,49 € = 5,39 € / Schuljahr; keine Lizenzkaufgebühren).';
     } else if (studentBillingOption === 'student_partial') {
-      pricingText = 'KOSTENTRANSPARENZ: Jahres-Eigenanteil: 0,40 € / Mo. (4,80 € / Schuljahr; die Musikschule bezuschusst den Rest; keine Lizenzkaufgebühren).';
+      pricingText = 'KOSTENTRANSPARENZ: Jahres-Eigenanteil: 0,40 € / Mo. (1. Monat kostenlos, max. 11 × 0,40 € = 4,40 € / Schuljahr; Schule bezuschusst Rest; keine Lizenzkaufgebühren).';
     }
   }
 

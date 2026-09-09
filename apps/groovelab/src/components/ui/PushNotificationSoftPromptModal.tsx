@@ -42,20 +42,28 @@ export const PushNotificationSoftPromptModal: React.FC<PushNotificationSoftPromp
         return;
       }
 
-      // 2. Persist granular preferences in Supabase database
+      // 2. Persist granular preferences and decision in Supabase database
+      const nowIso = new Date().toISOString();
       const { error: dbError } = await supabase
         .from('users')
         .update({
           push_notifications_enabled: true,
           push_notif_schedule_changes: scheduleChanges,
           push_notif_homework: homework,
-          push_notif_all_features: streakAndNews
+          push_notif_all_features: streakAndNews,
+          push_prompt_decision: 'accepted',
+          push_prompt_dismissed_at: null
         })
         .eq('id', userId);
 
       if (dbError) {
         console.warn('Failed to update granular preferences in DB:', dbError);
       }
+
+      try {
+        localStorage.setItem(`campus_push_decision_${userId}`, 'accepted');
+        localStorage.removeItem(`campus_push_deferred_until_${userId}`);
+      } catch (e) {}
 
       setLoading(false);
       if (onSuccess) onSuccess();
@@ -64,6 +72,57 @@ export const PushNotificationSoftPromptModal: React.FC<PushNotificationSoftPromp
       console.error('Error during soft-prompt subscription:', err);
       setErrorMsg(err.message || 'Ein unerwarteter Fehler ist aufgetreten.');
       setLoading(false);
+    }
+  };
+
+  const handleDecline = async () => {
+    setLoading(true);
+    try {
+      // Revisionssichere Speicherung: Ablehnung wird in DB und LocalStorage persistiert
+      await supabase
+        .from('users')
+        .update({
+          push_notifications_enabled: false,
+          push_prompt_decision: 'declined',
+          push_prompt_dismissed_at: new Date().toISOString()
+        })
+        .eq('id', userId);
+
+      try {
+        localStorage.setItem(`campus_push_decision_${userId}`, 'declined');
+        localStorage.removeItem(`campus_push_deferred_until_${userId}`);
+      } catch (e) {}
+    } catch (err) {
+      console.warn('Error persisting push decline:', err);
+    } finally {
+      setLoading(false);
+      onClose();
+    }
+  };
+
+  const handleDefer = async () => {
+    setLoading(true);
+    try {
+      // 14-Tage Cooldown: Speichere Timestamp in DB und LocalStorage
+      const nowIso = new Date().toISOString();
+      const deferUntil = Date.now() + 14 * 86400000;
+      await supabase
+        .from('users')
+        .update({
+          push_prompt_decision: 'deferred',
+          push_prompt_dismissed_at: nowIso
+        })
+        .eq('id', userId);
+
+      try {
+        localStorage.setItem(`campus_push_decision_${userId}`, 'deferred');
+        localStorage.setItem(`campus_push_deferred_until_${userId}`, String(deferUntil));
+      } catch (e) {}
+    } catch (err) {
+      console.warn('Error persisting push deferral:', err);
+    } finally {
+      setLoading(false);
+      onClose();
     }
   };
 
@@ -368,23 +427,45 @@ export const PushNotificationSoftPromptModal: React.FC<PushNotificationSoftPromp
             {loading ? 'Wird aktiviert...' : 'Ausgewählte Mitteilungen aktivieren'}
           </button>
 
-          <button
-            type="button"
-            onClick={onClose}
-            style={{
-              width: '100%',
-              padding: '10px 16px',
-              borderRadius: '14px',
-              background: 'transparent',
-              color: '#64748b',
-              border: 'none',
-              fontSize: '0.82rem',
-              fontWeight: 700,
-              cursor: 'pointer'
-            }}
-          >
-            Später erinnern
-          </button>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button
+              type="button"
+              onClick={handleDefer}
+              disabled={loading}
+              style={{
+                flex: 1,
+                padding: '10px 14px',
+                borderRadius: '14px',
+                background: '#f8fafc',
+                color: '#475569',
+                border: '1px solid #e2e8f0',
+                fontSize: '0.80rem',
+                fontWeight: 700,
+                cursor: loading ? 'not-allowed' : 'pointer'
+              }}
+            >
+              Später erinnern
+            </button>
+
+            <button
+              type="button"
+              onClick={handleDecline}
+              disabled={loading}
+              style={{
+                flex: 1,
+                padding: '10px 14px',
+                borderRadius: '14px',
+                background: 'transparent',
+                color: '#94a3b8',
+                border: 'none',
+                fontSize: '0.80rem',
+                fontWeight: 650,
+                cursor: loading ? 'not-allowed' : 'pointer'
+              }}
+            >
+              Nicht aktivieren
+            </button>
+          </div>
         </div>
       </div>
     </div>

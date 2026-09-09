@@ -89,15 +89,8 @@
           };
         }
         
+        // Use standard static manifests for Chrome Android WebAPK and W3C compliance
         var manifestHref = isGrooveLab ? '/manifest-groovelab.json' : '/manifest.json';
-        try {
-          var manifestStr = JSON.stringify(manifestObj);
-          if (typeof btoa === 'function') {
-            manifestHref = 'data:application/manifest+json;base64,' + btoa(unescape(encodeURIComponent(manifestStr)));
-          }
-        } catch (e) {
-          console.error('[Manifest] Failed to encode dynamic manifest:', e);
-        }
         
         function setOrAddMeta(name, content) {
           var meta = document.querySelector('meta[name="' + name + '"]');

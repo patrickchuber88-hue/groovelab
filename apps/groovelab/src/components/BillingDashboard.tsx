@@ -4254,7 +4254,7 @@ Campus-Groovelab Mahnwesen & Rechtsabteilung`;
         <NtryDtls><TxDtls><RmtInf><Ustrd>Campus-Groovelab RE-104-2608-01</Ustrd></RmtInf></TxDtls></NtryDtls>
       </Ntry>
       <Ntry>
-        <Amt Ccy="EUR">5.88</Amt>
+        <Amt Ccy="EUR">5.39</Amt>
         <CdtDbtInd>CRDT</CdtDbtInd>
         <BookgDt><Dt>2026-08-27</Dt></BookgDt>
         <NtryDtls><TxDtls><RmtInf><Ustrd>Aktivierung CG-F63B8EDE-2608</Ustrd></RmtInf></TxDtls></NtryDtls>

@@ -99,8 +99,10 @@ export const downloadAppleWalletPass = (options: WalletPassOptions, filename?: s
 };
 
 /**
- * Generates an actionable Google Wallet / Android Pass payload.
- * For Android users, this formats the digital ID into a Google Wallet Save payload or a standardized pass URI.
+ * Generates a Google Wallet Save payload structure.
+ * NOTE: Google Pay & Wallet requires this payload to be signed as an RS256 JWT
+ * via a registered Google Cloud Service Account in the Google Pay & Wallet Console.
+ * Unsigned client-side URLs will be rejected by Google Pay with "Ein Problem ist aufgetreten".
  */
 export const generateGoogleWalletPassUrl = (options: WalletPassOptions): string => {
   const {
