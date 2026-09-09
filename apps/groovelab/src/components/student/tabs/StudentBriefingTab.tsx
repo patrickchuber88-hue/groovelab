@@ -6,13 +6,12 @@ import {
   Phone, Users, Shield, Palmtree, Settings, FileText, ThumbsUp, Heart, AlertTriangle,
   Mic, Disc, Download, Key, Headphones, Sliders
 } from 'lucide-react';
-import { Cell } from 'recharts';
 import { ALL_STICKERS } from '../../../domain/stickersAndTresor';
 import { UpdateAnnouncementHero } from '../../common/UpdateAnnouncementHero';
 import { AudioTrackCarousel, AudioTrackItem } from '../../AudioTrackCarousel';
 import { DEFAULT_FOKUS_LEVELS } from '../../../utils/studentProgressEngine';
 import { buildContinuousHomeworkNarrative } from '../../../services/neuralTtsService';
-import { Avatar, getInstrumentAvatarUrl } from '../studentAvatars.constants';
+import { Avatar, getInstrumentAvatarUrl, resolveCampusStudentAvatar } from '../studentAvatars.constants';
 import { getSimulatedNow, toLocalYYYYMMDD, getISOWeekRaw, getISOWeek, getItemWeek, getLehrwerkColor } from '../studentDateUtils';
 
 export interface StudentBriefingTabProps {
@@ -249,6 +248,45 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
     unreadClassFeedCount,
     xpActive
   } = props;
+
+  const activeWeeklyFocusKey = useMemo(() => {
+    let focusKey: string | null = null;
+    try {
+      if (studentUser?.skill_radar_levels?.weekly_focus && studentUser.skill_radar_levels.weekly_focus !== 'ausgeglichen') {
+        focusKey = studentUser.skill_radar_levels.weekly_focus;
+      } else {
+        const saved = localStorage.getItem(`groovelab_skill_overrides_${props.studentId || studentUser?.id || 'default'}`);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (parsed.weekly_focus && parsed.weekly_focus !== 'ausgeglichen') {
+            focusKey = parsed.weekly_focus;
+          }
+        }
+      }
+    } catch (e) {}
+    return focusKey;
+  }, [studentUser?.skill_radar_levels, props.studentId, studentUser?.id]);
+
+  const weeklyFocusMeta = useMemo(() => {
+    if (!activeWeeklyFocusKey) return null;
+    const key = activeWeeklyFocusKey.toLowerCase();
+    if (key === 'rhythmus') {
+      return { key, label: 'Rhythmus & Beat', icon: '🥁', color: '#b45309', bg: '#fef3c7', border: '#fde047' };
+    }
+    if (key === 'technik') {
+      return { key, label: 'Technik & Finger', icon: '⚡', color: '#0369a1', bg: '#e0f2fe', border: '#bae6fd' };
+    }
+    if (key === 'intonation' || key === 'klang') {
+      return { key, label: 'Klang & Ton', icon: '🎵', color: '#15803d', bg: '#dcfce7', border: '#bbf7d0' };
+    }
+    if (key === 'ausdruck') {
+      return { key, label: 'Ausdruck & Gefühl', icon: '🎭', color: '#7e22ce', bg: '#f3e8ff', border: '#e9d5ff' };
+    }
+    if (key === 'repertoire') {
+      return { key, label: 'Repertoire & Song', icon: '📚', color: '#be185d', bg: '#fce7f3', border: '#fbcfe8' };
+    }
+    return { key, label: activeWeeklyFocusKey, icon: '🎯', color: '#b45309', bg: '#fef3c7', border: '#fde047' };
+  }, [activeWeeklyFocusKey]);
 
   return (
       <div style={{ display: activeTab === 'briefing' ? 'block' : 'none' }}>
@@ -543,13 +581,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                             zIndex: 1
                           }} />
                           <img 
-                            src={
-                              studentUser?.role === 'admin' || studentUser?.role === 'secretary'
-                                ? '/campus_login_hero.png'
-                                : studentUser?.photo_url && studentUser.photo_url.includes('_avatar')
-                                ? studentUser.photo_url
-                                : getInstrumentAvatarUrl(studentInstrumentName || studentUser?.resolved_instrument || studentUser?.instrument)
-                            } 
+                            src={resolveCampusStudentAvatar({ ...studentUser, instrument: studentInstrumentName || studentUser?.instrument })} 
                             alt="" 
                             style={{ 
                               width: '100%', 
@@ -760,6 +792,40 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                         <span>{!isStudentAbsenceAllowed ? 'Unterricht absagen (Eltern-PIN)' : 'Unterricht absagen'}</span>
                                       </>
                                     )}
+                                  </button>
+                                )}
+
+                                {/* 4. Wochenfokus / Musik-Stern Badge */}
+                                {weeklyFocusMeta && (
+                                  <button 
+                                    type="button"
+                                    onClick={() => {
+                                      if (handleOpenHomeworkBookWithView) {
+                                        handleOpenHomeworkBookWithView('skillradar');
+                                      }
+                                    }}
+                                    style={{ 
+                                      display: 'inline-flex', 
+                                      alignItems: 'center', 
+                                      gap: '8px', 
+                                      background: 'linear-gradient(135deg, #fef3c7 0%, #fefce8 100%)', 
+                                      color: '#854d0e', 
+                                      padding: isMusicStandMode ? '10px 20px' : '8px 16px', 
+                                      minHeight: isMusicStandMode ? '44px' : '38px', 
+                                      boxSizing: 'border-box', 
+                                      borderRadius: '14px', 
+                                      fontSize: isMusicStandMode ? '0.94rem' : '0.86rem', 
+                                      fontWeight: 850, 
+                                      border: '1.5px solid #fde047',
+                                      cursor: 'pointer',
+                                      boxShadow: '0 2px 8px rgba(234, 179, 8, 0.15)',
+                                      transition: 'all 0.18s ease'
+                                    }}
+                                    className="hover-scale"
+                                    title="Zu deinem Musik-Stern im Aufgabenheft"
+                                  >
+                                    <span style={{ fontSize: '1.05rem' }}>⭐</span>
+                                    <span>Wochenfokus: {weeklyFocusMeta.label}</span>
                                   </button>
                                 )}
                               </div>
@@ -3379,13 +3445,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                       borderBottom: isMobile ? '1px solid rgba(0, 0, 0, 0.1)' : 'none'
                     }}>
                       <img 
-                        src={
-                          studentUser?.role === 'admin' || studentUser?.role === 'secretary'
-                            ? '/campus_login_hero.png'
-                            : studentUser?.photo_url && studentUser.photo_url.includes('_avatar')
-                            ? studentUser.photo_url
-                            : getInstrumentAvatarUrl(studentInstrumentName || studentUser?.resolved_instrument || studentUser?.instrument)
-                        } 
+                        src={resolveCampusStudentAvatar({ ...studentUser, instrument: studentInstrumentName || studentUser?.instrument })} 
                         alt="" 
                         style={{ 
                           width: '100%', 
@@ -3604,6 +3664,40 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                   !isStudentAbsenceAllowed ? <Lock size={14} color="#64748b" /> : <CalendarX size={14} color="#64748b" />
                                 )}
                                 <span>{isCanceled ? (!isStudentAbsenceAllowed ? 'Absage zurücknehmen (Eltern-PIN)' : 'Absage zurücknehmen') : (!isStudentAbsenceAllowed ? 'Unterricht absagen (Eltern-PIN)' : 'Unterricht absagen')}</span>
+                              </button>
+                            )}
+
+                            {/* 4. Wochenfokus / Skill-Radar Badge */}
+                            {weeklyFocusMeta && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (handleOpenHomeworkBookWithView) {
+                                    handleOpenHomeworkBookWithView('skillradar');
+                                  }
+                                }}
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '8px',
+                                  background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
+                                  color: '#166534',
+                                  padding: '8px 16px',
+                                  minHeight: '38px',
+                                  boxSizing: 'border-box',
+                                  borderRadius: '12px',
+                                  fontSize: '0.78rem',
+                                  fontWeight: 800,
+                                  border: '1.5px solid #86efac',
+                                  cursor: 'pointer',
+                                  boxShadow: '0 2px 8px rgba(34, 197, 94, 0.15)',
+                                  transition: 'all 0.18s ease'
+                                }}
+                                className="hover-scale"
+                                title="Zum Skill-Radar im Aufgabenheft"
+                              >
+                                <span>{weeklyFocusMeta.icon}</span>
+                                <span>Wochenfokus: {weeklyFocusMeta.label}</span>
                               </button>
                             )}
                           </div>
@@ -4794,13 +4888,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                         zIndex: 1
                       }} />
                       <img 
-                        src={
-                          studentUser?.role === 'admin' || studentUser?.role === 'secretary'
-                            ? '/campus_login_hero.png'
-                            : studentUser?.photo_url && studentUser.photo_url.includes('_avatar')
-                            ? studentUser.photo_url
-                            : getInstrumentAvatarUrl(studentInstrumentName || studentUser?.resolved_instrument || studentUser?.instrument)
-                        } 
+                        src={resolveCampusStudentAvatar({ ...studentUser, instrument: studentInstrumentName || studentUser?.instrument })} 
                         alt="" 
                         style={{ 
                           width: '100%', 
@@ -5105,6 +5193,40 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                   !isStudentAbsenceAllowed ? <Lock size={14} color="#64748b" /> : <CalendarX size={14} color="#64748b" />
                                 )}
                                 <span>{isCanceled ? (!isStudentAbsenceAllowed ? 'Absage zurücknehmen (Eltern-PIN)' : 'Absage zurücknehmen') : (!isStudentAbsenceAllowed ? 'Unterricht absagen (Eltern-PIN)' : 'Unterricht absagen')}</span>
+                              </button>
+                            )}
+
+                            {/* 4. Wochenfokus / Kompetenz-Radar Badge */}
+                            {weeklyFocusMeta && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (handleOpenHomeworkBookWithView) {
+                                    handleOpenHomeworkBookWithView('skillradar');
+                                  }
+                                }}
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '8px',
+                                  background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+                                  color: '#0f172a',
+                                  padding: '8px 16px',
+                                  minHeight: '38px',
+                                  boxSizing: 'border-box',
+                                  borderRadius: '12px',
+                                  fontSize: '0.78rem',
+                                  fontWeight: 800,
+                                  border: '1.5px solid #cbd5e1',
+                                  cursor: 'pointer',
+                                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)',
+                                  transition: 'all 0.18s ease'
+                                }}
+                                className="hover-scale"
+                                title="Zum Kompetenz-Radar im Aufgabenheft"
+                              >
+                                <Target size={14} color="#0f172a" />
+                                <span>Fokus: {weeklyFocusMeta.label}</span>
                               </button>
                             )}
                           </div>

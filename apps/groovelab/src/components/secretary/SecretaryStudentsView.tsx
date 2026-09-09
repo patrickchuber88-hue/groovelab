@@ -320,6 +320,8 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
               
               <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                 <button
+                  type="button"
+                  aria-label="Eltern-Onboarding Link kopieren"
                   onClick={() => {
                     const onboardingUrl = getParentOnboardingUrl(
                       schoolName || currentSchoolProfile?.name || 'Stadtmusikschule',
@@ -336,7 +338,7 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
                     borderRadius: '8px', 
                     padding: '4px 10px', 
                     fontSize: '0.72rem', 
-                    fontWeight: 800,
+                    fontWeight: 800, 
                     background: copiedStudentId === 'general-onboarding' ? '#e6f4ea' : '#ffffff',
                     border: copiedStudentId === 'general-onboarding' ? '1px solid #e6f4ea' : '1px solid #cbd5e1',
                     color: copiedStudentId === 'general-onboarding' ? '#34a853' : '#0f172a',
@@ -351,6 +353,8 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
                 </button>
 
                 <button
+                  type="button"
+                  aria-label="Smarter CSV und Excel Import"
                   onClick={() => setShowBulkImportModal(true)}
                   style={{ 
                     display: 'flex', 
@@ -376,6 +380,8 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
                 </button>
 
                 <button
+                  type="button"
+                  aria-label="Druckfertiges Eltern-Infoblatt als PDF öffnen"
                   onClick={() => setShowParentInfoSheetModal(true)}
                   style={{ 
                     display: 'flex', 
@@ -402,6 +408,8 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
 
                 {/* Sammel-Onboarding (Text/CSV) Toggle Button */}
                 <button
+                  type="button"
+                  aria-label="Sammel-Onboarding Textfeld ein- oder ausklappen"
                   onClick={() => setIsStudentCsvExpanded(!isStudentCsvExpanded)}
                   style={{ 
                     display: 'flex', 
@@ -427,6 +435,8 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
 
                 {/* Interaktives In-App Leitfaden & Eltern-Info Modal */}
                 <button
+                  type="button"
+                  aria-label="Interaktiven Leitfaden und Eltern-Info öffnen"
                   onClick={() => {
                     setGuidanceInitialTab('teacher');
                     setShowGuidanceModal(true);
@@ -454,6 +464,8 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
                 </button>
 
                 <button
+                  type="button"
+                  aria-label="Neuen Schüler anlegen"
                   onClick={() => setShowAddStudentModal(true)}
                   style={{ 
                     display: 'flex', 
@@ -574,6 +586,7 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
                   )}
 
                   <textarea
+                    aria-label="CSV oder Liste von Schülern für Batch-Import"
                     value={studentCsvText}
                     onChange={(e) => setStudentCsvText(e.target.value)}
                     placeholder={
@@ -602,6 +615,8 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
                       Tipp: Mehrere Zeilen direkt aus Excel, Word oder Notizen kopieren und hier einfügen.
                     </span>
                     <button
+                      type="button"
+                      aria-label="Schüler jetzt importieren"
                       onClick={handleBatchImportStudents}
                       disabled={isImportingStudentsBatch || !studentCsvText.trim()}
                       className="hover-scale"
@@ -646,6 +661,7 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
                 <Search size={13} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} />
                 <input 
                   type="text" 
+                  aria-label="Schüler suchen"
                   placeholder="Schüler suchen..." 
                   value={studentSearchQuery}
                   onChange={(e) => {
@@ -670,6 +686,7 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
                 {studentSearchQuery && (
                   <button
                     type="button"
+                    aria-label="Suchbegriff löschen"
                     onClick={() => {
                       setStudentSearchQuery('');
                       setStudentCurrentPage(1);
@@ -688,6 +705,7 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
               {/* Instrument Select */}
               <div style={{ flex: '0.8', minWidth: '110px' }}>
                 <select 
+                  aria-label="Nach Instrument filtern"
                   value={studentFilterInstrument}
                   onChange={(e) => {
                     setStudentFilterInstrument(e.target.value);
@@ -710,6 +728,7 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
               {/* Teacher Select */}
               <div style={{ flex: '0.9', minWidth: '110px' }}>
                 <select 
+                  aria-label="Nach Lehrkraft filtern"
                   value={studentFilterTeacher}
                   onChange={(e) => {
                     setStudentFilterTeacher(e.target.value);
@@ -733,6 +752,7 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
               {/* Status/Tariff Select */}
               <div style={{ flex: '0.7', minWidth: '100px' }}>
                 <select
+                  aria-label="Nach Status filtern"
                   value={studentFilterStatus}
                   onChange={(e) => {
                     setStudentFilterStatus(e.target.value as any);
@@ -756,6 +776,7 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
                 {/* Select All Filtered Button */}
                 <button
                   type="button"
+                  aria-label={filteredStudents.length > 0 && filteredStudents.map((s: any) => s.id).every((id: string) => selectedStudentIds.includes(id)) ? 'Auswahl aller gefilterten Schüler aufheben' : 'Alle gefilterten Schüler auswählen'}
                   onClick={() => {
                     const filteredIds = filteredStudents.map((s: any) => s.id);
                     const allSelected = filteredIds.length > 0 && filteredIds.every((id: string) => selectedStudentIds.includes(id));
@@ -795,6 +816,7 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
                 {/* 👁️ Global Eye toggle */}
                 <button
                   type="button"
+                  aria-label={showRealNames ? "Klarnamen anzeigen" : "Nachnamen maskieren (Datenschutz)"}
                   onClick={() => toggleRealNames()}
                   style={{
                     display: 'inline-flex',
@@ -825,6 +847,7 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
                     {/* Bulk Campus Button */}
                     <button
                       type="button"
+                      aria-label={`Campus-Modul für ${selectedStudentIds.length} Schüler verwalten`}
                       onClick={async () => {
                         const choice = window.prompt(
                           `Campus-Modul für die ${selectedStudentIds.length} ausgewählten Schüler:\n\nTippe "1" zum AKTIVIEREN\nTippe "2" zum DEAKTIVIEREN\n(oder Abbrechen)`,
@@ -886,6 +909,7 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
                     {/* Bulk GrooveLab Button */}
                     <button
                       type="button"
+                      aria-label={`GrooveLab-Modul für ${selectedStudentIds.length} Schüler verwalten`}
                       onClick={async () => {
                         const choice = window.prompt(
                           `GrooveLab-Modul für die ${selectedStudentIds.length} ausgewählten Schüler:\n\nTippe "1" zum AKTIVIEREN\nTippe "2" zum DEAKTIVIEREN\n(oder Abbrechen)`,
@@ -947,6 +971,7 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
                     {/* Bulk Delete Action Button */}
                     <button
                       type="button"
+                      aria-label={`Ausgewählte ${selectedStudentIds.length} Schüler löschen`}
                       onClick={() => {
                         setBulkDeleteStep(1);
                         setBulkDeletePin('');
@@ -998,6 +1023,7 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
               <div style={{ flex: '0 0 20px', display: 'flex', justifyContent: 'center' }}>
                 <input 
                   type="checkbox"
+                  aria-label="Alle Schüler der aktuellen Ansicht auswählen"
                   checked={filteredStudents.length > 0 && filteredStudents.every((s: any) => selectedStudentIds.includes(s.id))}
                   onChange={(e) => {
                     const filteredIds = filteredStudents.map((s: any) => s.id);
@@ -1053,7 +1079,7 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
                         transition: 'all 0.15s ease',
                         minHeight: '48px'
                       }}
-                      className="student-drag-card"
+                      className="student-drag-card virtual-row"
                     >
                       {/* Checkbox for Bulk Selection */}
                       <div 
@@ -1062,6 +1088,7 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
                       >
                         <input 
                           type="checkbox"
+                          aria-label={`Schüler ${student.first_name} ${student.last_name} auswählen`}
                           checked={isSelected}
                           onChange={(e) => {
                             e.stopPropagation();
@@ -1077,6 +1104,15 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
 
                       {/* Avatar & Name */}
                       <div 
+                        role="button"
+                        tabIndex={0}
+                        aria-label={`Schülerdetails für ${student.first_name} ${maskLastName(student.last_name, showRealNames)} öffnen`}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            setSelectedStudentForDetail(student);
+                          }
+                        }}
                         onClick={() => setSelectedStudentForDetail(student)}
                         style={{ 
                           flex: '1.6', 
@@ -1176,6 +1212,7 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
                       {/* Teacher Select */}
                       <div style={{ flex: '1.2', minWidth: 0 }}>
                         <select
+                          aria-label={`Lehrkraft für ${student.first_name} ${student.last_name}`}
                           value={student.teacher_id || ''}
                           onChange={(e) => {
                             handleUpdateStudentTeacher(student.id, e.target.value || null);
@@ -1205,6 +1242,7 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
                       {/* Duration Select */}
                       <div style={{ flex: '0.7', minWidth: 0 }}>
                         <select
+                          aria-label={`Unterrichtsdauer für ${student.first_name} ${student.last_name}`}
                           value={student.lesson_duration || 30}
                           onChange={async (e) => {
                             const newDur = parseInt(e.target.value);
@@ -1263,6 +1301,7 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
                         {/* Campus Chip with Legal Governance (§ 312j BGB) */}
                         <button
                           type="button"
+                          aria-label={`Campus-Modul für ${student.first_name} ${student.last_name} ${student.is_campus_active ? 'deaktivieren' : 'aktivieren'}`}
                           onClick={async () => {
                             const isCampusAvailable = !isBillingBooked || hasCampusSub;
                             if (!isCampusAvailable) {
@@ -1360,7 +1399,7 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
                               : '#f8fafc',
                             color: student.is_campus_active 
                               ? (student.exempt_from_direct_billing ? '#6b21a8' : (student.isPendingOnboarding ? '#137333' : '#ffffff')) 
-                              : '#94a3b8',
+                              : '#64748b',
                             opacity: (!isBillingBooked || hasCampusSub) ? 1 : 0.45,
                             whiteSpace: 'nowrap',
                             display: 'flex',
@@ -1396,6 +1435,7 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
                         {/* GrooveLab Chip */}
                         <button
                           type="button"
+                          aria-label={`GrooveLab-Modul für ${student.first_name} ${student.last_name} ${student.is_groovelab_active ? 'deaktivieren' : 'aktivieren'}`}
                           onClick={async () => {
                             const isGrooveAvailable = !isBillingBooked || hasGroovelabSub;
                             if (!isGrooveAvailable) {
@@ -1450,8 +1490,8 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
                               ? (student.isPendingOnboarding ? '#fefce8' : '#eab308') 
                               : '#f8fafc',
                             color: student.is_groovelab_active 
-                              ? (student.isPendingOnboarding ? '#a16207' : '#ffffff') 
-                              : '#94a3b8',
+                              ? (student.isPendingOnboarding ? '#a16207' : '#0f172a') 
+                              : '#64748b',
                             opacity: (!isBillingBooked || hasGroovelabSub) ? 1 : 0.45,
                             display: 'flex',
                             alignItems: 'center',
@@ -1483,6 +1523,7 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
                         {/* Direct Red Delete Button */}
                         <button
                           type="button"
+                          aria-label={`Schüler ${student.first_name} ${student.last_name} löschen`}
                           onClick={(e) => {
                             e.stopPropagation();
                             handleDeleteStudentCampus(
@@ -1517,6 +1558,7 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
                         {/* ⋮ 3-Dots Options Menu Button */}
                         <button
                           type="button"
+                          aria-label={`Weitere Optionen für ${student.first_name} ${student.last_name}`}
                           onClick={(e) => {
                             e.stopPropagation();
                             if (activeContextMenu?.student?.id === student.id) {
@@ -1565,6 +1607,8 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
 
                 <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
                   <button 
+                    type="button"
+                    aria-label="Erste Seite"
                     onClick={() => setStudentCurrentPage(1)}
                     disabled={safeCurrentPage === 1}
                     style={{ 
@@ -1581,6 +1625,8 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
                     ⏪
                   </button>
                   <button 
+                    type="button"
+                    aria-label="Vorherige Seite"
                     onClick={() => setStudentCurrentPage(prev => Math.max(prev - 1, 1))}
                     disabled={safeCurrentPage === 1}
                     style={{ 
@@ -1602,6 +1648,8 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
                   </span>
 
                   <button 
+                    type="button"
+                    aria-label="Nächste Seite"
                     onClick={() => setStudentCurrentPage(prev => Math.min(prev + 1, totalPages))}
                     disabled={safeCurrentPage === totalPages}
                     style={{ 
@@ -1619,6 +1667,8 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
                   </button>
 
                   <button 
+                    type="button"
+                    aria-label="Letzte Seite"
                     onClick={() => setStudentCurrentPage(totalPages)}
                     disabled={safeCurrentPage === totalPages}
                     style={{ 
@@ -1639,6 +1689,7 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 700 }}>Einträge pro Seite:</span>
                   <select
+                    aria-label="Einträge pro Seite auswählen"
                     value={studentPageSize}
                     onChange={(e) => {
                       setStudentPageSize(parseInt(e.target.value));
@@ -1660,15 +1711,25 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
 
         {/* MANAGE STUDENT MODAL */}
         {showAddStudentModal && (
-          <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(15,23,42,0.3)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+          <div 
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="manage-student-modal-title"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) setShowAddStudentModal(false);
+            }}
+            style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(15,23,42,0.3)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}
+          >
             <div style={{ background: '#ffffff', borderRadius: '24px', maxWidth: '520px', width: '100%', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)', animation: 'modalFadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1)', display: 'flex', flexDirection: 'column' }}>
               
               {/* Modal Header */}
               <div style={{ padding: '24px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
+                <h3 id="manage-student-modal-title" style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
                   ➕ Neuen Schüler anlegen
                 </h3>
                 <button 
+                  type="button"
+                  aria-label="Dialog schließen"
                   onClick={() => setShowAddStudentModal(false)}
                   style={{ border: 'none', background: 'transparent', fontSize: '1.2rem', cursor: 'pointer', color: '#64748b' }}
                 >
@@ -1726,6 +1787,7 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
                           <label key={tag} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', color: '#334155', cursor: 'pointer' }}>
                             <input
                               type="checkbox"
+                              aria-label={`Instrument ${tag}`}
                               checked={checked}
                               onChange={(e) => {
                                 const currentChecked = newStudentInstrument ? newStudentInstrument.split(',').map(s => s.trim()).filter(Boolean) : [];
@@ -1748,6 +1810,7 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                     <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Unterrichtsdauer</label>
                     <select
+                      aria-label="Unterrichtsdauer"
                       value={newStudentDuration}
                       onChange={(e) => setNewStudentDuration(parseInt(e.target.value))}
                       style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.85rem', outline: 'none', background: 'white' }}
@@ -1764,6 +1827,7 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                     <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Zugeordneter Hauptlehrer</label>
                     <select
+                      aria-label="Zugeordneter Hauptlehrer"
                       value={newStudentTeacherId}
                       onChange={(e) => setNewStudentTeacherId(e.target.value)}
                       style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.85rem', outline: 'none', background: 'white' }}
@@ -1785,6 +1849,7 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
                     </div>
                     <input 
                       type="checkbox" 
+                      aria-label="Campus Modul aktiv"
                       checked={newStudentIsCampusActive}
                       onChange={(e) => setNewStudentIsCampusActive(e.target.checked)}
                       style={{ accentColor: '#34a853', width: '18px', height: '18px' }}
@@ -1797,6 +1862,7 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
                     </div>
                     <input 
                       type="checkbox" 
+                      aria-label="GrooveLab Modul aktiv"
                       checked={newStudentIsGroovelabActive}
                       onChange={(e) => setNewStudentIsGroovelabActive(e.target.checked)}
                       style={{ accentColor: '#ea4335', width: '18px', height: '18px' }}
@@ -1809,6 +1875,7 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
                     </div>
                     <input 
                       type="checkbox" 
+                      aria-label="Direkter App-Nutzer (Tablet PIN)"
                       checked={newStudentIsAppUser}
                       onChange={(e) => setNewStudentIsAppUser(e.target.checked)}
                       style={{ accentColor: '#2563eb', width: '18px', height: '18px' }}

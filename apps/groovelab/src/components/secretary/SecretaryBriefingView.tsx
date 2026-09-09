@@ -164,6 +164,7 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
             const scheduleConflicts = (() => {
               interface ScheduleConflictItem {
                 id: string;
+                title?: string;
                 type: 'room' | 'teacher';
                 dayOfWeek: number;
                 dayLabel: string;
@@ -307,7 +308,13 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
             })();
 
             return (
-              <div style={{ display: 'grid', gridTemplateColumns: typeof window !== 'undefined' && window.innerWidth < 1024 ? '1fr' : '1fr 360px', gap: '24px', alignItems: 'start' }}>
+              <div 
+                role="tabpanel"
+                id="secretary-briefing-tabpanel"
+                aria-label="Sekretariat Briefing Übersicht"
+                tabIndex={0}
+                style={{ display: 'grid', gridTemplateColumns: typeof window !== 'undefined' && window.innerWidth < 1024 ? '1fr' : '1fr 360px', gap: '24px', alignItems: 'start' }}
+              >
                 
                 {/* LEFT COLUMN: MAIN CONTENT AREA */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -373,6 +380,7 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                         <div style={{ display: 'flex', gap: '8px' }}>
                           <button
                             type="button"
+                            aria-label="Kündigung des Audio-Tresors abbrechen"
                             onClick={async () => {
                               if (confirm("Möchtest du die Kündigung abbrechen und den Audio-Tresor aktiv behalten?")) {
                                 try {
@@ -404,6 +412,7 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                           </button>
                           <button
                             type="button"
+                            aria-label="Kündigung jetzt sofort ausführen und Cloud-Speicher leeren"
                             onClick={async () => {
                               if (confirm(`Möchtest du den Stichtag jetzt sofort ausführen? Der Cloud-Speicher wird geleert und dein Paket auf Standard (0,00 €) umgestellt.`)) {
                                 try {
@@ -537,6 +546,7 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
                           <button
                             type="button"
+                            aria-label={`Audio-Tresor Speichervolumen auf +${nextTierGb} GB erweitern`}
                             onClick={() => {
                               setSelectedStorageAddonGb(nextTierGb);
                               setShowStorageManagerModal(true);
@@ -599,6 +609,8 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                         </div>
                       </div>
                       <button
+                        type="button"
+                        aria-label="Auftragsverarbeitungsvertrag (AVV) jetzt unterzeichnen"
                         onClick={() => setShowPilotAgreementModalFromDashboard(true)}
                         style={{
                           background: '#dc2626',
@@ -677,6 +689,8 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                           <button
+                            type="button"
+                            aria-label={`Rechnung ${currentInvoiceId} einsehen`}
                             onClick={() => {
                               setSecretarySubTab('licenses');
                               const isAnnualBilling = studentBillingOption === 'option1' || studentBillingOption === 'option3_2' || studentBillingOption === 'debit' || studentBillingOption === 'cash' || studentBillingOption === 'both';
@@ -722,6 +736,8 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                             Rechnung einsehen
                           </button>
                           <button
+                            type="button"
+                            aria-label="Rechnungs-Benachrichtigung schließen"
                             onClick={() => {
                               setDismissedInvoiceAlert(true);
                               localStorage.setItem(`dismissedInvoiceAlert_${schoolId}`, 'true');
@@ -863,12 +879,14 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                           <h3 style={{ margin: 0, fontSize: '0.96rem', fontWeight: 800, color: '#1e293b', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
                             Vorläufige Raumbuchungen der Lehrkräfte
                           </h3>
-                          <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>
+                          <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase' }}>
                             Freigabe erforderlich ({pendingBookings.length})
                           </span>
                         </div>
                       </div>
                       <button
+                        type="button"
+                        aria-label="Logbuch der Raumbuchungen öffnen"
                         onClick={() => {
                           fetchLogbookBookings();
                           setShowLogbookModal(true);
@@ -945,12 +963,14 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                                 <span style={{ fontSize: '0.74rem', fontWeight: 600, color: '#64748b' }}>
                                   Datum: <strong style={{ color: '#0f172a' }}>{dateFormatted}</strong> ({b.start_time} - {b.end_time} Uhr)
                                 </span>
-                                <span style={{ fontSize: '0.70rem', color: '#94a3b8' }}>
+                                <span style={{ fontSize: '0.70rem', color: '#475569' }}>
                                   Gebucht von: <strong style={{ color: '#475569' }}>{teacherName}</strong>
                                 </span>
                               </div>
                               <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
                                 <button
+                                  type="button"
+                                  aria-label={`Raumbuchung für ${roomName} am ${dateFormatted} freigeben`}
                                   onClick={() => handleConfirmBooking(b.id)}
                                   style={{
                                     background: '#34a853',
@@ -970,6 +990,8 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                                   Bestätigen
                                 </button>
                                 <button
+                                  type="button"
+                                  aria-label={`Raumbuchung für ${roomName} am ${dateFormatted} ablehnen`}
                                   onClick={() => handleRejectBooking(b.id)}
                                   style={{
                                     background: 'rgba(239, 68, 68, 0.08)',
@@ -1387,6 +1409,8 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                             {/* Action Row */}
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '10px', paddingTop: '4px' }}>
                               <button
+                                type="button"
+                                aria-label={`Konflikt im Stundenplan lösen: ${conflict.title || 'Terminkonflikt'}`}
                                 onClick={() => {
                                   setActiveTab('campus');
                                   setCampusSubTab('schedules');
@@ -1527,7 +1551,7 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                                   <strong style={{ fontSize: '0.84rem', color: '#1c1c1e', fontWeight: 700 }}>
                                     {data.teacherName}
                                   </strong>
-                                  <span style={{ fontSize: '0.72rem', color: '#8e8e93', fontWeight: 500 }}>
+                                  <span style={{ fontSize: '0.72rem', color: '#475569', fontWeight: 500 }}>
                                     📅 {daysLabel} ({data.slotsCount} {data.slotsCount === 1 ? 'Termin' : 'Termine'})
                                   </span>
                                   {data.submittedAtLabel && (
@@ -1537,6 +1561,8 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                                   )}
                                 </div>
                                 <button
+                                  type="button"
+                                  aria-label={`Räume zuteilen für ${data.teacherName}`}
                                   onClick={() => {
                                     setActiveTab('campus');
                                     setCampusSubTab('schedules');

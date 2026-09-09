@@ -597,8 +597,8 @@ Hiermit versichere ich in gutem Glauben, dass die vorstehenden Angaben richtig u
               </div>
 
               <div>
-                <strong style={{ color: '#0f172a' }}>Umsatzsteuer &amp; Steuerliche Einstufung (§ 5 Abs. 1 Nr. 6 DDG / § 6 UStG AT / Art. 8 MWSTG CH):</strong><br />
-                - <strong>Deutschland:</strong> Umsatzsteuerbefreit gemäß <strong>§ 19 UStG (Kleinunternehmerregelung)</strong>. Es wird keine Umsatzsteuer erhoben oder ausgewiesen.<br />
+                <strong style={{ color: '#0f172a' }}>Umsatzsteuer &amp; Steuerliche Einstufung (§ 5 Abs. 1 Nr. 6 DDG / § 27a UStG / § 6 UStG AT / Art. 8 MWSTG CH):</strong><br />
+                - <strong>Deutschland:</strong> Umsatzsteuerbefreit gemäß <strong>§ 19 UStG (Kleinunternehmerregelung)</strong>. Es wird keine Umsatzsteuer erhoben oder gesondert ausgewiesen. Eine Umsatzsteuer-Identifikationsnummer (USt-IdNr.) gemäß § 27a UStG wird für den rein inländischen Geschäftsbetrieb nicht benötigt; für den grenzüberschreitenden innergemeinschaftlichen B2B-Dienstleistungsverkehr (Reverse-Charge) sowie nach § 139c AO wird die Wirtschafts-Identifikationsnummer (W-IdNr.) geführt bzw. auf gesonderte behördliche Zuteilung vorgehalten.<br />
                 - <strong>Österreich:</strong> Umsatzsteuerbefreit gemäß <strong>§ 6 Abs. 1 Z 27 UStG 1994 (Kleinunternehmerregelung)</strong>.<br />
                 - <strong>Schweiz:</strong> Leistungsort Schweiz gemäß <strong>Art. 8 Abs. 1 MWSTG</strong> (nicht im Inland steuerbar).
               </div>

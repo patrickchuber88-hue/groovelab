@@ -334,6 +334,8 @@ export const isInternalMetadataNote = (text: any): boolean => {
     clean.startsWith('frage für den unterricht:') ||
     clean.startsWith('hausaufgabe kw ') ||
     clean.startsWith('rhythm_score:') ||
+    clean.startsWith('earlab_score:') ||
+    clean.startsWith('earlab:') ||
     clean.startsWith('snapshot_') ||
     clean.startsWith('snapshot:') ||
     clean === 'inhalte in der premium-version freischalten' ||

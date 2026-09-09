@@ -4499,6 +4499,7 @@ export function ScheduleCalendarViewDesktop({
                     boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
                   }}
                   title="Anleitung / Tour starten"
+                  aria-label="Anleitung oder interaktive Tour starten"
                   onMouseOver={e => e.currentTarget.style.color = '#1d1d1f'}
                   onMouseOut={e => e.currentTarget.style.color = '#86868b'}
                 >
@@ -4511,6 +4512,7 @@ export function ScheduleCalendarViewDesktop({
                 <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em', fontFamily: 'Urbanist' }}>Raster:</span>
                 <select
                   value={gridSnapMinutes}
+                  aria-label="Raster für Zeitintervalle in Minuten"
                   onChange={(e) => {
                     const val = Number(e.target.value);
                     setGridSnapMinutes(val);
@@ -4547,6 +4549,8 @@ export function ScheduleCalendarViewDesktop({
                   boxShadow: '0 1px 4px rgba(245, 158, 11, 0.12)'
                 }}>
                   <button
+                    type="button"
+                    aria-label={`${allOpenReschedules.length} offene Ersatztermine bearbeiten`}
                     onClick={() => {
                       const targetOcc = allOpenReschedules[currentRescheduleIndex];
                       if (targetOcc) {
@@ -4589,6 +4593,7 @@ export function ScheduleCalendarViewDesktop({
                   {allOpenReschedules.length > 1 && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: '2px', marginLeft: '4px', borderLeft: '1px solid rgba(180, 83, 9, 0.2)', paddingLeft: '6px' }}>
                       <button
+                        type="button"
                         onClick={(e) => {
                           e.stopPropagation();
                           setCurrentRescheduleIndex(prev => (prev > 0 ? prev - 1 : allOpenReschedules.length - 1));
@@ -4605,6 +4610,7 @@ export function ScheduleCalendarViewDesktop({
                           justifyContent: 'center'
                         }}
                         title="Vorheriger Ersatztermin"
+                        aria-label="Vorheriger Ersatztermin"
                       >
                         <ChevronLeft size={13} />
                       </button>
@@ -4612,6 +4618,7 @@ export function ScheduleCalendarViewDesktop({
                         {currentRescheduleIndex + 1}/{allOpenReschedules.length}
                       </span>
                       <button
+                        type="button"
                         onClick={(e) => {
                           e.stopPropagation();
                           setCurrentRescheduleIndex(prev => (prev < allOpenReschedules.length - 1 ? prev + 1 : 0));
@@ -4628,6 +4635,7 @@ export function ScheduleCalendarViewDesktop({
                           justifyContent: 'center'
                         }}
                         title="Nächster Ersatztermin"
+                        aria-label="Nächster Ersatztermin"
                       >
                         <ChevronRight size={13} />
                       </button>
@@ -4640,9 +4648,11 @@ export function ScheduleCalendarViewDesktop({
 
           {/* Right: Date Navigation & View Mode Switcher */}
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-            <div className="apple-btn-group">
+            <div className="apple-btn-group" role="group" aria-label="Ansichtsmodus">
               <button
                 type="button"
+                aria-label="Tagesansicht anzeigen"
+                aria-pressed={viewMode === 'day'}
                 onClick={() => {
                   setViewMode('day');
                   if (focusedDayOffset === null) setFocusedDayOffset(0);
@@ -4654,6 +4664,8 @@ export function ScheduleCalendarViewDesktop({
               </button>
               <button
                 type="button"
+                aria-label="Wochenansicht anzeigen"
+                aria-pressed={viewMode === 'week'}
                 onClick={() => {
                   setViewMode('week');
                   setFocusedDayOffset(null);
@@ -4666,15 +4678,16 @@ export function ScheduleCalendarViewDesktop({
             </div>
 
             <div className="apple-btn-group">
-              <button onClick={prevWeek} className="apple-btn" style={{ padding: '6px 8px' }} title="Vorherige Woche"><ChevronLeft size={14} /></button>
-              <button onClick={jumpToToday} className="apple-btn" title="Aktuelle Woche anzeigen">Heute</button>
-              <button onClick={nextWeek} className="apple-btn" style={{ padding: '6px 8px' }} title="Nächste Woche"><ChevronRight size={14} /></button>
+              <button type="button" onClick={prevWeek} className="apple-btn" style={{ padding: '6px 8px' }} title="Vorherige Woche" aria-label="Vorherige Woche anzeigen"><ChevronLeft size={14} /></button>
+              <button type="button" onClick={jumpToToday} className="apple-btn" title="Aktuelle Woche anzeigen" aria-label="Zur aktuellen Woche springen">Heute</button>
+              <button type="button" onClick={nextWeek} className="apple-btn" style={{ padding: '6px 8px' }} title="Nächste Woche" aria-label="Nächste Woche anzeigen"><ChevronRight size={14} /></button>
               
               <div style={{ height: '16px', width: '1px', background: 'rgba(0,0,0,0.08)', margin: '0 2px' }} />
 
               <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
                 <input 
                   type="date"
+                  aria-label="Datum im Kalender auswählen"
                   value={toLocalYYYYMMDD(currentDate)}
                   onChange={(e) => {
                     if (e.target.value) {
@@ -4690,7 +4703,7 @@ export function ScheduleCalendarViewDesktop({
                     zIndex: 2
                   }}
                 />
-                <button className="apple-btn" style={{ pointerEvents: 'none' }}>
+                <button type="button" className="apple-btn" style={{ pointerEvents: 'none' }}>
                   <CalendarIcon size={13} />
                   <span>{currentDate.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })}</span>
                 </button>
@@ -4719,7 +4732,10 @@ export function ScheduleCalendarViewDesktop({
                     return (
                       <button
                         key={room.id}
+                        type="button"
                         onClick={() => setSelectedRoomIdForXRay(prev => prev === room.id ? null : room.id)}
+                        aria-label={`Röntgen-Ansicht für Raum ${room.name} filtern`}
+                        aria-pressed={isActive}
                         style={{
                           background: isActive ? primaryColor : '#ffffff',
                           color: isActive ? '#ffffff' : '#475569',
@@ -4766,6 +4782,8 @@ export function ScheduleCalendarViewDesktop({
               {/* Tausch-Modus Button (Ersetzt Vertretung) */}
               <button
                 type="button"
+                aria-label="Wochenübergreifenden Tausch-Modus umschalten"
+                aria-pressed={isSwapModeActive}
                 onClick={() => {
                   const nextActive = !isSwapModeActive;
                   setIsSwapModeActive(nextActive);
@@ -4782,7 +4800,7 @@ export function ScheduleCalendarViewDesktop({
                 {swapSourceOcc && (
                   <span style={{
                     background: '#eab308',
-                    color: '#ffffff',
+                    color: '#0f172a',
                     fontSize: '0.62rem',
                     fontWeight: 900,
                     padding: '1px 6px',
@@ -4795,6 +4813,8 @@ export function ScheduleCalendarViewDesktop({
               </button>
               <button
                 type="button"
+                aria-label="Gruppenunterricht-Modus umschalten"
+                aria-pressed={isGroupModeActive}
                 onClick={() => {
                   setIsGroupModeActive(prev => !prev);
                   setSelectedForGroup([]);
@@ -4809,6 +4829,8 @@ export function ScheduleCalendarViewDesktop({
 
               <button
                 type="button"
+                aria-label={showRealNames ? "Klarnamen schützen und Nachnamen abkürzen" : "Vollständige Schülernamen anzeigen"}
+                aria-pressed={showRealNames}
                 onClick={() => toggleRealNames()}
                 className={`apple-btn ${showRealNames ? 'active' : ''}`}
                 style={{ color: showRealNames ? brandColor : undefined }}
@@ -4820,6 +4842,8 @@ export function ScheduleCalendarViewDesktop({
 
               <button
                 type="button"
+                aria-label={isWeekendVisible ? "Wochenende ausblenden" : "Wochenende im Kalender einblenden"}
+                aria-pressed={isWeekendVisible}
                 onClick={() => setShowWeekend(prev => !prev)}
                 className={`apple-btn ${isWeekendVisible ? 'active' : ''}`}
                 style={isWeekendVisible ? { color: textAccentColor } : {}}
@@ -4835,8 +4859,10 @@ export function ScheduleCalendarViewDesktop({
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
             <div id="tour-calendar-actions" className="apple-btn-group">
               <button
+                type="button"
                 onClick={handleCopyWeek}
                 className="apple-btn"
+                aria-label="Aktive Unterrichtstermine dieser Woche kopieren"
                 title="Kopiert alle aktiven Unterrichtstermine dieser Woche"
               >
                 <Copy size={13} />
@@ -4844,8 +4870,10 @@ export function ScheduleCalendarViewDesktop({
               </button>
 
               <button
+                type="button"
                 onClick={handlePasteWeek}
                 className="apple-btn"
+                aria-label="Kopierte Unterrichtstermine in diese Woche einfügen"
                 disabled={!localStorage.getItem('groovelab_copied_week_data')}
                 title="Fügt die kopierten Unterrichtstermine in diese Woche ein (überschreibt bestehende)"
               >
@@ -4854,9 +4882,11 @@ export function ScheduleCalendarViewDesktop({
               </button>
 
               <button
+                type="button"
                 onClick={handleResetWeek}
                 className="apple-btn"
-                style={{ color: '#64748b' }}
+                aria-label="Ungespeicherte Änderungen dieser Woche verwerfen"
+                style={{ color: '#475569' }}
                 title="Alle ungespeicherten Änderungen in dieser Woche verwerfen"
               >
                 <Trash2 size={13} />
@@ -4870,6 +4900,7 @@ export function ScheduleCalendarViewDesktop({
                 type="button"
                 onClick={handleMergeSelectedOccurrences}
                 className="apple-btn active"
+                aria-label={`${selectedForGroup.length} ausgewählte Unterrichtstermine zusammenführen`}
                 style={{
                   background: '#2563eb',
                   color: '#ffffff',
@@ -4884,8 +4915,10 @@ export function ScheduleCalendarViewDesktop({
 
             {Object.keys(pendingChanges).length > 0 && (
               <button 
+                type="button"
                 onClick={savePendingChanges}
                 className="apple-btn active"
+                aria-label={`${Object.keys(pendingChanges).length} Änderungen speichern und Schüler informieren`}
                 style={{
                   background: brandColor,
                   color: '#ffffff',
@@ -7492,7 +7525,12 @@ return (
           }
 
           return (
-            <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-label="Freier Slot Details"
+              style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            >
               <div style={{ 
                 position: 'relative',
                 background: '#ffffff', 
@@ -7542,7 +7580,9 @@ return (
                   </div>
                 )}
                 <button
+                  type="button"
                   onClick={() => setEditOccState(null)}
+                  aria-label="Freier Slot Details schließen"
                   style={{
                     marginTop: '8px',
                     padding: '12px 28px',
@@ -7638,7 +7678,12 @@ return (
         const endTimeStr = minutesToTime(endMin);
 
         return (
-          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.25)', backdropFilter: 'blur(3px)', zIndex: 1000, display: 'flex', justifyContent: 'flex-end', alignItems: 'stretch' }}>
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label={modalTitle}
+            style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.25)', backdropFilter: 'blur(3px)', zIndex: 1000, display: 'flex', justifyContent: 'flex-end', alignItems: 'stretch' }}
+          >
             <style>{`
               @keyframes slideIn {
                 from { transform: translateX(100%); }
@@ -7772,6 +7817,7 @@ return (
                     <button
                       type="button"
                       onClick={() => setDocStudent(occ.student)}
+                      aria-label="Aufgabenheft und pädagogische Tools öffnen"
                       style={{
                         background: 'rgba(255, 255, 255, 0.22)',
                         color: '#ffffff',
@@ -7797,8 +7843,10 @@ return (
 
                   {/* Close Button Top Right */}
                   <button
+                    type="button"
                     onClick={() => setEditOccState(null)}
                     title="Schließen"
+                    aria-label="Termin-Drawer schließen"
                     style={{
                       background: 'rgba(255, 255, 255, 0.2)',
                       border: 'none',
@@ -8159,6 +8207,8 @@ return (
                     {!isCancelled && (
                       <div style={{ marginBottom: '16px' }}>
                         <button 
+                          type="button"
+                          aria-label={isPastDate ? 'Ausfall melden und Ersatztermin anbieten' : 'Termin ausfallen lassen und Ersatztermin vormerken'}
                           onClick={async (e) => {
                             await handleCancel(e as any, editOccState.id, occ?.student ? `${occ.student.first_name} ${maskLastName(occ.student.last_name, showRealNames)}`.trim() : undefined);
                             setEditOccState(null);
@@ -8193,6 +8243,8 @@ return (
                     <div>
                       {canDiscard && (
                         <button 
+                          type="button"
+                          aria-label="Termin auf regulären Stammtermin zurücksetzen"
                           onClick={async () => {
                             if (!editOccState.id.startsWith('mock-')) {
                               try {
@@ -8273,13 +8325,17 @@ return (
 
                     <div style={{ display: 'flex', gap: '8px' }}>
                       <button 
+                        type="button"
                         onClick={() => setEditOccState(null)} 
+                        aria-label="Terminbearbeitung abbrechen"
                         style={{ padding: '9px 16px', borderRadius: '100px', border: 'none', background: 'rgba(0,0,0,0.05)', color: '#1d1d1f', fontWeight: 600, cursor: 'pointer', fontSize: '0.8rem' }}
                       >
                         Abbrechen
                       </button>
                       <button 
+                        type="button"
                         onClick={handleSaveEdit} 
+                        aria-label="Terminänderungen speichern"
                         style={{ padding: '9px 16px', borderRadius: '100px', border: 'none', background: isEnsembleOcc ? '#007aff' : '#34a853', color: 'white', fontWeight: 700, cursor: 'pointer', fontSize: '0.8rem' }}
                       >
                         Speichern
@@ -8311,186 +8367,59 @@ return (
                         marginBottom: '16px',
                         boxShadow: '0 4px 14px rgba(52, 168, 83, 0.2)'
                       }}>
-                        <div>
-                          <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <MessageSquare size={18} color="#ffffff" />
-                            <span>Termin-Shoutbox</span>
-                            {isFrozen && <Lock size={14} color="#ffffff" />}
-                          </h4>
-                          <p style={{ margin: '3px 0 0 0', fontSize: '0.75rem', color: 'rgba(255, 255, 255, 0.9)', fontWeight: 600 }}>
-                            Termingekoppelte Direktnachrichten mit {occ.student?.first_name || 'Schüler'}
-                          </p>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <MessageSquare size={18} color="#ffffff" />
+                          <div>
+                            <div style={{ fontSize: '0.92rem', fontWeight: 800, color: '#ffffff' }}>Termin-Shoutbox</div>
+                            <div style={{ fontSize: '0.72rem', color: 'rgba(255, 255, 255, 0.85)', fontWeight: 500 }}>
+                              {isFrozen ? 'Eingefroren (48h nach Unterricht abgelaufen)' : 'Direkt mit Schüler / Eltern synchronisiert'}
+                            </div>
+                          </div>
                         </div>
-                        
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0, whiteSpace: 'nowrap' }}>
-                          <span style={{
-                            padding: '4px 9px',
-                            borderRadius: '8px',
-                            background: 'rgba(255, 255, 255, 0.22)',
-                            color: '#ffffff',
-                            fontSize: '0.65rem',
-                            fontWeight: 700,
-                            border: '1px solid rgba(255, 255, 255, 0.35)',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '4px',
-                            backdropFilter: 'blur(4px)',
-                            whiteSpace: 'nowrap'
-                          }}>
-                            <CalendarIcon size={11} color="#ffffff" />
-                            <span>Termingekoppelt</span>
-                          </span>
-                          <span style={{
-                            padding: '4px 9px',
-                            borderRadius: '8px',
-                            background: 'rgba(255, 255, 255, 0.22)',
-                            color: '#ffffff',
-                            fontSize: '0.65rem',
-                            fontWeight: 700,
-                            border: '1px solid rgba(255, 255, 255, 0.35)',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '4px',
-                            backdropFilter: 'blur(4px)',
-                            whiteSpace: 'nowrap'
-                          }}>
-                            <ShieldCheck size={12} color="#ffffff" />
-                            <span>DSGVO-konform • TLS 1.3</span>
-                          </span>
-                        </div>
-                      </div>
-
-                      {isMoved && (
-                        <div style={{ marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px', background: '#fffbeb', border: '1px solid #fef3c7', padding: '6px 12px', borderRadius: '100px', alignSelf: 'flex-start' }}>
-                          <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#b45309', textTransform: 'uppercase' }}>Regulär:</span>
-                          <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#92400e' }}>
-                            {new Date(occ.original_date!).toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' })}, {occ.original_start_time ? occ.original_start_time.substring(0, 5) : ''} Uhr
-                          </span>
-                        </div>
-                      )}
-
-                      {/* Chat Messages Viewport */}
-                      <div 
-                        ref={chatViewportRef} 
-                        style={{ 
-                          flex: 1, 
-                          overflowY: 'auto', 
-                          display: 'flex', 
-                          flexDirection: 'column', 
-                          gap: '10px', 
-                          marginBottom: '12px', 
-                          padding: '14px', 
-                          background: '#f8fafc', 
-                          borderRadius: '16px',
-                          border: '1px solid #e2e8f0',
-                          minHeight: '260px',
-                          maxHeight: '440px'
-                        }}
-                      >
                         {isFrozen && (
-                          <div style={{ background: '#fef2f2', border: '1px solid #fee2e2', color: '#991b1b', padding: '8px 12px', borderRadius: '100px', fontSize: '0.75rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px', textAlign: 'center', justifyContent: 'center' }}>
-                            🔒 Shoutbox nach 48h eingefroren (Schreibschutz aktiv)
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(0,0,0,0.2)', padding: '4px 8px', borderRadius: '6px', fontSize: '0.68rem', fontWeight: 700 }}>
+                            <Lock size={12} /> Archiviert
                           </div>
                         )}
-                        {(() => {
-                          const deduplicatedMessages: any[] = [];
-                          const seenMessages = new Set<string>();
-                          chatMessages.forEach(msg => {
-                            const timeKey = new Date(msg.created_at).toISOString().substring(0, 16);
-                            const key = `${msg.sender_id}_${timeKey}_${msg.content}`;
-                            if (!seenMessages.has(key)) {
-                              seenMessages.add(key);
-                              deduplicatedMessages.push(msg);
-                            }
-                          });
+                      </div>
 
-                          if (deduplicatedMessages.length === 0) {
+                      {/* Chat Messages Timeline */}
+                      <div style={{
+                        flex: 1,
+                        overflowY: 'auto',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '10px',
+                        paddingRight: '6px',
+                        marginBottom: '14px'
+                      }}>
+                        {(() => {
+                          const chatMsgs = (chatMessages || []);
+                          if (chatMsgs.length === 0) {
                             return (
-                              <div style={{
-                                flex: 1,
-                                display: 'flex',
-                                flexDirection: 'column',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                padding: '24px 16px',
-                                textAlign: 'center',
-                                background: 'linear-gradient(185deg, #ffffff 0%, #f8fafc 100%)',
-                                borderRadius: '14px',
-                                border: '1px dashed #cbd5e1',
-                                margin: 'auto 0'
-                              }}>
-                                <div style={{
-                                  width: '46px',
-                                  height: '46px',
-                                  borderRadius: '14px',
-                                  background: '#e6f4ea',
-                                  color: '#34a853',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  marginBottom: '10px',
-                                  boxShadow: '0 4px 12px rgba(52, 168, 83, 0.12)'
-                                }}>
-                                  <CalendarIcon size={22} />
-                                </div>
-                                <h5 style={{ margin: '0 0 4px 0', fontSize: '0.9rem', fontWeight: 800, color: '#0f172a' }}>
-                                  Termingekoppelter Schulchat
-                                </h5>
-                                <p style={{ margin: 0, fontSize: '0.76rem', color: '#64748b', lineHeight: 1.4, maxWidth: '240px' }}>
-                                  Geschützte Direktnachrichten für diesen Unterrichtstermin – DSGVO- &amp; datenschutzkonform.
-                                </p>
+                              <div style={{ textAlign: 'center', color: '#94a3b8', fontSize: '0.78rem', margin: 'auto 0', fontStyle: 'italic' }}>
+                                Noch keine Nachrichten für diesen Termin vorhanden.
                               </div>
                             );
                           }
-
-                          return deduplicatedMessages.map((msg, idx) => {
+                          return chatMsgs.map((msg: any, idx: number) => {
                             const isMe = msg.sender_id === userId;
-                            const isTerminMsg = msg.content.startsWith('[Termin');
                             let displayedContent = msg.content;
                             let prefixText = '';
-                            if (isTerminMsg) {
+                            if (msg.content && msg.content.startsWith('[')) {
                               const closeBracketIdx = msg.content.indexOf(']');
                               if (closeBracketIdx !== -1) {
                                 prefixText = msg.content.substring(1, closeBracketIdx);
                                 displayedContent = msg.content.substring(closeBracketIdx + 1).trim();
                               }
                             }
-
-                            const senderStudent = uniqueGroupOccs.find(o => o.student_id === msg.sender_id)?.student;
-                            const senderName = senderStudent ? `${senderStudent.first_name} ${maskLastName(senderStudent.last_name, showRealNames)}` : (occ.student?.first_name || 'Schüler');
-
+                            
                             return (
-                              <div key={msg.id || idx} style={{ display: 'flex', flexDirection: 'column', alignSelf: isMe ? 'flex-end' : 'flex-start', maxWidth: '82%', textAlign: 'left' }}>
-                                {!isMe && (
-                                  <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#34a853', marginBottom: '2px', marginLeft: '6px' }}>
-                                    {senderName}
-                                  </span>
-                                )}
-                                {prefixText && (
-                                  <span style={{ fontSize: '0.65rem', color: '#64748b', marginBottom: '2px', alignSelf: isMe ? 'flex-end' : 'flex-start', fontWeight: 600 }}>
-                                    📅 {prefixText}
-                                  </span>
-                                )}
-                                <div style={{ 
-                                  background: isMe ? '#e6f4ea' : '#ffffff', 
-                                  color: '#0f172a', 
-                                  padding: '9px 13px', 
-                                  borderRadius: isMe ? '14px 14px 2px 14px' : '14px 14px 14px 2px', 
-                                  fontSize: '0.84rem',
-                                  lineHeight: 1.4,
-                                  wordBreak: 'break-word',
-                                  boxShadow: '0 1px 2px rgba(0,0,0,0.06)',
-                                  border: isMe ? '1px solid #a7f3d0' : '1px solid #e2e8f0'
-                                }}>
-                                  {displayedContent}
-                                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '4px', marginTop: '4px' }}>
-                                    <span style={{ fontSize: '0.62rem', color: isMe ? '#34a853' : '#64748b', fontWeight: 600 }}>
-                                      {new Date(msg.created_at).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })}, {new Date(msg.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}
-                                    </span>
-                                    {isMe && <CheckCheck size={14} color="#34a853" style={{ marginLeft: '2px' }} />}
+                               <div key={msg.id || idx} style={{ alignSelf: isMe ? 'flex-end' : 'flex-start' }}>
+                                  <div style={{ background: isMe ? '#e6f4ea' : '#f1f5f9', padding: '8px 12px', borderRadius: '12px', fontSize: '0.8rem' }}>
+                                    {displayedContent}
                                   </div>
-                                </div>
-                              </div>
+                               </div>
                             );
                           });
                         })()}
@@ -8512,6 +8441,7 @@ return (
                               key={i}
                               type="button"
                               onClick={() => setChatTypedMessage(text)}
+                              aria-label={`Schnellantwort: ${text}`}
                               style={{
                                 padding: '5px 10px',
                                 borderRadius: '16px',
@@ -8540,6 +8470,7 @@ return (
                           disabled={isFrozen}
                           value={chatTypedMessage}
                           onChange={e => setChatTypedMessage(e.target.value)}
+                          aria-label="Nachricht an Schüler schreiben"
                           style={{ 
                             flex: 1, 
                             padding: '12px 20px', 
@@ -8556,6 +8487,7 @@ return (
                         <button 
                           type="submit" 
                           disabled={isFrozen || !chatTypedMessage.trim()} 
+                          aria-label="Nachricht absenden"
                           style={{ 
                             background: isFrozen || !chatTypedMessage.trim() ? '#dbe3ea' : (isEnsembleOcc ? '#007aff' : '#34a853'), 
                             color: 'white', 
@@ -8607,7 +8539,12 @@ return (
       
       {/* Cancelled Lesson Swap Confirmation Dialog */}
       {swapConfirmState && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Termintausch mit abgesagtem Termin"
+          style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+        >
           <div style={{ background: 'white', padding: '24px', borderRadius: '20px', boxShadow: '0 20px 40px rgba(0,0,0,0.15)', width: '480px', maxWidth: '90vw', border: '1px solid rgba(255,255,255,0.5)', boxSizing: 'border-box' }}>
             <h3 style={{ marginTop: 0, marginBottom: '16px', fontSize: '1.2rem', fontWeight: 800, color: '#1e293b' }}>
               Termintausch mit abgesagtem Termin
@@ -8621,6 +8558,8 @@ return (
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <button 
+                type="button"
+                aria-label="Neuen Alternativtermin anbieten (Vollständiger Tausch)"
                 onClick={() => {
                   // Perform a complete swap, keeping both active. Proposes target student the old time slot of the source student.
                   moveOccurrenceOrGroup(swapConfirmState.sourceId, { 
@@ -8642,6 +8581,8 @@ return (
               </button>
 
               <button 
+                type="button"
+                aria-label="Termin abgesagt lassen (Nur aktiven Schüler verschieben)"
                 onClick={() => {
                   // Reschedule the active student, but keep the cancelled student cancelled.
                   // Active student goes to the new slot.
@@ -8664,8 +8605,10 @@ return (
               </button>
 
               <button 
+                type="button"
+                aria-label="Tausch abbrechen"
                 onClick={() => setSwapConfirmState(null)}
-                style={{ width: '100%', padding: '10px', borderRadius: '10px', border: 'none', background: 'transparent', color: '#64748b', fontWeight: 600, cursor: 'pointer', fontSize: '0.85rem', marginTop: '4px' }}
+                style={{ width: '100%', padding: '10px', borderRadius: '10px', border: 'none', background: 'transparent', color: '#475569', fontWeight: 600, cursor: 'pointer', fontSize: '0.85rem', marginTop: '4px' }}
               >
                 Tausch abbrechen
               </button>
@@ -8687,7 +8630,12 @@ return (
         const tgtName = `${targetOcc.student?.first_name || ''} ${maskLastName(targetOcc.student?.last_name, showRealNames)}`.trim() || 'Schüler';
 
         return (
-          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)', zIndex: 100000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Termine zusammenführen oder tauschen"
+            style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)', zIndex: 100000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          >
             <div style={{ 
               background: '#ffffff', 
               padding: '28px', 
@@ -8711,6 +8659,8 @@ return (
               
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', width: '100%', marginTop: '8px' }}>
                 <button
+                  type="button"
+                  aria-label="Termine tauschen"
                   onClick={async () => {
                     const { sourceId, targetId } = dropDecisionState;
                     setDropDecisionState(null);
@@ -8736,6 +8686,8 @@ return (
                 </button>
 
                 <button
+                  type="button"
+                  aria-label="Termine zusammenführen zu Ensemble- oder Band-Gruppe"
                   onClick={async () => {
                     const targetRoomId = targetOcc.schedules?.room_id || null;
                     const isSourceGroup = occurrences.some(o => 
@@ -8795,6 +8747,8 @@ return (
                 </button>
 
                 <button
+                  type="button"
+                  aria-label="Vorgang abbrechen"
                   onClick={() => {
                     setDropDecisionState(null);
                   }}
@@ -8804,14 +8758,14 @@ return (
                     borderRadius: '12px',
                     border: 'none',
                     background: 'transparent',
-                    color: '#86868b',
+                    color: '#475569',
                     fontSize: '0.85rem',
                     fontWeight: 600,
                     cursor: 'pointer',
                     transition: 'all 0.2s'
                   }}
                   onMouseOver={e => e.currentTarget.style.color = '#ef4444'}
-                  onMouseOut={e => e.currentTarget.style.color = '#86868b'}
+                  onMouseOut={e => e.currentTarget.style.color = '#475569'}
                 >
                   Abbrechen
                 </button>
@@ -8925,6 +8879,7 @@ return (
                 <button
                   type="button"
                   onClick={() => setSwapDetailModalOcc(null)}
+                  aria-label="Termintausch Details schließen"
                   style={{
                     background: 'rgba(0,0,0,0.05)',
                     border: 'none',
@@ -8989,7 +8944,7 @@ return (
                     height: '24px', 
                     borderRadius: '50%', 
                     background: '#eab308', 
-                    color: '#ffffff',
+                    color: '#0f172a',
                     display: 'flex', 
                     alignItems: 'center', 
                     justifyContent: 'center',
@@ -9060,6 +9015,7 @@ return (
               <button
                 type="button"
                 onClick={() => setSwapDetailModalOcc(null)}
+                aria-label="Termintausch Details schließen"
                 style={{
                   width: '100%',
                   padding: '11px 20px',

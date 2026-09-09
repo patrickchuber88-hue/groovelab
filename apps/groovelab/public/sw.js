@@ -192,8 +192,13 @@ self.addEventListener('fetch', function(event) {
     return;
   }
 
-  // Skip API/Supabase internal traffic
-  if (url.pathname.includes('/rest/v1/') || url.pathname.includes('/functions/v1/')) {
+  // Skip API/Supabase internal traffic, auth endpoints, and cloud storage media (Quota & Memory Shield)
+  if (
+    url.pathname.includes('/rest/v1/') ||
+    url.pathname.includes('/functions/v1/') ||
+    url.pathname.includes('/auth/v1/') ||
+    url.pathname.includes('/storage/v1/')
+  ) {
     return;
   }
 
@@ -250,6 +255,14 @@ self.addEventListener('fetch', function(event) {
         });
       })
     );
+    return;
+  }
+
+  // Skip audio/video media streams or range requests to prevent Cache API QuotaExceededError
+  if (
+    event.request.headers.get('range') ||
+    /\.(mp3|wav|ogg|m4a|webm|mp4|aac|flac)$/i.test(url.pathname)
+  ) {
     return;
   }
 

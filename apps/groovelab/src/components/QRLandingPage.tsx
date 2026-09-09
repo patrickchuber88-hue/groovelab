@@ -11,6 +11,7 @@ import { CampusAppointmentShoutboxModal } from './CampusAppointmentShoutboxModal
 import { useMasterPricing } from '../context/MasterPricingContext';
 import { computeGroundTruthMetrics, broadcastPracticeUpdate, DEFAULT_FOKUS_LEVELS, getEngineEffectiveLevel, getEngineTargetMinutes, getEngineFlameCategory } from '../utils/studentProgressEngine';
 import { ParentCampusActivationModal } from './ParentCampusActivationModal';
+import { LegalTextModal } from './LegalTextModal';
 import { validateHandoverUrl } from '../utils/cryptoAuth';
 import { registerClientSessionLease } from '../utils/sessionLeaseManager';
 import { setVaultItem } from '../utils/aesStorageVault';
@@ -306,6 +307,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
   const [showParentAgb, setShowParentAgb] = useState(false);
   const [showPrivacy, setShowPrivacy] = useState(false);
   const [showActivationInfoModal, setShowActivationInfoModal] = useState(false);
+  const [legalModalTab, setLegalModalTab] = useState<'impressum' | 'privacy' | 'terms' | 'cancellation' | 'accessibility' | null>(null);
 
   // Biometrics Onboarding Modal State
   const [showBiometricsModal, setShowBiometricsModal] = useState(false);
@@ -499,6 +501,13 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
   const [savePinInput, setSavePinInput] = useState('');
   const [savePinError, setSavePinError] = useState<string | null>(null);
   const [savePinLoading, setSavePinLoading] = useState(false);
+
+  // 1:1 Parent-Teacher Chat States (WhatsApp-Ablösung im Elternbereich)
+  const [parentActiveSection, setParentActiveSection] = useState<'chat' | 'settings'>('chat');
+  const [parentChatMessages, setParentChatMessages] = useState<any[]>([]);
+  const [parentTypedMessage, setParentTypedMessage] = useState('');
+  const [isSendingParentMessage, setIsSendingParentMessage] = useState(false);
+  const parentChatEndRef = useRef<HTMLDivElement>(null);
 
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const showToastMsg = (message: string, type: 'success' | 'error' = 'success') => {
@@ -1755,7 +1764,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           .eq('school_id', profile.school_id),
         supabase
           .from('users')
-          .select('id, first_name, last_name, planned_boards, campus_räume, groovelab_räume')
+          .select('id, first_name, last_name, photo_url, avatar_url, instrument, planned_boards, campus_räume, groovelab_räume')
           .eq('school_id', profile.school_id)
           .eq('role', 'teacher'),
         supabase
@@ -3476,6 +3485,95 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
     await sendDirectChatMessage(messageContent);
   };
 
+  // ── 1:1 Eltern-Lehrer-Chat (WhatsApp-Ablösung im Elternbereich) ──────────────
+  const assignedTeacher = useMemo(() => {
+    return teachers.find(t => t.id === profile?.teacher_id) || teachers[0] || null;
+  }, [teachers, profile?.teacher_id]);
+
+  const fetchParentChatMessages = useCallback(async () => {
+    if (!profile?.id || !assignedTeacher?.id) return;
+    try {
+      const studentId = profile.id;
+      const teacherId = assignedTeacher.id;
+      const { data, error } = await supabase
+        .from('campus_direct_messages')
+        .select('*')
+        .or(`and(sender_id.eq.${studentId},recipient_id.eq.${teacherId}),and(sender_id.eq.${teacherId},recipient_id.eq.${studentId})`)
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+      if (data) {
+        setParentChatMessages(data);
+        setTimeout(() => parentChatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
+      }
+    } catch (err) {
+      console.warn('[QRLanding] Error fetching parent chat:', err);
+    }
+  }, [profile?.id, assignedTeacher?.id]);
+
+  useEffect(() => {
+    if (!parentUnlocked || parentActiveSection !== 'chat' || !profile?.id || !assignedTeacher?.id) return;
+    fetchParentChatMessages();
+
+    const channel = supabase
+      .channel(`parent_direct_chat_${profile.id}_${assignedTeacher.id}`)
+      .on('postgres_changes', {
+        schema: 'public',
+        event: '*',
+        table: 'campus_direct_messages'
+      }, () => {
+        fetchParentChatMessages();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [parentUnlocked, parentActiveSection, profile?.id, assignedTeacher?.id, fetchParentChatMessages]);
+
+  const handleSendParentMessage = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!parentTypedMessage.trim() || !profile?.id || !assignedTeacher?.id || isSendingParentMessage) return;
+
+    const studentId = profile.id;
+    const teacherId = assignedTeacher.id;
+    const content = parentTypedMessage.trim();
+
+    setIsSendingParentMessage(true);
+    const optimisticMsg = {
+      id: `temp-${Date.now()}`,
+      sender_id: studentId,
+      recipient_id: teacherId,
+      school_id: profile.school_id,
+      content,
+      sender_role: 'parent',
+      recipient_role: 'teacher',
+      is_read: false,
+      created_at: new Date().toISOString()
+    };
+    setParentChatMessages(prev => [...prev, optimisticMsg]);
+    setParentTypedMessage('');
+    setTimeout(() => parentChatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 40);
+
+    try {
+      const { error } = await supabase.from('campus_direct_messages').insert({
+        sender_id: studentId,
+        recipient_id: teacherId,
+        school_id: profile.school_id,
+        content,
+        sender_role: 'parent',
+        recipient_role: 'teacher',
+        is_read: false
+      });
+      if (error) throw error;
+      await fetchParentChatMessages();
+    } catch (err) {
+      console.error('[QRLanding] Error sending parent message:', err);
+    } finally {
+      setIsSendingParentMessage(false);
+    }
+  };
+
   const handleCancelOccurrence = async (occ: any) => {
     try {
       const timePart = occ.start_time?.includes(':') ? occ.start_time : `${occ.start_time || '00'}:00`;
@@ -4201,7 +4299,8 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
     const pastOccurrences = sortedOccurrences.filter(occ => occ.date < todayStr);
 
     const isCampusActive = profile?.is_campus_active === true;
-    const upcomingOccurrences = isCampusActive ? allUpcomingOccurrences : allUpcomingOccurrences.slice(0, 4);
+    // Alle Termine des Schuljahres sind kostenfrei auf der QR-Landingpage sichtbar
+    const upcomingOccurrences = allUpcomingOccurrences;
 
     if (sortedOccurrences.length === 0) {
       return (
@@ -4840,6 +4939,27 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
               })}
             </div>
           )}
+
+          {/* Legal Botenstatus Disclaimer for appointments & cancellations */}
+          <div style={{
+            fontSize: '0.66rem',
+            color: '#64748b',
+            lineHeight: 1.45,
+            padding: '8px 12px',
+            background: 'rgba(241, 245, 249, 0.75)',
+            borderRadius: '12px',
+            border: '1px solid #e2e8f0',
+            marginTop: '8px',
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: '6px',
+            textAlign: 'left'
+          }}>
+            <span style={{ color: '#34a853', flexShrink: 0, marginTop: '1px' }}>🛡️</span>
+            <span>
+              <strong>Hinweis:</strong> Mitteilungen und Terminabsagen über diese Ansicht werden als elektronische Nachricht an die Lehrkraft übermittelt (Botenfunktion). Gebühren- und Nachholansprüche richten sich ausschließlich nach der Schul- und Entgeltordnung Ihrer Musikschule.
+            </span>
+          </div>
         </div>
       );
     };
@@ -6569,7 +6689,331 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           </button>
         </div>
 
-        {/* 🎨 Campus UI Design Switcher (Junior, Teen, +16) */}
+        {/* 🎛️ Segmented Sub-Tab Switcher: 1:1 Chat vs. Rechte */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: '1fr 1fr',
+          gap: '6px',
+          background: '#f1f5f9',
+          padding: '4px',
+          borderRadius: '16px',
+          width: '100%',
+          boxSizing: 'border-box'
+        }}>
+          <button
+            type="button"
+            onClick={() => setParentActiveSection('chat')}
+            style={{
+              padding: '10px 14px',
+              borderRadius: '12px',
+              border: 'none',
+              background: parentActiveSection === 'chat' ? '#ffffff' : 'transparent',
+              color: parentActiveSection === 'chat' ? '#0284c7' : '#64748b',
+              fontWeight: parentActiveSection === 'chat' ? 850 : 650,
+              fontSize: '0.84rem',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              boxShadow: parentActiveSection === 'chat' ? '0 2px 8px rgba(0,0,0,0.06)' : 'none',
+              transition: 'all 0.15s ease'
+            }}
+          >
+            <MessageSquare size={16} />
+            <span>1:1 Lehrer-Chat</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setParentActiveSection('settings')}
+            style={{
+              padding: '10px 14px',
+              borderRadius: '12px',
+              border: 'none',
+              background: parentActiveSection === 'settings' ? '#ffffff' : 'transparent',
+              color: parentActiveSection === 'settings' ? '#0284c7' : '#64748b',
+              fontWeight: parentActiveSection === 'settings' ? 850 : 650,
+              fontSize: '0.84rem',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              boxShadow: parentActiveSection === 'settings' ? '0 2px 8px rgba(0,0,0,0.06)' : 'none',
+              transition: 'all 0.15s ease'
+            }}
+          >
+            <Settings size={16} />
+            <span>Rechte &amp; Freigaben</span>
+          </button>
+        </div>
+
+        {/* 💬 TAB 1: 1:1 LEHRER-CHAT (WHATSAPP-ABLÖSUNG) */}
+        {parentActiveSection === 'chat' && (
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '12px',
+            width: '100%',
+            boxSizing: 'border-box'
+          }}>
+            {/* Teacher Hero Header */}
+            <div style={{
+              background: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              borderRadius: '18px',
+              padding: '14px 16px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '12px',
+              flexWrap: 'wrap'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{
+                  width: '44px',
+                  height: '44px',
+                  borderRadius: '50%',
+                  background: '#e0f2fe',
+                  color: '#0284c7',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontWeight: 900,
+                  fontSize: '1rem',
+                  overflow: 'hidden',
+                  flexShrink: 0,
+                  border: '2px solid #bae6fd'
+                }}>
+                  {assignedTeacher?.photo_url ? (
+                    <img src={assignedTeacher.photo_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  ) : (
+                    <User size={22} />
+                  )}
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.94rem', fontWeight: 900, color: '#0f172a' }}>
+                    {assignedTeacher ? `${assignedTeacher.first_name || ''} ${assignedTeacher.last_name || ''}`.trim() : 'Deine Lehrkraft'}
+                  </div>
+                  <div style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span>{profile?.instrument ? `Fach: ${profile.instrument}` : 'Fachunterricht'}</span>
+                    <span>•</span>
+                    <span style={{ color: '#059669', fontWeight: 700 }}>Offizieller Schulkanal</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Verified Parent Pill */}
+              <div style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
+                padding: '3px 8px',
+                borderRadius: '6px',
+                background: '#eff6ff',
+                border: '1px solid #dbeafe',
+                color: '#1d4ed8',
+                fontSize: '0.68rem',
+                fontWeight: 800
+              }}>
+                <ShieldCheck size={12} color="#1d4ed8" strokeWidth={2.5} />
+                <span>Eltern-Kanal</span>
+              </div>
+            </div>
+
+            {/* Message Stream */}
+            <div style={{
+              background: '#fafbfc',
+              border: '1px solid #e2e8f0',
+              borderRadius: '18px',
+              padding: '16px',
+              maxHeight: '360px',
+              minHeight: '200px',
+              overflowY: 'auto',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '12px'
+            }} className="custom-scrollbar">
+              {parentChatMessages.length === 0 ? (
+                <div style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: '32px 16px',
+                  color: '#64748b',
+                  textAlign: 'center',
+                  gap: '8px',
+                  margin: 'auto 0'
+                }}>
+                  <div style={{
+                    width: '44px',
+                    height: '44px',
+                    borderRadius: '14px',
+                    background: '#e0f2fe',
+                    color: '#0284c7',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}>
+                    <MessageSquare size={22} />
+                  </div>
+                  <div style={{ fontSize: '0.88rem', fontWeight: 850, color: '#0f172a' }}>
+                    Direkte Eltern-Lehrer-Kommunikation
+                  </div>
+                  <div style={{ fontSize: '0.74rem', color: '#64748b', maxWidth: '280px', lineHeight: 1.4 }}>
+                    Schreibe {assignedTeacher ? assignedTeacher.first_name : 'deiner Lehrkraft'} eine Nachricht zu Krankmeldungen, Unterrichtsfragen oder Feedback.
+                  </div>
+                </div>
+              ) : (
+                parentChatMessages.map((msg, idx) => {
+                  const isMe = msg.sender_id === profile?.id;
+                  const isParent = msg.sender_role === 'parent';
+
+                  return (
+                    <div
+                      key={msg.id || idx}
+                      style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignSelf: isMe ? 'flex-end' : 'flex-start',
+                        maxWidth: '84%',
+                        alignItems: isMe ? 'flex-end' : 'flex-start',
+                        gap: '2px'
+                      }}
+                    >
+                      {/* Sender Name & Parent Badge */}
+                      <div style={{
+                        fontSize: '0.70rem',
+                        fontWeight: 800,
+                        color: isMe ? '#1d4ed8' : '#0284c7',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        marginBottom: '2px',
+                        marginLeft: isMe ? '0' : '4px',
+                        marginRight: isMe ? '4px' : '0'
+                      }}>
+                        <span>{isMe ? 'Du (Erziehungsberechtigte/r)' : (assignedTeacher?.first_name ? `${assignedTeacher.first_name} ${assignedTeacher.last_name || ''}` : 'Lehrkraft')}</span>
+                        {isParent && (
+                          <span style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '3px',
+                            padding: '1px 5px',
+                            borderRadius: '5px',
+                            background: '#eff6ff',
+                            border: '1px solid #dbeafe',
+                            color: '#1d4ed8',
+                            fontSize: '0.62rem',
+                            fontWeight: 800,
+                            lineHeight: 1
+                          }}>
+                            <ShieldCheck size={10} color="#1d4ed8" strokeWidth={2.5} />
+                            <span>Eltern</span>
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Bubble */}
+                      <div style={{
+                        padding: '11px 15px',
+                        borderRadius: isMe ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
+                        background: isMe ? 'linear-gradient(135deg, #15803d 0%, #16a34a 100%)' : '#ffffff',
+                        color: isMe ? '#ffffff' : '#0f172a',
+                        border: isMe ? 'none' : '1px solid #e2e8f0',
+                        fontSize: '0.88rem',
+                        lineHeight: 1.45,
+                        wordBreak: 'break-word',
+                        boxShadow: isMe ? '0 2px 8px rgba(21, 128, 61, 0.2)' : '0 1px 4px rgba(0,0,0,0.03)'
+                      }}>
+                        {msg.content}
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'flex-end',
+                          gap: '4px',
+                          marginTop: '4px',
+                          fontSize: '0.68rem',
+                          color: isMe ? 'rgba(255,255,255,0.85)' : '#94a3b8',
+                          fontWeight: 600
+                        }}>
+                          <span>
+                            {new Date(msg.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Uhr
+                          </span>
+                          {isMe && <CheckCheck size={12} color="#ffffff" />}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+              <div ref={parentChatEndRef} />
+            </div>
+
+            {/* Input / Composer */}
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleSendParentMessage();
+              }}
+              style={{
+                display: 'flex',
+                gap: '8px',
+                width: '100%',
+                boxSizing: 'border-box'
+              }}
+            >
+              <input
+                type="text"
+                placeholder={assignedTeacher ? `Nachricht an ${assignedTeacher.first_name}...` : 'Nachricht an die Lehrkraft...'}
+                value={parentTypedMessage}
+                onChange={(e) => setParentTypedMessage(e.target.value)}
+                disabled={isSendingParentMessage}
+                style={{
+                  flex: 1,
+                  padding: '11px 14px',
+                  borderRadius: '14px',
+                  border: '1.5px solid #cbd5e1',
+                  background: '#ffffff',
+                  fontSize: '0.85rem',
+                  fontWeight: 600,
+                  outline: 'none',
+                  color: '#0f172a',
+                  boxSizing: 'border-box'
+                }}
+                className="focus-ring"
+              />
+              <button
+                type="submit"
+                disabled={isSendingParentMessage || !parentTypedMessage.trim()}
+                style={{
+                  padding: '11px 16px',
+                  borderRadius: '14px',
+                  border: 'none',
+                  background: parentTypedMessage.trim() ? '#15803d' : '#e2e8f0',
+                  color: parentTypedMessage.trim() ? '#ffffff' : '#94a3b8',
+                  fontSize: '0.84rem',
+                  fontWeight: 800,
+                  cursor: parentTypedMessage.trim() ? 'pointer' : 'not-allowed',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  boxShadow: parentTypedMessage.trim() ? '0 3px 10px rgba(21, 128, 61, 0.25)' : 'none',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                <Send size={15} />
+                <span>Senden</span>
+              </button>
+            </form>
+          </div>
+        )}
+
+        {/* ⚙️ TAB 2: RECHTE & EINSTELLUNGEN */}
+        {parentActiveSection === 'settings' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', width: '100%' }}>
+            {/* 🎨 Campus UI Design Switcher (Junior, Teen, +16) */}
         <div style={{
           display: 'flex',
           flexDirection: 'column',
@@ -6794,6 +7238,9 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
             </div>
           </div>
         )}
+
+        </div>
+      )}
 
         {/* 🔢 Step-Up PIN Modal Dialog */}
         {showSavePinModal && (
@@ -8403,11 +8850,21 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           <ParentCampusActivationModal
             student={profile}
             schoolData={schoolData}
+            isParentUnlocked={parentUnlocked}
             onClose={() => setShowGiroCodeModal(false)}
             onPaymentSubmitted={() => {
               setAgreedToTerms(true);
               handleActivateContract();
             }}
+          />
+        )}
+
+        {/* Legal Modal (Impressum, Datenschutz, AGB, Widerruf, Barrierefreiheit) */}
+        {legalModalTab && (
+          <LegalTextModal
+            isOpen={Boolean(legalModalTab)}
+            onClose={() => setLegalModalTab(null)}
+            initialTab={legalModalTab}
           />
         )}
       </div>
@@ -8823,11 +9280,35 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                   Abmelden
                 </button>
               </div>
+
+              {/* Legal Footer Links (Impressum, Datenschutz, AGB) */}
+              <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', fontSize: '0.62rem', color: '#64748b', marginTop: '6px' }}>
+                <button type="button" onClick={() => setLegalModalTab('impressum')} style={{ background: 'none', border: 'none', padding: 0, color: '#64748b', textDecoration: 'underline', cursor: 'pointer', fontSize: 'inherit' }}>
+                  Impressum
+                </button>
+                <span>·</span>
+                <button type="button" onClick={() => setLegalModalTab('privacy')} style={{ background: 'none', border: 'none', padding: 0, color: '#64748b', textDecoration: 'underline', cursor: 'pointer', fontSize: 'inherit' }}>
+                  Datenschutz
+                </button>
+                <span>·</span>
+                <button type="button" onClick={() => setLegalModalTab('terms')} style={{ background: 'none', border: 'none', padding: 0, color: '#64748b', textDecoration: 'underline', cursor: 'pointer', fontSize: 'inherit' }}>
+                  AGB
+                </button>
+              </div>
             </div>
 
             {/* Bottom Spectrum Stripe */}
             <div style={{ height: '8px', width: '100%', background: spectrumGradient, flexShrink: 0 }} />
           </div>
+
+          {/* Legal Modal (Impressum, Datenschutz, AGB, Widerruf, Barrierefreiheit) */}
+          {legalModalTab && (
+            <LegalTextModal
+              isOpen={Boolean(legalModalTab)}
+              onClose={() => setLegalModalTab(null)}
+              initialTab={legalModalTab}
+            />
+          )}
         </div>
       );
     }
@@ -10825,27 +11306,46 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
             {profile.is_campus_active || profile.is_groovelab_active || profile.app_usage_mode === 'parent_hybrid' || profile.is_pin_activated ? (
               <div style={{
                 margin: '4px 16px 12px 16px',
-                padding: '8px 12px',
-                borderRadius: '12px',
+                padding: '10px 14px',
+                borderRadius: '16px',
                 background: '#e6f4ea',
                 border: '1px solid #ceead6',
                 display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
+                flexDirection: 'column',
                 gap: '6px',
                 fontSize: '0.66rem',
-                fontWeight: 800,
-                color: '#137333'
+                fontWeight: 600,
+                color: '#137333',
+                textAlign: 'left'
               }}>
-                <ShieldCheck size={14} color="#34a853" />
-                <span>Vollzugriff aktiv (TLS 1.3 transportverschlüsselt & AES-256 datenbankgeschützt gem. DSGVO Art. 6 Abs. 1 lit. b)</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 800 }}>
+                  <ShieldCheck size={14} color="#34a853" style={{ flexShrink: 0 }} />
+                  <span>Vollzugriff aktiv (TLS 1.3 transportverschlüsselt &amp; AES-256 datenbankgeschützt gem. DSGVO Art. 6 Abs. 1 lit. b)</span>
+                </div>
+                <div style={{ display: 'flex', gap: '8px', fontSize: '0.62rem', color: '#137333', marginTop: '2px', flexWrap: 'wrap' }}>
+                  <button type="button" onClick={() => setLegalModalTab('impressum')} style={{ background: 'none', border: 'none', padding: 0, color: '#137333', textDecoration: 'underline', cursor: 'pointer', fontSize: 'inherit', fontWeight: 700 }}>
+                    Impressum
+                  </button>
+                  <span>·</span>
+                  <button type="button" onClick={() => setLegalModalTab('privacy')} style={{ background: 'none', border: 'none', padding: 0, color: '#137333', textDecoration: 'underline', cursor: 'pointer', fontSize: 'inherit', fontWeight: 700 }}>
+                    Datenschutz
+                  </button>
+                  <span>·</span>
+                  <button type="button" onClick={() => setLegalModalTab('terms')} style={{ background: 'none', border: 'none', padding: 0, color: '#137333', textDecoration: 'underline', cursor: 'pointer', fontSize: 'inherit', fontWeight: 700 }}>
+                    AGB
+                  </button>
+                  <span>·</span>
+                  <button type="button" onClick={() => setLegalModalTab('accessibility')} style={{ background: 'none', border: 'none', padding: 0, color: '#137333', textDecoration: 'underline', cursor: 'pointer', fontSize: 'inherit', fontWeight: 700 }}>
+                    Barrierefreiheit
+                  </button>
+                </div>
               </div>
             ) : (
               <div style={{
                 margin: '4px 16px 12px 16px',
-                padding: '10px 12px',
+                padding: '10px 14px',
                 borderRadius: '16px',
-                background: 'rgba(248, 250, 252, 0.75)',
+                background: 'rgba(248, 250, 252, 0.85)',
                 backdropFilter: 'blur(12px)',
                 WebkitBackdropFilter: 'blur(12px)',
                 border: '1px solid rgba(226, 232, 240, 0.9)',
@@ -10855,12 +11355,29 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                 textAlign: 'left'
               }}>
                 <ShieldCheck size={14} color="#34a853" style={{ flexShrink: 0, marginTop: '2px' }} />
-                <div>
+                <div style={{ flex: 1 }}>
                   <div style={{ fontSize: '0.66rem', fontWeight: 800, color: '#334155', letterSpacing: '0.01em', marginBottom: '2px' }}>
                     Datenschutzhinweis (Kostenfreie Leseansicht)
                   </div>
                   <div style={{ fontSize: '0.62rem', color: '#64748b', lineHeight: 1.4, fontWeight: 500 }}>
                     Diese Ansicht dient der Übermittlung von Hausaufgaben und Unterrichtsterminen (Art. 6 Abs. 1 lit. b DSGVO). Interaktive Zusatzfunktionen (Audio-Loopstation &amp; Avatare) werden nach Freischaltung durch die Erziehungsberechtigten aktiviert.
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px', fontSize: '0.62rem', color: '#475569', marginTop: '6px', flexWrap: 'wrap' }}>
+                    <button type="button" onClick={() => setLegalModalTab('impressum')} style={{ background: 'none', border: 'none', padding: 0, color: '#0f172a', textDecoration: 'underline', cursor: 'pointer', fontSize: 'inherit', fontWeight: 700 }}>
+                      Impressum
+                    </button>
+                    <span>·</span>
+                    <button type="button" onClick={() => setLegalModalTab('privacy')} style={{ background: 'none', border: 'none', padding: 0, color: '#0f172a', textDecoration: 'underline', cursor: 'pointer', fontSize: 'inherit', fontWeight: 700 }}>
+                      Datenschutz
+                    </button>
+                    <span>·</span>
+                    <button type="button" onClick={() => setLegalModalTab('terms')} style={{ background: 'none', border: 'none', padding: 0, color: '#0f172a', textDecoration: 'underline', cursor: 'pointer', fontSize: 'inherit', fontWeight: 700 }}>
+                      AGB
+                    </button>
+                    <span>·</span>
+                    <button type="button" onClick={() => setLegalModalTab('accessibility')} style={{ background: 'none', border: 'none', padding: 0, color: '#0f172a', textDecoration: 'underline', cursor: 'pointer', fontSize: 'inherit', fontWeight: 700 }}>
+                      Barrierefreiheit
+                    </button>
                   </div>
                 </div>
               </div>
@@ -11201,6 +11718,15 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
             }}
           />,
           document.body
+        )}
+
+        {/* Legal Modal (Impressum, Datenschutz, AGB, Widerruf, Barrierefreiheit) */}
+        {legalModalTab && (
+          <LegalTextModal
+            isOpen={Boolean(legalModalTab)}
+            onClose={() => setLegalModalTab(null)}
+            initialTab={legalModalTab}
+          />
         )}
       </div>
     );

@@ -67,6 +67,27 @@ const FORBIDDEN_FRONTEND_PATTERNS = [
     severity: 'CRITICAL',
     description: 'Master Admin authentication must use the login_master_admin RPC with server-side bcrypt/Argon2 verification.',
     allowedFiles: ['src/tests/']
+  },
+  {
+    name: 'Direct is_master_admin Mutation from Client',
+    regex: /\.from\(\s*['"]users['"]\s*\)[^;]*\.update\(\s*\{[^}]*is_master_admin/gs,
+    severity: 'CRITICAL',
+    description: 'The is_master_admin flag must NEVER be modified directly from frontend client updates.',
+    allowedFiles: ['src/tests/']
+  },
+  {
+    name: 'Direct parent_pin Mutation from Client',
+    regex: /(?:\.from\(\s*['"](?:users|students)['"]\s*\)[^;]*\.update\([^;]*parent_pin|updateData[^;]*parent_pin)/gs,
+    severity: 'CRITICAL',
+    description: 'The parent_pin must NEVER be set or modified via direct view updates. Use set_parent_pin_with_recovery_key RPC.',
+    allowedFiles: ['src/tests/']
+  },
+  {
+    name: 'Service Role Key in Frontend Code',
+    regex: /\bSUPABASE_SERVICE_ROLE_KEY\b/g,
+    severity: 'CRITICAL',
+    description: 'SUPABASE_SERVICE_ROLE_KEY must NEVER be imported or used in frontend client code.',
+    allowedFiles: ['src/tests/', 'src/check_view_policies.mjs']
   }
 ];
 
@@ -95,7 +116,7 @@ function walkDir(dir, filterExt = ['.ts', '.tsx', '.js', '.jsx']) {
 }
 
 // 1. SCAN FRONTEND SOURCE CODE
-console.log('📂 [1/2] Scanning Frontend Source Code (apps/groovelab/src)...');
+console.log('📂 [1/3] Scanning Frontend Source Code (apps/groovelab/src)...');
 const frontendFiles = walkDir(SRC_DIR);
 
 for (const filePath of frontendFiles) {
@@ -119,14 +140,30 @@ for (const filePath of frontendFiles) {
   }
 }
 
-// 2. SCAN SQL MIGRATIONS FOR RLS DEFICIENCIES
-console.log('\n📂 [2/2] Scanning Database Migrations (supabase/migrations)...');
+// 2. SCAN SQL MIGRATIONS FOR RLS DEFICIENCIES & DML SHIELDS
+console.log('\n📂 [2/3] Scanning Database Migrations (supabase/migrations)...');
 const migrationFiles = walkDir(MIGRATIONS_DIR, ['.sql']);
+
+let latestDmlMigration = null;
+let highestDmlMigrationNum = -1;
 
 for (const filePath of migrationFiles) {
   filesScanned++;
   const content = fs.readFileSync(filePath, 'utf-8');
   const relPath = path.relative(ROOT_DIR, filePath);
+  const baseName = path.basename(filePath);
+
+  // Check for handle_users_view_dml definitions
+  if (content.includes('FUNCTION public.handle_users_view_dml()')) {
+    const match = baseName.match(/^(\d+)_/);
+    if (match) {
+      const num = parseInt(match[1], 10);
+      if (num > highestDmlMigrationNum) {
+        highestDmlMigrationNum = num;
+        latestDmlMigration = { file: relPath, content, baseName };
+      }
+    }
+  }
 
   // Look for CREATE TABLE without ENABLE ROW LEVEL SECURITY
   const createTableRegex = /CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(?:public\.)?([a-zA-Z0-9_]+)/gi;
@@ -140,9 +177,24 @@ for (const filePath of migrationFiles) {
 
     const rlsPattern = new RegExp(`ALTER\\s+TABLE\\s+(?:public\\.)?${tableName}\\s+ENABLE\\s+ROW\\s+LEVEL\\s+SECURITY`, 'i');
     if (!rlsPattern.test(content) && !content.includes('ENABLE ROW LEVEL SECURITY')) {
-      // Check if later migrations enforce it or warn
-      // console.warn(`   ⚠️ Migration ${path.basename(filePath)} creates table "${tableName}" - ensure RLS is enabled.`);
+      // Handled in consolidated lockdown
     }
+  }
+}
+
+// Verify that the LATEST handle_users_view_dml has the student & privilege escalation shields!
+if (latestDmlMigration) {
+  const hasStudentShield = latestDmlMigration.content.includes('v_is_student') && 
+                           latestDmlMigration.content.includes('parent_allow_');
+  const hasMasterShield = latestDmlMigration.content.includes('is_master_admin');
+
+  if (!hasStudentShield || !hasMasterShield) {
+    console.error(`\n❌ [VIOLATION] [CRITICAL] Insecure handle_users_view_dml in latest migration`);
+    console.error(`   File: ${latestDmlMigration.file}`);
+    console.error(`   Details: The latest handle_users_view_dml definition must include the student shield (v_is_student) and is_master_admin protection.`);
+    violationsCount++;
+  } else {
+    console.log(`   ✅ Latest DML Migration (${latestDmlMigration.baseName}) contains full Privilege Escalation & Student Parental Shields.`);
   }
 }
 

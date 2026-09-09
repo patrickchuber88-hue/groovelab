@@ -40,6 +40,7 @@ export interface GrooveTrainerProps {
   initialBpm?: number;
   uiLevel?: 'junior' | 'teen' | 'pro';
   embedded?: boolean;
+  useNotebookLayout?: boolean;
   homeworkNotesList?: string[];
 }
 
@@ -148,42 +149,42 @@ export const LEVEL_THEMES: Record<RhythmLevel, LevelTheme> = {
   },
   achtel: {
     id: 'achtel',
-    primary: '#f97316',
-    lightBg: '#fff7ed',
-    border: '#fed7aa',
-    badgeBg: '#ffedd5',
-    badgeText: '#c2410c',
-    accent: '#ea580c',
-    gradient: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
-    padGlow: 'rgba(249, 115, 22, 0.40)',
+    primary: '#d97706',
+    lightBg: '#fffbeb',
+    border: '#fde68a',
+    badgeBg: '#fef3c7',
+    badgeText: '#92400e',
+    accent: '#b45309',
+    gradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+    padGlow: 'rgba(217, 119, 6, 0.35)',
     emoji: '🐰',
     animal: 'Hase',
     meter: 'Achtel'
   },
   synkopen: {
     id: 'synkopen',
-    primary: '#fb923c',
-    lightBg: '#fff7ed',
-    border: '#fdba74',
-    badgeBg: '#ffedd5',
-    badgeText: '#9a3412',
-    accent: '#ea580c',
-    gradient: 'linear-gradient(135deg, #fb923c 0%, #c2410c 100%)',
-    padGlow: 'rgba(234, 88, 12, 0.35)',
+    primary: '#d97706',
+    lightBg: '#fffbeb',
+    border: '#fde68a',
+    badgeBg: '#fef3c7',
+    badgeText: '#92400e',
+    accent: '#b45309',
+    gradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+    padGlow: 'rgba(217, 119, 6, 0.35)',
     emoji: '🦘',
     animal: 'Känguru',
     meter: 'Off-Beat'
   },
   shuffle: {
     id: 'shuffle',
-    primary: '#ea580c',
-    lightBg: '#fff7ed',
-    border: '#fed7aa',
-    badgeBg: '#ffedd5',
-    badgeText: '#7c2d12',
-    accent: '#9a3412',
-    gradient: 'linear-gradient(135deg, #ea580c 0%, #9a3412 100%)',
-    padGlow: 'rgba(234, 88, 12, 0.40)',
+    primary: '#b45309',
+    lightBg: '#fffbeb',
+    border: '#fde68a',
+    badgeBg: '#fef3c7',
+    badgeText: '#78350f',
+    accent: '#78350f',
+    gradient: 'linear-gradient(135deg, #d97706 0%, #92400e 100%)',
+    padGlow: 'rgba(180, 83, 9, 0.35)',
     emoji: '🐎',
     animal: 'Pferd',
     meter: 'Swing'
@@ -197,6 +198,7 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
   initialBpm = 85,
   uiLevel = 'teen',
   embedded = false,
+  useNotebookLayout = false,
   homeworkNotesList
 }) => {
   const [selectedLevel, setSelectedLevel] = useState<RhythmLevel>('viertel');
@@ -1039,72 +1041,107 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
         ? `Sehr entspannter Groove! Versuche, etwas direkter auf die Zählzeit zu landen (+${meanOffset}ms).`
         : "Solider Beat! Der Großteil deiner Schläge liegt sauber im Zielbereich. Weiter so!"));
 
-  return (
+  const isNotebook = Boolean(useNotebookLayout || embedded);
+
+  const studioCard = (
     <div style={{
       width: '100%',
-      maxWidth: '490px',
+      maxWidth: isNotebook ? '860px' : '490px',
       margin: '0 auto',
       background: '#ffffff',
-      borderRadius: '32px',
-      border: '1px solid #e2e8f0',
-      boxShadow: '0 24px 48px -12px rgba(234, 88, 12, 0.12), 0 2px 8px rgba(0,0,0,0.02)',
-      padding: embedded ? '14px' : '18px 20px',
+      borderRadius: isNotebook ? '24px' : '32px',
+      border: '1.5px solid #e2e8f0',
+      boxShadow: isNotebook ? '0 10px 30px -5px rgba(0, 0, 0, 0.05)' : '0 24px 48px -12px rgba(217, 119, 6, 0.12), 0 2px 8px rgba(0,0,0,0.02)',
+      padding: isNotebook ? '20px 22px 28px 22px' : (embedded ? '14px' : '18px 20px'),
       display: 'flex',
       flexDirection: 'column',
-      gap: '14px',
+      gap: isNotebook ? '18px' : '14px',
       fontFamily: "'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
       position: 'relative',
       userSelect: 'none',
       WebkitUserSelect: 'none'
     }} className="animate-fade-in">
       
-      {/* 1. Header: Absolut puristisch & ruhig */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+      {/* 1. Header: Nahtlos in das Hausaufgabenheft integriert */}
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        gap: '12px',
+        padding: isNotebook ? '2px 4px 6px 4px' : '0'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: isNotebook ? '14px' : '10px' }}>
           <div style={{
-            width: '36px',
-            height: '36px',
-            borderRadius: '11px',
-            background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
+            width: isNotebook ? '46px' : '36px',
+            height: isNotebook ? '46px' : '36px',
+            borderRadius: isNotebook ? '14px' : '11px',
+            background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            boxShadow: '0 4px 12px rgba(234, 88, 12, 0.32)',
+            boxShadow: '0 4px 14px rgba(217, 119, 6, 0.28)',
             flexShrink: 0
           }}>
-            <Radio size={18} color="#ffffff" strokeWidth={2.5} />
+            <Radio size={isNotebook ? 22 : 18} color="#ffffff" strokeWidth={2.4} />
           </div>
           <div>
-            <h3 style={{ margin: 0, fontSize: '1.10rem', fontWeight: 950, color: '#0f172a', letterSpacing: '-0.02em' }}>
-              Groove-Trainer
-            </h3>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <h3 style={{
+                margin: 0,
+                fontSize: isNotebook ? '1.24rem' : '1.10rem',
+                fontWeight: 950,
+                color: '#0f172a',
+                letterSpacing: '-0.02em',
+                lineHeight: 1.2
+              }}>
+                Groove-Trainer
+              </h3>
+              {isNotebook && (
+                <span style={{
+                  fontSize: '0.70rem',
+                  fontWeight: 900,
+                  color: '#92400e',
+                  background: '#fef3c7',
+                  border: '1px solid #fde68a',
+                  padding: '2px 8px',
+                  borderRadius: '100px'
+                }}>
+                  Studio Modus
+                </span>
+              )}
+            </div>
+            {isNotebook && (
+              <p style={{ margin: '2px 0 0 0', fontSize: '0.80rem', color: '#64748b', fontWeight: 650 }}>
+                16 Takte Rhythmus-Puls, Call &amp; Response und Mikro-Timing trainieren
+              </p>
+            )}
           </div>
         </div>
 
         {/* Header Right: Glänzendes XP-Pill & Micro-Tools */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           {/* ⚡ XP-Anzeige */}
           <div style={{
             display: 'flex',
             alignItems: 'center',
-            gap: '5px',
+            gap: '6px',
             background: 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)',
             border: '1.5px solid #fde68a',
-            padding: '4px 9px',
-            borderRadius: '11px',
-            boxShadow: '0 2px 6px rgba(217, 119, 6, 0.12)'
+            padding: isNotebook ? '6px 12px' : '4px 9px',
+            borderRadius: '12px',
+            boxShadow: '0 2px 8px rgba(217, 119, 6, 0.12)'
           }} title="Gesammelte XP">
-            <Zap size={13} fill="#d97706" color="#d97706" />
-            <span style={{ fontSize: '0.76rem', fontWeight: 950, color: '#92400e' }}>
+            <Zap size={isNotebook ? 15 : 13} fill="#d97706" color="#d97706" />
+            <span style={{ fontSize: isNotebook ? '0.84rem' : '0.76rem', fontWeight: 950, color: '#92400e' }}>
               {studentBaseXp + sessionAccumulatedXp} XP
             </span>
             {sessionAccumulatedXp > 0 && (
               <span style={{
-                fontSize: '0.62rem',
+                fontSize: isNotebook ? '0.68rem' : '0.62rem',
                 fontWeight: 900,
                 color: '#15803d',
                 background: '#dcfce7',
-                padding: '1px 5px',
+                padding: '1px 6px',
                 borderRadius: '6px'
               }}>
                 +{sessionAccumulatedXp}
@@ -1117,22 +1154,29 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
             type="button"
             onClick={() => setIsSoundSettingsOpen(!isSoundSettingsOpen)}
             style={{
-              background: isSoundSettingsOpen ? '#fff7ed' : '#f8fafc',
-              border: isSoundSettingsOpen ? '1.5px solid #f97316' : '1px solid #e2e8f0',
-              color: isSoundSettingsOpen ? '#ea580c' : '#64748b',
-              borderRadius: '10px',
-              width: '32px',
-              height: '32px',
+              background: isSoundSettingsOpen ? '#fffbeb' : '#f8fafc',
+              border: isSoundSettingsOpen ? '1.5px solid #f59e0b' : '1px solid #e2e8f0',
+              color: isSoundSettingsOpen ? '#b45309' : '#64748b',
+              borderRadius: isNotebook ? '12px' : '10px',
+              padding: isNotebook ? '6px 12px' : '0',
+              width: isNotebook ? 'auto' : '32px',
+              height: isNotebook ? '36px' : '32px',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
+              gap: '6px',
               transition: 'all 0.15s ease'
             }}
             className="hover-scale"
             title="Klangkiste (Tools für Sound, Tempo, Spielmodi & Latenz)"
           >
-            <SlidersHorizontal size={14} color={isSoundSettingsOpen ? '#ea580c' : '#64748b'} />
+            <SlidersHorizontal size={14} color={isSoundSettingsOpen ? '#b45309' : '#64748b'} />
+            {isNotebook && (
+              <span style={{ fontSize: '0.76rem', fontWeight: 900, color: isSoundSettingsOpen ? '#b45309' : '#475569' }}>
+                Klang &amp; Tempo
+              </span>
+            )}
           </button>
         </div>
       </div>
@@ -1140,14 +1184,14 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
       {/* 🎛️ Collapsible Klangkiste (Floating Tools Shelf) */}
       {isSoundSettingsOpen && (
         <div style={{
-          background: '#fafafa',
-          borderRadius: '20px',
-          border: '1px solid #e2e8f0',
-          padding: '14px 16px',
+          background: '#ffffff',
+          borderRadius: isNotebook ? '24px' : '20px',
+          border: '1.5px solid #fed7aa',
+          padding: isNotebook ? '18px 22px' : '14px 16px',
           display: 'flex',
           flexDirection: 'column',
           gap: '12px',
-          boxShadow: '0 4px 14px rgba(15, 23, 42, 0.04)'
+          boxShadow: isNotebook ? '0 10px 25px -5px rgba(217, 119, 6, 0.08)' : '0 4px 14px rgba(15, 23, 42, 0.04)'
         }} className="animate-fade-in">
           
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
@@ -1166,20 +1210,20 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
                       onClick={() => setSoundKit(kit.id)}
                       style={{
                         border: 'none',
-                        background: isSel ? '#fff7ed' : 'transparent',
-                        color: isSel ? '#c2410c' : '#64748b',
+                        background: isSel ? '#fffbeb' : 'transparent',
+                        color: isSel ? '#92400e' : '#64748b',
                         borderRadius: '8px',
                         padding: '5px 10px',
                         fontSize: '0.72rem',
                         fontWeight: isSel ? 950 : 700,
                         cursor: 'pointer',
-                        boxShadow: isSel ? '0 1px 4px rgba(234, 88, 12, 0.15)' : 'none',
+                        boxShadow: isSel ? '0 1px 4px rgba(217, 119, 6, 0.15)' : 'none',
                         display: 'flex',
                         alignItems: 'center',
                         gap: '4px'
                       }}
                     >
-                      <Layers size={11} color={isSel ? '#ea580c' : '#94a3b8'} />
+                      <Layers size={11} color={isSel ? '#d97706' : '#94a3b8'} />
                       <span>{kit.label}</span>
                     </button>
                   );
@@ -1192,9 +1236,9 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
               type="button"
               onClick={() => setIsBassEnabled(!isBassEnabled)}
               style={{
-                background: isBassEnabled ? '#fff7ed' : '#ffffff',
-                border: isBassEnabled ? '1.5px solid #f97316' : '1px solid #cbd5e1',
-                color: isBassEnabled ? '#c2410c' : '#64748b',
+                background: isBassEnabled ? '#fffbeb' : '#ffffff',
+                border: isBassEnabled ? '1.5px solid #f59e0b' : '1px solid #cbd5e1',
+                color: isBassEnabled ? '#92400e' : '#64748b',
                 borderRadius: '10px',
                 padding: '5px 10px',
                 cursor: 'pointer',
@@ -1207,7 +1251,7 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
               }}
               title="Groovige Bassline zu- oder abschalten"
             >
-              <Music size={12} color={isBassEnabled ? '#ea580c' : '#64748b'} />
+              <Music size={12} color={isBassEnabled ? '#d97706' : '#64748b'} />
               <span>Bass {isBassEnabled ? 'AN' : 'AUS'}</span>
             </button>
           </div>
@@ -1224,8 +1268,8 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
                 style={{
                   flex: 1,
                   border: 'none',
-                  background: trainingMode === 'call_response' ? '#fff7ed' : 'transparent',
-                  color: trainingMode === 'call_response' ? '#c2410c' : '#64748b',
+                  background: trainingMode === 'call_response' ? '#fffbeb' : 'transparent',
+                  color: trainingMode === 'call_response' ? '#92400e' : '#64748b',
                   borderRadius: '7px',
                   padding: '5px 6px',
                   fontSize: '0.68rem',
@@ -1237,7 +1281,7 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
                   gap: '4px'
                 }}
               >
-                <Headphones size={11} color={trainingMode === 'call_response' ? '#ea580c' : '#64748b'} />
+                <Headphones size={11} color={trainingMode === 'call_response' ? '#d97706' : '#64748b'} />
                 <span>Echo (Standard)</span>
               </button>
               <button
@@ -1246,8 +1290,8 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
                 style={{
                   flex: 1,
                   border: 'none',
-                  background: trainingMode === 'disappearing_beat' ? '#fff7ed' : 'transparent',
-                  color: trainingMode === 'disappearing_beat' ? '#c2410c' : '#64748b',
+                  background: trainingMode === 'disappearing_beat' ? '#fffbeb' : 'transparent',
+                  color: trainingMode === 'disappearing_beat' ? '#92400e' : '#64748b',
                   borderRadius: '7px',
                   padding: '5px 6px',
                   fontSize: '0.68rem',
@@ -1259,7 +1303,7 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
                   gap: '4px'
                 }}
               >
-                <Clock size={11} color={trainingMode === 'disappearing_beat' ? '#ea580c' : '#64748b'} />
+                <Clock size={11} color={trainingMode === 'disappearing_beat' ? '#d97706' : '#64748b'} />
                 <span>Tunnel</span>
               </button>
               <button
@@ -1268,8 +1312,8 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
                 style={{
                   flex: 1,
                   border: 'none',
-                  background: trainingMode === 'tempo_sprint' ? '#fff7ed' : 'transparent',
-                  color: trainingMode === 'tempo_sprint' ? '#c2410c' : '#64748b',
+                  background: trainingMode === 'tempo_sprint' ? '#fffbeb' : 'transparent',
+                  color: trainingMode === 'tempo_sprint' ? '#92400e' : '#64748b',
                   borderRadius: '7px',
                   padding: '5px 6px',
                   fontSize: '0.68rem',
@@ -1281,7 +1325,7 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
                   gap: '4px'
                 }}
               >
-                <FastForward size={11} color={trainingMode === 'tempo_sprint' ? '#ea580c' : '#64748b'} />
+                <FastForward size={11} color={trainingMode === 'tempo_sprint' ? '#d97706' : '#64748b'} />
                 <span>Sprint (+2)</span>
               </button>
             </div>
@@ -1370,10 +1414,10 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
       <div style={{
         display: 'grid',
         gridTemplateColumns: 'repeat(4, 1fr)',
-        gap: '5px',
+        gap: isNotebook ? '10px' : '5px',
         background: '#f8fafc',
-        padding: '4px',
-        borderRadius: '16px',
+        padding: isNotebook ? '6px' : '4px',
+        borderRadius: isNotebook ? '20px' : '16px',
         border: '1px solid #e2e8f0'
       }}>
         {RHYTHM_LEVELS.map(lvl => {
@@ -1388,38 +1432,47 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
                 setBpm(lvl.defaultBpm);
               }}
               style={{
-                border: isSel ? '1.5px solid #f97316' : '1.5px solid transparent',
+                border: isSel ? '2px solid #f59e0b' : '2px solid transparent',
                 background: isSel ? '#ffffff' : 'transparent',
-                color: isSel ? '#c2410c' : '#475569',
-                borderRadius: '12px',
-                padding: '7px 2px',
+                color: isSel ? '#92400e' : '#475569',
+                borderRadius: isNotebook ? '16px' : '12px',
+                padding: isNotebook ? '12px 6px' : '7px 2px',
                 cursor: 'pointer',
-                boxShadow: isSel ? '0 3px 10px rgba(234, 88, 12, 0.15)' : 'none',
+                boxShadow: isSel ? '0 4px 14px rgba(217, 119, 6, 0.16), 0 1px 3px rgba(0,0,0,0.04)' : 'none',
                 transition: 'all 0.15s cubic-bezier(0.16, 1, 0.3, 1)',
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: '2px',
+                gap: isNotebook ? '4px' : '2px',
                 transform: isSel ? 'scale(1.02)' : 'scale(1)'
               }}
               className="hover-scale-mini"
             >
               <div style={{
-                color: isSel ? '#ea580c' : '#94a3b8',
+                color: isSel ? '#d97706' : '#94a3b8',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center'
               }}>
-                {lvl.id === 'viertel' && <CircleDot size={15} strokeWidth={2.8} />}
-                {lvl.id === 'achtel' && <Layers size={15} strokeWidth={2.8} />}
-                {lvl.id === 'synkopen' && <Activity size={15} strokeWidth={2.8} />}
-                {lvl.id === 'shuffle' && <Flame size={15} strokeWidth={2.8} />}
+                {lvl.id === 'viertel' && <CircleDot size={isNotebook ? 20 : 15} strokeWidth={2.6} />}
+                {lvl.id === 'achtel' && <Layers size={isNotebook ? 20 : 15} strokeWidth={2.6} />}
+                {lvl.id === 'synkopen' && <Activity size={isNotebook ? 20 : 15} strokeWidth={2.6} />}
+                {lvl.id === 'shuffle' && <Flame size={isNotebook ? 20 : 15} strokeWidth={2.6} />}
               </div>
-              <div style={{ fontSize: '0.80rem', fontWeight: 950, color: isSel ? '#c2410c' : '#0f172a', lineHeight: 1.1 }}>
+              <div style={{
+                fontSize: isNotebook ? '0.94rem' : '0.80rem',
+                fontWeight: 950,
+                color: isSel ? '#92400e' : '#0f172a',
+                lineHeight: 1.15
+              }}>
                 {lvl.id === 'viertel' ? 'Viertel' : (lvl.id === 'achtel' ? 'Achtel' : (lvl.id === 'synkopen' ? 'Off-Beat' : 'Shuffle'))}
               </div>
-              <div style={{ fontSize: '0.62rem', fontWeight: 850, color: isSel ? '#ea580c' : '#94a3b8' }}>
+              <div style={{
+                fontSize: isNotebook ? '0.72rem' : '0.62rem',
+                fontWeight: 850,
+                color: isSel ? '#d97706' : '#94a3b8'
+              }}>
                 {lvl.badge}
               </div>
             </button>
@@ -1428,20 +1481,26 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
       </div>
 
       {/* 🌟 FOKUS-ZONE 2: 16-TAKTE-PULSBALKEN & VISUELLE BEAT-BÜHNE */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: isNotebook ? '10px' : '8px' }}>
         {/* Nahtlose Takt-Fortschrittszeile */}
         <div style={{
           display: 'flex',
           flexDirection: 'column',
-          gap: '4px',
+          gap: '5px',
           padding: '0 2px'
         }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.74rem', fontWeight: 950 }}>
-            <span style={{ color: '#0f172a', display: 'flex', alignItems: 'center', gap: '5px' }}>
-              <Activity size={13} color="#ea580c" />
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            fontSize: isNotebook ? '0.82rem' : '0.74rem',
+            fontWeight: 950
+          }}>
+            <span style={{ color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Activity size={isNotebook ? 15 : 13} color="#d97706" />
               <span>Takt {Math.min(16, currentBar + 1)} von 16</span>
             </span>
-            <span style={{ color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.70rem', fontWeight: 800 }}>
+            <span style={{ color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px', fontSize: isNotebook ? '0.76rem' : '0.70rem', fontWeight: 800 }}>
               <Target size={12} color="#64748b" />
               <span>{16 - Math.min(16, currentBar + 1) <= 0 ? 'Ziel erreicht!' : `noch ${16 - Math.min(16, currentBar + 1)} Takte`}</span>
             </span>
@@ -1450,7 +1509,7 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
           <div style={{
             position: 'relative',
             width: '100%',
-            height: '6px',
+            height: isNotebook ? '8px' : '6px',
             background: '#f1f5f9',
             borderRadius: '100px',
             overflow: 'hidden'
@@ -1459,80 +1518,84 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
               width: `${Math.min(100, Math.max(0, ((currentBar * activeLevelConfig.subdivisions + currentStep) / (16 * activeLevelConfig.subdivisions)) * 100))}%`,
               height: '100%',
               borderRadius: '100px',
-              background: 'linear-gradient(90deg, #f97316 0%, #ea580c 60%, #16a34a 100%)',
+              background: 'linear-gradient(90deg, #f59e0b 0%, #d97706 60%, #16a34a 100%)',
               transition: 'width 0.10s linear',
-              boxShadow: '0 0 10px rgba(234, 88, 12, 0.45)'
+              boxShadow: '0 0 10px rgba(217, 119, 6, 0.40)'
             }} />
           </div>
         </div>
 
         {/* Die Magische Beat-Bühne (Visual Metronome Pulse) */}
         <div style={{
-          background: 'linear-gradient(180deg, #fafaf9 0%, #fff7ed 100%)',
-          borderRadius: '24px',
-          padding: '14px 16px',
-          boxShadow: 'inset 0 1px 3px rgba(255, 255, 255, 0.9), 0 8px 20px -6px rgba(234, 88, 12, 0.08)',
+          background: isNotebook 
+            ? 'linear-gradient(180deg, #ffffff 0%, #fdfbf7 100%)'
+            : 'linear-gradient(180deg, #fafaf9 0%, #fff7ed 100%)',
+          borderRadius: isNotebook ? '26px' : '24px',
+          padding: isNotebook ? '18px 22px' : '14px 16px',
+          boxShadow: isNotebook 
+            ? '0 10px 30px -6px rgba(217, 119, 6, 0.08), 0 2px 6px rgba(0,0,0,0.02)'
+            : 'inset 0 1px 3px rgba(255, 255, 255, 0.9), 0 8px 20px -6px rgba(234, 88, 12, 0.08)',
           display: 'flex',
           flexDirection: 'column',
-          gap: '12px',
+          gap: isNotebook ? '14px' : '12px',
           border: '1.5px solid #fed7aa',
           position: 'relative'
         }}>
           
           {/* Signal-Pill & Streak */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
             <span style={{
-              background: isCallPhase ? '#fef3c7' : 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
+              background: isCallPhase ? '#fef3c7' : 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
               color: isCallPhase ? '#92400e' : '#ffffff',
               border: isCallPhase ? '1.5px solid #fde68a' : 'none',
-              fontSize: '0.78rem',
+              fontSize: isNotebook ? '0.84rem' : '0.78rem',
               fontWeight: 950,
-              padding: '5px 13px',
+              padding: isNotebook ? '6px 16px' : '5px 13px',
               borderRadius: '100px',
               display: 'flex',
               alignItems: 'center',
-              gap: '6px',
-              boxShadow: isCallPhase ? '0 2px 8px rgba(217, 119, 6, 0.15)' : '0 2px 10px rgba(234, 88, 12, 0.30)'
+              gap: '7px',
+              boxShadow: isCallPhase ? '0 2px 8px rgba(217, 119, 6, 0.15)' : '0 2px 10px rgba(217, 119, 6, 0.28)'
             }}>
               {trainingMode === 'call_response' 
                 ? (isCallPhase 
-                  ? <><Headphones size={13} color="#92400e" strokeWidth={2.5} /> HÖR GUT ZU!</> 
-                  : <><Target size={13} color="#ffffff" strokeWidth={2.4} /> DU BIST DRAN!</>)
+                  ? <><Headphones size={14} color="#92400e" strokeWidth={2.5} /> HÖR GUT ZU!</> 
+                  : <><Target size={14} color="#ffffff" strokeWidth={2.4} /> DU BIST DRAN!</>)
                 : (trainingMode === 'tempo_sprint'
-                  ? <><FastForward size={13} color="#ffffff" /> Sprint ({bpm} BPM)</>
+                  ? <><FastForward size={14} color="#ffffff" /> Sprint ({bpm} BPM)</>
                   : (isDisappeared 
-                    ? <><Clock size={13} color="#64748b" /> Beat im Tunnel – Zähle!</> 
-                    : <><Activity size={13} color="#ffffff" /> Der Beat groovt</>))}
+                    ? <><Clock size={14} color="#64748b" /> Beat im Tunnel – Zähle!</> 
+                    : <><Activity size={14} color="#ffffff" /> Der Beat groovt</>))}
             </span>
 
             {/* Streak & Combo Badge */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               {pocketStreak >= 4 && (
                 <span style={{
                   background: '#fef3c7',
                   border: '1px solid #fde68a',
                   color: '#b45309',
-                  fontSize: '0.66rem',
+                  fontSize: isNotebook ? '0.74rem' : '0.66rem',
                   fontWeight: 950,
-                  padding: '2px 8px',
+                  padding: '3px 10px',
                   borderRadius: '100px'
                 }}>
                   COMBO x{comboMultiplier}
                 </span>
               )}
               <span style={{
-                fontSize: '0.74rem',
+                fontSize: isNotebook ? '0.82rem' : '0.74rem',
                 fontWeight: 950,
-                color: '#c2410c',
+                color: '#92400e',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '4px',
+                gap: '5px',
                 background: '#ffffff',
-                padding: '3px 8px',
-                borderRadius: '8px',
+                padding: isNotebook ? '4px 10px' : '3px 8px',
+                borderRadius: '10px',
                 border: '1px solid #fed7aa'
               }}>
-                <Flame size={13} color="#ea580c" /> Streak: {pocketStreak}
+                <Flame size={14} color="#d97706" /> Streak: {pocketStreak}
               </span>
             </div>
           </div>
@@ -1541,7 +1604,7 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
           <div style={{
             display: 'grid',
             gridTemplateColumns: `repeat(${activeLevelConfig.syllables.length}, 1fr)`,
-            gap: '6px',
+            gap: isNotebook ? '10px' : '6px',
             padding: '2px 0'
           }}>
             {activeLevelConfig.syllables.map((syl, sIdx) => {
@@ -1556,13 +1619,15 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
-                    gap: '4px'
+                    gap: isNotebook ? '6px' : '4px'
                   }}
                 >
                   <span style={{
-                    fontSize: activeLevelConfig.syllables.length > 8 ? '0.70rem' : '0.84rem',
+                    fontSize: activeLevelConfig.syllables.length > 8 
+                      ? (isNotebook ? '0.78rem' : '0.70rem') 
+                      : (isNotebook ? '0.94rem' : '0.84rem'),
                     fontWeight: 950,
-                    color: isCurrent ? '#ea580c' : (isTarget ? '#0f172a' : '#94a3b8'),
+                    color: isCurrent ? '#d97706' : (isTarget ? '#0f172a' : '#94a3b8'),
                     letterSpacing: '0.01em',
                     transition: 'all 0.08s ease'
                   }}>
@@ -1571,22 +1636,22 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
 
                   <div style={{
                     width: '100%',
-                    height: '56px',
-                    borderRadius: '16px',
+                    height: isNotebook ? '68px' : '56px',
+                    borderRadius: isNotebook ? '20px' : '16px',
                     background: isCurrent 
-                      ? 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)'
-                      : (isAnticipating ? '#fff7ed' : (isTarget ? '#ffffff' : '#f8fafc')),
+                      ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)'
+                      : (isAnticipating ? '#fffbeb' : (isTarget ? '#ffffff' : '#f8fafc')),
                     border: isCurrent 
-                      ? '2px solid #ffffff' 
-                      : (isAnticipating ? '2px solid #f97316' : (isTarget ? '1.5px solid #fed7aa' : '1px dashed #cbd5e1')),
+                      ? '2.5px solid #ffffff' 
+                      : (isAnticipating ? '2px solid #f59e0b' : (isTarget ? '1.5px solid #fed7aa' : '1px dashed #cbd5e1')),
                     boxShadow: isCurrent 
-                      ? '0 6px 16px rgba(234, 88, 12, 0.45), inset 0 1.5px 0 rgba(255, 255, 255, 0.6)' 
+                      ? '0 8px 20px rgba(217, 119, 6, 0.42), inset 0 1.5px 0 rgba(255, 255, 255, 0.7)' 
                       : (isAnticipating 
-                        ? '0 0 12px rgba(234, 88, 12, 0.30), inset 0 1px 0 rgba(255, 255, 255, 0.8)' 
+                        ? '0 0 14px rgba(245, 158, 11, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.8)' 
                         : (isTarget 
-                          ? '0 2px 5px rgba(0,0,0,0.02), inset 0 1.5px 0 rgba(255, 255, 255, 0.95), inset 0 -2px 4px rgba(0,0,0,0.02)' 
+                          ? '0 2px 6px rgba(0,0,0,0.03), inset 0 1.5px 0 rgba(255, 255, 255, 0.95), inset 0 -2px 4px rgba(0,0,0,0.02)' 
                           : 'none')),
-                    transform: isCurrent ? 'scale(1.09)' : (isAnticipating ? 'scale(1.04)' : 'scale(1)'),
+                    transform: isCurrent ? 'scale(1.08)' : (isAnticipating ? 'scale(1.04)' : 'scale(1)'),
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -1594,14 +1659,14 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
                   }}>
                     {isTarget && (
                       <div style={{
-                        width: isCurrent ? '13px' : '9px',
-                        height: isCurrent ? '13px' : '9px',
+                        width: isCurrent ? (isNotebook ? '16px' : '13px') : (isNotebook ? '11px' : '9px'),
+                        height: isCurrent ? (isNotebook ? '16px' : '13px') : (isNotebook ? '11px' : '9px'),
                         borderRadius: '50%',
-                        background: isCurrent ? '#ffffff' : (isAnticipating ? '#ea580c' : '#f97316'),
+                        background: isCurrent ? '#ffffff' : (isAnticipating ? '#d97706' : '#f59e0b'),
                         transition: 'all 0.08s ease',
                         boxShadow: isCurrent 
-                          ? '0 0 10px rgba(255,255,255,0.95)' 
-                          : (isAnticipating ? '0 0 8px rgba(234, 88, 12, 0.6)' : 'none')
+                          ? '0 0 12px rgba(255,255,255,0.95)' 
+                          : (isAnticipating ? '0 0 8px rgba(217, 119, 6, 0.6)' : 'none')
                       }} />
                     )}
                   </div>
@@ -1624,7 +1689,7 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
               <div style={{ position: 'absolute', left: '15%', width: '22%', top: 0, bottom: 0, background: '#dbeafe' }} />
               <div style={{ position: 'absolute', left: '37%', width: '26%', top: 0, bottom: 0, background: '#dcfce7' }} />
               <div style={{ position: 'absolute', left: '63%', width: '22%', top: 0, bottom: 0, background: '#fef3c7' }} />
-              <div style={{ position: 'absolute', left: '50%', top: 0, bottom: 0, width: '2px', background: '#f97316', transform: 'translateX(-50%)' }} />
+              <div style={{ position: 'absolute', left: '50%', top: 0, bottom: 0, width: '2px', background: '#f59e0b', transform: 'translateX(-50%)' }} />
               {timingOffsetMs !== null && (
                 <div style={{
                   position: 'absolute',
@@ -1633,7 +1698,7 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
                   bottom: '1px',
                   width: '6px',
                   borderRadius: '3px',
-                  background: lastRating === 'pocket' ? '#ea580c' : (lastRating === 'good' ? '#16a34a' : (lastRating === 'rush' ? '#2563eb' : (lastRating === 'drag' ? '#d97706' : '#dc2626'))),
+                  background: lastRating === 'pocket' ? '#d97706' : (lastRating === 'good' ? '#16a34a' : (lastRating === 'rush' ? '#2563eb' : (lastRating === 'drag' ? '#b45309' : '#dc2626'))),
                   transform: 'translateX(-50%)',
                   transition: 'left 0.12s ease'
                 }} />
@@ -1647,54 +1712,76 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
       {/* 🌟 FOKUS-ZONE 3: DAS HERO 3D MPC DRUM-PAD (ALL-IN-ONE TRIGGER) */}
       <button
         type="button"
+        aria-label={!isPlaying ? "Groove-Trainer starten" : "Im Rhythmus tippen"}
         onPointerDown={(e) => {
           e.preventDefault();
           handleUserTap();
         }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            handleUserTap();
+          }
+        }}
         style={{
           width: '100%',
-          minHeight: '108px',
-          borderRadius: '24px',
+          minHeight: isNotebook ? '124px' : '108px',
+          borderRadius: isNotebook ? '28px' : '24px',
           border: 'none',
           background: !isPlaying 
-            ? 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)'
+            ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 60%, #b45309 100%)'
             : (isPadPressed 
-              ? '#ea580c' 
-              : 'linear-gradient(180deg, #fb923c 0%, #ea580c 100%)'),
+              ? '#b45309' 
+              : 'linear-gradient(180deg, #f59e0b 0%, #d97706 100%)'),
           color: '#ffffff',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
-          gap: '4px',
+          gap: isNotebook ? '6px' : '4px',
           cursor: 'pointer',
           boxShadow: isPadPressed 
-            ? '0 2px 0 #9a3412, inset 0 3px 8px rgba(0, 0, 0, 0.25)' 
-            : '0 6px 0 #9a3412, 0 16px 32px -6px rgba(234, 88, 12, 0.42), inset 0 1.5px 0 rgba(255, 255, 255, 0.42)',
+            ? '0 2px 0 #78350f, inset 0 3px 8px rgba(0, 0, 0, 0.25)' 
+            : (isNotebook 
+              ? '0 6px 0 #92400e, 0 18px 36px -6px rgba(217, 119, 6, 0.38), inset 0 1.5px 0 rgba(255, 255, 255, 0.45)'
+              : '0 6px 0 #92400e, 0 16px 32px -6px rgba(217, 119, 6, 0.42), inset 0 1.5px 0 rgba(255, 255, 255, 0.42)'),
           userSelect: 'none',
           WebkitUserSelect: 'none',
           touchAction: 'manipulation',
           transform: isPadPressed ? 'translateY(4px)' : 'translateY(0)',
-          transition: 'all 0.07s cubic-bezier(0.16, 1, 0.3, 1)'
+          transition: 'all 0.07s cubic-bezier(0.16, 1, 0.3, 1)',
+          outline: 'none'
         }}
         className="hover-scale-mini"
       >
         {!isPlaying ? (
           <>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '9px' }}>
-              <Play size={24} fill="#ffffff" color="#ffffff" strokeWidth={2.4} />
-              <span style={{ fontSize: '1.24rem', fontWeight: 950, letterSpacing: '-0.01em', color: '#ffffff' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: isNotebook ? '12px' : '9px' }}>
+              <Play size={isNotebook ? 28 : 24} fill="#ffffff" color="#ffffff" strokeWidth={2.4} />
+              <span style={{
+                fontSize: isNotebook ? '1.42rem' : '1.24rem',
+                fontWeight: 950,
+                letterSpacing: '-0.01em',
+                color: '#ffffff'
+              }}>
                 TIPPEN ZUM STARTEN
               </span>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.76rem', color: 'rgba(255, 255, 255, 0.92)', fontWeight: 750 }}>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              fontSize: isNotebook ? '0.84rem' : '0.76rem',
+              color: 'rgba(255, 255, 255, 0.94)',
+              fontWeight: 750
+            }}>
               <span>Tippe hier oder drücke</span>
               <span style={{
-                background: 'rgba(0, 0, 0, 0.22)',
-                border: '1px solid rgba(255, 255, 255, 0.35)',
-                padding: '1px 6px',
-                borderRadius: '6px',
-                fontSize: '0.68rem',
+                background: 'rgba(0, 0, 0, 0.24)',
+                border: '1px solid rgba(255, 255, 255, 0.40)',
+                padding: '2px 8px',
+                borderRadius: '7px',
+                fontSize: isNotebook ? '0.74rem' : '0.68rem',
                 fontWeight: 900,
                 letterSpacing: '0.04em'
               }}>
@@ -1704,42 +1791,47 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
           </>
         ) : (
           <>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Target size={22} color="#ffffff" strokeWidth={2.8} />
-              <span style={{ fontSize: '1.18rem', fontWeight: 950, letterSpacing: '-0.01em', color: '#ffffff' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: isNotebook ? '10px' : '8px' }}>
+              <Target size={isNotebook ? 26 : 22} color="#ffffff" strokeWidth={2.8} />
+              <span style={{
+                fontSize: isNotebook ? '1.34rem' : '1.18rem',
+                fontWeight: 950,
+                letterSpacing: '-0.01em',
+                color: '#ffffff'
+              }}>
                 HIER IM TAKT TROMMELN
               </span>
             </div>
 
             {/* Live-Feedback direkt im Hero-Pad */}
-            <div style={{ minHeight: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ minHeight: isNotebook ? '24px' : '20px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               {lastRating === 'pocket' && (
-                <span style={{ fontSize: '0.82rem', fontWeight: 950, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <Sparkles size={14} color="#ffffff" /> PERFEKT IM POCKET! {isProMode && timingOffsetMs !== null && `(${timingOffsetMs > 0 ? `+${timingOffsetMs}` : timingOffsetMs}ms)`}
+                <span style={{ fontSize: isNotebook ? '0.90rem' : '0.82rem', fontWeight: 950, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                  <Sparkles size={16} color="#ffffff" /> PERFEKT IM POCKET! {isProMode && timingOffsetMs !== null && `(${timingOffsetMs > 0 ? `+${timingOffsetMs}` : timingOffsetMs}ms)`}
                 </span>
               )}
               {lastRating === 'good' && (
-                <span style={{ fontSize: '0.82rem', fontWeight: 950, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <Check size={14} color="#ffffff" /> SUPER IM GROOVE! {isProMode && timingOffsetMs !== null && `(${timingOffsetMs > 0 ? `+${timingOffsetMs}` : timingOffsetMs}ms)`}
+                <span style={{ fontSize: isNotebook ? '0.90rem' : '0.82rem', fontWeight: 950, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                  <Check size={16} color="#ffffff" /> SUPER IM GROOVE! {isProMode && timingOffsetMs !== null && `(${timingOffsetMs > 0 ? `+${timingOffsetMs}` : timingOffsetMs}ms)`}
                 </span>
               )}
               {lastRating === 'rush' && (
-                <span style={{ fontSize: '0.78rem', fontWeight: 900, color: '#fee2e2', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <Clock size={13} color="#fee2e2" /> Etwas zu eilig – bleib ruhig!
+                <span style={{ fontSize: isNotebook ? '0.86rem' : '0.78rem', fontWeight: 900, color: '#fee2e2', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                  <Clock size={15} color="#fee2e2" /> Etwas zu eilig – bleib ruhig!
                 </span>
               )}
               {lastRating === 'drag' && (
-                <span style={{ fontSize: '0.78rem', fontWeight: 900, color: '#fef3c7', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <Clock size={13} color="#fef3c7" /> Lass dir Zeit, ganz entspannt!
+                <span style={{ fontSize: isNotebook ? '0.86rem' : '0.78rem', fontWeight: 900, color: '#fef3c7', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                  <Clock size={15} color="#fef3c7" /> Lass dir Zeit, ganz entspannt!
                 </span>
               )}
               {lastRating === 'miss' && (
-                <span style={{ fontSize: '0.78rem', fontWeight: 900, color: '#fee2e2', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <RotateCcw size={13} color="#fee2e2" /> Neuer Versuch – hör auf den Beat!
+                <span style={{ fontSize: isNotebook ? '0.86rem' : '0.78rem', fontWeight: 900, color: '#fee2e2', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                  <RotateCcw size={15} color="#fee2e2" /> Neuer Versuch – hör auf den Beat!
                 </span>
               )}
               {!lastRating && (
-                <span style={{ fontSize: '0.74rem', color: 'rgba(255, 255, 255, 0.85)', fontWeight: 750 }}>
+                <span style={{ fontSize: isNotebook ? '0.82rem' : '0.74rem', color: 'rgba(255, 255, 255, 0.88)', fontWeight: 750 }}>
                   Tippe im Rhythmus der Beats
                 </span>
               )}
@@ -1754,25 +1846,32 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
         alignItems: 'center',
         justifyContent: 'space-between',
         padding: '0 4px',
-        minHeight: '34px'
+        minHeight: isNotebook ? '40px' : '34px'
       }}>
         {/* 3 Goldsterne */}
         <div style={{
           display: 'flex',
           alignItems: 'center',
-          gap: '6px',
+          gap: isNotebook ? '8px' : '6px',
           background: '#f8fafc',
           border: '1px solid #f1f5f9',
-          padding: '4px 9px',
-          borderRadius: '10px'
+          padding: isNotebook ? '6px 12px' : '4px 9px',
+          borderRadius: isNotebook ? '12px' : '10px'
         }}>
-          <div style={{ display: 'flex', gap: '2px' }}>
-            <Star size={15} color={starsEarned >= 1 ? '#f59e0b' : '#cbd5e1'} fill={starsEarned >= 1 ? '#f59e0b' : 'none'} />
-            <Star size={15} color={starsEarned >= 2 ? '#f59e0b' : '#cbd5e1'} fill={starsEarned >= 2 ? '#f59e0b' : 'none'} />
-            <Star size={15} color={starsEarned >= 3 ? '#f59e0b' : '#cbd5e1'} fill={starsEarned >= 3 ? '#f59e0b' : 'none'} />
+          <div style={{ display: 'flex', gap: '3px' }}>
+            <Star size={isNotebook ? 18 : 15} color={starsEarned >= 1 ? '#f59e0b' : '#cbd5e1'} fill={starsEarned >= 1 ? '#f59e0b' : 'none'} />
+            <Star size={isNotebook ? 18 : 15} color={starsEarned >= 2 ? '#f59e0b' : '#cbd5e1'} fill={starsEarned >= 2 ? '#f59e0b' : 'none'} />
+            <Star size={isNotebook ? 18 : 15} color={starsEarned >= 3 ? '#f59e0b' : '#cbd5e1'} fill={starsEarned >= 3 ? '#f59e0b' : 'none'} />
           </div>
           {totalHits > 0 && (
-            <span style={{ fontSize: '0.74rem', fontWeight: 950, color: '#854d0e', background: '#fef9c3', padding: '1px 5px', borderRadius: '5px' }}>
+            <span style={{
+              fontSize: isNotebook ? '0.80rem' : '0.74rem',
+              fontWeight: 950,
+              color: '#854d0e',
+              background: '#fef9c3',
+              padding: '2px 7px',
+              borderRadius: '6px'
+            }}>
               {accuracyPercent}%
             </span>
           )}
@@ -1788,35 +1887,35 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
                 background: '#fee2e2',
                 border: '1px solid #fecaca',
                 color: '#dc2626',
-                borderRadius: '10px',
-                padding: '5px 12px',
-                fontSize: '0.76rem',
+                borderRadius: isNotebook ? '12px' : '10px',
+                padding: isNotebook ? '7px 16px' : '5px 12px',
+                fontSize: isNotebook ? '0.82rem' : '0.76rem',
                 fontWeight: 900,
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '5px',
+                gap: '6px',
                 transition: 'all 0.15s ease'
               }}
               className="hover-scale"
               title="Übung stoppen"
             >
-              <Square size={11} fill="#dc2626" color="#dc2626" />
+              <Square size={12} fill="#dc2626" color="#dc2626" />
               <span>Stop</span>
             </button>
           ) : (
             <span style={{
-              fontSize: '0.74rem',
+              fontSize: isNotebook ? '0.80rem' : '0.74rem',
               color: '#64748b',
               fontWeight: 900,
               background: '#f8fafc',
               border: '1px solid #f1f5f9',
-              padding: '4px 9px',
-              borderRadius: '10px',
+              padding: isNotebook ? '6px 12px' : '4px 9px',
+              borderRadius: isNotebook ? '12px' : '10px',
               letterSpacing: '0.02em',
               display: 'inline-flex',
               alignItems: 'center',
-              gap: '4px'
+              gap: '5px'
             }}>
               ♩ = {bpm} BPM
             </span>
@@ -1829,12 +1928,12 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
         <div style={{
           background: '#ffffff',
           border: '1.5px solid #bbf7d0',
-          borderRadius: '24px',
-          padding: '24px',
+          borderRadius: isNotebook ? '28px' : '24px',
+          padding: isNotebook ? '26px 30px' : '24px',
           display: 'flex',
           flexDirection: 'column',
-          gap: '20px',
-          boxShadow: '0 20px 40px -8px rgba(21, 128, 61, 0.15)',
+          gap: isNotebook ? '22px' : '20px',
+          boxShadow: isNotebook ? '0 20px 48px -12px rgba(21, 128, 61, 0.20)' : '0 20px 40px -8px rgba(21, 128, 61, 0.15)',
           position: 'relative'
         }} className="animate-fade-in">
           
@@ -2237,4 +2336,14 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
 
     </div>
   );
+
+  if (isNotebook) {
+    return (
+      <div style={{ width: '100%', maxWidth: '860px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        {studioCard}
+      </div>
+    );
+  }
+
+  return studioCard;
 };

@@ -16,6 +16,7 @@ import { MeisterOhrSticker } from './MeisterOhrSticker';
 const AudioEditorModal = React.lazy(() => import('./campus/AudioEditorModal').then(m => ({ default: m.AudioEditorModal })));
 const GrooveLoopstation = React.lazy(() => import('./groovelab/GrooveLoopstation').then(m => ({ default: m.GrooveLoopstation })));
 const CampusTuner = React.lazy(() => import('./campus/CampusTuner').then(m => ({ default: m.CampusTuner })));
+const EarLabStudioModal = React.lazy(() => import('./campus/EarLabStudioModal').then(m => ({ default: m.EarLabStudioModal })));
 const AudioBiographyView = React.lazy(() => import('./campus/AudioBiographyView').then(m => ({ default: m.AudioBiographyView })));
 const MeisterwerkCertificateModal = React.lazy(() => import('./ui/MeisterwerkCertificateModal').then(m => ({ default: m.MeisterwerkCertificateModal })));
 import { synthesizeNeuralSpeech, playAudioBlob, stopNeuralSpeech, buildContinuousHomeworkNarrative, cleanTextForTts, formatPageNumbersGerman } from '../services/neuralTtsService';
@@ -54,7 +55,7 @@ export {
 export type { StickerUnlockContext, StickerUnlockResult };
 
 import { getSimulatedNow, getISOWeekRaw } from './student/studentDateUtils';
-import { getInstrumentAvatarUrl } from './student/studentAvatars.constants';
+import { getInstrumentAvatarUrl, resolveCampusStudentAvatar } from './student/studentAvatars.constants';
 import { SpeechDictationButton } from './student/SpeechDictationButton';
 import {
   type Student,
@@ -899,24 +900,79 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   const [isDemoMode, setIsDemoMode] = useState<boolean>(false);
   const [selectedSimSticker, setSelectedSimSticker] = useState<string>('fleiss-pionier');
 
-  // Teacher Skill Level Overrides for Interactive Skill-Radar Cockpit
+  // Teacher Skill Level Overrides for Interactive Skill-Radar Cockpit (Single Source of Truth)
   const [skillOverrides, setSkillOverrides] = useState<{ [tagKey: string]: number }>(() => {
     try {
+      if (student?.skill_radar_levels && typeof student.skill_radar_levels === 'object') {
+        const db = student.skill_radar_levels;
+        return {
+          rhythmus: Number(db.rhythmus || 1),
+          technik: Number(db.technik || 1),
+          klang: Number(db.klang || db.intonation || 1),
+          intonation: Number(db.klang || db.intonation || 1),
+          ausdruck: Number(db.ausdruck || 1),
+          repertoire: Number(db.repertoire || 1)
+        };
+      }
       const saved = localStorage.getItem(`groovelab_skill_overrides_${student?.id || 'default'}`);
-      return saved ? JSON.parse(saved) : {};
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.klang && !parsed.intonation) parsed.intonation = parsed.klang;
+        if (parsed.intonation && !parsed.klang) parsed.klang = parsed.intonation;
+        return parsed;
+      }
+      return {};
     } catch {
       return {};
     }
   });
+
+  // Reactive listener for external skill radar changes (e.g. from TeacherStudentDetailModal)
+  useEffect(() => {
+    const handleSkillRadarChanged = (e: any) => {
+      if (e.detail?.studentId && student?.id && e.detail.studentId === student.id) {
+        if (e.detail.levels) {
+          const lvls = e.detail.levels;
+          setSkillOverrides({
+            ...lvls,
+            klang: lvls.klang || lvls.intonation || 1,
+            intonation: lvls.klang || lvls.intonation || 1
+          });
+        }
+        if (e.detail.weeklyFocus && e.detail.weeklyFocus !== 'ausgeglichen') {
+          setPendingTargetFocusTags([e.detail.weeklyFocus]);
+        }
+      }
+    };
+    window.addEventListener('skill_radar_levels_changed', handleSkillRadarChanged);
+    return () => window.removeEventListener('skill_radar_levels_changed', handleSkillRadarChanged);
+  }, [student?.id]);
 
   const handleSetSkillLevel = (tagKey: string, targetLevel: number) => {
     if (readOnly && !isTeacherTools) return;
     const validLevel = Math.min(5, Math.max(1, targetLevel));
     setSkillOverrides(prev => {
       const updated = { ...prev, [tagKey]: validLevel };
+      if (tagKey === 'klang') updated.intonation = validLevel;
+      if (tagKey === 'intonation') updated.klang = validLevel;
       try {
         localStorage.setItem(`groovelab_skill_overrides_${student?.id || 'default'}`, JSON.stringify(updated));
+        localStorage.setItem(`student_pillars_${student?.id || 'default'}`, JSON.stringify(updated));
       } catch (e) {}
+
+      if (student?.id) {
+        window.dispatchEvent(new CustomEvent('skill_radar_levels_changed', {
+          detail: { studentId: student.id, levels: updated, weeklyFocus: pendingTargetFocusTags[0] || 'ausgeglichen' }
+        }));
+        const payload = {
+          ...updated,
+          intonation: updated.klang || updated.intonation,
+          weekly_focus: pendingTargetFocusTags[0] || 'ausgeglichen'
+        };
+        student.skill_radar_levels = payload;
+        supabase.from('users').update({ skill_radar_levels: payload }).eq('id', student.id).then(() => {});
+      }
+
       return updated;
     });
     triggerDebouncedAutoSave(350);
@@ -927,9 +983,26 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       const current = prev[tagKey] ?? 3;
       const nextLevel = Math.min(5, current + 1);
       const updated = { ...prev, [tagKey]: nextLevel };
+      if (tagKey === 'klang') updated.intonation = nextLevel;
+      if (tagKey === 'intonation') updated.klang = nextLevel;
       try {
         localStorage.setItem(`groovelab_skill_overrides_${student?.id || 'default'}`, JSON.stringify(updated));
+        localStorage.setItem(`student_pillars_${student?.id || 'default'}`, JSON.stringify(updated));
       } catch (e) {}
+
+      if (student?.id) {
+        window.dispatchEvent(new CustomEvent('skill_radar_levels_changed', {
+          detail: { studentId: student.id, levels: updated, weeklyFocus: pendingTargetFocusTags[0] || 'ausgeglichen' }
+        }));
+        const payload = {
+          ...updated,
+          intonation: updated.klang || updated.intonation,
+          weekly_focus: pendingTargetFocusTags[0] || 'ausgeglichen'
+        };
+        student.skill_radar_levels = payload;
+        supabase.from('users').update({ skill_radar_levels: payload }).eq('id', student.id).then(() => {});
+      }
+
       return updated;
     });
     triggerDebouncedAutoSave(350);
@@ -938,13 +1011,21 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   const handleTriggerSkillQuest = (tagKey: string) => {
     // Toggle active focus tag for this skill (Max 2)
     setPendingTargetFocusTags(prev => {
+      let nextTags: string[];
       if (prev.includes(tagKey)) {
-        return prev.filter(k => k !== tagKey);
+        nextTags = prev.filter(k => k !== tagKey);
+      } else if (prev.length >= 2) {
+        nextTags = [prev[1], tagKey];
+      } else {
+        nextTags = [...prev, tagKey];
       }
-      if (prev.length >= 2) {
-        return [prev[1], tagKey];
+
+      if (student?.id) {
+        window.dispatchEvent(new CustomEvent('skill_radar_levels_changed', {
+          detail: { studentId: student.id, levels: skillOverrides, weeklyFocus: nextTags[0] || 'ausgeglichen' }
+        }));
       }
-      return [...prev, tagKey];
+      return nextTags;
     });
     triggerImmediateAutoSave();
   };
@@ -953,11 +1034,27 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     const updated: { [k: string]: number } = {};
     SKILL_TAGS.forEach(t => {
       updated[t.key] = 5; // Level 5 Meister
+      if (t.legacyKey) updated[t.legacyKey] = 5;
     });
     setSkillOverrides(updated);
     try {
       localStorage.setItem(`groovelab_skill_overrides_${student?.id || 'default'}`, JSON.stringify(updated));
+      localStorage.setItem(`student_pillars_${student?.id || 'default'}`, JSON.stringify(updated));
     } catch (e) {}
+
+    if (student?.id) {
+      window.dispatchEvent(new CustomEvent('skill_radar_levels_changed', {
+        detail: { studentId: student.id, levels: updated, weeklyFocus: pendingTargetFocusTags[0] || 'ausgeglichen' }
+      }));
+      const payload = {
+        ...updated,
+        intonation: 5,
+        weekly_focus: pendingTargetFocusTags[0] || 'ausgeglichen'
+      };
+      student.skill_radar_levels = payload;
+      supabase.from('users').update({ skill_radar_levels: payload }).eq('id', student.id).then(() => {});
+    }
+
     triggerImmediateAutoSave();
   };
 
@@ -1153,10 +1250,10 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
   const [stickerCategoryFilter, setStickerCategoryFilter] = useState<'all' | 'ueben' | 'xp' | 'streaks' | 'songs' | 'spezial'>('all');
   const [isXpLegendOpen, setIsXpLegendOpen] = useState<boolean>(false);
-  const [activeViewMode, setActiveViewMode] = useState<'document' | 'recordings' | 'loopstation' | 'practice' | 'tuner' | 'groovetrainer'>(initialViewMode || (isTeacherTools ? 'loopstation' : 'document'));
+  const [activeViewMode, setActiveViewMode] = useState<'document' | 'recordings' | 'loopstation' | 'practice' | 'tuner' | 'groovetrainer' | 'earlab'>(initialViewMode || (isTeacherTools ? 'loopstation' : 'document'));
 
   useEffect(() => {
-    if (isSoftLocked && !isTeacherMode && (activeViewMode === 'loopstation' || activeViewMode === 'practice' || activeViewMode === 'recordings' || activeViewMode === 'groovetrainer')) {
+    if (isSoftLocked && !isTeacherMode && (activeViewMode === 'loopstation' || activeViewMode === 'practice' || activeViewMode === 'recordings' || activeViewMode === 'groovetrainer' || activeViewMode === 'earlab')) {
       setActiveViewMode('document');
       if (onTriggerSoftLock) onTriggerSoftLock();
     }
@@ -8134,11 +8231,13 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
   const renderSkillRadarButton = (isMobile: boolean = false) => {
     if (isTeacherTools) return null;
+    const radarTitle = uiLevel === 'junior' ? 'Musik-Stern ⭐' : uiLevel === 'pro' ? 'Kompetenz-Radar' : 'Skill-Radar';
     return (
       <button
         type="button"
         onClick={() => { setActiveModalTab('skillradar'); setActiveSubView('hub'); }}
-        title="Skill-Radar"
+        title={radarTitle}
+        aria-label={radarTitle}
         style={{
           background: activeModalTab === 'skillradar' ? '#34a853' : 'rgba(255,255,255,0.15)',
           border: isMobile ? 'none' : '1px solid rgba(255,255,255,0.08)',
@@ -8159,8 +8258,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         }}
         className="hover-scale"
       >
-        <Activity size={isMobile ? 12 : 13} />
-        <span>Skill-Radar</span>
+        {uiLevel === 'junior' ? <Star size={isMobile ? 12 : 13} /> : <Activity size={isMobile ? 12 : 13} />}
+        <span>{radarTitle}</span>
       </button>
     );
   };
@@ -8179,6 +8278,10 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         isTeacherTools={isTeacherTools}
         isMobileView={isMobileView}
         useNotebookLayout={useNotebookLayout}
+        uiLevel={uiLevel}
+        teacherName={effectiveTeacherFullName}
+        studentName={studentFirstName}
+        instrumentName={studentInstrument || (student as any)?.instrument || (student as any)?.instrument_type || (student as any)?.instrument_name || ''}
         handleMasterAllSkills={handleMasterAllSkills}
         handleTriggerSkillQuest={handleTriggerSkillQuest}
         handleSetSkillLevel={handleSetSkillLevel}
@@ -8869,7 +8972,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 }}
               >
                 <img
-                  src={getInstrumentAvatarUrl(studentInstrument)}
+                  src={resolveCampusStudentAvatar({ ...(student || {}), instrument: studentInstrument || student?.instrument })}
                   style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                   alt=""
                 />
@@ -9051,7 +9154,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
               { value: 'recordings', label: 'Audio-Aufnahmen' },
               { value: 'tuner', label: 'Stimmgerät (Tuner)' },
               { value: 'groovetrainer', label: 'Groove-Trainer' },
-              ...(uiLevel !== 'junior' ? [{ value: 'radar', label: 'Skill-Radar' }] : []),
+              { value: 'earlab', label: uiLevel === 'junior' ? 'Klang-Detektiv 🎧' : 'EarLab & Harmony 🎧' },
+              { value: 'radar', label: uiLevel === 'junior' ? 'Musik-Stern ⭐' : uiLevel === 'pro' ? 'Kompetenz-Radar' : 'Skill-Radar' },
               ...(uiLevel === 'pro' ? [{ value: 'history', label: 'Archiv & Historie' }] : [])
             ];
 
@@ -9263,11 +9367,14 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           ) : activeViewMode === 'groovetrainer' ? (
             <div style={{
               width: '100%',
+              flex: 1,
+              background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+              borderTop: '1px solid #e2e8f0',
               boxSizing: 'border-box',
-              padding: isMobileOrSim ? '16px 16px calc(280px + env(safe-area-inset-bottom, 40px)) 16px' : '20px 24px 80px 24px',
+              padding: isMobileOrSim ? '16px 16px calc(280px + env(safe-area-inset-bottom, 40px)) 16px' : '24px 32px 80px 32px',
               display: 'flex',
               flexDirection: 'column',
-              justifyContent: 'center',
+              justifyContent: 'flex-start',
               alignItems: 'center',
               minHeight: isMobileOrSim ? 'auto' : 'calc(70vh - 60px)'
             }}>
@@ -9278,6 +9385,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                   setHubTab('modules');
                 }}
                 uiLevel={uiLevel}
+                useNotebookLayout={true}
+                homeworkNotesList={homeworkNotesList}
                 onRewardXp={async (xp, durationSeconds = 0) => {
                   if (student?.id && (xp > 0 || durationSeconds > 0)) {
                     await awardCampusXP(xp, 'Groove-Trainer gemeistert', durationSeconds);
@@ -9341,12 +9450,58 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           ) : activeViewMode === 'tuner' ? (
             <div style={{
               width: '100%',
+              flex: 1,
+              background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+              borderTop: '1px solid #e2e8f0',
               boxSizing: 'border-box',
-              padding: isMobileOrSim ? '16px 16px calc(280px + env(safe-area-inset-bottom, 40px)) 16px' : '28px 24px 80px 24px'
+              padding: isMobileOrSim ? '16px 16px calc(280px + env(safe-area-inset-bottom, 40px)) 16px' : '28px 24px 80px 24px',
+              minHeight: isMobileOrSim ? 'auto' : 'calc(70vh - 60px)'
             }}>
               <React.Suspense fallback={<div style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>Lade Stimmgerät...</div>}>
                 <CampusTuner
                   uiLevel={uiLevel}
+                />
+              </React.Suspense>
+            </div>
+          ) : activeViewMode === 'earlab' ? (
+            <div style={{
+              width: '100%',
+              flex: 1,
+              background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+              borderTop: '1px solid #e2e8f0',
+              boxSizing: 'border-box',
+              padding: isMobileOrSim ? '16px 16px calc(280px + env(safe-area-inset-bottom, 40px)) 16px' : '24px 32px 80px 32px',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'flex-start',
+              alignItems: 'center',
+              minHeight: isMobileOrSim ? 'auto' : 'calc(70vh - 60px)'
+            }}>
+              <React.Suspense fallback={<div style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>Lade EarLab &amp; Harmony-Studio...</div>}>
+                <EarLabStudioModal
+                  student={student}
+                  uiLevel={uiLevel}
+                  embedded={true}
+                  useNotebookLayout={true}
+                  onClose={() => {
+                    setActiveViewMode('document');
+                    setHubTab('modules');
+                  }}
+                  onRewardXp={async (xp, reason) => {
+                    if (student?.id && xp > 0) {
+                      await awardCampusXP(xp, reason);
+                    }
+                  }}
+                  onSessionComplete={(summary) => {
+                    const pillarLabel = summary.pillar === 'intervals' ? 'Intervalle' : summary.pillar === 'chords' ? 'Akkorde' : 'Rhythmus';
+                    const entry = `EARLAB_SCORE:${summary.vdmLevel.toUpperCase()}|${pillarLabel}|${summary.accuracy}%|+${summary.xp}XP|${new Date().toLocaleDateString('de-DE')}`;
+                    setHomeworkNotesList(prev => {
+                      const filtered = prev.filter(n => !n.startsWith('EARLAB_SCORE:'));
+                      const updated = [...filtered, entry];
+                      syncHomeworkNotes(updated).catch(err => console.error('Error syncing earlab score:', err));
+                      return updated;
+                    });
+                  }}
                 />
               </React.Suspense>
             </div>

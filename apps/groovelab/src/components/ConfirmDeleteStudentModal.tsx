@@ -30,14 +30,22 @@ export const ConfirmDeleteStudentModal: React.FC<ConfirmDeleteStudentModalProps>
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Reset modal state when opened/closed
+  // Reset modal state when opened/closed & handle Escape key
   useEffect(() => {
     if (isOpen) {
       setStep(1);
       setIsSubmitting(false);
       setError(null);
+
+      const handleKeyDown = (e: KeyboardEvent) => {
+        if (e.key === 'Escape') {
+          onClose();
+        }
+      };
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
     }
-  }, [isOpen, student]);
+  }, [isOpen, student, onClose]);
 
   if (!isOpen || !student) return null;
 
@@ -76,6 +84,9 @@ export const ConfirmDeleteStudentModal: React.FC<ConfirmDeleteStudentModalProps>
       onClick={onClose}
     >
       <div 
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="confirm-delete-student-title"
         style={{
           backgroundColor: '#ffffff',
           borderRadius: '24px',
@@ -112,7 +123,7 @@ export const ConfirmDeleteStudentModal: React.FC<ConfirmDeleteStudentModalProps>
               {step === 1 ? <Trash2 size={20} /> : <ShieldAlert size={20} />}
             </div>
             <div>
-              <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700, color: '#0f172a' }}>
+              <h3 id="confirm-delete-student-title" style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700, color: '#0f172a' }}>
                 {step === 1 ? 'Schüler entfernen' : 'Doppelte Bestätigung'}
               </h3>
               <p style={{ margin: 0, fontSize: '0.8rem', color: '#64748b' }}>

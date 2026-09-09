@@ -28,7 +28,7 @@ import {
   isQuietHoursActive, 
   ChatRespectValidationResult 
 } from '../utils/chatRespectGuard';
-import { getInstrumentAvatarUrl } from './StudioAvatar';
+import { getInstrumentAvatarUrl, resolveCampusStudentAvatar } from './StudioAvatar';
 
 const resolveCampusAvatar = (u: any): string => {
   if (!u) return '/avatar_ghost.jpg';
@@ -38,7 +38,7 @@ const resolveCampusAvatar = (u: any): string => {
   // Teachers in Campus module must ALWAYS display their instrument avatar (per AGENTS.md)!
   const isTeacher = role === 'teacher' || roles.includes('teacher');
   if (isTeacher) {
-    return getInstrumentAvatarUrl(u.instrument);
+    return resolveCampusStudentAvatar(u);
   }
 
   if (role === 'admin' || role === 'secretary' || roles.includes('admin') || roles.includes('secretary')) {
@@ -46,9 +46,9 @@ const resolveCampusAvatar = (u: any): string => {
   }
   
   if (role === 'student') {
-    return getInstrumentAvatarUrl(u.instrument);
+    return resolveCampusStudentAvatar(u);
   }
-  return getInstrumentAvatarUrl(u.instrument);
+  return resolveCampusStudentAvatar(u);
 };
 
 const formatStudentDisplayName = (u: any): string => {
@@ -1717,9 +1717,33 @@ export function CampusDirectMessages({
                       margin: '2px 0 0 0',
                       whiteSpace: 'nowrap',
                       overflow: 'hidden',
-                      textOverflow: 'ellipsis'
+                      textOverflow: 'ellipsis',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
                     }}>
-                      {partner.lastMessage ? cleanChatMessageContent(partner.lastMessage.content) : 'Keine Nachrichten.'}
+                      {partner.lastMessage?.sender_role === 'parent' && (
+                        <span style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '3px',
+                          background: '#eff6ff',
+                          color: '#1d4ed8',
+                          border: '1px solid #dbeafe',
+                          padding: '1px 5px',
+                          borderRadius: '5px',
+                          fontSize: '0.62rem',
+                          fontWeight: 800,
+                          flexShrink: 0,
+                          lineHeight: 1
+                        }}>
+                          <ShieldCheck size={10} color="#1d4ed8" strokeWidth={2.5} />
+                          <span>Eltern</span>
+                        </span>
+                      )}
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {partner.lastMessage ? cleanChatMessageContent(partner.lastMessage.content) : 'Keine Nachrichten.'}
+                      </span>
                     </p>
                   </div>
                 </button>
@@ -2457,16 +2481,37 @@ export function CampusDirectMessages({
 
                         {/* Chat Bubble with natural sizing, sender name, and inline metadata */}
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: isSelf ? 'flex-end' : 'flex-start', maxWidth: isMobile ? '80%' : '68%' }}>
-                          {/* Sender Name above incoming bubble (only on initial message of cluster) */}
-                          {!isSelf && !isContinuation && (
+                          {/* Sender Name & Parent Badge above incoming bubble */}
+                          {!isSelf && (!isContinuation || (msg.sender_role === 'parent' && prevMsg?.sender_role !== 'parent')) && (
                             <div style={{
                               fontSize: '0.72rem',
                               fontWeight: 800,
-                              color: '#34a853',
+                              color: msg.sender_role === 'parent' ? '#1d4ed8' : '#34a853',
                               marginBottom: '3px',
-                              marginLeft: '4px'
+                              marginLeft: '4px',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '6px'
                             }}>
-                              {formatStudentDisplayName(selectedRecipient)}
+                              <span>{formatStudentDisplayName(selectedRecipient)}</span>
+                              {msg.sender_role === 'parent' && (
+                                <span style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '3px',
+                                  padding: '1px 6px',
+                                  borderRadius: '6px',
+                                  background: '#eff6ff',
+                                  border: '1px solid #dbeafe',
+                                  color: '#1d4ed8',
+                                  fontSize: '0.65rem',
+                                  fontWeight: 800,
+                                  lineHeight: 1
+                                }}>
+                                  <ShieldCheck size={11} color="#1d4ed8" strokeWidth={2.5} />
+                                  <span>Eltern</span>
+                                </span>
+                              )}
                             </div>
                           )}
 

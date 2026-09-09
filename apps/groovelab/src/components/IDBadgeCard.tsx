@@ -94,6 +94,8 @@ export interface IDBadgeCardProps {
   selectedPrint?: boolean;
   onToggleSelectPrint?: (e: React.MouseEvent) => void;
   isPrintVersion?: boolean;
+  isLocked?: boolean;
+  lockMessage?: string;
 }
 
 export const IDBadgeCard: React.FC<IDBadgeCardProps> = ({
@@ -107,7 +109,9 @@ export const IDBadgeCard: React.FC<IDBadgeCardProps> = ({
   showSubtext = false,
   selectedPrint,
   onToggleSelectPrint,
-  isPrintVersion = false
+  isPrintVersion = false,
+  isLocked = false,
+  lockMessage
 }) => {
   const currentPlatform = activePlatform || (typeof window !== 'undefined' ? localStorage.getItem('groovelab_active_platform') : 'groovelab') || 'groovelab';
 
@@ -242,6 +246,21 @@ export const IDBadgeCard: React.FC<IDBadgeCardProps> = ({
         gap: isPrintVersion ? '4px' : '6px',
         flexWrap: 'wrap'
       }}>
+        {isLocked && (
+          <span style={{ 
+            background: '#fef3c7', 
+            color: '#b45309', 
+            border: '1px solid #fde68a',
+            padding: isPrintVersion ? '1.5px 5px' : '3px 8px', 
+            borderRadius: '5px', 
+            fontSize: isPrintVersion ? '0.45rem' : '0.58rem', 
+            fontWeight: 1000, 
+            letterSpacing: '0.08em',
+            textTransform: 'uppercase'
+          }}>
+            WARTET AUF FREIGABE
+          </span>
+        )}
         {hasVerwaltung && (
           <span style={{ 
             background: '#fce8e6', 
@@ -287,7 +306,7 @@ export const IDBadgeCard: React.FC<IDBadgeCardProps> = ({
             GROOVELAB
           </span>
         )}
-        {!hasVerwaltung && !hasCampus && !hasGrooveLab && (
+        {!hasVerwaltung && !hasCampus && !hasGrooveLab && !isLocked && (
           <span style={{ 
             background: '#f1f5f9', 
             color: '#64748b', 
@@ -329,9 +348,42 @@ export const IDBadgeCard: React.FC<IDBadgeCardProps> = ({
           alignItems: 'center',
           justifyContent: 'center',
           boxSizing: 'border-box',
-          boxShadow: isPrintVersion ? 'none' : '0 4px 14px rgba(0,0,0,0.03)'
+          boxShadow: isPrintVersion ? 'none' : '0 4px 14px rgba(0,0,0,0.03)',
+          position: 'relative',
+          overflow: 'hidden'
         }}>
-          <QRCode value={effectiveQrValue} size={finalQrSize} style={{ width: `${finalQrSize}px`, height: `${finalQrSize}px` }} />
+          <QRCode 
+            value={effectiveQrValue} 
+            size={finalQrSize} 
+            style={{ 
+              width: `${finalQrSize}px`, 
+              height: `${finalQrSize}px`,
+              filter: isLocked ? 'blur(6px)' : 'none',
+              opacity: isLocked ? 0.22 : 1,
+              transition: 'all 0.3s ease'
+            }} 
+          />
+          {isLocked && (
+            <div style={{
+              position: 'absolute',
+              inset: 0,
+              borderRadius: isPrintVersion ? '12px' : '22px',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: 'rgba(255, 255, 255, 0.86)',
+              backdropFilter: 'blur(4px)',
+              padding: '8px',
+              textAlign: 'center',
+              zIndex: 5
+            }}>
+              <span style={{ fontSize: isPrintVersion ? '1.2rem' : '1.75rem', marginBottom: '4px' }}>🔒</span>
+              <span style={{ fontSize: isPrintVersion ? '0.46rem' : '0.66rem', fontWeight: 800, color: '#92400e', lineHeight: 1.25, maxWidth: '130px' }}>
+                {lockMessage || 'Elterliche Freigabe erforderlich'}
+              </span>
+            </div>
+          )}
         </div>
       </div>
 

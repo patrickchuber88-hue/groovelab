@@ -391,6 +391,9 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
             {/* FOCUS MODAL FOR SELECTED SETTINGS CATEGORY */}
             {activeSecretarySettingsModal && (
               <div 
+                role="dialog"
+                aria-modal="true"
+                aria-label="Schul-Einstellungen Detailansicht"
                 style={{
                   position: 'fixed',
                   top: 0,

@@ -372,6 +372,7 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
     const occRefId = targetOccId || (targetScheduleId ? `virtual-${targetScheduleId}-${targetDate}` : null);
 
     // Optimistic message
+    const isParentSender = Boolean(isParentUnlocked);
     const optimisticMessage = {
       id: `temp-${Date.now()}`,
       sender_id: currentUserId,
@@ -380,7 +381,8 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
       created_at: new Date().toISOString(),
       is_read: false,
       occurrence_id: occRefId,
-      is_system: false
+      is_system: false,
+      sender_role: isParentSender ? 'parent' : (currentUserRole === 'teacher' ? 'teacher' : 'student')
     };
     setChatMessages(prev => [...prev, optimisticMessage]);
     setChatTypedMessage('');
@@ -393,7 +395,8 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
         content: text,
         occurrence_id: occRefId,
         is_read: false,
-        is_system: false
+        is_system: false,
+        sender_role: isParentSender ? 'parent' : (currentUserRole === 'teacher' ? 'teacher' : 'student')
       });
       if (error) throw error;
       await fetchMessages();
@@ -1073,15 +1076,37 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
                   alignItems: isMe ? 'flex-end' : 'flex-start',
                   gap: '2px'
                 }}>
-                  {!isMe && (
+                  {(!isMe || msg.sender_role === 'parent') && (
                     <span style={{
                       fontSize: '0.80rem',
                       fontWeight: 800,
-                      color: currentUserRole === 'student' ? '#15803d' : '#2563eb',
+                      color: msg.sender_role === 'parent' ? '#1d4ed8' : (currentUserRole === 'student' ? '#15803d' : '#2563eb'),
                       marginBottom: '2px',
-                      marginLeft: '6px'
+                      marginLeft: isMe ? '0px' : '6px',
+                      marginRight: isMe ? '6px' : '0px',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '5px'
                     }}>
-                      {senderDisplayName}
+                      <span>{senderDisplayName}</span>
+                      {msg.sender_role === 'parent' && (
+                        <span style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '3px',
+                          padding: '1px 6px',
+                          borderRadius: '6px',
+                          background: '#eff6ff',
+                          border: '1px solid #dbeafe',
+                          color: '#1d4ed8',
+                          fontSize: '0.65rem',
+                          fontWeight: 800,
+                          lineHeight: 1
+                        }}>
+                          <ShieldCheck size={11} color="#1d4ed8" strokeWidth={2.5} />
+                          <span>Eltern</span>
+                        </span>
+                      )}
                     </span>
                   )}
                   <div style={{

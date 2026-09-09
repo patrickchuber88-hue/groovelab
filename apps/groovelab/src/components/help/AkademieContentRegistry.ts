@@ -84,440 +84,16 @@ export const TIER_CONFIG: Record<AkademieTier, {
   }
 };
 
-export const AKADEMIE_GUIDES_DATABASE: AkademieBoardGuide[] = [
-  // ══════════════════════════════════════════════════════════════════════════════════
-  // STUFE 1: MASTER-ADMIN (PLATTFORM-BETREIBER)
-  // ══════════════════════════════════════════════════════════════════════════════════
-  {
-    id: 'master-exec-cockpit',
-    tier: 'master_admin',
-    boardId: 'executive',
-    title: 'Executive Cockpit & Live-FinOps Metriken',
-    subtitle: 'Gesamtheitliche Steuerung von MRR, ARR, Schulkontingenten und Kapazitäts-Tiers',
-    badge: 'Executive',
-    category: 'quickstart',
-    summary: 'Echtzeit-Überwachung des Gesamtsystems: Live-Plattform-MRR (68,92 € / Mo.), Live-ARR (827,04 € / Jahr), Schüler-Aktivierungen und Server-Auslastung.',
-    steps: [
-      {
-        title: '1. Multi-Tenant MRR & ARR Invarianten prüfen',
-        desc: 'Das Executive Board berechnet den MRR mathematisch deterministisch. Jede Schule wird nach aktiven Lehrern, Schülern und Speicher-Addons aggregiert.',
-        actionLabel: 'Zu den Executive Metriken',
-        actionTarget: 'executive'
-      },
-      {
-        title: '2. Kapazitäts-Tiers & Hetzner-Serverlast überwachen',
-        desc: 'Automatische Klassifizierung in Tier 1 (bis 3 Schulen) bis Tier 5 (bis 500 Schulen). Prüfe CPU-Auslastung und P95-Latenz.',
-        actionLabel: 'Hardware-Fit einsehen',
-        actionTarget: 'executive'
-      },
-      {
-        title: '3. Master-Passkey & TOTP-Zwei-Faktor-Schutz',
-        desc: 'Der Master-Admin Zugang ist kryptografisch durch WebAuthn (Touch ID / YubiKey) und zeitbasierte OTP-Tokens gesichert.',
-        actionLabel: 'Sicherheits-Status prüfen',
-        actionTarget: 'trust_safety'
-      }
-    ],
-    proTips: [
-      'Nutze die Tastenkombination [Cmd + Shift + M], um jederzeit direkt in das Master-Executive-Cockpit zurückzuspringen.',
-      'Die ARR-Berechnung erfolgt 100% synchron zum 12-fachen des monatlichen deterministischen Live-MRR.'
-    ],
-    shortcuts: [
-      { key: 'Cmd + Shift + M', desc: 'Master Executive Cockpit öffnen' },
-      { key: 'Cmd + K', desc: 'Spotlight Schnellsuche' }
-    ],
-    invariants: [
-      'Zero-Trust: Direkte Client-Updates an `is_master_admin` oder `school_id` sind serverseitig neutralisiert.',
-      'Revisionssicheres Audit-Logging: Jeder Master-Admin Login wird in `master_audit_trail` protokolliert.'
-    ],
-    tags: ['master', 'executive', 'mrr', 'arr', 'finops', 'hetzner', 'passkey', 'totp']
-  },
-  {
-    id: 'master-school-management',
-    tier: 'master_admin',
-    boardId: 'schools',
-    title: 'Mandanten-Verwaltung & Schul-Provisionierung',
-    subtitle: 'Schlüsselfertiges Anlegen neuer Musikschulen, Subdomains und Schulträger-Zuweisung',
-    badge: 'Mandanten',
-    category: 'core_boards',
-    summary: 'Verwalte Musikschulen in DE, AT und CH. Provisioniere neue Mandanten mit Subdomains (<schule>.campus-groovelab.de) und Modul-Bundles.',
-    steps: [
-      {
-        title: '1. Neue Musikschule anlegen',
-        desc: 'Klicke auf "Neue Musikschule anlegen". Gib den offiziellen Schulnamen, die Stadt, Postleitzahl und das Primär-Modul (Kombi-Bundle, Campus oder GrooveLab) ein.',
-        actionLabel: 'Schulen-Board aufrufen',
-        actionTarget: 'schools'
-      },
-      {
-        title: '2. Subdomain & DNS-Kopplung',
-        desc: 'Das System erzeugt automatisch die saubere Subdomain. Der Schulleitungs-Initial-Token wird für die Übergabe generiert.',
-        actionLabel: 'Subdomain prüfen',
-        actionTarget: 'schools'
-      },
-      {
-        title: '3. Mandanten-Isolation prüfen',
-        desc: 'Jede Schule erhält eine isolierte `school_id`. Cross-Tenant Datenlecks sind durch PostgreSQL Row Level Security (RLS) mathematisch ausgeschlossen.',
-        actionLabel: 'Mandanten-Status prüfen',
-        actionTarget: 'schools'
-      }
-    ],
-    proTips: [
-      'Schulen mit Kombi-Vorteil erhalten automatisch den monatlichen Nachlass von 4,90 € auf das Hosting-Bundle.',
-      'Der Initial-Admin-Link kann direkt als druckfertiges Übergabeprotokoll exportiert werden.'
-    ],
-    invariants: [
-      'Multi-Tenancy Doktrin: Jede Abfrage erzwingt `school_id = get_current_user_school_id()`.',
-      'Software-Lizenzgebühr ist immer 0,00 € (Inklusive).'
-    ],
-    tags: ['schulen', 'mandanten', 'provisionierung', 'subdomain', 'rls', 'isolation']
-  },
-  {
-    id: 'master-payment-reconciliation',
-    tier: 'master_admin',
-    boardId: 'briefing',
-    title: 'Zahlungsabgleich & Schüler-Aktivierungsfreigaben',
-    subtitle: 'Automatischer Bank-Sync, B2C-Direktzahler-Abgleich und Freischaltung',
-    badge: 'Zahlungsabgleich',
-    category: 'finops_compliance',
-    summary: 'Überwache Banküberweisungen von Eltern für Schüleraktivierungen. 1-Klick-Freischaltung für Schüler-Profile nach Zahlungseingang.',
-    steps: [
-      {
-        title: '1. Eingegangene Banküberweisungen prüfen',
-        desc: 'Vergleiche den Bank-Kontoauszug mit den offenen Aktivierungsanfragen. Der Verwendungszweck enthält den kanonischen Hash (CG-[STUDENT_HASH_8]-[YYMM]).',
-        actionLabel: 'Zahlungsabgleich öffnen',
-        actionTarget: 'briefing'
-      },
-      {
-        title: '2. Schülerprofil freischalten',
-        desc: 'Klicke auf den grünen Haken "Zahlung bestätigen". Das Schüler-Profil wird in Millisekunden für das gesamte Schuljahr aktiviert.',
-        actionLabel: 'Offene Zahlungen anzeigen',
-        actionTarget: 'briefing'
-      },
-      {
-        title: '3. Rechnungsbeleg automatisch archivieren',
-        desc: 'Das System generiert die GoBD-konforme B2C-Jahresrechnung und legt sie im Revisions-Tresor der Musikschule ab.',
-        actionLabel: 'Archiv einsehen',
-        actionTarget: 'billing'
-      }
-    ],
-    proTips: [
-      'Nutze die Filterfunktion, um Zahlungen nach Schule oder Betrag (5,88 € bzw. CHF 12.00) zu sortieren.',
-      'Sammelüberweisungen für Geschwisterkinder werden anhand des Elternnamens intelligent zusammengeführt.'
-    ],
-    invariants: [
-      'Rechnungsnummer-Standard: B2C-Aktivierungen folgen ausnahmslos dem Format `CG-[STUDENT_HASH_8]-[YYMM]`.',
-      'Keine Speicherung von Bank- oder Kontodaten der Eltern (DSGVO-Datenminimierung).'
-    ],
-    tags: ['zahlung', 'abgleich', 'aktivierung', 'überweisung', 'gobd', 'b2c']
-  },
-  {
-    id: 'master-financial-control',
-    tier: 'master_admin',
-    boardId: 'billing',
-    title: 'Financial Control, B2B-Rechnungen & Delinquency Engine',
-    subtitle: 'Monatliche Musikschul-Sammelrechnungen, Mahnwesen und 5-Stufen Eskalation',
-    badge: 'Financial Control',
-    category: 'finops_compliance',
-    summary: 'Zentrale Rechnungsstellung an Musikschulen: Automatische Generierung der monatlichen B2B-Infrastruktur-Rechnungen und 5-Stufen Delinquency Engine.',
-    steps: [
-      {
-        title: '1. Monatsrechnungen zum 1. des Monats erzeugen',
-        desc: 'Klicke auf "Monatslauf starten". Das System berechnet für jede Musikschule die exakte Aufstellung aller aktiven Lehrer, Schüler und Module.',
-        actionLabel: 'Rechnungslauf starten',
-        actionTarget: 'billing'
-      },
-      {
-        title: '2. B2B Delinquency Engine überwachen',
-        desc: 'Bei Zahlungsverzug greift die 5-Stufen-Eskalation: Stufe 0 (Nominal) ➔ Stufe 1 (Freundliche Erinnerung nach 28 Tagen) bis Stufe 4 (Soft-Lock mit Notfall-PIN).',
-        actionLabel: 'Mahnstufen einsehen',
-        actionTarget: 'billing'
-      },
-      {
-        title: '3. Rechnungs-PDFs herunterladen & versenden',
-        desc: 'Drucke oder exportiere die Sammelrechnungen mit kanonischer Nomenklatur für die Kämmereien und Schulträger.',
-        actionLabel: 'PDFs herunterladen',
-        actionTarget: 'billing'
-      }
-    ],
-    proTips: [
-      'Härtefall-Schulen können im System mit einer verlängerten Zahlungsfrist (Grace Period) hinterlegt werden.',
-      'GrooveLab-Aktivierungen werden verbindlich der Schule als Sammelzahler berechnet.'
-    ],
-    invariants: [
-      'Kanonische Reihenfolge: Software-Bereitstellung (0,00 €) steht immer an Position 1 jeder Rechnung.',
-      'Rechnungsnummer: B2B Musikschulrechnungen lauten immer `RE-[SCHOOL_ID]-[YYMM]-01`.'
-    ],
-    tags: ['b2b', 'rechnungen', 'delinquency', 'mahnwesen', 'finops', 'softlock']
-  },
-  {
-    id: 'master-telemetry-health',
-    tier: 'master_admin',
-    boardId: 'telemetry',
-    title: 'Server-Telemetrie, P95-Latenzen & System-Health',
-    subtitle: 'Hetzner NVMe I/O, PostgreSQL Ping, Connection-Pools und Error-Telemetry',
-    badge: 'Telemetrie',
-    category: 'core_boards',
-    summary: 'Echtzeit-Diagnose der Hetzner Cloud-Instanzen: Überwache CPU-Load, RAM-Verbrauch, Supabase Connection-Pools und P95-Endpunkt-Latenzen.',
-    steps: [
-      {
-        title: '1. P95-Endpunkt-Latenz überwachen',
-        desc: 'Prüfe, ob die Antwortzeiten aller Kern-RPCs unter der Schwelle von 50 ms liegen. Grüne Ampeln signalisieren nominalen Betrieb.',
-        actionLabel: 'Latenz-Graph öffnen',
-        actionTarget: 'telemetry'
-      },
-      {
-        title: '2. PostgreSQL Connection Pooling prüfen',
-        desc: 'Stelle sicher, dass Supavisor die Verbindungen im Transaction Mode effizient bündelt und keine Verbindungslimits erreicht werden.',
-        actionLabel: 'Pool-Status prüfen',
-        actionTarget: 'telemetry'
-      },
-      {
-        title: '3. Client-Fehlerprotokolle analysieren',
-        desc: 'Erfasse ungefilterte Client-Fehler telemetrisch zur sofortigen Beseitigung von Frontend-Exceptions.',
-        actionLabel: 'Error-Log einsehen',
-        actionTarget: 'telemetry'
-      }
-    ],
-    proTips: [
-      'Ein kontinuierlicher Ping von unter 30 ms garantiert ein butterweiches Benutzererlebnis auch auf mobilen Datenverbindungen.',
-      'Nutze den Resilienz-Audit PDF-Export als formalen Nachweis für Schulträger und Datenschutzbeauftragte.'
-    ],
-    invariants: [
-      'Hochverfügbarkeits-SLA: Ausfallzeiten dürfen im Monatsmittel 0,05% nicht überschreiten.'
-    ],
-    tags: ['telemetrie', 'hetzner', 'latenz', 'p95', 'health', 'postgresql', 'sla'],
-    pdfDownloadType: 'resilience_audit'
-  },
-  {
-    id: 'master-pricing-campaigns',
-    tier: 'master_admin',
-    boardId: 'pricing',
-    title: 'Tarife, Kampagnen & Bereitstellungspreise',
-    subtitle: 'Verwaltung der globalen Hosting-Pakete, Team-Gebühren und Rabattaktionen',
-    badge: 'Preise',
-    category: 'finops_compliance',
-    summary: 'Pflege die globalen Preistabellen für Campus (14,90 €), GrooveLab (9,90 €), Kombi-Vorteil (19,90 €) und Team-Pauschalen (0,49 €).',
-    steps: [
-      {
-        title: '1. Globale Bereitstellungspreise einsehen',
-        desc: 'Überprüfe die festen monatlichen Hosting-Preise und aktiven Schulkontingente.',
-        actionLabel: 'Preise aufrufen',
-        actionTarget: 'pricing'
-      },
-      {
-        title: '2. Kampagnen & Schulanfangs-Aktionen einrichten',
-        desc: 'Konfiguriere Rabatte für Schuljahres-Komplettaktivierungen (z. B. 20% Nachlass bei September-Aktivierung aller Schüler).',
-        actionLabel: 'Kampagnen verwalten',
-        actionTarget: 'pricing'
-      },
-      {
-        title: '3. Währungsumrechnung (EUR / CHF) verifizieren',
-        desc: 'Stelle sicher, dass Schweizer Schulen die festgelegten CHF-Sätze (CHF 12.00 / Jahr bzw. CHF 19.90 / Mo.) erhalten.',
-        actionLabel: 'Währungen prüfen',
-        actionTarget: 'pricing'
-      }
-    ],
-    proTips: [
-      'Die Software ist stets mit 0,00 € (Inklusive) auszuweisen. Wir vermieten ausschließlich Cloud-Infrastruktur.',
-      'Änderungen an Preisen wirken sich nur auf zukünftige Abrechnungszeiträume aus.'
-    ],
-    invariants: [
-      'UWG / PAngV Konformität: Das Wort "Lizenz" ist plattformweit strengstens untersagt.'
-    ],
-    tags: ['preise', 'tarife', 'kampagnen', 'rabatt', 'chf', 'eur', 'infrastruktur']
-  },
-  {
-    id: 'master-trust-safety',
-    tier: 'master_admin',
-    boardId: 'trust_safety',
-    title: 'Trust & Safety, DSGVO-Takedowns & Compliance',
-    subtitle: 'Bearbeitung von Löschanfragen nach Art. 17 DSGVO, Takedown-Requests und Prüfprotokolle',
-    badge: 'Trust & Safety',
-    category: 'finops_compliance',
-    summary: 'Zentrales Compliance-Center: Führe vollständige Mandanten-Löschungen nach Vertragsende durch und beantworte Auskunftsersuchen nach DSGVO.',
-    steps: [
-      {
-        title: '1. Art. 17 DSGVO Löschanfrage prüfen',
-        desc: 'Prüfe eingegangene Löschanfragen von Schulen oder Nutzern. Das System identifiziert alle verknüpften Datensätze.',
-        actionLabel: 'Anfragen prüfen',
-        actionTarget: 'trust_safety'
-      },
-      {
-        title: '2. Revisionssichere Löschung ausführen',
-        desc: 'Führe die Löschung über den autoritativen RPC durch. Verknüpfte Audio-Tresor-Dateien im Object Storage werden rückstandslos bereinigt.',
-        actionLabel: 'Lösch-Protokoll öffnen',
-        actionTarget: 'trust_safety'
-      },
-      {
-        title: '3. Löschzertifikat für Datenschutzbeauftragte exportieren',
-        desc: 'Generiere das rechtssichere Löschprotokoll mit kryptografischem Zeitstempel für die Schulakten.',
-        actionLabel: 'Zertifikat generieren',
-        actionTarget: 'trust_safety'
-      }
-    ],
-    proTips: [
-      'Löschungen können innerhalb einer 72-Stunden-Sperrfrist bei versehentlicher Auslösung gestoppt werden.',
-      'Audit-Trail-Einträge bleiben zur Erfüllung gesetzlicher Aufbewahrungspflichten pseudonymisiert erhalten.'
-    ],
-    invariants: [
-      'DSGVO Art. 17: Vollständige physische Bereinigung aller personenbezogenen Daten aus Tabellen und Buckets.'
-    ],
-    tags: ['dsgvo', 'löschung', 'compliance', 'takedown', 'art17', 'zertifikat']
-  },
-  {
-    id: 'master-feedback-hub',
-    tier: 'master_admin',
-    boardId: 'feedback',
-    title: 'Community-Ideen, Feedback & Feature-Voting',
-    subtitle: 'Wünsche von Musikschulleitern und Lehrkräften sichten, priorisieren und freigeben',
-    badge: 'Feedback',
-    category: 'core_boards',
-    summary: 'Sammelstelle für alle Feature-Wünsche und Verbesserungsvorschläge aus dem Schulbetrieb. Priorisiere Entwicklungs-Roadmaps direkt mit den Nutzern.',
-    steps: [
-      {
-        title: '1. Neue Feedback-Einträge sichten',
-        desc: 'Lies die Anregungen der Musikschulen zu neuen Instrumenten, Unterrichtsfunktionen oder Auswertungen.',
-        actionLabel: 'Feedback-Board öffnen',
-        actionTarget: 'feedback'
-      },
-      {
-        title: '2. Status aktualisieren (Geplant / In Entwicklung / Live)',
-        desc: 'Setze den Status der Tickets. Schulen werden im FeedbackHub automatisch über Fortschritte informiert.',
-        actionLabel: 'Roadmap verwalten',
-        actionTarget: 'feedback'
-      },
-      {
-        title: '3. Duplikate zusammenführen & Voting-Punkte aggregieren',
-        desc: 'Führe ähnliche Ideen zusammen, um die am stärksten nachgefragten Features sofort zu erkennen.',
-        actionLabel: 'Ideen priorisieren',
-        actionTarget: 'feedback'
-      }
-    ],
-    proTips: [
-      'Antworte direkt auf konstruktives Feedback – Musikschulleiter schätzen den direkten Draht zu den Entwicklern.',
-      'Erfolgreich umgesetzte Wünsche werden mit einem "Live"-Badge im Schulportal markiert.'
-    ],
-    invariants: [
-      'Transparenz-Doktrin: Schulen sehen den Status ihrer eingereichten Vorschläge jederzeit im eigenen Dashboard.'
-    ],
-    tags: ['feedback', 'ideen', 'community', 'voting', 'roadmap', 'wünsche']
-  },
-  {
-    id: 'master-maintenance-ops',
-    tier: 'master_admin',
-    boardId: 'maintenance',
-    title: 'Wartung, Betrieb & Globaler Wartungsmodus',
-    subtitle: 'Schaltungsfreie System-Updates, Cache-Invalidierung und geplante Wartungsfenster',
-    badge: 'Wartung',
-    category: 'core_boards',
-    summary: 'Zentrale Betriebskontrolle: Aktiviere bei größeren Datenbankmigrationen den weltweiten Wartungsmodus mit Countdown-Banner für alle Schulen.',
-    steps: [
-      {
-        title: '1. Wartungsfenster ankündigen',
-        desc: 'Lege Startzeit und voraussichtliche Dauer fest. Das System blendet in allen Benutzer-Dashboards ein dezentes Informationsbanner ein.',
-        actionLabel: 'Wartungsplaner öffnen',
-        actionTarget: 'maintenance'
-      },
-      {
-        title: '2. Globalen Wartungsmodus scharf schalten',
-        desc: 'Schalte das System in den Read-Only-Modus. Bestehende Sitzungen bleiben geschützt, Schreiboperationen werden pausiert.',
-        actionLabel: 'Wartung aktivieren',
-        actionTarget: 'maintenance'
-      },
-      {
-        title: '3. Service Worker Cache-Buster auslösen',
-        desc: 'Nach dem Update invalidiert ein Klick auf "Cache leeren" die veralteten Frontend-Assets aller Browser weltweit.',
-        actionLabel: 'Cache invalidieren',
-        actionTarget: 'maintenance'
-      }
-    ],
-    proTips: [
-      'Wartungsarbeiten sollten idealerweise nachts zwischen 02:00 und 05:00 Uhr durchgeführt werden.',
-      'Der Notfall-Bypass ermöglicht es Master-Admins, die Plattform auch im Wartungsmodus vollumfänglich zu prüfen.'
-    ],
-    invariants: [
-      'Zero Data Loss: Im Wartungsmodus werden keine ungespeicherten Entwürfe überschrieben.'
-    ],
-    tags: ['wartung', 'maintenance', 'cache', 'update', 'read only', 'migration']
-  },
-  {
-    id: 'master-backup-disaster-recovery',
-    tier: 'master_admin',
-    boardId: 'backup',
-    title: 'Backup, Disaster Recovery & Notfall-Wiederherstellung',
-    subtitle: 'Point-in-Time Recovery, tägliche Hetzner Snapshots und Storage-Backups',
-    badge: 'Backup',
-    category: 'core_boards',
-    summary: 'Katastrophenschutz nach BSI-Grundschutz: Überprüfe die automatischen PostgreSQL WAL-Archive, tägliche Datenbank-Snapshots und Audio-Tresor-Backups.',
-    steps: [
-      {
-        title: '1. Backup-Integrität & Snapshots prüfen',
-        desc: 'Kontrolliere das Protokoll der nächtlichen Sicherungsläufe. Alle Tabellen und Schemata werden verschlüsselt gesichert.',
-        actionLabel: 'Backups einsehen',
-        actionTarget: 'backup'
-      },
-      {
-        title: '2. Point-in-Time Recovery (PITR) testen',
-        desc: 'Im Notfall kann der Stand der Datenbank sekundengenau auf einen beliebigen Zeitpunkt der letzten 14 Tage zurückgesetzt werden.',
-        actionLabel: 'Recovery-Optionen prüfen',
-        actionTarget: 'backup'
-      },
-      {
-        title: '3. Georedundante Storage-Replikation verifizieren',
-        desc: 'Die Audio-Dateien des Tresors werden über redundante Hetzner Storage Boxen an getrennten Standorten repliziert.',
-        actionLabel: 'Replikation prüfen',
-        actionTarget: 'backup'
-      }
-    ],
-    proTips: [
-      'Führe vierteljährlich einen unangekündigten Desaster-Recovery-Trockenlauf in einer Testumgebung durch.',
-      'Sämtliche Backups sind mit AES-256 at Rest verschlüsselt.'
-    ],
-    invariants: [
-      'RPO < 5 Minuten: Der maximale potenzielle Datenverlust bei Gesamtausfall liegt unter 5 Minuten.',
-      'RTO < 60 Minuten: Wiederherstellung der vollen Betriebsbereitschaft in unter einer Stunde.'
-    ],
-    tags: ['backup', 'disaster recovery', 'pitr', 'hetzner', 'snapshots', 'rpo', 'rto']
-  },
-  {
-    id: 'master-operator-access',
-    tier: 'master_admin',
-    boardId: 'operator',
-    title: 'Betreiber-Sicherheit, WebAuthn-Passkeys & Revisions-Audit-Trail',
-    subtitle: 'Hardware-Token Authentifizierung, Ghost-Support-Sitzungen und unveränderbares Audit-Log',
-    badge: 'Betreiber',
-    category: 'core_boards',
-    summary: 'Höchste Sicherheitsstufe nach OWASP ASVS Level 3: Verwalte Master-Passkeys (FIDO2 / Touch ID), initiiere zeitlich befristete Ghost-Support-Sessions und prüfe das unveränderliche Audit-Log.',
-    steps: [
-      {
-        title: '1. FIDO2 / WebAuthn Passkeys registrieren',
-        desc: 'Kopple deinen physischen Hardware-Schlüssel (YubiKey oder Apple Touch ID). Der Login ist gegen Phishing immun.',
-        actionLabel: 'Passkeys verwalten',
-        actionTarget: 'operator'
-      },
-      {
-        title: '2. Zeitlich befristete Ghost-Support-Sitzung starten',
-        desc: 'Benötigt eine Musikschule Hilfe, kann eine befristete Support-Sitzung (max. 60 Minuten) gestartet werden. Jede Aktion wird protokolliert.',
-        actionLabel: 'Support-Session starten',
-        actionTarget: 'operator'
-      },
-      {
-        title: '3. Revisionssicheren Audit-Trail analysieren',
-        desc: 'Alle administrativen Aktionen werden mit Zeitstempel, IP-Hash und aufrufendem Operator manipulationssicher im Log festgehalten.',
-        actionLabel: 'Audit-Trail aufrufen',
-        actionTarget: 'operator'
-      }
-    ],
-    proTips: [
-      'Hinterlege stets mindestens zwei voneinander unabhängige Hardware-Passkeys als Notfall-Redundanz.',
-      'Ghost-Support-Sitzungen erlöschen nach Ablauf der Frist automatisch ohne verbleibende Berechtigungen.'
-    ],
-    invariants: [
-      'Zero Secret Leakage: Master-Admin Passwörter und TOTP-Secrets verlassen niemals die serverseitige Enklave.',
-      'Audit-Unveränderbarkeit: Einträge in `master_audit_trail` können selbst von Master-Admins weder geändert noch gelöscht werden.'
-    ],
-    tags: ['operator', 'passkey', 'webauthn', 'ghost support', 'audit trail', 'fido2', 'security']
-  },
+/**
+ * 🛡️ OWASP ASVS Level 3 Dynamischer Loader für Master-Admin Guides.
+ * Verhindert, dass vertrauliche Plattform-Betreiber-Interna in reguläre Mandanten-Bundles leaken.
+ */
+export async function getMasterAdminGuides(): Promise<AkademieBoardGuide[]> {
+  const mod = await import('./AkademieMasterAdminRegistry');
+  return mod.MASTER_ADMIN_GUIDES;
+}
 
+export const AKADEMIE_GUIDES_DATABASE: AkademieBoardGuide[] = [
   // ══════════════════════════════════════════════════════════════════════════════════
   // STUFE 2: MUSIKSCHULLEITER & SEKRETARIAT (VERWALTUNG VOR ORT)
   // ══════════════════════════════════════════════════════════════════════════════════
@@ -525,197 +101,206 @@ export const AKADEMIE_GUIDES_DATABASE: AkademieBoardGuide[] = [
     id: 'school-briefing',
     tier: 'school_management',
     boardId: 'briefing',
-    title: 'Schulleitungs-Briefing & Schulübersicht',
-    subtitle: 'Tagesbetrieb, Raumbelegungen, anwesendes Kollegium und Notfallmeldungen',
+    title: 'Schulleitungs-Briefing & Live-Betriebs-Cockpit',
+    subtitle: 'Tagesbetrieb, Raumauslastung, anwesendes Kollegium und dynamisches Terminänderungs-Radar',
     badge: 'Briefing',
     category: 'quickstart',
-    summary: 'Das zentrale Briefing Board der Schulleitung: Sieh auf einen Blick, welche Räume belegt sind, welche Lehrkräfte unterrichten und ob Terminänderungen vorliegen.',
+    summary: 'Das zentrale Führungs-Cockpit für Schulleitung und Sekretariat: Sieh in Echtzeit den laufenden Unterrichtsbetrieb, prüfe freie Räume und erkenne kurzfristige Ausfälle oder Raumkonflikte sofort.',
     steps: [
       {
         title: '1. Schulleitungs-Tagesüberblick öffnen',
-        desc: 'Das Briefing zeigt dir in Echtzeit alle laufenden und anstehenden Unterrichtseinheiten des heutigen Tages.',
-        actionLabel: 'Briefing-Board aufrufen',
+        desc: 'Das Briefing-Board bündelt alle Unterrichtseinheiten des heutigen Tages chronologisch über alle Gebäude und Stockwerke hinweg.',
+        actionLabel: 'Briefing öffnen',
         actionTarget: 'briefing'
       },
       {
-        title: '2. Raumauslastung prüfen',
-        desc: 'Überprüfe freie und belegte Räume. Eventuelle Raumkollisionen werden sofort mit einer Warnung hervorgehoben.',
+        title: '2. Raumauslastung & Belegungsstatus prüfen',
+        desc: 'Die Raum-Engine visualisiert auf einen Blick, welche Säle belegt sind. Droht eine Doppelbelegung, warnt das rote Konflikt-Radar sofort.',
         actionLabel: 'Räume prüfen',
         actionTarget: 'rooms'
       },
       {
-        title: '3. Notfall-Mitteilungen ansehen',
-        desc: 'Kurzfristige Krankmeldungen von Lehrkräften oder Schülern erscheinen direkt in der Notfall-Übersicht.',
-        actionLabel: 'Termine ansehen',
+        title: '3. Dynamisches Terminänderungen-Widget überwachen',
+        desc: 'Wurden Unterrichtsstunden verschoben oder entfallen sie? Das Terminänderungen-Widget zeigt offene Anpassungen – liegen keine Änderungen vor, blendet es sich automatisch aus.',
+        actionLabel: 'Stundenplan ansehen',
         actionTarget: 'schedule'
       }
     ],
     proTips: [
-      'Schulleitungs- und Sekretariats-Profile nutzen das klassische Tafelbild (/campus_login_hero.png) und besitzen keine Musiker-Avatare.',
-      'Das Terminänderungen-Widget blendet sich automatisch aus, wenn für heute keine Änderungen anstehen.'
+      '🏛️ Tafelbild-Governance: Schulleitung und Sekretariat tragen plattformweit das professionelle Briefing-Board-Tafelbild (/campus_login_hero.png) – keine Musiker-Avatare.',
+      '⚡ Zero-Click Latenz: Raum- und Statusänderungen synchronisieren sich in Millisekunden auf alle Lehrer-Tablets und Tür-Kioske.',
+      '🛡️ DSGVO-Konformität: Schülerdaten werden auf der Übersichtsebene mit datensparsamer Namensmaskierung angezeigt.'
     ],
     invariants: [
-      'Profilbild-Governance: Nutzer der Verwaltung/Sekretariat tragen ausnahmslos das Tafelbild als Profilbild.'
+      'Profilbild-Doktrin: Nutzer der Verwaltung (Rollen `admin` und `secretary`) tragen verbindlich das Tafelbild.',
+      'Dynamische Sichtbarkeit: Das Terminänderungen-Widget blendet sich bei 0 offenen Änderungen vollständig aus.'
     ],
-    tags: ['schulleitung', 'briefing', 'tagesübersicht', 'raumbelegung', 'anwesenheit']
+    tags: ['schulleitung', 'sekretariat', 'briefing', 'betrieb', 'raumauslastung', 'kollegium', 'kollision']
   },
   {
     id: 'school-schedule-designer',
     tier: 'school_management',
     boardId: 'schedule',
-    title: 'Intelligenter Stundenplan-Designer & Matrix',
-    subtitle: 'Kollisionsfreie Planung, Raumzuweisung und Drag & Drop für das ganze Schuljahr',
+    title: 'Intelligenter Stundenplan-Designer & Raum-Matrix',
+    subtitle: 'Kollisionsfreie Planung, Raum-Engine, Kiosk-Türschilder-Sync und Drag & Drop für das ganze Schuljahr',
     badge: 'Stundenplan',
     category: 'core_boards',
-    summary: 'Plane Einzel- und Gruppenunterrichte mit automatischer Raumkollisionsprüfung, Wochenwiederholungen und Kalenderansichten.',
+    summary: 'Plane Einzel- und Gruppenunterrichte für das gesamte Schuljahr mit nativer Raumkollisionsprüfung, Matrix-Ansichten für Räume und Kollegium sowie automatischer Ferien-Berücksichtigung.',
     steps: [
       {
-        title: '1. Unterrichtsblöcke per Drag & Drop planen',
-        desc: 'Ziehe den Schüler aus der linken Schülerleiste auf den gewünschten Wochentag und die Startuhrzeit.',
+        title: '1. Schülerblock per Drag & Drop platzieren',
+        desc: 'Ziehe den Schüler aus der linken Schülerleiste auf den gewünschten Wochentag, die Uhrzeit und die zugewiesene Lehrkraft.',
         actionLabel: 'Stundenplaner aufrufen',
         actionTarget: 'schedule'
       },
       {
-        title: '2. Raumkollisionen in Echtzeit erkennen',
-        desc: 'Ist ein Raum zur selben Zeit belegt, meldet der Designer sofort eine Kollisionswarnung und schlägt freie Räume vor.',
-        actionLabel: 'Räume prüfen',
+        title: '2. Automatische Raumzuweisung & Konfliktprüfung',
+        desc: 'Wähle den Unterrichtsraum. Die integrierte Raum-Engine blockiert Doppelbelegungen deterministisch und schlägt freie Ausweichräume vor.',
+        actionLabel: 'Räume zuweisen',
         actionTarget: 'schedule'
       },
       {
-        title: '3. Wöchentliche Serien duplizieren',
-        desc: 'Nutze die Taste [D], um Unterrichtseinheiten schnell auf Folgewochen oder das ganze Schulhalbjahr zu übertragen.',
-        actionLabel: 'Stundenplan anzeigen',
+        title: '3. Wöchentliche Serien duplizieren (Shortcut [D])',
+        desc: 'Markiere einen Block und drücke [D], um die Unterrichtseinheit für das gesamte Schulhalbjahr wöchentlich fortlaufend anzulegen.',
+        actionLabel: 'Serientermine prüfen',
         actionTarget: 'schedule'
       }
     ],
     proTips: [
-      'Nutze die Matrix-Ansicht, um alle Räume oder Lehrkräfte nebeneinander im Spaltenvergleich zu sehen.',
-      'Feiertage und Schulferien des jeweiligen Bundeslands können im Kalender hinterlegt werden.'
+      '📊 Raum-Matrix-Ansicht: Schalte auf die Spaltenansicht um, um alle Räume der Musikschule parallel nebeneinander im Zeitverlauf zu vergleichen.',
+      '🏖️ Gesetzliche Schulferien: Feiertage und bewegliche Ferientage deines Bundeslands (DE, AT, CH) sind im Kalender hinterlegt – keine Fehlbuchungen in den Ferien.',
+      '🚪 Kiosk-Türschilder-Kopplung: Jeder verschobene Block aktualisiert sekundenschnell das digitale Türschild vor Ort am Unterrichtsraum.'
     ],
     shortcuts: [
       { key: 'D', desc: 'Terminblock duplizieren' },
       { key: 'Esc', desc: 'Drag-Modus abbrechen' }
     ],
     invariants: [
-      'Dynamisches Terminänderungen-Widget: Bei 0 Änderungen blendet sich das Widget auf allen Dashboards vollkommen aus.'
+      'Multi-Tenancy Doktrin: Jede Kalenderabfrage erzwingt strikt `school_id = get_current_user_school_id()`.',
+      'Kollisions-Sperre: Die Datenbank verhindert physische Doppelbelegungen desselben Raumes.'
     ],
-    tags: ['stundenplan', 'matrix', 'kollision', 'duplizieren', 'räume', 'serientermine']
+    tags: ['stundenplan', 'matrix', 'raumplaner', 'kollision', 'ferien', 'serientermine', 'duplizieren']
   },
   {
     id: 'school-rooms-kiosk-engine',
     tier: 'school_management',
     boardId: 'rooms',
-    title: 'Raum-Engine & Proberaum Kiosk-Tablets',
-    subtitle: 'Räume organisieren, Belegungen prüfen und Kiosk-Displays latenzfrei koppeln',
+    title: 'Raum-Engine, Ausstattung & Kiosk-Displays',
+    subtitle: 'Räume organisieren, Instrumentenausstattung erfassen und digitale Türschilder latenzfrei koppeln',
     badge: 'Raum-Engine',
     category: 'core_boards',
-    summary: 'Richte alle Unterrichtsräume deiner Musikschule ein. Tablets vor Ort an den Proberäumen zeigen stets den tagesaktuellen Belegungsplan.',
+    summary: 'Richte alle Unterrichtsräume deiner Musikschule ein: Erfasse Instrumente (Flügel, Drumset, Verstärker) und kopple kostengünstige Tablets vor Ort an den Türen als digitale Kiosk-Türschilder.',
     steps: [
       {
-        title: '1. Gebäude & Räume definieren',
-        desc: 'Lege Räume mit Raumbezeichnung, Gebäude und optionaler Ausstattung (z. B. Flügel, Drumset) an.',
+        title: '1. Räume mit Ausstattung anlegen',
+        desc: 'Erstelle Räume mit Raumnummer, Raumname, Gebäude und Ausstattungsmerkmalen (z. B. 2x Flügel, PA-Anlage, Schallschutz).',
         actionLabel: 'Räume verwalten',
         actionTarget: 'rooms'
       },
       {
-        title: '2. Kiosk-Display vor Ort koppeln',
-        desc: 'Öffne auf dem Tablet an der Proberaumtür die URL campus-groovelab.de und tippe auf "Display koppeln". Gib den 6-stelligen Token ein.',
-        actionLabel: 'Kopplungstoken generieren',
+        title: '2. Kiosk-Display vor Ort an der Tür koppeln',
+        desc: 'Öffne auf dem Tablet an der Tür die Plattform und klicke auf "Display koppeln". Gib den 6-stelligen Kopplungstoken ein – das Tablet wird sofort zum Türschild.',
+        actionLabel: 'Token generieren',
         actionTarget: 'rooms'
       },
       {
-        title: '3. Echtzeit-Synchronisation bei Raumwechseln',
-        desc: 'Verschiebst du im Stundenplaner einen Termin in einen anderen Raum, aktualisiert sich das Display an der Tür in unter 500 ms.',
-        actionLabel: 'Stundenplan prüfen',
-        actionTarget: 'schedule'
+        title: '3. Automatische Raumbelegungsanzeige überwachen',
+        desc: 'Das Display zeigt die laufende Unterrichtsstunde, Lehrkraft, Fach und die nächsten Termine. Bei Raumwechseln synchronisiert sich die Anzeige in unter 500 ms.',
+        actionLabel: 'Status prüfen',
+        actionTarget: 'rooms'
       }
     ],
     proTips: [
-      'Kiosk-Displays schalten nach Unterrichtsende automatisch in den abgedunkelten Nachtmodus und sparen Strom.',
-      'Sperre den Browser auf dem Kiosk-Tablet mit dem "Geführten Zugriff" (iOS) oder "App anheften" (Android).'
+      '🌙 Automatischer Nachtmodus: Nach Unterrichtsende schalten die Kiosk-Tablets automatisch in den Stromsparmodus mit abgedunkeltem Display.',
+      '🔒 Geführter Zugriff (iOS/Android): Sperre das Tablet im Kiosk-Modus, sodass Schüler oder Besucher die Raumplan-App nicht verlassen können.',
+      '🚪 Stationen für Band-Proben: Definiere im Raum spezielle Stationen (z. B. Drum-Station, Keys-Station) für strukturierte Ensemble-Proben.'
     ],
     invariants: [
-      'Kiosk-Sicherheit: Kiosk-Tokens verfallen nach 30 Tagen automatisch und erlauben rein lesenden Zugriff auf den Raumplan.'
+      'Kiosk-Sicherheit: Kiosk-Tokens gewähren rein lesenden Zugriff auf den Raumplan des spezifischen Raums – keine administrativen Rechte.',
+      'Hardware-Unabhängigkeit: Kiosk-Displays laufen auf jedem Standard-Tablet mit modernem Browser.'
     ],
-    tags: ['räume', 'kiosk', 'tablet', 'raumwechsel', 'sync', 'hardware']
+    tags: ['raeume', 'kiosk', 'tuerschild', 'hardware', 'tablet', 'raumwechsel', 'ausstattung']
   },
   {
     id: 'school-teachers-team',
     tier: 'school_management',
     boardId: 'team',
-    title: 'Kollegium & Lehrkräfte-Verwaltung',
-    subtitle: 'Lehrkräfte anlegen, Fächer zuweisen und Zero-Mail Login-Links bereitstellen',
+    title: 'Kollegium, Lehrkräfte-Deputate & QR-Ausweise',
+    subtitle: 'Lehrkräfte anlegen, Unterrichtsfächer zuweisen, Deputate verwalten und Zero-Mail-Zugänge ausgeben',
     badge: 'Kollegium',
     category: 'core_boards',
-    summary: 'Verwalte dein Kollegium: Lege Lehrkräfte mit ihren Instrumentalfächern und Stundensätzen an. Drucke Login-Ausweise für den Zero-Mail-Zugang.',
+    summary: 'Verwalte das gesamte Lehrerkollegium: Lege Lehrkräfte mit Instrumentalfächern und Stundendeputaten an. Drucke QR-Ausweise für den sekundenschnellen Zero-Mail-Login am Unterrichtstag.',
     steps: [
       {
-        title: '1. Neue Lehrkraft anlegen',
-        desc: 'Gib Vor- und Nachnamen, E-Mail (optional für Gehaltsabrechnung) und Unterrichtsfächer ein.',
+        title: '1. Neue Lehrkraft im Kollegium anlegen',
+        desc: 'Gib Vor- und Nachnamen, E-Mail-Adresse und die Unterrichtsfächer (z. B. Klavier, Querflöte, Ensemble) ein.',
         actionLabel: 'Kollegium öffnen',
         actionTarget: 'team'
       },
       {
-        title: '2. QR-Ausweis & Zugangs-Link ausgeben',
-        desc: 'Drucke den Ausweis mit QR-Code aus oder sende der Lehrkraft den passwortlosen Schnellstart-Link.',
+        title: '2. QR-Lehrerausweis ausdrucken & übergeben',
+        desc: 'Drucke den Ausweis mit hochauflösendem QR-Code aus. Die Lehrkraft scannt den Code mit dem Smartphone oder iPad und ist in 1 Sekunde eingeloggt.',
         actionLabel: 'Ausweis drucken',
         actionTarget: 'team'
       },
       {
-        title: '3. Unterrichtsstunden zuweisen',
-        desc: 'Verknüpfe Schüler im Stundenplan direkt mit der zuständigen Lehrkraft.',
+        title: '3. Schüler zuweisen & Deputat überwachen',
+        desc: 'Weise der Lehrkraft Schüler und Unterrichtsstunden im Stundenplan zu. Das System berechnet das wöchentliche Stundendeputat automatisch.',
         actionLabel: 'Stundenplan öffnen',
         actionTarget: 'schedule'
       }
     ],
     proTips: [
-      'Lehrkräfte benötigen keine Passwörter – der Scan des Ausweises loggt sie in 1 Sekunde ein.',
-      'Verwaltungs- und Sekretariats-Nutzer sind in allen Bereitstellungspaketen kostenlos inklusive.'
+      '🪪 Zero-Mail-Doktrin: Lehrkräfte benötigen keine Passwörter – der Scan des Ausweises ermöglicht sofortigen, sicheren Zugang.',
+      '👥 Kostenlose Verwaltung: Benutzer mit den Rollen `admin` und `secretary` sind in der Plattform immer zu 100% inklusive (0,00 €).',
+      '🎵 Musiker-Avatare: Lehrkräfte wählen ihren individuellen Musiker-Avatar für den Unterricht – die Identität begeistert Schüler ab Minute 1.'
     ],
     invariants: [
-      'Service-Gebühr: Aktive Lehrkräfte und Administratoren werden mit 0,49 € / Mo. berechnet.'
+      'Service-Pauschale: Aktive Lehrkräfte und Administratoren werden mit transparenten 0,49 € / Mo. berechnet.',
+      'DSGVO-Mitarbeiterschutz: Private Kontaktdaten von Lehrkräften werden niemals an Schüler oder Eltern herausgegeben.'
     ],
-    tags: ['kollegium', 'lehrer', 'fächer', 'ausweis', 'team', 'stundensatz'],
+    tags: ['kollegium', 'lehrer', 'team', 'deputat', 'ausweis', 'passwortlos', 'servicepauschale'],
     pdfDownloadType: 'teacher_quickstart'
   },
   {
     id: 'school-students-onboarding',
     tier: 'school_management',
     boardId: 'students',
-    title: 'Schülerverwaltung, Aufnahme & 1-Seiter Elternbrief',
-    subtitle: 'DSGVO-konforme Aufnahme, Namensmaskierung und druckfertige Eltern-Infoblätter',
+    title: 'Schülerverwaltung, Smart-CSV-Import & 1-Seiter Elternbrief',
+    subtitle: 'DSGVO-konforme Aufnahme, Namensmaskierung, 1-Klick-Ausweisdruck und Eltern-Infoblätter (PDF)',
     badge: 'Schüler',
     category: 'core_boards',
-    summary: 'Der Leitfaden für Schüleraufnahme und Verwaltung: Schüler anlegen, Smart-CSV importieren, druckfertige Eltern-Infoblätter erzeugen und Krankmeldungen koordinieren.',
+    summary: 'Effiziente Schülerverwaltung für Musikschulen: Nimm Schüler einzeln auf oder importiere ganze Klassenlisten per Smart-CSV. Drucke 1-Seiter-Elternbriefe und Schülerausweise im Sammeldruck auf DIN-A4-Bögen.',
     steps: [
       {
-        title: '1. Neuer Schüler & Smart-CSV-Import',
-        desc: 'Erfasse Neuanmeldungen einzeln oder importiere Klassenlisten per Excel/CSV. Vornamen und Nachnamen werden DSGVO-konform getrennt.',
-        actionLabel: 'Schüleraufnahme starten',
+        title: '1. Schüler einzeln anlegen oder per Smart-CSV importieren',
+        desc: 'Lade deine Schülerliste als Excel/CSV hoch. Das System trennt Vornamen und Nachnamen automatisch und prüft auf Dubletten.',
+        actionLabel: 'Schülerliste aufrufen',
         actionTarget: 'students'
       },
       {
-        title: '2. 1-Seiter Eltern-Infoblatt drucken',
+        title: '2. Druckfertigen 1-Seiter Elternbrief generieren',
         desc: 'Klicke auf "Eltern-Infoblatt (PDF)". Der druckfertige DIN-A4-1-Seiter mit Schullogo und QR-Code erklärt Eltern die Nutzung ohne Passwort-Registrierung.',
         actionLabel: 'Elternbrief herunterladen',
         actionTarget: 'students'
       },
       {
-        title: '3. Namensmaskierung für Minderjährige prüfen',
-        desc: 'Schülernamen werden im Lehrer-Dashboard zum Schutz von Minderjährigen automatisch auf "Vorname + Nachname-Initial" (z. B. "Max M.") gekürzt.',
-        actionLabel: 'Schülerliste prüfen',
+        title: '3. Schülerausweise im Sammeldruck ausgeben',
+        desc: 'Drucke ganze Ausweisbögen (8 Ausweise pro A4-Seite) für den Schuljahresstart aus und lege sie den Begrüßungsmappen bei.',
+        actionLabel: 'Sammeldruck starten',
         actionTarget: 'students'
       }
     ],
     proTips: [
-      'Drucke neue Eltern-Infoblätter direkt bei der Anmeldung aus und lege sie der Begrüßungsmappe bei.',
-      'Bei Rückfragen verweise auf den QR-Code: Die App benötigt keine Installation aus dem App Store.'
+      '🛡️ Automatische Namensmaskierung: Zum Schutz von Minderjährigen werden Schülernamen im System als "Vorname + Nachname-Initial" (z. B. "Max M.") geführt.',
+      '🆓 100% kostenlose Karteileichen: Inaktive Schüler in der Kartei verursachen 0,00 € Kosten – abgerechnet werden nur aktiv genutzte Profile.',
+      '📲 Apple Wallet Pass: Schüler und Eltern können den Campus-Pass mit 1 Fingertipp direkt in die Apple/Google Wallet auf dem Smartphone laden.'
     ],
     invariants: [
-      'Zero-Mail: Schüler und Eltern benötigen niemals eine E-Mail-Adresse für den Zugang.',
-      'Absolute Datenminimierung: Keine Bank- oder SEPA-Daten von Schülern in der Datenbank.'
+      'Zero-Registration Doktrin: Schüler und Eltern müssen niemals Passwörter anlegen oder persönliche E-Mail-Adressen registrieren.',
+      'Absolute Datenminimierung: Keine Speicherung von Bank- oder SEPA-Daten der Eltern in der Plattform-Datenbank.'
     ],
-    tags: ['schüler', 'aufnahme', 'elternbrief', 'datenschutz', 'dsgvo', 'namensmaskierung'],
+    tags: ['schueler', 'aufnahme', 'smart csv', 'elternbrief', 'ausweis', 'sammeldruck', 'dsgvo', 'namensmaskierung'],
     pdfDownloadType: 'parent_quickstart'
   },
   {
@@ -723,77 +308,80 @@ export const AKADEMIE_GUIDES_DATABASE: AkademieBoardGuide[] = [
     tier: 'school_management',
     boardId: 'billing',
     title: 'B2B-Infrastruktur-Rechnungen & FinOps-Transparenz',
-    subtitle: 'Reine Cloud- und Bereitstellungskosten statt teurer Software-Lizenzen (0,00 € Lizenz)',
+    subtitle: 'Reine Cloud- und Bereitstellungskosten statt teurer Software-Lizenzen (0,00 € Lizenzgebühr)',
     badge: 'FinOps',
     category: 'finops_compliance',
-    summary: 'Verstehe deine monatliche Musikschul-Rechnung: Keine Lizenzkaufgebühren, faire Bereitstellungspauschalen und automatische Kostendeckung.',
+    summary: 'Verstehe die monatliche B2B-Infrastruktur-Abrechnung deiner Musikschule: Keine Lizenzkaufgebühren (0,00 € inklusive), transparente Bereitstellungspauschalen und automatische Kostendeckung bei Eltern-Direktabrechnung.',
     steps: [
       {
-        title: '1. Kanonische Nomenklatur prüfen',
-        desc: 'Rechnungspositionen: 1. Software-Bereitstellung (0,00 €) ➔ 2. Hosting Campus (14,90 €) ➔ 3. Hosting GrooveLab (9,90 €) ➔ 4. Kombi-Vorteil (-4,90 €) ➔ 5. Team (0,49 €) ➔ 6. Schüler (0,49 €).',
-        actionLabel: 'Rechnungsübersicht öffnen',
+        title: '1. Kanonische Nomenklatur auf der Monatsrechnung prüfen',
+        desc: 'Rechnungspositionen: 1. Software-Bereitstellung (0,00 €) ➔ 2. Hosting Campus (14,90 €) ➔ 3. Hosting GrooveLab (9,90 €) ➔ 4. Kombi-Vorteil (-4,90 €) ➔ 5. Service (0,49 €) ➔ 6. Basis-Bereitstellung (0,09 €).',
+        actionLabel: 'Rechnungen einsehen',
         actionTarget: 'billing'
       },
       {
-        title: '2. Kostenlose inaktive Schülerkarteien',
-        desc: 'Nur Schüler, die sich aktiv einloggen, werden abgerechnet. Inaktive Schüler in der Kartei kosten 0,00 €.',
-        actionLabel: 'Schülerstatus einsehen',
+        title: '2. Inaktive Schülerkarteien kostenfrei halten',
+        desc: 'Nur Schüler, die sich aktiv einloggen und Hausaufgaben nutzen, lösen eine Aktivierungsgebühr aus. Inaktive Profile in der Datenbank kosten 0,00 €.',
+        actionLabel: 'Schülerstatus prüfen',
         actionTarget: 'students'
       },
       {
-        title: '3. B2C-Jahresgebühren & Eltern-Direktabrechnung',
-        desc: 'Wird Direktabrechnung genutzt, zahlen Eltern den Jahresbeitrag von 5,88 € / Jahr (CHF 12.00 / Jahr). Dies entlastet die Schule vollständig.',
-        actionLabel: 'Tarif-Optionen prüfen',
+        title: '3. Eltern-Direktabrechnung zur vollständigen Entlastung',
+        desc: 'Wird Direktabrechnung für Campus vereinbart, zahlen Eltern den Jahresbeitrag von 5,88 € / Jahr (CHF 12.00 / Jahr). Die Schule zahlt für diese Schüler 0,00 €.',
+        actionLabel: 'Tarife einsehen',
         actionTarget: 'billing'
       }
     ],
     proTips: [
-      'GrooveLab-Aktivierungen werden verbindlich immer zu 100% von der Musikschule als Sammelzahler übernommen.',
-      'Rechnungs-PDFs können jederzeit mit einem Klick für die städtische Buchhaltung heruntergeladen werden.'
+      '🎸 GrooveLab-Aktivierungen: Werden immer zu 100% von der Musikschule als Sammelzahler übernommen – Eltern zahlen dafür niemals.',
+      '📄 Rechnungs-PDFs für Kämmerei & Schulträger: Lade GoBD-konforme Rechnungs-PDFs mit Rechnungsnummer `RE-[SCHOOL_ID]-[YYMM]-01` mit 1 Klick herunter.',
+      '🎁 Kombi-Vorteil: Nutzt deine Schule Campus und GrooveLab, spart das Kombi-Bundle monatlich 4,90 € auf das Grund-Hosting.'
     ],
     invariants: [
-      'Verbotene Begriffe: Niemals "Lizenz" oder "Lizenzgebühr" verwenden. Es handelt sich um Cloud-Infrastruktur.',
-      'Rechnungsnummer: B2B Musikschulrechnungen lauten immer `RE-[SCHOOL_ID]-[YYMM]-01`.'
+      'Verbotene Begriffe: Niemals "Lizenz", "Schüler-Lizenz" oder "Karteileichen-Gebühr" verwenden – es handelt sich um reine Cloud-Infrastruktur.',
+      'Rechnungsnummer-Standard: Musikschulrechnungen lauten verbindlich immer `RE-[SCHOOL_ID]-[YYMM]-01`.'
     ],
-    tags: ['rechnung', 'finops', 'kosten', 'infrastruktur', 'b2b', 'elternbeitrag']
+    tags: ['rechnung', 'finops', 'kosten', 'infrastruktur', 'b2b', 'elternbeitrag', 'kombivorteil', 'gobd']
   },
   {
     id: 'school-profile-settings',
     tier: 'school_management',
     boardId: 'setup',
     title: 'Musikschulprofil, Standorte & Geofencing',
-    subtitle: 'Schulname, Adresse, Öffnungszeiten, Bankverbindung und Branding konfigurieren',
+    subtitle: 'Schulname, Adresse, Schulfarbe (Branding), Öffnungszeiten und Bankverbindung konfigurieren',
     badge: 'Schulprofil',
     category: 'core_boards',
-    summary: 'Richte das Profil deiner Musikschule ein: Hinterlege die offizielle Adresse, passe die Schulfarbe (Brand Color) an und definiere Öffnungszeiten für Kiosk-Terminals.',
+    summary: 'Richte das Profil deiner Musikschule ein: Hinterlege offizielle Adressdaten, passe die Schulfarbe (Brand Color) an und lade das Schullogo für alle ausgedruckten Elternbriefe und Schülerausweise hoch.',
     steps: [
       {
-        title: '1. Stammdaten & Schullogo hinterlegen',
-        desc: 'Lade das Schullogo hoch. Es erscheint automatisch auf allen ausgedruckten Elternbriefen und Schülerausweisen.',
+        title: '1. Stammdaten & Schullogo hochladen',
+        desc: 'Lade dein Musikschul-Wappen oder Schullogo hoch. Es wird automatisch im Briefing, auf Urkunden und auf allen Eltern-PDFs eingebunden.',
         actionLabel: 'Schulprofil öffnen',
         actionTarget: 'setup'
       },
       {
-        title: '2. Geofencing & Öffnungszeiten festlegen',
-        desc: 'Definiere den GPS-Radius deiner Standorte und die Betriebszeiten für Schüler-Kioske vor Ort.',
-        actionLabel: 'Standorte anpassen',
+        title: '2. Schulfarbe & Branding-Akzente wählen',
+        desc: 'Definiere den primären HEX-Farbwert deiner Musikschule. Das Interface übernimmt diese Farbe für Akzente und Kacheln.',
+        actionLabel: 'Design anpassen',
         actionTarget: 'setup'
       },
       {
-        title: '3. Bankverbindung für Eltern-Überweisungen eintragen',
-        desc: 'Hinterlege die IBAN deiner Musikschule für Schüler-Jahresbeiträge bei Direktabrechnung.',
-        actionLabel: 'Bankdaten prüfen',
+        title: '3. Bankverbindung & IBAN für Eltern-Überweisungen',
+        desc: 'Hinterlege die IBAN der Musikschule für B2C-Schüler-Jahresbeiträge bei vereinbarter Eltern-Direktabrechnung.',
+        actionLabel: 'Bankdaten eintragen',
         actionTarget: 'setup'
       }
     ],
     proTips: [
-      'Wähle eine kontrastreiche Schulfarbe – sie zieht sich als Akzentfarbe durch das gesamte System.',
-      'Änderungen an den Öffnungszeiten übertragen sich sofort auf die Kiosk-Displays an den Türen.'
+      '📍 Geofencing & Standorte: Trage die Adressen aller Unterrichtsgebäude ein, um Kiosk-Displays und Raum-Engines präzise zuzuordnen.',
+      '🕒 Öffnungszeiten-Automatik: Kiosk-Türschilder schalten sich passgenau zu den Öffnungszeiten deiner Gebäude ein und aus.',
+      '🧾 Transparenz auf Elternbriefen: Die hinterlegte IBAN und Schuladresse erscheinen automatisch im Fußbereich aller generierten Infoblätter.'
     ],
     invariants: [
-      'DSGVO-Datensparsamkeit: Keine Weitergabe von Schuldaten an Dritte.'
+      'Zero-Leakage: Bank- und Kontodaten der Musikschule werden verschlüsselt gespeichert und nur auf offiziellen Infoblättern ausgegeben.',
+      'Brand-Integrität: Die Kernfarben Grün (#34a853), Gelb (#eab308) und Rot (#ea4335) bleiben für Modul-Logiken geschützt.'
     ],
-    tags: ['profil', 'logo', 'branding', 'geofencing', 'öffnungszeiten', 'iban']
+    tags: ['profil', 'logo', 'branding', 'schulfarbe', 'iban', 'geofencing', 'oeffnungszeiten', 'standorte']
   },
   {
     id: 'school-groovelab-admin',
@@ -803,35 +391,37 @@ export const AKADEMIE_GUIDES_DATABASE: AkademieBoardGuide[] = [
     subtitle: 'Ensembles überwachen, Schul-Repertoire verwalten und Live-Lab Stationen steuern',
     badge: 'GrooveLab',
     category: 'core_boards',
-    summary: 'Die Ensemble- und Band-Zentrale für die Schulleitung: Sieh alle aktiven Bands deiner Schule, weise Coaches zu und pflege das Schul-Repertoire an Chords und Play-Alongs.',
+    summary: 'Die Ensemble- und Band-Zentrale für Schulleitung und Fachbereichsleiter: Sieh alle aktiven Bands deiner Schule, weise Coaches zu und pflege das Schul-Repertoire an Chords, Leadsheets und Play-Alongs.',
     steps: [
       {
-        title: '1. Band-Übersicht aufrufen',
-        desc: 'Im gelben GrooveLab-Reiter siehst du alle bestehenden Bands mit ihrer Besetzung und den zugewiesenen Lehrkräften.',
+        title: '1. Band-Netzwerk der Musikschule öffnen',
+        desc: 'Im gelben GrooveLab-Reiter siehst du alle bestehenden Bands mit ihrer Besetzung und den zuständigen Ensemble-Coaches.',
         actionLabel: 'Bands verwalten',
         actionTarget: 'bands'
       },
       {
-        title: '2. Schul-Song-Bibliothek erweitern',
-        desc: 'Pflege Chords, Leadsheets und Backing-Tracks für Ensembles in der zentralen Schul-Bibliothek.',
-        actionLabel: 'Songs öffnen',
+        title: '2. Schul-Song-Bibliothek & Repertoire erweitern',
+        desc: 'Stelle Songs, Chords und Playalongs in der zentralen Schul-Bibliothek bereit. Alle Bands deiner Schule greifen darauf zu.',
+        actionLabel: 'Song-Katalog öffnen',
         actionTarget: 'bands'
       },
       {
-        title: '3. Proberaum-Stationen & Kioske zuweisen',
-        desc: 'Konfiguriere digitale Instrumenten-Stationen für Live-Bandproben im Proberaum.',
-        actionLabel: 'Stationen verwalten',
+        title: '3. Proberaum-Stationen & Kioske konfigurieren',
+        desc: 'Richte digitale Instrumenten-Stationen für Live-Bandproben in den Proberäumen deiner Musikschule ein.',
+        actionLabel: 'Stationen einrichten',
         actionTarget: 'rooms'
       }
     ],
     proTips: [
-      'Im GrooveLab-Modul wechseln Buttons und Akzente auf das leuchtende Gelb (#eab308).',
-      'Schulleitung und Sekretariat tragen auch im GrooveLab das Tafelbild – keine Musiker-Avatare.'
+      '🟡 Gelbes Marken-Erlebnis: Im GrooveLab-Modul wechseln Buttons und Akzente auf das leuchtende Gelb (#eab308).',
+      '🏛️ Neutrales Tafelbild: Schulleitung und Sekretariat tragen auch im GrooveLab das professionelle Tafelbild – keine Musiker-Avatare.',
+      '🎤 Konzert-Setlists: Verfolge, welche Songs von wie vielen Ensembles bühnenreif geprobt wurden, um das nächste Schulfestival zu planen.'
     ],
     invariants: [
-      'Kosten-Axiom: GrooveLab-Aktivierungen werden verbindlich immer zu 100% von der Musikschule übernommen.'
+      'Kosten-Axiom: GrooveLab-Aktivierungen werden verbindlich immer zu 100% von der Musikschule als Sammelzahler übernommen.',
+      'Revisionssicherheit: Song-Lizenzen und GEMA-Freigaben können im Dokumenten-Tresor des Moduls hinterlegt werden.'
     ],
-    tags: ['groovelab', 'bands', 'repertoire', 'stationen', 'ensemble', 'kiosk']
+    tags: ['groovelab', 'bands', 'repertoire', 'stationen', 'ensemble', 'kiosk', 'proberaum', 'festival']
   },
 
   // ══════════════════════════════════════════════════════════════════════════════════
@@ -841,269 +431,282 @@ export const AKADEMIE_GUIDES_DATABASE: AkademieBoardGuide[] = [
     id: 'teacher-briefing',
     tier: 'teacher',
     boardId: 'briefing',
-    title: 'Tages-Briefing & Schüler-Timeline',
-    subtitle: 'Chronologischer Tagesplan, Anwesenheit erfassen und Raumwechsel sofort erkennen',
+    title: 'Tages-Briefing & Chronologische Schüler-Timeline',
+    subtitle: 'Tagesplan auf einen Blick, Raumwechsel-Radar, Anwesenheit erfassen und Quick-Notizen',
     badge: 'Briefing',
     category: 'quickstart',
-    summary: 'Dein Start in den Unterrichtstag: Scanne deinen QR-Ausweis, öffne dein Tages-Briefing und sieh sofort alle Schüler, Raumwechsel und Aufgaben des Tages in chronologischer Reihenfolge.',
+    summary: 'Dein reibungsloser Start in den Unterrichtstag: Öffne dein Briefing und sieh sofort alle Unterrichtseinheiten chronologisch sortiert, erkenne Raumverlegungen im Voraus und erfasse Anwesenheiten mit 1 Klick.',
     steps: [
       {
-        title: '1. Zero-Mail Login per Ausweis-Scan',
-        desc: 'Halte die Kamera deines Smartphones oder Tablets auf deinen Lehrkraft-Ausweis. Du bist sofort ohne E-Mail und Passwort eingeloggt.',
-        actionLabel: 'Zum Briefing-Dashboard',
+        title: '1. Tages-Timeline überfliegen & Raumwechsel prüfen',
+        desc: 'Dein Tagesplan sortiert alle Schüler minutengenau. Bei kurzfristigen Raumkonflikten warnt dich das rote Raum-Radar sofort im Kopfbereich.',
+        actionLabel: 'Briefing öffnen',
         actionTarget: 'briefing'
       },
       {
-        title: '2. Tages-Briefing & Schüler-Timeline prüfen',
-        desc: 'Dein Briefing-Board zeigt dir die Schüler des Tages chronologisch. Steht ein Raumwechsel an, wird er farblich hervorgehoben.',
-        actionLabel: 'Timeline ansehen',
+        title: '2. Anwesenheit mit 1 Klick dokumentieren',
+        desc: 'Tippe beim Schüler auf den Status-Button: Grün (Anwesend), Gelb (Entschuldigt) oder Rot (Unentschuldigt). Das System speichert die Anwesenheit GoBD-konform.',
+        actionLabel: 'Timeline prüfen',
         actionTarget: 'briefing'
       },
       {
-        title: '3. Anwesenheit mit 1 Klick dokumentieren',
-        desc: 'Tippe beim Termin auf den Status, um Anwesenheit oder entschuldigtes Fehlen festzuhalten.',
-        actionLabel: 'Termine prüfen',
-        actionTarget: 'briefing'
+        title: '3. Schüler-Akte für den Unterricht aufschlagen',
+        desc: 'Klicke direkt auf die Schüler-Kachel, um das Hausaufgabenheft, die Notenbuchseiten der Vorwoche und offene Fragen des Schülers aufzurufen.',
+        actionLabel: 'Schüler-Akte öffnen',
+        actionTarget: 'homework_book'
       }
     ],
     proTips: [
-      'Füge die Seite deinem Home-Bildschirm hinzu (PWA), um Campus-Groovelab wie eine native App ohne Browserleiste zu nutzen.',
-      'Dein Musiker-Avatar (bzw. Geist-Avatar im GrooveLab) zeigt deinen Schülern sofort deine musikalische Identität.'
+      '📲 PWA auf iPad/Tablet: Speichere Campus-Groovelab über Safari auf dem Home-Bildschirm. Die App startet im Vollbild ohne störende Browserleisten.',
+      '🔔 Offene Schülerfragen: Hat ein Schüler zu Hause eine Frage per Sprach-Diktat gestellt, leuchtet an seinem Termin ein gelbes Frage-Badge auf.',
+      '☕ Freistunden-Erkennung: Pausen und Freiblöcke werden automatisch visualisiert, damit du Vorbereitungszeit optimal nutzen kannst.'
     ],
     invariants: [
-      'Lehrkraft-Transparenz: Lehrernamen werden datenschutzkonform mit vollem Vor- und Nachnamen geführt.'
+      'Datenschutz-Transparenz: Lehrkräfte werden mit vollem Vor- und Nachnamen geführt, Schüler im Dashboard kindgerecht anonymisiert.',
+      'Echtzeit-Synchronität: Statusänderungen der Anwesenheit sind sofort für das Sekretariat einsehbar.'
     ],
-    tags: ['lehrer', 'briefing', 'timeline', 'ausweis', 'anwesenheit', 'unterrichtstag'],
+    tags: ['lehrer', 'briefing', 'timeline', 'tagesplan', 'anwesenheit', 'raumwechsel', 'unterricht'],
     pdfDownloadType: 'teacher_quickstart'
   },
   {
     id: 'teacher-homework-book',
     tier: 'teacher',
     boardId: 'homework_book',
-    title: 'Schüler-Protokoll & Hausaufgabenheft',
-    subtitle: 'Lehrbücher auswählen, Notenseiten eintragen und Hausaufgaben nach Goldstandard erfassen',
+    title: 'Schüler-Protokoll & Hausaufgabenheft (Goldstandard-Blaupause)',
+    subtitle: 'Notenbücher zuweisen, Seiten eintragen, Schülerfragen auflösen und Notizen diktieren',
     badge: 'Protokoll',
     category: 'core_boards',
-    summary: 'Dokumentiere den Unterricht nach der ergonomischen Master-Blaupause: Reinweiße Schülervorschau oben, bunte Buchcover-Badges und klare Übe-Ziele in der matten Werkzeugbank darunter.',
+    summary: 'Dokumentiere den Unterricht in Sekundenschnelle nach dem Monolith-Goldstandard: Reinweiße Schülervorschau oben, matte Werkzeugbank mit Notenbuch-Katalog darunter und integriertes Schülerfragen-Management.',
     steps: [
       {
-        title: '1. Schüler im Briefing anklicken',
-        desc: 'Tippe auf den Schüler in deiner Tages-Timeline, um das Schüler-Protokoll zu öffnen.',
-        actionLabel: 'Schüler-Protokoll öffnen',
+        title: '1. Notenbuch & Buchseiten auswählen',
+        desc: 'Wähle das Lehrwerk aus der Schulbibliothek und trage die Seitenzahlen (z. B. "S. 14–16") ein. Die App erzeugt automatisch die grüne Buch-Pille für den Schüler.',
+        actionLabel: 'Lehrwerk wählen',
         actionTarget: 'homework_book'
       },
       {
-        title: '2. Lehrbuch & Seitenzahlen (z. B. S. 24) festlegen',
-        desc: 'Wähle das Notenheft aus der Schulbibliothek und trage die Seitenzahl ein. Die Seitenzahl wird als grüne Pille gerendert.',
-        actionLabel: 'Hausaufgabe anlegen',
+        title: '2. Wochenziele & Hausaufgabe eintragen oder diktieren',
+        desc: 'Schreibe präzise Takthinweise in die Werkzeugbank oder nutze die Mikrofon-Diktierfunktion. Die Schülervorschau rendert den Text live in Magazin-Typografie.',
+        actionLabel: 'Notizen erfassen',
         actionTarget: 'homework_book'
       },
       {
-        title: '3. Hausaufgaben-Notizen in die Werkzeugbank eintragen',
-        desc: 'Trage Bemerkungen und Wochenziele in die matte Werkzeugbank unterhalb der Helden-Karte ein. Die Schülervorschau aktualisiert sich live.',
-        actionLabel: 'Notizen speichern',
+        title: '3. Schülerfragen beantworten & als besprochen markieren',
+        desc: 'Sieh die vom Schüler zu Hause notierte Frage („Welchen Fingersatz spielen?“). Klicke nach der Klärung auf "Im Unterricht besprochen", um sie als erledigt abzuhaken.',
+        actionLabel: 'Frage prüfen',
         actionTarget: 'homework_book'
       }
     ],
     proTips: [
-      'Keine farbigen Streifenbalken: Das Hausaufgabenheft fließt als saubere Magazin-Typografie auf weißem Grund.',
-      'Deine internen Lehrernotizen sind für Eltern und Schüler unsichtbar und dienen deiner eigenen Unterrichtsvorbereitung.'
+      '🔄 Fortlaufender Wochenplan: Noch nicht vollendete Aufgaben kannst du mit 1 Klick aus der Vorwoche übernehmen – kein doppeltes Tippen.',
+      '🔒 Private Lehrernotizen: Notizen im gelben Reiter "Nur für Lehrkraft" sind für Schüler und Eltern unsichtbar – perfekt für pädagogische Zwischenbemerkungen.',
+      '🌙 Nachtruhe-Schutz: Einträge nach 20:00 Uhr werden im Silent-Modus gespeichert und erreichen den Schüler erst morgens ab 07:00 Uhr.'
     ],
     invariants: [
-      'Master-Blaupause: Die Schülervorschau sieht auf allen Geräten exakt identisch aus (Universal Uniformity).'
+      'Master-Blaupause: Die Schülervorschau im Lehrer-Dashboard ist pixelgenau identisch mit der Live-Schülersicht auf dem Smartphone.',
+      'Universal Uniformity: Alle Formatierungen und Buchcover-Badges folgen plattformweit dem gleichen Standard.'
     ],
-    tags: ['hausaufgaben', 'protokoll', 'lehrbuch', 'seiten', 'werkzeugbank', 'übeziele']
+    tags: ['hausaufgaben', 'protokoll', 'lehrwerk', 'seiten', 'werkzeugbank', 'schuelerfrage', 'notizen', 'diktat']
   },
   {
     id: 'teacher-playalong-studio',
     tier: 'teacher',
     boardId: 'recordings',
     title: 'Play-Along Studio & Audio-Tresor',
-    subtitle: '1-Klick-Aufnahmen im Unterricht: Hörbeispiele, Play-Alongs und Notizen aufnehmen',
+    subtitle: 'Kristallklare Unterrichtsaufnahmen bis 7 Min., Vorzähler-Beeps, EBU R128 Mastering und Loop-Bereitstellung',
     badge: 'Audio-Studio',
     category: 'audio_studio',
-    summary: 'Nimm mit einem Klick Hörbeispiele, Klavierbegleitungen oder Metronom-Vorzähler auf. Schüler können zu Hause sample-genau mitspielen.',
+    summary: 'Nimm im Unterricht Hörbeispiele, Playalongs oder Klavierbegleitungen mit 1 Klick auf. Das System pegelt den Sound automatisch nach Studio-Standard (-14 LUFS) ein und hängt die Aufnahme direkt an die Hausaufgabe an.',
     steps: [
       {
-        title: '1. Play-Along Studio in der Werkzeugbank öffnen',
-        desc: 'Klicke im Schüler-Protokoll auf "Play-Along Studio". Dein Mikrofon wird automatisch eingepegelt.',
+        title: '1. Aufnahme-Modus im Protokoll aufrufen',
+        desc: 'Tippe im Schüler-Protokoll auf das Mikrofon-Symbol. Dein Eingangspegel wird visuell kalibriert.',
         actionLabel: 'Studio öffnen',
         actionTarget: 'recordings'
       },
       {
-        title: '2. Aufnahme starten & einspielen',
-        desc: 'Drücke auf den roten Aufnahme-Button. Spiele das Stück oder die Begleitung ein (bis zu 7 Minuten mit Audio-Tresor).',
+        title: '2. Take mit akustischem 4-Beat Einzähler aufnehmen',
+        desc: 'Drücke auf Aufnahme. Der präzise WebAudio-Vorzähler zählt dich ein. Spiele das Stück oder die Begleitung bis zu 7 Minuten lang ein.',
         actionLabel: 'Aufnahme testen',
         actionTarget: 'recordings'
       },
       {
-        title: '3. Automatische Verknüpfung mit der Hausaufgabe',
-        desc: 'Die Aufnahme wird automatisch an die heutige Hausaufgabe angehängt und steht dem Schüler sofort in seiner App zur Verfügung.',
-        actionLabel: 'Hausaufgabe prüfen',
-        actionTarget: 'homework_book'
+        title: '3. Pädagogischen Typ wählen & bereitstellen',
+        desc: 'Tagge die Aufnahme als 🐢 Langsam (Übetempo), 🚀 Original, 🥁 Beat oder 🎸 Playalong. Der Schüler findet sie sofort auf der linken Seite seines Aufgabenhefts.',
+        actionLabel: 'Take speichern',
+        actionTarget: 'recordings'
       }
     ],
     proTips: [
-      'Strikte Audio-Zuordnung: Deine Lehreraufnahmen erscheinen beim Schüler immer LINKS ("Von deiner Lehrkraft").',
-      'Nutze Multi-Takes, um getrennte Spuren für Melodie und Begleitung aufzunehmen.'
+      '🎛️ EBU R128 Mastering: Jede Aufnahme wird automatisch mit Studio-Peak-Limiter und -14 LUFS gemastert – keine übersteuerten oder zu leisen Aufnahmen mehr.',
+      '✂️ Waveform Trim: Schneide die Stille vor dem Einsatz mit den Schnitt-Markern direkt im Browser weg.',
+      '🔂 Loop-Kompatibilität: Saubere 4- oder 8-Takt-Takes können vom Schüler zu Hause nahtlos in der Loopstation als Endlos-Schleife abgespielt werden.'
     ],
     invariants: [
-      'Audio-Zuordnungs-Axiom: Lehreraufnahmen links, Schüler-Eigenaufnahmen rechts.',
-      'Sample-Genauigkeit: Die Loopstation startet immer mit verbindlicher 4-Takte-Pause.'
+      'Symmetrie-Doktrin: Lehreraufnahmen stehen beim Schüler verbindlich auf der linken Seite, eigene Schüler-Takes auf der rechten Seite.',
+      'Datensicherheit: Aufnahmen liegen verschlüsselt im schuleigenen Audio-Tresor mit zeitlich signierten Token-URLs.'
     ],
-    tags: ['audio', 'playalong', 'tresor', 'aufnahme', 'begleitung', 'mikrofon']
+    tags: ['audio', 'tresor', 'playalong', 'aufnahme', 'begleitung', 'mastering', 'lufs', 'waveform', 'trim']
   },
   {
     id: 'teacher-students',
     tier: 'teacher',
     boardId: 'students',
-    title: 'Meine Schüler & Pädagogischer Entwicklungsstand',
-    subtitle: 'Schülerübersicht, Kontaktdaten der Eltern und didaktische Historie einsehen',
+    title: 'Schüler-Roster & Pädagogische Entwicklungs-Historie',
+    subtitle: 'Schülerprofile, Streak-Monitoring, Meisterwerk-Urkunden verleihen und QR-Ausweise drucken',
     badge: 'Schüler',
     category: 'core_boards',
-    summary: 'Behalte den Lernfortschritt aller deiner Schüler im Blick: Verfolge gemeisterte Stücke, offene Hausaufgaben und den Übe-Verlauf der letzten Wochen.',
+    summary: 'Behalte den Lernfortschritt all deiner Schüler im Blick: Sieh, wer fleißig geübt hat, verleihe offizielle Meisterwerk-Urkunden und drucke bei Verlust sofort einen neuen Campus-Pass aus.',
     steps: [
       {
-        title: '1. Schülerliste aufrufen',
-        desc: 'Sieh alle dir zugewiesenen Schüler mit aktuellem Status, Instrument und Unterrichtszeit.',
-        actionLabel: 'Schülerübersicht öffnen',
+        title: '1. Schüler-Roster filtern & auswählen',
+        desc: 'Öffne die Schüler-Verwaltung. Filtere nach Unterrichtstag, Instrument oder Namen. Die Kachel zeigt sofort die aktive Übe-Flamme (Streak).',
+        actionLabel: 'Schülerliste aufrufen',
         actionTarget: 'students'
       },
       {
-        title: '2. Didaktischen Verlauf & Streaks ansehen',
-        desc: 'Prüfe, wie oft der Schüler zu Hause den Fokus-Timer genutzt hat und wie aktiv geübt wurde.',
-        actionLabel: 'Übe-Protokoll einsehen',
+        title: '2. Didaktischen Verlauf & Übe-Protokoll prüfen',
+        desc: 'Klicke auf das Schülerprofil. Sieh die Minuten-Historie der letzten Wochen, gemeisterte Stücke und bisherige Lehrwerke.',
+        actionLabel: 'Profil einsehen',
         actionTarget: 'students'
       },
       {
-        title: '3. Meisterwerk-Urkunde verleihen',
-        desc: 'Hat ein Schüler ein anspruchsvolles Stück gemeistert, schalte mit 1 Klick die offizielle Meisterwerk-Urkunde frei.',
+        title: '3. Meisterwerk-Urkunde mit 1 Klick verleihen',
+        desc: 'Hat der Schüler ein Stück bühnenreif gemeistert? Klicke auf "Meisterwerk bestätigen". Das System generiert sofort die offizielle Musikschul-Urkunde für seinen Tresor.',
         actionLabel: 'Urkunde verleihen',
         actionTarget: 'homework_book'
       }
     ],
     proTips: [
-      'Schülernamen werden im Lehrer-Dashboard zum Schutz von Minderjährigen auf "Vorname + Nachname-Initial" (z. B. "Max M.") gekürzt.',
-      'Lobe lange Flammen-Serien (Streaks) im Unterricht – das motiviert Schüler enorm.'
+      '🪪 Ersatz-Campus-Pass in 5 Sekunden: Schüler hat den Pass vergessen? Klicke im Profil auf "Ausweis drucken" – der schlüsselfertige QR-Pass druckt sofort auf jedem Standard-Drucker.',
+      '🔥 Streaks im Unterricht loben: Schüler mit aktiver Flamme (z. B. 14 Tage) sind nachweislich motivierter – ein kurzes Lob am Stundenbeginn verstärkt den Lerneffekt.',
+      '🛡️ DSGVO-Konformität: Im Lehrer-Dashboard werden Schülernachnamen zum Schutz der Privatsphäre standardmäßig als Initiale (z. B. "Linus M.") maskiert.'
     ],
     invariants: [
-      'Datenschutz: Keine Einsicht in private Bank- oder Vertragsdaten der Eltern.'
+      'Tenancy-Schutz: Lehrkräfte sehen ausschließlich Schüler, die ihnen durch das Sekretariat oder die Schulleitung aktiv zugewiesen wurden.',
+      'Keine Vertragsdaten: Lehrkräfte haben niemals Zugriff auf private Bankverbindungen, SEPA-Mandate oder Rechnungsdaten der Eltern.'
     ],
-    tags: ['schüler', 'fortschritt', 'übeverlauf', 'streaks', 'meisterwerk', 'urkunde']
+    tags: ['schueler', 'roster', 'fortschritt', 'streaks', 'ausweis', 'pass', 'urkunde', 'meisterwerk']
   },
   {
     id: 'teacher-schedule',
     tier: 'teacher',
     boardId: 'schedule',
-    title: 'Mein Stundenplan & Raumbelegung',
-    subtitle: 'Wochenübersicht, Termine abstimmen und Raumzuweisungen prüfen',
+    title: 'Stundenplan-Designer, Raum-Engine & Termine',
+    subtitle: 'Wochenkalender, Raumbelegungs-Check, Ferien-Synchronisation und flexible Ausweichtermine',
     badge: 'Stundenplan',
     category: 'core_boards',
-    summary: 'Dein persönlicher Wochenkalender: Sieh alle Unterrichtseinheiten, Raumzuweisungen und Terminkollisionen auf einen Blick.',
+    summary: 'Dein intelligenter Wochen-Terminplaner: Sieh all deine Schülerblöcke, Raumzuweisungen und Ferienzeiten. Die Raum-Engine verhindert Doppelbelegungen und warnt dich vor Raumkonflikten.',
     steps: [
       {
-        title: '1. Wochenansicht öffnen',
-        desc: 'Der Kalender zeigt deine Unterrichtstage, Schülerblöcke und zugewiesenen Räume an.',
-        actionLabel: 'Stundenplan aufrufen',
+        title: '1. Wochenkalender aufrufen',
+        desc: 'Der Stundenplan zeigt deine Unterrichtstage übersichtlich in Spalten. Jeder Schülerblock enthält Uhrzeit, Schülername, Fach und Raumnummer.',
+        actionLabel: 'Stundenplan öffnen',
         actionTarget: 'schedule'
       },
       {
-        title: '2. Raumwechsel im Blick behalten',
-        desc: 'Wurde ein Unterricht in einen anderen Raum verlegt, ist der Raum im Kalender farblich hervorgehoben.',
+        title: '2. Raumbelegung & Raumwechsel kontrollieren',
+        desc: 'Tippe auf einen Unterrichtsblock, um die Raumdetails einzusehen. Die Raum-Engine prüft im Hintergrund, ob der Raum frei ist.',
         actionLabel: 'Räume prüfen',
         actionTarget: 'schedule'
       },
       {
-        title: '3. Ersatztermine & Ausweichtermine vorschlagen',
-        desc: 'Muss ein Schüler einen Termin verschieben, kannst du direkt über den Kalender einen Alternativtermin anbieten.',
-        actionLabel: 'Termine verwalten',
+        title: '3. Ausweichtermine & Nachholstunden ansetzen',
+        desc: 'Muss ein Schüler verschieben? Ziehe den Block per Drag & Drop auf einen freien Slot oder wähle einen Ausweichraum.',
+        actionLabel: 'Termin bearbeiten',
         actionTarget: 'schedule'
       }
     ],
     proTips: [
-      'Der Kalender synchronisiert sich in Echtzeit mit den Kiosk-Displays an den Türen der Musikschule.',
-      'Nutze den Monatsüberblick für Ferien- und Feiertagsplanung.'
+      '🚪 Kiosk-Türschilder-Sync: Jede Termin- oder Raumänderung im Stundenplan wird in Echtzeit auf den digitalen Kiosk-Türschildern der Musikschule aktualisiert.',
+      '🏖️ Automatische Ferien-Engine: Gesetzliche Schulferien und Feiertage deines Bundeslands (DE, AT, CH) sind fest im Kalender hinterlegt.',
+      '⚡ Notenständer-Modus (Vergrößern): Aktiviere "Vergrößern" in der Menüleiste, um deinen Stundenplan auch aus 1–2 Metern Entfernung auf dem Klavierpult lesen zu können.'
     ],
     invariants: [
-      'Echtzeit-Synchronität: Kalenderänderungen aktualisieren Schülerevents sofort.'
+      'Default-Deny Raum-Engine: Eine Doppelbelegung desselben Raums zur selben Minute wird serverseitig mit einem Konflikt-Fehler blockiert.',
+      'Multi-Tenancy: Termine sind strikt auf die eigene Schule (`school_id`) begrenzt.'
     ],
-    tags: ['stundenplan', 'wochenansicht', 'raum', 'termine', 'kalender']
+    tags: ['stundenplan', 'kalender', 'raum', 'raumplaner', 'termine', 'ferien', 'nachholstunde']
   },
   {
     id: 'teacher-shouts',
     tier: 'teacher',
     boardId: 'shouts',
-    title: 'Notfall-Chat & Shouts (§ 8a SGB VIII)',
-    subtitle: '1:1 Direktnachrichten für kurzfristige Absprachen rechtssicher und datensparsam führen',
+    title: 'Notfall-Chat & Shouts (§ 8a SGB VIII Kinderschutz)',
+    subtitle: 'Rechtssichere 1:1 Kurzmitteilungen direkt am Termin – ohne WhatsApp und ohne private Telefonnummern',
     badge: 'Shouts',
     category: 'core_boards',
-    summary: 'Sichere Direktkommunikation mit Schülern und Eltern: Sende kurze Notizen zur Unterrichtszeit direkt an den Termin – ohne WhatsApp oder private Handynummern.',
+    summary: 'Sichere, DSGVO- und kinderschutzkonforme Kommunikation mit Schülern und Eltern: Sende kurze organisatorische Mitteilungen direkt zum Unterrichtstermin – deine private Handynummer bleibt zu 100% geschützt.',
     steps: [
       {
         title: '1. Shoutbox am Termin öffnen',
-        desc: 'Klicke in deiner Tages-Timeline auf die Sprechblase des Termins.',
-        actionLabel: 'Timeline aufrufen',
+        desc: 'Klicke in deiner Tages-Timeline oder im Stundenplan auf die Sprechblase des Termins.',
+        actionLabel: 'Timeline öffnen',
         actionTarget: 'briefing'
       },
       {
-        title: '2. Kurznachricht eingeben',
-        desc: 'Tippe deine Nachricht (z. B. "Bitte Notenheft Band 2 mitbringen" oder "Komme 5 Min. später").',
-        actionLabel: 'Nachricht verfassen',
+        title: '2. Kurznachricht verfassen & absenden',
+        desc: 'Tippe deine Notiz (z. B. "Bitte Notenheft Band 2 mitbringen" oder "Unterricht beginnt heute 10 Minuten später in Raum 104").',
+        actionLabel: 'Nachricht schreiben',
         actionTarget: 'briefing'
       },
       {
-        title: '3. Schüler / Eltern erhalten Sofort-Benachrichtigung',
-        desc: 'Die Nachricht erscheint sofort am Termin im Schüler-Dashboard.',
-        actionLabel: 'Chat prüfen',
+        title: '3. Schüler & Eltern erhalten Push-Mitteilung',
+        desc: 'Die Nachricht erscheint sofort hervorgehoben auf der Schüler-Startseite und wird bei aktivierten Eltern-Benachrichtigungen zugestellt.',
+        actionLabel: 'Status prüfen',
         actionTarget: 'briefing'
       }
     ],
     proTips: [
-      'Kein privater Nummeraustausch nötig – der Chat läuft vollständig über die Schulplattform.',
-      'Shouts dienen kurzen organisatorischen Absprachen und schützen Lehrkräfte vor Anrufen in der Freizeit.'
+      '🛡️ Privatsphäre-Garantie: Nie wieder WhatsApp-Nachrichten am Sonntagabend – alle Mitteilungen sind an den Unterrichtskontext gebunden.',
+      '🌙 Nachtruhe aktiv: Zwischen 20:00 Uhr und 07:00 Uhr werden keine Push-Töne ausgelöst, um die Nachtruhe von Familien und Lehrkräften zu respektieren.',
+      '📋 Lesebestätigung: Du siehst mit einem dezenten Häkchen, ob die Eltern oder der Schüler die Notiz geöffnet haben.'
     ],
     invariants: [
-      'Kinderschutz nach § 8a SGB VIII: Alle Nachrichten werden als organisatorische Unterrichtsbote protokolliert.'
+      'Kinderschutz nach § 8a SGB VIII: Alle Nachrichten werden revisionssicher im pädagogischen Kontext der Musikschule archiviert.',
+      'Zero-Secret-Leakage: Weder Telefonnummern noch private E-Mail-Adressen werden im Chat-Header übertragen.'
     ],
-    tags: ['shouts', 'chat', 'nachrichten', 'kinderschutz', 'absprache', 'notfall']
+    tags: ['shouts', 'chat', 'kinderschutz', 'sgb viii', 'nachrichten', 'termine', 'dsgvo', 'notfall']
   },
   {
     id: 'teacher-groovelab-bands',
     tier: 'teacher',
     boardId: 'bands',
     title: 'GrooveLab Bands, Repertoire & Skill-Radar',
-    subtitle: 'Ensembles coachen, Songs aus der Bibliothek zuweisen und Fertigkeiten visualisieren',
+    subtitle: 'Ensemble-Coaching, Songs aus der Bibliothek zuweisen, Chords bearbeiten und Skill-Radar bewerten',
     badge: 'GrooveLab',
     category: 'core_boards',
-    summary: 'Das gelbe GrooveLab-Modul für Ensembles und Bands: Teile Songs in Song-Parts, vergebe XP-Punkte und visualisiere Fertigkeiten im Skill-Radar.',
+    summary: 'Das gelbe Band- und Ensemble-Modul für Lehrkräfte: Gründe Schülerbands, weise Stücke aus dem Song-Katalog zu, transponiere Akkorde und verfolge den Probenfortschritt im interaktiven 5-Achsen Skill-Radar.',
     steps: [
       {
-        title: '1. Band gründen & Besetzung zusammenstellen',
-        desc: 'Wähle Schüler für die Band aus und weise ihnen Instrumente (E-Gitarre, Bass, Drums, Keys, Vocals) zu.',
+        title: '1. Band zusammenstellen & Rollen verteilen',
+        desc: 'Öffne das gelbe GrooveLab-Modul. Erstelle eine neue Band und teile Schüler für Lead-Gitarre, Bass, Drums, Keys und Gesang ein.',
         actionLabel: 'Bands verwalten',
         actionTarget: 'bands'
       },
       {
-        title: '2. Songs aus der Bibliothek zuweisen',
-        desc: 'Wähle Stücke aus dem Repertoire-Katalog aus. Schüler sehen Chords, Leadsheets und Übe-Tracks in ihrem Band-Room.',
-        actionLabel: 'Songs öffnen',
+        title: '2. Songs aus dem Repertoire-Katalog zuweisen',
+        desc: 'Wähle Songs aus der Bibliothek (z. B. Rock, Pop, Jazz). Die Schüler erhalten automatisch Zugriff auf Songtexte, Griffbilder und Playalongs in ihrem Band-Room.',
+        actionLabel: 'Song-Katalog öffnen',
         actionTarget: 'bands'
       },
       {
-        title: '3. Skill-Radar & Fortschritt bewerten',
-        desc: 'Bewerte Timing, Dynamik und Ausdruck. Das Skill-Radar visualisiert den Lernfortschritt der gesamten Band.',
-        actionLabel: 'Skill-Radar prüfen',
+        title: '3. Band-Probe im Skill-Radar bewerten',
+        desc: 'Bewerte nach der Probe die 5 Dimensionen (Rhythmus, Timing, Dynamik, Ausdruck, Zusammenspiel). Das Skill-Radar zeigt der Band ihren gemeinsamen Fortschritt.',
+        actionLabel: 'Skill-Radar bewerten',
         actionTarget: 'bands'
       }
     ],
     proTips: [
-      'Im GrooveLab-Modul schalten alle Buttons und Highlights auf das charakteristische Gelb (#eab308).',
-      'Bands können eigene Band-Avatare (Neon Rock, Acoustic Duo, etc.) wählen.'
+      '🟡 Gelbes Marken-Design: Im GrooveLab-Modul schalten alle Buttons auf Gelb (#eab308) – perfekte visuelle Orientierung.',
+      '🎸 Chords & Transposition: Ändere die Tonart eines Songs im Handumdrehen, damit die Tonlage perfekt zur Stimme deines Sängers passt.',
+      '🎤 Setlist für Konzerte: Markiere fertige Songs als "Bühnenreif", um die Setlist für das Musikschul-Konzert automatisch zusammenzustellen.'
     ],
     invariants: [
-      'Modul-Isolation: GrooveLab-Aktivierungen werden immer von der Musikschule übernommen (0,00 € für Eltern).'
+      'Sammelzahler-Doktrin: GrooveLab-Aktivierungen werden ausnahmslos zu 100% von der Musikschule übernommen – Eltern zahlen dafür niemals.',
+      'Avatar-Freigabe: Musiker- und Geist-Avatare sind exklusiv für Schüler und Lehrkräfte im GrooveLab-Modul freigeschaltet.'
     ],
-    tags: ['groovelab', 'bands', 'repertoire', 'skillradar', 'songs', 'ensemble']
+    tags: ['groovelab', 'bands', 'repertoire', 'songs', 'skillradar', 'ensemble', 'chords', 'setlist', 'buehne']
   },
 
   // ══════════════════════════════════════════════════════════════════════════════════
@@ -1117,264 +720,323 @@ export const AKADEMIE_GUIDES_DATABASE: AkademieBoardGuide[] = [
     subtitle: '1-Sekunden-Login ohne Passwort, Stundenplan & wichtige Mitteilungen',
     badge: 'Schüler-Start',
     category: 'quickstart',
-    summary: 'Dein Einstieg in Campus-Groovelab: Scanne einfach deinen QR-Code auf dem Campus-Pass oder gib deine 5-stellige PIN ein. Du siehst sofort deine nächste Unterrichtsstunde, den Raum und wichtige Notizen deiner Lehrkraft.',
+    summary: 'Dein barrierefreier Einstieg in Campus-Groovelab: Scanne einfach deinen QR-Code auf dem Campus-Pass oder gib deine 5-stellige PIN ein. Du siehst sofort deine nächste Unterrichtsstunde, den Raum, aktuelle Vertretungen und wichtige Notizen deiner Lehrkraft.',
     steps: [
       {
-        title: '1. Campus-Pass bereithalten',
-        desc: 'Dein Campus-Pass ist die kleine Karte oder das Blatt, das du von deiner Musikschule bekommen hast.',
-        actionLabel: 'Pass bereithalten',
+        title: '1. Campus-Pass bereitstellen & in Apple/Google Wallet laden',
+        desc: 'Dein Campus-Pass ist deine Eintrittskarte: Drucke ihn aus, lege ihn in den Notenhefter oder speichere ihn mit 1 Klick direkt in deiner Apple Wallet bzw. Google Wallet für blitzschnellen Check-in am Instrument.',
+        actionLabel: 'Pass im Wallet speichern',
         actionTarget: 'briefing'
       },
       {
-        title: '2. QR-Code mit Smartphone scannen',
-        desc: 'Öffne die Kamera deines Handys oder Tablets und halte sie auf den QR-Code. Du bist sofort ohne Passwort eingeloggt.',
+        title: '2. QR-Code mit Smartphone scannen oder PIN eingeben',
+        desc: 'Öffne die Kamera deines Handys oder Tablets und halte sie auf den QR-Code. Alternativ reicht dein Geburtstag (Tag 1–31) als kinderleichte 2FA-PIN. Du bist sofort ohne Passwort eingeloggt.',
         actionLabel: 'Zum Briefing',
         actionTarget: 'briefing'
       },
       {
-        title: '3. Nächste Stunde & Raum prüfen',
-        desc: 'Auf deiner Startseite siehst du genau, wann deine nächste Stunde beginnt und in welchem Raum sie stattfindet.',
+        title: '3. Nächste Stunde, Raum & Mitteilungen prüfen',
+        desc: 'Auf deiner Startseite siehst du auf einen Blick: Wann beginnt der Unterricht, in welchem Raum findest du deine Lehrkraft und gibt es aktuelle Terminänderungen oder Vorab-Notizen?',
         actionLabel: 'Tages-Briefing ansehen',
         actionTarget: 'briefing'
       }
     ],
     proTips: [
-      'Tippe im Browser auf "Teilen" ➔ "Zum Home-Bildschirm", dann öffnet sich Campus-Groovelab wie eine echte App.',
-      'Solltest du deinen Pass verlegt haben, kann deine Lehrkraft dir in 5 Sekunden einen neuen ausdrucken.'
+      '📲 App auf Home-Bildschirm speichern (PWA): Tippe im Safari-Browser auf "Teilen" ➔ "Zum Home-Bildschirm". Campus-Groovelab startet dann im Vollbild ohne störende Browserleisten wie eine native iOS-App.',
+      '👨‍👩‍👧‍👦 Familien-Multi-Pass: Geschwister an derselben Musikschule? Die App merkt sich alle Pässe auf einem Gerät – ihr könnt mit 1 Klick oben rechts zwischen den Schülerprofilen wechseln.',
+      '🛡️ Offline-Sicherheit & Ersatz-Pass: Der Stundenplan bleibt auch ohne Internetverbindung im Offline-Cache gespeichert. Hast du den Pass vergessen, druckt deine Lehrkraft in 5 Sekunden einen neuen aus.'
     ],
     invariants: [
-      '100% Datenschutz: Es werden keine E-Mail-Adressen, Kreditkarten oder Telefonnummern von Schülern gespeichert.'
+      'Zero-Knowledge & Kinderschutz: Es werden niemals E-Mail-Adressen, Kreditkarten oder Telefonnummern von Schülern erhoben.',
+      'Garantierte Kostenfreiheit: Die QR-Landingpage und das Tages-Briefing sind für Schüler und Eltern zu 100% kostenfrei.'
     ],
-    tags: ['schüler', 'campus pass', 'login', 'qr code', 'pin', 'ohne passwort', 'briefing'],
+    tags: ['schüler', 'campus pass', 'login', 'qr code', 'pin', 'wallet', 'apple wallet', 'ohne passwort', 'briefing', 'pwa'],
     pdfDownloadType: 'parent_quickstart'
   },
   {
     id: 'student-homework-book',
     tier: 'student',
     boardId: 'homework_book',
-    title: 'Digitales Aufgabenheft: Notizen & Buchseiten',
-    subtitle: 'Alle Hausaufgaben, Buchseiten und Übe-Ziele synchron auf deinem Smartphone',
+    title: 'Digitales Aufgabenheft: Wochen-Fahrplan & Playalong',
+    subtitle: 'Buchseiten, Lehreraufnahmen, Tempo-Drossel und Sprach-Fragen für den Unterricht',
     badge: 'Aufgaben',
     category: 'core_boards',
-    summary: 'Vergiss nie wieder deine Notenhefte oder Hausaufgaben: Im Reiter "Aufgaben" findest du genau die Seiten, die du üben sollst, und die Audio-Aufnahmen deiner Lehrkraft zum Mitspielen.',
+    summary: 'Keine verlorenen Zettel mehr: In deinem Aufgabenheft findest du genau die Seiten deines Notenbuchs, kannst dir Notizen mit 1 Fingertipp vorlesen lassen, das Tempo zum Üben drosseln und Fragen direkt per Sprache an deine Lehrkraft einsprechen.',
     steps: [
       {
-        title: '1. Aufgaben-Reiter öffnen',
-        desc: 'Tippe im Menü auf "Aufgaben". Hier siehst du die Hausaufgabe deiner letzten Unterrichtsstunde.',
-        actionLabel: 'Zu den Aufgaben springen',
+        title: '1. Noten-Buchseiten & Wochen-Fahrplan erfassen',
+        desc: 'Die grünen Pillen (z. B. "S. 1–3") zeigen dir genau die Seiten im Notenbuch. Die Notizen deiner Lehrkraft erklären dir präzise, worauf du bei den Takten und Griffen achten sollst.',
+        actionLabel: 'Aufgaben ansehen',
         actionTarget: 'homework_book'
       },
       {
-        title: '2. Buchseiten & Übe-Ziele nachlesen',
-        desc: 'Die grünen Pillen (z. B. "S. 24") zeigen dir genau die Seiten im Notenbuch. Die Notizen erklären, worauf du achten sollst.',
-        actionLabel: 'Hausaufgabe lesen',
+        title: '2. Notizen mit 1 Fingertipp vorlesen lassen',
+        desc: 'Tippe oben rechts auf "Vorlesen", wenn du am Instrument sitzt oder noch nicht flüssig liest. Deine Aufgaben werden dir sofort in natürlicher, ruhiger Stimme vorgelesen.',
+        actionLabel: 'Vorlesen testen',
         actionTarget: 'homework_book'
       },
       {
-        title: '3. Lehrer-Aufnahmen auf der linken Seite anhören',
-        desc: 'Höre dir das Stück an, wie es klingen soll. Aufnahmen deiner Lehrkraft stehen immer links bereit.',
+        title: '3. Mit Tempo-Drossel (50% / 75%) & 4-Takte-Pause mitspielen',
+        desc: 'Tippe auf den grünen Play-Button deiner Lehreraufnahme. Ist der Lauf zu schnell? Schalte die Tempo-Drossel auf 50% oder 75%. Die 4-Takte-Pause gibt dir Zeit, die Hände in Anschlagsposition zu bringen.',
         actionLabel: 'Aufnahme abspielen',
+        actionTarget: 'homework_book'
+      },
+      {
+        title: '4. Frage für den Unterricht per Mikrofon einsprechen',
+        desc: 'Unsicher beim Fingersatz oder Rhythmus? Tippe auf "Frage an Lehrkraft" und sprich deine Frage einfach über das Mikrofon ein (oder tippe sie ein). Deine Lehrkraft sieht deine Frage automatisch zu Beginn der nächsten Stunde.',
+        actionLabel: 'Frage notieren',
         actionTarget: 'homework_book'
       }
     ],
     proTips: [
-      'Wenn du eine Hausaufgabe fertig geübt hast, kannst du sie als erledigt abhaken.',
-      'Über die Shoutbox kannst du deinem Lehrer eine kurze Frage stellen, wenn du bei einer Note unsicher bist.'
+      '🔄 Fortlaufender Übeplan: Aufgaben, die du noch nicht ganz fehlerfrei beherrschst, wandern automatisch als Übertrag in die Folgewoche mit – kein Druck, nichts geht verloren.',
+      '🌙 Gesunde Nachtruhe (Digital Detox): Das Aufgabenheft schützt dich und deine Familie ab 20:00 Uhr vor störenden Benachrichtigungen und Tönen bis 07:00 Uhr morgens.',
+      '🎛️ Apple Notenständer-Modus (Vergrößern): Steht dein Tablet weiter weg auf dem Notenständer? Klicke auf "Vergrößern", um extragroße Schrift und Touch-Ziele für 60–90 cm Spielabstand zu aktivieren.'
     ],
     invariants: [
-      'Aufnahmen-Herkunft: Aufnahmen deiner Lehrkraft stehen links, deine eigenen Übe-Aufnahmen rechts.'
+      'Symmetrie der Aufnahmen: Aufnahmen deiner Lehrkraft stehen strikt links im Aufgabenheft, deine privaten Studio-Aufnahmen rechts.',
+      'Datensparsamkeit: Gesprochene Schülerfragen werden direkt im Browser transkribiert – keine Speicherung privater Sprachdaten auf Werbeservern.'
     ],
-    tags: ['aufgabenheft', 'hausaufgaben', 'noten', 'buchseiten', 'üben', 'notizen']
+    tags: ['aufgabenheft', 'hausaufgaben', 'buchseiten', 'noten', 'vorlesen', 'tts', 'tempo', 'lehreraufnahme', 'frage', 'diktat', 'nachtruhe', 'vergrößern']
   },
   {
     id: 'student-practice-studio-timer',
     tier: 'student',
     boardId: 'practice_board',
-    title: 'Übe-Studio & Fokus-Timer: XP sammeln & Streaks',
-    subtitle: 'Starte den Fokus-Timer, baue deine Flammen-Serie auf und nimm eigene Takes auf',
+    title: 'Übe-Studio & Zen-Mission: Belohnungs-Sticker & Fokus',
+    subtitle: 'Ablenkungsfreie 3-Stufen-Mission, Playalong-Dock, Sound-Chimes und Flammen-Streaks',
     badge: 'Übe-Studio',
     category: 'audio_studio',
-    summary: 'Mach dein Üben zu einem Erfolgserlebnis: Starte den Timer, sammle Erfahrungspunkte (XP), halte deine Wochen-Serie und nimm dich selbst auf.',
+    summary: 'Mach dein tägliches Üben zu einer motivierenden Entdeckungsreise: Wähle deine Zen-Mission (5, 10 oder 15 Min.), spiele direkt im Zen-Dock zu den Aufnahmen deiner Lehrkraft mit und feiere das Erreichen mit Sound-Chimes, Konfetti und bunten Belohnungs-Stickern.',
     steps: [
       {
-        title: '1. Fokus-Timer vor dem Üben starten',
-        desc: 'Gehe in dein Übe-Studio und starte den Timer. Der Timer läuft ruhig im Hintergrund mit.',
-        actionLabel: 'Timer starten',
+        title: '1. Zen-Mission starten (5, 10 oder 15 Minuten)',
+        desc: 'Öffne das Übe-Studio und wähle deine Missions-Dauer. Der Bildschirm wechselt in einen ruhigen, ablenkungsfreien Zen-Modus – keine störenden Menüs, volle Konzentration auf dein Instrument.',
+        actionLabel: 'Mission starten',
         actionTarget: 'practice_board'
       },
       {
-        title: '2. XP-Punkte & Übe-Serie (Streaks) ausbauen',
-        desc: 'Für jede geübte Minute sammelst du XP. Übst du mehrere Tage in Folge, entfacht deine Übe-Flamme (Streak).',
-        actionLabel: 'Streaks ansehen',
+        title: '2. Mit dem Zen Playalong-Dock mitspielen',
+        desc: 'Während die Zen-Uhr läuft, steuerst du deine Lehrer-Aufnahmen und Playalongs direkt im unteren Zen-Dock – mit Start/Pause, Vorzähler und Tempo-Drossel, ohne den Fokus zu verlieren.',
+        actionLabel: 'Playalong testen',
         actionTarget: 'practice_board'
       },
       {
-        title: '3. Eigene Aufnahmen im Studio aufnehmen',
-        desc: 'Drücke auf den Aufnahmeknopf und nimm dein eigenes Spiel auf. Deine Aufnahmen landen sicher auf der rechten Seite ("Dein Übe-Studio").',
-        actionLabel: 'Aufnahme starten',
+        title: '3. Meilenstein erreichen: Sound-Chime, Konfetti & Sticker sammeln',
+        desc: 'Hast du deine Übezeit geschafft, ertönt der feierliche Klang-Chime! Virtuelles Konfetti steigt auf und du kannst dir deinen verdienten Belohnungs-Sticker für dein digitales Notenheft aussuchen.',
+        actionLabel: 'Sticker ansehen',
         actionTarget: 'practice_board'
       }
     ],
     proTips: [
-      'Schließe Kopfhörer an, um dein Spiel sauber und ohne Nebengeräusche abzuhören.',
-      'Sammle genug XP, um neue Musiker-Avatare und Auszeichnungs-Sticker freizuschalten.'
+      '🔥 Flammen-Serie (Streaks): Für jeden Tag, an dem du deine Mission erfüllst, wächst deine Übe-Flamme. Halte die Serie aktiv und schalte seltene Musiker-Avatare frei.',
+      '👨‍👩‍👧 Eltern-Begleitung (Üben ohne Tablet): Hast du ganz frei am Klavier, Schlagzeug oder im Garten geübt? Deine Eltern können gemeinsam geübte Minuten mit 1 Klick nachtragen und bestätigen.',
+      '🎧 Kopfhörer-Empfehlung: Schließe geschlossene Kopfhörer an, um die Lehrer-Aufnahme im Zen-Dock kristallklar zu hören und dein eigenes Spiel präzise abzugleichen.'
     ],
     invariants: [
-      'Eigene Aufnahmen: Deine Aufnahmen landen ausschließlich in deinem privaten Übe-Studio (rechte Seite).'
+      'Intrinsische Motivation: Keine negativen Abzüge oder Strafen bei verpassten Tagen – die Freude am Musizieren steht immer an erster Stelle.',
+      'Offline-Resilienz: Die Zen-Mission und der Fokus-Timer laufen dank präziser Web-Worker auch bei instabiler Internetverbindung sekundengenau weiter.'
     ],
-    tags: ['üben', 'timer', 'xp', 'streaks', 'aufnahme', 'studio', 'flamme']
+    tags: ['üben', 'timer', 'zen mission', 'playalong dock', 'streaks', 'flamme', 'konfetti', 'sticker', 'xp', 'elternbegleitung']
+  },
+  {
+    id: 'student-groove-trainer',
+    tier: 'student',
+    boardId: 'groove_trainer',
+    title: 'Groove-Trainer: Rhythmus-Labor & Pocket-Coach',
+    subtitle: 'Bären-Puls bis Shuffle, Call & Response und Live-Timing-Feedback (In the Pocket)',
+    badge: 'Groove-Trainer',
+    category: 'audio_studio',
+    summary: 'Entwickle ein unerschütterliches Taktgefühl: Trainiere mit 4 Tier-Rhythmen (vom Bären-Puls bis zum Pferde-Galopp), wähle dein Lieblings-Drumkit und erhalte sekundengenaues Live-Feedback, ob du genau auf den Punkt spielst.',
+    steps: [
+      {
+        title: '1. Rhythmus-Stufe & Tier-Puls wählen',
+        desc: 'Wähle dein Level: 1. Bären-Puls (Viertelnoten / 80 BPM), 2. Häschen-Groove (Achtel / 90 BPM), 3. Off-Beat (Synkopen / 95 BPM) oder 4. Pferde-Galopp (Shuffle / 75 BPM).',
+        actionLabel: 'Groove-Trainer öffnen',
+        actionTarget: 'groove_trainer'
+      },
+      {
+        title: '2. Trainingsmodus & Sound-Kit aktivieren',
+        desc: 'Schalte zwischen "Call & Response" (Zuhören ➔ Nachspielen), "Continuous" (Dauer-Groove) oder dem "Disappearing Beat" (Klick blendet sich aus, um dein inneres Metronom zu testen). Wähle Drums, 808 oder Congas.',
+        actionLabel: 'Modus einstellen',
+        actionTarget: 'groove_trainer'
+      },
+      {
+        title: '3. Im Rhythmus tappen & Live-Feedback prüfen',
+        desc: 'Tappe auf das Rhythmus-Pad oder spiele dein Instrument. Das System bewertet jeden Schlag in Echtzeit: "Pocket" (Perfekt im Takt), "Rush" (Zu schnell) oder "Drag" (Zu langsam).',
+        actionLabel: 'Training starten',
+        actionTarget: 'groove_trainer'
+      }
+    ],
+    proTips: [
+      '🎯 Die Pocket treffen: Versuche 16 Takte am Stück nur "Pocket"-Treffer zu erzielen, um die höchste Rhythmus-XP-Auszeichnung freizuschalten.',
+      '👻 Disappearing Beat meistern: Der Klick wird nach 4 Takten leiser und verschwindet ganz – schaffst du es, nach 8 Takten Stille exakt auf der "1" wieder einzusetzen?',
+      '🔊 Sound-Kits variieren: Wechsle auf "Body Percussion" für natürliches Klatschen oder "Urban 808" für modernen Beat-Sound.'
+    ],
+    invariants: [
+      'Latenz-Kompensation: Die Rhythmus-Engine nutzt WebAudio Precision Clocks mit Sub-Millisekunden-Genauigkeit.',
+      'Sicherer Schutz: Keine Bestrafung bei Fehltritten – Feedback dient rein dem spielerischen Gehör- und Timing-Aufbau.'
+    ],
+    tags: ['groove trainer', 'rhythmus', 'metronom', 'timing', 'pocket', 'viertel', 'achtel', 'synkopen', 'shuffle', 'call response']
   },
   {
     id: 'student-loopstation-playalong',
     tier: 'student',
     boardId: 'loopstation',
-    title: 'Interaktive Audio-Loopstation mit 4-Takte-Pause',
-    subtitle: 'Spiele sample-genau zur Aufnahme deiner Lehrkraft mit',
+    title: 'Interaktive Audio-Loopstation: Mehrspur-Studio & Overdubbing',
+    subtitle: 'Spur 1 bis 4 layern, analoge Lautstärke-Knobs, Solo/Mute und automatisches Studio-Mastering',
     badge: 'Loopstation',
     category: 'audio_studio',
-    summary: 'Die Loopstation spielt die Aufnahme deines Lehrers im Kreis ab. Durch die verbindliche 4-Takte-Pause hast du immer Zeit, dich bereit zu machen.',
+    summary: 'Baue deine eigenen Songs und Begleitungen Spur für Spur auf: Nimm auf Spur 1 einen Beat oder Akkorde auf, loope sie nahtlos mit 4-Takte-Pause und spiele auf Spur 2 dein Solo darüber ein.',
     steps: [
       {
-        title: '1. Loopstation im Aufgabenheft starten',
-        desc: 'Tippe bei der Aufnahme deiner Lehrkraft auf das Loopstation-Symbol.',
+        title: '1. Grundspur auf Track 1 einspielen',
+        desc: 'Schalte das Metronom ein, wähle dein Tempo (BPM) und starte die Aufnahme. Der 4-Beat Einzähler zählt dich sauber ein. Spiele dein Grundmuster und stoppe genau am Taktende.',
         actionLabel: 'Loopstation öffnen',
-        actionTarget: 'homework_book'
+        actionTarget: 'loopstation'
       },
       {
-        title: '2. 4-Takte Vorzähler-Pause abwarten',
-        desc: 'Nutze die 4 Takte Pause, um dein Instrument in Anschlagsposition zu bringen.',
-        actionLabel: 'Loop abspielen',
-        actionTarget: 'homework_book'
+        title: '2. Zweite Spur overdubben (Mehrspur-Aufnahme)',
+        desc: 'Track 1 loopt nun automatisch im Kreis. Aktiviere Track 2 für die Aufnahme. Dank der verbindlichen 4-Takte-Pause hast du Zeit, dich am Instrument vorzubereiten, bevor dein Solo startet.',
+        actionLabel: 'Overdub starten',
+        actionTarget: 'loopstation'
       },
       {
-        title: '3. Im Kreis mitspielen',
-        desc: 'Die Spur wiederholt sich nahtlos, bis du die Passage sicher beherrschst.',
-        actionLabel: 'Loopstation testen',
-        actionTarget: 'homework_book'
+        title: '3. Spuren mit Lautstärke-Knobs & Mute/Solo abmischen',
+        desc: 'Drehe an den analogen Lautstärke-Knobs, um Spuren leiser oder lauter zu machen. Schalte einzelne Instrumente stumm oder setze ein Solo-Highlight.',
+        actionLabel: 'Mix abmischen',
+        actionTarget: 'loopstation'
       }
     ],
     proTips: [
-      'Konzentriere dich auf gleichmäßiges Timing und die Intonation.',
-      'Die 4-Takte-Pause verhindert gehetztes Einsetzen und schont deine Konzentration.'
+      '🎛️ Audio-Mastering im Hintergrund: Die Loopstation pegelt deine Aufnahme automatisch nach EBU R128 (-14 LUFS) ein – dein Take klingt direkt wie eine fertige Studio-Produktion.',
+      '🎧 Kopfhörer bei Mehrspur-Takes: Nutze kabelgebundene Kopfhörer beim Overdubbing, damit die erste Spur nicht ins Mikrofon überspricht.',
+      '⚡ Latenz-Ausgleich: Hast du Bluetooth-Lautsprecher? Stelle den Sync-Offset-Regler um einige Millisekunden nach, um Verzögerungen vollständig auszugleichen.'
     ],
     invariants: [
-      'Sample-Genauigkeit: Die Loopstation startet immer mit verbindlicher 4-Takte-Pause.'
+      '4-Takte-Ruhepause: Die Loopstation startet Mehrspur-Takes ausnahmslos mit 4 Takten Pause für stressfreies Einsetzen.',
+      'Studio-Mastering: Alle Spuren werden lokal verlustfrei verarbeitet und erst nach Pegelung im Tresor abgelegt.'
     ],
-    tags: ['loopstation', 'playalong', 'pause', 'timing', 'üben', 'audio']
+    tags: ['loopstation', 'overdub', 'mehrspur', 'tracks', 'fader', 'mastering', 'playalong', 'knobs', 'lufs', 'timing']
   },
   {
     id: 'student-meisterwerk-vault',
     tier: 'student',
     boardId: 'hero',
-    title: 'Meisterwerk-Tresor & Mein Held',
-    subtitle: 'Deine gemeisterten Stücke, offizielle Meisterwerk-Urkunden und Sticker-Album',
+    title: 'Meisterwerk-Tresor & Mein Held: Urkunden & Level-Evolution',
+    subtitle: 'Gemeisterte Stücke, offizielle Musikschul-Urkunden und Level-Rahmen von Bronze bis Diamant',
     badge: 'Tresor',
     category: 'core_boards',
-    summary: 'Deine persönliche musikalische Ruhmeshalle: Jedes Stück, das du mit deiner Lehrkraft fertig lernst, wird im Meisterwerk-Tresor mit einer Urkunde verewigt.',
+    summary: 'Deine persönliche musikalische Hall of Fame: Jedes Musikstück, das du flüssig vorspielen kannst, wird von deiner Lehrkraft als offizielles Meisterwerk mit Urkunde im Tresor verewigt.',
     steps: [
       {
-        title: '1. Stück mit Lehrkraft vollenden',
-        desc: 'Wenn du ein Stück flüssig vorspielen kannst, schaltet deine Lehrkraft die Meisterwerk-Urkunde frei.',
-        actionLabel: 'Zum Helden-Bereich',
+        title: '1. Stück im Unterricht meistern & freischalten',
+        desc: 'Sobald du ein Werk fehlerfrei beherrschst, aktiviert deine Lehrkraft das Meisterwerk-Siegel. Das Stück wandert aus den offenen Aufgaben direkt in deine Helden-Galerie.',
+        actionLabel: 'Helden-Bereich öffnen',
         actionTarget: 'hero'
       },
       {
-        title: '2. Offizielle Urkunde ansehen',
-        desc: 'Tippe auf die Urkunde in deinem Tresor. Sie trägt deinen Namen, das Musikschul-Siegel und das Abschlussdatum.',
+        title: '2. Offizielle Meisterwerk-Urkunde einsehen & drucken',
+        desc: 'Tippe auf das gemeisterte Stück. Deine Urkunde enthält deinen Namen, das Musikschul-Wappen, Abschlussdatum und Notenbuch-Quelle. Lade sie mit 1 Klick als hochauflösendes PDF herunter.',
         actionLabel: 'Urkunden ansehen',
         actionTarget: 'hero'
       },
       {
-        title: '3. Als PDF herunterladen oder ausdrucken',
-        desc: 'Drucke deine Urkunde für dein Zimmer aus oder teile sie digital mit deinen Großeltern.',
-        actionLabel: 'PDF exportieren',
+        title: '3. Level-Evolution & Meister-Krone freischalten',
+        desc: 'Mit jedem Meisterwerk und jeder Übe-Minute steigt dein Musiker-Level. Dein Avatar erhält edle Rahmen (Bronze ➔ Silber ➔ Gold ➔ Platin ➔ Diamant) und schließlich die Meister-Krone.',
+        actionLabel: 'Avatar ansehen',
         actionTarget: 'hero'
       }
     ],
     proTips: [
-      'Je mehr Stücke du meisterst, desto höher steigt dein Level und desto seltenere Sticker schaltest du frei.',
-      'Urkunden können jederzeit erneut als hochauflösendes PDF heruntergeladen werden.'
+      '🖼️ Urkunde für Großeltern & Zimmer: Lade das druckfertige A4-PDF herunter und hänge es über dein Instrument oder teile es digital mit deiner Familie.',
+      '👑 Die Meister-Krone: Schüler, die mehr als 10 Stücke gemeistert haben, schalten die legendäre goldene Meisterkrone im Profil frei.',
+      '🎨 Eigenes Musiker-Foto: Mit Erlaubnis deiner Eltern (per PIN) kannst du ein echtes Foto von dir am Instrument im Profil hochladen.'
     ],
     invariants: [
-      'Revisionssicherheit: Ausgestellte Meisterwerk-Urkunden bleiben dauerhaft in deiner musikalischen Biografie erhalten.'
+      'Revisionssicher & Unveränderbar: Ausgestellte Meisterwerk-Urkunden tragen eine kryptografische Prüfsumme und bleiben dauerhaft in deiner Schulbiografie erhalten.',
+      'Datenschutz: Exporte enthalten ausschließlich deinen Vornamen und den ersten Buchstaben des Nachnamens.'
     ],
-    tags: ['meisterwerk', 'urkunde', 'tresor', 'abschluss', 'sticker', 'erfolg']
+    tags: ['meisterwerk', 'urkunde', 'tresor', 'held', 'avatar', 'level', 'evolution', 'krone', 'pdf', 'auszeichnung']
   },
   {
     id: 'student-groovelab-bandroom',
     tier: 'student',
     boardId: 'songs',
-    title: 'GrooveLab Band-Room, Songs & Musiker-Avatare',
-    subtitle: 'Gemeinsam mit deiner Band Songs meistern und den Skill-Radar füllen',
+    title: 'GrooveLab Band-Room: Songs, Chords & Musiker-Avatare',
+    subtitle: 'Interaktive Band-Setlists, Songtexte mit Akkorden, Skill-Radar und Ensemble-Proben',
     badge: 'GrooveLab',
     category: 'core_boards',
-    summary: 'Das gelbe Band-Modul für Schüler: Tritt deiner Band bei, wähle deinen Musiker-Avatar (oder Geist-Avatar), lerne deine Song-Parts und bereite deinen nächsten Band-Auftritt vor.',
+    summary: 'Das gelbe Band- und Repertoire-Modul: Probt eure gemeinsamen Songs für das nächste Konzert, studiert Songtexte und Akkorde ein und verfolgt euren Band-Fortschritt im interaktiven Skill-Radar.',
     steps: [
       {
         title: '1. In den gelben GrooveLab-Reiter wechseln',
-        desc: 'Tippe oben auf "GrooveLab", um in den Band-Modus zu wechseln.',
+        desc: 'Tippe im Hauptmenü auf den gelben Reiter "GrooveLab". Du siehst sofort die Band, in der du eingeteilt bist, und das anstehende Repertoire.',
         actionLabel: 'Zu GrooveLab wechseln',
         actionTarget: 'songs'
       },
       {
-        title: '2. Band-Room betreten & Songs ansehen',
-        desc: 'Sieh, welche Stücke deine Band gerade probt. Öffne Chords, Songtexte und Play-Alongs.',
-        actionLabel: 'Songs öffnen',
+        title: '2. Songs öffnen, Chords & Songtexte einblenden',
+        desc: 'Tippe auf ein Song-Cover (z. B. "Linkin Park - Numb"). Du siehst die Akkorde, den Liedtext und die für dein Instrument passenden Griffbilder.',
+        actionLabel: 'Song-Mediathek öffnen',
         actionTarget: 'songs'
       },
       {
-        title: '3. Skill-Radar füllen & Song-XP sammeln',
-        desc: 'Jedes gemeisterte Stück bringt deiner Band Punkte und füllt deinen persönlichen Skill-Radar.',
-        actionLabel: 'Songs ansehen',
+        title: '3. Skill-Radar füllen & Musiker-Avatar anpassen',
+        desc: 'Für jeden geübten Song wachsen deine Werte im 5-Achsen Skill-Radar (Rhythmus, Tonhöhe, Dynamik, Tempo, Ausdruck). Passe deinen Geist- oder Band-Avatar individuell an.',
+        actionLabel: 'Skill-Radar ansehen',
         actionTarget: 'songs'
       }
     ],
     proTips: [
-      'Nutze den Band-Chat, um Absprachen für die nächste Bandprobe zu treffen.',
-      'Im GrooveLab kannst du deinen persönlichen Musiker-Avatar individuell gestalten.'
+      '🎸 Band-Transposition: Ist der Gesang zu hoch oder tief? Nutze die Tonart-Verschiebung im Song-Detail, um die Akkorde für deine Gitarre oder dein Klavier anzupassen.',
+      '👻 Musiker-Avatar im Band-Modus: Im GrooveLab-Modul kannst du dir aus Dutzenden coolen Instrumenten- und Geist-Avataren deinen Bühnen-Charakter wählen.',
+      '🎵 Repertoire-Status: Lerne erst den "Refrain", dann die "Strophe", bis der Song als "Auftrittsbereit" grün markiert ist.'
     ],
     invariants: [
-      'GrooveLab-Aktivierungen sind für Eltern und Schüler immer zu 100% kostenlos.'
+      '100% Schulübernahme: GrooveLab-Aktivierungen werden ausnahmslos von der Musikschule als Sammelzahler übernommen – für Eltern und Schüler stets 0,00 €.',
+      'Kein Chat-Spam: Band-Nachrichten sind rein didaktische Probentermine und Setlist-Hinweise der Lehrkraft.'
     ],
-    tags: ['groovelab', 'band', 'songs', 'avatar', 'skillradar', 'ensemble']
+    tags: ['groovelab', 'band', 'bandroom', 'songs', 'repertoire', 'chords', 'akkorde', 'skill radar', 'avatar', 'auftritt']
   },
   {
     id: 'student-parents-safety',
     tier: 'student',
     boardId: 'profile',
-    title: 'Eltern-Bereich: PIN-Schutz, Bildschirmzeit & Daten-Tresor',
-    subtitle: 'Persönliche PIN festlegen, Übe-Zeitfenster steuern und DSGVO-Archiv exportieren',
+    title: 'Eltern-Bereich: Wöchentlicher Übe-Report, Streak-Schilde & PIN',
+    subtitle: 'Transparente Übe-Minuten, Schutzschilde bei Krankheit, 4-stellige PIN und DSGVO-Datentresor',
     badge: 'Eltern-Schutz',
     category: 'core_boards',
-    summary: 'Sicherheit und Übersicht für Eltern: Schützen Sie das Profil mit einer persönlichen PIN, passen Sie die empfohlene Bildschirmzeit für jüngere Kinder an und laden Sie das vollständige didaktische Archiv herunter.',
+    summary: 'Sicherheit, Gelassenheit und volle Transparenz für Eltern: Sehen Sie auf einen Blick die wöchentlichen Übe-Minuten Ihres Kindes, schützen Sie die Flammen-Serie mit Schutzschilden und verwalten Sie sensible Einstellungen mit einer persönlichen PIN.',
     steps: [
       {
-        title: '1. Eltern-Bereich im Profil öffnen',
-        desc: 'Öffne das Profilmenü und tippe auf "Eltern-Schutz".',
+        title: '1. Eltern-Bereich im Profil aufrufen',
+        desc: 'Tippe im Profil auf "Mein Profil" und wähle die Kachel "Eltern-Bereich & Sicherheit".',
         actionLabel: 'Profil öffnen',
         actionTarget: 'profile'
       },
       {
-        title: '2. 4-stellige Eltern-PIN einrichten',
-        desc: 'Verhindere ungewollte Änderungen am Profil durch eine persönliche Eltern-PIN.',
-        actionLabel: 'PIN einrichten',
+        title: '2. Wöchentlichen Übe-Report einsehen',
+        desc: 'Hier sehen Sie die reinen Übe-Minuten der Woche im Vergleich zum empfohlenen Tagesziel (z. B. 15 Min./Tag). Keine Bewertungen, sondern reine Lernzeit am Instrument.',
+        actionLabel: 'Report ansehen',
         actionTarget: 'profile'
       },
       {
-        title: '3. Vollständigen Daten-Export herunterladen',
-        desc: 'Lade mit 1 Klick alle Hausaufgabennotizen, Urkunden und Audio-Takes als ZIP-Archiv herunter.',
-        actionLabel: 'Archiv exportieren',
+        title: '3. 4-stellige Eltern-PIN zum Schutz einrichten',
+        desc: 'Vergeben Sie eine persönliche 4-stellige Eltern-PIN. Dadurch wird verhindert, dass Kinder versehentlich Profileinstellungen verstellen oder persönliche Daten ändern.',
+        actionLabel: 'PIN vergeben',
         actionTarget: 'profile'
       }
     ],
     proTips: [
-      'Die Eltern-PIN schützt Einstellungen vor versehentlichen Änderungen durch jüngere Kinder.',
-      'Der Datenexport enthält alle Übungszeiten und Urkunden in einer komprimierten ZIP-Datei.'
+      '🛡️ Streak-Schutzschilde: Ist Ihr Kind krank, im Urlaub oder hat Schullandheim? Bis zu 3 automatische Schutzschilde verhindern, dass die mühsam aufgebaute Übe-Flamme erlischt.',
+      '👨‍👩‍👧 Gemeinsam geübte Minuten bestätigen: Hat Ihr Kind ohne Tablet am echten Klavier geübt? Bestätigen Sie die Minuten mit 1 Fingertipp im Eltern-Report.',
+      '📦 Vollständiger DSGVO-Archiv-Download: Sie können jederzeit ein komplettes ZIP-Archiv aller hochgeladenen Hausaufgaben, Urkunden und Übezeiten herunterladen.'
     ],
     invariants: [
-      'Zero-Knowledge: PIN-Prüfungen erfolgen zu 100% serverseitig über sichere Hash-RPCs.',
-      'Absolute Datenminimierung: Keine Speicherung von SEPA-, Bank- oder Kreditkartendaten.'
+      'Zero-Tracking Doktrin: Keine Werbe-Tracker, keine Cookies von Drittanbietern, keine Datenweitergabe an Werbenetzwerke.',
+      'Server-Side PIN Verifikation: PIN-Prüfungen erfolgen zu 100% kryptografisch serverseitig – kein Auslesen im Browser möglich.'
     ],
-    tags: ['eltern', 'pin', 'schutz', 'bildschirmzeit', 'export', 'datenschutz', 'dsgvo']
+    tags: ['eltern', 'sicherheit', 'pin', 'report', 'uebezeiten', 'streak schild', 'dsgvo', 'datenschutz', 'kinderschutz']
   }
 ];

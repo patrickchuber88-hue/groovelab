@@ -28,7 +28,7 @@ import { deleteStudentFully } from '../utils/studentDeletionService';
 import { getParentOnboardingUrl, isDevEnvironment } from '../utils/tenantUrlHelper';
 
 // Lazy load heavy auxiliary modals and views on demand
-const SecretaryDutiesView = lazy(() => import('./secretary/SecretaryDutiesView').then(m => ({ default: m.SecretaryDutiesView })));
+const SecretaryAnnouncementsView = lazy(() => import('./secretary/SecretaryAnnouncementsView').then(m => ({ default: m.SecretaryAnnouncementsView })));
 const SecretaryCrisisView = lazy(() => import('./secretary/SecretaryCrisisView').then(m => ({ default: m.SecretaryCrisisView })));
 const SecretaryEquipmentView = lazy(() => import('./secretary/SecretaryEquipmentView').then(m => ({ default: m.SecretaryEquipmentView })));
 const SecretaryAuditView = lazy(() => import('./secretary/SecretaryAuditView').then(m => ({ default: m.SecretaryAuditView })));
@@ -226,8 +226,12 @@ const AvatarImage = React.memo(({ src, style, className, user, userId, onClick, 
   const displaySrc = React.useMemo(() => {
     const r = (user?.role || '').toLowerCase();
     const roles = Array.isArray(user?.roles) ? user.roles.map((x: any) => String(x).toLowerCase()) : [];
-    if (r === 'admin' || r === 'secretary' || roles.includes('admin') || roles.includes('secretary')) {
-      return '/campus_login_hero.png';
+    const isExplicitTeacher = r === 'teacher' || user?.isTeacherContext === true || user?.isTeacher === true;
+    const isExplicitStudent = r === 'student';
+    if (!isExplicitTeacher && !isExplicitStudent) {
+      if (r === 'admin' || r === 'secretary' || roles.includes('admin') || roles.includes('secretary')) {
+        return '/campus_login_hero.png';
+      }
     }
     const activePlat = activePlatform || (typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_active_platform') || localStorage.getItem('groovelab_active_platform')) : 'groovelab');
     if (activePlat === 'groovelab') {
@@ -1274,10 +1278,10 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
     if (saved === 'campus' || saved === 'groovelab' || saved === 'secretary') return saved as any;
     return 'secretary';
   });
-  const [secretarySubTab, setSecretarySubTab] = useState<'briefing' | 'employees' | 'licenses' | 'setup' | 'rooms' | 'equipment' | 'crisis' | 'audit' | 'duties'>(() => {
+  const [secretarySubTab, setSecretarySubTab] = useState<'briefing' | 'employees' | 'licenses' | 'setup' | 'rooms' | 'equipment' | 'crisis' | 'audit' | 'duties' | 'announcements'>(() => {
     const saved = typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_secretary_subtab') || localStorage.getItem('groovelab_secretary_subtab')) : null;
-    const valid = ['briefing', 'employees', 'licenses', 'setup', 'rooms', 'equipment', 'crisis', 'audit', 'duties'];
-    if (saved && valid.includes(saved)) return saved as any;
+    const valid = ['briefing', 'employees', 'licenses', 'setup', 'rooms', 'equipment', 'crisis', 'audit', 'duties', 'announcements'];
+    if (saved && valid.includes(saved)) return (saved === 'duties' ? 'announcements' : saved) as any;
     return 'briefing';
   });
 
@@ -1582,30 +1586,31 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
     if (saved && valid.includes(saved)) return saved as any;
     return 'briefing';
   });
-  // Administrative Duties (Infos der Verwaltung)
-  const [dutiesList, setDutiesList] = useState<any[]>([]);
-  const [dutiesLoading, setDutiesLoading] = useState<boolean>(false);
-  const [newDutyTitle, setNewDutyTitle] = useState('');
-  const [newDutyDescription, setNewDutyDescription] = useState('');
-  const [newDutyType, setNewDutyType] = useState<'todo' | 'questionnaire'>('todo');
-  const [newDutyQuestions, setNewDutyQuestions] = useState<any[]>([]);
-  const [newDutyQuestionType, setNewDutyQuestionType] = useState<'text' | 'choice' | 'boolean'>('text');
-  const [newDutyQuestionOptions, setNewDutyQuestionOptions] = useState<string>('Ja, Nein, Vielleicht');
-  const [newDutyPriority, setNewDutyPriority] = useState<'standard' | 'critical'>('standard');
-  const [newDutyTargetType, setNewDutyTargetType] = useState<'all' | 'group' | 'individual'>('all');
-  const [newDutyTargetGroup, setNewDutyTargetGroup] = useState('guitar');
-  const [newDutyTargetTeacherId, setNewDutyTargetTeacherId] = useState('');
-  const [newDutyDueDate, setNewDutyDueDate] = useState('');
-  const [newDutyRecurrence, setNewDutyRecurrence] = useState<'none' | 'monthly' | 'half_yearly'>('none');
-  const [newDutyAttachmentUrl, setNewDutyAttachmentUrl] = useState('');
-  const [isUploadingDutyAttachment, setIsUploadingDutyAttachment] = useState(false);
-  const [selectedDutyForStats, setSelectedDutyForStats] = useState<any>(null);
+  // Administrative Mitteilungen & Informationen
+  const [announcementsList, setAnnouncementsList] = useState<any[]>([]);
+  const [announcementsLoading, setAnnouncementsLoading] = useState<boolean>(false);
+  const [newAnnouncementTitle, setNewAnnouncementTitle] = useState('');
+  const [newAnnouncementDescription, setNewAnnouncementDescription] = useState('');
+  const [newAnnouncementType, setNewAnnouncementType] = useState<'todo' | 'questionnaire'>('todo');
+  const [newAnnouncementQuestions, setNewAnnouncementQuestions] = useState<any[]>([]);
+  const [newAnnouncementQuestionType, setNewAnnouncementQuestionType] = useState<'text' | 'choice' | 'boolean'>('text');
+  const [newAnnouncementQuestionOptions, setNewAnnouncementQuestionOptions] = useState<string>('Ja, Nein, Vielleicht');
+  const [newAnnouncementPriority, setNewAnnouncementPriority] = useState<'standard' | 'critical'>('standard');
+  const [newAnnouncementIsAnonymous, setNewAnnouncementIsAnonymous] = useState<boolean>(false);
+  const [newAnnouncementTargetType, setNewAnnouncementTargetType] = useState<'all' | 'group' | 'individual'>('all');
+  const [newAnnouncementTargetGroup, setNewAnnouncementTargetGroup] = useState('guitar');
+  const [newAnnouncementTargetTeacherId, setNewAnnouncementTargetTeacherId] = useState('');
+  const [newAnnouncementDueDate, setNewAnnouncementDueDate] = useState('');
+  const [newAnnouncementRecurrence, setNewAnnouncementRecurrence] = useState<'none' | 'monthly' | 'half_yearly'>('none');
+  const [newAnnouncementAttachmentUrl, setNewAnnouncementAttachmentUrl] = useState('');
+  const [isUploadingAnnouncementAttachment, setIsUploadingAnnouncementAttachment] = useState(false);
+  const [selectedAnnouncementForStats, setSelectedAnnouncementForStats] = useState<any>(null);
   const [statsSearchQuery, setStatsSearchQuery] = useState('');
   const [statsStatusFilter, setStatsStatusFilter] = useState<'all' | 'completed' | 'pending'>('all');
   const [statsModalTab, setStatsModalTab] = useState<'status' | 'qa'>('status');
-  const [dutyResponsesList, setDutyResponsesList] = useState<any[]>([]);
-  const [newDutyQuestionInput, setNewDutyQuestionInput] = useState('');
-  const [editingDutyId, setEditingDutyId] = useState<string | null>(null);
+  const [announcementResponsesList, setAnnouncementResponsesList] = useState<any[]>([]);
+  const [newAnnouncementQuestionInput, setNewAnnouncementQuestionInput] = useState('');
+  const [editingAnnouncementId, setEditingAnnouncementId] = useState<string | null>(null);
   const [expandedResponseIds, setExpandedResponseIds] = useState<Record<string, boolean>>({});
 
   const [enabledCampusSubjects, setEnabledCampusSubjects] = useState<boolean>(true);
@@ -2427,6 +2432,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
   const [customBillingZip, setCustomBillingZip] = useState<string>('');
   const [customBillingCity, setCustomBillingCity] = useState<string>('');
   const [customBillingEmail, setCustomBillingEmail] = useState<string>('');
+  const [customBillingLeitwegId, setCustomBillingLeitwegId] = useState<string>(() => currentSchoolProfile?.leitweg_id || '');
   const [hasCustomActivationBillingAddress, setHasCustomActivationBillingAddress] = useState<boolean>(false);
   const [customActivationBillingName, setCustomActivationBillingName] = useState<string>('');
   const [customActivationBillingStreet, setCustomActivationBillingStreet] = useState<string>('');
@@ -5766,7 +5772,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
         }
       }
 
-      await fetchDuties();
+      await fetchAnnouncements();
     } catch (err: any) {
       console.error('Error fetching secretary dashboard data:', err);
     } finally {
@@ -5774,39 +5780,39 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
     }
   };
 
-  const fetchDuties = async () => {
+  const fetchAnnouncements = async () => {
     try {
-      setDutiesLoading(true);
+      setAnnouncementsLoading(true);
       const { data, error } = await supabase
         .from('campus_feedback_requests')
         .select('*')
         .eq('school_id', schoolId)
         .order('created_at', { ascending: false });
       if (error) throw error;
-      setDutiesList(data || []);
+      setAnnouncementsList(data || []);
     } catch (err: any) {
-      console.error('Error fetching duties:', err);
+      console.error('Error fetching announcements:', err);
     } finally {
-      setDutiesLoading(false);
+      setAnnouncementsLoading(false);
     }
   };
 
-  const handleUploadDutyAttachment = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleUploadAnnouncementAttachment = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     try {
-      setIsUploadingDutyAttachment(true);
+      setIsUploadingAnnouncementAttachment(true);
 
       // 🛡️ Enterprise Media Security & Anti-Malware Ingestion Validation
       const validation = await validateMediaBlob(file, 'any');
       if (!validation.isValid) {
         alert(validation.reason || 'Sicherheitswarnung: Das Dateiformat ist unzulässig oder enthält bedenkliche Binärstrukturen.');
-        setIsUploadingDutyAttachment(false);
+        setIsUploadingAnnouncementAttachment(false);
         return;
       }
 
       const fileExt = file.name.split('.').pop();
-      const fileName = `duty_${Date.now()}.${fileExt}`;
+      const fileName = `announcement_${Date.now()}.${fileExt}`;
       const filePath = `feed-attachments/${fileName}`;
       const { error: uploadErr } = await supabase.storage
         .from('campus-assets')
@@ -5816,16 +5822,16 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
       const { data: urlData } = supabase.storage
         .from('campus-assets')
         .getPublicUrl(filePath);
-      setNewDutyAttachmentUrl(urlData.publicUrl);
+      setNewAnnouncementAttachmentUrl(urlData.publicUrl);
     } catch (err: any) {
       alert('Upload fehlgeschlagen: ' + err.message);
     } finally {
-      setIsUploadingDutyAttachment(false);
+      setIsUploadingAnnouncementAttachment(false);
     }
   };
 
   const handleMoveQuestion = (idx: number, direction: 'up' | 'down') => {
-    const nextQuestions = [...newDutyQuestions];
+    const nextQuestions = [...newAnnouncementQuestions];
     if (direction === 'up' && idx > 0) {
       const temp = nextQuestions[idx - 1];
       nextQuestions[idx - 1] = nextQuestions[idx];
@@ -5835,12 +5841,13 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
       nextQuestions[idx + 1] = nextQuestions[idx];
       nextQuestions[idx] = temp;
     }
-    setNewDutyQuestions(nextQuestions);
+    setNewAnnouncementQuestions(nextQuestions);
   };
 
-  const handleCreateDuty = async () => {
-    if (!newDutyTitle.trim()) {
-      alert('Bitte einen Titel eingeben.');
+  const handleCreateAnnouncement = async () => {
+    if (!newAnnouncementTitle.trim()) {
+      setApprovalToast({ message: '⚠️ Bitte einen Titel für die Mitteilung eingeben.', type: 'error' });
+      setTimeout(() => setApprovalToast(null), 3500);
       return;
     }
     try {
@@ -5848,89 +5855,112 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
       const currentUserRole = currentUserProfile?.role === 'admin' ? 'Administration' : 'Sekretariat';
 
       const payload: any = {
-        title: newDutyTitle.trim(),
-        description: newDutyDescription.trim(),
-        questions: newDutyType === 'questionnaire' ? newDutyQuestions : null,
-        due_date: newDutyDueDate ? newDutyDueDate + (newDutyDueDate.includes('T') ? '' : 'T23:59:59Z') : null,
-        priority: newDutyPriority,
-        target_type: newDutyTargetType,
-        target_group: newDutyTargetType === 'group' ? newDutyTargetGroup : null,
-        target_teacher_id: newDutyTargetType === 'individual' ? newDutyTargetTeacherId : null,
-        recurrence: newDutyRecurrence,
-        attachment_url: newDutyAttachmentUrl || null
+        title: newAnnouncementTitle.trim(),
+        description: newAnnouncementDescription.trim(),
+        questions: newAnnouncementType === 'questionnaire' ? newAnnouncementQuestions : null,
+        due_date: newAnnouncementDueDate ? newAnnouncementDueDate + (newAnnouncementDueDate.includes('T') ? '' : 'T23:59:59Z') : null,
+        priority: newAnnouncementPriority,
+        target_type: newAnnouncementTargetType,
+        target_group: newAnnouncementTargetType === 'group' ? newAnnouncementTargetGroup : null,
+        target_teacher_id: newAnnouncementTargetType === 'individual' ? newAnnouncementTargetTeacherId : null,
+        recurrence: newAnnouncementRecurrence,
+        attachment_url: newAnnouncementAttachmentUrl || null,
+        is_anonymous: newAnnouncementType === 'questionnaire' ? newAnnouncementIsAnonymous : false
       };
 
-      if (editingDutyId) {
-        const { error } = await supabase
+      if (editingAnnouncementId) {
+        let { error } = await supabase
           .from('campus_feedback_requests')
           .update(payload)
-          .eq('id', editingDutyId);
+          .eq('id', editingAnnouncementId);
+
+        if (error && error.message?.includes('is_anonymous')) {
+          delete payload.is_anonymous;
+          const retry = await supabase
+            .from('campus_feedback_requests')
+            .update(payload)
+            .eq('id', editingAnnouncementId);
+          error = retry.error;
+        }
 
         if (error) throw error;
-        alert('Pflichtaufgabe erfolgreich aktualisiert!');
-        setEditingDutyId(null);
+        setApprovalToast({ message: '✅ Mitteilung erfolgreich aktualisiert!', type: 'success' });
+        setTimeout(() => setApprovalToast(null), 4000);
+        setEditingAnnouncementId(null);
       } else {
         payload.school_id = schoolId;
         payload.created_by_name = currentUserName;
         payload.created_by_role = currentUserRole;
 
-        const { error } = await supabase
+        let { error } = await supabase
           .from('campus_feedback_requests')
           .insert(payload);
 
+        if (error && error.message?.includes('is_anonymous')) {
+          delete payload.is_anonymous;
+          const retry = await supabase
+            .from('campus_feedback_requests')
+            .insert(payload);
+          error = retry.error;
+        }
+
         if (error) throw error;
-        alert('Pflichtaufgabe erfolgreich erstellt!');
+        setApprovalToast({ message: '✅ Mitteilung erfolgreich am Infobrett veröffentlicht!', type: 'success' });
+        setTimeout(() => setApprovalToast(null), 4000);
       }
 
-      setNewDutyTitle('');
-      setNewDutyDescription('');
-      setNewDutyType('todo');
-      setNewDutyQuestions([]);
-      setNewDutyPriority('standard');
-      setNewDutyTargetType('all');
-      setNewDutyDueDate('');
-      setNewDutyRecurrence('none');
-      setNewDutyAttachmentUrl('');
+      setNewAnnouncementTitle('');
+      setNewAnnouncementDescription('');
+      setNewAnnouncementType('todo');
+      setNewAnnouncementQuestions([]);
+      setNewAnnouncementPriority('standard');
+      setNewAnnouncementIsAnonymous(false);
+      setNewAnnouncementTargetType('all');
+      setNewAnnouncementDueDate('');
+      setNewAnnouncementRecurrence('none');
+      setNewAnnouncementAttachmentUrl('');
       
-      fetchDuties();
+      fetchAnnouncements();
     } catch (err: any) {
-      alert('Speichern fehlgeschlagen: ' + err.message);
+      setApprovalToast({ message: '❌ Speichern fehlgeschlagen: ' + err.message, type: 'error' });
+      setTimeout(() => setApprovalToast(null), 5000);
     }
   };
 
-  const handleDeleteDuty = async (id: string) => {
-    if (!confirm('Möchtest du diese Pflichtaufgabe wirklich löschen? Alle Antworten von Lehrkräften werden ebenfalls gelöscht.')) return;
+  const handleDeleteAnnouncement = async (id: string) => {
+    if (!confirm('Möchtest du diese Mitteilung wirklich entfernen? Alle Rückmeldungen von Lehrkräften werden ebenfalls gelöscht.')) return;
     try {
       const { error } = await supabase
         .from('campus_feedback_requests')
         .delete()
         .eq('id', id);
       if (error) throw error;
-      alert('Aufgabe gelöscht.');
-      fetchDuties();
+      setApprovalToast({ message: 'Mitteilung gelöscht.', type: 'success' });
+      setTimeout(() => setApprovalToast(null), 3000);
+      fetchAnnouncements();
     } catch (err: any) {
       alert('Löschen fehlgeschlagen: ' + err.message);
     }
   };
 
-  const fetchDutyStats = async (duty: any) => {
+  const fetchAnnouncementStats = async (announcement: any) => {
     try {
-      setSelectedDutyForStats(duty);
+      setSelectedAnnouncementForStats(announcement);
       setStatsSearchQuery('');
       setStatsStatusFilter('all');
       setStatsModalTab('status');
       const { data, error } = await supabase
         .from('campus_feedback_responses')
         .select('*')
-        .eq('request_id', duty.id);
+        .eq('request_id', announcement.id);
       if (error) throw error;
-      setDutyResponsesList(data || []);
+      setAnnouncementResponsesList(data || []);
     } catch (err: any) {
-      console.error('Error fetching duty stats:', err);
+      console.error('Error fetching announcement stats:', err);
     }
   };
 
-  const getDutysTargetedTeachers = (duty: any) => {
+  const getAnnouncementTargetedTeachers = (announcement: any) => {
     const allUniqueTeachers = [...campusTeachers, ...bypassTeachers, ...coaches].reduce((acc: any[], t: any) => {
       if (!acc.some(existing => existing.id === t.id)) {
         acc.push(t);
@@ -5938,15 +5968,15 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
       return acc;
     }, []);
 
-    if (duty.target_type === 'all') return allUniqueTeachers;
-    if (duty.target_type === 'individual') {
-      const found = allUniqueTeachers.find(t => t.id === duty.target_teacher_id);
+    if (announcement.target_type === 'all') return allUniqueTeachers;
+    if (announcement.target_type === 'individual') {
+      const found = allUniqueTeachers.find(t => t.id === announcement.target_teacher_id);
       return found ? [found] : [];
     }
-    if (duty.target_type === 'group') {
+    if (announcement.target_type === 'group') {
       return allUniqueTeachers.filter(t => {
         const inst = (t.instrument || '').toLowerCase();
-        const targetGrp = (duty.target_group || '').toLowerCase();
+        const targetGrp = (announcement.target_group || '').toLowerCase();
         if (targetGrp === 'guitar') return inst.includes('gitarre') || inst.includes('guitar') || inst.includes('bass');
         if (targetGrp === 'piano') return inst.includes('klavier') || inst.includes('piano') || inst.includes('keyboard') || inst.includes('keys');
         if (targetGrp === 'vocals') return inst.includes('gesang') || inst.includes('vocal') || inst.includes('sing');
@@ -5957,13 +5987,13 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
     return [];
   };
 
-  const handleSendReminder = async (duty: any) => {
-    if (!duty) return;
-    const targeted = getDutysTargetedTeachers(duty);
-    const pendingTeachers = targeted.filter((t: any) => !dutyResponsesList.some((res: any) => res.teacher_id === t.id));
+  const handleSendReminder = async (announcement: any) => {
+    if (!announcement) return;
+    const targeted = getAnnouncementTargetedTeachers(announcement);
+    const pendingTeachers = targeted.filter((t: any) => !announcementResponsesList.some((res: any) => res.teacher_id === t.id));
     
     if (pendingTeachers.length === 0) {
-      alert('Alle Lehrkräfte haben diese Aufgabe bereits erledigt!');
+      alert('Alle Lehrkräfte haben diese Mitteilung bereits zur Kenntnis genommen bzw. beantwortet!');
       return;
     }
     
@@ -5973,9 +6003,9 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
     let successCount = 0;
     for (const teacher of pendingTeachers) {
       try {
-        const title = 'Erinnerung: Dienstliche Aufgabe ausstehend 🚨';
-        const message = `Bitte erledige die Aufgabe: "${duty.title}"`;
-        const metadata = { type: 'duty_reminder', request_id: duty.id };
+        const title = 'Mitteilung der Musikschulleitung 📋';
+        const message = `Bitte beachten bzw. Rückmeldung geben: "${announcement.title}"`;
+        const metadata = { type: 'announcement_reminder', request_id: announcement.id };
 
         const { data: notification, error: notifErr } = await supabase
           .from('notifications')
@@ -6008,18 +6038,19 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
     alert(`Erinnerungen erfolgreich an ${successCount} Lehrkräfte gesendet!`);
   };
 
-  const handleExportCSV = (duty: any) => {
-    if (!duty) return;
-    const targeted = getDutysTargetedTeachers(duty);
+  const handleExportCSV = (announcement: any) => {
+    if (!announcement) return;
+    const targeted = getAnnouncementTargetedTeachers(announcement);
     
     let csvContent = '\uFEFF'; // Add BOM for excel support
+    const isAnonymous = !!announcement.is_anonymous;
     
-    if (duty.questions && duty.questions.length > 0) {
-      const headers = ['Lehrkraft', 'Status', 'Abgabe-Datum', ...duty.questions.map((q: any) => typeof q === 'string' ? q : q.text)];
+    if (announcement.questions && announcement.questions.length > 0) {
+      const headers = ['Lehrkraft', 'Status', 'Abgabe-Datum', ...announcement.questions.map((q: any) => typeof q === 'string' ? q : q.text)];
       csvContent += headers.map(h => `"${h.replace(/"/g, '""')}"`).join(',') + '\n';
       
-      targeted.forEach((t: any) => {
-        const response = dutyResponsesList.find(res => res.teacher_id === t.id);
+      targeted.forEach((t: any, idx: number) => {
+        const response = announcementResponsesList.find(res => res.teacher_id === t.id);
         const hasCompleted = !!response;
         
         let answersObj: Record<string, string> = {};
@@ -6032,10 +6063,10 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
         }
         
         const row = [
-          formatTeacherFullName(t),
-          hasCompleted ? 'Erledigt' : 'Offen',
+          isAnonymous ? `Anonyme Lehrkraft #${idx + 1}` : formatTeacherFullName(t),
+          hasCompleted ? 'Bestätigt' : 'Ausstehend',
           hasCompleted ? new Date(response.created_at).toLocaleDateString('de-DE') : '-',
-          ...duty.questions.map((q: any) => {
+          ...announcement.questions.map((q: any) => {
             const qKey = typeof q === 'string' ? q : q.text;
             if (!hasCompleted) return '-';
             const ans = answersObj[qKey] !== undefined ? answersObj[qKey] : (response.response_text || '');
@@ -6049,15 +6080,15 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
       const headers = ['Lehrkraft', 'Status', 'Abgabe-Datum', 'Antwort'];
       csvContent += headers.map(h => `"${h.replace(/"/g, '""')}"`).join(',') + '\n';
       
-      targeted.forEach((t: any) => {
-        const response = dutyResponsesList.find(res => res.teacher_id === t.id);
+      targeted.forEach((t: any, idx: number) => {
+        const response = announcementResponsesList.find(res => res.teacher_id === t.id);
         const hasCompleted = !!response;
         
         const row = [
-          formatTeacherFullName(t),
-          hasCompleted ? 'Erledigt' : 'Offen',
+          isAnonymous ? `Anonyme Lehrkraft #${idx + 1}` : formatTeacherFullName(t),
+          hasCompleted ? 'Bestätigt' : 'Ausstehend',
           hasCompleted ? new Date(response.created_at).toLocaleDateString('de-DE') : '-',
-          hasCompleted ? (response.response_text || 'Erledigt') : '-'
+          hasCompleted ? (response.response_text || 'Bestätigt') : '-'
         ];
         
         csvContent += row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',') + '\n';
@@ -6068,10 +6099,9 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
-    link.setAttribute('download', `Dienstaufgabe_${duty.title.replace(/[^a-zA-Z0-9]/g, '_')}_Auswertung.csv`);
+    link.setAttribute('download', `Mitteilung_${announcement.title.replace(/[^a-zA-Z0-9]/g, '_')}_Auswertung.csv`);
     document.body.appendChild(link);
     link.click();
-    document.body.removeChild(link);
   };
 
   const handleResolveTicket = async (ticketId: string) => {
@@ -8269,15 +8299,28 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
 
         {/* Modal: School Reset Confirmation */}
         {showResetModal && (
-          <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(15,23,42,0.3)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+          <div 
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="school-reset-title"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) {
+                setShowResetModal(false);
+                setResetConfirmText('');
+              }
+            }}
+            style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(15,23,42,0.3)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}
+          >
             <div style={{ background: '#ffffff', borderRadius: '24px', maxWidth: '540px', width: '100%', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
               
               {/* Header */}
               <div style={{ padding: '24px', borderBottom: '1px solid #fee2e2', background: '#fff5f5', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#c53030', fontFamily: 'Urbanist', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <h3 id="school-reset-title" style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#c53030', fontFamily: 'Urbanist', display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <ShieldAlert size={20} /> Werkseinstellungen zurücksetzen
                 </h3>
                 <button 
+                  type="button"
+                  aria-label="Dialog schließen"
                   onClick={() => {
                     setShowResetModal(false);
                     setResetConfirmText('');
@@ -8393,14 +8436,24 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
 
         {/* Modal: Add Subject */}
         {showAddSubjectModal && (
-          <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(15,23,42,0.3)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+          <div 
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="add-subject-modal-title"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) setShowAddSubjectModal(false);
+            }}
+            style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(15,23,42,0.3)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}
+          >
             <div style={{ background: '#ffffff', borderRadius: '24px', maxWidth: '520px', width: '100%', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
               {/* Modal Header */}
               <div style={{ padding: '24px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
+                <h3 id="add-subject-modal-title" style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
                   <Plus size={18} style={{ marginRight: '6px', verticalAlign: 'middle', color: '#34a853' }} /> Neues Unterrichtsfach anlegen
                 </h3>
                 <button 
+                  type="button"
+                  aria-label="Dialog schließen"
                   onClick={() => setShowAddSubjectModal(false)}
                   style={{ border: 'none', background: 'transparent', fontSize: '1.2rem', cursor: 'pointer', color: '#64748b' }}
                 >
@@ -8411,20 +8464,24 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
               {/* Modal Body */}
               <form onSubmit={handleCreateSubject} style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Name des Fachs *</label>
+                  <label htmlFor="new-subject-name" style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Name des Fachs *</label>
                   <input 
+                    id="new-subject-name"
                     type="text" 
                     required
                     value={newSubjectName}
                     onChange={(e) => setNewSubjectName(e.target.value)}
                     placeholder="z.B. Blockflöte, Klavier, Gesang"
+                    aria-label="Name des neuen Unterrichtsfachs"
                     style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.85rem', outline: 'none' }}
                   />
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Kategorie / Sparte *</label>
+                  <label htmlFor="new-subject-category" style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Kategorie / Sparte *</label>
                   <select
+                    id="new-subject-category"
+                    aria-label="Kategorie des neuen Unterrichtsfachs"
                     value={newSubjectCategory}
                     onChange={(e) => setNewSubjectCategory(e.target.value)}
                     style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.85rem', outline: 'none', background: 'white' }}
@@ -8474,14 +8531,27 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
 
         {/* Modal: Edit Subject */}
         {showEditSubjectModal && editingSubject && (
-          <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(15,23,42,0.3)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+          <div 
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="edit-subject-modal-title"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) {
+                setShowEditSubjectModal(false);
+                setEditingSubject(null);
+              }
+            }}
+            style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(15,23,42,0.3)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}
+          >
             <div style={{ background: '#ffffff', borderRadius: '24px', maxWidth: '520px', width: '100%', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
               {/* Modal Header */}
               <div style={{ padding: '24px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <h3 id="edit-subject-modal-title" style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist', display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <Edit2 size={18} style={{ color: '#34a853' }} /> Unterrichtsfach bearbeiten
                 </h3>
                 <button 
+                  type="button"
+                  aria-label="Dialog schließen"
                   onClick={() => {
                     setShowEditSubjectModal(false);
                     setEditingSubject(null);
@@ -8495,20 +8565,24 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
               {/* Modal Body */}
               <form onSubmit={handleUpdateSubject} style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Name des Fachs *</label>
+                  <label htmlFor="edit-subject-name" style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Name des Fachs *</label>
                   <input 
+                    id="edit-subject-name"
                     type="text" 
                     required
                     value={editSubjectName}
                     onChange={(e) => setEditSubjectName(e.target.value)}
                     placeholder="z.B. Klavier, Gitarre, Gesang"
+                    aria-label="Name des zu bearbeitenden Fachs"
                     style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.85rem', outline: 'none' }}
                   />
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Kategorie / Sparte *</label>
+                  <label htmlFor="edit-subject-category" style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Kategorie / Sparte *</label>
                   <select
+                    id="edit-subject-category"
+                    aria-label="Kategorie des zu bearbeitenden Fachs"
                     value={editSubjectCategory}
                     onChange={(e) => setEditSubjectCategory(e.target.value)}
                     style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.85rem', outline: 'none', background: 'white' }}
@@ -8564,7 +8638,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
 
 
 
-  const renderDutiesBoard = () => {
+  const renderAnnouncementsBoard = () => {
     const allUniqueTeachers = [...campusTeachers, ...bypassTeachers, ...coaches].reduce((acc: any[], t: any) => {
       if (!acc.some(existing => existing.id === t.id)) {
         acc.push(t);
@@ -8573,69 +8647,73 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
     }, []);
 
     return (
-      <Suspense fallback={<div style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>Lade Dienstgeschäfte...</div>}>
-        <SecretaryDutiesView
-          duties={dutiesList}
-          dutiesLoading={dutiesLoading}
+      <Suspense fallback={<div style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>Lade Mitteilungen & Informationen...</div>}>
+        <SecretaryAnnouncementsView
+          announcements={announcementsList}
+          announcementsLoading={announcementsLoading}
           allUniqueTeachers={allUniqueTeachers}
-          editingDutyId={editingDutyId}
-          setEditingDutyId={setEditingDutyId}
-          newDutyTitle={newDutyTitle}
-          setNewDutyTitle={setNewDutyTitle}
-          newDutyDescription={newDutyDescription}
-          setNewDutyDescription={setNewDutyDescription}
-          newDutyType={newDutyType}
-          setNewDutyType={setNewDutyType}
-          newDutyPriority={newDutyPriority}
-          setNewDutyPriority={setNewDutyPriority}
-          newDutyTargetType={newDutyTargetType}
-          setNewDutyTargetType={setNewDutyTargetType}
-          newDutyTargetGroup={newDutyTargetGroup}
-          setNewDutyTargetGroup={setNewDutyTargetGroup}
-          newDutyTargetTeacherId={newDutyTargetTeacherId}
-          setNewDutyTargetTeacherId={setNewDutyTargetTeacherId}
-          newDutyDueDate={newDutyDueDate}
-          setNewDutyDueDate={setNewDutyDueDate}
-          newDutyRecurrence={newDutyRecurrence}
-          setNewDutyRecurrence={setNewDutyRecurrence}
-          newDutyAttachmentUrl={newDutyAttachmentUrl}
-          setNewDutyAttachmentUrl={setNewDutyAttachmentUrl}
-          newDutyQuestions={newDutyQuestions}
-          setNewDutyQuestions={setNewDutyQuestions}
-          uploadingDutyAttachment={isUploadingDutyAttachment}
-          handleUploadDutyAttachment={handleUploadDutyAttachment}
-          handleSaveDuty={handleCreateDuty}
-          handleDeleteDuty={handleDeleteDuty}
-          handleEditDuty={(duty) => {
-            setEditingDutyId(duty.id);
-            setNewDutyTitle(duty.title);
-            setNewDutyDescription(duty.description || '');
-            setNewDutyType(duty.duty_type as any);
-            setNewDutyQuestions(duty.questions || []);
-            setNewDutyPriority((duty.priority as any) || 'standard');
-            setNewDutyTargetType(duty.target_type as any);
-            setNewDutyTargetGroup(duty.target_group || 'all');
-            setNewDutyTargetTeacherId(duty.target_teacher_id || '');
-            setNewDutyDueDate(duty.due_date ? duty.due_date.split('T')[0] : '');
-            setNewDutyRecurrence((duty.recurrence as any) || 'none');
-            setNewDutyAttachmentUrl(duty.attachment_url || '');
+          editingAnnouncementId={editingAnnouncementId}
+          setEditingAnnouncementId={setEditingAnnouncementId}
+          newAnnouncementTitle={newAnnouncementTitle}
+          setNewAnnouncementTitle={setNewAnnouncementTitle}
+          newAnnouncementDescription={newAnnouncementDescription}
+          setNewAnnouncementDescription={setNewAnnouncementDescription}
+          newAnnouncementType={newAnnouncementType}
+          setNewAnnouncementType={setNewAnnouncementType}
+          newAnnouncementPriority={newAnnouncementPriority}
+          setNewAnnouncementPriority={setNewAnnouncementPriority}
+          newAnnouncementIsAnonymous={newAnnouncementIsAnonymous}
+          setNewAnnouncementIsAnonymous={setNewAnnouncementIsAnonymous}
+          newAnnouncementTargetType={newAnnouncementTargetType}
+          setNewAnnouncementTargetType={setNewAnnouncementTargetType}
+          newAnnouncementTargetGroup={newAnnouncementTargetGroup}
+          setNewAnnouncementTargetGroup={setNewAnnouncementTargetGroup}
+          newAnnouncementTargetTeacherId={newAnnouncementTargetTeacherId}
+          setNewAnnouncementTargetTeacherId={setNewAnnouncementTargetTeacherId}
+          newAnnouncementDueDate={newAnnouncementDueDate}
+          setNewAnnouncementDueDate={setNewAnnouncementDueDate}
+          newAnnouncementRecurrence={newAnnouncementRecurrence}
+          setNewAnnouncementRecurrence={setNewAnnouncementRecurrence}
+          newAnnouncementAttachmentUrl={newAnnouncementAttachmentUrl}
+          setNewAnnouncementAttachmentUrl={setNewAnnouncementAttachmentUrl}
+          newAnnouncementQuestions={newAnnouncementQuestions}
+          setNewAnnouncementQuestions={setNewAnnouncementQuestions}
+          uploadingAnnouncementAttachment={isUploadingAnnouncementAttachment}
+          handleUploadAnnouncementAttachment={handleUploadAnnouncementAttachment}
+          handleSaveAnnouncement={handleCreateAnnouncement}
+          handleDeleteAnnouncement={handleDeleteAnnouncement}
+          handleEditAnnouncement={(announcement) => {
+            setEditingAnnouncementId(announcement.id);
+            setNewAnnouncementTitle(announcement.title);
+            setNewAnnouncementDescription(announcement.description || '');
+            setNewAnnouncementType(announcement.duty_type as any);
+            setNewAnnouncementQuestions(announcement.questions || []);
+            setNewAnnouncementPriority((announcement.priority as any) || 'standard');
+            setNewAnnouncementIsAnonymous(announcement.is_anonymous || false);
+            setNewAnnouncementTargetType(announcement.target_type as any);
+            setNewAnnouncementTargetGroup(announcement.target_group || 'all');
+            setNewAnnouncementTargetTeacherId(announcement.target_teacher_id || '');
+            setNewAnnouncementDueDate(announcement.due_date ? announcement.due_date.split('T')[0] : '');
+            setNewAnnouncementRecurrence((announcement.recurrence as any) || 'none');
+            setNewAnnouncementAttachmentUrl(announcement.attachment_url || '');
           }}
-          handleResetDutyForm={() => {
-            setEditingDutyId(null);
-            setNewDutyTitle('');
-            setNewDutyDescription('');
-            setNewDutyType('todo');
-            setNewDutyQuestions([]);
-            setNewDutyPriority('standard');
-            setNewDutyTargetType('all');
-            setNewDutyDueDate('');
-            setNewDutyRecurrence('none');
-            setNewDutyAttachmentUrl('');
+          handleResetAnnouncementForm={() => {
+            setEditingAnnouncementId(null);
+            setNewAnnouncementTitle('');
+            setNewAnnouncementDescription('');
+            setNewAnnouncementType('todo');
+            setNewAnnouncementQuestions([]);
+            setNewAnnouncementPriority('standard');
+            setNewAnnouncementIsAnonymous(false);
+            setNewAnnouncementTargetType('all');
+            setNewAnnouncementDueDate('');
+            setNewAnnouncementRecurrence('none');
+            setNewAnnouncementAttachmentUrl('');
           }}
-          selectedDutyForStats={selectedDutyForStats}
-          setSelectedDutyForStats={setSelectedDutyForStats}
-          dutyResponses={dutyResponsesList}
-          fetchDutyStats={fetchDutyStats}
+          selectedAnnouncementForStats={selectedAnnouncementForStats}
+          setSelectedAnnouncementForStats={setSelectedAnnouncementForStats}
+          announcementResponses={announcementResponsesList}
+          fetchAnnouncementStats={fetchAnnouncementStats}
           statsModalTab={statsModalTab}
           setStatsModalTab={setStatsModalTab}
           statsStatusFilter={statsStatusFilter}
@@ -8644,8 +8722,8 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
           setStatsSearchQuery={setStatsSearchQuery}
           expandedResponseIds={expandedResponseIds}
           setExpandedResponseIds={setExpandedResponseIds}
-          handleExportDutyPdf={() => window.print()}
-          handleExportDutyCsv={() => handleExportCSV(selectedDutyForStats)}
+          handleExportAnnouncementPdf={() => window.print()}
+          handleExportAnnouncementCsv={() => handleExportCSV(selectedAnnouncementForStats)}
         />
       </Suspense>
     );
@@ -8767,7 +8845,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
       try { await supabase.from('band_members').delete().eq('user_id', id); } catch (e) {}
       try { await supabase.from('chat_messages').delete().or(`sender_id.eq.${id},recipient_id.eq.${id}`); } catch (e) {}
       try { await supabase.from('direct_messages').delete().or(`sender_id.eq.${id},recipient_id.eq.${id}`); } catch (e) {}
-      try { await supabase.from('duties').delete().eq('teacher_id', id); } catch (e) {}
+      try { await supabase.from('campus_feedback_responses').delete().eq('teacher_id', id); } catch (e) {}
       try { await supabase.from('pending_students').delete().eq('id', id); } catch (e) {}
 
       const { error: rawErr } = await supabase.from('users').delete().eq('id', id);
@@ -10613,7 +10691,11 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
           padding: '24px',
           fontFamily: "'Outfit', 'Plus Jakarta Sans', sans-serif"
         }}>
-          <div style={{
+          <div 
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="blocked-overlay-title"
+            style={{
             background: '#ffffff',
             borderRadius: '32px',
             padding: '40px',
@@ -10642,7 +10724,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
               🎸
             </div>
             <div>
-              <h2 style={{ margin: '0 0 10px 0', fontSize: '1.5rem', fontWeight: 950, color: '#0f172a', letterSpacing: '-0.02em', fontFamily: 'Outfit' }}>
+              <h2 id="blocked-overlay-title" style={{ margin: '0 0 10px 0', fontSize: '1.5rem', fontWeight: 950, color: '#0f172a', letterSpacing: '-0.02em', fontFamily: 'Outfit' }}>
                 Testphase abgelaufen!
               </h2>
               <p style={{ margin: 0, fontSize: '0.92rem', color: '#475569', lineHeight: 1.5 }}>
@@ -10841,6 +10923,8 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
       {/* Real-time pending booking push toast notification */}
       {realtimeToast.visible && (
         <div 
+          role="status"
+          aria-live="polite"
           className="slide-in-toast"
           style={{
             position: 'fixed',
@@ -10870,6 +10954,8 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
             </span>
           </div>
           <button
+            type="button"
+            aria-label="Benachrichtigung schließen"
             onClick={() => setRealtimeToast(prev => ({ ...prev, visible: false }))}
             style={{
               background: 'transparent',
@@ -10891,7 +10977,17 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
 
       {/* ROOM BOOKINGS LOGBOOK MODAL */}
       {showLogbookModal && (
-        <div style={{
+        <div 
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="logbook-modal-title"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowLogbookModal(false);
+              setEditingLogbookBookingId(null);
+            }
+          }}
+          style={{
           position: 'fixed',
           top: 0,
           left: 0,
@@ -10928,7 +11024,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
               background: '#f8fafc'
             }}>
               <div>
-                <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, color: '#1e293b', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                <h2 id="logbook-modal-title" style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, color: '#1e293b', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
                   📖 Raumbuchungen Logbuch
                 </h2>
                 <p style={{ margin: '4px 0 0 0', fontSize: '0.78rem', color: '#64748b', fontWeight: 600 }}>
@@ -10936,6 +11032,8 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                 </p>
               </div>
               <button
+                type="button"
+                aria-label="Logbuch schließen"
                 onClick={() => {
                   setShowLogbookModal(false);
                   setEditingLogbookBookingId(null);
@@ -11202,7 +11300,14 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
 
       {/* TRIAL LOGBOOK MODAL */}
       {showTrialLogModal && (
-        <div style={{
+        <div 
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="trial-log-modal-title"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowTrialLogModal(false);
+          }}
+          style={{
           position: 'fixed',
           top: 0,
           left: 0,
@@ -11233,10 +11338,11 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
             <div style={{ padding: '24px', borderBottom: '1.5px solid #cbd5e1', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#f8fafc' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <ClipboardList size={22} color="#34a853" />
-                <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 900, color: '#0f172a' }}>Probezeit- & Freischaltungs-Logbuch</h3>
+                <h3 id="trial-log-modal-title" style={{ margin: 0, fontSize: '1.1rem', fontWeight: 900, color: '#0f172a' }}>Probezeit- & Freischaltungs-Logbuch</h3>
               </div>
               <button
                 type="button"
+                aria-label="Logbuch schließen"
                 onClick={() => setShowTrialLogModal(false)}
                 style={{
                   background: '#f1f5f9',
@@ -11439,7 +11545,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                 }).length;
               })()
             },
-            hasCampusSub && { id: 'duties', label: 'Dienstliche Aufgaben', icon: FileText },
+            hasCampusSub && { id: 'announcements', label: 'Mitteilungen & Informationen', icon: FileText },
             { id: 'rooms', label: 'Räume', icon: DoorOpen },
             hasCampusSub && { id: 'equipment', label: 'Instrumente & Ausstattung', icon: Settings },
             { id: 'employees', label: 'Mitarbeiter', icon: Users },
@@ -11662,7 +11768,10 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
           zIndex: 10
         }}>
           {/* App Switcher Tabs */}
-          <div style={{ 
+          <div 
+            role="tablist"
+            aria-label="Modulauswahl Verwaltung, Campus und GrooveLab"
+            style={{ 
             display: 'flex', 
             alignItems: 'flex-end', 
             gap: '6px', 
@@ -11672,6 +11781,18 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
           }}>
             {/* Sekretariat Tab Button */}
             <div 
+              role="tab"
+              aria-selected={activeTab === 'secretary'}
+              tabIndex={0}
+              id="tab-secretary"
+              aria-controls="panel-secretary"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  setActiveTab('secretary');
+                  sessionStorage.setItem('groovelab_active_workspace', 'secretary');
+                }
+              }}
               onClick={() => {
                 setActiveTab('secretary');
                 sessionStorage.setItem('groovelab_active_workspace', 'secretary');
@@ -11707,6 +11828,18 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
             {(!isBillingBooked || hasCampusSub) && (
               /* Campus Tab Button */
               <div 
+                role="tab"
+                aria-selected={activeTab === 'campus'}
+                tabIndex={0}
+                id="tab-campus"
+                aria-controls="panel-campus"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    setActiveTab('campus');
+                    sessionStorage.setItem('groovelab_active_workspace', 'campus');
+                  }
+                }}
                 onClick={() => {
                   setActiveTab('campus');
                   sessionStorage.setItem('groovelab_active_workspace', 'campus');
@@ -11743,6 +11876,18 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
             {(!isBillingBooked || hasGroovelabSub) && (
               /* GrooveLab Tab Button */
               <div 
+                role="tab"
+                aria-selected={activeTab === 'groovelab'}
+                tabIndex={0}
+                id="tab-groovelab"
+                aria-controls="panel-groovelab"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    setActiveTab('groovelab');
+                    sessionStorage.setItem('groovelab_active_workspace', 'groovelab');
+                  }
+                }}
                 onClick={() => {
                   setActiveTab('groovelab');
                   sessionStorage.setItem('groovelab_active_workspace', 'groovelab');
@@ -12153,7 +12298,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
           {/* Active Tab Header */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
-              {activeTab !== 'groovelab' && !((activeTab as any) === 'campus') && !((activeTab as any) === 'campus' && (campusSubTab === 'onboarding' || campusSubTab === 'schedules')) && !(activeTab === 'secretary' && (secretarySubTab === 'crisis' || secretarySubTab === 'rooms' || secretarySubTab === 'briefing' || secretarySubTab === 'duties' || secretarySubTab === 'audit' || secretarySubTab === 'equipment' || secretarySubTab === 'employees' || secretarySubTab === 'licenses' || secretarySubTab === 'setup')) && (
+              {activeTab !== 'groovelab' && !((activeTab as any) === 'campus') && !((activeTab as any) === 'campus' && (campusSubTab === 'onboarding' || campusSubTab === 'schedules')) && !(activeTab === 'secretary' && (secretarySubTab === 'crisis' || secretarySubTab === 'rooms' || secretarySubTab === 'briefing' || secretarySubTab === 'duties' || secretarySubTab === 'announcements' || secretarySubTab === 'audit' || secretarySubTab === 'equipment' || secretarySubTab === 'employees' || secretarySubTab === 'licenses' || secretarySubTab === 'setup')) && (
                 <>
                   <h2 className="swiss-h1" style={{ margin: 0, color: (activeTab as any) === 'campus' ? '#34a853' : '#f59e0b' }}>
                     {getTabTitle()}
@@ -13233,14 +13378,24 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
 
                     {/* Manual Add Teacher Modal */}
                     {showAddTeacherModal && (
-                      <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(15,23,42,0.3)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+                      <div 
+                        role="dialog"
+                        aria-modal="true"
+                        aria-labelledby="add-teacher-modal-title"
+                        onClick={(e) => {
+                          if (e.target === e.currentTarget) setShowAddTeacherModal(false);
+                        }}
+                        style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(15,23,42,0.3)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}
+                      >
                         <div style={{ background: '#ffffff', borderRadius: '24px', maxWidth: '520px', width: '100%', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)', display: 'flex', flexDirection: 'column' }}>
                           {/* Modal Header */}
                           <div style={{ padding: '24px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
+                            <h3 id="add-teacher-modal-title" style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
                               <Plus size={18} style={{ marginRight: '6px', verticalAlign: 'middle' }} /> Neue Lehrkraft hinzufügen
                             </h3>
                             <button 
+                              type="button"
+                              aria-label="Dialog schließen"
                               onClick={() => setShowAddTeacherModal(false)}
                               style={{ border: 'none', background: 'transparent', fontSize: '1.2rem', cursor: 'pointer', color: '#64748b' }}
                             >
@@ -14356,7 +14511,18 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                   {/* DIALOG POPUP: SPONTANE AD-HOC BELEGUNG BUCHEN            */}
                   {/* ──────────────────────────────────────────────────────── */}
                   {showAdHocBooking && (
-                    <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.4)', backdropFilter: 'blur(8px)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+                    <div 
+                      role="dialog"
+                      aria-modal="true"
+                      aria-labelledby="adhoc-booking-modal-title"
+                      onClick={(e) => {
+                        if (e.target === e.currentTarget) {
+                          setShowAdHocBooking(false);
+                          setAdHocStudentName('');
+                        }
+                      }}
+                      style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.4)', backdropFilter: 'blur(8px)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}
+                    >
                       <form
                         onSubmit={(e) => {
                           e.preventDefault();
@@ -14391,7 +14557,6 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                 student_name: adHocStudentName.trim() || 'Spontane Buchung (Freies Üben)',
                                 time_slot: adHocStartTime,
                                 duration: adHocDuration,
-                                student_id: null
                               }
                             ]
                           };
@@ -14404,7 +14569,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                         style={{ background: 'white', borderRadius: '28px', border: '1px solid rgba(255,255,255,0.5)', width: '100%', maxWidth: '440px', padding: '32px', display: 'flex', flexDirection: 'column', gap: '20px', boxShadow: '0 24px 64px rgba(15,23,42,0.18)', animation: 'modalFadeIn 0.3s cubic-bezier(0.16,1,0.3,1)' }}
                       >
                         <div>
-                          <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>⚡ Spontanbelegung buchen</h3>
+                          <h3 id="adhoc-booking-modal-title" style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>⚡ Spontanbelegung buchen</h3>
                           <p style={{ margin: '4px 0 0 0', fontSize: '0.8rem', color: '#64748b', fontWeight: 550 }}>
                             Buche ad-hoc freie Zeitkapazitäten für {rooms.find(r => r.id === adHocRoomId)?.name || 'diesen Raum'}.
                           </p>
@@ -14412,8 +14577,10 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
 
                         {/* Teacher Selector */}
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                          <label style={{ fontSize: '0.67rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Lehrkraft auswählen</label>
+                          <label htmlFor="adhoc-teacher-select" style={{ fontSize: '0.67rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Lehrkraft auswählen</label>
                           <select
+                            id="adhoc-teacher-select"
+                            aria-label="Lehrkraft für Spontanbelegung auswählen"
                             required
                             value={adHocTeacherId}
                             onChange={(e) => setAdHocTeacherId(e.target.value)}
@@ -14428,8 +14595,10 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
 
                         {/* Student Name input */}
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                          <label style={{ fontSize: '0.67rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Schüler / Zweck (Optional)</label>
+                          <label htmlFor="adhoc-student-name" style={{ fontSize: '0.67rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Schüler / Zweck (Optional)</label>
                           <input
+                            id="adhoc-student-name"
+                            aria-label="Schüler oder Zweck für Spontanbelegung"
                             type="text"
                             placeholder="z.B. Nachholstunde Max Muster, oder Freies Üben"
                             value={adHocStudentName}
@@ -14438,31 +14607,33 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                           />
                         </div>
 
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                          {/* Start time */}
+                        {/* Start Time & Duration Picker */}
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                            <label style={{ fontSize: '0.67rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Startzeit</label>
+                            <label htmlFor="adhoc-start-time" style={{ fontSize: '0.67rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Startzeit</label>
                             <input
+                              id="adhoc-start-time"
+                              aria-label="Startzeit für Spontanbelegung"
                               type="time"
-                              required
                               value={adHocStartTime}
                               onChange={(e) => setAdHocStartTime(e.target.value)}
-                              style={{ padding: '8px', borderRadius: '12px', border: '1.5px solid #e2e8f0', background: '#f8fafc', fontSize: '0.82rem', fontWeight: 700, outline: 'none' }}
+                              style={{ padding: '8px', borderRadius: '12px', border: '1.5px solid #e2e8f0', background: '#f8fafc', fontSize: '0.82rem', fontWeight: 700, color: '#475569', outline: 'none' }}
                             />
                           </div>
-
-                          {/* Duration selector */}
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                            <label style={{ fontSize: '0.67rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Dauer</label>
+                            <label htmlFor="adhoc-duration" style={{ fontSize: '0.67rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Dauer</label>
                             <select
+                              id="adhoc-duration"
+                              aria-label="Dauer für Spontanbelegung"
                               value={adHocDuration}
                               onChange={(e) => setAdHocDuration(Number(e.target.value))}
                               style={{ padding: '8px', borderRadius: '12px', border: '1.5px solid #e2e8f0', background: '#f8fafc', fontSize: '0.82rem', fontWeight: 700, color: '#475569', cursor: 'pointer', outline: 'none' }}
                             >
-                              <option value={30}>30 Minuten</option>
-                              <option value={45}>45 Minuten</option>
-                              <option value={60}>60 Minuten</option>
-                              <option value={90}>90 Minuten</option>
+                              <option value={30}>30 Min.</option>
+                              <option value={45}>45 Min.</option>
+                              <option value={50}>50 Min.</option>
+                              <option value={60}>60 Min.</option>
+                              <option value={90}>90 Min.</option>
                             </select>
                           </div>
                         </div>
@@ -14471,9 +14642,9 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                         <div style={{ display: 'flex', gap: '12px', marginTop: '10px' }}>
                           <button
                             type="submit"
-                            style={{ flex: 2, background: '#34a853', color: 'white', border: 'none', padding: '14px', borderRadius: '14px', fontSize: '0.85rem', fontWeight: 800, cursor: 'pointer', boxShadow: '0 4px 12px rgba(52, 168, 83,0.2)' }}
+                            style={{ flex: 1.5, background: '#ea4335', color: 'white', border: 'none', padding: '14px', borderRadius: '14px', fontSize: '0.85rem', fontWeight: 900, cursor: 'pointer', boxShadow: '0 4px 14px rgba(234,67,53,0.3)' }}
                           >
-                            Einbuchen & Reservieren
+                            Einbuchen ⚡
                           </button>
                           <button
                             type="button"
@@ -14494,16 +14665,26 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                   {/* DETAIL DRAWER PANEL (CLICK ON ANY PLAN BLOCK TO INSPECT) */}
                   {/* ──────────────────────────────────────────────────────── */}
                   {selectedDayPlan && (
-                    <div style={{ position: 'fixed', top: 0, right: 0, width: '400px', height: '100vh', background: 'white', boxShadow: '-12px 0 48px rgba(15,23,42,0.14)', borderLeft: '1px solid #e2e8f0', zIndex: 1050, display: 'flex', flexDirection: 'column', padding: '24px', animation: 'modalFadeIn 0.3s cubic-bezier(0.16,1,0.3,1)' }}>
+                    <div 
+                      role="dialog"
+                      aria-modal="true"
+                      aria-labelledby="dayplan-inspect-title"
+                      style={{ position: 'fixed', top: 0, right: 0, width: '400px', height: '100vh', background: 'white', boxShadow: '-12px 0 48px rgba(15,23,42,0.14)', borderLeft: '1px solid #e2e8f0', zIndex: 1050, display: 'flex', flexDirection: 'column', padding: '24px', animation: 'modalFadeIn 0.3s cubic-bezier(0.16,1,0.3,1)' }}
+                    >
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid #f1f5f9', paddingBottom: '16px', marginBottom: '16px' }}>
                         <div>
                           <span style={{ fontSize: '0.63rem', fontWeight: 800, color: '#f59e0b', background: '#fffbeb', border: '1px solid rgba(245,158,11,0.2)', padding: '2px 8px', borderRadius: '6px', textTransform: 'uppercase', display: 'inline-block', marginBottom: '6px' }}>
                             {['','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag','Sonntag'][selectedDayPlan.dayOfWeek]} Plan
                           </span>
-                          <h3 style={{ margin: '0 0 2px 0', fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>{getPlanDisplayName(selectedDayPlan)}</h3>
+                          <h3 id="dayplan-inspect-title" style={{ margin: '0 0 2px 0', fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>{getPlanDisplayName(selectedDayPlan)}</h3>
                           <span style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 700 }}>🎸 {selectedDayPlan.instrument}</span>
                         </div>
-                        <button onClick={() => setSelectedDayPlan(null)} style={{ background: '#f1f5f9', border: 'none', color: '#64748b', cursor: 'pointer', padding: '7px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <button 
+                          type="button"
+                          aria-label="Details schließen"
+                          onClick={() => setSelectedDayPlan(null)} 
+                          style={{ background: '#f1f5f9', border: 'none', color: '#64748b', cursor: 'pointer', padding: '7px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+                        >
                           <X size={16} />
                         </button>
                       </div>
@@ -14826,6 +15007,9 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                   {/* FOCUS MODAL FOR CAMPUS SETTINGS */}
                   {activeCampusSettingsModal && (
                     <div 
+                      role="dialog"
+                      aria-modal="true"
+                      aria-label="Campus Einstellungen"
                       style={{
                         position: 'fixed',
                         top: 0,
@@ -17952,14 +18136,24 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
 
                   {/* Schüler hinzufügen Modal */}
                   {showAddGroovelabStudentModal && (
-                    <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(15,23,42,0.3)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+                    <div 
+                      role="dialog"
+                      aria-modal="true"
+                      aria-labelledby="add-gl-student-title"
+                      onClick={(e) => {
+                        if (e.target === e.currentTarget) setShowAddGroovelabStudentModal(false);
+                      }}
+                      style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(15,23,42,0.3)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}
+                    >
                       <div style={{ background: '#ffffff', borderRadius: '24px', maxWidth: '520px', width: '100%', maxHeight: '85vh', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
                         {/* Modal Header */}
                         <div style={{ padding: '24px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
+                          <h3 id="add-gl-student-title" style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
                             <Plus style={{ color: '#eab308', marginRight: '6px' }} size={18} /> Schüler hinzufügen
                           </h3>
                           <button 
+                            type="button"
+                            aria-label="Dialog schließen"
                             onClick={() => setShowAddGroovelabStudentModal(false)}
                             style={{ border: 'none', background: 'transparent', fontSize: '1.2rem', cursor: 'pointer', color: '#64748b' }}
                           >
@@ -17974,6 +18168,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                               <div style={{ position: 'relative' }}>
                                 <input
                                   type="text"
+                                  aria-label="Schüler aus der Musikschule suchen"
                                   value={groovelabStudentModalSearchQuery}
                                   onChange={(e) => setGroovelabStudentModalSearchQuery(e.target.value)}
                                   placeholder="Schüler aus der Musikschule suchen..."
@@ -18538,14 +18733,23 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
 
                   {/* Lehrkraft hinzufügen Modal */}
                   {showAddCoachModal && (
-                    <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(15,23,42,0.3)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+                    <div 
+                      role="dialog"
+                      aria-modal="true"
+                      aria-labelledby="add-coach-modal-title"
+                      onClick={(e) => {
+                        if (e.target === e.currentTarget) setShowAddCoachModal(false);
+                      }}
+                      style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(15,23,42,0.3)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
                       <div style={{ background: '#ffffff', borderRadius: '24px', maxWidth: '520px', width: '100%', maxHeight: '85vh', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
                         {/* Modal Header */}
                         <div style={{ padding: '24px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
+                          <h3 id="add-coach-modal-title" style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
                             <Plus size={18} style={{ marginRight: '6px', verticalAlign: 'middle', color: '#eab308' }} /> Lehrkraft hinzufügen
                           </h3>
                           <button 
+                            type="button"
+                            aria-label="Dialog schließen"
                             onClick={() => setShowAddCoachModal(false)}
                             style={{ border: 'none', background: 'transparent', fontSize: '1.2rem', cursor: 'pointer', color: '#64748b' }}
                           >
@@ -18560,6 +18764,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                               <div style={{ position: 'relative' }}>
                                 <input
                                   type="text"
+                                  aria-label="Lehrkraft aus der Schule suchen"
                                   value={coachModalSearchQuery}
                                   onChange={(e) => setCoachModalSearchQuery(e.target.value)}
                                   placeholder="Lehrkraft aus der Schule suchen..."
@@ -19000,6 +19205,9 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                 {/* FOCUS MODAL FOR GROOVELAB SETTINGS */}
                 {activeGroovelabSettingsModal && (
                   <div 
+                    role="dialog"
+                    aria-modal="true"
+                    aria-label="GrooveLab Einstellungen"
                     style={{
                       position: 'fixed',
                       top: 0,
@@ -19584,6 +19792,9 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
               setCustomBillingCity={setCustomBillingCity}
               customBillingEmail={customBillingEmail}
               setCustomBillingEmail={setCustomBillingEmail}
+              customBillingLeitwegId={customBillingLeitwegId}
+              setCustomBillingLeitwegId={setCustomBillingLeitwegId}
+              setShowAvvModal={setShowAvvModal}
               hasCustomActivationBillingAddress={hasCustomActivationBillingAddress}
               setHasCustomActivationBillingAddress={setHasCustomActivationBillingAddress}
               customActivationBillingName={customActivationBillingName}
@@ -19816,7 +20027,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
             />
           </Suspense>
         )}
-        {activeTab === 'secretary' && secretarySubTab === 'duties' && renderDutiesBoard()}
+        {activeTab === 'secretary' && (secretarySubTab === 'announcements' || secretarySubTab === 'duties') && renderAnnouncementsBoard()}
         {activeTab === 'secretary' && secretarySubTab === 'audit' && (
           <Suspense fallback={<div style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>Lade Audit-Logbuch...</div>}>
             <SecretaryAuditView
@@ -19888,7 +20099,11 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
         </Suspense>
       )}
       {showBulkDeleteModal && (
-        <div style={{
+        <div 
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="bulk-delete-title"
+          style={{
           position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
           backgroundColor: 'rgba(15, 23, 42, 0.75)', backdropFilter: 'blur(8px)',
           display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '16px'
@@ -19907,13 +20122,15 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                   <Trash2 size={22} color="white" />
                 </div>
                 <div>
-                  <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 900, fontFamily: 'Urbanist' }}>
+                  <h3 id="bulk-delete-title" style={{ margin: 0, fontSize: '1.2rem', fontWeight: 900, fontFamily: 'Urbanist' }}>
                     Mehrere Schüler löschen ({selectedStudentIds.length})
                   </h3>
                   <span style={{ fontSize: '0.78rem', opacity: 0.9 }}>Sicherheitsabfrage für Sammellöschung</span>
                 </div>
               </div>
               <button
+                type="button"
+                aria-label="Dialog schließen"
                 onClick={() => {
                   setShowBulkDeleteModal(false);
                   setBulkDeleteStep(1);
@@ -20064,7 +20281,11 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
         const avatarTextColor = activeTab === 'campus' ? '#34a853' : '#b45309';
 
         return (
-          <div style={{
+          <div 
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="manage-teacher-title"
+            style={{
             position: 'fixed',
             top: 0,
             right: 0,
@@ -20109,13 +20330,15 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                   {(manageTeacher.firstName || 'S')?.[0]}{(manageTeacher.lastName || 'L')?.[0]}
                 </div>
                 <div>
-                  <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
+                  <h3 id="manage-teacher-title" style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
                     Lehrkräfte-Kartei
                   </h3>
                   <p style={{ margin: '2px 0 0 0', fontSize: '0.78rem', color: '#64748b' }}>Verwaltung &bull; ID: #{manageTeacher.id.substring(0, 8)}</p>
                 </div>
               </div>
               <button 
+                type="button"
+                aria-label="Details schließen"
                 onClick={() => setManageTeacher(null)}
                 style={{
                   background: 'rgba(0, 0, 0, 0.04)',
@@ -20907,7 +21130,14 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
 
       {/* Modal for scheduled billing option change */}
       {showChangeTariffModal && (
-        <div style={{
+        <div 
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="tariff-change-modal-title"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowChangeTariffModal(false);
+          }}
+          style={{
           position: 'fixed',
           top: 0,
           left: 0,
@@ -20939,7 +21169,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
               }
             `}</style>
             
-            <h3 style={{ margin: '0 0 12px 0', fontSize: '1.1rem', fontWeight: 800, fontFamily: 'Urbanist', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <h3 id="tariff-change-modal-title" style={{ margin: '0 0 12px 0', fontSize: '1.1rem', fontWeight: 800, fontFamily: 'Urbanist', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h7.5"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/><circle cx="18" cy="18" r="3"/><path d="M18 16.5v1.5l1 1"/></svg>
               Tarifänderung zum neuen Monat
             </h3>
@@ -21046,7 +21276,14 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
 
       {/* Modal for Active Students list for monthly invoice */}
       {activeStudentsModalList && (
-        <div style={{
+        <div 
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="active-students-modal-title"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setActiveStudentsModalList(null);
+          }}
+          style={{
           position: 'fixed',
           top: 0,
           left: 0,
@@ -21075,7 +21312,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '12px' }}>
               <div>
-                <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
+                <h3 id="active-students-modal-title" style={{ margin: 0, fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
                   Aktivierte Schüler ({activeStudentsModalList.list.length})
                 </h3>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '3px' }}>
@@ -21419,6 +21656,9 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
 
         return (
           <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="switch-billing-title"
             style={{
               position: 'fixed',
               top: 0,
@@ -21459,7 +21699,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                   <span style={{ fontSize: '0.68rem', background: '#e0e7ff', color: '#4338ca', padding: '3px 10px', borderRadius: '999px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                     Enterprise Abrechnungs-Modell
                   </span>
-                  <h3 style={{ margin: '8px 0 2px 0', fontSize: '1.35rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em' }}>
+                  <h3 id="switch-billing-title" style={{ margin: '8px 0 2px 0', fontSize: '1.35rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em' }}>
                     Abrechnungsmodell für Schüler-Aktivierungen anpassen
                   </h3>
                   <p style={{ margin: 0, fontSize: '0.82rem', color: '#64748b', lineHeight: 1.4 }}>
@@ -21763,6 +22003,9 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
 
         return (
           <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="storage-manager-title"
             style={{
               position: 'fixed',
               top: 0,
@@ -21799,7 +22042,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                   <span style={{ fontSize: '0.65rem', background: '#dcfce7', color: '#166534', padding: '3px 8px', borderRadius: '999px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                     Cloud-Speicher Self-Service
                   </span>
-                  <h3 style={{ margin: '6px 0 2px 0', fontSize: '1.25rem', fontWeight: 900, color: '#0f172a' }}>
+                  <h3 id="storage-manager-title" style={{ margin: '6px 0 2px 0', fontSize: '1.25rem', fontWeight: 900, color: '#0f172a' }}>
                     Audio-Tresor Speicher anpassen
                   </h3>
                   <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748b' }}>
@@ -21808,6 +22051,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                 </div>
                 <button
                   type="button"
+                  aria-label="Dialog schließen"
                   onClick={() => setShowStorageManagerModal(false)}
                   style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px' }}
                 >
@@ -22337,6 +22581,9 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
       {/* 🧾 Revisionssicheres Buchungsbeleg-Modal (Tier-1 Enterprise+) */}
       {storageBookingSuccessModal?.isOpen && (
         <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="storage-booking-success-title"
           style={{
             position: 'fixed',
             top: 0,
@@ -22389,7 +22636,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                 <span style={{ fontSize: '0.65rem', background: '#f1f5f9', color: '#475569', padding: '2px 8px', borderRadius: '999px', fontWeight: 800, textTransform: 'uppercase' }}>
                   Buchung bestätigt
                 </span>
-                <h3 style={{ margin: '4px 0 0 0', fontSize: '1.2rem', fontWeight: 900, color: '#0f172a' }}>
+                <h3 id="storage-booking-success-title" style={{ margin: '4px 0 0 0', fontSize: '1.2rem', fontWeight: 900, color: '#0f172a' }}>
                   {storageBookingSuccessModal.isDowngrade 
                     ? 'Speicher-Reduzierung vorgemerkt' 
                     : 'Speichererweiterung erfolgreich gebucht'}
@@ -22486,6 +22733,9 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
 
         return (
           <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="storage-termination-title"
             style={{
               position: 'fixed',
               top: 0,
@@ -22531,7 +22781,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                     <span style={{ fontSize: '1.4rem' }}>📦</span>
                   </div>
                   <div>
-                    <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#0f172a' }}>
+                    <h3 id="storage-termination-title" style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#0f172a' }}>
                       Audio-Tresor Kündigungs-Assistent
                     </h3>
                     <p style={{ margin: '2px 0 0 0', fontSize: '0.76rem', color: '#64748b' }}>
@@ -22541,6 +22791,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                 </div>
                 <button
                   type="button"
+                  aria-label="Dialog schließen"
                   onClick={() => setShowStorageTerminationModal(false)}
                   style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }}
                 >
@@ -22740,6 +22991,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
             operatorBic={operatorBic}
             billingPayer={billingPayer}
             studentBillingOption={studentBillingOption}
+            leitwegId={currentSchoolProfile?.leitweg_id || undefined}
             onClose={() => setSelectedInvoice(null)}
           />
         </Suspense>
@@ -22747,7 +22999,11 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
 
       {/* Cancel Confirmation Modal */}
       {showCancelModal && (
-        <div style={{
+        <div 
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="cancel-subscription-title"
+          style={{
           position: 'fixed',
           top: 0,
           left: 0,
@@ -22779,7 +23035,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
               const yearInfo = getSchoolYearEndInfo(simulatedToday, schoolContractEndsAt);
               return (
                 <>
-                  <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
+                  <h3 id="cancel-subscription-title" style={{ margin: 0, fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
                     Abonnement kündigen?
                   </h3>
                   
@@ -22905,7 +23161,11 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
 
       {/* Module Upgrade Modal (Kombi-Vorteil Checkout gem. § 312j BGB) */}
       {showModuleUpgradeModal && (
-        <div style={{
+        <div 
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="module-upgrade-title"
+          style={{
           position: 'fixed',
           inset: 0,
           background: 'rgba(15, 23, 42, 0.45)',
@@ -22946,7 +23206,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                   {upgradeTargetModule === 'campus' ? '🎒' : '⚡'}
                 </div>
                 <div>
-                  <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
+                  <h3 id="module-upgrade-title" style={{ margin: 0, fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
                     {upgradeTargetModule === 'campus' ? 'Campus-Modul hinzubuchen' : 'GrooveLab-Modul hinzubuchen'}
                   </h3>
                   <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>
@@ -22955,6 +23215,8 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                 </div>
               </div>
               <button
+                type="button"
+                aria-label="Dialog schließen"
                 onClick={() => setShowModuleUpgradeModal(false)}
                 style={{
                   background: '#f1f5f9',
@@ -23256,9 +23518,13 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
       {/* ─── Unassigned-Warning Modal ─── */}
       {showUnassignedWarning && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)' }}>
-          <div style={{ background: 'white', borderRadius: '20px', padding: '28px 28px 22px', maxWidth: 380, width: '90%', boxShadow: '0 20px 60px rgba(0,0,0,0.25)', textAlign: 'center' }}>
-            <div style={{ fontSize: '2.4rem', marginBottom: 10 }}>⚠️</div>
-            <h3 style={{ margin: '0 0 8px', fontSize: '1.05rem', fontWeight: 800, color: '#1e293b' }}>Nicht alle Räume zugewiesen</h3>
+          <div 
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="unassigned-warning-title"
+            style={{ background: 'white', borderRadius: '20px', padding: '28px 28px 22px', maxWidth: 380, width: '90%', boxShadow: '0 20px 60px rgba(0,0,0,0.25)', textAlign: 'center' }}>
+            <div style={{ fontSize: '2.4rem', marginBottom: 10 }} aria-hidden="true">⚠️</div>
+            <h3 id="unassigned-warning-title" style={{ margin: '0 0 8px', fontSize: '1.05rem', fontWeight: 800, color: '#1e293b' }}>Nicht alle Räume zugewiesen</h3>
             <p style={{ margin: '0 0 20px', fontSize: '0.88rem', color: '#64748b', lineHeight: 1.5 }}>
               Es gibt noch {matrixAllocations.filter(p => !p.roomId).length} Lehrkraft-Tag-Kombination(en) ohne Raumzuweisung. Diese werden <strong>nicht freigegeben</strong>.
             </p>
@@ -23284,6 +23550,8 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
       {activeContextMenu && activeContextMenu.student && (
         <>
           <div 
+            role="presentation"
+            aria-hidden="true"
             onClick={() => setActiveContextMenu(null)}
             style={{ position: 'fixed', inset: 0, zIndex: 9998, background: 'transparent' }}
           />
@@ -23709,9 +23977,12 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
             {/* 1-Tap Module Switcher */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
               <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Modul wechseln:</span>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px' }}>
+              <div role="tablist" aria-label="Schnellwechsel Modul" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px' }}>
                 <button
                   type="button"
+                  role="tab"
+                  aria-selected={activeTab === 'secretary'}
+                  id="quick-tab-secretary"
                   onClick={() => {
                     setActiveTab('secretary');
                     sessionStorage.setItem('groovelab_active_workspace', 'secretary');
@@ -23731,6 +24002,9 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                 </button>
                 <button
                   type="button"
+                  role="tab"
+                  aria-selected={activeTab === 'campus'}
+                  id="quick-tab-campus"
                   onClick={() => {
                     setActiveTab('campus');
                     sessionStorage.setItem('groovelab_active_workspace', 'campus');
@@ -23750,6 +24024,9 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                 </button>
                 <button
                   type="button"
+                  role="tab"
+                  aria-selected={activeTab === 'groovelab'}
+                  id="quick-tab-groovelab"
                   onClick={() => {
                     setActiveTab('groovelab');
                     sessionStorage.setItem('groovelab_active_workspace', 'groovelab');
@@ -23793,7 +24070,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                     }).length;
                   })()
                 },
-                hasCampusSub && { id: 'duties', label: 'Dienstliche Aufgaben', icon: FileText },
+                hasCampusSub && { id: 'announcements', label: 'Mitteilungen & Informationen', icon: FileText },
                 { id: 'rooms', label: 'Räume', icon: DoorOpen },
                 hasCampusSub && { id: 'equipment', label: 'Instrumente & Ausstattung', icon: Settings },
                 { id: 'employees', label: 'Mitarbeiter', icon: Users },

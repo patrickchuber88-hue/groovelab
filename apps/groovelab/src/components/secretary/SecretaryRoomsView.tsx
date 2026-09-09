@@ -687,13 +687,17 @@ export function SecretaryRoomsView({
                     
                     <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                       {/* Segmented Control for Views */}
-                      <div style={{ background: '#f1f5f9', borderRadius: '12px', padding: '3px', display: 'flex', gap: '2px', border: '1px solid rgba(0,0,0,0.02)' }}>
+                      <div role="tablist" aria-label="Raumansicht auswählen" style={{ background: '#f1f5f9', borderRadius: '12px', padding: '3px', display: 'flex', gap: '2px', border: '1px solid rgba(0,0,0,0.02)' }}>
                         {(['overview', 'plan'] as const).map(v => {
                           const isActive = (roomsSubView as string) === v || (v === 'overview' && (roomsSubView as string) === 'settings');
                           return (
                             <button
                               key={v}
                               type="button"
+                              role="tab"
+                              aria-selected={isActive}
+                              aria-controls={`panel-${v}`}
+                              id={`tab-${v}`}
                               onClick={() => { setRoomsSubView(v); setEditingRoom(null); }}
                               style={{
                                 padding: '6px 14px',
@@ -721,6 +725,9 @@ export function SecretaryRoomsView({
                       {roomsSubView === 'overview' && (
                         <>
                           <button
+                            type="button"
+                            aria-expanded={isRoomCsvExpanded}
+                            aria-label="Sammel-Onboarding (CSV) ein- oder ausblenden"
                             onClick={() => setIsRoomCsvExpanded(!isRoomCsvExpanded)}
                             style={{ 
                               display: 'flex', 
@@ -729,7 +736,7 @@ export function SecretaryRoomsView({
                               borderRadius: '12px', 
                               padding: '8px 16px', 
                               fontSize: '0.8rem', 
-                              fontWeight: 800,
+                              fontWeight: 800, 
                               background: isRoomCsvExpanded ? '#f1f5f9' : '#ffffff',
                               border: '1px solid #cbd5e1',
                               cursor: 'pointer',
@@ -741,6 +748,8 @@ export function SecretaryRoomsView({
                           </button>
 
                           <button
+                            type="button"
+                            aria-label="Neuen Raum anlegen"
                             onClick={() => openRoomEditor()}
                             style={{ 
                               display: 'flex', 
@@ -749,7 +758,7 @@ export function SecretaryRoomsView({
                               borderRadius: '12px', 
                               padding: '8px 16px', 
                               fontSize: '0.8rem', 
-                              fontWeight: 800,
+                              fontWeight: 800, 
                               background: '#ea4335',
                               color: '#ffffff',
                               border: 'none',
@@ -840,6 +849,7 @@ export function SecretaryRoomsView({
 
                       <form onSubmit={handleBulkRoomImport} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                         <textarea
+                          aria-label="CSV-Raumdaten eingeben"
                           value={roomCsvText}
                           onChange={e => setRoomCsvText(e.target.value)}
                           placeholder="z.B.&#10;Klavierzimmer;2;12&#10;Schlagzeugstudio;1;18&#10;Theorieraum;15;30"
@@ -849,6 +859,7 @@ export function SecretaryRoomsView({
                         <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
                           <button
                             type="button"
+                            aria-label="CSV-Import abbrechen"
                             onClick={() => setIsRoomCsvExpanded(false)}
                             style={{ padding: '8px 16px', borderRadius: '10px', border: '1.5px solid #cbd5e1', background: '#ffffff', color: '#64748b', fontSize: '0.78rem', fontWeight: 800, cursor: 'pointer' }}
                           >
@@ -856,6 +867,7 @@ export function SecretaryRoomsView({
                           </button>
                           <button
                             type="submit"
+                            aria-label="Räume importieren"
                             disabled={roomCsvSaving || !roomCsvText.trim()}
                             style={{ padding: '8px 20px', borderRadius: '10px', border: 'none', background: 'linear-gradient(135deg, #0b57d0 0%, #1a73e8 100%)', color: '#ffffff', fontSize: '0.78rem', fontWeight: 800, cursor: 'pointer', opacity: roomCsvSaving || !roomCsvText.trim() ? 0.6 : 1 }}
                           >
@@ -909,7 +921,7 @@ export function SecretaryRoomsView({
 
                     {/* GrooveLab Aktiv */}
                     <div style={{
-                      background: 'linear-gradient(135deg, #facc15 0%, #eab308 100%)', color: 'white',
+                      background: 'linear-gradient(135deg, #facc15 0%, #eab308 100%)', color: '#0f172a',
                       borderRadius: '16px', padding: '12px 16px',
                       display: 'flex', flexDirection: 'column', gap: '4px',
                       boxShadow: '0 8px 20px -5px rgba(234, 179, 8, 0.35)',
@@ -927,9 +939,13 @@ export function SecretaryRoomsView({
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', width: '100%', minWidth: 0 }}>
                     
                     {/* HORIZONTAL BUILDING TABS FOR PLAN VIEW */}
-                    <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '8px', borderBottom: '1.5px solid #e2e8f0', width: '100%' }}>
+                    <div role="tablist" aria-label="Gebäude filtern" style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '8px', borderBottom: '1.5px solid #e2e8f0', width: '100%' }}>
                       {/* Alle Gebäude tab */}
                       <button
+                        type="button"
+                        role="tab"
+                        aria-selected={selectedBuildingId === 'All'}
+                        aria-label={`Alle Gebäude (${uniqueRooms.length}) anzeigen`}
                         onClick={() => { setSelectedBuildingId('All'); }}
                         style={{
                           padding: '10px 18px',
@@ -951,6 +967,10 @@ export function SecretaryRoomsView({
                       </button>
                       {/* Ohne Zuordnung tab */}
                       <button
+                        type="button"
+                        role="tab"
+                        aria-selected={selectedBuildingId === ''}
+                        aria-label={`Räume ohne Zuordnung (${uniqueRooms.filter(r => !r.building_id).length}) anzeigen`}
                         onClick={() => { setSelectedBuildingId(''); }}
                         style={{
                           padding: '10px 18px',
@@ -976,6 +996,10 @@ export function SecretaryRoomsView({
                         return (
                           <button
                             key={b.id}
+                            type="button"
+                            role="tab"
+                            aria-selected={selectedBuildingId === b.id}
+                            aria-label={`Gebäude ${b.name} (${count} Räume) anzeigen`}
                             onClick={() => { setSelectedBuildingId(b.id); }}
                             style={{
                               padding: '10px 18px',
@@ -1010,6 +1034,8 @@ export function SecretaryRoomsView({
                           <p className="no-pdf" style={{ margin: '3px 0 0 0', fontSize: '0.72rem', color: '#64748b' }}>Lese-Ansicht · Zum Bearbeiten → Campus › Stundenpläne</p>
                         </div>
                         <button
+                          type="button"
+                          aria-label="Raumbelegungsplan als PDF exportieren"
                           onClick={handleExportPlanPDF}
                           style={{
                             display: 'flex',
@@ -1312,6 +1338,15 @@ export function SecretaryRoomsView({
                                 transform: isHovered ? 'scale(1.02)' : 'scale(1)',
                                 transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
                               }}
+                              role="button"
+                              tabIndex={0}
+                              aria-label={`Gebäude ${b.name} auswählen`}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  e.preventDefault();
+                                  setSelectedBuildingId(b.id);
+                                }
+                              }}
                             >
                               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0, flex: 1 }}>
                                 <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: '#e0f2fe', color: '#0369a1', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.1rem', flexShrink: 0 }}>
@@ -1333,12 +1368,16 @@ export function SecretaryRoomsView({
                                   {roomCount}
                                 </span>
                                 <button
+                                  type="button"
+                                  aria-label={`Gebäude ${b.name} bearbeiten`}
                                   onClick={(e) => { e.stopPropagation(); openBuildingEditor(b); }}
                                   style={{ background: 'transparent', border: 'none', color: '#ea4335', cursor: 'pointer', padding: 0 }}
                                 >
                                   ✏️
                                 </button>
                                 <button
+                                  type="button"
+                                  aria-label={`Gebäude ${b.name} löschen`}
                                   onClick={(e) => { e.stopPropagation(); handleDeleteBuilding(b.id); }}
                                   style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', padding: 0 }}
                                 >
@@ -1369,6 +1408,7 @@ export function SecretaryRoomsView({
                           <input 
                             type="text" 
                             placeholder="Raum suchen..." 
+                            aria-label="Raum suchen"
                             value={roomSearchQuery}
                             onChange={(e) => setRoomSearchQuery(e.target.value)}
                             style={{
@@ -1388,6 +1428,7 @@ export function SecretaryRoomsView({
                         <div style={{ flex: 1, minWidth: '130px' }}>
                           <select 
                             value={roomFilterFloor}
+                            aria-label="Nach Stockwerk filtern"
                             onChange={(e) => setRoomFilterFloor(e.target.value)}
                             style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.78rem', outline: 'none', background: 'white', fontWeight: 700 }}
                           >
@@ -1401,6 +1442,7 @@ export function SecretaryRoomsView({
                         <div style={{ flex: 1, minWidth: '130px' }}>
                           <select
                             value={roomFilterStatus}
+                            aria-label="Nach Raumstatus oder Modul filtern"
                             onChange={(e) => setRoomFilterStatus(e.target.value as any)}
                             style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.78rem', outline: 'none', background: 'white', fontWeight: 700 }}
                           >
@@ -1578,6 +1620,7 @@ export function SecretaryRoomsView({
                                     
                                     <button
                                       type="button"
+                                      aria-label={`Raum ${room.name} löschen`}
                                       onClick={() => handleDeleteRoom(room.id)}
                                       style={{ background: 'transparent', border: 'none', color: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: '10px', width: '44px', height: '44px', minWidth: '44px', minHeight: '44px', touchAction: 'manipulation', flexShrink: 0 }}
                                       className="hover-scale-mini"
@@ -1593,6 +1636,8 @@ export function SecretaryRoomsView({
                                   {/* Active Status Toggles */}
                                   <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexShrink: 0 }}>
                                     <button
+                                      type="button"
+                                      aria-label={`Campus-Modul für Raum ${room.name} ${room.is_campus_active !== false ? 'deaktivieren' : 'aktivieren'}`}
                                       onClick={async (e) => {
                                         e.stopPropagation();
                                         const newVal = room.is_campus_active === false ? true : false;
@@ -1610,7 +1655,7 @@ export function SecretaryRoomsView({
                                         fontWeight: 800,
                                         cursor: 'pointer',
                                         background: room.is_campus_active !== false ? '#e6f4ea' : '#f1f5f9',
-                                        color: room.is_campus_active !== false ? '#34a853' : '#86868b',
+                                        color: room.is_campus_active !== false ? '#34a853' : '#475569',
                                         transition: 'all 0.15s ease',
                                         fontFamily: 'Urbanist'
                                       }}
@@ -1620,6 +1665,8 @@ export function SecretaryRoomsView({
                                     </button>
 
                                     <button
+                                      type="button"
+                                      aria-label={`GrooveLab-Modul für Raum ${room.name} ${room.is_groovelab_active ? 'deaktivieren' : 'aktivieren'}`}
                                       onClick={async (e) => {
                                         e.stopPropagation();
                                         const newVal = !room.is_groovelab_active;
@@ -1882,6 +1929,15 @@ export function SecretaryRoomsView({
                                 setDragHoveredFloor(null);
                               }}
                               onClick={() => setRoomFilterFloor(flName)}
+                              role="button"
+                              tabIndex={0}
+                              aria-label={`Stockwerk ${flName} filtern`}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  e.preventDefault();
+                                  setRoomFilterFloor(flName);
+                                }
+                              }}
                               style={{
                                 display: 'flex',
                                 alignItems: 'center',
@@ -1926,6 +1982,8 @@ export function SecretaryRoomsView({
                                     {flName}
                                     {flName !== 'EG' && addedFloors.includes(flName) && (
                                       <button
+                                        type="button"
+                                        aria-label={`Stockwerk ${flName} löschen`}
                                         onClick={(e) => {
                                           e.stopPropagation();
                                           if (confirm(`Stockwerk „${flName}“ löschen? Zugeordnete Räume werden zurück auf „EG“ gesetzt.`)) {
@@ -1974,7 +2032,14 @@ export function SecretaryRoomsView({
               </div>
             )}              {/* ── VIEW 3: Einstellungen / Editor ── */}
               {roomsSubView === 'settings' && (
-                <div style={{
+                <div 
+                  role="dialog"
+                  aria-modal="true"
+                  aria-labelledby="room-settings-modal-title"
+                  onClick={(e) => {
+                    if (e.target === e.currentTarget) { setRoomsSubView('overview'); setEditingRoom(null); }
+                  }}
+                  style={{
                   position: 'fixed',
                   top: 0,
                   left: 0,
@@ -2003,10 +2068,12 @@ export function SecretaryRoomsView({
                   }}>
                     {/* Modal Header */}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '24px 28px', borderBottom: '1px solid #f1f5f9' }}>
-                      <h4 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 900, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px', fontFamily: 'Urbanist' }}>
+                      <h4 id="room-settings-modal-title" style={{ margin: 0, fontSize: '1.1rem', fontWeight: 900, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px', fontFamily: 'Urbanist' }}>
                         <DoorOpen size={18} color="#ea4335" /> {editingRoom ? `„${editingRoom.name}“ bearbeiten` : 'Neuen Raum anlegen'}
                       </h4>
                       <button
+                        type="button"
+                        aria-label="Raum-Dialog schließen"
                         onClick={() => { setRoomsSubView('overview'); setEditingRoom(null); }}
                         style={{ background: '#f1f5f9', border: 'none', color: '#64748b', cursor: 'pointer', padding: '6px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                       >
@@ -2025,10 +2092,11 @@ export function SecretaryRoomsView({
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', paddingRight: '10px' }}>
                         {/* Name */}
                         <div>
-                          <label style={{ fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '6px', fontFamily: 'Urbanist' }}>
+                          <label style={{ fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', color: '#475569', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '6px', fontFamily: 'Urbanist' }}>
                             <Tag size={12} color="#ea4335" /> Raumname *
                           </label>
                           <input
+                            aria-label="Raumname"
                             value={roomFormName}
                             onChange={e => setRoomFormName(e.target.value)}
                             placeholder='z.B. „Raum 1 – Schlagzeug“ oder „Studio Nord“'
@@ -2038,10 +2106,11 @@ export function SecretaryRoomsView({
 
                         {/* Gebäude */}
                         <div>
-                          <label style={{ fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '6px', fontFamily: 'Urbanist' }}>
+                          <label style={{ fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', color: '#475569', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '6px', fontFamily: 'Urbanist' }}>
                             <School size={12} color="#ea4335" /> Gebäude
                           </label>
                           <select
+                            aria-label="Gebäude auswählen"
                             value={roomFormBuildingId}
                             onChange={e => setRoomFormBuildingId(e.target.value)}
                             style={{ width: '100%', padding: '11px 14px', borderRadius: '10px', border: '1.5px solid #cbd5e1', fontSize: '0.85rem', fontWeight: 700, color: '#0f172a', outline: 'none', background: '#f8fafc' }}
@@ -2056,11 +2125,12 @@ export function SecretaryRoomsView({
                         {/* Max students & QM */}
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                           <div>
-                            <label style={{ fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '6px', fontFamily: 'Urbanist' }}>
+                            <label style={{ fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', color: '#475569', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '6px', fontFamily: 'Urbanist' }}>
                               <Users size={12} color="#ea4335" /> Max. Schüler
                             </label>
                             <input
                               type="number"
+                              aria-label="Maximale Schüleranzahl"
                               value={roomFormMaxStudents}
                               onChange={e => {
                                 const val = e.target.value;
@@ -2071,11 +2141,12 @@ export function SecretaryRoomsView({
                             />
                           </div>
                           <div>
-                            <label style={{ fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '6px', fontFamily: 'Urbanist' }}>
+                            <label style={{ fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', color: '#475569', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '6px', fontFamily: 'Urbanist' }}>
                               <Ruler size={12} color="#ea4335" /> Größe in m²
                             </label>
                             <input
                               type="number"
+                              aria-label="Raumgröße in Quadratmetern"
                               value={roomFormQm}
                               onChange={e => {
                                 const val = e.target.value;
@@ -2089,12 +2160,21 @@ export function SecretaryRoomsView({
 
                         {/* Modul */}
                         <div>
-                          <label style={{ fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '8px', fontFamily: 'Urbanist' }}>
+                          <label style={{ fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', color: '#475569', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '8px', fontFamily: 'Urbanist' }}>
                             <Sliders size={12} color="#ea4335" /> Module Freigabe
                           </label>
                           <div style={{ display: 'flex', gap: '12px', width: '100%' }}>
                             <div 
+                              role="button"
+                              tabIndex={0}
+                              aria-label="Für Campus freischalten"
                               onClick={() => setRoomFormIsCampusActive(!roomFormIsCampusActive)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  e.preventDefault();
+                                  setRoomFormIsCampusActive(!roomFormIsCampusActive);
+                                }
+                              }}
                               style={{
                                 flex: 1,
                                 padding: '12px',
@@ -2111,6 +2191,7 @@ export function SecretaryRoomsView({
                             >
                               <input
                                 type="checkbox"
+                                aria-label="Campus Modul aktiv"
                                 checked={roomFormIsCampusActive !== false}
                                 readOnly
                                 style={{ width: '16px', height: '16px', accentColor: '#34a853', cursor: 'pointer' }}
@@ -2122,7 +2203,16 @@ export function SecretaryRoomsView({
                             </div>
 
                             <div 
+                              role="button"
+                              tabIndex={0}
+                              aria-label="Für GrooveLab freischalten"
                               onClick={() => setRoomFormIsGroovelabActive(!roomFormIsGroovelabActive)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  e.preventDefault();
+                                  setRoomFormIsGroovelabActive(!roomFormIsGroovelabActive);
+                                }
+                              }}
                               style={{
                                 flex: 1,
                                 padding: '12px',
@@ -2139,6 +2229,7 @@ export function SecretaryRoomsView({
                             >
                               <input
                                 type="checkbox"
+                                aria-label="GrooveLab Modul aktiv"
                                 checked={!!roomFormIsGroovelabActive}
                                 readOnly
                                 style={{ width: '16px', height: '16px', accentColor: '#eab308', cursor: 'pointer' }}
@@ -2153,7 +2244,7 @@ export function SecretaryRoomsView({
 
                         {/* Akustisch ungeeignete Instrumente */}
                         <div>
-                          <label style={{ fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '8px', fontFamily: 'Urbanist' }}>
+                          <label style={{ fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', color: '#475569', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '8px', fontFamily: 'Urbanist' }}>
                             <ShieldAlert size={12} color="#ea4335" /> Akustisch ungeeignet für
                           </label>
                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
@@ -2163,6 +2254,7 @@ export function SecretaryRoomsView({
                                 <button
                                   key={inst}
                                   type="button"
+                                  aria-label={`Akustisch ungeeignet für ${inst}`}
                                   onClick={() => {
                                     if (isUnsuitable) {
                                       setRoomFormUnsuitableInstruments(prev => prev.filter(i => i !== inst));
@@ -2191,7 +2283,7 @@ export function SecretaryRoomsView({
 
                         {/* Vorhandene Instrumente */}
                         <div>
-                          <label style={{ fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '8px', fontFamily: 'Urbanist' }}>
+                          <label style={{ fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', color: '#475569', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '8px', fontFamily: 'Urbanist' }}>
                             <Music size={12} color="#ea4335" /> Vorhandene Instrumente (mit Modell)
                           </label>
                           
@@ -2205,6 +2297,7 @@ export function SecretaryRoomsView({
                                   </span>
                                   <button
                                     type="button"
+                                    aria-label={`Instrument ${inst.name} entfernen`}
                                     onClick={() => setRoomFormRoomInstruments(prev => prev.filter((_, i) => i !== idx))}
                                     style={{ border: 'none', background: 'transparent', color: '#ef4444', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer', padding: '2px' }}
                                   >
@@ -2218,12 +2311,14 @@ export function SecretaryRoomsView({
                           {/* Add Instrument Form Inline */}
                           <div style={{ display: 'flex', gap: '8px', background: '#f8fafc', border: '1.5px dashed #cbd5e1', borderRadius: '12px', padding: '10px', alignItems: 'center' }}>
                             <input
+                              aria-label="Neues Instrument Name"
                               placeholder="z.B. Klavier"
                               value={newInstrumentName}
                               onChange={e => setNewInstrumentName(e.target.value)}
                               style={{ flex: 1, height: '36px', boxSizing: 'border-box', padding: '8px 12px', borderRadius: '8px', border: '1.5px solid #cbd5e1', fontSize: '0.75rem', fontWeight: 700, color: '#0f172a', outline: 'none', background: 'white' }}
                             />
                             <input
+                              aria-label="Neues Instrument Typ oder Modell"
                               placeholder="Typ: z.B. Yamaha U1"
                               value={newInstrumentModel}
                               onChange={e => setNewInstrumentModel(e.target.value)}
@@ -2231,6 +2326,7 @@ export function SecretaryRoomsView({
                             />
                             <button
                               type="button"
+                              aria-label="Instrument hinzufügen"
                               onClick={() => {
                                 if (!newInstrumentName.trim()) return;
                                 setRoomFormRoomInstruments(prev => [...prev, { name: newInstrumentName.trim(), model: newInstrumentModel.trim() }]);
@@ -2246,10 +2342,11 @@ export function SecretaryRoomsView({
 
                         {/* Sonstiges */}
                         <div>
-                          <label style={{ fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '6px', fontFamily: 'Urbanist' }}>
+                          <label style={{ fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', color: '#475569', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '6px', fontFamily: 'Urbanist' }}>
                             <Sparkles size={12} color="#ea4335" /> Sonstige Ausstattung
                           </label>
                           <input
+                            aria-label="Sonstige Ausstattung"
                             value={roomFormSonstiges}
                             onChange={e => setRoomFormSonstiges(e.target.value)}
                             placeholder='z.B. Bluetooth Box, Belüftung, Whiteboard...'
@@ -2262,6 +2359,8 @@ export function SecretaryRoomsView({
                     {/* Modal Footer */}
                     <div style={{ padding: '20px 28px', borderTop: '1px solid #f1f5f9', display: 'flex', gap: '10px', background: '#f8fafc' }}>
                       <button
+                        type="button"
+                        aria-label={editingRoom ? 'Änderungen speichern' : 'Raum anlegen'}
                         onClick={handleSaveRoom}
                         disabled={roomSaving || !roomFormName.trim()}
                         style={{
@@ -2283,6 +2382,7 @@ export function SecretaryRoomsView({
                       </button>
                       <button
                         type="button"
+                        aria-label="Abbrechen"
                         onClick={() => { setRoomsSubView('overview'); setEditingRoom(null); }}
                         style={{
                           padding: '12px 20px',
@@ -2304,7 +2404,14 @@ export function SecretaryRoomsView({
 
               {/* Building Modal Editor */}
               {showBuildingModal && (
-                <div style={{
+                <div 
+                  role="dialog"
+                  aria-modal="true"
+                  aria-labelledby="building-modal-title"
+                  onClick={(e) => {
+                    if (e.target === e.currentTarget) { setShowBuildingModal(false); setEditingBuilding(null); }
+                  }}
+                  style={{
                   position: 'fixed',
                   top: 0,
                   left: 0,
@@ -2332,10 +2439,12 @@ export function SecretaryRoomsView({
                   }}>
                     {/* Modal Header */}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '24px 28px', borderBottom: '1px solid #f1f5f9' }}>
-                      <h4 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 900, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px', fontFamily: 'Urbanist' }}>
+                      <h4 id="building-modal-title" style={{ margin: 0, fontSize: '1.1rem', fontWeight: 900, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px', fontFamily: 'Urbanist' }}>
                         <School size={18} color="#ea4335" /> {editingBuilding ? `„${editingBuilding.name}“ bearbeiten` : 'Neues Gebäude anlegen'}
                       </h4>
                       <button
+                        type="button"
+                        aria-label="Gebäude-Dialog schließen"
                         onClick={() => { setShowBuildingModal(false); setEditingBuilding(null); }}
                         style={{ background: '#f1f5f9', border: 'none', color: '#64748b', cursor: 'pointer', padding: '6px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                       >
@@ -2347,10 +2456,11 @@ export function SecretaryRoomsView({
                       {/* Modal Body */}
                       <div style={{ padding: '28px 28px 32px 28px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
                         <div>
-                          <label style={{ fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '6px', fontFamily: 'Urbanist' }}>
+                          <label style={{ fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', color: '#475569', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '6px', fontFamily: 'Urbanist' }}>
                             <School size={12} color="#ea4335" /> Gebäudename *
                           </label>
                           <input
+                            aria-label="Gebäudename"
                             value={buildingFormName}
                             onChange={e => setBuildingFormName(e.target.value)}
                             required
@@ -2359,10 +2469,11 @@ export function SecretaryRoomsView({
                           />
                         </div>
                         <div>
-                          <label style={{ fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '6px', fontFamily: 'Urbanist' }}>
+                          <label style={{ fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', color: '#475569', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '6px', fontFamily: 'Urbanist' }}>
                             <School size={12} color="#ea4335" /> Adresse
                           </label>
                           <input
+                            aria-label="Adresse des Gebäudes"
                             value={buildingFormAddress}
                             onChange={e => setBuildingFormAddress(e.target.value)}
                             placeholder="z.B. Kaiserstraße 10, 80331 München"
@@ -2375,6 +2486,7 @@ export function SecretaryRoomsView({
                       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', padding: '18px 28px', borderTop: '1px solid #f1f5f9', background: '#f8fafc' }}>
                         <button
                           type="button"
+                          aria-label="Abbrechen"
                           onClick={() => { setShowBuildingModal(false); setEditingBuilding(null); }}
                           style={{ padding: '10px 20px', border: '1.5px solid #e2e8f0', background: 'white', color: '#64748b', borderRadius: '10px', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}
                         >
@@ -2382,6 +2494,7 @@ export function SecretaryRoomsView({
                         </button>
                         <button
                           type="submit"
+                          aria-label="Gebäude speichern"
                           style={{ padding: '10px 20px', border: 'none', background: 'linear-gradient(135deg, #ea4335 0%, #c5221f 100%)', color: 'white', borderRadius: '10px', fontSize: '0.8rem', fontWeight: 750, cursor: 'pointer', boxShadow: '0 4px 12px rgba(234,67,53,0.2)' }}
                         >
                           Speichern
@@ -2394,26 +2507,31 @@ export function SecretaryRoomsView({
 
               {/* Re-use the same selectedDayPlan detail drawer */}
               {selectedDayPlan && roomsSubView === 'plan' && (
-                <div style={{ position: 'fixed', top: 0, right: 0, width: '380px', height: '100vh', background: 'white', boxShadow: '-12px 0 48px rgba(15,23,42,0.14)', borderLeft: '1px solid #e2e8f0', zIndex: 1050, display: 'flex', flexDirection: 'column', padding: '24px', animation: 'modalFadeIn 0.3s cubic-bezier(0.16,1,0.3,1)' }}>
+                <div 
+                  role="dialog"
+                  aria-modal="true"
+                  aria-labelledby="dayplan-detail-title"
+                  style={{ position: 'fixed', top: 0, right: 0, width: '380px', height: '100vh', background: 'white', boxShadow: '-12px 0 48px rgba(15,23,42,0.14)', borderLeft: '1px solid #e2e8f0', zIndex: 1050, display: 'flex', flexDirection: 'column', padding: '24px', animation: 'modalFadeIn 0.3s cubic-bezier(0.16,1,0.3,1)' }}
+                >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid #f1f5f9', paddingBottom: '16px', marginBottom: '16px' }}>
                     <div>
                       <span style={{ fontSize: '0.63rem', fontWeight: 800, color: '#f59e0b', background: '#fffbeb', border: '1px solid rgba(245,158,11,0.2)', padding: '2px 8px', borderRadius: '6px', textTransform: 'uppercase', display: 'inline-block', marginBottom: '6px' }}>
                         {['','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag','Sonntag'][selectedDayPlan.dayOfWeek]} · Lese-Ansicht
                       </span>
-                      <h3 style={{ margin: '0 0 2px 0', fontSize: '1.1rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>{getPlanDisplayName(selectedDayPlan)}</h3>
-                      <span style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 700 }}>🎸 {selectedDayPlan.instrument}</span>
+                      <h3 id="dayplan-detail-title" style={{ margin: '0 0 2px 0', fontSize: '1.1rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>{getPlanDisplayName(selectedDayPlan)}</h3>
+                      <span style={{ fontSize: '0.72rem', color: '#475569', fontWeight: 700 }}>🎸 {selectedDayPlan.instrument}</span>
                     </div>
-                    <button onClick={() => setSelectedDayPlan(null)} style={{ background: '#f1f5f9', border: 'none', color: '#64748b', cursor: 'pointer', padding: '7px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <button type="button" aria-label="Details schließen" onClick={() => setSelectedDayPlan(null)} style={{ background: '#f1f5f9', border: 'none', color: '#64748b', cursor: 'pointer', padding: '7px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       <X size={16} />
                     </button>
                   </div>
                   <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '7px' }}>
-                    <h4 style={{ margin: '0 0 8px 0', fontSize: '0.7rem', fontWeight: 900, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.06em' }}>Stundenliste</h4>
+                    <h4 style={{ margin: '0 0 8px 0', fontSize: '0.7rem', fontWeight: 900, textTransform: 'uppercase', color: '#475569', letterSpacing: '0.06em' }}>Stundenliste</h4>
                     {selectedDayPlan.teacherId === 'groovelab' ? (
                       <div style={{ padding: '9px 11px', borderRadius: '10px', border: '1px solid #f1f5f9', background: '#f8fafc', borderLeft: '4px solid #3b82f6', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <div>
                           <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1d1d1f', display: 'block' }}>GrooveLab Betriebszeit</span>
-                          <span style={{ fontSize: '0.6rem', color: '#94a3b8', fontWeight: 650, display: 'block', marginTop: '1px' }}>
+                          <span style={{ fontSize: '0.6rem', color: '#475569', fontWeight: 650, display: 'block', marginTop: '1px' }}>
                             Virtueller Termin für Raumzuteilung
                           </span>
                         </div>
@@ -2428,7 +2546,7 @@ export function SecretaryRoomsView({
                           <div key={idx} style={{ padding: '9px 11px', borderRadius: '10px', border: '1px solid #f1f5f9', background: isBreak ? '#fffbeb' : '#f8fafc', borderLeft: isBreak ? '4px solid #f59e0b' : '4px solid #3b82f6', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <div>
                               <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1d1d1f', display: 'block' }}>{isBreak ? '☕ Pause' : slot.student_name}</span>
-                              <span style={{ fontSize: '0.6rem', color: '#94a3b8', fontWeight: 650, display: 'block', marginTop: '1px' }}>
+                              <span style={{ fontSize: '0.6rem', color: '#475569', fontWeight: 650, display: 'block', marginTop: '1px' }}>
                                 {isBreak ? 'Pause' : `Instrument: ${slot.student_instrument || selectedDayPlan.instrument || 'Instrument'}`}
                               </span>
                             </div>

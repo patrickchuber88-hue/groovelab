@@ -2709,7 +2709,10 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
               })()}
 
               {/* Mobile Floating Action Bar: Meine Buchungen + Raum buchen */}
-              <div style={{
+              <div 
+                role="toolbar"
+                aria-label="Mobile Schnellaktionen"
+                style={{
                 position: 'fixed',
                 bottom: '80px',
                 right: '16px',
@@ -4713,6 +4716,9 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
           {/* Mobile Bottom-Sheet Slider (Apple-Grade Slide-Up Drawer) */}
           {isMobile && showMobileRoomSlider && (
             <div 
+              role="dialog"
+              aria-modal="true"
+              aria-label="Raum-Details und Buchungen"
               style={{
                 position: 'fixed',
                 inset: 0,

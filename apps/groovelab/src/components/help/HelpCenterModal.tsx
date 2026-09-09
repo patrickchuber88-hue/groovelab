@@ -19,7 +19,8 @@ import {
   AKADEMIE_GUIDES_DATABASE, 
   TIER_CONFIG, 
   AkademieTier, 
-  AkademieBoardGuide 
+  AkademieBoardGuide,
+  getMasterAdminGuides
 } from './AkademieContentRegistry';
 
 export type HelpUserRole = 'admin' | 'secretary' | 'teacher' | 'student' | 'master_admin' | 'school_management';
@@ -61,12 +62,48 @@ export const HelpCenterModal: React.FC<HelpCenterModalProps> = ({
   const [activeTier, setActiveTier] = useState<AkademieTier>(defaultTier);
   const effectiveTier: AkademieTier = isMasterAdmin ? activeTier : defaultTier;
 
+  // 🛡️ OWASP ASVS Level 3 Dynamisches Nachladen der Master-Admin-Guides
+  const [masterAdminGuides, setMasterAdminGuides] = useState<AkademieBoardGuide[]>([]);
+  const [isMasterGuidesLoading, setIsMasterGuidesLoading] = useState(false);
+
+  useEffect(() => {
+    if (isMasterAdmin && masterAdminGuides.length === 0) {
+      setIsMasterGuidesLoading(true);
+      getMasterAdminGuides()
+        .then((guides) => {
+          setMasterAdminGuides(guides);
+        })
+        .catch((err) => {
+          console.error('[HelpCenter] Fehler beim Laden der Master-Admin Guides:', err);
+        })
+        .finally(() => {
+          setIsMasterGuidesLoading(false);
+        });
+    }
+  }, [isMasterAdmin, masterAdminGuides.length]);
+
+  // 🛡️ HERMETISCHER POOL (Zero-Cross-Visibility):
+  // Nicht-Master-Admins erhalten AUSNAHMSLOS nur die Guides ihres defaultTier.
+  // Master-Admin Guides sind für reguläre Nutzer weder im Speicher noch im Bundle vorhanden.
+  const allAvailableGuides = useMemo(() => {
+    if (isMasterAdmin) {
+      return [...masterAdminGuides, ...AKADEMIE_GUIDES_DATABASE];
+    }
+    return AKADEMIE_GUIDES_DATABASE.filter(g => g.tier === defaultTier);
+  }, [isMasterAdmin, masterAdminGuides, defaultTier]);
+
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [selectedGuideId, setSelectedGuideId] = useState<string | null>(null);
   const [isMobileDetailView, setIsMobileDetailView] = useState(false);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [downloadSuccess, setDownloadSuccess] = useState<string | null>(null);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
+
+  // Kategorie zurücksetzen bei Tier-Wechsel
+  useEffect(() => {
+    setSelectedCategory('all');
+  }, [effectiveTier]);
 
   // Responsive state
   const [windowWidth, setWindowWidth] = useState(() => (typeof window !== 'undefined' ? window.innerWidth : 1200));
@@ -105,16 +142,27 @@ export const HelpCenterModal: React.FC<HelpCenterModalProps> = ({
     });
   }, []);
 
+  // Verfügbare Kategorien für das Apple HIG Segmented Control innerhalb des aktiven Tiers
+  const availableCategories = useMemo(() => {
+    const tierPool = isMasterAdmin
+      ? allAvailableGuides.filter(g => g.tier === effectiveTier)
+      : allAvailableGuides;
+
+    const cats = new Set(tierPool.map(g => g.category));
+    const list: { key: string; label: string }[] = [{ key: 'all', label: 'Alle' }];
+    if (cats.has('quickstart')) list.push({ key: 'quickstart', label: 'Schnellstart' });
+    if (cats.has('core_boards')) list.push({ key: 'core_boards', label: 'Boards' });
+    if (cats.has('audio_studio')) list.push({ key: 'audio_studio', label: 'Studio & Audio' });
+    if (cats.has('finops_compliance')) list.push({ key: 'finops_compliance', label: 'Recht & FinOps' });
+    return list;
+  }, [allAvailableGuides, isMasterAdmin, effectiveTier]);
+
   // Sync initial topic or board on open (strictly scoped to user's authorized tier)
   useEffect(() => {
     if (!isOpen) return;
 
-    const allowedGuides = isMasterAdmin
-      ? AKADEMIE_GUIDES_DATABASE
-      : AKADEMIE_GUIDES_DATABASE.filter(g => g.tier === defaultTier);
-
     if (initialTopicId) {
-      const matched = allowedGuides.find(g => g.id === initialTopicId);
+      const matched = allAvailableGuides.find(g => g.id === initialTopicId);
       if (matched) {
         if (isMasterAdmin) setActiveTier(matched.tier);
         setSelectedGuideId(matched.id);
@@ -124,7 +172,7 @@ export const HelpCenterModal: React.FC<HelpCenterModalProps> = ({
     }
 
     if (initialBoardId) {
-      const matchedBoard = allowedGuides.find(g => g.boardId === initialBoardId);
+      const matchedBoard = allAvailableGuides.find(g => g.boardId === initialBoardId);
       if (matchedBoard) {
         if (isMasterAdmin) setActiveTier(matchedBoard.tier);
         setSelectedGuideId(matchedBoard.id);
@@ -135,11 +183,18 @@ export const HelpCenterModal: React.FC<HelpCenterModalProps> = ({
 
     // Default to first guide in active tier
     if (isMasterAdmin) setActiveTier(defaultTier);
-    const tierGuides = allowedGuides.filter(g => g.tier === defaultTier);
+    const tierGuides = allAvailableGuides.filter(g => g.tier === defaultTier);
     if (tierGuides.length > 0) {
       setSelectedGuideId(tierGuides[0].id);
     }
-  }, [isOpen, initialTopicId, initialBoardId, defaultTier, isMasterAdmin, isMobile]);
+  }, [isOpen, initialTopicId, initialBoardId, defaultTier, isMasterAdmin, isMobile, allAvailableGuides]);
+
+  // Fallback: Wenn Master Admin Guides nachgeladen wurden und noch kein Guide gewählt ist
+  useEffect(() => {
+    if (isMasterAdmin && effectiveTier === 'master_admin' && !selectedGuideId && masterAdminGuides.length > 0) {
+      setSelectedGuideId(masterAdminGuides[0].id);
+    }
+  }, [isMasterAdmin, effectiveTier, selectedGuideId, masterAdminGuides]);
 
   // Lock body scroll when open
   useEffect(() => {
@@ -171,15 +226,15 @@ export const HelpCenterModal: React.FC<HelpCenterModalProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose, isMobileDetailView]);
 
-  // Filtered guides by search or active tier (STRICT ZERO-CROSS-VISIBILITY)
+  // Filtered guides by search, active tier, and category (STRICT ZERO-CROSS-VISIBILITY)
   const filteredGuides = useMemo(() => {
-    const basePool = isMasterAdmin
-      ? (searchQuery ? AKADEMIE_GUIDES_DATABASE : AKADEMIE_GUIDES_DATABASE.filter(g => g.tier === effectiveTier))
-      : AKADEMIE_GUIDES_DATABASE.filter(g => g.tier === defaultTier);
+    const tierPool = isMasterAdmin
+      ? allAvailableGuides.filter(g => g.tier === effectiveTier)
+      : allAvailableGuides;
 
     const q = searchQuery.trim().toLowerCase();
     if (q) {
-      return basePool.filter(g => {
+      return tierPool.filter(g => {
         const inTitle = g.title.toLowerCase().includes(q);
         const inSub = g.subtitle.toLowerCase().includes(q);
         const inBadge = g.badge.toLowerCase().includes(q);
@@ -191,8 +246,12 @@ export const HelpCenterModal: React.FC<HelpCenterModalProps> = ({
       });
     }
 
-    return basePool;
-  }, [searchQuery, effectiveTier, defaultTier, isMasterAdmin]);
+    if (selectedCategory !== 'all') {
+      return tierPool.filter(g => g.category === selectedCategory);
+    }
+
+    return tierPool;
+  }, [allAvailableGuides, isMasterAdmin, effectiveTier, searchQuery, selectedCategory]);
 
   const activeGuide: AkademieBoardGuide | null = useMemo(() => {
     if (selectedGuideId) {
@@ -490,9 +549,12 @@ export const HelpCenterModal: React.FC<HelpCenterModalProps> = ({
                       return (
                         <button
                           key={tierKey}
+                          type="button"
                           onClick={() => {
                             setActiveTier(tierKey);
-                            const firstInTier = AKADEMIE_GUIDES_DATABASE.find(g => g.tier === tierKey);
+                            const firstInTier = tierKey === 'master_admin'
+                              ? (masterAdminGuides[0] || null)
+                              : AKADEMIE_GUIDES_DATABASE.find(g => g.tier === tierKey);
                             if (firstInTier) setSelectedGuideId(firstInTier.id);
                           }}
                           style={{
@@ -530,6 +592,62 @@ export const HelpCenterModal: React.FC<HelpCenterModalProps> = ({
               )
             )}
 
+            {/* Apple HIG Segmented Control: Rollenspezifische Kategorien */}
+            {!searchQuery && availableCategories.length > 1 && (
+              <div 
+                role="tablist" 
+                aria-label="Kategorien-Filter"
+                style={{
+                  padding: '8px 14px 10px 14px',
+                  display: 'flex',
+                  gap: '6px',
+                  overflowX: 'auto',
+                  background: '#f8fafc',
+                  borderBottom: '1px solid #e2e8f0',
+                  flexShrink: 0
+                }}
+                className="custom-scrollbar"
+              >
+                {availableCategories.map(cat => {
+                  const isSelected = selectedCategory === cat.key;
+                  const isYellow = activeTierConfig.color === '#facc15' || activeTierConfig.color === '#eab308';
+                  return (
+                    <button
+                      key={cat.key}
+                      type="button"
+                      role="tab"
+                      aria-selected={isSelected}
+                      tabIndex={0}
+                      onClick={() => setSelectedCategory(cat.key)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          setSelectedCategory(cat.key);
+                        }
+                      }}
+                      style={{
+                        padding: '5px 12px',
+                        borderRadius: '100px',
+                        border: isSelected ? `1.5px solid ${activeTierConfig.color}` : '1px solid #e2e8f0',
+                        background: isSelected ? activeTierConfig.color : '#ffffff',
+                        color: isSelected ? (isYellow ? '#0f172a' : '#ffffff') : '#475569',
+                        fontSize: '0.72rem',
+                        fontWeight: isSelected ? 850 : 650,
+                        cursor: 'pointer',
+                        whiteSpace: 'nowrap',
+                        transition: 'all 0.15s ease',
+                        boxShadow: isSelected ? `0 2px 8px ${activeTierConfig.color}25` : '0 1px 2px rgba(0,0,0,0.02)',
+                        outline: 'none',
+                        flexShrink: 0
+                      }}
+                    >
+                      {cat.label}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
             {/* Guides List */}
             <div 
               style={{
@@ -558,9 +676,24 @@ export const HelpCenterModal: React.FC<HelpCenterModalProps> = ({
                   return (
                     <div
                       key={guide.id}
+                      role="button"
+                      tabIndex={0}
                       onClick={() => {
                         setSelectedGuideId(guide.id);
                         if (isMobile) setIsMobileDetailView(true);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          setSelectedGuideId(guide.id);
+                          if (isMobile) setIsMobileDetailView(true);
+                        }
+                      }}
+                      onFocus={(e) => {
+                        e.currentTarget.style.boxShadow = `0 0 0 2px ${activeTierConfig.color}`;
+                      }}
+                      onBlur={(e) => {
+                        e.currentTarget.style.boxShadow = isSelected ? '0 4px 16px rgba(0,0,0,0.06)' : 'none';
                       }}
                       style={{
                         padding: '11px 14px',
@@ -572,6 +705,7 @@ export const HelpCenterModal: React.FC<HelpCenterModalProps> = ({
                         flexDirection: 'column',
                         gap: '4px',
                         boxShadow: isSelected ? '0 4px 16px rgba(0,0,0,0.06)' : 'none',
+                        outline: 'none',
                         transition: 'all 0.15s ease'
                       }}
                       onMouseEnter={(e) => {

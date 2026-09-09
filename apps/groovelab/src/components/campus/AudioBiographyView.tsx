@@ -132,7 +132,7 @@ export interface UniversalPlaylistCoverConfig {
 }
 
 export const UNIVERSAL_PLAYLIST_COVERS: UniversalPlaylistCoverConfig[] = [
-  // 1. Konzert & Vorspiel (VdM- & Bühnen-Repertoire)
+  // 1. Konzert & Vorspiel (Konzert- & Bühnen-Repertoire)
   {
     id: 'cov_spring_summer_concert',
     category: 'concert_stage',

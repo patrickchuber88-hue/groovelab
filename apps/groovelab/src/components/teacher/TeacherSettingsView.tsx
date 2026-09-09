@@ -34,6 +34,17 @@ export const TeacherSettingsView: React.FC<TeacherSettingsViewProps> = ({
   setIsHelpCenterOpen,
   windowWidth,
 }) => {
+  React.useEffect(() => {
+    if (!activeTeacherSettingsModal) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setActiveTeacherSettingsModal(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [activeTeacherSettingsModal, setActiveTeacherSettingsModal]);
+
   return (
         <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '24px' }}>
           <div>
@@ -129,6 +140,19 @@ export const TeacherSettingsView: React.FC<TeacherSettingsViewProps> = ({
                     return (
                       <div
                         key={module.id}
+                        role="button"
+                        tabIndex={0}
+                        aria-label={`${module.title} öffnen: ${module.subtitle}`}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            if (module.id === 'feedback') {
+                              setIsFeedbackModalOpen(true);
+                            } else {
+                              setActiveTeacherSettingsModal(module.id as any);
+                            }
+                          }
+                        }}
                         onClick={() => {
                           if (module.id === 'feedback') {
                             setIsFeedbackModalOpen(true);
@@ -181,7 +205,7 @@ export const TeacherSettingsView: React.FC<TeacherSettingsViewProps> = ({
                             marginTop: '10px',
                             fontSize: '0.62rem',
                             fontWeight: 800,
-                            color: '#ca8a04',
+                            color: '#854d0e',
                             background: '#fefce8',
                             border: '1px solid #fef08a',
                             padding: '2px 8px',
@@ -272,6 +296,9 @@ export const TeacherSettingsView: React.FC<TeacherSettingsViewProps> = ({
               }}
             >
               <div 
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="teacher-settings-modal-title"
                 style={{
                   width: '100%',
                   maxWidth: '620px',
@@ -314,7 +341,7 @@ export const TeacherSettingsView: React.FC<TeacherSettingsViewProps> = ({
                       {activeTeacherSettingsModal === 'quiet_hours' && <Moon size={22} color="#ffffff" />}
                     </div>
                     <div>
-                      <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
+                      <h3 id="teacher-settings-modal-title" style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
                         {activeTeacherSettingsModal === 'livelab' && 'Live Lab & Proberaum-Setup'}
                         {activeTeacherSettingsModal === 'repertoire' && 'Repertoire & Song-Standards'}
                         {(activeTeacherSettingsModal === 'profile' || activeTeacherSettingsModal === 'avatar') && 'Coach-Profil & Musiker-Avatar'}
@@ -332,6 +359,7 @@ export const TeacherSettingsView: React.FC<TeacherSettingsViewProps> = ({
                   </div>
                   <button
                     onClick={() => setActiveTeacherSettingsModal(null)}
+                    aria-label="Einstellungen schließen"
                     style={{
                       width: '32px',
                       height: '32px',
@@ -392,7 +420,7 @@ export const TeacherSettingsView: React.FC<TeacherSettingsViewProps> = ({
                                     borderRadius: '12px',
                                     border: isSelected ? '2px solid #eab308' : '1px solid #e2e8f0',
                                     background: isSelected ? '#fefce8' : '#ffffff',
-                                    color: isSelected ? '#ca8a04' : '#1e293b',
+                                    color: isSelected ? '#854d0e' : '#1e293b',
                                     fontWeight: 800,
                                     fontSize: '0.82rem',
                                     cursor: 'pointer',
@@ -445,7 +473,7 @@ export const TeacherSettingsView: React.FC<TeacherSettingsViewProps> = ({
                                     borderRadius: '10px',
                                     border: isSelected ? '2px solid #eab308' : '1px solid #cbd5e1',
                                     background: isSelected ? '#fefce8' : '#ffffff',
-                                    color: isSelected ? '#ca8a04' : '#64748b',
+                                    color: isSelected ? '#854d0e' : '#64748b',
                                     fontWeight: 800,
                                     fontSize: '0.8rem',
                                     cursor: 'pointer'
@@ -523,7 +551,7 @@ export const TeacherSettingsView: React.FC<TeacherSettingsViewProps> = ({
                                     borderRadius: '12px',
                                     border: isSelected ? '2px solid #eab308' : '1px solid #cbd5e1',
                                     background: isSelected ? '#fefce8' : '#ffffff',
-                                    color: isSelected ? '#ca8a04' : '#64748b',
+                                    color: isSelected ? '#854d0e' : '#64748b',
                                     fontWeight: 900,
                                     fontSize: '0.86rem',
                                     cursor: 'pointer',
@@ -624,6 +652,26 @@ export const TeacherSettingsView: React.FC<TeacherSettingsViewProps> = ({
                             return (
                               <div
                                 key={av.url}
+                                role="button"
+                                tabIndex={0}
+                                aria-label={`Musiker-Avatar: ${av.name}${isSelected ? ' (Ausgewählt)' : ''}`}
+                                aria-pressed={isSelected}
+                                onKeyDown={async (e) => {
+                                  if (e.key === 'Enter' || e.key === ' ') {
+                                    e.preventDefault();
+                                    if (!teacher?.id) return;
+                                    try {
+                                      const { error } = await supabase
+                                        .from('users')
+                                        .update({ photo_url: av.url, avatar_url: av.url })
+                                        .eq('id', teacher.id);
+                                      if (error) throw error;
+                                      setTeacher((prev: any) => ({ ...prev, photo_url: av.url, avatar_url: av.url }));
+                                    } catch (err: any) {
+                                      alert('Fehler beim Aktualisieren: ' + err.message);
+                                    }
+                                  }
+                                }}
                                 onClick={async () => {
                                   if (!teacher?.id) return;
                                   try {
@@ -657,7 +705,7 @@ export const TeacherSettingsView: React.FC<TeacherSettingsViewProps> = ({
                                   alt={av.name}
                                   style={{ width: '48px', height: '48px', borderRadius: '50%', objectFit: 'cover' }}
                                 />
-                                <span style={{ fontSize: '0.66rem', fontWeight: 800, color: isSelected ? '#ca8a04' : '#64748b', textAlign: 'center' }}>
+                                <span style={{ fontSize: '0.66rem', fontWeight: 800, color: isSelected ? '#854d0e' : '#64748b', textAlign: 'center' }}>
                                   {av.name}
                                 </span>
                               </div>

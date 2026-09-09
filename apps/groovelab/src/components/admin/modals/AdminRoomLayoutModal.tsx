@@ -237,8 +237,21 @@ export const AdminRoomLayoutModal: React.FC<AdminRoomLayoutModalProps> = ({
       return kiosk ? `${window.location.origin}/?kiosk_token=${kiosk.secret_token}` : `${window.location.origin}/?kiosk_room_id=${id}`;
     };
 
+    useEffect(() => {
+      const handleKeyDown = (e: KeyboardEvent) => {
+        if (e.key === 'Escape') onClose();
+      };
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [onClose]);
+
     return (
-      <div style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.75)', backdropFilter: 'blur(12px)', zIndex: 4000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+      <div 
+        role="dialog" 
+        aria-modal="true" 
+        aria-labelledby="room-layout-title"
+        style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.75)', backdropFilter: 'blur(12px)', zIndex: 4000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}
+      >
         <style dangerouslySetInnerHTML={{__html: `
           @keyframes pulse-orange {
             0%, 100% { border-color: #f97316; box-shadow: 0 0 0 0px rgba(249, 115, 22, 0.4); }
@@ -250,11 +263,14 @@ export const AdminRoomLayoutModal: React.FC<AdminRoomLayoutModalProps> = ({
           {/* Header */}
           <div style={{ padding: '24px 32px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc' }}>
             <div>
-              <h2 style={{ fontSize: '1.5rem', fontWeight: 900, color: '#0f172a', margin: 0 }}>Raum-Layout gestalten: {customizingRoom.name}</h2>
+              <h2 id="room-layout-title" style={{ fontSize: '1.5rem', fontWeight: 900, color: '#0f172a', margin: 0 }}>Raum-Layout gestalten: {customizingRoom.name}</h2>
               <p style={{ fontSize: '0.875rem', color: '#64748b', margin: '4px 0 0 0' }}>Bewege die iPads an ihre Plätze und konfiguriere die Instrumente.</p>
             </div>
             <button 
+              type="button"
               onClick={() => onClose()} 
+              aria-label="Raum-Layout-Editor schließen"
+              title="Schließen"
               style={{ background: '#f1f5f9', border: 'none', borderRadius: '50%', width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#64748b', transition: 'all 0.2s' }}
             >
               <X size={20} />

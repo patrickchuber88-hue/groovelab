@@ -721,24 +721,59 @@ export const SchoolSelfOnboardingModal: React.FC<SchoolSelfOnboardingModalProps>
                 )}
               </button>
 
-              {/* Rechtlicher Hinweis (B2B SaaS / AGB & AVV) */}
+              {/* Rechtlicher Hinweis (B2B SaaS / AGB, Datenschutz & AVV) */}
               <div style={{ fontSize: '0.68rem', color: '#94a3b8', textAlign: 'center', lineHeight: 1.45, padding: '0 6px' }}>
                 Mit Klick auf „Kostenfrei freischalten“ akzeptieren Sie unsere{' '}
                 <span
+                  role="button"
+                  tabIndex={0}
                   onClick={() => {
                     setLegalModalTab('terms');
                     setShowLegalModal(true);
                   }}
-                  style={{ color: '#15803d', textDecoration: 'underline', cursor: 'pointer', fontWeight: 750 }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      setLegalModalTab('terms');
+                      setShowLegalModal(true);
+                    }
+                  }}
+                  style={{ color: '#15803d', textDecoration: 'underline', cursor: 'pointer', fontWeight: 750, outline: 'none' }}
                 >
                   AGB für Bildungseinrichtungen
+                </span>, die{' '}
+                <span
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => {
+                    setLegalModalTab('privacy');
+                    setShowLegalModal(true);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      setLegalModalTab('privacy');
+                      setShowLegalModal(true);
+                    }
+                  }}
+                  style={{ color: '#15803d', textDecoration: 'underline', cursor: 'pointer', fontWeight: 750, outline: 'none' }}
+                >
+                  Datenschutzerklärung
                 </span>{' '}
                 sowie die{' '}
                 <span
+                  role="button"
+                  tabIndex={0}
                   onClick={() => {
                     setShowAvvModal(true);
                   }}
-                  style={{ color: '#15803d', textDecoration: 'underline', cursor: 'pointer', fontWeight: 750 }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      setShowAvvModal(true);
+                    }
+                  }}
+                  style={{ color: '#15803d', textDecoration: 'underline', cursor: 'pointer', fontWeight: 750, outline: 'none' }}
                 >
                   Vereinbarung zur Auftragsverarbeitung (AVV nach Art. 28 DSGVO / Art. 9 nDSG)
                 </span>.

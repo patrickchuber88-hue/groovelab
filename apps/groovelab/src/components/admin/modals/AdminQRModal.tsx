@@ -219,14 +219,31 @@ export const AdminQRModal: React.FC<AdminQRModalProps> = ({
       URL.revokeObjectURL(blobUrl);
     };
 
+    useEffect(() => {
+      const handleKeyDown = (e: KeyboardEvent) => {
+        if (e.key === 'Escape') onClose();
+      };
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [onClose]);
+
     const brandColor = activePlatform === 'groovelab' ? '#eab308' : '#34a853';
 
     return (
-      <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(20px)', zIndex: 5000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', overflowY: 'auto' }} onClick={() => onClose()}>
-        <div style={{ width: '100%', maxWidth: '300px', display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative' }} onClick={e => e.stopPropagation()}>
+      <div 
+        role="dialog" 
+        aria-modal="true" 
+        aria-label="QR-Zugangskarte und Login-Token"
+        style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(20px)', zIndex: 5000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', overflowY: 'auto' }} 
+        onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      >
+        <div style={{ width: '100%', maxWidth: '300px', display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative' }}>
           {/* Close Button */}
           <button 
+            type="button"
             onClick={() => onClose()} 
+            aria-label="QR-Modal schließen"
+            title="Schließen"
             style={{ 
               position: 'absolute', 
               top: '-56px', 

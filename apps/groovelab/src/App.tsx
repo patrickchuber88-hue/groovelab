@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef, useMemo, lazy, Suspense } from 'react';
-import { Music, AlertCircle, Play, Pause, ArrowDown, ArrowRight, Library, Shield, ShieldCheck, FileText, LogOut, Award, Users, User, Monitor, Tablet, X, Camera, Clock, QrCode, Plus, ExternalLink, BarChart, Star, Box, Settings, Lock, Key, Pencil, Trash2, Zap, RotateCcw, Check, CheckCircle, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Search, Mic, Calendar, PlayCircle, Youtube, Megaphone, Mail, School, GraduationCap, Trophy, Compass, MapPin, RefreshCw, Repeat, BookOpen, Info, Disc, Building } from 'lucide-react';
+import { Music, AlertCircle, Play, Pause, ArrowDown, ArrowRight, Library, Shield, ShieldCheck, FileText, LogOut, Award, Users, User, Monitor, Tablet, X, Camera, Clock, QrCode, Plus, ExternalLink, BarChart, Star, Box, Settings, Lock, Key, Pencil, Trash2, Zap, RotateCcw, Check, CheckCircle, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Search, Mic, Calendar, PlayCircle, Youtube, Megaphone, Mail, School, GraduationCap, Trophy, Compass, MapPin, RefreshCw, Repeat, BookOpen, Info, Disc, Building, ZoomIn } from 'lucide-react';
 import { useWindowSize } from 'react-use';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase, supabaseUrl, supabaseAnonKey } from './lib/supabase';
 import { dbCircuitBreaker } from './utils/circuitBreaker';
 import { subscribeUserToPush } from './utils/webPush';
-import { StudioAvatar, getInstrumentAvatarUrl, getDefaultMusicianAvatarUrl, renderBandAvatar, resolveStudentInstrumentAsync, getEffectiveInstrument } from './components/StudioAvatar';
+import { StudioAvatar, getInstrumentAvatarUrl, getDefaultMusicianAvatarUrl, renderBandAvatar, resolveStudentInstrumentAsync, getEffectiveInstrument, resolveCampusStudentAvatar } from './components/StudioAvatar';
 import { reportClientError, initGlobalErrorListeners } from './lib/errorTelemetry';
 import { isDevEnvironment } from './utils/tenantUrlHelper';
 import { CampusGroovelabText } from './components/CampusGroovelabBrand';
@@ -47,29 +47,30 @@ const HelpCenterModal = lazy(() => import('./components/help/HelpCenterModal').t
 const TrialInfoModal = lazy(() => import('./components/TrialInfoModal').then(m => ({ default: m.TrialInfoModal })));
 const AdminSecuritySuiteModal = lazy(() => import('./components/AdminSecuritySuiteModal').then(m => ({ default: m.AdminSecuritySuiteModal })));
 const QuarterlyAccessReportModal = lazy(() => import('./components/ui/QuarterlyAccessReportModal').then(m => ({ default: m.QuarterlyAccessReportModal })));
-
+const LegalTextModal = lazy(() => import('./components/LegalTextModal').then(m => ({ default: m.LegalTextModal })));
+const ConfettiModal = lazy(() => import('./components/ConfettiModal'));
+const MaintenanceLockoutOverlay = lazy(() => import('./components/MaintenanceLockoutOverlay').then(m => ({ default: m.MaintenanceLockoutOverlay })));
+const GlobalBroadcastBanner = lazy(() => import('./components/GlobalBroadcastBanner').then(m => ({ default: m.GlobalBroadcastBanner })));
+const PwaUpdateToast = lazy(() => import('./components/ui/PwaUpdateToast').then(m => ({ default: m.PwaUpdateToast })));
+const GroupedSongCard = lazy(() => import('./components/GroupedSongCard').then(m => ({ default: m.GroupedSongCard })));
+const DeviceSimulator = isDevEnvironment() 
+  ? lazy(() => import('./components/ui/DeviceSimulator').then(m => ({ default: m.DeviceSimulator })))
+  : ({ children }: { children: React.ReactNode }) => <>{children}</>;
 
 import { LegalConsentGate } from './components/LegalConsentGate';
 import { announceA11y } from './components/common/A11yLiveAnnouncer';
 
 import { MobileBottomNav } from './components/ui/MobileBottomNav';
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
-import { GroupedSongCard } from './components/GroupedSongCard';
 import { generateRandomBandName } from './utils/bandNameGenerator';
 import { APP_INSTRUMENT_ICONS, APP_INSTRUMENT_COLORS, brandColor } from './constants/instruments';
-import ConfettiModal from './components/ConfettiModal';
 import { normalizeInstrument, renderInstrumentIcon } from './utils/instruments';
 import { getDistanceFromLatLonInM } from './utils/geo';
 import { flushOfflineSyncQueue } from './services/offlineSyncService';
-import { DeviceSimulator } from './components/ui/DeviceSimulator';
 import { MobileTopHeader } from './components/ui/MobileTopHeader';
 import { formatTeacherFullName } from './utils/nameHelper';
 import { CampusLevelSwitcher, CampusUiLevel } from './components/campus/CampusLevelSwitcher';
 import { useMasterPricing } from './context/MasterPricingContext';
-import { LegalTextModal } from './components/LegalTextModal';
-import { MaintenanceLockoutOverlay } from './components/MaintenanceLockoutOverlay';
-import { GlobalBroadcastBanner } from './components/GlobalBroadcastBanner';
-import { PwaUpdateToast } from './components/ui/PwaUpdateToast';
 import { OfflineStatusBadge } from './components/ui/OfflineStatusBadge';
 import { OfflineSyncIndicator } from './components/ui/OfflineSyncIndicator';
 import { PrivacyShieldOverlay } from './components/ui/PrivacyShieldOverlay';
@@ -649,6 +650,7 @@ function App() {
   // Declarative definition of renderLegalModals to ensure availability across all routes/landing pages
   const renderLegalModals = () => {
     const isLegalOpen = showPrivacy || showAgb || showImpressum || showCancellation || showAccessibility;
+    if (!isLegalOpen) return null;
     const initialTab: 'privacy' | 'terms' | 'impressum' | 'cancellation' | 'accessibility' = showAccessibility
       ? 'accessibility'
       : (showPrivacy 
@@ -656,17 +658,19 @@ function App() {
         : (showAgb ? 'terms' : (showCancellation ? 'cancellation' : 'impressum')));
 
     return (
-      <LegalTextModal 
-        isOpen={isLegalOpen}
-        initialTab={initialTab}
-        onClose={() => {
-          setShowPrivacy(false);
-          setShowAgb(false);
-          setShowImpressum(false);
-          setShowCancellation(false);
-          setShowAccessibility(false);
-        }}
-      />
+      <Suspense fallback={null}>
+        <LegalTextModal 
+          isOpen={isLegalOpen}
+          initialTab={initialTab}
+          onClose={() => {
+            setShowPrivacy(false);
+            setShowAgb(false);
+            setShowImpressum(false);
+            setShowCancellation(false);
+            setShowAccessibility(false);
+          }}
+        />
+      </Suspense>
     );
   };
 
@@ -7210,7 +7214,7 @@ function App() {
         const rawCampusTab = typeof window !== 'undefined' ? (sessionStorage.getItem('campus_active_tab') || localStorage.getItem('campus_active_tab')) : null;
         const startTab = targetPlatform === 'campus' 
           ? ((rawCampusTab && rawCampusTab !== 'live') ? rawCampusTab : 'briefing')
-          : (typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_active_tab') || localStorage.getItem('groovelab_active_tab')) : null) || 'live';
+          : 'live';
         if (typeof window !== 'undefined') {
           sessionStorage.setItem(targetPlatform === 'campus' ? 'campus_active_tab' : 'groovelab_active_tab', startTab);
           localStorage.setItem(targetPlatform === 'campus' ? 'campus_active_tab' : 'groovelab_active_tab', startTab);
@@ -7679,79 +7683,88 @@ function App() {
 
   return (
     <LegalConsentGate user={user}>
-      <DeviceSimulator>
-      {isGhostParam && (
-        <GhostSupportCapsule 
+      <Suspense fallback={null}>
+        <DeviceSimulator>
+        {isGhostParam && (
+          <GhostSupportCapsule 
+            schoolName={user?.schools?.name || (Array.isArray(user?.schools) ? user.schools[0]?.name : undefined)} 
+            currentRole={user?.role}
+            onRoleChange={handleSwitchActiveRole}
+          />
+        )}
+        {isMaintenanceLockoutActive && maintenanceState && (
+          <Suspense fallback={null}>
+            <MaintenanceLockoutOverlay 
+              maintenanceState={maintenanceState} 
+              onBypassUnlocked={() => setMaintenanceBypass(true)} 
+              currentRole={user?.role}
+              currentSchoolId={school?.id}
+              activePlatform={activePlatform}
+            />
+          </Suspense>
+        )}
+        {broadcastAnnouncement && (
+          <Suspense fallback={null}>
+            <GlobalBroadcastBanner 
+              announcement={broadcastAnnouncement} 
+              currentRole={user?.role} 
+              activePlatform={activePlatform}
+              currentSchoolId={school?.id}
+            />
+          </Suspense>
+        )}
+        <OfflineSyncIndicator />
+        <PrivacyShieldOverlay 
+          isActive={isShielded} 
+          onUnlock={dismissShield} 
           schoolName={user?.schools?.name || (Array.isArray(user?.schools) ? user.schools[0]?.name : undefined)} 
-          currentRole={user?.role}
-          onRoleChange={handleSwitchActiveRole}
         />
-      )}
-      {isMaintenanceLockoutActive && maintenanceState && (
-        <MaintenanceLockoutOverlay 
-          maintenanceState={maintenanceState} 
-          onBypassUnlocked={() => setMaintenanceBypass(true)} 
-          currentRole={user?.role}
-          currentSchoolId={school?.id}
-          activePlatform={activePlatform}
-        />
-      )}
-      <GlobalBroadcastBanner 
-        announcement={broadcastAnnouncement} 
-        currentRole={user?.role} 
-        activePlatform={activePlatform}
-        currentSchoolId={school?.id}
-      />
-      <OfflineSyncIndicator />
-      <PrivacyShieldOverlay 
-        isActive={isShielded} 
-        onUnlock={dismissShield} 
-        schoolName={user?.schools?.name || (Array.isArray(user?.schools) ? user.schools[0]?.name : undefined)} 
-      />
-      {/* Soft Trial Pre-Expiry Warning Banner for Admin/Secretary (Days 27-30) */}
-      {(user?.role === 'admin' || user?.role === 'secretary') && school?.is_trial && !school?.subscription_bypass && trialDaysLeft !== null && trialDaysLeft <= 3 && trialDaysLeft > 0 && (
-        <div style={{
-          background: 'linear-gradient(90deg, #fffbeb 0%, #fef3c7 100%)',
-          borderBottom: '1px solid #fde68a',
-          padding: '10px 24px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: '12px',
-          zIndex: 999
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <Clock size={16} color="#b45309" />
-            <span style={{ fontSize: '0.84rem', fontWeight: 650, color: '#92400e' }}>
-              Hinweis: Die 30-tägige Probezeit Ihrer Musikschule endet in <strong>{trialDaysLeft} {trialDaysLeft === 1 ? 'Tag' : 'Tagen'}</strong>.
-            </span>
+        {/* Soft Trial Pre-Expiry Warning Banner for Admin/Secretary (Days 27-30) */}
+        {(user?.role === 'admin' || user?.role === 'secretary') && school?.is_trial && !school?.subscription_bypass && trialDaysLeft !== null && trialDaysLeft <= 3 && trialDaysLeft > 0 && (
+          <div style={{
+            background: 'linear-gradient(90deg, #fffbeb 0%, #fef3c7 100%)',
+            borderBottom: '1px solid #fde68a',
+            padding: '10px 24px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '12px',
+            zIndex: 999
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <Clock size={16} color="#b45309" />
+              <span style={{ fontSize: '0.84rem', fontWeight: 650, color: '#92400e' }}>
+                Hinweis: Die 30-tägige Probezeit Ihrer Musikschule endet in <strong>{trialDaysLeft} {trialDaysLeft === 1 ? 'Tag' : 'Tagen'}</strong>.
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowTrialInfoModal(true)}
+              style={{
+                padding: '6px 14px',
+                borderRadius: '10px',
+                background: '#b45309',
+                color: '#ffffff',
+                border: 'none',
+                fontWeight: 800,
+                fontSize: '0.78rem',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+                boxShadow: '0 2px 6px rgba(180, 83, 9, 0.2)'
+              }}
+            >
+              Jetzt ansehen &amp; freischalten
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={() => setShowTrialInfoModal(true)}
-            style={{
-              padding: '6px 14px',
-              borderRadius: '10px',
-              background: '#b45309',
-              color: '#ffffff',
-              border: 'none',
-              fontWeight: 800,
-              fontSize: '0.78rem',
-              cursor: 'pointer',
-              whiteSpace: 'nowrap',
-              boxShadow: '0 2px 6px rgba(180, 83, 9, 0.2)'
-            }}
-          >
-            Jetzt ansehen &amp; freischalten
-          </button>
-        </div>
-      )}
-      {showPwaUpdateToast && (
-        <PwaUpdateToast 
-          onUpdate={() => window.location.replace(window.location.pathname + '?reload_manual=1')}
-          onDismiss={() => setShowPwaUpdateToast(false)}
-        />
-      )}
+        )}
+        {showPwaUpdateToast && (
+          <Suspense fallback={null}>
+            <PwaUpdateToast 
+              onUpdate={() => window.location.replace(window.location.pathname + '?reload_manual=1')}
+              onDismiss={() => setShowPwaUpdateToast(false)}
+            />
+          </Suspense>
+        )}
       <OfflineStatusBadge />
       <div className="app-layout">
       {toastMessage && (
@@ -8687,6 +8700,8 @@ function App() {
                   src={user.photo_url} 
                   user={{
                     ...user,
+                    role: (activeWorkspace === 'teacher' || user.role === 'teacher') ? 'teacher' : user.role,
+                    isTeacherContext: (activeWorkspace === 'teacher' || user.role === 'teacher'),
                     resolved_instrument: user.resolved_instrument || user.instrument || (teachers.find(t => t.id === user.teacher_id)?.instrument) || (teachers[0]?.instrument) || 'Gitarre'
                   }} 
                   activePlatform={activePlatform} 
@@ -8736,7 +8751,7 @@ function App() {
             </div>
           </button>
 
-          {/* Notenständer-Modus Toggle Button (Student Goldstandard) */}
+          {/* Notenständer-Modus Toggle Button (Student Goldstandard) -> Jetzt: Vergrößern */}
           {user.role?.toLowerCase() === 'student' && activePlatform === 'campus' && (
             <button 
               type="button"
@@ -8758,7 +8773,7 @@ function App() {
                 transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
               }}
               className="hover-scale"
-              title="Großschrift & Glanceability für Notenständer & Distanz am Instrument (60–90 cm)"
+              title="Vergrößern: Großschrift & Glanceability für Notenständer & Distanz am Instrument (60–90 cm)"
               onMouseEnter={(e) => {
                 if (!isMusicStandMode) {
                   e.currentTarget.style.background = '#f1f5f9';
@@ -8775,8 +8790,8 @@ function App() {
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Music size={16} color={isMusicStandMode ? '#166534' : '#64748b'} strokeWidth={2} />
-                <span>Notenständer-Modus</span>
+                <ZoomIn size={16} color={isMusicStandMode ? '#166534' : '#64748b'} strokeWidth={2} />
+                <span>Vergrößern</span>
               </div>
               <span style={{
                 background: isMusicStandMode ? '#34a853' : '#f1f5f9',
@@ -8791,43 +8806,6 @@ function App() {
               </span>
             </button>
           )}
-
-          {/* Leitfäden & Akademie Button */}
-          <button 
-            type="button"
-            onClick={() => setIsGlobalHelpCenterOpen(true)}
-            style={{ 
-              width: '100%', 
-              display: 'flex', 
-              alignItems: 'center', 
-              justifyContent: 'center',
-              gap: '8px', 
-              padding: '11px 14px', 
-              borderRadius: '12px', 
-              border: '1px solid #e2e8f0', 
-              background: '#f8fafc', 
-              color: '#334155', 
-              fontWeight: 800, 
-              fontSize: '0.82rem',
-              cursor: 'pointer',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
-              transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
-            }}
-            className="hover-scale"
-            title="Leitfäden & Akademie öffnen"
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = '#f1f5f9';
-              e.currentTarget.style.color = '#0f172a';
-              e.currentTarget.style.borderColor = '#cbd5e1';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = '#f8fafc';
-              e.currentTarget.style.color = '#334155';
-              e.currentTarget.style.borderColor = '#e2e8f0';
-            }}
-          >
-            <BookOpen size={16} color="#64748b" strokeWidth={2} /> Leitfäden &amp; Akademie
-          </button>
 
           {/* Ausweis button (Hero CTA) */}
           {(user?.qr_token || user?.teacher_qr_token) && (() => {
@@ -8929,8 +8907,9 @@ function App() {
             display: 'flex', 
             alignItems: 'center',
             justifyContent: 'center',
-            gap: '6px', 
-            fontSize: '10px', 
+            flexWrap: 'wrap',
+            gap: '5px', 
+            fontSize: '9.5px', 
             fontWeight: 700, 
             color: '#94a3b8',
             textTransform: 'uppercase',
@@ -8939,8 +8918,11 @@ function App() {
             userSelect: 'none'
           }}>
             <span 
+              role="button"
+              tabIndex={0}
               onClick={() => setShowPrivacy(true)} 
-              style={{ cursor: 'pointer', transition: 'color 0.15s' }}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setShowPrivacy(true); } }}
+              style={{ cursor: 'pointer', transition: 'color 0.15s', outline: 'none' }}
               onMouseEnter={(e) => (e.currentTarget.style.color = '#475569')}
               onMouseLeave={(e) => (e.currentTarget.style.color = '#94a3b8')}
             >
@@ -8948,8 +8930,11 @@ function App() {
             </span>
             <span style={{ opacity: 0.4 }}>·</span>
             <span 
+              role="button"
+              tabIndex={0}
               onClick={() => setShowAgb(true)} 
-              style={{ cursor: 'pointer', transition: 'color 0.15s' }}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setShowAgb(true); } }}
+              style={{ cursor: 'pointer', transition: 'color 0.15s', outline: 'none' }}
               onMouseEnter={(e) => (e.currentTarget.style.color = '#475569')}
               onMouseLeave={(e) => (e.currentTarget.style.color = '#94a3b8')}
             >
@@ -8957,12 +8942,27 @@ function App() {
             </span>
             <span style={{ opacity: 0.4 }}>·</span>
             <span 
+              role="button"
+              tabIndex={0}
               onClick={() => setShowImpressum(true)} 
-              style={{ cursor: 'pointer', transition: 'color 0.15s' }}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setShowImpressum(true); } }}
+              style={{ cursor: 'pointer', transition: 'color 0.15s', outline: 'none' }}
               onMouseEnter={(e) => (e.currentTarget.style.color = '#475569')}
               onMouseLeave={(e) => (e.currentTarget.style.color = '#94a3b8')}
             >
               Impressum
+            </span>
+            <span style={{ opacity: 0.4 }}>·</span>
+            <span 
+              role="button"
+              tabIndex={0}
+              onClick={() => setShowAccessibility(true)} 
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setShowAccessibility(true); } }}
+              style={{ cursor: 'pointer', transition: 'color 0.15s', outline: 'none' }}
+              onMouseEnter={(e) => (e.currentTarget.style.color = '#475569')}
+              onMouseLeave={(e) => (e.currentTarget.style.color = '#94a3b8')}
+            >
+              Barrierefreiheit
             </span>
           </div>
         </div>
@@ -9005,8 +9005,9 @@ function App() {
                     setLocationMode('lab');
                     sessionStorage.setItem('groovelab_location_mode', 'lab');
                   }
-                  const startTab = sessionStorage.getItem('groovelab_active_tab') || 'live';
-                  setActiveStudentTab(startTab);
+                  setActiveStudentTab('live');
+                  sessionStorage.setItem('groovelab_active_tab', 'live');
+                  localStorage.setItem('groovelab_active_tab', 'live');
                 } else {
                   setActivePlatform(p);
                 }
@@ -9094,8 +9095,9 @@ function App() {
                     setLocationMode('lab');
                     sessionStorage.setItem('groovelab_location_mode', 'lab');
                   }
-                  const startTab = sessionStorage.getItem('groovelab_active_tab') || 'live';
-                  setActiveStudentTab(startTab);
+                  setActiveStudentTab('live');
+                  sessionStorage.setItem('groovelab_active_tab', 'live');
+                  localStorage.setItem('groovelab_active_tab', 'live');
                 }}
                 style={{
                   display: 'flex',
@@ -9533,101 +9535,6 @@ function App() {
                 </div>
               )}
 
-              {/* Sibling / Family Quick-Switch Capsule in Header (Seamless 1-Tap Switching without PIN) */}
-              {user?.role?.toLowerCase() === 'student' && activePlatform === 'campus' && (() => {
-                const familyProfiles: any[] = (() => {
-                  if (typeof window === 'undefined') return [];
-                  try {
-                    return JSON.parse(localStorage.getItem('campus_family_profiles') || '[]');
-                  } catch {
-                    return [];
-                  }
-                })();
-
-                const siblings = familyProfiles.filter((p: any) => p.id !== user.id);
-                if (siblings.length === 0) return null;
-
-                const isParentSessionActive = (() => {
-                  if (typeof window === 'undefined') return false;
-                  const globalUnlocked = sessionStorage.getItem('groovelab_parent_unlocked_global') === 'true';
-                  const userUnlocked = user?.id ? sessionStorage.getItem(`groovelab_parent_unlocked_${user.id}`) === 'true' : false;
-                  const parentSessionExpiry = user?.id ? Number(sessionStorage.getItem(`groovelab_parent_session_${user.id}`) || '0') : 0;
-                  return globalUnlocked || userUnlocked || (parentSessionExpiry > Date.now());
-                })();
-
-                return (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    {siblings.map((sibling: any) => {
-                      const siblingInst = sibling.instrument || 'Gitarre';
-                      const defaultAvatar = getInstrumentAvatarUrl(siblingInst);
-                      let avatarUrl = defaultAvatar;
-                      const rawPhoto = sibling.photo_url;
-                      if (rawPhoto && typeof rawPhoto === 'string' && rawPhoto.trim() && rawPhoto !== '/campus_login_hero.png') {
-                        const p = rawPhoto.trim();
-                        if (p.startsWith('http://') || p.startsWith('https://') || p.startsWith('data:image/') || p.startsWith('/avatars/') || p.startsWith('/')) {
-                          avatarUrl = p;
-                        } else if (p.endsWith('.png') || p.endsWith('.jpg') || p.endsWith('.jpeg')) {
-                          avatarUrl = `/avatars/${p}`;
-                        }
-                      }
-
-                      return (
-                        <button
-                          key={sibling.id}
-                          type="button"
-                          onClick={() => {
-                            if (isParentSessionActive) {
-                              sessionStorage.setItem('groovelab_parent_unlocked_global', 'true');
-                              sessionStorage.setItem(`groovelab_parent_session_${sibling.id}`, String(Date.now() + 180 * 1000));
-                            } else {
-                              sessionStorage.removeItem('groovelab_parent_unlocked_global');
-                              sessionStorage.removeItem(`groovelab_parent_session_${sibling.id}`);
-                            }
-                            localStorage.setItem('campus_active_student_id', sibling.id);
-                            localStorage.setItem('groovelab_current_student_id', sibling.id);
-                            sessionStorage.setItem('groovelab_user_id', sibling.id);
-                            window.location.search = `?student=${sibling.id}`;
-                          }}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '7px',
-                            background: '#ffffff',
-                            border: '1.5px solid #0284c7',
-                            borderRadius: '12px',
-                            height: windowWidth <= 768 ? '36px' : '40px',
-                            padding: windowWidth <= 480 ? '0 8px' : '0 12px',
-                            cursor: 'pointer',
-                            boxShadow: '0 2px 10px rgba(2, 132, 199, 0.12)',
-                            transition: 'all 0.15s ease'
-                          }}
-                          className="hover-scale"
-                          title={`Zu ${sibling.first_name} wechseln`}
-                        >
-                          <img
-                            src={avatarUrl}
-                            alt={sibling.first_name}
-                            onError={(e) => {
-                              const img = e.currentTarget;
-                              const fallback = getInstrumentAvatarUrl(siblingInst);
-                              if (img.src !== fallback && !img.src.endsWith(fallback)) {
-                                img.src = fallback;
-                              } else {
-                                img.src = '/avatars/gitarre_avatar_new.png';
-                              }
-                            }}
-                            style={{ width: '22px', height: '22px', borderRadius: '50%', objectFit: 'cover', background: '#f1f5f9' }}
-                          />
-                          <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#0369a1' }}>
-                            {windowWidth > 480 ? `Zu ${sibling.first_name}` : sibling.first_name}
-                          </span>
-                          <ArrowRight size={13} color="#0284c7" />
-                        </button>
-                      );
-                    })}
-                  </div>
-                );
-              })()}
 
               {/* Elegant Refresh / Reload Button */}
               <button 
@@ -10113,7 +10020,12 @@ function App() {
                   }}>
                     <StudioAvatar
                       src={user.photo_url}
-                      user={user}
+                      user={{
+                        ...user,
+                        role: (activeWorkspace === 'teacher' || user.role === 'teacher') ? 'teacher' : user.role,
+                        isTeacherContext: (activeWorkspace === 'teacher' || user.role === 'teacher'),
+                        resolved_instrument: user.resolved_instrument || user.instrument || (teachers.find(t => t.id === user.teacher_id)?.instrument) || (teachers[0]?.instrument) || 'Gitarre'
+                      }}
                       activePlatform={activePlatform}
                       style={{
                         width: '100%',
@@ -12023,22 +11935,23 @@ function App() {
               <div className="exercises-grid">
                 {groupedPracticeSongs.map((group: any) => (
                   <div key={group.song_id} style={{ position: 'relative' }}>
-                    <GroupedSongCard 
-                      songGroup={group} 
-                      isBandReady={group.isBandReady} 
-                      isExpanded={expandedSongId === group.song_id}
-                      onToggle={() => setExpandedSongId(expandedSongId === group.song_id ? null : group.song_id)}
-                      onUpdateProgress={updateProgress} 
-                      onSubmitForApproval={handleSubmitForApproval} 
-                      onDelete={handleDeleteSong}
-                      userBands={userBands}
-                      userId={user?.id}
-                      onOpenPdfViewer={(song: any, folderUrl: string) => {
-                        setActivePdfSong(song);
-                        setActivePdfFolderUrl(folderUrl);
-                      }}
-                    />
-
+                    <Suspense fallback={null}>
+                      <GroupedSongCard 
+                        songGroup={group} 
+                        isBandReady={group.isBandReady} 
+                        isExpanded={expandedSongId === group.song_id}
+                        onToggle={() => setExpandedSongId(expandedSongId === group.song_id ? null : group.song_id)}
+                        onUpdateProgress={updateProgress} 
+                        onSubmitForApproval={handleSubmitForApproval} 
+                        onDelete={handleDeleteSong}
+                        userBands={userBands}
+                        userId={user?.id}
+                        onOpenPdfViewer={(song: any, folderUrl: string) => {
+                          setActivePdfSong(song);
+                          setActivePdfFolderUrl(folderUrl);
+                        }}
+                      />
+                    </Suspense>
                   </div>
                 ))}
               </div>
@@ -13998,19 +13911,22 @@ function App() {
             isOpen={isGlobalHelpCenterOpen}
             onClose={() => setIsGlobalHelpCenterOpen(false)}
             userRole={(() => {
-              // 1. If currently authenticated user is a student, ALWAYS return 'student'
+              // 1. If currently authenticated user is master admin, ALWAYS return 'master_admin'
+              if (user?.role?.toLowerCase() === 'master_admin') return 'master_admin';
+
+              // 2. If currently authenticated user is a student, ALWAYS return 'student'
               if (user?.role?.toLowerCase() === 'student') return 'student';
               
               const activeWs = typeof window !== 'undefined'
                 ? (sessionStorage.getItem('groovelab_active_workspace') || localStorage.getItem('groovelab_active_workspace'))
                 : null;
               
-              // 2. Active workspace overrides for dual-role users (teachers/admins)
+              // 3. Active workspace overrides for dual-role users (teachers/admins)
               if (activeWs === 'student') return 'student';
               if (activeWs === 'teacher') return 'teacher';
               if (activeWs === 'secretary') return 'secretary';
               
-              // 3. User role fallbacks
+              // 4. User role fallbacks
               if (user?.role?.toLowerCase() === 'teacher') return 'teacher';
               if (user?.role?.toLowerCase() === 'secretary') return 'secretary';
               return (user?.role as any) || 'admin';
@@ -14475,7 +14391,15 @@ function App() {
               setSelectedStudentProfile(null);
             }}
             activePlatform={activePlatform as any}
-            callerDashboard={user?.role === 'teacher' ? 'teacher' : user?.role === 'secretary' ? 'secretary' : user?.role === 'admin' ? 'admin' : undefined}
+            callerDashboard={
+              (activeWorkspace === 'teacher' || (typeof window !== 'undefined' && sessionStorage.getItem('groovelab_active_workspace') === 'teacher') || user?.role === 'teacher')
+                ? 'teacher'
+                : (activeWorkspace === 'secretary' || (typeof window !== 'undefined' && sessionStorage.getItem('groovelab_active_workspace') === 'secretary') || user?.role === 'secretary')
+                ? 'secretary'
+                : (activeWorkspace === 'admin' || (typeof window !== 'undefined' && sessionStorage.getItem('groovelab_active_workspace') === 'admin') || user?.role === 'admin')
+                ? 'admin'
+                : undefined
+            }
             onSwitchPlatform={(newPlatform) => {
               setActivePlatform(newPlatform);
             }}
@@ -15433,6 +15357,7 @@ function App() {
     </div>
   </div>
 </DeviceSimulator>
+</Suspense>
 </LegalConsentGate>
 );
 }

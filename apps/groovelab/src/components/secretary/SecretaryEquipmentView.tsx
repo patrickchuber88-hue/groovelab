@@ -589,7 +589,14 @@ export const SecretaryEquipmentView: React.FC<SecretaryEquipmentViewProps> = ({
 
       {/* EDIT MODAL FOR EQUIPMENT GROUP */}
       {editingEquipmentGroup && (
-        <div style={{
+        <div 
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="equipment-group-modal-title"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setEditingEquipmentGroup(null);
+          }}
+          style={{
           position: 'fixed',
           top: 0,
           left: 0,
@@ -617,7 +624,7 @@ export const SecretaryEquipmentView: React.FC<SecretaryEquipmentViewProps> = ({
             {/* Modal Header */}
             <div style={{ padding: '20px 24px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
-                <h4 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
+                <h4 id="equipment-group-modal-title" style={{ margin: 0, fontSize: '1.1rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
                   Instrument bearbeiten
                 </h4>
                 <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 600 }}>

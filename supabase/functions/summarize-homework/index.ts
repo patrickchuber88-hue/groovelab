@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -12,15 +13,42 @@ serve(async (req) => {
   }
 
   try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
     const expectedAnonKey = Deno.env.get("SUPABASE_ANON_KEY") || "";
     const expectedServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 
-    // Enterprise Auth-Guard: Verify caller is authenticated
+    // Enterprise Auth-Guard: Verify caller has service role or active session lease
     const authHeader = req.headers.get("Authorization") || req.headers.get("apikey") || "";
     const bearerToken = authHeader.replace("Bearer ", "").trim();
 
-    if (!bearerToken || (bearerToken !== expectedAnonKey && bearerToken !== expectedServiceKey)) {
-      return new Response(JSON.stringify({ error: "Unauthorized: Valid API key or Authorization token required" }), {
+    const supabase = createClient(supabaseUrl, expectedServiceKey);
+
+    let isAuthorized = false;
+    if (bearerToken && bearerToken === expectedServiceKey) {
+      isAuthorized = true;
+    } else {
+      const leaseToken = req.headers.get("x-session-lease") || "";
+      if (leaseToken) {
+        const { data: lease } = await supabase
+          .from("session_leases")
+          .select("id, user_id, revoked_at")
+          .eq("id", leaseToken)
+          .is("revoked_at", null)
+          .maybeSingle();
+        if (lease && lease.id) {
+          isAuthorized = true;
+        }
+      }
+      if (!isAuthorized && bearerToken && bearerToken !== expectedAnonKey) {
+        const { data: { user } } = await supabase.auth.getUser(bearerToken);
+        if (user) {
+          isAuthorized = true;
+        }
+      }
+    }
+
+    if (!isAuthorized) {
+      return new Response(JSON.stringify({ error: "Unauthorized: Active authenticated session lease or service key required" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });

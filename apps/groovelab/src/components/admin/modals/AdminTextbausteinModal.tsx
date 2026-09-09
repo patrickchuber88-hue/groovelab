@@ -122,10 +122,24 @@ export const AdminTextbausteinModal: React.FC<AdminTextbausteinModalProps> = ({
     setTextbausteine(prev => prev.map(tb => tb.id === id ? { ...tb, active: !tb.active } : tb));
   };
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') handleClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen]);
+
   return (
     <>
       {isOpen && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 6000, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(10px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+        <div 
+          role="dialog" 
+          aria-modal="true" 
+          aria-label="Textbausteine verwalten"
+          style={{ position: 'fixed', inset: 0, zIndex: 6000, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(10px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}
+        >
           <div className="animation-slide-up" style={{ background: '#ffffff', padding: '32px', borderRadius: '32px', maxWidth: '950px', width: '95vw', maxHeight: '90vh', display: 'flex', flexDirection: 'column', gap: '24px', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)', border: '1px solid #cbd5e1' }}>
             
             {/* Header */}
@@ -142,6 +156,8 @@ export const AdminTextbausteinModal: React.FC<AdminTextbausteinModalProps> = ({
               <button 
                 type="button" 
                 onClick={handleClose} 
+                aria-label="Textbaustein-Editor schließen"
+                title="Schließen"
                 style={{ background: '#f1f5f9', border: 'none', borderRadius: '50%', width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#64748b' }}
               >
                 <X size={20} />
@@ -521,7 +537,12 @@ export const AdminTextbausteinModal: React.FC<AdminTextbausteinModalProps> = ({
       )}
 
       {showEmojiPicker && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 7000, background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+        <div 
+          role="dialog" 
+          aria-modal="true" 
+          aria-label="Icon auswählen"
+          style={{ position: 'fixed', inset: 0, zIndex: 7000, background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}
+        >
           <div className="animation-scale-up" style={{ background: '#ffffff', padding: '32px', borderRadius: '28px', maxWidth: '640px', width: '90vw', maxHeight: '80vh', display: 'flex', flexDirection: 'column', gap: '20px', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)', border: '1px solid #cbd5e1' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
@@ -531,6 +552,8 @@ export const AdminTextbausteinModal: React.FC<AdminTextbausteinModalProps> = ({
               <button 
                 type="button" 
                 onClick={() => setShowEmojiPicker(false)}
+                aria-label="Icon-Auswahl schließen"
+                title="Schließen"
                 style={{ background: '#f1f5f9', border: 'none', borderRadius: '50%', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#64748b' }}
               >
                 <X size={18} />
@@ -589,7 +612,11 @@ export const AdminTextbausteinModal: React.FC<AdminTextbausteinModalProps> = ({
       )}
 
       {previewingTextbaustein && (
-        <div style={{
+        <div 
+          role="dialog"
+          aria-modal="true"
+          aria-label="Textbaustein-Vorschau"
+          style={{
           position: 'fixed',
           inset: 0,
           background: 'rgba(0,0,0,0.5)',
@@ -616,6 +643,8 @@ export const AdminTextbausteinModal: React.FC<AdminTextbausteinModalProps> = ({
             <button
               type="button"
               onClick={() => onClosePreview?.()}
+              aria-label="Vorschau schließen"
+              title="Schließen"
               style={{
                 position: 'absolute',
                 top: '20px',

@@ -134,6 +134,8 @@ export const SecretaryEmployeesView: React.FC<SecretaryEmployeesViewProps> = ({
                     
                     <div style={{ display: 'flex', gap: '8px' }}>
                       <button
+                        type="button"
+                        aria-label="Sammel-Onboarding CSV ein- oder ausklappen"
                         onClick={() => setIsEmployeeCsvExpanded(!isEmployeeCsvExpanded)}
                         style={{ 
                           display: 'flex', 
@@ -157,6 +159,8 @@ export const SecretaryEmployeesView: React.FC<SecretaryEmployeesViewProps> = ({
                       </button>
 
                       <button
+                        type="button"
+                        aria-label="Neuen Mitarbeiter anlegen"
                         onClick={() => setShowAddEmployeeModal(true)}
                         style={{ 
                           display: 'flex', 
@@ -278,6 +282,8 @@ export const SecretaryEmployeesView: React.FC<SecretaryEmployeesViewProps> = ({
                         }}
                       />
                       <button
+                        type="button"
+                        aria-label="Mitarbeiter jetzt importieren"
                         onClick={handleImportEmployees}
                         className="google-btn-primary"
                         style={{ background: '#ea4335', color: '#ffffff', border: 'none', padding: '8px 16px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 800, alignSelf: 'flex-start', cursor: 'pointer' }}
@@ -292,6 +298,7 @@ export const SecretaryEmployeesView: React.FC<SecretaryEmployeesViewProps> = ({
                     <div style={{ position: 'relative', flex: 1.5, minWidth: '240px' }}>
                       <input
                         type="text"
+                        aria-label="Mitarbeiter nach Name oder E-Mail suchen"
                         value={employeeSearchQuery}
                         onChange={(e) => setEmployeeSearchQuery(e.target.value)}
                         onFocus={() => setEmployeeSearchFocused(true)}
@@ -468,6 +475,7 @@ export const SecretaryEmployeesView: React.FC<SecretaryEmployeesViewProps> = ({
                                     {/* Admin Button */}
                                     <button
                                       type="button"
+                                      aria-label={`Admin-Rolle für ${emp.first_name} ${emp.last_name} ${hasAdmin ? 'entfernen' : 'hinzufügen'}`}
                                       onClick={(e) => {
                                         e.stopPropagation();
                                         handleToggleRole(emp, 'admin');
@@ -476,7 +484,7 @@ export const SecretaryEmployeesView: React.FC<SecretaryEmployeesViewProps> = ({
                                         padding: '4px 8px',
                                         borderRadius: '10px',
                                         background: hasAdmin ? '#fce8e6' : '#ffffff',
-                                        color: hasAdmin ? '#ea4335' : '#a1a1aa',
+                                        color: hasAdmin ? '#ea4335' : '#475569',
                                         border: hasAdmin ? '1.5px solid #ea4335' : '1.5px dashed #cbd5e1',
                                         fontSize: '0.7rem',
                                         fontWeight: 700,
@@ -494,6 +502,7 @@ export const SecretaryEmployeesView: React.FC<SecretaryEmployeesViewProps> = ({
                                     {/* Verwaltung Button */}
                                     <button
                                       type="button"
+                                      aria-label={`Verwaltungs-Rolle für ${emp.first_name} ${emp.last_name} ${hasSecretary ? 'entfernen' : 'hinzufügen'}`}
                                       onClick={(e) => {
                                         e.stopPropagation();
                                         handleToggleRole(emp, 'secretary');
@@ -502,7 +511,7 @@ export const SecretaryEmployeesView: React.FC<SecretaryEmployeesViewProps> = ({
                                         padding: '4px 8px',
                                         borderRadius: '10px',
                                         background: hasSecretary ? '#f1f5f9' : '#ffffff',
-                                        color: hasSecretary ? '#334155' : '#a1a1aa',
+                                        color: hasSecretary ? '#334155' : '#475569',
                                         border: hasSecretary ? '1.5px solid #334155' : '1.5px dashed #cbd5e1',
                                         fontSize: '0.7rem',
                                         fontWeight: 700,
@@ -520,6 +529,7 @@ export const SecretaryEmployeesView: React.FC<SecretaryEmployeesViewProps> = ({
                                     {/* Lehrer Button */}
                                     <button
                                       type="button"
+                                      aria-label={`Lehrkraft-Rolle für ${emp.first_name} ${emp.last_name} ${hasTeacher ? 'entfernen' : 'hinzufügen'}`}
                                       onClick={(e) => {
                                         e.stopPropagation();
                                         handleToggleRole(emp, 'teacher');
@@ -528,7 +538,7 @@ export const SecretaryEmployeesView: React.FC<SecretaryEmployeesViewProps> = ({
                                         padding: '4px 8px',
                                         borderRadius: '10px',
                                         background: hasTeacher ? '#e6f4ea' : '#ffffff',
-                                        color: hasTeacher ? '#34a853' : '#a1a1aa',
+                                        color: hasTeacher ? '#34a853' : '#475569',
                                         border: hasTeacher ? '1.5px solid #34a853' : '1.5px dashed #cbd5e1',
                                         fontSize: '0.7rem',
                                         fontWeight: 700,
@@ -565,7 +575,7 @@ export const SecretaryEmployeesView: React.FC<SecretaryEmployeesViewProps> = ({
 
                             {/* Monospace PIN */}
                             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-                              <span style={{ fontSize: '0.58rem', color: '#86868b', textTransform: 'uppercase', fontWeight: 800 }}>Mitarbeiter-PIN</span>
+                              <span style={{ fontSize: '0.58rem', color: '#475569', textTransform: 'uppercase', fontWeight: 800 }}>Mitarbeiter-PIN</span>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
                                 <strong style={{ fontSize: '0.88rem', fontFamily: 'monospace', color: '#4b5563' }}>
                                   {emp.ausweis_nummer 
@@ -575,11 +585,12 @@ export const SecretaryEmployeesView: React.FC<SecretaryEmployeesViewProps> = ({
                                 {emp.ausweis_nummer && (
                                   <button
                                     type="button"
+                                    aria-label={revealedPins[emp.id] ? `PIN für ${emp.first_name} ${emp.last_name} verbergen` : `PIN für ${emp.first_name} ${emp.last_name} anzeigen`}
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       setRevealedPins(prev => ({ ...prev, [emp.id]: !prev[emp.id] }));
                                     }}
-                                    style={{ background: 'transparent', border: 'none', padding: '2px', cursor: 'pointer', display: 'flex', alignItems: 'center', color: '#94a3b8' }}
+                                    style={{ background: 'transparent', border: 'none', padding: '2px', cursor: 'pointer', display: 'flex', alignItems: 'center', color: '#64748b' }}
                                     title={revealedPins[emp.id] ? 'PIN verbergen' : 'PIN anzeigen'}
                                   >
                                     {revealedPins[emp.id] ? <EyeOff size={14} /> : <Eye size={14} />}
@@ -591,6 +602,8 @@ export const SecretaryEmployeesView: React.FC<SecretaryEmployeesViewProps> = ({
                             {/* Action Buttons */}
                             <div style={{ display: 'flex', gap: '14px', alignItems: 'center', justifyContent: 'flex-end' }}>
                               <button
+                                type="button"
+                                aria-label={`Mitarbeiter-Pass für ${emp.first_name} ${emp.last_name} per E-Mail teilen`}
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   if (emp.ausweis_nummer) {
@@ -630,6 +643,8 @@ export const SecretaryEmployeesView: React.FC<SecretaryEmployeesViewProps> = ({
                               </button>
                               {emp.id !== userId && (currentUserProfile?.role === 'admin' || emp.role !== 'admin') ? (
                                 <button
+                                  type="button"
+                                  aria-label={`Mitarbeiter ${emp.first_name} ${emp.last_name} löschen`}
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     handleDeleteUser(emp.id);
@@ -663,15 +678,25 @@ export const SecretaryEmployeesView: React.FC<SecretaryEmployeesViewProps> = ({
 
                   {/* Manual Add Employee Modal */}
                   {showAddEmployeeModal && (
-                    <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(15,23,42,0.3)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+                    <div 
+                      role="dialog"
+                      aria-modal="true"
+                      aria-labelledby="add-employee-modal-title"
+                      onClick={(e) => {
+                        if (e.target === e.currentTarget) setShowAddEmployeeModal(false);
+                      }}
+                      style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(15,23,42,0.3)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}
+                    >
                       <div style={{ background: '#ffffff', borderRadius: '24px', maxWidth: '520px', width: '100%', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)', display: 'flex', flexDirection: 'column' }}>
                         {/* Modal Header */}
                         <div style={{ padding: '24px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
+                          <h3 id="add-employee-modal-title" style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
                             ➕ Neuen Mitarbeiter hinzufügen
                           </h3>
                           <button 
+                            type="button"
                             onClick={() => setShowAddEmployeeModal(false)}
+                            aria-label="Dialog schließen"
                             style={{ border: 'none', background: 'transparent', fontSize: '1.2rem', cursor: 'pointer', color: '#64748b' }}
                           >
                             ✕
@@ -687,6 +712,7 @@ export const SecretaryEmployeesView: React.FC<SecretaryEmployeesViewProps> = ({
                                 <input
                                   type="text"
                                   required
+                                  aria-label="Vorname"
                                   value={employeeFirstName}
                                   onChange={(e) => setEmployeeFirstName(e.target.value)}
                                   placeholder="z.B. Clara"
@@ -698,6 +724,7 @@ export const SecretaryEmployeesView: React.FC<SecretaryEmployeesViewProps> = ({
                                 <input
                                   type="text"
                                   required
+                                  aria-label="Nachname"
                                   value={employeeLastName}
                                   onChange={(e) => {
                                     setEmployeeLastName(e.target.value);
@@ -712,6 +739,7 @@ export const SecretaryEmployeesView: React.FC<SecretaryEmployeesViewProps> = ({
                               <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Rolle *</label>
                               <select
                                 name="employeeRoleSelect"
+                                aria-label="Rolle auswählen"
                                 defaultValue="secretary"
                                 style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.85rem', outline: 'none', background: 'white' }}
                               >
@@ -726,6 +754,7 @@ export const SecretaryEmployeesView: React.FC<SecretaryEmployeesViewProps> = ({
                             <button
                               type="button"
                               onClick={() => setShowAddEmployeeModal(false)}
+                              aria-label="Abbrechen"
                               style={{ background: 'transparent', border: 'none', color: '#64748b', fontWeight: 800, cursor: 'pointer', fontSize: '0.82rem' }}
                             >
                               Abbrechen
@@ -733,6 +762,7 @@ export const SecretaryEmployeesView: React.FC<SecretaryEmployeesViewProps> = ({
                             <button
                               type="submit"
                               className="google-btn-primary"
+                              aria-label="Mitarbeiter anlegen"
                               style={{ background: '#dc2626', color: '#ffffff', border: 'none', borderRadius: '12px', padding: '10px 20px', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}
                             >
                               Mitarbeiter anlegen
@@ -780,7 +810,16 @@ export const SecretaryEmployeesView: React.FC<SecretaryEmployeesViewProps> = ({
                       const isHovered = dragHoveredEmployeeRole === 'All';
                       return (
                         <div
+                          role="button"
+                          tabIndex={0}
+                          aria-label="Filter: Alle Rollen anzeigen"
                           onClick={() => setEmployeeFilterRole('All')}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              setEmployeeFilterRole('All');
+                            }
+                          }}
                           onDragOver={(e) => {
                             e.preventDefault();
                             setDragHoveredEmployeeRole('All');
@@ -859,7 +898,16 @@ export const SecretaryEmployeesView: React.FC<SecretaryEmployeesViewProps> = ({
                       const isHovered = dragHoveredEmployeeRole === 'admin';
                       return (
                         <div
+                          role="button"
+                          tabIndex={0}
+                          aria-label="Filter: Administratoren"
                           onClick={() => setEmployeeFilterRole('admin')}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              setEmployeeFilterRole('admin');
+                            }
+                          }}
                           onDragOver={(e) => {
                             e.preventDefault();
                             setDragHoveredEmployeeRole('admin');
@@ -940,7 +988,16 @@ export const SecretaryEmployeesView: React.FC<SecretaryEmployeesViewProps> = ({
                       const isHovered = dragHoveredEmployeeRole === 'teacher';
                       return (
                         <div
+                          role="button"
+                          tabIndex={0}
+                          aria-label="Filter: Lehrer"
                           onClick={() => setEmployeeFilterRole('teacher')}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              setEmployeeFilterRole('teacher');
+                            }
+                          }}
                           onDragOver={(e) => {
                             e.preventDefault();
                             setDragHoveredEmployeeRole('teacher');
@@ -1021,7 +1078,16 @@ export const SecretaryEmployeesView: React.FC<SecretaryEmployeesViewProps> = ({
                       const isHovered = dragHoveredEmployeeRole === 'secretary';
                       return (
                         <div
+                          role="button"
+                          tabIndex={0}
+                          aria-label="Filter: Verwaltung"
                           onClick={() => setEmployeeFilterRole('secretary')}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              setEmployeeFilterRole('secretary');
+                            }
+                          }}
                           onDragOver={(e) => {
                             e.preventDefault();
                             setDragHoveredEmployeeRole('secretary');

@@ -34,6 +34,7 @@ export interface InvoiceData {
   isTrialMonth?: boolean;
   auditHash?: string;
   activatedStudentsList?: any[];
+  leitwegId?: string;
 }
 
 interface InvoicePreviewModalProps {
@@ -51,6 +52,7 @@ interface InvoicePreviewModalProps {
   operatorBic: string;
   billingPayer?: 'student' | 'school';
   studentBillingOption?: string;
+  leitwegId?: string;
   onClose: () => void;
 }
 
@@ -69,9 +71,11 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
   operatorBic,
   billingPayer = 'school',
   studentBillingOption = 'option1',
+  leitwegId,
   onClose
 }) => {
   const masterPricing = useMasterPricing();
+  const effectiveLeitwegId = (leitwegId || invoice.leitwegId || '').trim();
   const isInf = invoice.type === 'INF' || !invoice.type;
   const isAkt = invoice.type === 'AKT';
   const isTrial = invoice.isTrialMonth || invoice.status === 'Probemonat' || invoice.status === 'trial';
@@ -267,6 +271,7 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
         zipCode: schoolZipCode || '70000',
         city: schoolCity || 'Schulort'
       },
+      buyerReference: effectiveLeitwegId || undefined,
       lineItems,
       paymentReference: displayInvoiceId,
       notes: 'Campus-Groovelab Cloud- und Schul-Infrastruktur. Gemäß § 19 UStG wird keine Umsatzsteuer berechnet.'
@@ -461,6 +466,11 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                 <span style={{ display: 'block' }}>{schoolZipCode} {schoolCity}</span>
               ) : (
                 <span style={{ display: 'block', color: '#b45309', fontStyle: 'italic' }}>[PLZ &amp; Ort in Stammdaten hinterlegen]</span>
+              )}
+              {effectiveLeitwegId && (
+                <span style={{ display: 'block', marginTop: '3px', fontSize: '0.66rem', color: '#334155' }}>
+                  <strong style={{ color: '#0f172a' }}>Leitweg-ID:</strong> <span style={{ fontFamily: 'monospace', background: '#f1f5f9', padding: '1px 5px', borderRadius: '4px' }}>{effectiveLeitwegId}</span>
+                </span>
               )}
             </div>
             <div>

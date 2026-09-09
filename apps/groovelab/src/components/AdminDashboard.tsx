@@ -11,7 +11,7 @@ import {
 import { renderInstrumentIcon } from '../utils/instruments';
 import { checkIsAudioTresorActive } from '../domain/stickersAndTresor';
 import { CampusSetupScreen } from './CampusSetupScreen';
-import { StudioAvatar, getInstrumentAvatarUrl } from './StudioAvatar';
+import { StudioAvatar, getInstrumentAvatarUrl, resolveCampusStudentAvatar } from './StudioAvatar';
 import { IDBadgeCard, inlineAllImagesInElement } from './IDBadgeCard';
 import { useRealNamesVisibility, maskLastName, formatTeacherFullName } from '../utils/nameHelper';
 import { StudentToDelete } from './ConfirmDeleteStudentModal';
@@ -136,43 +136,44 @@ const ADMIN_INSTRUMENT_ICONS: Record<string, any> = {
   "Keys": renderInstrumentIcon("Keys")
 };
 
-const resolveCampusAvatar = (u: any): string => {
+const resolveCampusAvatar = (u: any, teachersList?: any[], schedulesList?: any[], fallbackTeacher?: any): string => {
   if (!u) return '/avatar_ghost.jpg';
   const role = (u.role || '').toLowerCase();
   const roles = Array.isArray(u.roles) ? u.roles.map((r: any) => String(r).toLowerCase()) : [];
+  const isExplicitTeacher = role === 'teacher' || u.isTeacherContext === true || u.isTeacher === true;
+  const isExplicitStudent = role === 'student';
   
-  if (role === 'admin' || role === 'secretary' || roles.includes('admin') || roles.includes('secretary')) {
-    return '/campus_login_hero.png';
+  if (!isExplicitTeacher && !isExplicitStudent) {
+    if (role === 'admin' || role === 'secretary' || roles.includes('admin') || roles.includes('secretary')) {
+      return '/campus_login_hero.png';
+    }
   }
   
   if (role === 'student') {
-    const studentInstrument = u.instrument || 'Nicht festgelegt';
-    const inst = studentInstrument.toLowerCase().trim();
-    if (inst.includes('guitar') || inst.includes('gitarre')) {
-      if (u.photo_url && (u.photo_url.includes('egitarre_avatar') || u.photo_url.includes('gitarre_avatar_new'))) {
-        return u.photo_url;
-      }
-      return '/avatars/gitarre_avatar_new.png';
-    }
-    return getInstrumentAvatarUrl(studentInstrument);
+    return resolveCampusStudentAvatar(u, teachersList || fallbackTeacher, schedulesList);
   } else {
     // Teachers
-    return getInstrumentAvatarUrl(u.instrument);
+    return resolveCampusStudentAvatar({ ...u, role: 'teacher', isTeacherContext: true });
   }
 };
 
-const resolveUserAvatar = (u: any, activePlatform?: string): string => {
+const resolveUserAvatar = (u: any, activePlatform?: string, teachersList?: any[], schedulesList?: any[], fallbackTeacher?: any): string => {
   if (!u) return '/avatar_ghost.jpg';
   const role = (u.role || '').toLowerCase();
   const roles = Array.isArray(u.roles) ? u.roles.map((r: any) => String(r).toLowerCase()) : [];
-  if (role === 'admin' || role === 'secretary' || roles.includes('admin') || roles.includes('secretary')) {
-    return '/campus_login_hero.png';
+  const isExplicitTeacher = role === 'teacher' || u.isTeacherContext === true || u.isTeacher === true;
+  const isExplicitStudent = role === 'student';
+
+  if (!isExplicitTeacher && !isExplicitStudent) {
+    if (role === 'admin' || role === 'secretary' || roles.includes('admin') || roles.includes('secretary')) {
+      return '/campus_login_hero.png';
+    }
   }
   if (activePlatform === 'campus') {
-    return resolveCampusAvatar(u);
+    return resolveCampusAvatar(u, teachersList, schedulesList, fallbackTeacher);
   }
   const isTeacherAvatar = u.photo_url && (u.photo_url.includes('teacher_') || u.photo_url.includes('avatar_teacher'));
-  if (role === 'teacher') {
+  if (role === 'teacher' || isExplicitTeacher) {
     return isTeacherAvatar ? u.photo_url : '/avatar_ghost.jpg';
   }
   return u.photo_url || '/avatar_ghost.jpg';
@@ -316,6 +317,10 @@ export function AdminDashboard({
   };
   const [rooms, setRooms] = useState<any[]>([]);
   const [schedules, setSchedules] = useState<any[]>([]);
+
+  const resolveUserAvatarBound = (u: any, platform?: string) => {
+    return resolveUserAvatar(u, platform || activePlatform, teachers, schedules, admin);
+  };
   const [holidays, setHolidays] = useState<{ start: string, end: string, name: string }[]>([]);
   const [scheduleOccurrences, setScheduleOccurrences] = useState<any[]>([]);
   const [stations, setStations] = useState<any[]>([]);
@@ -1192,7 +1197,7 @@ export function AdminDashboard({
     if (isQRAdminOrSecretary) {
       originalUrl = '/campus_login_hero.png';
     } else if (selectedQRUser.role === 'student') {
-      originalUrl = getInstrumentAvatarUrl(selectedQRUser.instrument);
+      originalUrl = resolveCampusStudentAvatar(selectedQRUser, teachers, schedules);
     }
     
     if (originalUrl.startsWith('data:') || originalUrl.startsWith('blob:')) {
@@ -1824,6 +1829,18 @@ export function AdminDashboard({
         }
 
         if (studentsData) {
+          if (adminData.school_id && teachers.length === 0) {
+            let tsq = supabase
+              .from('users')
+              .select('*')
+              .eq('school_id', adminData.school_id)
+              .in('role', ['teacher', 'admin']);
+            if (activePlatform === 'campus') tsq = tsq.eq('is_campus_active', true);
+            else tsq = tsq.eq('is_groovelab_active', true);
+            tsq.order('first_name').then(({ data: tData }) => {
+              if (tData) setTeachers(tData);
+            });
+          }
           // --- AUTO-CLEANUP DELETED/ARCHIVED STUDENTS (NON-BLOCKING BACKGROUND DISPATCH) ---
           const expiredStudents = studentsData.filter((s: any) => s.contract_ends_at && new Date(s.contract_ends_at).getTime() < Date.now());
           const expiredIds = expiredStudents.map((s: any) => s.id);
@@ -4253,7 +4270,7 @@ export function AdminDashboard({
         handleDeleteStudent={handleDeleteStudent}
         handleUpdateStudent={handleUpdateStudent}
         parseBulkInput={parseBulkInput}
-        resolveUserAvatar={resolveUserAvatar}
+        resolveUserAvatar={resolveUserAvatarBound}
       />
     </Suspense>
   );
@@ -4459,6 +4476,7 @@ export function AdminDashboard({
                         e.stopPropagation();
                         handleDeleteRoom(room.id);
                       }} 
+                      aria-label={`Raum ${room.name} löschen`}
                       style={{ 
                         padding: '8px', 
                         borderRadius: '10px', 
@@ -4468,7 +4486,7 @@ export function AdminDashboard({
                         cursor: 'pointer', 
                         display: 'flex', 
                         alignItems: 'center', 
-                        justifyContent: 'center',
+                        justifyContent: 'center', 
                         transition: 'all 0.15s ease'
                       }}
                       onMouseEnter={e => {
@@ -4500,14 +4518,15 @@ export function AdminDashboard({
                         padding: '6px 10px', 
                         display: 'flex', 
                         alignItems: 'center', 
-                        gap: '8px',
-                        fontSize: '0.7rem',
-                        color: '#854d0e',
+                        gap: '6px', 
+                        fontSize: '0.7rem', 
+                        color: '#854d0e', 
                         fontWeight: 700
                       }}>
                         <MapPin size={10} /> Punkt {idx + 1}
                         <button 
                           onClick={() => handleDeleteGeofencePoint(room.id, idx)}
+                          aria-label={`Geofence Punkt ${idx + 1} für Raum ${room.name} löschen`}
                           style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center' }}
                           title="Punkt löschen"
                         >
@@ -4519,6 +4538,7 @@ export function AdminDashboard({
                     {(room.geofence_points?.length > 0 || room.latitude) && (
                       <button 
                         onClick={() => handleClearGeofencePoints(room.id)}
+                        aria-label={`Alle Geofence-Punkte für Raum ${room.name} löschen`}
                         style={{ background: 'transparent', border: 'none', color: '#cbd5e1', fontSize: '0.65rem', fontWeight: 700, cursor: 'pointer', padding: '6px' }}
                       >
                         Alle löschen
@@ -4530,6 +4550,7 @@ export function AdminDashboard({
                   <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                     <button 
                       onClick={() => handleAddGeofencePoint(room.id)}
+                      aria-label={`Aktuellen GPS-Standort für Raum ${room.name} scannen`}
                       style={{ 
                         background: '#fffbeb', 
                         border: '1px dashed #fcd34d', 
@@ -4550,6 +4571,7 @@ export function AdminDashboard({
 
                     <button 
                       onClick={() => setShowManualInput(showManualInput === room.id ? null : room.id)}
+                      aria-label="Manuelle Koordinateneingabe umschalten"
                       style={{ 
                         background: '#f8fafc', 
                         border: '1px dashed #cbd5e1', 
@@ -4570,6 +4592,7 @@ export function AdminDashboard({
                     {showManualInput === room.id && (
                       <div style={{ display: 'flex', gap: '6px', alignItems: 'center', animation: 'fadeIn 0.2s' }}>
                         <input 
+                          aria-label="Geokoordinaten Breitengrad und Längengrad eingeben"
                           placeholder="Lat, Lng" 
                           value={manualCoords[room.id] || ''} 
                           onChange={e => setManualCoords({...manualCoords, [room.id]: e.target.value})}
@@ -4586,6 +4609,7 @@ export function AdminDashboard({
                               alert('Format: 47.123, 7.456');
                             }
                           }}
+                          aria-label="Geokoordinaten setzen"
                           style={{ background: groovelabBrandColor, color: 'white', border: 'none', borderRadius: '8px', padding: '6px 10px', fontSize: '0.7rem', fontWeight: 700, cursor: 'pointer' }}
                         >
                           Set
@@ -4611,7 +4635,14 @@ export function AdminDashboard({
                           <Tablet size={16} color={getStationColor(station.name, station.color)} /> {station.name}
                         </div>
                         {station.name.toLowerCase() !== 'lehrer ipad' && (
-                          <button onClick={() => handleDeleteStation(station.id)} style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '4px' }} onMouseEnter={e => e.currentTarget.style.color = '#ef4444'} onMouseLeave={e => e.currentTarget.style.color = '#94a3b8'}>
+                          <button 
+                            onClick={() => handleDeleteStation(station.id)} 
+                            aria-label={`Übeplatz ${station.name} löschen`}
+                            title={`Übeplatz ${station.name} löschen`}
+                            style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '4px' }} 
+                            onMouseEnter={e => e.currentTarget.style.color = '#ef4444'} 
+                            onMouseLeave={e => e.currentTarget.style.color = '#94a3b8'}
+                          >
                             <Trash2 size={14} />
                           </button>
                         )}
@@ -4706,7 +4737,7 @@ export function AdminDashboard({
         setNewGoalDeadline={setNewGoalDeadline}
         handleAddGoal={handleAddGoal}
         handleDeleteGoal={handleDeleteGoal}
-        resolveUserAvatar={resolveUserAvatar}
+        resolveUserAvatar={resolveUserAvatarBound}
       />
     </Suspense>
   );
@@ -4974,7 +5005,7 @@ export function AdminDashboard({
         handleAssignTemplate={handleAssignTemplate}
         handleGeneratePin={handleGeneratePin}
         handleUpdateStudentLevel={handleUpdateStudentLevel}
-        resolveUserAvatar={resolveUserAvatar}
+        resolveUserAvatar={resolveUserAvatarBound}
       />
     </Suspense>
   );
@@ -4983,6 +5014,12 @@ export function AdminDashboard({
     if (!showBatchiPadModal) return null;
     return (
       <div 
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="batch-ipad-modal-title"
+        onClick={(e) => {
+          if (e.target === e.currentTarget) setShowBatchiPadModal(null);
+        }}
         style={{ 
           position: 'fixed', 
           inset: 0, 
@@ -5015,12 +5052,13 @@ export function AdminDashboard({
           }}
         >
           <div style={{ padding: '0 16px 18px 16px', width: '100%' }}>
-            <h3 style={{ fontSize: '1.05rem', fontWeight: 600, color: '#000000', margin: '0 0 4px 0', letterSpacing: '-0.01em' }}>iPads hinzufügen</h3>
+            <h3 id="batch-ipad-modal-title" style={{ fontSize: '1.05rem', fontWeight: 600, color: '#000000', margin: '0 0 4px 0', letterSpacing: '-0.01em' }}>iPads hinzufügen</h3>
             <p style={{ fontSize: '0.82rem', color: '#3a3a3c', margin: '0 0 16px 0', lineHeight: '1.35', fontWeight: 400 }}>
               Wie viele iPads sollen der Reihe nach angelegt werden?
             </p>
             <input 
               type="number"
+              aria-label="Anzahl der hinzuzufügenden iPads"
               min="1"
               max="50"
               value={batchiPadCount}
@@ -5101,12 +5139,17 @@ export function AdminDashboard({
   const renderStudentDetailModal = () => {
     if (!selectedStudent) return null;
 
+    const activeWorkspace = typeof window !== 'undefined' 
+      ? (sessionStorage.getItem('groovelab_active_workspace') || localStorage.getItem('groovelab_active_workspace')) 
+      : null;
+    const isTeacherMode = admin?.role === 'teacher' || activeWorkspace === 'teacher' || userId === 'teacher';
+
     return (
       <Suspense fallback={null}>
         <StudentDetailModal 
           student={selectedStudent} 
           onClose={() => setSelectedStudent(null)} 
-          callerDashboard="teacher"
+          callerDashboard={isTeacherMode ? 'teacher' : 'admin'}
           onOpenBandProfile={(band) => {
             setEditingBand(band);
             setSelectedStudent(null);
@@ -5124,12 +5167,20 @@ export function AdminDashboard({
   const renderLogoutDialog = () => {
     if (!showLogoutConfirm) return null;
     return (
-      <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+      <div 
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="logout-dialog-title"
+        onClick={(e) => {
+          if (e.target === e.currentTarget) setShowLogoutConfirm(false);
+        }}
+        style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}
+      >
         <div style={{ background: 'white', padding: '32px', borderRadius: '32px', maxWidth: '400px', width: '100%', textAlign: 'center', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
           <div style={{ width: '64px', height: '64px', borderRadius: '20px', background: '#fff1f2', color: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px' }}>
             <LogOut size={32} />
           </div>
-          <h3 style={{ fontSize: '1.5rem', fontWeight: 900, marginBottom: '8px', color: '#1e293b' }}>Abmelden?</h3>
+          <h3 id="logout-dialog-title" style={{ fontSize: '1.5rem', fontWeight: 900, marginBottom: '8px', color: '#1e293b' }}>Abmelden?</h3>
           <p style={{ color: '#64748b', marginBottom: '32px', fontWeight: 500 }}>Bist du sicher, dass du das Admin-Dashboard verlassen möchtest?</p>
           <div style={{ display: 'flex', gap: '12px' }}>
             <button onClick={() => setShowLogoutConfirm(false)} style={{ flex: 1, padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0', background: 'white', color: '#1e293b', fontWeight: 700, cursor: 'pointer' }}>Abbrechen</button>
@@ -5140,11 +5191,16 @@ export function AdminDashboard({
     );
   };
   return (
-    <div style={{ 
-      flex: 1, 
-      padding: hideHeader ? '0px' : (activeTab === 'live' ? (windowWidth <= 768 ? '0px' : '0px 10px 10px 10px') : (windowWidth <= 768 ? '0px' : '10px')), 
-      overflowY: activeTab === 'live' ? (windowWidth <= 768 ? 'visible' : 'hidden') : 'auto',
-      height: activeTab === 'live' ? (windowWidth <= 768 ? 'auto' : '100%') : 'auto',
+    <div 
+      role="tabpanel"
+      id={`admin-tabpanel-${activeTab}`}
+      aria-label={`Admin Dashboard: ${activeTab}`}
+      tabIndex={0}
+      style={{ 
+        flex: 1, 
+        padding: hideHeader ? '0px' : (activeTab === 'live' ? (windowWidth <= 768 ? '0px' : '0px 10px 10px 10px') : (windowWidth <= 768 ? '0px' : '10px')), 
+        overflowY: activeTab === 'live' ? (windowWidth <= 768 ? 'visible' : 'hidden') : 'auto',
+        height: activeTab === 'live' ? (windowWidth <= 768 ? 'auto' : '100%') : 'auto',
       display: 'flex',
       flexDirection: 'column',
       minWidth: 0,
@@ -5514,22 +5570,29 @@ export function AdminDashboard({
 
       {/* Modals for Band Editing (Teacher Sonderrecht) */}
       {editingBand && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 5000, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(10px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+        <div role="dialog" aria-modal="true" aria-label="Band bearbeiten" style={{ position: 'fixed', inset: 0, zIndex: 5000, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(10px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
           <form onSubmit={handleSaveBandEdit} className="glass-panel animation-slide-up" style={{ background: 'white', padding: '32px', borderRadius: '32px', maxWidth: '600px', width: '100%', maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
               <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#1e293b', margin: 0 }}>Band bearbeiten</h2>
-              <button type="button" onClick={() => setEditingBand(null)} style={{ background: '#f1f5f9', border: 'none', borderRadius: '50%', width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#64748b' }}><X size={20} /></button>
+              <button 
+                type="button" 
+                onClick={() => setEditingBand(null)} 
+                aria-label="Modal Band bearbeiten schließen"
+                style={{ background: '#f1f5f9', border: 'none', borderRadius: '50%', width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#64748b' }}
+              >
+                <X size={20} />
+              </button>
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                 <div>
                   <label style={{ fontSize: '0.75rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase' }}>Bandname</label>
-                  <input required value={editingBand.name} onChange={e => setEditingBand({...editingBand, name: e.target.value})} style={{ width: '100%', padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', marginTop: '6px', fontWeight: 700, background: '#f8fafc' }} />
+                  <input required aria-label="Bandname" value={editingBand.name} onChange={e => setEditingBand({...editingBand, name: e.target.value})} style={{ width: '100%', padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', marginTop: '6px', fontWeight: 700, background: '#f8fafc' }} />
                 </div>
                 <div>
                   <label style={{ fontSize: '0.75rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase' }}>Genre</label>
-                  <input value={editingBand.genre || ''} onChange={e => setEditingBand({...editingBand, genre: e.target.value})} placeholder="z.B. Rock, Pop" style={{ width: '100%', padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', marginTop: '6px', fontWeight: 700, background: '#f8fafc' }} />
+                  <input aria-label="Genre" value={editingBand.genre || ''} onChange={e => setEditingBand({...editingBand, genre: e.target.value})} placeholder="z.B. Rock, Pop" style={{ width: '100%', padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', marginTop: '6px', fontWeight: 700, background: '#f8fafc' }} />
                 </div>
               </div>
 
@@ -5547,6 +5610,7 @@ export function AdminDashboard({
                 </div>
                 
                 <select 
+                  aria-label="Bandcoach auswählen"
                   value={editingBand.coach_id || ''} 
                   onChange={e => setEditingBand({...editingBand, coach_id: e.target.value, coach_is_manual: true})}
                   style={{ width: '100%', padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', fontWeight: 700, background: 'white' }}
@@ -5573,7 +5637,7 @@ export function AdminDashboard({
                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                            <div style={{ width: '32px', height: '32px', borderRadius: '10px', overflow: 'hidden', background: m.user_id ? '#f1f5f9' : '#000000', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                              {m.user_id ? (
-                               <img src={u?.photo_url || '/avatar_ghost.jpg'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                               <img src={resolveCampusAvatar(u, teachers, schedules)} alt={`${u?.first_name || 'Mitglied'} Avatar`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                              ) : (
                                <span style={{ color: 'white', fontSize: '0.75rem', fontWeight: 900 }}>{m.external_name?.[0] || 'E'}</span>
                              )}
@@ -5585,7 +5649,15 @@ export function AdminDashboard({
                              <div style={{ fontSize: '0.7rem', fontWeight: 700, color: brandColor, textTransform: 'uppercase' }}>{m.instrument}</div>
                            </div>
                          </div>
-                        <button type="button" onClick={() => handleRemoveMember(m.id)} style={{ background: '#fee2e2', border: 'none', color: '#ef4444', padding: '8px', borderRadius: '10px', cursor: 'pointer' }}><Trash2 size={16} /></button>
+                        <button 
+                          type="button" 
+                          onClick={() => handleRemoveMember(m.id)} 
+                          aria-label={`Mitglied ${m.user_id ? `${u?.first_name} ${u?.last_name || ''}` : m.external_name} entfernen`}
+                          title="Mitglied entfernen"
+                          style={{ background: '#fee2e2', border: 'none', color: '#ef4444', padding: '8px', borderRadius: '10px', cursor: 'pointer' }}
+                        >
+                          <Trash2 size={16} />
+                        </button>
                       </div>
                     );
                   })}
@@ -5606,16 +5678,24 @@ export function AdminDashboard({
 
       {/* Add Member Search Modal */}
       {showAddMember && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 6000, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(10px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+        <div role="dialog" aria-modal="true" aria-label="Schüler suchen" style={{ position: 'fixed', inset: 0, zIndex: 6000, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(10px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
           <div className="glass-panel animation-slide-up" style={{ background: 'white', padding: '32px', borderRadius: '32px', maxWidth: '450px', width: '100%' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
               <h2 style={{ fontSize: '1.5rem', fontWeight: 900 }}>Schüler suchen</h2>
-              <button onClick={() => setShowAddMember(null)} style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer' }}><X size={24} /></button>
+              <button 
+                onClick={() => setShowAddMember(null)} 
+                aria-label="Dialog Schüler suchen schließen"
+                title="Dialog schließen"
+                style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer' }}
+              >
+                <X size={24} />
+              </button>
             </div>
             
             <div style={{ position: 'relative', marginBottom: '20px' }}>
               <Search size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
               <input 
+                aria-label="Schüler nach Name suchen"
                 placeholder="Name eingeben..." 
                 value={memberSearch}
                 onChange={e => setMemberSearch(e.target.value)}
@@ -5632,10 +5712,11 @@ export function AdminDashboard({
                 ).map(s => (
                 <div key={s.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px', background: '#f8fafc', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <img src={s.photo_url || '/avatar_ghost.jpg'} style={{ width: '36px', height: '36px', borderRadius: '50%', objectFit: 'cover' }} />
+                      <img src={resolveCampusAvatar(s, teachers, schedules)} alt={`${s.first_name} ${s.last_name} Avatar`} style={{ width: '36px', height: '36px', borderRadius: '50%', objectFit: 'cover' }} />
                       <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>{s.first_name} {s.last_name}</div>
                    </div>
                    <select 
+                     aria-label={`Instrument für ${s.first_name} ${s.last_name} auswählen`}
                      onChange={(e) => handleAddMember(showAddMember, s.id, e.target.value)}
                      defaultValue=""
                      style={{ padding: '8px', borderRadius: '10px', border: '1px solid #e2e8f0', fontWeight: 800, fontSize: '0.75rem', background: 'white' }}
@@ -5883,7 +5964,10 @@ function IDGallery({ users, brandColor, onShowQR, activePlatform }: { users: any
 
       {/* Floating Action Panel for printing */}
       {selectedCount > 0 && (
-        <div style={{
+        <div 
+          role="toolbar"
+          aria-label="Aktionen für ausgewählte Ausweise"
+          style={{
           position: 'fixed',
           bottom: '32px',
           left: '50%',
@@ -6787,6 +6871,9 @@ function DeviceSetupScreen({
       {/* FOCUS MODALS FOR GROOVELAB SETTINGS */}
       {activeGrooveSettingsModal && (
         <div 
+          role="dialog"
+          aria-modal="true"
+          aria-label="GrooveLab Einstellungen"
           style={{
             position: 'fixed',
             top: 0,
@@ -7189,6 +7276,7 @@ function DeviceSetupScreen({
                         <input 
                           type={showKioskPin ? "text" : "password"}
                           maxLength={4}
+                          aria-label="Vierstellige Kiosk-PIN"
                           value={kioskPin}
                           onChange={(e) => {
                             const val = e.target.value.replace(/\D/g, '').slice(0, 4);
@@ -7213,6 +7301,7 @@ function DeviceSetupScreen({
                         <button
                           type="button"
                           onClick={() => setShowKioskPin(!showKioskPin)}
+                          aria-label={showKioskPin ? "PIN verbergen" : "PIN anzeigen"}
                           style={{
                             position: 'absolute',
                             right: '8px',

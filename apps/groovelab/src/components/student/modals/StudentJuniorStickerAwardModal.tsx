@@ -71,7 +71,7 @@ export const StudentJuniorStickerAwardModal: React.FC<StudentJuniorStickerAwardM
           alignItems: 'center',
           gap: '6px'
         }}>
-          <Award size={14} /> Neuer Sticker freigeschaltet!
+          <Award size={14} /> {sticker.category === 'schuljahr' ? 'Offizielles Ausbildungs-Wappen!' : 'Neuer Sticker freigeschaltet!'}
         </span>
 
         {/* Animated Floating Sticker Badge */}
@@ -127,7 +127,7 @@ export const StudentJuniorStickerAwardModal: React.FC<StudentJuniorStickerAwardM
             </div>
           )}
           <div style={{ fontSize: '1.02rem', fontWeight: 800, color: '#15803d', marginBottom: '8px' }}>
-            Super gemacht! Du warst richtig fleißig!
+            {sticker.category === 'schuljahr' ? 'Willkommen im neuen Campus-Schuljahr!' : 'Super gemacht! Du warst richtig fleißig!'}
           </div>
           <p style={{ fontSize: '0.88rem', color: '#64748b', fontWeight: 650, margin: 0, lineHeight: 1.3 }}>
             {sticker.desc}
@@ -182,7 +182,7 @@ export const StudentJuniorStickerAwardModal: React.FC<StudentJuniorStickerAwardM
             className="hover-scale"
           >
             <BookOpen size={18} />
-            <span>In mein Album kleben</span>
+            <span>{sticker.category === 'schuljahr' ? 'Ausbildungs-Wappen annehmen' : 'In mein Album kleben'}</span>
           </button>
         </div>
       </div>

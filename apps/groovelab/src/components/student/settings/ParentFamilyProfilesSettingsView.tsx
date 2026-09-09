@@ -1,6 +1,6 @@
 import React from 'react';
 import { Users, QrCode, X, ShieldCheck } from 'lucide-react';
-import { getInstrumentAvatarUrl, STUDENT_AVATARS } from '../studentAvatars.constants';
+import { getInstrumentAvatarUrl, resolveCampusStudentAvatar, STUDENT_AVATARS } from '../studentAvatars.constants';
 
 export interface ParentFamilyProfilesSettingsViewProps {
   familyProfiles: any[];
@@ -50,7 +50,7 @@ export const ParentFamilyProfilesSettingsView: React.FC<ParentFamilyProfilesSett
               Familien-Profile &amp; Geschwister
             </h3>
             <p style={{ margin: '4px 0 0 0', fontSize: '0.80rem', color: '#475569', fontWeight: 600, lineHeight: 1.4 }}>
-              Alle Kinder auf einem Gerät: Wechsle per Fingertipp blitzschnell zwischen Geschwisterprofilen – ohne ständige PIN-Eingabe.
+              Alle Kinder auf einem Gerät: Im Elternbereich wechselst du blitzschnell per Fingertipp – geschützt durch deine Eltern-PIN.
             </p>
           </div>
         </div>
@@ -81,8 +81,8 @@ export const ParentFamilyProfilesSettingsView: React.FC<ParentFamilyProfilesSett
         }}>
           {familyProfiles.map((member: any) => {
             const isCurrent = member.id === studentId;
-            const memberInst = member.instrument || (isCurrent ? studentUser?.instrument : 'Gitarre') || 'Gitarre';
-            const defaultInstAvatar = getInstrumentAvatarUrl(memberInst);
+            const targetMember = isCurrent && !member.instrument ? { ...member, instrument: studentUser?.instrument } : member;
+            const defaultInstAvatar = resolveCampusStudentAvatar(targetMember);
             
             // Robust avatar URL resolution
             let avatarSrc = defaultInstAvatar;
@@ -147,7 +147,7 @@ export const ParentFamilyProfilesSettingsView: React.FC<ParentFamilyProfilesSett
                     alt={member.first_name || 'Schüler'}
                     onError={(e) => {
                       const img = e.currentTarget;
-                      const fallback = getInstrumentAvatarUrl(memberInst);
+                      const fallback = resolveCampusStudentAvatar(targetMember);
                       if (img.src !== fallback && !img.src.endsWith(fallback)) {
                         img.src = fallback;
                       } else {
@@ -309,21 +309,28 @@ export const ParentFamilyProfilesSettingsView: React.FC<ParentFamilyProfilesSett
         </div>
       </div>
 
-      {/* Real-time sync status footer bar */}
+      {/* Real-time sync status footer bar & Security Policy explanation */}
       <div style={{
         display: 'flex',
-        alignItems: 'center',
+        flexDirection: 'column',
         gap: '8px',
-        padding: '12px 16px',
-        borderRadius: '14px',
-        background: '#e6f4ea',
-        border: '1px solid #bbf7d0',
-        color: '#15803d',
+        padding: '14px 16px',
+        borderRadius: '16px',
+        background: '#f8fafc',
+        border: '1.5px solid #e2e8f0',
+        color: '#475569',
         fontSize: '0.78rem',
-        fontWeight: 750
+        fontWeight: 650,
+        lineHeight: 1.45
       }}>
-        <ShieldCheck size={16} color="#15803d" style={{ flexShrink: 0 }} />
-        <span>Geschwisterprofile sind lokal auf diesem Gerät verknüpft und können jederzeit einzeln getrennt werden.</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#0f172a', fontWeight: 800 }}>
+          <ShieldCheck size={16} color="#0284c7" style={{ flexShrink: 0 }} />
+          <span>Eltern-Souveränität &amp; Geschwister-Schutz</span>
+        </div>
+        <div>
+          Hier im Elternbereich hast du als Erziehungsberechtigte/r jederzeit direkten 1-Tap Zugriff auf alle verknüpften Kinder. 
+          Im Schülerbereich deiner Kinder ist der Wechsel zu Profilen mit persönlicher PIN geschützt, um Privatsphäre (Chats &amp; Audioaufnahmen) zu wahren.
+        </div>
       </div>
     </div>
   );

@@ -333,6 +333,7 @@ export const AddSiblingModal: React.FC<AddSiblingModalProps> = ({
       instrument: scannedUser.instrument || 'Gitarre',
       photo_url: scannedUser.photo_url || null,
       campus_ui_level: scannedUser.campus_ui_level || 'junior',
+      has_personal_pin: Boolean(scannedUser.has_personal_pin || scannedUser.is_pin_activated),
       role: 'student'
     };
 

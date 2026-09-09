@@ -4,6 +4,7 @@ import {
   Search, Trash2, UserPlus
 } from 'lucide-react';
 import { maskLastName } from '../../utils/nameHelper';
+import { getInstrumentAvatarUrl } from '../StudioAvatar';
 
 export interface TeacherStudentsViewProps {
   allStudents: any[];
@@ -239,7 +240,7 @@ export const TeacherStudentsView: React.FC<TeacherStudentsViewProps> = ({
                             setSelectedStudentProfile(student);
                           }
                         }}
-                        className="google-card"
+                        className="google-card virtual-card-lg"
                         style={{ 
                           padding: windowWidth < 768 ? '14px 12px' : '24px', 
                           borderRadius: windowWidth < 768 ? '16px' : '24px', 
@@ -449,35 +450,7 @@ export const TeacherStudentsView: React.FC<TeacherStudentsViewProps> = ({
                     {widgetUniqueInstruments.map((inst: string) => {
                       const instLower = inst.toLowerCase().trim();
                       
-                      // Determine visual photo files based on instrument name
-                      let imgFile = 'gitarre_avatar_new.png';
-                      if (instLower.includes('klavier') || instLower.includes('piano') || instLower.includes('tasten')) {
-                        imgFile = 'klavier_avatar_new.png';
-                      } else if (instLower.includes('gitar') || instLower.includes('guitar')) {
-                        imgFile = 'gitarre_avatar_new.png';
-                      } else if (instLower.includes('bass')) {
-                        imgFile = 'bass_avatar.png';
-                      } else if (instLower.includes('schlag') || instLower.includes('drum') || instLower.includes('percussion')) {
-                        imgFile = 'schlagzeug_avatar.png';
-                      } else if (instLower.includes('gesang') || instLower.includes('stimme') || instLower.includes('sing') || instLower.includes('vocals')) {
-                        imgFile = 'gesang_avatar.png';
-                      } else if (instLower.includes('geige') || instLower.includes('violine') || instLower.includes('streich') || instLower.includes('cello')) {
-                        imgFile = instLower.includes('cello') ? 'cello_avatar_new.png' : 'violine_avatar_new.png';
-                      } else if (instLower.includes('sax')) {
-                        imgFile = 'saxophon_avatar_new.png';
-                      } else if (instLower.includes('klarinette')) {
-                        imgFile = 'klarinette_avatar_new.png';
-                      } else if (instLower.includes('flöte')) {
-                        imgFile = 'querfloete_avatar.png';
-                      } else if (instLower.includes('horn')) {
-                        imgFile = 'horn_avatar_new.png';
-                      } else if (instLower.includes('posaune')) {
-                        imgFile = 'posaune_avatar.png';
-                      } else if (instLower.includes('trompete')) {
-                        imgFile = 'trompete_avatar_new.png';
-                      } else {
-                        imgFile = 'gitarre_avatar_new.png';
-                      }
+                      const avatarUrl = getInstrumentAvatarUrl(inst);
 
                       const isActive = studentInstrumentFilter.toLowerCase().trim() === instLower;
 
@@ -518,7 +491,7 @@ export const TeacherStudentsView: React.FC<TeacherStudentsViewProps> = ({
                             }}
                           >
                             <img 
-                              src={`/avatars/${imgFile}`} 
+                              src={avatarUrl} 
                               alt={inst} 
                               style={{ 
                                 width: '100%', 

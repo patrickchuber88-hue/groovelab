@@ -2,7 +2,7 @@ import QRCode from 'react-qr-code';
 import { X, Download, RefreshCw, Calendar, CheckCircle2, Check, Copy, ExternalLink } from 'lucide-react';
 import { useRef, useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { StudioAvatar, getInstrumentAvatarUrl, getDefaultMusicianAvatarUrl } from './StudioAvatar';
+import { StudioAvatar, getInstrumentAvatarUrl, getDefaultMusicianAvatarUrl, resolveCampusStudentAvatar } from './StudioAvatar';
 import { StudentMobileScheduleWizard } from './StudentMobileScheduleWizard';
 import { IDBadgeCard, inlineAllImagesInElement } from './IDBadgeCard';
 import { isDevEnvironment } from '../utils/tenantUrlHelper';
@@ -188,7 +188,7 @@ export function QRCodeModal({ user, activePlatform, onClose }: QRCodeModalProps)
     if (isAdminOrSecretary && activePlatform === 'campus') {
       originalUrl = '/campus_login_hero.png';
     } else if (activePlatform === 'campus') {
-      originalUrl = getInstrumentAvatarUrl(user.instrument);
+      originalUrl = resolveCampusStudentAvatar(user);
     } else {
       const isStudentAvatar = user.photo_url && (
         user.photo_url.includes('student_') ||

@@ -102,6 +102,8 @@ interface Invoice {
   storageAddonGb: number;
   storageUsedBytes: number;
   storageAddonMonthlyFee: number;
+  leitwegId?: string;
+  leitweg_id?: string;
   contractStartDate?: string | null;
   createdAt?: string | null;
 }
@@ -2325,6 +2327,7 @@ Campus-Groovelab Mahnwesen & Rechtsabteilung`;
                         subscriptionBypass: inv.subscriptionBypass,
                         subtotal: inv.subtotal,
                         studentBillingOption: inv.studentBillingOption,
+                        leitwegId: inv.leitwegId || inv.leitweg_id || (inv as any).schoolLeitwegId || undefined,
                         isTrialMonth: inv.status === 'trial'
                       });
                     }}
@@ -2979,6 +2982,7 @@ Campus-Groovelab Mahnwesen & Rechtsabteilung`;
                                       subscriptionBypass: inv.subscriptionBypass,
                                       subtotal: inv.subtotal,
                                       studentBillingOption: inv.studentBillingOption,
+                                      leitwegId: inv.leitwegId || inv.leitweg_id || (inv as any).schoolLeitwegId || undefined,
                                       isTrialMonth: invoice.isTrialMonth
                                     });
                                   }}
@@ -4956,6 +4960,7 @@ Campus-Groovelab Mahnwesen & Rechtsabteilung`;
           operatorBic={operatorBic}
           billingPayer={['both', 'debit', 'cash', 'option1'].includes(viewingInvoice.studentBillingOption) ? 'student' : 'school'}
           studentBillingOption={viewingInvoice.studentBillingOption}
+          leitwegId={viewingInvoice.leitwegId || undefined}
           onClose={() => setViewingInvoice(null)}
         />
       )}

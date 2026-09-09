@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import QRCode from 'react-qr-code';
 import { downloadLocalQrCodePng } from '../utils/localQrGenerator';
 import { supabase } from '../lib/supabase';
-import { Music, Tablet, ShieldCheck, FileText, X, Check, School, AlertCircle, ArrowRight, Download, User, Upload, Key, KeyRound, RotateCw, HelpCircle, Lock, Calendar, Clock, ArrowLeft, Mail, Users, Plus, Fingerprint, Timer, Trophy, Smartphone, Camera, CameraOff, Unlink, SwitchCamera, Star, Ban, Sparkles } from 'lucide-react';
+import { Music, Tablet, ShieldCheck, FileText, X, Check, School, AlertCircle, ArrowRight, Download, User, Upload, Key, KeyRound, RotateCw, HelpCircle, Lock, Calendar, Clock, ArrowLeft, Mail, Users, Plus, Fingerprint, Timer, Trophy, Smartphone, Camera, CameraOff, Unlink, SwitchCamera, Star, Ban, Sparkles, Pencil } from 'lucide-react';
 import { getDistanceFromLatLonInM } from '../utils/geo';
 import { isWebAuthnSupported, registerBiometrics, authenticateUserBiometrics, getStoredBiometricProfiles, saveBiometricProfile, removeBiometricProfile, BiometricVaultProfile } from '../utils/webauthn';
 import { StudentMobileScheduleWizard } from './StudentMobileScheduleWizard';
@@ -15,7 +15,7 @@ import { registerClientSessionLease } from '../utils/sessionLeaseManager';
 import { setVaultItem } from '../utils/aesStorageVault';
 import { scrubSensitiveUrlParams } from '../utils/urlSecurityScrubber';
 import { CampusGroovelabBrand, CampusGroovelabText, CampusGroovelabLogo } from './CampusGroovelabBrand';
-import { getInstrumentAvatarUrl } from './StudioAvatar';
+import { getInstrumentAvatarUrl, resolveCampusStudentAvatar } from './StudioAvatar';
 
 
 
@@ -632,6 +632,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       return [];
     }
   });
+  const [isManagingProfiles, setIsManagingProfiles] = useState<boolean>(false);
 
   useEffect(() => {
     if (isWebAuthnSupported()) {
@@ -665,20 +666,10 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       if (user) {
         await finalizeLogin(user, loginStationId, false);
       } else {
-        // Fallback user object using biometric vault profile
-        const fallbackUser = {
-          id: profile.userId,
-          first_name: profile.firstName,
-          last_name: profile.lastName,
-          role: profile.role || 'admin',
-          roles: [profile.role || 'admin'],
-          email: profile.email,
-          photo_url: profile.photoUrl || '/campus_login_hero.png',
-          avatar_url: profile.photoUrl || '/campus_login_hero.png',
-          is_campus_active: true,
-          is_groovelab_active: true
-        };
-        await finalizeLogin(fallbackUser, loginStationId, false);
+        console.error('Biometric user profile not found in database:', userErr);
+        setBiometricError('Benutzerprofil konnte nicht verifiziert werden. Bitte melden Sie sich mit Ihren Zugangsdaten an.');
+        setBiometricLoading(false);
+        return;
       }
     } catch (err: any) {
       console.error('Biometrics login error:', err);
@@ -2888,7 +2879,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         // If it's a newly added sibling, insert into database first
         if (child.isNew && !currentUserId) {
           const qrToken = crypto.randomUUID();
-          const avatarUrl = getInstrumentAvatarUrl(child.instrument);
+          const avatarUrl = resolveCampusStudentAvatar(child);
 
           const hasCampus = schoolData?.has_campus_subscription !== false;
           const finalLastName = hasCampus ? child.last_name : (child.last_name?.trim() ? child.last_name.trim().charAt(0).toUpperCase() + '.' : '');
@@ -4360,7 +4351,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 const isAdminOrSecretary = p.role === 'admin' || p.role === 'secretary';
                 const avatarSrc = isAdminOrSecretary
                   ? '/campus_login_hero.png'
-                  : p.photoUrl || getInstrumentAvatarUrl(p.instrument || '');
+                  : p.photoUrl || resolveCampusStudentAvatar(p);
                 const isSelected = selectedBiometricUser?.userId === p.userId;
 
                 return (
@@ -4471,66 +4462,105 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           </div>
         )}
 
-        {/* ─── 1-TAP FAMILY AVATAR STAGE (SIBLING QUICKSTART - SCALABLE 1-10+ PROFILES) ─── */}
+        {/* ─── 1-TAP FAMILY AVATAR STAGE (NETFLIX KIDS BORDERLESS HERO PROFILES) ─── */}
         {scopedFamilyProfiles.length > 0 && !isGroovelabKiosk && (
           <div style={{
             width: '100%',
-            marginBottom: '16px',
-            background: 'rgba(255, 255, 255, 0.05)',
-            border: '1px solid rgba(255, 255, 255, 0.12)',
-            borderRadius: '24px',
-            padding: '14px 12px',
-            boxSizing: 'border-box',
+            marginBottom: '18px',
             display: 'flex',
             flexDirection: 'column',
-            gap: '10px'
+            gap: '12px'
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 4px' }}>
-              <div style={{ fontSize: '0.78rem', fontWeight: 900, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '8px', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
-                <Users size={15} color="#4ade80" />
-                <span>Wer übt heute?</span>
-              </div>
-              <span style={{ 
-                fontSize: '0.66rem', 
-                color: '#4ade80', 
-                background: 'rgba(34, 197, 94, 0.15)', 
-                border: '1px solid rgba(74, 222, 128, 0.25)', 
-                padding: '2px 8px', 
-                borderRadius: '100px', 
-                fontWeight: 800,
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '4px'
-              }}>
-                <Sparkles size={10} />
-                {scopedFamilyProfiles.length > 1 ? `${scopedFamilyProfiles.length} Profile` : '1-Tap Start'}
-              </span>
-            </div>
-
-            {/* Horizontal Snap-Stream Carousel (Smooth swipe on iOS/iPad & trackpad on Mac) */}
+            {/* Header: Magazin-Typografie + Netflix Edit-Mode Toggle */}
             <div style={{ 
               display: 'flex', 
-              gap: '10px', 
-              justifyContent: scopedFamilyProfiles.length <= 2 ? 'center' : 'flex-start', 
-              alignItems: 'stretch', 
+              alignItems: 'center', 
+              justifyContent: 'space-between', 
+              padding: '0 4px' 
+            }}>
+              <div style={{ 
+                fontSize: '0.94rem', 
+                fontWeight: 800, 
+                color: '#ffffff', 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '8px', 
+                letterSpacing: '-0.01em',
+                fontFamily: "'Plus Jakarta Sans', sans-serif"
+              }}>
+                <Users size={16} color="#4ade80" />
+                <span>Wer übt heute?</span>
+              </div>
+
+              {/* Netflix-Style Profile Management Toggle */}
+              <button
+                type="button"
+                onClick={() => setIsManagingProfiles(prev => !prev)}
+                aria-label={isManagingProfiles ? 'Verwaltung beenden' : 'Profile verwalten'}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  padding: '4px 10px',
+                  borderRadius: '100px',
+                  fontSize: '0.72rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  border: isManagingProfiles ? '1px solid rgba(74, 222, 128, 0.45)' : '1px solid rgba(255, 255, 255, 0.15)',
+                  background: isManagingProfiles ? 'rgba(34, 197, 94, 0.22)' : 'rgba(255, 255, 255, 0.08)',
+                  color: isManagingProfiles ? '#4ade80' : 'rgba(255, 255, 255, 0.75)',
+                  transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                  backdropFilter: 'blur(8px)',
+                  WebkitBackdropFilter: 'blur(8px)'
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.background = isManagingProfiles ? 'rgba(34, 197, 94, 0.32)' : 'rgba(255, 255, 255, 0.14)';
+                  e.currentTarget.style.color = '#ffffff';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.background = isManagingProfiles ? 'rgba(34, 197, 94, 0.22)' : 'rgba(255, 255, 255, 0.08)';
+                  e.currentTarget.style.color = isManagingProfiles ? '#4ade80' : 'rgba(255, 255, 255, 0.75)';
+                }}
+              >
+                {isManagingProfiles ? (
+                  <>
+                    <Check size={11} color="#4ade80" />
+                    <span>Fertig</span>
+                  </>
+                ) : (
+                  <>
+                    <Pencil size={11} />
+                    <span>Verwalten</span>
+                  </>
+                )}
+              </button>
+            </div>
+
+            {/* Horizontal Snap-Stream of Borderless Netflix Kids Profiles */}
+            <div style={{ 
+              display: 'flex', 
+              gap: '14px', 
+              justifyContent: scopedFamilyProfiles.length <= 3 ? 'center' : 'flex-start', 
+              alignItems: 'flex-start', 
               overflowX: 'auto',
               scrollSnapType: 'x mandatory',
               WebkitOverflowScrolling: 'touch',
               scrollbarWidth: 'none',
-              padding: '4px 6px 6px 6px',
-              maskImage: scopedFamilyProfiles.length > 2 
-                ? 'linear-gradient(to right, transparent 0%, black 14px, black calc(100% - 14px), transparent 100%)' 
+              padding: '6px 4px 8px 4px',
+              maskImage: scopedFamilyProfiles.length > 3 
+                ? 'linear-gradient(to right, transparent 0%, black 16px, black calc(100% - 16px), transparent 100%)' 
                 : 'none',
               width: '100%',
               boxSizing: 'border-box'
             }}>
               {scopedFamilyProfiles.map((p) => {
-                const avatarSrc = getInstrumentAvatarUrl(p.instrument || p.groovelab_instrument || '');
+                const avatarSrc = resolveCampusStudentAvatar(p);
                 const displayLastName = p.last_name ? (p.last_name.trim().length > 1 ? `${p.last_name.trim()[0]}.` : p.last_name) : '';
                 return (
                   <div
                     key={p.id}
                     onClick={() => {
+                      if (isManagingProfiles) return;
                       sessionStorage.setItem('groovelab_user_id', p.id);
                       sessionStorage.setItem('groovelab_location_mode', 'home');
                       sessionStorage.setItem('groovelab_active_workspace', 'student');
@@ -4542,99 +4572,107 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                       sessionStorage.removeItem('groovelab_support_ghost');
                       onLogin(p.id, true);
                     }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        if (isManagingProfiles) return;
+                        sessionStorage.setItem('groovelab_user_id', p.id);
+                        sessionStorage.setItem('groovelab_location_mode', 'home');
+                        sessionStorage.setItem('groovelab_active_workspace', 'student');
+                        sessionStorage.setItem('groovelab_active_platform', 'campus');
+                        sessionStorage.setItem('campus_active_tab', 'briefing');
+                        sessionStorage.setItem('groovelab_active_tab', 'briefing');
+                        sessionStorage.removeItem('groovelab_is_master_admin');
+                        localStorage.removeItem('groovelab_is_master_admin');
+                        sessionStorage.removeItem('groovelab_support_ghost');
+                        onLogin(p.id, true);
+                      }
+                    }}
                     role="button"
                     tabIndex={0}
                     aria-label={`Als ${p.first_name} anmelden`}
                     style={{
                       flex: '0 0 auto',
-                      width: '104px',
+                      width: '76px',
                       scrollSnapAlign: 'center',
-                      background: 'rgba(255, 255, 255, 0.07)',
-                      border: '1px solid rgba(255, 255, 255, 0.14)',
-                      borderRadius: '20px',
-                      padding: '12px 6px 12px 6px',
                       display: 'flex',
                       flexDirection: 'column',
                       alignItems: 'center',
-                      cursor: 'pointer',
+                      cursor: isManagingProfiles ? 'default' : 'pointer',
                       position: 'relative',
                       boxSizing: 'border-box',
-                      transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
-                      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.15)'
-                    }}
-                    onMouseOver={(e) => {
-                      e.currentTarget.style.transform = 'translateY(-3px) scale(1.03)';
-                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.13)';
-                      e.currentTarget.style.borderColor = 'rgba(74, 222, 128, 0.5)';
-                      e.currentTarget.style.boxShadow = '0 10px 24px -4px rgba(34, 197, 94, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.3)';
-                    }}
-                    onMouseOut={(e) => {
-                      e.currentTarget.style.transform = 'none';
-                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.07)';
-                      e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.14)';
-                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.15)';
+                      outline: 'none'
                     }}
                   >
-                    {/* Delete / Remove Profile Button (floating on top right corner) */}
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        const updated = savedFamilyProfiles.filter(item => item.id !== p.id);
-                        setSavedFamilyProfiles(updated);
-                        localStorage.setItem('groovelab_local_profiles', JSON.stringify(updated));
-                        localStorage.setItem('campus_family_profiles', JSON.stringify(updated));
-                      }}
-                      title="Profil von diesem Gerät entfernen"
-                      aria-label={`${p.first_name} von diesem Gerät entfernen`}
+                    {/* Delete Badge - ONLY visible during Netflix Management Mode */}
+                    {isManagingProfiles && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const updated = savedFamilyProfiles.filter(item => item.id !== p.id);
+                          setSavedFamilyProfiles(updated);
+                          localStorage.setItem('groovelab_local_profiles', JSON.stringify(updated));
+                          localStorage.setItem('campus_family_profiles', JSON.stringify(updated));
+                        }}
+                        title={`${p.first_name} von diesem Gerät entfernen`}
+                        aria-label={`${p.first_name} von diesem Gerät entfernen`}
+                        style={{
+                          position: 'absolute',
+                          top: '-4px',
+                          right: '2px',
+                          width: '22px',
+                          height: '22px',
+                          borderRadius: '50%',
+                          background: '#ef4444',
+                          border: '2px solid #ffffff',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: '#ffffff',
+                          cursor: 'pointer',
+                          padding: 0,
+                          zIndex: 10,
+                          boxShadow: '0 3px 8px rgba(239, 68, 68, 0.45)',
+                          transition: 'transform 0.15s ease'
+                        }}
+                        onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.15)'}
+                        onMouseOut={(e) => e.currentTarget.style.transform = 'none'}
+                      >
+                        <X size={11} strokeWidth={3} />
+                      </button>
+                    )}
+
+                    {/* 68px Apple Squircle Avatar with Glow Halo on Hover */}
+                    <div 
                       style={{
-                        position: 'absolute',
-                        top: '-4px',
-                        right: '-4px',
-                        width: '19px',
-                        height: '19px',
-                        borderRadius: '50%',
-                        background: 'rgba(15, 23, 42, 0.75)',
-                        backdropFilter: 'blur(8px)',
-                        border: '1px solid rgba(255, 255, 255, 0.30)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: 'rgba(255, 255, 255, 0.65)',
-                        cursor: 'pointer',
-                        padding: 0,
-                        zIndex: 5,
-                        boxShadow: '0 2px 6px rgba(0,0,0,0.35)',
-                        transition: 'all 0.15s ease'
+                        position: 'relative',
+                        width: '68px',
+                        height: '68px',
+                        borderRadius: '20px',
+                        overflow: 'hidden',
+                        border: '2px solid rgba(255, 255, 255, 0.35)',
+                        boxShadow: '0 8px 20px -4px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.35)',
+                        background: '#0c0f12',
+                        flexShrink: 0,
+                        transition: 'all 0.28s cubic-bezier(0.16, 1, 0.3, 1)',
+                        transform: isManagingProfiles ? 'rotate(1deg)' : 'none'
                       }}
                       onMouseOver={(e) => {
-                        e.currentTarget.style.background = '#ef4444';
-                        e.currentTarget.style.color = '#ffffff';
-                        e.currentTarget.style.borderColor = '#ef4444';
-                        e.currentTarget.style.transform = 'scale(1.15)';
+                        if (!isManagingProfiles) {
+                          e.currentTarget.style.transform = 'scale(1.08) translateY(-2px)';
+                          e.currentTarget.style.borderColor = '#4ade80';
+                          e.currentTarget.style.boxShadow = '0 14px 28px -6px rgba(34, 197, 94, 0.45), 0 0 0 3px rgba(74, 222, 128, 0.35)';
+                        }
                       }}
                       onMouseOut={(e) => {
-                        e.currentTarget.style.background = 'rgba(15, 23, 42, 0.75)';
-                        e.currentTarget.style.color = 'rgba(255, 255, 255, 0.65)';
-                        e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.30)';
-                        e.currentTarget.style.transform = 'none';
+                        if (!isManagingProfiles) {
+                          e.currentTarget.style.transform = 'none';
+                          e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.35)';
+                          e.currentTarget.style.boxShadow = '0 8px 20px -4px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.35)';
+                        }
                       }}
                     >
-                      <X size={10} />
-                    </button>
-
-                    {/* Apple Squircle Avatar with glowing border */}
-                    <div style={{
-                      position: 'relative',
-                      width: '54px',
-                      height: '54px',
-                      borderRadius: '16px',
-                      overflow: 'hidden',
-                      border: '1.5px solid rgba(255, 255, 255, 0.45)',
-                      boxShadow: '0 6px 14px rgba(0,0,0,0.30), inset 0 1px 0 rgba(255,255,255,0.5)',
-                      background: '#0c0f12',
-                      flexShrink: 0
-                    }}>
                       <img 
                         src={avatarSrc} 
                         alt={p.first_name}
@@ -4649,10 +4687,10 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                       />
                     </div>
 
-                    {/* Name (Vorname + N.) */}
+                    {/* Pure, Unboxed Name Label */}
                     <span style={{
                       fontSize: '0.84rem',
-                      fontWeight: 850,
+                      fontWeight: 800,
                       color: '#ffffff',
                       marginTop: '8px',
                       whiteSpace: 'nowrap',
@@ -4660,7 +4698,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                       textOverflow: 'ellipsis',
                       width: '100%',
                       textAlign: 'center',
-                      letterSpacing: '-0.01em'
+                      letterSpacing: '-0.01em',
+                      fontFamily: "'Plus Jakarta Sans', sans-serif"
                     }}>
                       {p.first_name} {displayLastName}
                     </span>
@@ -4677,26 +4716,26 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           display: 'flex',
           alignItems: 'center',
           gap: '12px',
-          margin: '10px 0 16px 0'
+          margin: '6px 0 16px 0'
         }}>
-          <div style={{ flex: 1, height: '1px', background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.15))' }} />
+          <div style={{ flex: 1, height: '1px', background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.18))' }} />
           <span style={{
-            fontSize: '10px',
-            fontWeight: 800,
-            color: isGroovelabKiosk ? 'rgba(0, 0, 0, 0.6)' : 'rgba(255, 255, 255, 0.55)',
-            textTransform: 'uppercase',
-            letterSpacing: '0.08em',
+            fontSize: '11px',
+            fontWeight: 700,
+            color: isGroovelabKiosk ? 'rgba(0, 0, 0, 0.6)' : 'rgba(255, 255, 255, 0.6)',
+            letterSpacing: '0.03em',
             whiteSpace: 'nowrap',
             display: 'flex',
             alignItems: 'center',
-            gap: '6px'
+            gap: '6px',
+            fontFamily: "'Plus Jakarta Sans', sans-serif"
           }}>
-            <Tablet size={12} style={{ color: isGroovelabKiosk ? '#78350f' : '#4ade80' }} />
+            <Tablet size={13} style={{ color: isGroovelabKiosk ? '#78350f' : '#4ade80' }} />
             {isGroovelabKiosk 
-              ? (effectiveStationId ? 'GROOVELAB QR-CODE SCANNEN' : 'GrooveLab Kiosk einrichten') 
-              : 'ODER QR-AUSWEIS SCANNEN'}
+              ? (effectiveStationId ? 'GrooveLab QR-Code scannen' : 'GrooveLab Kiosk einrichten') 
+              : 'oder QR-Ausweis vorhalten'}
           </span>
-          <div style={{ flex: 1, height: '1px', background: 'linear-gradient(90deg, rgba(255,255,255,0.15), transparent)' }} />
+          <div style={{ flex: 1, height: '1px', background: 'linear-gradient(90deg, rgba(255,255,255,0.18), transparent)' }} />
         </div>
 
         {/* Standard Camera Box (Apple Liquid-Glass Viewfinder) */}

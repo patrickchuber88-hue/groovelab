@@ -1,5 +1,5 @@
-import { getInstrumentAvatarUrl, getDefaultMusicianAvatarUrl } from '../components/StudioAvatar';
-export { getInstrumentAvatarUrl, getDefaultMusicianAvatarUrl };
+import { getInstrumentAvatarUrl, getDefaultMusicianAvatarUrl, resolveCampusStudentAvatar } from '../components/StudioAvatar';
+export { getInstrumentAvatarUrl, getDefaultMusicianAvatarUrl, resolveCampusStudentAvatar };
 
 export const formatStudentDisplayName = (firstName?: string | null, lastName?: string | null, fallbackId?: string | null): string => {
   const first = String(firstName || '').replace(/^Unterricht:\s*/i, '').trim();

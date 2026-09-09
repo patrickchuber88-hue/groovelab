@@ -531,7 +531,10 @@ export const AdminSongsView: React.FC<AdminSongsViewProps> = ({
             alignItems: 'center',
             margin: '4px 0 4px 0'
           }}>
-            <div style={{
+            <div 
+              role="tablist"
+              aria-label="Mediathek Bereiche"
+              style={{
               display: 'flex',
               alignItems: 'center',
               background: 'rgba(241, 245, 249, 0.95)',
@@ -544,6 +547,9 @@ export const AdminSongsView: React.FC<AdminSongsViewProps> = ({
             }}>
               <button
                 type="button"
+                role="tab"
+                aria-selected={mediathekTab === 'songs'}
+                id="tab-mediathek-songs"
                 onClick={() => setMediathekTab('songs')}
                 style={{
                   flex: 1,
@@ -570,6 +576,9 @@ export const AdminSongsView: React.FC<AdminSongsViewProps> = ({
 
               <button
                 type="button"
+                role="tab"
+                aria-selected={mediathekTab === 'lehrwerke'}
+                id="tab-mediathek-lehrwerke"
                 onClick={() => setMediathekTab('lehrwerke')}
                 style={{
                   flex: 1,
@@ -596,6 +605,9 @@ export const AdminSongsView: React.FC<AdminSongsViewProps> = ({
 
               <button
                 type="button"
+                role="tab"
+                aria-selected={mediathekTab === 'schnelltext'}
+                id="tab-mediathek-schnelltext"
                 onClick={() => setMediathekTab('schnelltext')}
                 style={{
                   flex: 1,
@@ -736,11 +748,11 @@ export const AdminSongsView: React.FC<AdminSongsViewProps> = ({
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                           <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Interpret / Band</label>
-                          <input required placeholder="z.B. Nirvana" value={newSong.artist} onChange={e => setNewSong({...newSong, artist: e.target.value})} style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
+                          <input required aria-label="Interpret / Band" placeholder="z.B. Nirvana" value={newSong.artist} onChange={e => setNewSong({...newSong, artist: e.target.value})} style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
                         </div>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                           <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Songtitel</label>
-                          <input required placeholder="z.B. Smells Like Teenspirit" value={newSong.title} onChange={e => setNewSong({...newSong, title: e.target.value})} style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
+                          <input required aria-label="Songtitel" placeholder="z.B. Smells Like Teenspirit" value={newSong.title} onChange={e => setNewSong({...newSong, title: e.target.value})} style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
                         </div>
                       </div>
 
@@ -914,11 +926,11 @@ export const AdminSongsView: React.FC<AdminSongsViewProps> = ({
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                           <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Media Link (Spotify / YouTube)</label>
-                          <input placeholder="https://open.spotify.com/... oder https://youtube.com/..." value={newSong.media_link} onChange={e => setNewSong({...newSong, media_link: e.target.value})} style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
+                          <input aria-label="Media Link (Spotify / YouTube)" placeholder="https://open.spotify.com/... oder https://youtube.com/..." value={newSong.media_link} onChange={e => setNewSong({...newSong, media_link: e.target.value})} style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
                         </div>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                           <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Tomplay Link (Interaktive Noten)</label>
-                          <input placeholder="https://tomplay.com/..." value={newSong.tomplay_url} onChange={e => setNewSong({...newSong, tomplay_url: e.target.value})} style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
+                          <input aria-label="Tomplay Link (Interaktive Noten)" placeholder="https://tomplay.com/..." value={newSong.tomplay_url} onChange={e => setNewSong({...newSong, tomplay_url: e.target.value})} style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
                         </div>
                       </div>
                     </>
@@ -953,22 +965,22 @@ export const AdminSongsView: React.FC<AdminSongsViewProps> = ({
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                       <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Interpret</label>
-                      <input required placeholder="Interpret" value={editingSong.artist} onChange={e => setEditingSong({...editingSong, artist: e.target.value})} style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
+                      <input required aria-label="Interpret" placeholder="Interpret" value={editingSong.artist} onChange={e => setEditingSong({...editingSong, artist: e.target.value})} style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                       <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Titel</label>
-                      <input required placeholder="Titel" value={editingSong.title} onChange={e => setEditingSong({...editingSong, title: e.target.value})} style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
+                      <input required aria-label="Titel" placeholder="Titel" value={editingSong.title} onChange={e => setEditingSong({...editingSong, title: e.target.value})} style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
                     </div>
                   </div>
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                       <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Media Link (Spotify / YouTube)</label>
-                      <input placeholder="https://open.spotify.com/... oder https://youtube.com/..." value={editingSong.media_link || ''} onChange={e => setEditingSong({...editingSong, media_link: e.target.value})} style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
+                      <input aria-label="Media Link (Spotify / YouTube)" placeholder="https://open.spotify.com/... oder https://youtube.com/..." value={editingSong.media_link || ''} onChange={e => setEditingSong({...editingSong, media_link: e.target.value})} style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                       <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Tomplay Link (Interaktive Noten)</label>
-                      <input placeholder="https://tomplay.com/..." value={editingSong.tomplay_url || ''} onChange={e => setEditingSong({...editingSong, tomplay_url: e.target.value})} style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
+                      <input aria-label="Tomplay Link (Interaktive Noten)" placeholder="https://tomplay.com/..." value={editingSong.tomplay_url || ''} onChange={e => setEditingSong({...editingSong, tomplay_url: e.target.value})} style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
                     </div>
                   </div>
 
@@ -1234,21 +1246,35 @@ export const AdminSongsView: React.FC<AdminSongsViewProps> = ({
                           <a 
                             href={song.tomplay_url} 
                             target="_blank" 
-                            rel="noopener noreferrer"
+                            rel="noopener noreferrer" 
                             onClick={(e) => e.stopPropagation()}
-                            title="Tomplay (Interaktive Noten)"
-                            style={{ 
-                              width: '34px', height: '34px', borderRadius: '10px', 
-                              background: '#eff6ff', color: '#2563eb', 
-                              display: 'flex', alignItems: 'center', justifyContent: 'center',
-                              textDecoration: 'none', border: '1px solid #bfdbfe',
+                            aria-label={`Interaktive Noten auf Tomplay für ${song.title} öffnen`}
+                            title="Interaktive Noten auf Tomplay öffnen"
+                            style={{
+                              background: '#eff6ff',
+                              border: '1px solid #bfdbfe',
+                              width: '38px',
+                              height: '38px',
+                              borderRadius: '10px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              color: '#2563eb',
                               transition: 'all 0.2s'
                             }}
                           >
                             <Music size={14} style={{ strokeWidth: 2.5 }} />
                           </a>
                         )}
-                        <button onClick={(e) => { e.stopPropagation(); handleDeleteSong(song.id); }} style={{ background: '#fff1f2', border: '1px solid #fecaca', width: '38px', height: '38px', borderRadius: '10px', cursor: 'pointer', color: '#ef4444', transition: 'all 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Trash2 size={16} /></button>
+                        <button 
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); handleDeleteSong(song.id); }} 
+                          aria-label={`Song ${song.title} von ${song.artist} löschen`}
+                          title="Song löschen"
+                          style={{ background: '#fff1f2', border: '1px solid #fecaca', width: '38px', height: '38px', borderRadius: '10px', cursor: 'pointer', color: '#ef4444', transition: 'all 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                        >
+                          <Trash2 size={16} />
+                        </button>
                       </div>
                     </div>
                   );
@@ -1320,15 +1346,15 @@ export const AdminSongsView: React.FC<AdminSongsViewProps> = ({
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                           <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Titel des Buchs</label>
-                          <input required placeholder="z.B. GrooveLab Drums Vol. 2" value={newLehrwerk.title} onChange={e => setNewLehrwerk({...newLehrwerk, title: e.target.value})} style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
+                          <input required aria-label="Titel des Buchs" placeholder="z.B. GrooveLab Drums Vol. 2" value={newLehrwerk.title} onChange={e => setNewLehrwerk({...newLehrwerk, title: e.target.value})} style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
                         </div>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                           <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Autor (optional)</label>
-                          <input placeholder="z.B. Max Mustermann" value={newLehrwerk.author || ''} onChange={e => setNewLehrwerk({...newLehrwerk, author: e.target.value})} style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
+                          <input aria-label="Autor" placeholder="z.B. Max Mustermann" value={newLehrwerk.author || ''} onChange={e => setNewLehrwerk({...newLehrwerk, author: e.target.value})} style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
                         </div>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                           <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Seitenzahl des Buchs</label>
-                          <input type="number" min="1" max="1000" placeholder="50" value={newLehrwerk.totalPages} onChange={e => setNewLehrwerk({...newLehrwerk, totalPages: Number(e.target.value) || 50})} style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
+                          <input aria-label="Seitenzahl des Buchs" type="number" min="1" max="1000" placeholder="50" value={newLehrwerk.totalPages} onChange={e => setNewLehrwerk({...newLehrwerk, totalPages: Number(e.target.value) || 50})} style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
                         </div>
                       </div>
                     ) : (
@@ -1361,15 +1387,15 @@ export const AdminSongsView: React.FC<AdminSongsViewProps> = ({
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                         <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Titel des Buchs</label>
-                        <input required placeholder="z.B. GrooveLab Drums Vol. 2" value={editingLehrwerk.title} onChange={e => setEditingLehrwerk({...editingLehrwerk, title: e.target.value})} style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
+                        <input required aria-label="Titel des Buchs" placeholder="z.B. GrooveLab Drums Vol. 2" value={editingLehrwerk.title} onChange={e => setEditingLehrwerk({...editingLehrwerk, title: e.target.value})} style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
                       </div>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                         <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Autor (optional)</label>
-                        <input placeholder="z.B. Max Mustermann" value={editingLehrwerk.author || ''} onChange={e => setEditingLehrwerk({...editingLehrwerk, author: e.target.value})} style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
+                        <input aria-label="Autor" placeholder="z.B. Max Mustermann" value={editingLehrwerk.author || ''} onChange={e => setEditingLehrwerk({...editingLehrwerk, author: e.target.value})} style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
                       </div>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                         <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Seitenzahl des Buchs</label>
-                        <input type="number" min="1" max="1000" placeholder="50" value={editingLehrwerk.totalPages || 50} onChange={e => setEditingLehrwerk({...editingLehrwerk, totalPages: Number(e.target.value) || 50})} style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
+                        <input aria-label="Seitenzahl des Buchs" type="number" min="1" max="1000" placeholder="50" value={editingLehrwerk.totalPages || 50} onChange={e => setEditingLehrwerk({...editingLehrwerk, totalPages: Number(e.target.value) || 50})} style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
                       </div>
                     </div>
                     <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>

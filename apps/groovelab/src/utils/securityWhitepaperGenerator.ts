@@ -5,7 +5,7 @@
  * Compliance PDF for music school boards, municipal IT departments, and DPOs.
  */
 
-export async function generateEnterpriseSecurityWhitepaperPDF(): Promise<void> {
+export async function generateEnterpriseSecurityWhitepaperPDF(options?: { schoolName?: string }): Promise<void> {
   try {
     const { default: jsPDF } = await import('jspdf');
     const doc = new jsPDF('p', 'mm', 'a4');
@@ -42,7 +42,8 @@ export async function generateEnterpriseSecurityWhitepaperPDF(): Promise<void> {
 
     doc.setTextColor(textGray[0], textGray[1], textGray[2]);
     doc.setFontSize(8);
-    doc.text(`Dokument-Version: 2026.8-LTS | Datum: ${new Date().toLocaleDateString('de-DE')} | Gültig für alle Schulträger`, margin, 35);
+    const schoolSub = options?.schoolName ? `Schule: ${options.schoolName}` : 'Gültig für alle Schulträger';
+    doc.text(`Dokument-Version: 2026.8-LTS | Datum: ${new Date().toLocaleDateString('de-DE')} | ${schoolSub}`, margin, 35);
 
     // Decorative Header Divider
     doc.setDrawColor(borderGray[0], borderGray[1], borderGray[2]);

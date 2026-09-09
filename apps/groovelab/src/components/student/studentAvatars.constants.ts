@@ -42,7 +42,7 @@ export interface Avatar {
   current_streak?: number;
 }
 
-export { getInstrumentAvatarUrl } from '../StudioAvatar';
+export { getInstrumentAvatarUrl, resolveCampusStudentAvatar } from '../StudioAvatar';
 
 export const maskEmail = (email: string | null | undefined): string => {
   if (!email) return 'Nicht hinterlegt';

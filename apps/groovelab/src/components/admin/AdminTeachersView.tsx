@@ -71,6 +71,7 @@ export const AdminTeachersView: React.FC<AdminTeachersViewProps> = ({
                 setShowAddTeacher(true);
                 setEditingTeacher(null);
               }}
+              aria-label="Neue Lehrkraft hinzufügen"
               style={{
                 background: brandColor,
                 color: activePlatform === 'groovelab' ? '#1e293b' : 'white',
@@ -101,11 +102,11 @@ export const AdminTeachersView: React.FC<AdminTeachersViewProps> = ({
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Vorname</label>
-                <input required placeholder="Vorname" value={newTeacher.firstName} onChange={e => setNewTeacher({...newTeacher, firstName: e.target.value})} style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.9rem', fontWeight: 600 }} />
+                <input required aria-label="Vorname" placeholder="Vorname" value={newTeacher.firstName} onChange={e => setNewTeacher({...newTeacher, firstName: e.target.value})} style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.9rem', fontWeight: 600 }} />
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Nachname</label>
-                <input required placeholder="Nachname" value={newTeacher.lastName} onChange={e => setNewTeacher({...newTeacher, lastName: e.target.value})} style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.9rem', fontWeight: 600 }} />
+                <input required aria-label="Nachname" placeholder="Nachname" value={newTeacher.lastName} onChange={e => setNewTeacher({...newTeacher, lastName: e.target.value})} style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.9rem', fontWeight: 600 }} />
               </div>
             </div>
             
@@ -240,11 +241,11 @@ export const AdminTeachersView: React.FC<AdminTeachersViewProps> = ({
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Vorname</label>
-                <input required placeholder="Vorname" value={editingTeacher.first_name} onChange={e => setEditingTeacher({...editingTeacher, first_name: e.target.value})} style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.9rem', fontWeight: 600 }} />
+                <input required aria-label="Vorname" placeholder="Vorname" value={editingTeacher.first_name} onChange={e => setEditingTeacher({...editingTeacher, first_name: e.target.value})} style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.9rem', fontWeight: 600 }} />
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Nachname</label>
-                <input required placeholder="Nachname" value={editingTeacher.last_name} onChange={e => setEditingTeacher({...editingTeacher, last_name: e.target.value})} style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.9rem', fontWeight: 600 }} />
+                <input required aria-label="Nachname" placeholder="Nachname" value={editingTeacher.last_name} onChange={e => setEditingTeacher({...editingTeacher, last_name: e.target.value})} style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.9rem', fontWeight: 600 }} />
               </div>
             </div>
             
@@ -360,17 +361,17 @@ export const AdminTeachersView: React.FC<AdminTeachersViewProps> = ({
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
               <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Musikalischer Werdegang (Bio)</label>
-              <textarea placeholder="Erzähle etwas über deinen Werdegang..." value={editingTeacher.bio || ''} onChange={e => setEditingTeacher({...editingTeacher, bio: e.target.value})} style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #e2e8f0', minHeight: '80px', fontSize: '0.9rem', fontWeight: 500, lineHeight: 1.4 }} />
+              <textarea aria-label="Musikalischer Werdegang (Bio)" placeholder="Erzähle etwas über deinen Werdegang..." value={editingTeacher.bio || ''} onChange={e => setEditingTeacher({...editingTeacher, bio: e.target.value})} style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #e2e8f0', minHeight: '80px', fontSize: '0.9rem', fontWeight: 500, lineHeight: 1.4 }} />
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Expertise & Stile</label>
-                <input placeholder="z.B. Jazz, Rock, Metal..." value={editingTeacher.expertise || ''} onChange={e => setEditingTeacher({...editingTeacher, expertise: e.target.value})} style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.9rem', fontWeight: 600 }} />
+                <input aria-label="Expertise & Stile" placeholder="z.B. Jazz, Rock, Metal..." value={editingTeacher.expertise || ''} onChange={e => setEditingTeacher({...editingTeacher, expertise: e.target.value})} style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.9rem', fontWeight: 600 }} />
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Bands & Projekte</label>
-                <input placeholder="z.B. Bands..." value={editingTeacher.bands || ''} onChange={e => setEditingTeacher({...editingTeacher, bands: e.target.value})} style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.9rem', fontWeight: 600 }} />
+                <input aria-label="Bands & Projekte" placeholder="z.B. Bands..." value={editingTeacher.bands || ''} onChange={e => setEditingTeacher({...editingTeacher, bands: e.target.value})} style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.9rem', fontWeight: 600 }} />
               </div>
             </div>
 
@@ -389,6 +390,9 @@ export const AdminTeachersView: React.FC<AdminTeachersViewProps> = ({
             return (
               <div 
                 key={t.id} 
+                role="button"
+                tabIndex={0}
+                aria-label={`Lehrkraft ${t.first_name} ${t.last_name || ''} bearbeiten`}
                 className="glass-panel" 
                 style={{ 
                   padding: '16px 20px', 
@@ -402,12 +406,22 @@ export const AdminTeachersView: React.FC<AdminTeachersViewProps> = ({
                   position: 'relative',
                   overflow: 'hidden',
                   cursor: 'pointer',
+                  outline: 'none',
                   transition: 'all 0.2s ease'
                 }}
                 onClick={() => {
                   if (t.id === userId || canManageTeachers) {
                     setEditingTeacher(t);
                     setShowAddTeacher(false);
+                  }
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    if (t.id === userId || canManageTeachers) {
+                      e.preventDefault();
+                      setEditingTeacher(t);
+                      setShowAddTeacher(false);
+                    }
                   }
                 }}
               >
@@ -422,7 +436,7 @@ export const AdminTeachersView: React.FC<AdminTeachersViewProps> = ({
                 {/* Info */}
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
-                    <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: isObserver ? '#94a3b8' : '#1e293b', margin: 0, transition: 'color 0.3s', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.first_name} {t.last_name}</h3>
+                    <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: isObserver ? '#475569' : '#1e293b', margin: 0, transition: 'color 0.3s', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.first_name} {t.last_name}</h3>
                     {t.role === 'admin' && !isObserver && <Shield size={14} color="#f59e0b" />}
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginBottom: '6px' }}>
@@ -445,7 +459,18 @@ export const AdminTeachersView: React.FC<AdminTeachersViewProps> = ({
                   {/* Lehrer / Hospitant Toggle */}
                   {(t.id === userId || canManageTeachers) ? (
                     <div
+                      role="switch"
+                      aria-checked={!isObserver}
+                      tabIndex={0}
+                      aria-label={`Lehrer-Modus für ${t.first_name} ${t.last_name || ''} umschalten (aktuell: ${isObserver ? 'Hospitant' : 'Lehrer aktiv'})`}
                       onClick={(e) => handleToggleObserver(t, e)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          handleToggleObserver(t, e as any);
+                        }
+                      }}
                       title={isObserver ? 'Auf Lehrer-Modus umschalten' : 'Auf Hospitant-Modus umschalten'}
                       style={{
                         display: 'inline-flex',
@@ -458,7 +483,8 @@ export const AdminTeachersView: React.FC<AdminTeachersViewProps> = ({
                         borderRadius: '16px',
                         background: isObserver ? '#f1f5f9' : `${brandColor}10`,
                         border: `1.5px solid ${isObserver ? '#e2e8f0' : `${brandColor}20`}`,
-                        transition: 'all 0.25s'
+                        transition: 'all 0.25s',
+                        outline: 'none'
                       }}
                     >
                       {/* Toggle pill */}
@@ -483,7 +509,7 @@ export const AdminTeachersView: React.FC<AdminTeachersViewProps> = ({
                         }}></div>
                       </div>
                       {/* Label */}
-                      <span style={{ fontSize: '0.7rem', fontWeight: 800, color: isObserver ? '#94a3b8' : brandColor, letterSpacing: '0.02em', transition: 'color 0.25s' }}>
+                      <span style={{ fontSize: '0.7rem', fontWeight: 800, color: isObserver ? '#475569' : brandColor, letterSpacing: '0.02em', transition: 'color 0.25s' }}>
                         {isObserver ? 'Hospitant' : 'Lehrer aktiv'}
                       </span>
                     </div>
@@ -498,7 +524,7 @@ export const AdminTeachersView: React.FC<AdminTeachersViewProps> = ({
                       background: isObserver ? '#f1f5f9' : `${brandColor}10`,
                       border: `1.5px solid ${isObserver ? '#e2e8f0' : `${brandColor}20`}`
                     }}>
-                      <span style={{ fontSize: '0.7rem', fontWeight: 800, color: isObserver ? '#94a3b8' : brandColor, letterSpacing: '0.02em' }}>
+                      <span style={{ fontSize: '0.7rem', fontWeight: 800, color: isObserver ? '#475569' : brandColor, letterSpacing: '0.02em' }}>
                         {isObserver ? '👁 Hospitant' : 'Lehrer aktiv'}
                       </span>
                     </div>
@@ -518,10 +544,24 @@ export const AdminTeachersView: React.FC<AdminTeachersViewProps> = ({
                 </div>
                 
                 {/* Action buttons */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }} onClick={e => e.stopPropagation()}>
-                  <button onClick={() => setSelectedQRUser(t)} style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '10px', borderRadius: '10px', cursor: 'pointer', color: '#64748b', transition: 'all 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><QrCode size={18} /></button>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); setSelectedQRUser(t); }} 
+                    aria-label={`QR-Zugangskarte und Login-Token für ${t.first_name} ${t.last_name || ''} anzeigen`}
+                    title="QR Code & Ausweis"
+                    style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '10px', borderRadius: '10px', cursor: 'pointer', color: '#64748b', transition: 'all 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                  >
+                    <QrCode size={18} />
+                  </button>
                   {t.id !== userId && canManageTeachers && (
-                    <button onClick={() => handleDeleteTeacher(t.id)} style={{ background: activePlatform === 'groovelab' ? '#fefce8' : '#fff1f2', border: activePlatform === 'groovelab' ? '1px solid #fef08a' : '1px solid #fecaca', padding: '10px', borderRadius: '10px', cursor: 'pointer', color: activePlatform === 'groovelab' ? '#eab308' : '#ef4444', transition: 'all 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Trash2 size={18} /></button>
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); handleDeleteTeacher(t.id); }} 
+                      aria-label={`Lehrkraft ${t.first_name} ${t.last_name || ''} aus Schule löschen`}
+                      title="Lehrkraft löschen"
+                      style={{ background: activePlatform === 'groovelab' ? '#fefce8' : '#fff1f2', border: activePlatform === 'groovelab' ? '1px solid #fef08a' : '1px solid #fecaca', padding: '10px', borderRadius: '10px', cursor: 'pointer', color: activePlatform === 'groovelab' ? '#eab308' : '#ef4444', transition: 'all 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                    >
+                      <Trash2 size={18} />
+                    </button>
                   )}
                 </div>
               </div>

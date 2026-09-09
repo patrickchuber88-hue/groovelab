@@ -266,6 +266,15 @@ const StationNode = React.memo(({ num, color, inst, sess, isMe, viewMode, onProf
       
       <div 
         className="glass-panel" 
+        role={isActive ? "button" : undefined}
+        tabIndex={isActive ? 0 : -1}
+        aria-label={isActive ? `Station ${stationName} öffnen: ${sess?.users?.first_name || ''} ${sess?.users?.last_name || ''} (${inst})` : `Station ${stationName} (${inst}, nicht belegt)`}
+        onKeyDown={(e) => {
+          if (isActive && (e.key === 'Enter' || e.key === ' ')) {
+            e.preventDefault();
+            onProfileSelect(sess.users);
+          }
+        }}
         onClick={() => {
           if (isActive) {
             onProfileSelect(sess.users);
@@ -752,61 +761,74 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                       borderRadius: '24px',
                       padding: '24px',
                       textAlign: 'center',
-                      boxShadow: '0 8px 32px rgba(0,0,0,0.04)'
+                      boxShadow: '0 8px 32px rgba(0,0,0,0.04)',
+                      overflow: 'hidden'
                     }}>
+                      {/* Light diagonal stripes overlay (5% opacity) */}
                       <div style={{
-                        width: '48px',
-                        height: '48px',
-                        borderRadius: '50%',
-                        background: 'rgba(251, 188, 5, 0.08)',
-                        border: '1px solid rgba(251, 188, 5, 0.15)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: '#eab308',
-                        margin: '0 auto 12px auto'
-                      }}>
-                        <Lock size={20} />
+                        position: 'absolute',
+                        inset: 0,
+                        backgroundImage: 'repeating-linear-gradient(-45deg, transparent, transparent 10px, rgba(15, 23, 42, 0.05) 10px, rgba(15, 23, 42, 0.05) 11px)',
+                        pointerEvents: 'none',
+                        borderRadius: 'inherit',
+                        zIndex: 0
+                      }} />
+                      <div style={{ position: 'relative', zIndex: 1 }}>
+                        <div style={{
+                          width: '48px',
+                          height: '48px',
+                          borderRadius: '50%',
+                          background: 'rgba(251, 188, 5, 0.08)',
+                          border: '1px solid rgba(251, 188, 5, 0.15)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: '#eab308',
+                          margin: '0 auto 12px auto'
+                        }}>
+                          <Lock size={20} />
+                        </div>
+                        <h4 style={{ fontSize: '18px', fontWeight: 900, color: '#1e293b', margin: '0 0 6px 0', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                          <CampusGroovelabLogo size={18} fontSize="18px" /> Live
+                        </h4>
+                        <p style={{ fontSize: '13px', color: '#64748b', margin: '0 0 16px 0', lineHeight: 1.4 }}>
+                          Bitte logge dich vor Ort in der Musikschule ein, um deine iPad-Station zu aktivieren und das Live Lab Board freizuschalten.
+                        </p>
+                        {checkingInStatus === 'locating' || checkingInStatus === 'verifying' ? (
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                            <div className="spin-checkin" style={{ width: '20px', height: '20px', border: '3px solid #fbbc05', borderTopColor: 'transparent', borderRadius: '50%' }} />
+                            <span style={{ fontSize: '12px', fontWeight: 600, color: '#eab308' }}>
+                              {checkingInStatus === 'locating' ? 'Bestimme Standort...' : 'Verifiziere Geodaten...'}
+                            </span>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={handleGeofenceCheck}
+                            className="pulse-btn-checkin"
+                            aria-label="Am Live Lab Board einloggen"
+                            style={{
+                              padding: '12px 24px',
+                              borderRadius: '12px',
+                              background: '#fbbc05',
+                              border: 'none',
+                              color: '#0f172a',
+                              fontSize: '14px',
+                              fontWeight: 800,
+                              cursor: 'pointer',
+                              boxShadow: '0 4px 10px rgba(251, 188, 5, 0.2)'
+                            }}
+                          >
+                            Einloggen
+                          </button>
+                        )}
+                        {checkingInStatus === 'error' && geoErrorMsg && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '12px', padding: '8px 12px', background: '#fef2f2', border: '1px solid #fee2e2', borderRadius: '10px', color: '#ef4444', fontSize: '12px' }}>
+                            <AlertCircle size={14} style={{ flexShrink: 0 }} />
+                            <span style={{ fontWeight: 600, textAlign: 'left' }}>{geoErrorMsg}</span>
+                          </div>
+                        )}
                       </div>
-                      <h4 style={{ fontSize: '18px', fontWeight: 900, color: '#1e293b', margin: '0 0 6px 0', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
-                        <CampusGroovelabLogo size={18} fontSize="18px" /> Live
-                      </h4>
-                      <p style={{ fontSize: '13px', color: '#64748b', margin: '0 0 16px 0', lineHeight: 1.4 }}>
-                        Bitte checke vor Ort in der Musikschule ein, um deine iPad-Station zu aktivieren.
-                      </p>
-                      {checkingInStatus === 'locating' || checkingInStatus === 'verifying' ? (
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
-                          <div className="spin-checkin" style={{ width: '20px', height: '20px', border: '3px solid #fbbc05', borderTopColor: 'transparent', borderRadius: '50%' }} />
-                          <span style={{ fontSize: '12px', fontWeight: 600, color: '#eab308' }}>
-                            {checkingInStatus === 'locating' ? 'Bestimme Standort...' : 'Verifiziere Geodaten...'}
-                          </span>
-                        </div>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={handleGeofenceCheck}
-                          className="pulse-btn-checkin"
-                          style={{
-                            padding: '12px 24px',
-                            borderRadius: '12px',
-                            background: '#fbbc05',
-                            border: 'none',
-                            color: '#0f172a',
-                            fontSize: '14px',
-                            fontWeight: 800,
-                            cursor: 'pointer',
-                            boxShadow: '0 4px 10px rgba(251, 188, 5, 0.2)'
-                          }}
-                        >
-                          Jetzt Einchecken
-                        </button>
-                      )}
-                      {checkingInStatus === 'error' && geoErrorMsg && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '12px', padding: '8px 12px', background: '#fef2f2', border: '1px solid #fee2e2', borderRadius: '10px', color: '#ef4444', fontSize: '12px' }}>
-                          <AlertCircle size={14} style={{ flexShrink: 0 }} />
-                          <span style={{ fontWeight: 600, textAlign: 'left' }}>{geoErrorMsg}</span>
-                        </div>
-                      )}
                     </div>
                   )}
 
@@ -860,25 +882,30 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                                   </div>
                                   {viewMode === 'admin' && (
                                     <button
+                                      type="button"
                                       onClick={(e) => {
                                         e.stopPropagation();
                                         if (isSelf && handleTeacherSelfCheckout) handleTeacherSelfCheckout();
                                         else if (!isSelf && handleTeacherCheckout) handleTeacherCheckout(c);
                                       }}
+                                      title={isSelf ? 'Vom Lehrer iPad abmelden' : 'Coach abmelden'}
+                                      aria-label={isSelf ? 'Vom Lehrer iPad abmelden' : 'Coach abmelden'}
                                       style={{
                                         background: '#fef2f2',
-                                        border: 'none',
+                                        border: '1px solid #fee2e2',
                                         borderRadius: '50%',
-                                        width: '16px',
-                                        height: '16px',
+                                        width: '20px',
+                                        height: '20px',
                                         display: 'flex',
                                         alignItems: 'center',
                                         justifyContent: 'center',
                                         cursor: 'pointer',
                                         color: '#ef4444',
-                                        fontSize: '8px',
+                                        fontSize: '9px',
+                                        fontWeight: 800,
                                         padding: 0,
-                                        marginLeft: '4px'
+                                        marginLeft: '6px',
+                                        transition: 'all 0.15s ease'
                                       }}
                                     >
                                       ✕
@@ -1433,7 +1460,7 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                             GrooveLab Live-Plattform
                           </h4>
                           <p style={{ fontSize: '14px', color: '#64748b', maxWidth: '300px', margin: '0 0 24px 0', lineHeight: 1.4 }}>
-                            Bitte checke vor Ort in der Musikschule ein, um deine iPad-Station zu aktivieren und die Live-Ansicht zu nutzen.
+                            Bitte logge dich vor Ort in der Musikschule ein, um deine iPad-Station zu aktivieren und das Live Lab Board freizuschalten.
                           </p>
 
                           {checkingInStatus === 'locating' || checkingInStatus === 'verifying' ? (
@@ -1448,6 +1475,7 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                               type="button"
                               onClick={handleGeofenceCheck}
                               className="pulse-btn-checkin"
+                              aria-label="Am Live Lab Board einloggen"
                               style={{
                                 padding: '14px 28px',
                                 borderRadius: '16px',
@@ -1461,7 +1489,7 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                                 boxShadow: '0 4px 14px rgba(251, 188, 5, 0.3)'
                               }}
                             >
-                              Jetzt Einchecken
+                              Einloggen
                             </button>
                           )}
 
@@ -1675,7 +1703,7 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                         GrooveLab Live-Plattform
                       </h4>
                       <p style={{ fontSize: '14px', color: '#64748b', maxWidth: '300px', margin: '0 0 24px 0', lineHeight: 1.4 }}>
-                        Bitte checke vor Ort in der Musikschule ein, um deine iPad-Station zu aktivieren und die Live-Ansicht zu nutzen.
+                        Bitte logge dich vor Ort in der Musikschule ein, um deine iPad-Station zu aktivieren und das Live Lab Board freizuschalten.
                       </p>
 
                       {checkingInStatus === 'locating' || checkingInStatus === 'verifying' ? (
@@ -1690,6 +1718,7 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                           type="button"
                           onClick={handleGeofenceCheck}
                           className="pulse-btn-checkin"
+                          aria-label="Am Live Lab Board einloggen"
                           style={{
                             padding: '14px 28px',
                             borderRadius: '16px',
@@ -1703,7 +1732,7 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                             boxShadow: '0 4px 14px rgba(251, 188, 5, 0.3)'
                           }}
                         >
-                          Jetzt Einchecken
+                          Einloggen
                         </button>
                       )}
 
@@ -1980,10 +2009,10 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                boxShadow: '0 10px 30px rgba(234, 179, 8, 0.05)'
              }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
-                  <div style={{ background: '#eab308', color: 'white', padding: '8px', borderRadius: '10px', boxShadow: '0 4px 10px rgba(234, 179, 8, 0.3)' }}>
-                    <Zap size={18} fill="white" />
+                  <div style={{ background: '#eab308', color: '#0f172a', padding: '8px', borderRadius: '10px', boxShadow: '0 4px 10px rgba(234, 179, 8, 0.3)' }}>
+                    <Zap size={18} color="#0f172a" fill="#0f172a" />
                   </div>
-                  <h3 style={{ fontSize: '0.85rem', fontWeight: 1000, color: '#eab308', textTransform: 'uppercase', letterSpacing: '0.15em', margin: 0 }}>Band-Matching</h3>
+                  <h3 style={{ fontSize: '0.85rem', fontWeight: 1000, color: '#854d0e', textTransform: 'uppercase', letterSpacing: '0.15em', margin: 0 }}>Band-Matching</h3>
                 </div>
                
                 {wallSongs.length > 0 ? (

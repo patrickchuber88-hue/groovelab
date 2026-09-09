@@ -1,8 +1,30 @@
-import React, { useRef } from "react";
-import { Target, ChevronDown } from "lucide-react";
+import React, { useRef, useState } from "react";
+import { 
+  Target, ChevronDown, BarChart2, Info, Award, Compass, Sparkles, Scale, 
+  Clock3, Zap, Music, BookOpen, Calendar, Edit3 
+} from "lucide-react";
 import { getISOWeek } from "../studentDateUtils";
 import { SKILL_TAGS } from "../meisterwerk.types";
 import { cleanNotesText, isInternalMetadataNote } from "../../../domain/stickersAndTresor";
+import { SkillRadarPentagon } from "../../common/SkillRadarPentagon";
+import { SkillDetailSheetModal } from "./SkillDetailSheetModal";
+
+export const getSkillMonochromeIcon = (key: string, size = 15) => {
+  switch (key) {
+    case 'rhythmus':
+      return <Clock3 size={size} />;
+    case 'technik':
+      return <Zap size={size} />;
+    case 'klang':
+      return <Music size={size} />;
+    case 'ausdruck':
+      return <Sparkles size={size} />;
+    case 'repertoire':
+      return <BookOpen size={size} />;
+    default:
+      return <Compass size={size} />;
+  }
+};
 
 export interface MeisterwerkSkillRadarTabProps {
   progressItems: any[];
@@ -16,6 +38,10 @@ export interface MeisterwerkSkillRadarTabProps {
   isTeacherTools?: boolean;
   isMobileView: boolean;
   useNotebookLayout?: boolean;
+  uiLevel?: 'junior' | 'teen' | 'pro';
+  teacherName?: string;
+  studentName?: string;
+  instrumentName?: string;
   handleMasterAllSkills: () => void;
   handleTriggerSkillQuest: (tagKey: string) => void;
   handleSetSkillLevel: (tagKey: string, targetLevel: number) => void;
@@ -34,12 +60,17 @@ export const MeisterwerkSkillRadarTab: React.FC<MeisterwerkSkillRadarTabProps> =
   isTeacherTools,
   isMobileView,
   useNotebookLayout = false,
+  uiLevel = 'teen',
+  teacherName,
+  studentName,
+  instrumentName,
   handleMasterAllSkills,
   handleTriggerSkillQuest,
   handleSetSkillLevel,
   renderTextWithDidacticBadges
 }) => {
   const radarAnalysisCardsRef = useRef<HTMLDivElement | null>(null);
+  const [selectedSkillForModal, setSelectedSkillForModal] = useState<string | null>(null);
 
     const feedbackEntries = (progressItems || [])
       .map((item: any) => {
@@ -127,31 +158,12 @@ export const MeisterwerkSkillRadarTab: React.FC<MeisterwerkSkillRadarTabProps> =
       }
     });
 
-    const N = SKILL_TAGS.length;
-    const cx = 260, cy = 250, rMax = 135;
-    const getPoint = (index: number, val: number) => {
-      const angle = (Math.PI * 2 / N) * index - Math.PI / 2;
-      return {
-        x: cx + rMax * val * Math.cos(angle),
-        y: cy + rMax * val * Math.sin(angle),
-        angle
-      };
-    };
-
-    const dataPoints = tagCounts.map((t, i) => getPoint(i, Math.max(t.pct, 0.20)));
-    const dataPath = dataPoints.map((p, i) => (i === 0 ? `M ${p.x} ${p.y}` : `L ${p.x} ${p.y}`)).join(' ') + ' Z';
-    const gridLevels = [0.25, 0.5, 0.75, 1.0];
-    const gridPaths = gridLevels.map(lvl => {
-      const pts = SKILL_TAGS.map((_, i) => getPoint(i, lvl));
-      return pts.map((p, i) => (i === 0 ? `M ${p.x} ${p.y}` : `L ${p.x} ${p.y}`)).join(' ') + ' Z';
-    });
-
     const isMobileOrTabletView = isMobileView;
     return (
       <div style={{ flex: 1, width: '100%', display: 'flex', flexDirection: isMobileOrTabletView ? 'column' : 'row', overflowY: isMobileOrTabletView ? 'auto' : 'hidden', background: useNotebookLayout ? '#fcfaf7' : '#ffffff' }} className="modal-content-container custom-scrollbar">
-        {/* LINKE BUCHSEITE: 5-PENTAGON SKILL-RADAR */}
+        {/* LINKE BUCHSEITE: 5-PENTAGON KOMPETENZ-RADAR */}
         <div style={{
-          flex: isMobileOrTabletView ? 'none' : '1 1 0%',
+          flex: isMobileOrTabletView ? 'none' : '1.1 1 0%',
           width: '100%',
           display: 'flex',
           flexDirection: 'column',
@@ -159,9 +171,11 @@ export const MeisterwerkSkillRadarTab: React.FC<MeisterwerkSkillRadarTabProps> =
           justifyContent: 'space-between',
           borderRight: isMobileOrTabletView ? 'none' : '1px solid #e8e8ed',
           borderBottom: isMobileOrTabletView ? '1.5px solid #e8e8ed' : 'none',
-          padding: isMobileOrTabletView ? '16px 14px' : '24px 28px',
+          padding: isMobileOrTabletView ? '16px 14px' : '20px 24px',
           position: 'relative',
-          background: '#ffffff'
+          background: '#ffffff',
+          gap: '14px',
+          overflowY: 'auto'
         }}>
           {/* Apple Glassmorphic Legend Pill */}
           <div style={{
@@ -169,29 +183,30 @@ export const MeisterwerkSkillRadarTab: React.FC<MeisterwerkSkillRadarTabProps> =
             flexWrap: 'wrap',
             alignItems: 'center',
             justifyContent: 'center',
-            gap: '10px',
-            padding: '6px 16px',
-            fontSize: '0.74rem',
+            gap: '12px',
+            padding: '8px 18px',
+            fontSize: '0.84rem',
             fontWeight: 750,
-            background: 'rgba(255, 255, 255, 0.90)',
+            background: 'rgba(255, 255, 255, 0.92)',
             backdropFilter: 'blur(20px)',
             border: '1px solid #e2e8f0',
             borderRadius: '100px',
-            boxShadow: '0 2px 8px -2px rgba(0, 0, 0, 0.04)',
+            boxShadow: '0 2px 10px -2px rgba(0, 0, 0, 0.05)',
             zIndex: 5
           }}>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', color: '#0f172a' }}>
-              <span>🎯</span>
-              <span>Aktiver Wochenfokus</span>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: '#0f172a' }}>
+              <Target size={14} className="text-slate-800" />
+              <span>{uiLevel === 'junior' ? 'Sternen-Wochenfokus' : 'Aktiver Wochenfokus'}</span>
             </span>
             <span style={{ color: '#cbd5e1' }}>•</span>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', color: '#0f172a' }}>
-              <span>🌟</span>
-              <span>Meisterstufe (Stufe 5)</span>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: '#0f172a' }}>
+              <Award size={14} className="text-slate-800" />
+              <span>{uiLevel === 'junior' ? 'Meister-Zauberer' : 'Meisterstufe (Stufe 5)'}</span>
             </span>
             <span style={{ color: '#cbd5e1' }}>•</span>
-            <span style={{ color: '#64748b', fontWeight: 650 }}>
-              Stufen 1–5: Kompetenz-Profil
+            <span style={{ color: '#475569', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+              <Compass size={14} className="text-slate-500" />
+              <span>{uiLevel === 'junior' ? 'Tippe auf eine Spitze für deinen Zaubertipp!' : 'Stufen 1–5: Förder-Entwicklungsraster'}</span>
             </span>
           </div>
 
@@ -220,206 +235,33 @@ export const MeisterwerkSkillRadarTab: React.FC<MeisterwerkSkillRadarTabProps> =
             </table>
           </div>
 
-          {/* SVG Radar Center Container (Apple Health / Watch Aesthetic) */}
+          {/* Harmonisiertes SVG Radar Center Container (Single Source of Truth Component) */}
           <div style={{
             margin: 'auto 0',
             width: '100%',
-            maxHeight: isMobileOrTabletView ? '340px' : '440px',
+            maxWidth: isMobileOrTabletView ? '360px' : '440px',
+            maxHeight: isMobileOrTabletView ? '360px' : '440px',
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'center',
             position: 'relative'
           }}>
-            <svg
-              width="100%"
-              height="100%"
-              viewBox="-20 -20 560 520"
-              style={{
-                maxWidth: '520px',
-                maxHeight: '490px',
-                display: 'block',
-                overflow: 'visible'
-              }}
-            >
-              <defs>
-                {/* Apple Aurora Liquid-Glass Gradient (Harmonizes with Indigo, Blue, Green, Purple, Gold) */}
-                <linearGradient id="appleAuroraGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stopColor="#6366f1" stopOpacity="0.22" />
-                  <stop offset="45%" stopColor="#a855f7" stopOpacity="0.18" />
-                  <stop offset="100%" stopColor="#3b82f6" stopOpacity="0.14" />
-                </linearGradient>
-
-                {/* Soft Aurora Polygon Diffusion Shadow */}
-                <filter id="applePolyShadow" x="-20%" y="-20%" width="140%" height="140%">
-                  <feDropShadow dx="0" dy="4" stdDeviation="10" floodColor="#6366f1" floodOpacity="0.18" />
-                </filter>
-              </defs>
-
-              {/* 1. Concentric Chronometer Grid Pentagons */}
-              {gridPaths.map((d, i) => {
-                const isOuter = i === 3;
-                return (
-                  <path
-                    key={i}
-                    d={d}
-                    fill="none"
-                    stroke={isOuter ? "#cbd5e1" : "#e2e8f0"}
-                    strokeWidth={isOuter ? "1.4" : "0.9"}
-                  />
-                );
-              })}
-
-              {/* 2. Axis Spokes (Fine Precision Lines) */}
-              {SKILL_TAGS.map((_, i) => {
-                const pt = getPoint(i, 1);
-                return (
-                  <line
-                    key={i}
-                    x1={cx}
-                    y1={cy}
-                    x2={pt.x}
-                    y2={pt.y}
-                    stroke="#e2e8f0"
-                    strokeWidth="0.9"
-                  />
-                );
-              })}
-
-              {/* 3. Primary Apple Aurora Liquid-Glass Radar Polygon */}
-              <path
-                d={dataPath}
-                fill="url(#appleAuroraGradient)"
-                stroke="#6366f1"
-                strokeWidth="2.4"
-                strokeLinejoin="round"
-                strokeLinecap="round"
-                filter="url(#applePolyShadow)"
-                style={{ transition: 'all 0.6s cubic-bezier(0.16, 1, 0.3, 1)' }}
-              />
-
-              {/* 4. Apple Minimalist Nodes */}
-              {tagCounts.map((tag, i) => {
-                const p = getPoint(i, Math.max(tag.pct, 0.20));
-                const isSuperkraft = tag.level >= 4;
-                const isTargetFocus = activeWeeklyTargetTags.includes(tag.key);
-                const tagThemeColor = tag.color || '#ff9f0a';
-                return (
-                  <g key={i}>
-                    {isTargetFocus ? (
-                      <g>
-                        <circle
-                          cx={p.x}
-                          cy={p.y}
-                          r="15"
-                          fill={`${tagThemeColor}22`}
-                          stroke={tagThemeColor}
-                          strokeWidth="1.6"
-                        />
-                        <circle
-                          cx={p.x}
-                          cy={p.y}
-                          r="6.5"
-                          fill={tagThemeColor}
-                          stroke="#ffffff"
-                          strokeWidth="2.5"
-                          style={{ filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.15))' }}
-                        />
-                      </g>
-                    ) : isSuperkraft ? (
-                      <circle
-                        cx={p.x}
-                        cy={p.y}
-                        r="5.5"
-                        fill="#34c759"
-                        stroke="#ffffff"
-                        strokeWidth="2.5"
-                        style={{ filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.12))' }}
-                      />
-                    ) : (
-                      <circle
-                        cx={p.x}
-                        cy={p.y}
-                        r="5"
-                        fill={tag.dotColor || '#0a84ff'}
-                        stroke="#ffffff"
-                        strokeWidth="2"
-                        style={{ filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.12))' }}
-                      />
-                    )}
-                  </g>
-                );
-              })}
-
-              {/* 5. Apple 2-Line Typographic Labels with Distinct Category Tag Colors */}
-              {tagCounts.map((tag, i) => {
-                const p = getPoint(i, 1.25);
-                const isSuperkraft = tag.level >= 4;
-                const isTargetFocus = activeWeeklyTargetTags.includes(tag.key);
-                
-                let textAnchor: "middle" | "start" | "end" = "middle";
-                let offsetX = 0;
-                let offsetY = 0;
-
-                if (i === 0) {
-                  // Top (Rhythmus)
-                  textAnchor = "middle";
-                  offsetY = -14;
-                } else if (i === 1) {
-                  // Top Right (Spieltechnik)
-                  textAnchor = "start";
-                  offsetX = 10;
-                  offsetY = -4;
-                } else if (i === 2) {
-                  // Bottom Right (Klang)
-                  textAnchor = "start";
-                  offsetX = 10;
-                  offsetY = 10;
-                } else if (i === 3) {
-                  // Bottom Left (Ausdruck)
-                  textAnchor = "end";
-                  offsetX = -10;
-                  offsetY = 10;
-                } else if (i === 4) {
-                  // Top Left (Repertoire)
-                  textAnchor = "end";
-                  offsetX = -10;
-                  offsetY = -4;
+            <SkillRadarPentagon
+              levels={skillOverrides}
+              activeFocusTags={activeWeeklyTargetTags}
+              size={isMobileOrTabletView ? 'compact' : 'normal'}
+              uiLevel={uiLevel}
+              studentName={studentName}
+              instrumentName={instrumentName}
+              showVignette={false}
+              onSkillClick={(tagKey) => {
+                setSelectedSkillForModal(tagKey);
+                if (handleTriggerSkillQuest) {
+                  handleTriggerSkillQuest(tagKey);
                 }
-
-                const posX = p.x + offsetX;
-                const posY = p.y + offsetY;
-
-                return (
-                  <g key={i}>
-                    {/* Zeile 1: Name mit didaktischer Kategoriefarbe */}
-                    <text
-                      x={posX}
-                      y={posY}
-                      textAnchor={textAnchor}
-                      fontSize="12"
-                      fontWeight="800"
-                      fill={tag.color || '#1d1d1f'}
-                      style={{ letterSpacing: '-0.01em', fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif' }}
-                    >
-                      {tag.icon} {tag.shortLabel}
-                    </text>
-                    {/* Zeile 2: Subtitle & Level */}
-                    <text
-                      x={posX}
-                      y={posY + 14}
-                      textAnchor={textAnchor}
-                      fontSize="10.5"
-                      fontWeight="650"
-                      fill={isTargetFocus ? (tag.color || '#d97706') : (isSuperkraft ? '#15803d' : '#0284c7')}
-                      style={{ letterSpacing: '0.01em', fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif' }}
-                    >
-                      Stufe {tag.level} · {isTargetFocus ? 'Fokus 🎯' : (isSuperkraft ? 'Meister 🌟' : 'Aufsteiger 🚀')}
-                    </text>
-                  </g>
-                );
-              })}
-            </svg>
+              }}
+            />
           </div>
 
           {/* VORWOCHEN-RÜCKBLICK & LEHRER-STUNDENEINSTIEG */}
@@ -466,18 +308,18 @@ export const MeisterwerkSkillRadarTab: React.FC<MeisterwerkSkillRadarTabProps> =
               }}>
                 {/* Header Row */}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.76rem', fontWeight: 800, color: '#0f172a' }}>
-                    <span>📅</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.86rem', fontWeight: 800, color: '#0f172a' }}>
+                    <Calendar size={16} className="text-slate-800" />
                     <span>Vorwochen-Check-In & Stundeneinstieg</span>
                   </div>
                   {prevWeekText && (
                     <span style={{
-                      fontSize: '0.64rem',
-                      fontWeight: 750,
+                      fontSize: '0.74rem',
+                      fontWeight: 800,
                       color: '#0369a1',
                       background: '#f0f9ff',
                       border: '1px solid #e0f2fe',
-                      padding: '2px 8px',
+                      padding: '3px 9px',
                       borderRadius: '100px'
                     }}>
                       KW {prevWeekNum}
@@ -491,11 +333,11 @@ export const MeisterwerkSkillRadarTab: React.FC<MeisterwerkSkillRadarTabProps> =
                     <div style={{
                       background: '#f8fafc',
                       border: '1px solid #f1f5f9',
-                      borderRadius: '10px',
-                      padding: '8px 12px',
-                      fontSize: '0.74rem',
+                      borderRadius: '12px',
+                      padding: '10px 14px',
+                      fontSize: '0.82rem',
                       color: '#334155',
-                      lineHeight: '1.4'
+                      lineHeight: '1.45'
                     }}>
                       <strong style={{ color: '#0f172a' }}>{prevWeekItem?.topic_name || `Hausaufgabe KW ${prevWeekNum}`}:</strong> {prevWeekText}
                     </div>
@@ -509,25 +351,26 @@ export const MeisterwerkSkillRadarTab: React.FC<MeisterwerkSkillRadarTabProps> =
                           background: 'linear-gradient(180deg, #16a34a 0%, #15803d 100%)',
                           border: 'none',
                           color: '#ffffff',
-                          borderRadius: '10px',
-                          padding: '8px 14px',
-                          fontSize: '0.74rem',
+                          borderRadius: '12px',
+                          padding: '10px 16px',
+                          fontSize: '0.82rem',
                           fontWeight: 800,
                           cursor: 'pointer',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          gap: '6px',
+                          gap: '8px',
                           boxShadow: '0 2px 6px rgba(22, 163, 74, 0.25)',
                           transition: 'all 0.15s ease'
                         }}
                         className="hover-scale"
                       >
-                        <span>🌟 Vorwoche super gemeistert (+100 XP)</span>
+                        <Sparkles size={15} />
+                        <span>Vorwoche super gemeistert (+100 XP)</span>
                       </button>
 
                       {/* 5 Säulen Quick Focus Selector */}
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                         {SKILL_TAGS.map(t => {
                           const isTarget = activeWeeklyTargetTags.includes(t.key);
                           return (
@@ -551,9 +394,9 @@ export const MeisterwerkSkillRadarTab: React.FC<MeisterwerkSkillRadarTabProps> =
                               }}
                               className="hover-scale-mini"
                             >
-                              <span>{t.icon}</span>
+                              <span>{getSkillMonochromeIcon(t.key, 12)}</span>
                               <span>{t.shortLabel}</span>
-                              {isTarget && <span style={{ fontSize: '0.60rem' }}>🎯</span>}
+                              {isTarget && <Target size={11} />}
                             </button>
                           );
                         })}
@@ -570,7 +413,7 @@ export const MeisterwerkSkillRadarTab: React.FC<MeisterwerkSkillRadarTabProps> =
                     alignItems: 'center',
                     gap: '10px'
                   }}>
-                    <span style={{ fontSize: '1.2rem' }}>🎵</span>
+                    <Music size={16} className="text-slate-600" />
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                       <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#0f172a' }}>
                         Bereit für den neuen Stundeneinstieg
@@ -638,33 +481,56 @@ export const MeisterwerkSkillRadarTab: React.FC<MeisterwerkSkillRadarTabProps> =
               background: '#ffffff',
               border: '1px solid #e2e8f0',
               borderRadius: '20px',
-              padding: isMobileOrTabletView ? '14px 16px' : '18px 20px',
+              padding: isMobileOrTabletView ? '16px 18px' : '20px 22px',
               boxShadow: '0 4px 16px -2px rgba(0, 0, 0, 0.04)',
               display: 'flex',
               flexDirection: 'column',
-              gap: '12px'
+              gap: '14px'
             }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#0f172a', fontWeight: 850, fontSize: isMobileOrTabletView ? '0.82rem' : '0.86rem' }}>
-                  <span style={{ fontSize: '1.1rem' }}>🎯</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#0f172a', fontWeight: 850, fontSize: isMobileOrTabletView ? '0.92rem' : '1.04rem' }}>
+                  <Target size={18} className="text-slate-900" />
                   <span style={{ whiteSpace: 'nowrap' }}>Aktiver Wochenschwerpunkt</span>
                 </div>
                 <span style={{
-                  fontSize: '0.68rem',
+                  fontSize: '0.78rem',
                   fontWeight: 800,
-                  color: activeWeeklyTargetTags.length > 0 ? '#b45309' : '#64748b',
+                  color: activeWeeklyTargetTags.length > 0 ? '#b45309' : '#475569',
                   background: activeWeeklyTargetTags.length > 0 ? '#fef3c7' : '#f1f5f9',
                   border: `1px solid ${activeWeeklyTargetTags.length > 0 ? '#fde68a' : '#e2e8f0'}`,
-                  padding: '2px 9px',
+                  padding: '4px 12px',
                   borderRadius: '100px',
-                  whiteSpace: 'nowrap'
+                  whiteSpace: 'nowrap',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px'
                 }}>
-                  {activeWeeklyTargetTags.length > 0 ? 'Fokus aktiv' : 'Ausgeglichen'}
+                  {activeWeeklyTargetTags.length > 0 ? (
+                    <>
+                      <Target size={12} />
+                      <span>Fokus aktiv</span>
+                    </>
+                  ) : uiLevel === 'junior' ? (
+                    <>
+                      <Sparkles size={12} />
+                      <span>Rundum-Zauber</span>
+                    </>
+                  ) : uiLevel === 'pro' ? (
+                    <>
+                      <Scale size={12} />
+                      <span>Harmonische Balance</span>
+                    </>
+                  ) : (
+                    <>
+                      <Compass size={12} />
+                      <span>Ganzheitlich</span>
+                    </>
+                  )}
                 </span>
               </div>
 
               {activeWeeklyTargetTags.length > 0 ? (
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                   {activeWeeklyTargetTags.map(tagKey => {
                     const tagObj = SKILL_TAGS.find(t => t.key === tagKey);
                     if (!tagObj) return null;
@@ -673,23 +539,27 @@ export const MeisterwerkSkillRadarTab: React.FC<MeisterwerkSkillRadarTabProps> =
                         background: tagObj.bg || '#fefce8',
                         border: `1px solid ${tagObj.border || '#fef08a'}`,
                         color: tagObj.color || '#854d0e',
-                        padding: '4px 12px',
+                        padding: '6px 14px',
                         borderRadius: '100px',
-                        fontSize: '0.78rem',
+                        fontSize: '0.86rem',
                         fontWeight: 800,
                         display: 'inline-flex',
                         alignItems: 'center',
                         gap: '6px',
                         boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
                       }}>
-                        {tagObj.icon} {tagObj.label} 🎯
+                        {getSkillMonochromeIcon(tagKey, 14)} {tagObj.label} <Target size={12} />
                       </span>
                     );
                   })}
                 </div>
               ) : (
-                <div style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600 }}>
-                  Gleichmäßiges Training aller 5 Kern-Säulen in dieser Unterrichtswoche.
+                <div style={{ fontSize: '0.88rem', color: '#475569', fontWeight: 600, lineHeight: 1.45 }}>
+                  {uiLevel === 'junior'
+                    ? 'Du trainierst alle deine 5 Superkräfte gleichzeitig – wie ein wahrer Zaubermusiker!'
+                    : uiLevel === 'pro'
+                      ? 'Ganzheitliche Repertoire- und Technikpflege über alle 5 Säulen hinweg.'
+                      : 'Du stärkst alle 5 Fähigkeiten gleichzeitig für deinen perfekten Bandsound!'}
                 </div>
               )}
 
@@ -728,31 +598,31 @@ export const MeisterwerkSkillRadarTab: React.FC<MeisterwerkSkillRadarTabProps> =
                   <div style={{
                     background: '#f8fafc',
                     border: '1px solid #f1f5f9',
-                    borderRadius: '14px',
-                    padding: '10px 14px',
+                    borderRadius: '16px',
+                    padding: '12px 16px',
                     display: 'flex',
                     flexDirection: 'column',
-                    gap: '6px'
+                    gap: '8px'
                   }}>
-                    <span style={{ fontSize: '0.64rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <Target size={11} color="#64748b" strokeWidth={2.6} />
+                    <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                      <Target size={13} color="#64748b" strokeWidth={2.6} />
                       <span>Didaktischer Wochen-Leitfaden</span>
                     </span>
                     {rawImpulseLines.length > 1 ? (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', marginTop: '2px' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '2px' }}>
                         {rawImpulseLines.map((line, lIdx) => (
-                          <div key={`impulse-line-${lIdx}`} style={{ display: 'flex', alignItems: 'baseline', gap: '6px', fontSize: '0.78rem', color: '#1e293b', lineHeight: 1.45, fontWeight: 550 }}>
-                            <span style={{ color: '#94a3b8', fontSize: '0.70rem', flexShrink: 0 }}>•</span>
+                          <div key={`impulse-line-${lIdx}`} style={{ display: 'flex', alignItems: 'baseline', gap: '8px', fontSize: '0.86rem', color: '#1e293b', lineHeight: 1.5, fontWeight: 550 }}>
+                            <span style={{ color: '#94a3b8', fontSize: '0.76rem', flexShrink: 0 }}>•</span>
                             <span>{renderTextWithDidacticBadges(line)}</span>
                           </div>
                         ))}
                       </div>
                     ) : rawImpulseLines.length === 1 ? (
-                      <p style={{ margin: 0, fontSize: '0.78rem', color: '#1e293b', lineHeight: 1.45, fontWeight: 550 }}>
+                      <p style={{ margin: 0, fontSize: '0.86rem', color: '#1e293b', lineHeight: 1.5, fontWeight: 550 }}>
                         „{renderTextWithDidacticBadges(rawImpulseLines[0])}“
                       </p>
                     ) : (
-                      <p style={{ margin: 0, fontSize: '0.78rem', color: '#94a3b8', fontStyle: 'italic', lineHeight: 1.45 }}>
+                      <p style={{ margin: 0, fontSize: '0.86rem', color: '#64748b', fontStyle: 'italic', lineHeight: 1.5 }}>
                         „Jede musikalische Meisterleistung beginnt mit Freude am Entdecken und geduldigem Wachsen.“
                       </p>
                     )}
@@ -766,23 +636,42 @@ export const MeisterwerkSkillRadarTab: React.FC<MeisterwerkSkillRadarTabProps> =
               background: '#ffffff',
               border: '1px solid #e2e8f0',
               borderRadius: '20px',
-              padding: isMobileOrTabletView ? '14px 16px' : '18px 20px',
+              padding: isMobileOrTabletView ? '16px 18px' : '20px 22px',
               boxShadow: '0 4px 16px -2px rgba(0, 0, 0, 0.04)',
               display: 'flex',
               flexDirection: 'column',
-              gap: '12px'
+              gap: '14px'
             }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#0f172a', fontWeight: 850, fontSize: isMobileOrTabletView ? '0.82rem' : '0.86rem' }}>
-                  <span style={{ fontSize: '1.1rem' }}>📊</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#0f172a', fontWeight: 850, fontSize: isMobileOrTabletView ? '0.92rem' : '1.04rem' }}>
+                  <BarChart2 size={18} className="text-slate-900" />
                   <span style={{ whiteSpace: 'nowrap' }}>Kompetenz-Übersicht (5 Säulen)</span>
                 </div>
-                <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#64748b', whiteSpace: 'nowrap' }}>
+                <span style={{ fontSize: '0.78rem', fontWeight: 750, color: '#475569', background: '#f1f5f9', border: '1px solid #e2e8f0', padding: '3px 10px', borderRadius: '100px', whiteSpace: 'nowrap' }}>
                   5 Stufen System
                 </span>
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {/* Juristische Klarstellung & Pädagogische Orientierung (Art. 22 DSGVO / Schulrecht) */}
+              <div style={{
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '10px',
+                padding: '10px 14px',
+                background: '#f8fafc',
+                border: '1px solid #e2e8f0',
+                borderRadius: '12px',
+                fontSize: '0.78rem',
+                color: '#475569',
+                lineHeight: 1.45
+              }}>
+                <Info size={16} className="text-slate-600" style={{ flexShrink: 0, marginTop: '2px' }} />
+                <span>
+                  <strong style={{ color: '#1e293b' }}>Pädagogisches Entwicklungsraster:</strong> Dient der individuellen Förderung musikalischer Schwerpunkte (keine statische Notengebung). Einstufung erfolgt persönlich und pädagogisch durch deine Fachlehrkraft.
+                </span>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 {tagCounts.map(s => {
                   const isTarget = activeWeeklyTargetTags.includes(s.key);
                   const isMeister = s.level >= 5;
@@ -793,30 +682,55 @@ export const MeisterwerkSkillRadarTab: React.FC<MeisterwerkSkillRadarTabProps> =
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'space-between',
-                        padding: '8px 12px',
-                        borderRadius: '12px',
+                        padding: '10px 14px',
+                        borderRadius: '14px',
                         background: isTarget ? (s.lightBg || '#fffbeb') : '#f8fafc',
                         border: `1px solid ${isTarget ? (s.border || '#fde68a') : '#f1f5f9'}`,
                         transition: 'all 0.2s ease'
                       }}
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: isMobileOrTabletView ? '100px' : '130px' }}>
-                        <span style={{ fontSize: '0.84rem' }}>{s.icon}</span>
-                        <span style={{ fontSize: '0.78rem', fontWeight: 800, color: s.color || '#0f172a' }}>
+                      <div
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => setSelectedSkillForModal(s.key)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            setSelectedSkillForModal(s.key);
+                          }
+                        }}
+                        title={`${s.label}: Didaktische Details & Übetipps ansehen`}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '10px',
+                          minWidth: isMobileOrTabletView ? '110px' : '140px',
+                          cursor: 'pointer',
+                          borderRadius: '8px',
+                          padding: '2px 4px',
+                          outline: 'none',
+                          transition: 'opacity 0.15s ease'
+                        }}
+                        className="hover-scale-mini"
+                      >
+                        <span style={{ display: 'inline-flex', alignItems: 'center' }}>
+                          {getSkillMonochromeIcon(s.key, 16)}
+                        </span>
+                        <span style={{ fontSize: '0.92rem', fontWeight: 800, color: s.color || '#0f172a' }}>
                           {s.shortLabel}
                         </span>
                         {isTarget && (
-                          <span style={{ fontSize: '0.60rem', fontWeight: 850, color: s.color || '#b45309', background: s.bg || '#fef3c7', border: `1px solid ${s.border || '#fde68a'}`, padding: '1px 5px', borderRadius: '100px' }}>
+                          <span style={{ fontSize: '0.68rem', fontWeight: 850, color: s.color || '#b45309', background: s.bg || '#fef3c7', border: `1px solid ${s.border || '#fde68a'}`, padding: '2px 7px', borderRadius: '100px' }}>
                             Fokus
                           </span>
                         )}
                       </div>
 
-                      {/* 5 Apple-Dots (Direkt klickbar für Lehrkräfte mit 22px Touch-Hitbox) */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+                      {/* 5 Apple-Dots (Direkt klickbar für Lehrkräfte mit 28px Touch-Hitbox & 13.5px Dot) */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                         {[1, 2, 3, 4, 5].map(seg => {
                           const isFilled = s.level >= seg;
-                          let dotColor = '#e2e8f0';
+                          let dotColor = '#cbd5e1';
                           if (isFilled) {
                             if (isTarget) dotColor = s.dotColor || s.color || '#f59e0b';
                             else if (isMeister) dotColor = '#16a34a';
@@ -833,8 +747,8 @@ export const MeisterwerkSkillRadarTab: React.FC<MeisterwerkSkillRadarTabProps> =
                               }}
                               title={`Stufe ${seg}/5 für ${s.shortLabel} festlegen`}
                               style={{
-                                width: '22px',
-                                height: '22px',
+                                width: '28px',
+                                height: '28px',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
@@ -846,12 +760,12 @@ export const MeisterwerkSkillRadarTab: React.FC<MeisterwerkSkillRadarTabProps> =
                               className={(!readOnly || isTeacherTools) ? 'hover-scale-mini' : ''}
                             >
                               <span style={{
-                                width: '11px',
-                                height: '11px',
+                                width: '13.5px',
+                                height: '13.5px',
                                 borderRadius: '50%',
                                 background: dotColor,
                                 transition: 'all 0.15s ease',
-                                boxShadow: isFilled ? `0 1px 3px ${dotColor}66` : 'none',
+                                boxShadow: isFilled ? `0 1px 4px ${dotColor}66` : 'none',
                                 display: 'inline-block'
                               }} />
                             </button>
@@ -859,15 +773,15 @@ export const MeisterwerkSkillRadarTab: React.FC<MeisterwerkSkillRadarTabProps> =
                         })}
                       </div>
 
-                      {/* Level / Meister Badge */}
-                      <div style={{ minWidth: '85px', textAlign: 'right' }}>
+                      {/* Level / Meister Badge mit wachstumsorientierter Stufenbezeichnung */}
+                      <div style={{ minWidth: '120px', textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', justifyContent: 'center' }}>
                         {isMeister ? (
-                          <span style={{ fontSize: '0.72rem', fontWeight: 850, color: '#16a34a' }}>
-                            🌟 Meister
+                          <span style={{ fontSize: '0.84rem', fontWeight: 850, color: '#16a34a', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                            <Award size={14} /> Meisterstufe
                           </span>
                         ) : (
-                          <span style={{ fontSize: '0.72rem', fontWeight: 750, color: s.color || '#64748b' }}>
-                            Stufe {s.level}/5
+                          <span style={{ fontSize: '0.84rem', fontWeight: 750, color: s.color || '#475569', whiteSpace: 'nowrap' }}>
+                            Stufe {s.level} · {s.level === 1 ? 'Fundament' : s.level === 2 ? 'Aufbau' : s.level === 3 ? 'Entwickelt' : 'Sicher'}
                           </span>
                         )}
                       </div>
@@ -876,8 +790,8 @@ export const MeisterwerkSkillRadarTab: React.FC<MeisterwerkSkillRadarTabProps> =
                 })}
               </div>
 
-              <div style={{ fontSize: '0.70rem', color: '#64748b', lineHeight: 1.4, fontWeight: 500, marginTop: '2px' }}>
-                Mit jedem geübten Song und jeder Vorwochen-Quittierung wachsen deine musikalischen Fähigkeiten kontinuierlich weiter.
+              <div style={{ fontSize: '0.78rem', color: '#64748b', lineHeight: 1.45, fontWeight: 550, marginTop: '4px' }}>
+                Mit jedem geübten Song und jeder fachlichen Quittierung durch deine Lehrkraft wachsen deine musikalischen Fähigkeiten kontinuierlich weiter.
               </div>
             </div>
           </div>
@@ -885,7 +799,7 @@ export const MeisterwerkSkillRadarTab: React.FC<MeisterwerkSkillRadarTabProps> =
           {/* Custom tag pills */}
           {customTagCounts.length > 0 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', borderTop: '1px solid #f1f5f9', paddingTop: '12px' }}>
-              <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                 Weitere dokumentierte Trainings-Schwerpunkte
               </span>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
@@ -894,15 +808,31 @@ export const MeisterwerkSkillRadarTab: React.FC<MeisterwerkSkillRadarTabProps> =
                     background: '#f8fafc',
                     color: '#475569',
                     border: '1px solid #e2e8f0',
-                    padding: '4px 10px', borderRadius: '20px', fontSize: '0.72rem', fontWeight: 800
+                    padding: '5px 12px', borderRadius: '20px', fontSize: '0.80rem', fontWeight: 800,
+                    display: 'inline-flex', alignItems: 'center', gap: '4px'
                   }}>
-                    ✏️ {tag.key} · {tag.count}×
+                    <Edit3 size={12} /> {tag.key} · {tag.count}×
                   </span>
                 ))}
               </div>
             </div>
           )}
         </div>
+
+        {/* 🌟 Didaktik-Karte Modal für 5 Säulen & Wochenfokus */}
+        {selectedSkillForModal && (
+          <SkillDetailSheetModal
+            skillKey={selectedSkillForModal}
+            currentLevel={skillOverrides[selectedSkillForModal] || 1}
+            isWeeklyFocus={activeWeeklyTargetTags.includes(selectedSkillForModal)}
+            uiLevel={uiLevel}
+            teacherName={teacherName}
+            onClose={() => setSelectedSkillForModal(null)}
+            onStartPractice={() => {
+              setSelectedSkillForModal(null);
+            }}
+          />
+        )}
       </div>
     );
 };

@@ -265,11 +265,11 @@ export const parseStudentAnnotation = (
 };
 
 export const SKILL_TAGS = [
-  { key: 'rhythmus', label: 'Rhythmus & Timing', shortLabel: 'Rhythmus', icon: '🥁', color: '#4338ca', bg: '#e0e7ff', lightBg: '#eef2ff', border: '#c7d2fe', dotColor: '#4338ca', category: 'musical' },
-  { key: 'technik', label: 'Spieltechnik & Motorik', shortLabel: 'Technik', icon: '⚡', color: '#1e40af', bg: '#eff6ff', lightBg: '#eff6ff', border: '#bfdbfe', dotColor: '#2563eb', category: 'musical' },
-  { key: 'intonation', label: 'Klang & Intonation', shortLabel: 'Klang', icon: '🎵', color: '#166534', bg: '#e6f4ea', lightBg: '#f0fdf4', border: '#bbf7d0', dotColor: '#16a34a', category: 'musical' },
-  { key: 'ausdruck', label: 'Ausdruck & Dynamik', shortLabel: 'Ausdruck', icon: '🎭', color: '#6b21a8', bg: '#f3e8ff', lightBg: '#faf5ff', border: '#e9d5ff', dotColor: '#9333ea', category: 'musical' },
-  { key: 'repertoire', label: 'Repertoire & Performance', shortLabel: 'Repertoire', icon: '🌟', color: '#854d0e', bg: '#fef9c3', lightBg: '#fefce8', border: '#fef08a', dotColor: '#d97706', category: 'musical' },
+  { key: 'rhythmus', label: 'Rhythmus & Timing', shortLabel: 'Rhythmus', icon: '🥁', color: '#4338ca', bg: '#e0e7ff', lightBg: '#eef2ff', border: '#c7d2fe', dotColor: '#4338ca', category: 'musical', description: 'Metronom-Präzision & Groove-Verständnis' },
+  { key: 'technik', label: 'Technik & Motorik', shortLabel: 'Technik', icon: '⚡', color: '#1e40af', bg: '#eff6ff', lightBg: '#eff6ff', border: '#bfdbfe', dotColor: '#2563eb', category: 'musical', description: 'Fingerfertigkeit, Haltung & Geschmeidigkeit' },
+  { key: 'klang', label: 'Klang & Tonkultur', shortLabel: 'Klang', icon: '🎵', color: '#166534', bg: '#e6f4ea', lightBg: '#f0fdf4', border: '#bbf7d0', dotColor: '#16a34a', category: 'musical', legacyKey: 'intonation', description: 'Tonreinheit, Phrasierung & Sound' },
+  { key: 'ausdruck', label: 'Ausdruck & Dynamik', shortLabel: 'Ausdruck', icon: '🎭', color: '#6b21a8', bg: '#f3e8ff', lightBg: '#faf5ff', border: '#e9d5ff', dotColor: '#9333ea', category: 'musical', description: 'Musikalische Emotion & dynamische Nuancen' },
+  { key: 'repertoire', label: 'Repertoire & Performance', shortLabel: 'Repertoire', icon: '🌟', color: '#854d0e', bg: '#fef9c3', lightBg: '#fefce8', border: '#fef08a', dotColor: '#d97706', category: 'musical', description: 'Bühnenpräsenz, Song-Reife & Souveränität' },
 ];
 
 export const parseSongArtistAndTitle = (raw: string | undefined): { title: string; artist?: string } => {

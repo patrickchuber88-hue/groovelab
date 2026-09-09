@@ -1,7 +1,7 @@
 import React from "react";
 import {
-  Calendar, Eye, EyeOff, FileText, Pencil, Plus, QrCode, Search,
-  Trash2, Users, X
+  Calendar, Eye, EyeOff, FileText, Pencil, QrCode, School, Search,
+  Trash2, Users
 } from "lucide-react";
 import { maskLastName } from "../../utils/nameHelper";
 import { StudioAvatar, getInstrumentAvatarUrl } from "../StudioAvatar";
@@ -110,6 +110,8 @@ export const AdminStudentsView: React.FC<AdminStudentsViewProps> = ({
     const isSimMobile = typeof document !== 'undefined' && Boolean(document.querySelector('.sim-viewport-mobile, .sim-viewport-portrait, .sim-viewport-tablet, .sim-viewport-landscape, .sim-viewport-iphone14, [class*="sim-viewport-mobile"], [class*="sim-viewport-tablet"]'));
     const isMobileLayout = windowWidth < 768 || isSimMobile;
 
+    const activeStudentsCount = students.filter(s => !(s.contract_ends_at && new Date(s.contract_ends_at).getTime() < Date.now())).length;
+
     return (
       <div style={{ marginTop: '0px' }}>
         <div 
@@ -130,374 +132,98 @@ export const AdminStudentsView: React.FC<AdminStudentsViewProps> = ({
               <div style={{ background: activePlatform === 'campus' ? 'rgba(52, 168, 83, 0.15)' : 'rgba(234, 179, 8, 0.15)', color: activePlatform === 'campus' ? '#34a853' : '#eab308', padding: '5px', borderRadius: '8px', display: 'flex', alignItems: 'center' }}>
                 <Users size={16} />
               </div>
-              Schülerverwaltung ({students.length})
+              Schülerverwaltung ({activeStudentsCount})
             </h2>
-            <div className="schueler-header-controls" style={{ display: 'flex', flexDirection: isMobileLayout ? 'column' : 'row', gap: '10px', width: isMobileLayout ? '100%' : 'auto' }}>
-              {/* Apple-like Segmented Switch for Active / Archive */}
-              <div className="schueler-header-segmented" style={{
-                display: 'flex',
-                width: isMobileLayout ? '100%' : 'auto',
-                background: 'rgba(241, 245, 249, 0.8)',
-                backdropFilter: 'blur(12px)',
-                WebkitBackdropFilter: 'blur(12px)',
-                padding: '4px',
-                borderRadius: '16px',
-                border: '1px solid rgba(226, 232, 240, 0.8)',
-                position: 'relative'
-              }}>
+            <div className="schueler-header-controls" style={{ display: 'flex', flexDirection: isMobileLayout ? 'column' : 'row', gap: '10px', width: isMobileLayout ? '100%' : 'auto', alignItems: 'center' }}>
+              <div className="schueler-header-actions" style={{ display: 'flex', flexDirection: windowWidth < 768 ? 'column' : 'row', gap: '8px', width: windowWidth < 768 ? '100%' : 'auto' }}>
                 <button
-                  onClick={() => setListType('active')}
+                  type="button"
+                  onClick={() => toggleRealNames()}
+                  aria-label={showRealNames ? "Nachnamen anonymisieren / maskieren" : "Nachnamen für 10 Sekunden einblenden"}
                   style={{
-                    flex: 1, padding: '8px 16px', borderRadius: '12px', border: 'none',
-                    background: listType === 'active' ? 'white' : 'transparent',
-                    color: listType === 'active' ? (activePlatform === 'campus' ? '#34a853' : '#eab308') : '#64748b',
-                    fontWeight: listType === 'active' ? 800 : 600, fontSize: '0.85rem',
-                    boxShadow: listType === 'active' ? '0 4px 12px rgba(0,0,0,0.06)' : 'none',
-                    cursor: 'pointer', transition: 'all 0.3s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
-                    whiteSpace: 'nowrap'
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    borderRadius: '12px',
+                    padding: '8px 14px',
+                    fontSize: '0.82rem',
+                    fontWeight: 800,
+                    background: showRealNames ? '#fee2e2' : '#ffffff',
+                    border: '1px solid #e2e8f0',
+                    color: showRealNames ? '#ef4444' : '#64748b',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    height: '38px',
+                    width: windowWidth < 768 ? '100%' : 'auto',
+                    boxSizing: 'border-box'
                   }}
+                  title={showRealNames ? "Nachnamen anonymisieren / maskieren" : "Nachnamen für 10 Sekunden einblenden"}
                 >
-                  <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: listType === 'active' ? (activePlatform === 'campus' ? '#34a853' : '#eab308') : 'transparent' }} />
-                  Aktive Schüler
+                  {showRealNames ? <EyeOff size={14} /> : <Eye size={14} />}
+                  <span>{showRealNames ? "Namen maskieren" : "Namen anzeigen"}</span>
                 </button>
                 <button
-                  onClick={() => setListType('archive')}
+                  type="button"
+                  onClick={() => setShowParentInfoSheetModal(true)}
+                  aria-label="Druckfertiges 1-Seiter Eltern-Infoblatt als PDF herunterladen oder drucken"
                   style={{
-                    flex: 1, padding: '8px 16px', borderRadius: '12px', border: 'none',
-                    background: listType === 'archive' ? 'white' : 'transparent',
-                    color: listType === 'archive' ? (activePlatform === 'campus' ? '#34a853' : '#eab308') : '#64748b',
-                    fontWeight: listType === 'archive' ? 800 : 600, fontSize: '0.85rem',
-                    boxShadow: listType === 'archive' ? '0 4px 12px rgba(0,0,0,0.06)' : 'none',
-                    cursor: 'pointer', transition: 'all 0.3s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
-                    whiteSpace: 'nowrap'
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    borderRadius: '12px',
+                    padding: '8px 14px',
+                    fontSize: '0.82rem',
+                    fontWeight: 800,
+                    background: '#ffffff',
+                    border: '1px solid #cbd5e1',
+                    color: '#0f172a',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    height: '38px',
+                    width: windowWidth < 768 ? '100%' : 'auto',
+                    boxSizing: 'border-box'
                   }}
+                  className="hover-scale"
+                  title="Druckfertiges 1-Seiter Eltern-Infoblatt mit Schullogo & QR-Code als PDF herunterladen oder drucken"
                 >
-                  <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: listType === 'archive' ? (activePlatform === 'campus' ? '#34a853' : '#eab308') : 'transparent' }} />
-                  Archiv
+                  <FileText size={14} color="#059669" />
+                  <span>Eltern-Infoblatt (PDF)</span>
                 </button>
-              </div>
-
-              {canManageStudents && (
-                <div className="schueler-header-actions" style={{ display: 'flex', flexDirection: windowWidth < 768 ? 'column' : 'row', gap: '8px', width: windowWidth < 768 ? '100%' : 'auto' }}>
-                  <button
-                    onClick={() => toggleRealNames()}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '6px',
-                      borderRadius: '12px',
-                      padding: '8px 14px',
-                      fontSize: '0.82rem',
-                      fontWeight: 800,
-                      background: showRealNames ? '#fee2e2' : '#ffffff',
-                      border: '1px solid #e2e8f0',
-                      color: showRealNames ? '#ef4444' : '#64748b',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s',
-                      height: '38px',
-                      width: windowWidth < 768 ? '100%' : 'auto',
-                      boxSizing: 'border-box'
-                    }}
-                    title={showRealNames ? "Nachnamen anonymisieren / maskieren" : "Nachnamen für 10 Sekunden einblenden"}
-                  >
-                    {showRealNames ? <EyeOff size={14} /> : <Eye size={14} />}
-                    <span>{showRealNames ? "Namen maskieren" : "Namen anzeigen"}</span>
-                  </button>
-                  <button
-                    onClick={() => setShowParentInfoSheetModal(true)}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '6px',
-                      borderRadius: '12px',
-                      padding: '8px 14px',
-                      fontSize: '0.82rem',
-                      fontWeight: 800,
-                      background: '#ffffff',
-                      border: '1px solid #cbd5e1',
-                      color: '#0f172a',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s',
-                      height: '38px',
-                      width: windowWidth < 768 ? '100%' : 'auto',
-                      boxSizing: 'border-box'
-                    }}
-                    className="hover-scale"
-                    title="Druckfertiges 1-Seiter Eltern-Infoblatt mit Schullogo &amp; QR-Code als PDF herunterladen oder drucken"
-                  >
-                    <FileText size={14} color="#059669" />
-                    <span>Eltern-Infoblatt (PDF)</span>
-                  </button>
-                  {!showAddStudent && (
-                    <button
-                      onClick={() => {
-                        setShowAddStudent(true);
-                        setShowBulkAddStudents(false);
-                      }}
-                      style={{
-                        background: brandColor,
-                        color: activePlatform === 'groovelab' ? '#1e293b' : 'white',
-                        border: 'none',
-                        padding: '10px 18px',
-                        borderRadius: '16px',
-                        fontWeight: 800,
-                        fontSize: '0.85rem',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '6px',
-                        width: windowWidth < 768 ? '100%' : 'auto',
-                        boxShadow: `0 4px 12px ${brandColor}20`
-                      }}
-                      className="hover-scale"
-                    >
-                      <Plus size={16} /> Schüler hinzufügen
-                    </button>
-                  )}
-                  {!showBulkAddStudents && (
-                    <button
-                      onClick={() => {
-                        setShowBulkAddStudents(true);
-                        setShowAddStudent(false);
-                      }}
-                      style={{
-                        background: activePlatform === 'groovelab' 
-                          ? 'linear-gradient(135deg, #fefce8 0%, #fffbe6 100%)' 
-                          : 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-                        color: activePlatform === 'groovelab' ? '#854d0e' : '#334155',
-                        border: activePlatform === 'groovelab' 
-                          ? '1.5px solid #fef08a' 
-                          : '1.5px solid #e2e8f0',
-                        padding: '10px 18px',
-                        borderRadius: '16px',
-                        fontWeight: 800,
-                        fontSize: '0.85rem',
-                        letterSpacing: '-0.01em',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '8px',
-                        width: windowWidth < 768 ? '100%' : 'auto',
-                        minHeight: windowWidth < 768 ? '44px' : '38px',
-                        boxShadow: activePlatform === 'groovelab'
-                          ? '0 2px 8px rgba(234, 179, 8, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.8)'
-                          : '0 2px 8px rgba(0, 0, 0, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.8)',
-                        transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
-                        boxSizing: 'border-box'
-                      }}
-                      className="hover-scale"
-                      title="Mehrere Schüler gleichzeitig importieren oder anlegen"
-                    >
-                      <div style={{
-                        width: '24px',
-                        height: '24px',
-                        borderRadius: '8px',
-                        background: activePlatform === 'groovelab' ? '#fef08a' : '#e2e8f0',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        flexShrink: 0
-                      }}>
-                        <Users size={14} style={{ color: activePlatform === 'groovelab' ? '#ca8a04' : '#475569' }} />
-                      </div>
-                      <span>Mehrere anlegen</span>
-                    </button>
-                  )}
+                <div 
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    borderRadius: '12px',
+                    padding: '8px 14px',
+                    fontSize: '0.82rem',
+                    fontWeight: 750,
+                    background: '#f8fafc',
+                    border: '1px solid #e2e8f0',
+                    color: '#64748b',
+                    height: '38px',
+                    width: windowWidth < 768 ? '100%' : 'auto',
+                    boxSizing: 'border-box',
+                    justifyContent: 'center'
+                  }}
+                  title="Schülerinnen und Schüler werden verbindlich zentral im Schulsekretariat angelegt."
+                >
+                  <School size={14} color="#64748b" />
+                  <span>Schüler-Anlage im Sekretariat</span>
                 </div>
-              )}
+              </div>
             </div>
           </div>
 
-          {showAddStudent && (
-            <form onSubmit={handleAddStudent} className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px', background: 'white', borderRadius: '20px', border: `1px solid ${brandColor}20` }}>
-              <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#1e293b' }}>Neuen Schüler anlegen</h3>
-              <div style={{ display: 'grid', gridTemplateColumns: windowWidth < 768 ? '1fr' : '1fr 1fr', gap: '16px' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Vorname</label>
-                  <input required placeholder="Vorname" value={newStudent.firstName} onChange={e => setNewStudent({...newStudent, firstName: e.target.value})} style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 600 }} />
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>{schoolObj?.has_campus_subscription !== false ? 'Nachname' : 'Nachname (Initial)'}</label>
-                  <input required placeholder="Nachname" value={newStudent.lastName} onChange={e => setNewStudent({...newStudent, lastName: e.target.value})} style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 600 }} />
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Instrument</label>
-                <select 
-                  value={newStudent.instrument || 'Gitarre'} 
-                  onChange={e => setNewStudent({...newStudent, instrument: e.target.value})} 
-                  style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 600 }}
-                >
-                  <option value="Gitarre">Gitarre</option>
-                  <option value="Bass">Bass</option>
-                  <option value="Drums">Drums</option>
-                  <option value="Piano / Keys">Piano / Keys</option>
-                  <option value="Vocals">Vocals</option>
-                  <option value="Trompete">Trompete</option>
-                  <option value="Posaune">Posaune</option>
-                  <option value="Horn">Horn</option>
-                  <option value="Cello">Cello</option>
-                  <option value="Geige">Geige</option>
-                  <option value="Klarinette">Klarinette</option>
-                  <option value="Querflöte">Querflöte</option>
-                  <option value="Saxofon">Saxofon</option>
-                </select>
-              </div>
-
-              {/* Campus app_usage_mode Toggle (Only for Campus) */}
-              {activePlatform === 'campus' && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Campus-Nutzungsmodus</label>
-                  <div style={{ display: 'flex', background: '#f1f5f9', borderRadius: '12px', padding: '4px', border: '1px solid #e2e8f0' }}>
-                    <button
-                      type="button"
-                      onClick={() => setNewStudent({...newStudent, app_usage_mode: 'student_only'})}
-                      style={{
-                        flex: 1, padding: '10px', border: 'none', borderRadius: '8px',
-                        background: (newStudent.app_usage_mode || 'student_only') === 'student_only' ? '#ffffff' : 'transparent',
-                        color: (newStudent.app_usage_mode || 'student_only') === 'student_only' ? brandColor : '#64748b',
-                        fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s',
-                        boxShadow: (newStudent.app_usage_mode || 'student_only') === 'student_only' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none'
-                      }}
-                    >
-                      📱 Selbstnutzer
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setNewStudent({...newStudent, app_usage_mode: 'parent_hybrid'})}
-                      style={{
-                        flex: 1, padding: '10px', border: 'none', borderRadius: '8px',
-                        background: newStudent.app_usage_mode === 'parent_hybrid' ? '#ffffff' : 'transparent',
-                        color: newStudent.app_usage_mode === 'parent_hybrid' ? brandColor : '#64748b',
-                        fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s',
-                        boxShadow: newStudent.app_usage_mode === 'parent_hybrid' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none'
-                      }}
-                    >
-                      👪 Eltern-Hybrid
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* External Vocalist Toggle */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '16px', background: '#f8fafc', borderRadius: '16px', border: '1px solid #f1f5f9' }}>
-                 <div 
-                   onClick={() => setNewStudent({...newStudent, isExternalVocalist: !newStudent.isExternalVocalist, photoUrl: '/avatar_ghost.jpg'})}
-                   style={{ 
-                     width: '44px', height: '24px', borderRadius: '20px', 
-                     background: newStudent.isExternalVocalist ? brandColor : '#cbd5e1', 
-                     position: 'relative', cursor: 'pointer', transition: 'all 0.2s' 
-                   }}
-                 >
-                   <div style={{ 
-                     position: 'absolute', top: '2px', left: newStudent.isExternalVocalist ? '22px' : '2px', 
-                     width: '20px', height: '20px', background: 'white', borderRadius: '50%', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', transition: 'all 0.2s' 
-                   }}></div>
-                 </div>
-                 <div>
-                   <div style={{ fontSize: '0.85rem', fontWeight: 900, color: '#1e293b' }}>Gesangsschüler (Extern)</div>
-                   <div style={{ fontSize: '0.65rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>Kein Profilzugriff, Platzhalter für Band-Gesang</div>
-                 </div>
-              </div>
-
-              <div style={{ display: 'flex', gap: '12px' }}>
-                <button type="submit" style={{ flex: 1, background: brandColor, color: 'white', border: 'none', padding: '14px', borderRadius: '12px', fontWeight: 800, cursor: 'pointer' }}>Speichern</button>
-                <button type="button" onClick={() => setShowAddStudent(false)} style={{ flex: 1, background: '#f1f5f9', color: '#64748b', border: 'none', padding: '14px', borderRadius: '12px', fontWeight: 700, cursor: 'pointer' }}>Abbrechen</button>
-              </div>
-            </form>
-          )}
-
-          {showBulkAddStudents && (
-            <form onSubmit={handleBulkAddSubmit} className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '24px', background: 'white', borderRadius: '20px', border: `1px solid ${brandColor}20` }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <h3 style={{ fontSize: '1.15rem', fontWeight: 900, color: '#1e293b', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Users size={20} color={brandColor} /> Mehrere Schüler schnell anlegen
-                </h3>
-                <button 
-                  type="button" 
-                  onClick={() => {
-                    setShowBulkAddStudents(false);
-                    setBulkInput('');
-                    setParsedStudents([]);
-                  }}
-                  style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
-                >
-                  <X size={18} />
-                </button>
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Schülerliste (Namen)</label>
-                <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginBottom: '4px' }}>
-                  Füge einen Schülernamen pro Zeile ein.
-                </div>
-                <textarea 
-                  placeholder="Beispiel:&#10;Lukas Müller&#10;Marie Schmidt&#10;Felix Becker"
-                  value={bulkInput}
-                  onChange={e => {
-                    setBulkInput(e.target.value);
-                    parseBulkInput(e.target.value, defaultInstrumentForBulk);
-                  }}
-                  style={{ 
-                    padding: '14px', 
-                    borderRadius: '12px', 
-                    border: '1px solid #e2e8f0', 
-                    background: '#f8fafc', 
-                    fontWeight: 600,
-                    minHeight: '140px',
-                    fontFamily: 'monospace',
-                    fontSize: '0.9rem',
-                    lineHeight: '1.4',
-                    outline: 'none',
-                    resize: 'vertical'
-                  }}
-                />
-              </div>
-
-              <div style={{ display: 'flex', gap: '12px' }}>
-                <button 
-                  type="submit" 
-                  disabled={isBulkSaving || parsedStudents.length === 0}
-                  style={{ 
-                    flex: 1, 
-                    background: parsedStudents.length === 0 ? '#cbd5e1' : brandColor, 
-                    color: 'white', 
-                    border: 'none', 
-                    padding: '14px', 
-                    borderRadius: '12px', 
-                    fontWeight: 800, 
-                    cursor: parsedStudents.length === 0 || isBulkSaving ? 'not-allowed' : 'pointer',
-                    opacity: isBulkSaving ? 0.7 : 1
-                  }}
-                >
-                  {isBulkSaving ? 'Speichern...' : `Alle ${parsedStudents.length} Schüler anlegen`}
-                </button>
-                <button 
-                  type="button" 
-                  onClick={() => {
-                    setShowBulkAddStudents(false);
-                    setBulkInput('');
-                    setParsedStudents([]);
-                  }} 
-                  style={{ flex: 1, background: '#f1f5f9', color: '#64748b', border: 'none', padding: '14px', borderRadius: '12px', fontWeight: 700, cursor: 'pointer' }}
-                >
-                  Abbrechen
-                </button>
-              </div>
-            </form>
-          )}
 
           {editingStudent && (
             <form onSubmit={handleUpdateStudent} className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px', background: activePlatform === 'campus' ? '#e6f4ea' : (activePlatform === 'groovelab' ? '#fefce8' : '#fce8e6'), border: `1px solid ${brandColor}`, borderRadius: '20px' }}>
               <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: brandColor }}>Schüler bearbeiten</h3>
               <div style={{ display: 'grid', gridTemplateColumns: windowWidth < 768 ? '1fr' : '1fr 1fr', gap: '16px' }}>
-                <input required placeholder="Vorname" value={editingStudent.first_name || ''} onChange={e => setEditingStudent({...editingStudent, first_name: e.target.value})} style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white' }} />
-                <input required placeholder={schoolObj?.has_campus_subscription !== false ? "Nachname" : "Nachname (Initial)"} value={editingStudent.last_name || ''} onChange={e => setEditingStudent({...editingStudent, last_name: e.target.value})} style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white' }} />
+                <input required aria-label="Vorname" placeholder="Vorname" value={editingStudent.first_name || ''} onChange={e => setEditingStudent({...editingStudent, first_name: e.target.value})} style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white' }} />
+                <input required aria-label={schoolObj?.has_campus_subscription !== false ? "Nachname" : "Nachname (Initial)"} placeholder={schoolObj?.has_campus_subscription !== false ? "Nachname" : "Nachname (Initial)"} value={editingStudent.last_name || ''} onChange={e => setEditingStudent({...editingStudent, last_name: e.target.value})} style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white' }} />
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', gridColumn: '1 / -1' }}>
                   <label style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b' }}>Instrument</label>
@@ -599,13 +325,13 @@ export const AdminStudentsView: React.FC<AdminStudentsViewProps> = ({
                 {editingStudent.is_trial && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                     <label style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b' }}>Probezeit Ende</label>
-                    <input type="date" value={editingStudent.trial_ends_at ? new Date(editingStudent.trial_ends_at).toISOString().split('T')[0] : ''} onChange={e => setEditingStudent({...editingStudent, trial_ends_at: e.target.value || null})} style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white' }} />
+                    <input aria-label="Probezeit Ende" type="date" value={editingStudent.trial_ends_at ? new Date(editingStudent.trial_ends_at).toISOString().split('T')[0] : ''} onChange={e => setEditingStudent({...editingStudent, trial_ends_at: e.target.value || null})} style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white' }} />
                   </div>
                 )}
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                   <label style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b' }}>Vertragsende</label>
-                  <input type="date" value={editingStudent.contract_ends_at ? new Date(editingStudent.contract_ends_at).toISOString().split('T')[0] : ''} onChange={e => setEditingStudent({...editingStudent, contract_ends_at: e.target.value || null})} style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white' }} />
+                  <input aria-label="Vertragsende" type="date" value={editingStudent.contract_ends_at ? new Date(editingStudent.contract_ends_at).toISOString().split('T')[0] : ''} onChange={e => setEditingStudent({...editingStudent, contract_ends_at: e.target.value || null})} style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white' }} />
                 </div>
               </div>
 
@@ -620,6 +346,7 @@ export const AdminStudentsView: React.FC<AdminStudentsViewProps> = ({
             <Search size={18} style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
             <input 
               type="text" 
+              aria-label="Schüler suchen"
               placeholder="Schüler suchen..." 
               value={studentSearch}
               onChange={e => setStudentSearch(e.target.value)}
@@ -631,8 +358,7 @@ export const AdminStudentsView: React.FC<AdminStudentsViewProps> = ({
             {(() => {
               const filtered = students.filter(s => {
                 const isArchived = s.contract_ends_at && new Date(s.contract_ends_at).getTime() < Date.now();
-                if (listType === 'active' && isArchived) return false;
-                if (listType === 'archive' && !isArchived) return false;
+                if (isArchived) return false;
 
                 const inst = s.instrument?.toLowerCase() || 'gitarre';
                 let normInst = s.instrument || 'Gitarre';
@@ -681,9 +407,21 @@ export const AdminStudentsView: React.FC<AdminStudentsViewProps> = ({
                 }
               });
 
-              return displayStudents.map(s => {
-                const avatarSrc = getInstrumentAvatarUrl(s.instrument);
+              if (displayStudents.length === 0) {
+                return (
+                  <div style={{ gridColumn: '1 / -1', padding: '48px 24px', textAlign: 'center', background: '#f8fafc', borderRadius: '20px', border: '1px dashed #cbd5e1' }}>
+                    <Users size={36} color="#94a3b8" style={{ margin: '0 auto 12px', display: 'block' }} />
+                    <div style={{ fontWeight: 800, fontSize: '1rem', color: '#475569', marginBottom: '4px' }}>
+                      Keine Schüler gefunden
+                    </div>
+                    <div style={{ fontSize: '0.85rem', color: '#94a3b8', maxWidth: '400px', margin: '0 auto' }}>
+                      {studentSearch ? 'Keine Schüler entsprechen deinen Suchkriterien.' : 'Neue Schülerinnen und Schüler werden zentral im Schulsekretariat angelegt.'}
+                    </div>
+                  </div>
+                );
+              }
 
+              return displayStudents.map(s => {
                 return (
                   <div 
                     key={s.id} 
@@ -705,8 +443,17 @@ export const AdminStudentsView: React.FC<AdminStudentsViewProps> = ({
                     }} 
                   >
                     <div 
+                      role="button"
+                      tabIndex={0}
+                      aria-label={`Details für Schüler ${s.isGroup ? s.first_name : `${s.first_name} ${maskLastName(s.last_name, showRealNames)}`} öffnen`}
                       onClick={() => fetchStudentProfile(s)}
-                      style={{ display: 'flex', alignItems: 'center', gap: '16px', cursor: 'pointer', flex: 1 }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          fetchStudentProfile(s);
+                        }
+                      }}
+                      style={{ display: 'flex', alignItems: 'center', gap: '16px', cursor: 'pointer', flex: 1, outline: 'none', borderRadius: '16px' }}
                     >
                       <div style={{ position: 'relative' }}>
                         <div style={{ 
@@ -773,6 +520,7 @@ export const AdminStudentsView: React.FC<AdminStudentsViewProps> = ({
                       <>
                         <button 
                           onClick={(e) => { e.stopPropagation(); setEditingStudent(s); }} 
+                          aria-label={`Schüler ${s.isGroup ? s.first_name : `${s.first_name} ${maskLastName(s.last_name, showRealNames)}`} bearbeiten`}
                           style={{ 
                             background: "#ffffff", 
                             border: "1px solid #cbd5e1", 
@@ -794,6 +542,7 @@ export const AdminStudentsView: React.FC<AdminStudentsViewProps> = ({
                         </button>
                         <button 
                           onClick={(e) => { e.stopPropagation(); handleDeleteStudent(s.id); }} 
+                          aria-label={`Schüler ${s.isGroup ? s.first_name : `${s.first_name} ${maskLastName(s.last_name, showRealNames)}`} löschen`}
                           style={{ 
                             background: activePlatform === 'groovelab' ? '#fefce8' : '#fff1f2', 
                             border: activePlatform === 'groovelab' ? '1px solid #fef08a' : '1px solid #fecaca', 
@@ -823,6 +572,7 @@ export const AdminStudentsView: React.FC<AdminStudentsViewProps> = ({
                           setSelectedStudentForTageskompass(s);
                           setShowTageskompassModal(true); 
                         }} 
+                        aria-label={`Hausaufgabenheft und Schüler-Protokoll für ${s.isGroup ? s.first_name : `${s.first_name} ${maskLastName(s.last_name, showRealNames)}`} öffnen`}
                         style={{ 
                           background: '#e6f4ea', 
                           border: '1px solid #a7f3d0', 
@@ -858,6 +608,7 @@ export const AdminStudentsView: React.FC<AdminStudentsViewProps> = ({
                           e.stopPropagation(); 
                           setSelectedTimetableStudent(s); 
                         }} 
+                        aria-label={hasTimetableOnboarding(s) ? `Stundenplan-Slot für ${s.isGroup ? s.first_name : `${s.first_name} ${maskLastName(s.last_name, showRealNames)}`} ansehen` : `Stundenplan für ${s.isGroup ? s.first_name : `${s.first_name} ${maskLastName(s.last_name, showRealNames)}`} einrichten`}
                         style={{ 
                           background: hasTimetableOnboarding(s) ? '#e6f4ea' : '#fefce8', 
                           border: hasTimetableOnboarding(s) ? '1px solid #a7f3d0' : '1px solid #fef08a', 
@@ -891,6 +642,7 @@ export const AdminStudentsView: React.FC<AdminStudentsViewProps> = ({
                     )}
                     <button 
                       onClick={(e) => { e.stopPropagation(); setSelectedQRUser(s); }} 
+                      aria-label={`QR-Zugangskarte und Login-Token für ${s.isGroup ? s.first_name : `${s.first_name} ${maskLastName(s.last_name, showRealNames)}`} anzeigen`}
                       style={{ 
                         background: "#ffffff", 
                         border: "1px solid #cbd5e1", 

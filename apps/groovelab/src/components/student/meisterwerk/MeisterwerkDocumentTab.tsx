@@ -2,7 +2,7 @@ import React, { Suspense, useState, useMemo, useCallback } from 'react';
 import { supabase } from '../../../lib/supabase';
 import {
   Activity, ArrowRightLeft, Award, BookOpen, Calendar, Check, ChevronDown, ChevronLeft,
-  ChevronRight, Clock, Copy, Disc, Edit3, FileText, Hash, HelpCircle, History, Lightbulb,
+  ChevronRight, Clock, Copy, Disc, Edit3, FileText, Hash, Headphones, HelpCircle, History, Lightbulb,
   Lock, Mail, Mic, Moon, Music, Pin, Plus, Radio, RotateCcw, Search, Share2, Sliders,
   Sparkles, Square, Star, Target, Timer, Trash2, User, Volume2, VolumeX, AlertCircle,
   EyeOff, Hand, Info, MessageSquare, MoreHorizontal, Printer, RotateCw, Unlock, Wrench, Zap, X
@@ -2712,49 +2712,119 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                               </div>
                             )}
 
-                            {/* 6. Skill-Radar (Für Teen & Pro) */}
-                            {uiLevel !== 'junior' && (
-                              <div
-                                onClick={() => {
-                                  setActiveModalTab('skillradar');
-                                }}
-                                style={{
-                                  background: '#ffffff',
-                                  border: '1.5px solid #e2e8f0',
-                                  borderRadius: '18px',
-                                  padding: '16px 8px 14px 8px',
-                                  display: 'flex',
-                                  flexDirection: 'column',
-                                  alignItems: 'center',
-                                  textAlign: 'center',
-                                  cursor: 'pointer',
-                                  boxShadow: '0 2px 8px -2px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02)',
-                                  transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
-                                }}
-                                className="hover-scale"
-                              >
-                                <div style={{
-                                  width: '72px',
-                                  height: '72px',
-                                  borderRadius: '18px',
-                                  background: 'linear-gradient(135deg, #d946ef 0%, #a21caf 100%)',
-                                  boxShadow: '0 6px 14px -2px rgba(217, 70, 239, 0.40)',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  position: 'relative',
-                                  overflow: 'hidden',
-                                  border: '1px solid rgba(255, 255, 255, 0.25)'
-                                }}>
-                                  <Activity size={34} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />
-                                </div>
-                                <div style={{ marginTop: '10px', padding: '0 2px' }}>
-                                  <div style={{ fontSize: '0.92rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', lineHeight: '1.2' }}>
-                                    Skill-Radar
-                                  </div>
+                            {/* 5b. EarLab & Harmony-Studio (Für alle Altersstufen verfügbar!) */}
+                            <div
+                              role="button"
+                              tabIndex={0}
+                              onClick={() => {
+                                setActiveModalTab('document');
+                                setActiveViewMode('earlab' as any);
+                                setActiveSubView('hub');
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  e.preventDefault();
+                                  setActiveModalTab('document');
+                                  setActiveViewMode('earlab' as any);
+                                  setActiveSubView('hub');
+                                }
+                              }}
+                              aria-label={uiLevel === 'junior' ? 'Klang-Detektiv Gehörbildung öffnen' : 'EarLab & Harmony-Studio öffnen'}
+                              style={{
+                                background: '#ffffff',
+                                border: '1.5px solid #e2e8f0',
+                                borderRadius: '18px',
+                                padding: '16px 8px 14px 8px',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                textAlign: 'center',
+                                cursor: 'pointer',
+                                boxShadow: '0 2px 8px -2px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02)',
+                                transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
+                              }}
+                              className="hover-scale"
+                            >
+                              <div style={{
+                                width: '72px',
+                                height: '72px',
+                                borderRadius: '18px',
+                                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                                boxShadow: '0 6px 14px -2px rgba(16, 185, 129, 0.40)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                position: 'relative',
+                                overflow: 'hidden',
+                                border: '1px solid rgba(255, 255, 255, 0.3)'
+                              }}>
+                                <Headphones size={34} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />
+                              </div>
+                              <div style={{ marginTop: '10px', padding: '0 2px' }}>
+                                <div style={{ fontSize: '0.92rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', lineHeight: '1.2' }}>
+                                  {uiLevel === 'junior' ? 'Klang-Detektiv' : 'EarLab & Harmony'}
                                 </div>
                               </div>
-                            )}
+                            </div>
+
+                            {/* 6. Skill-Radar / Musik-Stern / Kompetenz-Radar (Für alle Altersstufen verfügbar) */}
+                            <div
+                              role="button"
+                              tabIndex={0}
+                              onClick={() => {
+                                setActiveModalTab('skillradar');
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  e.preventDefault();
+                                  setActiveModalTab('skillradar');
+                                }
+                              }}
+                              aria-label={uiLevel === 'junior' ? 'Mein Musik-Stern öffnen' : uiLevel === 'pro' ? 'Kompetenz-Radar öffnen' : 'Skill-Radar öffnen'}
+                              style={{
+                                background: '#ffffff',
+                                border: '1.5px solid #e2e8f0',
+                                borderRadius: '18px',
+                                padding: '16px 8px 14px 8px',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                textAlign: 'center',
+                                cursor: 'pointer',
+                                boxShadow: '0 2px 8px -2px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02)',
+                                transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
+                              }}
+                              className="hover-scale"
+                            >
+                              <div style={{
+                                width: '72px',
+                                height: '72px',
+                                borderRadius: '18px',
+                                background: uiLevel === 'junior'
+                                  ? 'linear-gradient(135deg, #f59e0b 0%, #ec4899 50%, #8b5cf6 100%)'
+                                  : 'linear-gradient(135deg, #d946ef 0%, #a21caf 100%)',
+                                boxShadow: uiLevel === 'junior'
+                                  ? '0 6px 14px -2px rgba(245, 158, 11, 0.40)'
+                                  : '0 6px 14px -2px rgba(217, 70, 239, 0.40)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                position: 'relative',
+                                overflow: 'hidden',
+                                border: '1px solid rgba(255, 255, 255, 0.25)'
+                              }}>
+                                {uiLevel === 'junior' ? (
+                                  <Star size={34} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />
+                                ) : (
+                                  <Activity size={34} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />
+                                )}
+                              </div>
+                              <div style={{ marginTop: '10px', padding: '0 2px' }}>
+                                <div style={{ fontSize: '0.92rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', lineHeight: '1.2' }}>
+                                  {uiLevel === 'junior' ? 'Musik-Stern ⭐' : uiLevel === 'pro' ? 'Kompetenz-Radar' : 'Skill-Radar'}
+                                </div>
+                              </div>
+                            </div>
 
                             {/* 7. Protokoll (Für alle Altersstufen verfügbar) */}
                             <div
@@ -8271,6 +8341,36 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                       </button>
                                     </div>
                                   )}
+
+                                  {/* 🎧 Discrete EarLab Achievement Badge in Weekly Homework Chronicle */}
+                                  {(() => {
+                                    const earlabScoreNote = (homeworkNotesList || []).find((n: any) => typeof n === 'string' && n.startsWith('EARLAB_SCORE:'));
+                                    if (!earlabScoreNote) return null;
+                                    const parts = (earlabScoreNote as string).replace('EARLAB_SCORE:', '').split('|');
+                                    const level = parts[0] || 'D1';
+                                    const pillar = parts[1] || 'Intervalle';
+                                    const acc = parts[2] || '100%';
+                                    const xpBadge = parts[3] || '+50XP';
+                                    return (
+                                      <div style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '8px',
+                                        background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
+                                        border: '1px solid #86efac',
+                                        borderRadius: '12px',
+                                        padding: '6px 12px',
+                                        fontSize: '0.78rem',
+                                        fontWeight: 800,
+                                        color: '#15803d',
+                                        marginTop: '10px',
+                                        alignSelf: 'flex-start'
+                                      }}>
+                                        <Headphones size={14} color="#16a34a" />
+                                        <span>EarLab: Stufe {level} ({pillar}) gemeistert • {acc} Trefferquote ({xpBadge})</span>
+                                      </div>
+                                    );
+                                  })()}
                                 </div>
                               )}
                             </div>

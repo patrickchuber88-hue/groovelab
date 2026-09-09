@@ -326,6 +326,7 @@ export const AdminStatsView: React.FC<AdminStatsViewProps> = ({
                     <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Titel des Ziels</label>
                     <input 
                       type="text" 
+                      aria-label="Titel des Ziels"
                       value={newGoalTitle} 
                       onChange={(e) => setNewGoalTitle(e.target.value)} 
                       placeholder="z.B. Wochenziel, Ferien-Challenge"
@@ -338,6 +339,7 @@ export const AdminStatsView: React.FC<AdminStatsViewProps> = ({
                       <input 
                         type="number" 
                         min="1"
+                        aria-label="Ziel in Minuten"
                         value={newGoalMinutes} 
                         onChange={(e) => setNewGoalMinutes(e.target.value)} 
                         style={{ padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.82rem', fontWeight: 700 }}
@@ -347,6 +349,7 @@ export const AdminStatsView: React.FC<AdminStatsViewProps> = ({
                       <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Deadline (optional)</label>
                       <input 
                         type="date" 
+                        aria-label="Deadline (optional)"
                         value={newGoalDeadline} 
                         onChange={(e) => setNewGoalDeadline(e.target.value)} 
                         style={{ padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.82rem', fontWeight: 600 }}
@@ -440,6 +443,7 @@ export const AdminStatsView: React.FC<AdminStatsViewProps> = ({
                                   </span>
                                   <button 
                                     onClick={() => handleDeleteGoal(target.id)}
+                                    aria-label={`Ziel ${target.title || 'Challenge'} löschen`}
                                     style={{ background: 'rgba(255, 255, 255, 0.15)', border: 'none', color: '#ffffff', cursor: 'pointer', padding: '4px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                                     title="Ziel löschen"
                                   >
@@ -549,7 +553,7 @@ export const AdminStatsView: React.FC<AdminStatsViewProps> = ({
                   <h3 style={{ fontSize: '1.2rem', fontWeight: 900, color: '#1e293b', margin: 0 }}>
                     Jahres-Statistik
                   </h3>
-                  <p style={{ fontSize: '0.7rem', color: '#94a3b8', margin: '2px 0 0 0', fontWeight: 600 }}>
+                  <p style={{ fontSize: '0.7rem', color: '#475569', margin: '2px 0 0 0', fontWeight: 600 }}>
                     Übeminuten (Sep - Aug)
                   </p>
                 </div>
@@ -597,7 +601,7 @@ export const AdminStatsView: React.FC<AdminStatsViewProps> = ({
                         // Heatmap calculations
                         let bg = '#f8fafc';
                         let border = '1px solid #e2e8f0';
-                        let labelColor = '#94a3b8';
+                        let labelColor = '#475569';
                         let textColor = '#64748b';
                         let numColor = '#1e293b';
                         let shadow = 'none';
@@ -809,7 +813,7 @@ export const AdminStatsView: React.FC<AdminStatsViewProps> = ({
                 );
               })}
             </div>
-            <div style={{ fontSize: '0.75rem', color: '#94a3b8', textAlign: 'center', marginTop: '12px', fontWeight: 600 }}>
+            <div style={{ fontSize: '0.75rem', color: '#475569', textAlign: 'center', marginTop: '12px', fontWeight: 600 }}>
               Übe-Stunden aufgeteilt nach Wochentagen.
             </div>
           </div>
@@ -828,7 +832,7 @@ export const AdminStatsView: React.FC<AdminStatsViewProps> = ({
               {(stats.leaderboard || []).map((user: any, idx: number) => (
                 <div key={user.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: '#f8fafc', borderRadius: '16px', border: '1px solid #f1f5f9' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <div style={{ fontSize: '0.9rem', fontWeight: 900, color: idx === 0 ? '#f59e0b' : idx === 1 ? '#94a3b8' : idx === 2 ? '#b45309' : '#64748b', width: '20px' }}>
+                    <div style={{ fontSize: '0.9rem', fontWeight: 900, color: idx === 0 ? '#f59e0b' : idx === 1 ? '#64748b' : idx === 2 ? '#b45309' : '#64748b', width: '20px' }}>
                       #{idx + 1}
                     </div>
                     <div style={{ 
@@ -864,7 +868,7 @@ export const AdminStatsView: React.FC<AdminStatsViewProps> = ({
                 </div>
               ))}
               {(stats.leaderboard || []).length === 0 && (
-                <div style={{ textAlign: 'center', padding: '24px', color: '#94a3b8', fontWeight: 600, fontSize: '0.85rem' }}>
+                <div style={{ textAlign: 'center', padding: '24px', color: '#475569', fontWeight: 600, fontSize: '0.85rem' }}>
                   Noch keine XP gesammelt.
                 </div>
               )}
@@ -901,7 +905,7 @@ export const AdminStatsView: React.FC<AdminStatsViewProps> = ({
                 );
               })}
               {(stats.topSongs || []).length === 0 && (
-                <div style={{ textAlign: 'center', padding: '40px', color: '#94a3b8', fontWeight: 600, fontSize: '0.85rem' }}>
+                <div style={{ textAlign: 'center', padding: '40px', color: '#475569', fontWeight: 600, fontSize: '0.85rem' }}>
                   Noch keine Songs im Schüler-Repertoire.
                 </div>
               )}

@@ -111,7 +111,7 @@ export default defineConfig({
           if (id.includes('AdminDashboard')) {
             return 'admin-core-suite';
           }
-          if (id.includes('secretary/Secretary') || id.includes('SecretaryDutiesView') || id.includes('SecretaryCrisisView') || id.includes('SecretaryAuditView') || id.includes('SecretaryEquipmentView') || id.includes('SecretaryRoomsView') || id.includes('SecretaryLicensesView') || id.includes('SecretarySetupView')) {
+          if (id.includes('secretary/Secretary') || id.includes('SecretaryAnnouncementsView') || id.includes('SecretaryDutiesView') || id.includes('SecretaryCrisisView') || id.includes('SecretaryAuditView') || id.includes('SecretaryEquipmentView') || id.includes('SecretaryRoomsView') || id.includes('SecretaryLicensesView') || id.includes('SecretarySetupView')) {
             return 'secretary-subviews';
           }
           if (id.includes('SecretaryDashboard')) {

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Mic, MicOff, Volume2, VolumeX, ArrowLeft, RotateCcw, Check, Sparkles, Sliders, Music, Radio } from 'lucide-react';
+import { Mic, MicOff, Volume2, VolumeX, ArrowLeft, RotateCcw, Check, Sparkles, Sliders, Music, Radio, ShieldCheck } from 'lucide-react';
 import { acquireAudioStream, releaseAudioStream } from '../../services/audioPermissionService';
 
 // Musikalische Noten-Definitionen
@@ -15,7 +15,7 @@ interface TuningString {
 interface InstrumentPreset {
   id: string;
   name: string;
-  icon: string;
+  shortName?: string;
   strings: TuningString[];
 }
 
@@ -23,7 +23,7 @@ const INSTRUMENT_PRESETS: InstrumentPreset[] = [
   {
     id: 'guitar_standard',
     name: 'Gitarre (Standard)',
-    icon: '🎸',
+    shortName: 'Gitarre',
     strings: [
       { name: 'E', octave: 2, freq: 82.41, label: '6. E' },
       { name: 'A', octave: 2, freq: 110.00, label: '5. A' },
@@ -36,7 +36,7 @@ const INSTRUMENT_PRESETS: InstrumentPreset[] = [
   {
     id: 'guitar_drop_d',
     name: 'Gitarre (Drop D)',
-    icon: '🎸',
+    shortName: 'Drop D',
     strings: [
       { name: 'D', octave: 2, freq: 73.42, label: '6. D' },
       { name: 'A', octave: 2, freq: 110.00, label: '5. A' },
@@ -49,7 +49,7 @@ const INSTRUMENT_PRESETS: InstrumentPreset[] = [
   {
     id: 'bass_4',
     name: 'E-Bass (4-Saiter)',
-    icon: '🎸',
+    shortName: 'Bass 4-S',
     strings: [
       { name: 'E', octave: 1, freq: 41.20, label: '4. E' },
       { name: 'A', octave: 1, freq: 55.00, label: '3. A' },
@@ -60,7 +60,7 @@ const INSTRUMENT_PRESETS: InstrumentPreset[] = [
   {
     id: 'bass_5',
     name: 'E-Bass (5-Saiter)',
-    icon: '🎸',
+    shortName: 'Bass 5-S',
     strings: [
       { name: 'B', octave: 0, freq: 30.87, label: '5. B' },
       { name: 'E', octave: 1, freq: 41.20, label: '4. E' },
@@ -72,7 +72,7 @@ const INSTRUMENT_PRESETS: InstrumentPreset[] = [
   {
     id: 'violin',
     name: 'Geige / Violine',
-    icon: '🎻',
+    shortName: 'Geige',
     strings: [
       { name: 'G', octave: 3, freq: 196.00, label: '4. G' },
       { name: 'D', octave: 4, freq: 293.66, label: '3. D' },
@@ -83,7 +83,7 @@ const INSTRUMENT_PRESETS: InstrumentPreset[] = [
   {
     id: 'cello',
     name: 'Cello',
-    icon: '🎻',
+    shortName: 'Cello',
     strings: [
       { name: 'C', octave: 2, freq: 65.41, label: '4. C' },
       { name: 'G', octave: 2, freq: 98.00, label: '3. G' },
@@ -94,7 +94,7 @@ const INSTRUMENT_PRESETS: InstrumentPreset[] = [
   {
     id: 'ukulele',
     name: 'Ukulele (G-C-E-A)',
-    icon: '🏝️',
+    shortName: 'Ukulele',
     strings: [
       { name: 'G', octave: 4, freq: 392.00, label: '4. G' },
       { name: 'C', octave: 4, freq: 261.63, label: '3. C' },
@@ -104,8 +104,8 @@ const INSTRUMENT_PRESETS: InstrumentPreset[] = [
   },
   {
     id: 'chromatic',
-    name: 'Chromatisch (Alle Töne)',
-    icon: '🎙️',
+    name: 'Chromatisch',
+    shortName: 'Chromatisch',
     strings: []
   }
 ];
@@ -198,6 +198,7 @@ export const CampusTuner: React.FC<CampusTunerProps> = ({ onBack, uiLevel = 'pro
   const [selectedStringIndex, setSelectedStringIndex] = useState<number | null>(null);
   const [a4Reference, setA4Reference] = useState<number>(440);
   const [isPlayingReference, setIsPlayingReference] = useState<boolean>(false);
+  const [playingToneFreq, setPlayingToneFreq] = useState<number | null>(null);
   const [micError, setMicError] = useState<string | null>(null);
 
   // Live Detektierte Werte
@@ -321,40 +322,55 @@ export const CampusTuner: React.FC<CampusTunerProps> = ({ onBack, uiLevel = 'pro
     }
   };
 
-  // Referenzton abspielen / stoppen
-  const toggleReferenceTone = () => {
-    if (isPlayingReference) {
-      if (oscRef.current) {
-        try {
-          oscRef.current.stop();
-          oscRef.current.disconnect();
-        } catch (e) {}
-        oscRef.current = null;
-      }
-      setIsPlayingReference(false);
-    } else {
+  // Referenzton / Saitenton abspielen oder stoppen
+  const playTone = useCallback((freq: number | null) => {
+    if (oscRef.current) {
       try {
-        const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-        const audioCtx = audioContextRef.current || new AudioCtx();
-        audioContextRef.current = audioCtx;
-
-        const osc = audioCtx.createOscillator();
-        const gain = audioCtx.createGain();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(a4Reference, audioCtx.currentTime);
-
-        gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
-        osc.connect(gain);
-        gain.connect(audioCtx.destination);
-
-        osc.start();
-        oscRef.current = osc;
-        gainNodeRef.current = gain;
-        setIsPlayingReference(true);
-      } catch (err) {
-        console.error('Error playing reference tone:', err);
-      }
+        oscRef.current.stop();
+        oscRef.current.disconnect();
+      } catch (e) {}
+      oscRef.current = null;
+      gainNodeRef.current = null;
     }
+
+    if (freq === null || playingToneFreq === freq) {
+      setPlayingToneFreq(null);
+      setIsPlayingReference(false);
+      return;
+    }
+
+    try {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      const audioCtx = audioContextRef.current || new AudioCtx();
+      audioContextRef.current = audioCtx;
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+
+      gain.gain.setValueAtTime(0.001, audioCtx.currentTime);
+      gain.gain.linearRampToValueAtTime(0.18, audioCtx.currentTime + 0.04);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+
+      osc.start();
+      oscRef.current = osc;
+      gainNodeRef.current = gain;
+      setPlayingToneFreq(freq);
+      setIsPlayingReference(freq === a4Reference);
+    } catch (err) {
+      console.error('Error playing reference tone:', err);
+      setPlayingToneFreq(null);
+      setIsPlayingReference(false);
+    }
+  }, [playingToneFreq, a4Reference]);
+
+  const toggleReferenceTone = () => {
+    playTone(playingToneFreq === a4Reference ? null : a4Reference);
   };
 
   // Cleanup on Unmount
@@ -364,6 +380,7 @@ export const CampusTuner: React.FC<CampusTunerProps> = ({ onBack, uiLevel = 'pro
       if (oscRef.current) {
         try {
           oscRef.current.stop();
+          oscRef.current.disconnect();
         } catch (e) {}
       }
     };
@@ -377,7 +394,7 @@ export const CampusTuner: React.FC<CampusTunerProps> = ({ onBack, uiLevel = 'pro
       display: 'flex',
       flexDirection: 'column',
       gap: '20px',
-      maxWidth: '880px',
+      maxWidth: '860px',
       margin: '0 auto',
       width: '100%',
       padding: '0 8px'
@@ -390,7 +407,7 @@ export const CampusTuner: React.FC<CampusTunerProps> = ({ onBack, uiLevel = 'pro
         flexWrap: 'wrap',
         gap: '12px'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           {onBack && (
             <button
               type="button"
@@ -416,54 +433,38 @@ export const CampusTuner: React.FC<CampusTunerProps> = ({ onBack, uiLevel = 'pro
               <span>Zurück zur Übersicht</span>
             </button>
           )}
-          <div>
-            <h2 style={{
-              margin: 0,
-              fontSize: '1.25rem',
-              fontWeight: 900,
-              color: '#0f172a',
-              letterSpacing: '-0.02em',
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{
+              width: '42px',
+              height: '42px',
+              borderRadius: '13px',
+              background: '#dcfce7',
               display: 'flex',
               alignItems: 'center',
-              gap: '8px'
+              justifyContent: 'center',
+              flexShrink: 0
             }}>
-              <span>🎸</span>
-              <span>WebAudio Stimmgerät</span>
-            </h2>
-            <p style={{ margin: '2px 0 0 0', fontSize: '0.78rem', color: '#64748b', fontWeight: 600 }}>
-              Präzise Frequenzerkennung mit Autokorrelation für saubere Intonation
-            </p>
+              <Radio size={22} color="#16a34a" />
+            </div>
+            <div>
+              <h2 style={{
+                margin: 0,
+                fontSize: '1.25rem',
+                fontWeight: 900,
+                color: '#0f172a',
+                letterSpacing: '-0.02em'
+              }}>
+                Stimmgerät
+              </h2>
+              <p style={{ margin: '2px 0 0 0', fontSize: '0.78rem', color: '#64748b', fontWeight: 600 }}>
+                Präzise chromatische Frequenzerkennung • Kammerton A4 (440 Hz)
+              </p>
+            </div>
           </div>
         </div>
 
-        {/* Instrument Preset Selector */}
+        {/* 440 Hz Kammerton Button */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <select
-            value={selectedPresetId}
-            onChange={(e) => {
-              setSelectedPresetId(e.target.value);
-              setSelectedStringIndex(null);
-            }}
-            style={{
-              padding: '8px 12px',
-              borderRadius: '12px',
-              border: '1.5px solid #cbd5e1',
-              background: '#ffffff',
-              fontSize: '0.82rem',
-              fontWeight: 800,
-              color: '#0f172a',
-              cursor: 'pointer',
-              outline: 'none',
-              boxShadow: '0 2px 6px rgba(0,0,0,0.02)'
-            }}
-          >
-            {INSTRUMENT_PRESETS.map(preset => (
-              <option key={preset.id} value={preset.id}>
-                {preset.icon} {preset.name}
-              </option>
-            ))}
-          </select>
-
           <button
             type="button"
             onClick={toggleReferenceTone}
@@ -471,23 +472,71 @@ export const CampusTuner: React.FC<CampusTunerProps> = ({ onBack, uiLevel = 'pro
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
-              padding: '8px 14px',
-              borderRadius: '12px',
-              border: 'none',
-              background: isPlayingReference ? '#ef4444' : '#f1f5f9',
-              color: isPlayingReference ? '#ffffff' : '#475569',
-              fontSize: '0.80rem',
-              fontWeight: 800,
+              padding: '9px 16px',
+              borderRadius: '14px',
+              border: isPlayingReference ? '1.5px solid #ef4444' : '1.5px solid #e2e8f0',
+              background: isPlayingReference ? '#ef4444' : '#ffffff',
+              color: isPlayingReference ? '#ffffff' : '#0f172a',
+              fontSize: '0.82rem',
+              fontWeight: 850,
               cursor: 'pointer',
+              boxShadow: isPlayingReference ? '0 4px 12px rgba(239, 68, 68, 0.25)' : '0 2px 6px rgba(0,0,0,0.02)',
               transition: 'all 0.15s ease'
             }}
             title="Kammerton A4 (440 Hz) abspielen"
             className="hover-scale"
           >
-            {isPlayingReference ? <VolumeX size={15} /> : <Volume2 size={15} />}
-            <span>440 Hz Ton</span>
+            {isPlayingReference ? <VolumeX size={16} /> : <Volume2 size={16} color="#16a34a" />}
+            <span>{isPlayingReference ? '440 Hz Stoppen' : '440 Hz Ton'}</span>
           </button>
         </div>
+      </div>
+
+      {/* Instrument Preset Segmented Pills Bar */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '6px',
+        background: '#f1f5f9',
+        padding: '5px',
+        borderRadius: '16px',
+        overflowX: 'auto',
+        maxWidth: '100%',
+        scrollbarWidth: 'none'
+      }}>
+        {INSTRUMENT_PRESETS.map(preset => {
+          const isActive = preset.id === selectedPresetId;
+          return (
+            <button
+              key={preset.id}
+              type="button"
+              onClick={() => {
+                setSelectedPresetId(preset.id);
+                setSelectedStringIndex(null);
+                if (playingToneFreq !== null) {
+                  playTone(null);
+                }
+              }}
+              style={{
+                padding: '8px 14px',
+                borderRadius: '12px',
+                border: 'none',
+                background: isActive ? '#ffffff' : 'transparent',
+                color: isActive ? '#0f172a' : '#64748b',
+                fontSize: '0.80rem',
+                fontWeight: isActive ? 900 : 700,
+                cursor: 'pointer',
+                boxShadow: isActive ? '0 2px 8px rgba(0,0,0,0.06)' : 'none',
+                whiteSpace: 'nowrap',
+                transition: 'all 0.15s ease',
+                flexShrink: 0
+              }}
+              className={isActive ? '' : 'hover-scale'}
+            >
+              {preset.name}
+            </button>
+          );
+        })}
       </div>
 
       {micError && (
@@ -503,7 +552,7 @@ export const CampusTuner: React.FC<CampusTunerProps> = ({ onBack, uiLevel = 'pro
           alignItems: 'center',
           gap: '8px'
         }}>
-          <span>⚠️</span>
+          <ShieldCheck size={18} color="#dc2626" />
           <span>{micError}</span>
         </div>
       )}
@@ -691,41 +740,75 @@ export const CampusTuner: React.FC<CampusTunerProps> = ({ onBack, uiLevel = 'pro
           </div>
         </div>
 
-        {/* Saiten-Auswahl / Target Pegs (sofern Preset Saiten hat) */}
+        {/* Saiten-Auswahl / Target Pegs mit Ton-Vorhören */}
         {selectedPreset.strings.length > 0 && (
           <div style={{
             display: 'flex',
             flexWrap: 'wrap',
-            gap: '8px',
+            gap: '10px',
             justifyContent: 'center',
             marginTop: '8px'
           }}>
             {selectedPreset.strings.map((str, idx) => {
               const isSelected = selectedStringIndex === idx;
+              const isPegPlaying = playingToneFreq === str.freq;
               return (
                 <button
                   key={idx}
                   type="button"
-                  onClick={() => setSelectedStringIndex(idx)}
+                  onClick={() => {
+                    setSelectedStringIndex(idx);
+                    playTone(str.freq);
+                  }}
                   style={{
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    minWidth: '58px',
-                    padding: '8px 12px',
-                    borderRadius: '14px',
-                    border: isSelected ? '2px solid #16a34a' : '1.5px solid #e2e8f0',
-                    background: isSelected ? '#dcfce7' : '#f8fafc',
-                    color: isSelected ? '#15803d' : '#334155',
+                    minWidth: '66px',
+                    padding: '10px 14px',
+                    borderRadius: '16px',
+                    border: isPegPlaying
+                      ? '2px solid #16a34a'
+                      : isSelected
+                      ? '2px solid #22c55e'
+                      : '1.5px solid #e2e8f0',
+                    background: isPegPlaying
+                      ? '#dcfce7'
+                      : isSelected
+                      ? '#f0fdf4'
+                      : '#f8fafc',
+                    color: isPegPlaying || isSelected ? '#15803d' : '#334155',
                     cursor: 'pointer',
                     transition: 'all 0.15s ease',
-                    boxShadow: isSelected ? '0 4px 12px rgba(34, 197, 94, 0.2)' : 'none'
+                    boxShadow: isPegPlaying
+                      ? '0 6px 18px rgba(34, 197, 94, 0.28)'
+                      : isSelected
+                      ? '0 4px 12px rgba(34, 197, 94, 0.15)'
+                      : 'none',
+                    position: 'relative'
                   }}
                   className="hover-scale"
+                  title={`${str.name}${str.octave} (${str.freq} Hz) Vorhören / Referenzton`}
                 >
-                  <span style={{ fontSize: '0.92rem', fontWeight: 900 }}>{str.name}{str.octave}</span>
-                  <span style={{ fontSize: '0.64rem', fontWeight: 700, color: '#64748b' }}>{str.label || `${str.freq}Hz`}</span>
+                  <span style={{ fontSize: '0.96rem', fontWeight: 950, letterSpacing: '-0.02em' }}>
+                    {str.name}{str.octave}
+                  </span>
+                  <span style={{ fontSize: '0.66rem', fontWeight: 700, color: '#64748b' }}>
+                    {str.label || `${str.freq} Hz`}
+                  </span>
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '3px',
+                    marginTop: '4px',
+                    fontSize: '0.64rem',
+                    fontWeight: 800,
+                    color: isPegPlaying ? '#16a34a' : '#94a3b8'
+                  }}>
+                    {isPegPlaying ? <Volume2 size={12} color="#16a34a" /> : <Volume2 size={11} color="#94a3b8" />}
+                    <span>{isPegPlaying ? 'Stop' : 'Ton'}</span>
+                  </div>
                 </button>
               );
             })}
@@ -766,16 +849,17 @@ export const CampusTuner: React.FC<CampusTunerProps> = ({ onBack, uiLevel = 'pro
       {/* Safety & Compliance Hint */}
       <div style={{
         textAlign: 'center',
-        fontSize: '0.72rem',
-        color: '#94a3b8',
-        fontWeight: 600,
+        fontSize: '0.76rem',
+        color: '#64748b',
+        fontWeight: 700,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: '6px'
+        gap: '8px',
+        padding: '6px 12px'
       }}>
-        <span>🔒</span>
-        <span>Lokale WebAudio-Verarbeitung: Es wird keine Audio-Aufnahme gespeichert oder übertragen.</span>
+        <ShieldCheck size={16} color="#16a34a" />
+        <span>DSGVO-konform • 100% lokale Signalverarbeitung im Browser • Campus-Groovelab</span>
       </div>
     </div>
   );

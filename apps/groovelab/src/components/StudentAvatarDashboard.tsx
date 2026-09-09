@@ -10,10 +10,7 @@ import {
   Pencil, Edit3, User, Mail, Phone, MapPin, Activity, Camera, TrendingUp, Users, Shield, Search, Palmtree, Settings, Bell, FileText, ThumbsUp, Heart, AlertTriangle, Anchor, ShieldCheck, CheckCheck, Building,
   Mic, Disc, Trash2, Download, Key, Delete, Headphones, ArrowRight, Sliders, Compass, Palette, Lightbulb, Copy, ShieldAlert, Fingerprint, GraduationCap
 } from 'lucide-react';
-import QRCode from 'react-qr-code';
-import { ResponsiveContainer, PieChart as RechartsPieChart, Pie, Cell, Tooltip } from 'recharts';
 import { createPortal } from 'react-dom';
-import { QRCodeModal } from './QRCodeModal';
 import { checkIsAudioTresorActive, ALL_STICKERS, getUnifiedStickersMap, getUnifiedStickerStatus } from '../domain/stickersAndTresor';
 import { UpdateAnnouncementHero } from './common/UpdateAnnouncementHero';
 import { usePremiumOnboardingTour, TourStep, TourStartButton } from './PremiumOnboardingTour';
@@ -29,18 +26,16 @@ import { CampusLevelSelectModal } from './campus/CampusLevelSelectModal';
 import { AudioTrackCarousel, AudioTrackItem } from './AudioTrackCarousel';
 import { ZenPlayAlongDock, PreFlightAudioPreviewButton, PreFlightAudioPlayerSection, getTrackPedagogicalType, playCountInBeep } from './campus/ZenPlayAlongDock';
 import { MeisterOhrSticker } from './MeisterOhrSticker';
-import { getAvatarLevelFrameStyle } from './StudioAvatar';
+import { getAvatarLevelFrameStyle, resolveCampusStudentAvatar } from './StudioAvatar';
 import { processPureRawBlob, TARGET_PURE_RAW_LUFS, TARGET_PEAK_DBTP } from '../utils/audioMasteringEngine';
 import { computeGroundTruthMetrics, broadcastPracticeUpdate, DEFAULT_FOKUS_LEVELS, getEngineEffectiveLevel } from '../utils/studentProgressEngine';
 import { synthesizeNeuralSpeech, playAudioBlob, stopNeuralSpeech, buildContinuousHomeworkNarrative, cleanTextForTts } from '../services/neuralTtsService';
 import { fetchHolidaysCached } from '../utils/holidayHelper';
 import { useParentSessionLock } from '../hooks/useParentSessionLock';
 import { AddSiblingModal } from './campus/AddSiblingModal';
-import { StudentCampusCupTab } from './student/tabs/StudentCampusCupTab';
 import { StudentPracticeTab } from './student/tabs/StudentPracticeTab';
 import { StudentSongDetailModal } from './student/modals/StudentSongDetailModal';
 import { StudentLehrwerkDetailModal } from './student/modals/StudentLehrwerkDetailModal';
-import { CampusWrappedStoryModal } from './student/modals/CampusWrappedStoryModal';
 import { DigitalDetoxOverlay } from './student/modals/DigitalDetoxOverlay';
 import { FirstLoginPinModal } from './student/modals/FirstLoginPinModal';
 import { StudentContributionsModal } from './student/modals/StudentContributionsModal';
@@ -53,6 +48,7 @@ import { StudentJuniorPreFlightModal } from './student/modals/StudentJuniorPreFl
 import { StudentJuniorStickerModal } from './student/modals/StudentJuniorStickerModal';
 import { StudentJuniorStickerDetailModal } from './student/modals/StudentJuniorStickerDetailModal';
 import { StudentJuniorStickerAwardModal } from './student/modals/StudentJuniorStickerAwardModal';
+import { SiblingPinUnlockModal } from './student/modals/SiblingPinUnlockModal';
 import { StudentSongsTab } from './student/tabs/StudentSongsTab';
 import { StudentProfileTab } from './student/tabs/StudentProfileTab';
 import { StudentSettingsTab } from './student/tabs/StudentSettingsTab';
@@ -70,6 +66,8 @@ const StudentToolboxModal = lazy(() => import('./campus/StudentToolboxModal').th
 const PushNotificationSoftPromptModal = lazy(() => import('./ui/PushNotificationSoftPromptModal').then(m => ({ default: m.PushNotificationSoftPromptModal })));
 const ParentCampusActivationModal = lazy(() => import('./ParentCampusActivationModal').then(m => ({ default: m.ParentCampusActivationModal })));
 const PaymentGracePeriodSoftLockModal = lazy(() => import('./PaymentGracePeriodSoftLockModal').then(m => ({ default: m.PaymentGracePeriodSoftLockModal })));
+const StudentCampusCupTab = lazy(() => import('./student/tabs/StudentCampusCupTab').then(m => ({ default: m.StudentCampusCupTab })));
+const CampusWrappedStoryModal = lazy(() => import('./student/modals/CampusWrappedStoryModal').then(m => ({ default: m.CampusWrappedStoryModal })));
 const Confetti = lazy(() => import('react-confetti'));
 
 interface HomeworkBookErrorBoundaryProps {
@@ -382,15 +380,29 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     }
   };
 
+  // 🛡️ UI-LEVEL WECHSEL-GUARD & LIVE-EVENT BINDUNG:
+  // Verhindert jegliche Fehlzündungen (Jubel-Modale, Sticker-Popups) beim Stufenwechsel unterm Jahr
+  const isSwitchingUiLevelRef = useRef<boolean>(false);
+  const justCompletedPracticeRef = useRef<boolean>(false);
+
   useEffect(() => {
     const handleGlobalLevelChange = (e: any) => {
-      if (e?.detail) setStudentUiLevel(e.detail);
+      if (e?.detail) {
+        isSwitchingUiLevelRef.current = true;
+        setJuniorAwardedStickerToCelebrate(null);
+        setStudentUiLevel(e.detail);
+        setTimeout(() => {
+          isSwitchingUiLevelRef.current = false;
+        }, 1500);
+      }
     };
     window.addEventListener('campus_ui_level_changed', handleGlobalLevelChange);
     return () => window.removeEventListener('campus_ui_level_changed', handleGlobalLevelChange);
   }, []);
 
   const handleLevelChange = async (newLevel: CampusUiLevel) => {
+    isSwitchingUiLevelRef.current = true;
+    setJuniorAwardedStickerToCelebrate(null);
     setStudentUiLevel(newLevel);
     setDraftUiLevel(newLevel);
     const effectiveId = studentId || studentUser?.id;
@@ -400,6 +412,12 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     localStorage.setItem('campus_student_ui_level', newLevel);
     window.dispatchEvent(new CustomEvent('campus_ui_level_changed', { detail: newLevel }));
     setShowLevelModal(false);
+
+    // Geräuschlose Entprellung: Unterdrückt Sticker-Popups beim Rendern des neuen Levels
+    setTimeout(() => {
+      isSwitchingUiLevelRef.current = false;
+    }, 1500);
+
     try {
       if (effectiveId) {
         // 🛡️ Revisionssichere Persistenz via RPC mit Fallback
@@ -432,6 +450,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
   }, [studentUser?.campus_ui_level, studentId, studentUser?.id]);
 
   const handleJuniorPracticeComplete = async (minutes: number, xpEarned: number) => {
+    justCompletedPracticeRef.current = true;
     try {
       await supabase.from('fokus_logs').insert({
         student_id: studentId,
@@ -1502,9 +1521,9 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     }
   });
   const [isAddSiblingModalOpen, setIsAddSiblingModalOpen] = useState<boolean>(false);
+  const [pendingSiblingUnlock, setPendingSiblingUnlock] = useState<any | null>(null);
 
-  const handleSwitchFamilyStudent = (targetStudentId: string, keepParentUnlocked = false) => {
-    if (targetStudentId === studentId) return;
+  const executeSwitchFamilyStudent = (targetStudentId: string, keepParentUnlocked = false) => {
     localStorage.setItem('groovelab_current_student_id', targetStudentId);
     localStorage.setItem('campus_active_student_id', targetStudentId);
     sessionStorage.setItem('groovelab_user_id', targetStudentId);
@@ -1518,6 +1537,37 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       sessionStorage.setItem(`groovelab_parent_session_${targetStudentId}`, String(Date.now() + 180 * 1000));
     }
     window.location.search = `?student=${targetStudentId}`;
+  };
+
+  const handleSwitchFamilyStudent = async (targetStudentId: string, keepParentUnlocked = false) => {
+    if (targetStudentId === studentId) return;
+
+    // 🛡️ Zero-Trust PIN-Schranke: Nur im Schülerbereich (keepParentUnlocked === false)
+    if (!keepParentUnlocked) {
+      const targetSibling = familyProfiles.find(p => p.id === targetStudentId);
+      let isPinProtected = Boolean(targetSibling?.has_personal_pin || targetSibling?.is_pin_activated);
+
+      // Falls das Flag im lokalen Speicher noch fehlt, kurz serverseitig in users verifizieren
+      if (targetSibling && targetSibling.has_personal_pin === undefined) {
+        try {
+          const { data: siblingData } = await supabase
+            .from('users')
+            .select('has_personal_pin, is_pin_activated')
+            .eq('id', targetStudentId)
+            .maybeSingle();
+          if (siblingData && (siblingData.has_personal_pin || siblingData.is_pin_activated)) {
+            isPinProtected = true;
+          }
+        } catch (e) {}
+      }
+
+      if (isPinProtected && targetSibling) {
+        setPendingSiblingUnlock(targetSibling);
+        return;
+      }
+    }
+
+    executeSwitchFamilyStudent(targetStudentId, keepParentUnlocked);
   };
 
   const handleRemoveFamilyProfile = (removeStudentId: string, e?: React.MouseEvent) => {
@@ -1715,7 +1765,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     instrument_type: studentUser?.resolved_instrument || studentUser?.instrument || 'Guitar',
     evolution_level: 1,
     xp: 0,
-    asset_path: getInstrumentAvatarUrl(studentUser?.resolved_instrument || studentUser?.instrument),
+    asset_path: resolveCampusStudentAvatar(studentUser),
     streak_flame: 0
   };
 
@@ -1724,9 +1774,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     const currentFirst = studentUser?.first_name || '';
     const currentLast = ''; // 🛡️ Zero-Knowledge: 100% last_name exclusion in student local storage
     const currentInst = studentUser?.resolved_instrument || studentUser?.instrument || '';
-    const currentPhoto = (studentUser?.photo_url && (studentUser.photo_url.startsWith('http') || studentUser.photo_url.startsWith('/')))
-      ? studentUser.photo_url
-      : getInstrumentAvatarUrl(currentInst);
+    const currentPhoto = resolveCampusStudentAvatar(studentUser);
     const currentUi = studentUiLevel || studentUser?.campus_ui_level || 'junior';
 
     if (!currentFirst) return;
@@ -1742,6 +1790,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
           instrument: currentInst,
           photo_url: currentPhoto,
           campus_ui_level: currentUi,
+          has_personal_pin: Boolean(studentUser?.has_personal_pin || studentUser?.is_pin_activated),
           last_active: new Date().toISOString()
         }
       ];
@@ -1934,7 +1983,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     ];
 
     if (assigned.length === 0) {
-      const defaultUrl = getInstrumentAvatarUrl('');
+      const defaultUrl = resolveCampusStudentAvatar(editingProfile);
       return [{ id: 'default_inst', label: 'Standard-Avatar', url: defaultUrl, category: 'Alle' }];
     }
 
@@ -4069,6 +4118,15 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
   const [juniorAwardedStickerToCelebrate, setJuniorAwardedStickerToCelebrate] = useState<any | null>(null);
   const [juniorSelectedPreviewSticker, setJuniorSelectedPreviewSticker] = useState<any | null>(null);
   const [juniorCheckedPages, setJuniorCheckedPages] = useState<Record<string, boolean>>({});
+  const [welcomeToast, setWelcomeToast] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!welcomeToast) return;
+    const timer = setTimeout(() => {
+      setWelcomeToast(null);
+    }, 4500);
+    return () => clearTimeout(timer);
+  }, [welcomeToast]);
 
   // 🚀 Junior Zen Space Mission: Reizentzug, Tab-Detox & Treibstoff-Physik
   const [juniorMissionPhase, setJuniorMissionPhase] = useState<'idle' | 'zen' | 'celebrating'>('idle');
@@ -7655,12 +7713,13 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       if (sessionCompletedTarget) {
         setHasCompletedTargetToday(true);
       }
+      justCompletedPracticeRef.current = true;
       setAvatar((prev: any) => ({
         ...(prev || {
           avatar_style: 'standard',
           instrument_type: studentUser?.resolved_instrument || studentUser?.instrument || 'Guitar',
           evolution_level: 1,
-          asset_path: getInstrumentAvatarUrl(studentUser?.resolved_instrument || studentUser?.instrument),
+          asset_path: resolveCampusStudentAvatar(studentUser),
           id: `local-avatar-${studentId}`,
           user_id: studentId
         }),
@@ -8870,26 +8929,110 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     });
   }, [effectivePracticeMinutes, avatar?.xp, avatar?.streak_flame, songStats?.masteredCount, progressItems, studentUser?.created_at, studentUser?.activated_at]);
 
+  // 🎓 First-Run FTUX Post-Activation Celebration & Schuljahres-Sticker Award (All UI Levels)
+  useEffect(() => {
+    if (!studentId || !unifiedStickersMap || isSwitchingUiLevelRef.current) return;
+
+    try {
+      const firstRunKey = `campus_first_activation_celebrated_${studentId}`;
+      const alreadyCelebrated = localStorage.getItem(firstRunKey);
+
+      if (!alreadyCelebrated) {
+        localStorage.setItem(firstRunKey, 'true');
+        setWelcomeToast('Willkommen im Campus! Dein Dashboard ist startklar 🎉');
+
+        // Look for the unlocked Schuljahr badge (e.g. schuljahr-1)
+        const schoolYearSticker = (ALL_STICKERS || []).find(st => st.category === 'schuljahr' && unifiedStickersMap[st.id]?.isUnlocked)
+          || (ALL_STICKERS || []).find(st => st.id === 'schuljahr-1');
+
+        if (schoolYearSticker) {
+          // Pre-populate groovelab_junior_celebrated_stickers_${studentId} so junior effect won't re-celebrate it
+          const storageKey = `groovelab_junior_celebrated_stickers_${studentId}`;
+          const stored = localStorage.getItem(storageKey);
+          const initialUnlocked = (ALL_STICKERS || []).filter(st => unifiedStickersMap[st.id]?.isUnlocked).map(st => st.id);
+          const celebratedSet = new Set<string>(stored ? JSON.parse(stored) : initialUnlocked);
+          celebratedSet.add(schoolYearSticker.id);
+          (ALL_STICKERS || []).filter(st => st.category === 'schuljahr').forEach(st => celebratedSet.add(st.id));
+          localStorage.setItem(storageKey, JSON.stringify(Array.from(celebratedSet)));
+
+          // Schuljahres-Wappen nur bei echtem Erststart feiern, NIEMALS während eines UI-Level-Wechsels
+          if (!isSwitchingUiLevelRef.current && (studentUiLevel === 'junior' || !studentUiLevel)) {
+            playSuccessChime();
+            setJuniorAwardedStickerToCelebrate(schoolYearSticker);
+          }
+        }
+      } else {
+        // 🛡️ Ensure all Schuljahres-Sticker are permanently in celebratedSet so they never leak into Junior loop
+        const storageKey = `groovelab_junior_celebrated_stickers_${studentId}`;
+        const stored = localStorage.getItem(storageKey);
+        if (stored) {
+          const celebratedSet = new Set<string>(JSON.parse(stored));
+          let changed = false;
+          (ALL_STICKERS || []).filter(st => st.category === 'schuljahr').forEach(st => {
+            if (!celebratedSet.has(st.id)) {
+              celebratedSet.add(st.id);
+              changed = true;
+            }
+          });
+          if (changed) {
+            localStorage.setItem(storageKey, JSON.stringify(Array.from(celebratedSet)));
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('First-run celebration error:', err);
+    }
+  }, [studentId, unifiedStickersMap, studentUiLevel]);
+
   // Check and trigger sticker award celebration in Level 1 (Junior) Briefing Board
   useEffect(() => {
-    if (studentUiLevel !== 'junior' || !studentId) return;
+    if (studentUiLevel !== 'junior' || !studentId || isSwitchingUiLevelRef.current) return;
 
     try {
       const storageKey = `groovelab_junior_celebrated_stickers_${studentId}`;
       const stored = localStorage.getItem(storageKey);
 
-      // If first visit on a new device/cleared cache, seed existing unlocked stickers
-      // so they are not annoyingly re-celebrated retroactively
+      // 🛡️ REINE PRÄSENTATIONS-LINSE:
+      // Alle aktuell in unifiedStickersMap freigeschalteten Sticker
+      const currentUnlockedIds = (ALL_STICKERS || []).filter(st => unifiedStickersMap[st.id]?.isUnlocked).map(st => st.id);
+
+      // Wenn der Cache leer ist, alle bisherigen Meilensteine geräuschlos einspeisen
       if (stored === null) {
-        const initialUnlocked = (ALL_STICKERS || []).filter(st => unifiedStickersMap[st.id]?.isUnlocked).map(st => st.id);
-        localStorage.setItem(storageKey, JSON.stringify(initialUnlocked));
+        localStorage.setItem(storageKey, JSON.stringify(currentUnlockedIds));
         return;
       }
 
       const celebratedIds: string[] = stored ? JSON.parse(stored) : [];
       const celebratedSet = new Set<string>(celebratedIds);
 
+      // 🛡️ SCHULJAHRES-STICKER ISOLATION:
+      // Schuljahres-Wappen (schuljahr-*) gehören STRIKT zum kalendarischen Schuljahresstart (01. September)
+      // und dürfen NIEMALS als spontanes Meilenstein-Popup im Junior-Dashboard gefeuert werden!
+      (ALL_STICKERS || []).filter(st => st.category === 'schuljahr').forEach(st => {
+        celebratedSet.add(st.id);
+      });
+
+      // 🛡️ STRIKTE LIVE-EVENT BINDUNG:
+      // Wurde keine Live-Übesession abgeschlossen (justCompletedPracticeRef ist false),
+      // werden alle neu freigeschalteten Sticker still und geräuschlos absorbiert (z. B. bei UI-Wechsel)!
+      if (!justCompletedPracticeRef.current) {
+        let updated = false;
+        for (const st of ALL_STICKERS) {
+          if (st.category === 'schuljahr') continue;
+          if (!celebratedSet.has(st.id) && unifiedStickersMap[st.id]?.isUnlocked) {
+            celebratedSet.add(st.id);
+            updated = true;
+          }
+        }
+        if (updated) {
+          localStorage.setItem(storageKey, JSON.stringify(Array.from(celebratedSet)));
+        }
+        return;
+      }
+
+      // Live Practice Event: Wenn soeben eine Übeeinheit aktiv beendet wurde, Meilenstein feiern
       for (const st of ALL_STICKERS) {
+        if (st.category === 'schuljahr') continue; // Schuljahres-Sticker werden niemals hier gefeiert
         if (celebratedSet.has(st.id)) continue;
 
         const stickerStatus = unifiedStickersMap[st.id];
@@ -8901,6 +9044,9 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
           break;
         }
       }
+
+      // Live-Trigger nach Prüfung verbrauchen
+      justCompletedPracticeRef.current = false;
     } catch (e) {
       console.warn('Junior sticker celebration error:', e);
     }
@@ -9771,7 +9917,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
         instrument_type: user.resolved_instrument || user.instrument || 'Guitar',
         evolution_level: 1,
         xp: metrics.totalXp,
-        asset_path: getInstrumentAvatarUrl(user.resolved_instrument || user.instrument),
+        asset_path: resolveCampusStudentAvatar(user),
         streak_flame: metrics.streakFlame,
         id: `local-avatar-${studentId}`,
         user_id: studentId
@@ -11732,24 +11878,28 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
         isMusicStandMode={isMusicStandMode}
       />
 
-      <StudentCampusCupTab
-        activeTab={activeTab}
-        rankingLoading={rankingLoading}
-        studentUser={studentUser}
-        sessionActive={sessionActive}
-        secondsElapsed={secondsElapsed}
-        classMins={classMins}
-        classWeeklyFocus={classWeeklyFocus}
-        otherClassMins={otherClassMins}
-        classmateIds={classmateIds}
-        studentId={studentId}
-        classFocusLogs={classFocusLogs}
-        classCount={classCount}
-        classGoals={classGoals}
-        classHighlights={classHighlights}
-        highlightsLoading={highlightsLoading}
-        isMobile={isMobile}
-      />
+      {activeTab === 'campus_cup' && (
+        <Suspense fallback={<div style={{ padding: '40px', textAlign: 'center', color: '#64748b', fontWeight: 600 }}>Lade Campus Cup...</div>}>
+          <StudentCampusCupTab
+            activeTab={activeTab}
+            rankingLoading={rankingLoading}
+            studentUser={studentUser}
+            sessionActive={sessionActive}
+            secondsElapsed={secondsElapsed}
+            classMins={classMins}
+            classWeeklyFocus={classWeeklyFocus}
+            otherClassMins={otherClassMins}
+            classmateIds={classmateIds}
+            studentId={studentId}
+            classFocusLogs={classFocusLogs}
+            classCount={classCount}
+            classGoals={classGoals}
+            classHighlights={classHighlights}
+            highlightsLoading={highlightsLoading}
+            isMobile={isMobile}
+          />
+        </Suspense>
+      )}
       <div style={{ display: activeTab === 'events' ? 'block' : 'none', width: '100%', boxSizing: 'border-box' }}>
         {activeTab === 'events' && (
           <Suspense fallback={<div style={{ padding: '40px', textAlign: 'center', color: '#64748b', fontWeight: 600 }}>Lade Termine &amp; Kalender...</div>}>
@@ -12172,15 +12322,19 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
         setSelectedTopic={setSelectedTopic}
       />
 
-      <CampusWrappedStoryModal
-        isOpen={showWrapped && !!wrappedData}
-        onClose={() => setShowWrapped(false)}
-        wrappedData={wrappedData}
-        avatar={avatar}
-        currentLevel={currentLevel}
-        studentId={studentId}
-        levelTitle={levelTitle}
-      />
+      {showWrapped && !!wrappedData && (
+        <Suspense fallback={null}>
+          <CampusWrappedStoryModal
+            isOpen={showWrapped && !!wrappedData}
+            onClose={() => setShowWrapped(false)}
+            wrappedData={wrappedData}
+            avatar={avatar}
+            currentLevel={currentLevel}
+            studentId={studentId}
+            levelTitle={levelTitle}
+          />
+        </Suspense>
+      )}
 
       <DigitalDetoxOverlay
         isOpen={showDetox}
@@ -12457,17 +12611,67 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       />
 
       {/* 🎉 GLOBAL JUNIOR STICKER AWARD CELEBRATION */}
-      <StudentJuniorStickerAwardModal
-        sticker={juniorAwardedStickerToCelebrate}
-        assignedCampusSongs={assignedCampusSongs}
-        progressItems={progressItems}
-        isSongMastered={isSongMastered}
-        onDownloadJpg={downloadJuniorStickerJpg}
-        onStickInAlbum={() => {
-          setJuniorAwardedStickerToCelebrate(null);
-          setShowJuniorStickerModal(true);
-        }}
-      />
+      {studentUiLevel === 'junior' && juniorAwardedStickerToCelebrate && (
+        <StudentJuniorStickerAwardModal
+          sticker={juniorAwardedStickerToCelebrate}
+          assignedCampusSongs={assignedCampusSongs}
+          progressItems={progressItems}
+          isSongMastered={isSongMastered}
+          onDownloadJpg={downloadJuniorStickerJpg}
+          onStickInAlbum={() => {
+            setJuniorAwardedStickerToCelebrate(null);
+            setShowJuniorStickerModal(true);
+          }}
+        />
+      )}
+
+      {/* 🛡️ SIBLING ZERO-TRUST PIN UNLOCK MODAL */}
+      {pendingSiblingUnlock && (
+        <SiblingPinUnlockModal
+          sibling={pendingSiblingUnlock}
+          onSuccess={(targetId) => {
+            setPendingSiblingUnlock(null);
+            executeSwitchFamilyStudent(targetId, false);
+          }}
+          onClose={() => setPendingSiblingUnlock(null)}
+        />
+      )}
+
+      {/* 🚀 FIRST-RUN WELCOME TOAST */}
+      {welcomeToast && (
+        <div
+          role="status"
+          aria-live="polite"
+          style={{
+            position: 'fixed',
+            top: '24px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 99999,
+            background: '#0f172a',
+            color: '#ffffff',
+            padding: '12px 24px',
+            borderRadius: '100px',
+            fontSize: '0.95rem',
+            fontWeight: 800,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            boxShadow: '0 12px 32px rgba(0,0,0,0.3)',
+            animation: 'toastSlideDown 0.35s cubic-bezier(0.16, 1, 0.3, 1)',
+            fontFamily: "'Plus Jakarta Sans', sans-serif"
+          }}
+        >
+          <Sparkles size={18} className="text-amber-400" />
+          <span>{welcomeToast}</span>
+          <style dangerouslySetInnerHTML={{ __html: `
+            @keyframes toastSlideDown {
+              from { opacity: 0; transform: translate(-50%, -16px); }
+              to { opacity: 1; transform: translate(-50%, 0); }
+            }
+          `}} />
+        </div>
+      )}
 
       <TourComponent />
     </div>

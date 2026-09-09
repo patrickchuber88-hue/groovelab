@@ -109,6 +109,7 @@ export const AdminBandsView: React.FC<AdminBandsViewProps> = ({
                 <Search size={14} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
                 <input 
                   type="text" 
+                  aria-label="Band suchen"
                   placeholder="Band suchen..." 
                   value={bandSearch}
                   onChange={(e) => setBandSearch(e.target.value)}
@@ -117,6 +118,7 @@ export const AdminBandsView: React.FC<AdminBandsViewProps> = ({
               </div>
               <button 
                 onClick={() => setShowAddBand(!showAddBand)} 
+                aria-label={showAddBand ? "Formular Band anlegen schließen" : "Neue Band anlegen"}
                 style={{ 
                   background: `linear-gradient(135deg, ${brandColor}, ${brandColor}ee)`, 
                   color: 'white', 
@@ -148,11 +150,11 @@ export const AdminBandsView: React.FC<AdminBandsViewProps> = ({
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Band Name</label>
-                  <input required placeholder="z.B. The Rockstars" value={newBand.name} onChange={e => setNewBand({...newBand, name: e.target.value})} style={{ padding: '14px', borderRadius: '14px', border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 600 }} />
+                  <input required aria-label="Band Name" placeholder="z.B. The Rockstars" value={newBand.name} onChange={e => setNewBand({...newBand, name: e.target.value})} style={{ padding: '14px', borderRadius: '14px', border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 600 }} />
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Song (Optional)</label>
-                  <select value={newBand.song_id} onChange={e => setNewBand({...newBand, song_id: e.target.value})} style={{ padding: '14px', borderRadius: '14px', border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 700 }}>
+                  <select aria-label="Song (Optional)" value={newBand.song_id} onChange={e => setNewBand({...newBand, song_id: e.target.value})} style={{ padding: '14px', borderRadius: '14px', border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 700 }}>
                     <option value="">-- Kein Song --</option>
                     {[...songs].sort((a, b) => {
                       const artistCompare = (a.artist || '').localeCompare(b.artist || '', 'de', { sensitivity: 'base' });
@@ -166,13 +168,13 @@ export const AdminBandsView: React.FC<AdminBandsViewProps> = ({
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Coach / Leitung</label>
-                  <select value={newBand.coach_id} onChange={e => setNewBand({...newBand, coach_id: e.target.value})} style={{ padding: '14px', borderRadius: '14px', border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 700 }}>
+                  <select aria-label="Coach / Leitung" value={newBand.coach_id} onChange={e => setNewBand({...newBand, coach_id: e.target.value})} style={{ padding: '14px', borderRadius: '14px', border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 700 }}>
                     {teachers.filter(t => !t.is_observer).map(t => <option key={t.id} value={t.id}>{t.first_name} {t.last_name}</option>)}
                   </select>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Avatar URL (Optional)</label>
-                  <input placeholder="https://..." value={newBand.photo_url} onChange={e => setNewBand({...newBand, photo_url: e.target.value})} style={{ padding: '14px', borderRadius: '14px', border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 600 }} />
+                  <input aria-label="Avatar URL (Optional)" placeholder="https://..." value={newBand.photo_url} onChange={e => setNewBand({...newBand, photo_url: e.target.value})} style={{ padding: '14px', borderRadius: '14px', border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 600 }} />
                 </div>
               </div>
 
@@ -183,6 +185,7 @@ export const AdminBandsView: React.FC<AdminBandsViewProps> = ({
                   <div style={{ flex: 1, position: 'relative' }}>
                     <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
                     <input 
+                      aria-label="Schüler suchen"
                       placeholder="Schüler suchen..." 
                       value={memberToSearch} 
                       onChange={e => setMemberToSearch(e.target.value)} 
@@ -200,10 +203,8 @@ export const AdminBandsView: React.FC<AdminBandsViewProps> = ({
                               setMemberToSearch('');
                             }}
                             style={{ padding: '10px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.85rem', fontWeight: 600, borderBottom: '1px solid #f1f5f9' }}
-                            
-                            
                           >
-                            <img src={s.photo_url || '/avatar_ghost.jpg'} style={{ width: '24px', height: '24px', borderRadius: '50%' }} />
+                            <img src={s.photo_url || '/avatar_ghost.jpg'} alt={`${s.first_name} Avatar`} style={{ width: '24px', height: '24px', borderRadius: '50%' }} />
                             {s.first_name} {maskLastName(s.last_name, showRealNames)}
                           </div>
                         ))}
@@ -218,7 +219,7 @@ export const AdminBandsView: React.FC<AdminBandsViewProps> = ({
                     return (
                       <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', background: 'white', borderRadius: '12px', border: '1px solid #f1f5f9' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          <img src={student?.photo_url || '/avatar_ghost.jpg'} style={{ width: '24px', height: '24px', borderRadius: '50%' }} />
+                          <img src={student?.photo_url || '/avatar_ghost.jpg'} alt={`${student?.first_name || 'Schüler'} Avatar`} style={{ width: '24px', height: '24px', borderRadius: '50%' }} />
                           <span style={{ fontWeight: 700, fontSize: '0.85rem' }}>{student?.first_name}</span>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -379,13 +380,20 @@ export const AdminBandsView: React.FC<AdminBandsViewProps> = ({
 
               return (
                 <div key={band.id} className="glass-panel" 
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`Bandprofil für ${band.name} öffnen`}
                   onClick={() => onOpenBandProfile?.(band)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      onOpenBandProfile?.(band);
+                    }
+                  }}
                   style={{ 
                     background: 'white', borderRadius: '24px', padding: '20px 24px', border: '1px solid #f1f5f9', boxShadow: '0 4px 12px rgba(0,0,0,0.02)',
-                    display: 'grid', gridTemplateColumns: 'auto 1fr auto auto auto', alignItems: 'center', gap: '24px', cursor: 'pointer', transition: 'all 0.2s'
+                    display: 'grid', gridTemplateColumns: 'auto 1fr auto auto auto', alignItems: 'center', gap: '24px', cursor: 'pointer', outline: 'none', transition: 'all 0.2s'
                   }}
-                  
-                  
                 >
                   <div style={{ width: '56px', height: '56px', borderRadius: '16px', background: brandColor, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', border: '2px solid white', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
                     {band.photo_url ? (
@@ -412,7 +420,7 @@ export const AdminBandsView: React.FC<AdminBandsViewProps> = ({
                           <img src={band.coach.photo_url || '/avatar_ghost.jpg'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
                         </div>
                         <div style={{ display: 'flex', flexDirection: 'column' }}>
-                          <span style={{ fontSize: '0.6rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Coach</span>
+                          <span style={{ fontSize: '0.6rem', fontWeight: 900, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Coach</span>
                           <span style={{ fontSize: '0.85rem', color: '#1e293b', fontWeight: 850 }}>{band.coach.first_name} {band.coach.last_name || ''}</span>
                         </div>
                       </div>
@@ -422,8 +430,8 @@ export const AdminBandsView: React.FC<AdminBandsViewProps> = ({
                           👤
                         </div>
                         <div style={{ display: 'flex', flexDirection: 'column' }}>
-                          <span style={{ fontSize: '0.6rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Coach</span>
-                          <span style={{ fontSize: '0.85rem', color: '#94a3b8', fontWeight: 800 }}>Kein Coach</span>
+                          <span style={{ fontSize: '0.6rem', fontWeight: 900, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Coach</span>
+                          <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 800 }}>Kein Coach</span>
                         </div>
                       </div>
                     )}
@@ -445,18 +453,25 @@ export const AdminBandsView: React.FC<AdminBandsViewProps> = ({
                     )}
                   </div>
 
-                <div style={{ display: 'flex', gap: '12px' }} onClick={e => e.stopPropagation()}>
-                  <button onClick={() => setEditingBand(band)} style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '10px', borderRadius: '12px', cursor: 'pointer', color: '#64748b' }}><Monitor size={18} /></button>
+                <div style={{ display: 'flex', gap: '12px' }}>
                   <button 
-                    onClick={async () => {
+                    onClick={(e) => { e.stopPropagation(); setEditingBand(band); }} 
+                    aria-label={`Band ${band.name} bearbeiten`}
+                    title="Band bearbeiten"
+                    style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '10px', borderRadius: '12px', cursor: 'pointer', color: '#64748b' }}
+                  >
+                    <Monitor size={18} />
+                  </button>
+                  <button 
+                    onClick={async (e) => {
+                      e.stopPropagation();
                       if(window.confirm(`Band "${band.name}" wirklich komplett auflösen?`)) {
                         await supabase.from('bands').delete().eq('id', band.id);
                         fetchData();
                       }
                     }}
+                    aria-label={`Band ${band.name} auflösen`}
                     style={{ background: '#fef2f2', border: '1px solid #fee2e2', color: '#ef4444', padding: '10px', borderRadius: '12px', cursor: 'pointer', transition: 'all 0.2s' }}
-                    
-                    
                     title="Band auflösen"
                   >
                     <Trash2 size={18} />
@@ -535,7 +550,7 @@ export const AdminBandsView: React.FC<AdminBandsViewProps> = ({
                             
                           >
                             <div style={{ width: '28px', height: '28px', borderRadius: '50%', overflow: 'hidden' }}>
-                              <img src={s.photo_url || '/avatar_ghost.jpg'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                              <img src={s.photo_url || '/avatar_ghost.jpg'} alt={`${s.first_name} Avatar`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                             </div>
                             <div>
                               <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#1e293b' }}>{s.first_name} {maskLastName(s.last_name, showRealNames)}</div>

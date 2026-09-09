@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Building, Calendar, Camera, Clock, Flame, Lock, Pencil, QrCode, Star, Users, X } from "lucide-react";
 import { QRCodeModal } from "../../QRCodeModal";
-import { getInstrumentAvatarUrl } from "../../../utils/avatarHelper";
+import { getInstrumentAvatarUrl, resolveCampusStudentAvatar } from "../../../utils/avatarHelper";
 import { STUDENT_AVATARS } from "../studentAvatars.constants";
 import { formatTeacherFullName } from "../../../utils/nameHelper";
 
@@ -88,7 +88,7 @@ export const StudentProfileTab: React.FC<StudentProfileTabProps> = ({
     ];
 
     if (assigned.length === 0) {
-      const defaultUrl = getInstrumentAvatarUrl("");
+      const defaultUrl = resolveCampusStudentAvatar(editingProfile);
       return [{ id: "default_inst", label: "Standard-Avatar", url: defaultUrl, category: "Alle" }];
     }
 
@@ -175,7 +175,7 @@ export const StudentProfileTab: React.FC<StudentProfileTabProps> = ({
                     ? '/campus_login_hero.png'
                     : studentUser.photo_url && studentUser.photo_url.includes('_avatar')
                     ? studentUser.photo_url
-                    : getInstrumentAvatarUrl(studentUser.resolved_instrument || studentUser.instrument)
+                    : resolveCampusStudentAvatar(studentUser)
                 } 
                 alt="" 
                 style={{ width: '95%', height: '95%', objectFit: 'contain' }} 
@@ -428,8 +428,9 @@ export const StudentProfileTab: React.FC<StudentProfileTabProps> = ({
               }} className="no-scrollbar">
                 {familyProfiles.map((member) => {
                   const isCurrent = member.id === studentId;
-                  const memberInst = member.instrument || (isCurrent ? studentUser?.instrument : 'Gitarre') || 'Gitarre';
-                  const defaultInstAvatar = getInstrumentAvatarUrl(memberInst);
+                  const isPinProtected = Boolean(member.has_personal_pin || member.is_pin_activated);
+                  const targetMember = isCurrent && !member.instrument ? { ...member, instrument: studentUser?.instrument } : member;
+                  const defaultInstAvatar = resolveCampusStudentAvatar(targetMember);
                   
                   let avatarSrc = defaultInstAvatar;
                   const rawPhoto = member.photo_url;
@@ -485,14 +486,14 @@ export const StudentProfileTab: React.FC<StudentProfileTabProps> = ({
                           justifyContent: 'center'
                         }}
                         className={!isCurrent ? "hover-scale" : undefined}
-                        title={isCurrent ? `${member.first_name} (Aktives Profil)` : `Zu ${member.first_name} wechseln`}
+                        title={isCurrent ? `${member.first_name} (Aktives Profil)` : isPinProtected ? `Zu ${member.first_name} wechseln (PIN-geschützt)` : `Zu ${member.first_name} wechseln`}
                       >
                         <img
                           src={avatarSrc}
                           alt={member.first_name || 'Schüler'}
                           onError={(e) => {
                             const img = e.currentTarget;
-                            const fallback = getInstrumentAvatarUrl(memberInst);
+                            const fallback = resolveCampusStudentAvatar(targetMember);
                             if (img.src !== fallback && !img.src.endsWith(fallback)) {
                               img.src = fallback;
                             } else {
@@ -515,6 +516,25 @@ export const StudentProfileTab: React.FC<StudentProfileTabProps> = ({
                             borderRadius: '17px',
                             pointerEvents: 'none'
                           }} />
+                        )}
+                        {isPinProtected && !isCurrent && (
+                          <div style={{
+                            position: 'absolute',
+                            bottom: '4px',
+                            right: '4px',
+                            width: '20px',
+                            height: '20px',
+                            borderRadius: '50%',
+                            background: '#0284c7',
+                            color: '#ffffff',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                            border: '1.5px solid #ffffff'
+                          }}>
+                            <Lock size={10} strokeWidth={2.5} />
+                          </div>
                         )}
                       </button>
 
@@ -554,16 +574,20 @@ export const StudentProfileTab: React.FC<StudentProfileTabProps> = ({
                           style={{
                             background: 'transparent',
                             border: 'none',
-                            color: '#64748b',
+                            color: isPinProtected ? '#0284c7' : '#64748b',
                             fontSize: '0.68rem',
-                            fontWeight: 700,
+                            fontWeight: 750,
                             cursor: 'pointer',
                             padding: '2px 4px',
-                            marginTop: '2px'
+                            marginTop: '2px',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '3px'
                           }}
                           className="hover-underline"
                         >
-                          Wechseln →
+                          {isPinProtected && <Lock size={10} strokeWidth={2.5} />}
+                          <span>Wechseln →</span>
                         </button>
                       )}
                     </div>
@@ -1062,7 +1086,7 @@ export const StudentProfileTab: React.FC<StudentProfileTabProps> = ({
                           ? '/campus_login_hero.png'
                           : editingProfile.photo_url && editingProfile.photo_url.includes('_avatar')
                           ? editingProfile.photo_url
-                          : getInstrumentAvatarUrl(editingProfile.resolved_instrument || editingProfile.instrument)
+                          : resolveCampusStudentAvatar(editingProfile)
                       } 
                       alt="" 
                       style={{ width: '92%', height: '92%', objectFit: 'contain' }} 

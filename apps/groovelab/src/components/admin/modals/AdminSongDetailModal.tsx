@@ -58,6 +58,19 @@ export const AdminSongDetailModal: React.FC<AdminSongDetailModalProps> = ({
   const [studentDetailSearch, setStudentDetailSearch] = useState<string>("");
 
   useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        triggerAutoSaveSongProgress();
+        onClose();
+        setSelectedStudentForProgress(null);
+        setSelectedSongSkill(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
+  useEffect(() => {
     if (song?.id) {
       setEditSongTitle(song.title || "");
       setEditSongArtist(song.artist || "");
@@ -319,7 +332,11 @@ export const AdminSongDetailModal: React.FC<AdminSongDetailModalProps> = ({
         );
 
         return (
-          <div style={{
+          <div 
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Song-Details: ${song?.title || ''}`}
+            style={{
             position: 'fixed',
             inset: 0,
             zIndex: 4000,
@@ -363,6 +380,9 @@ export const AdminSongDetailModal: React.FC<AdminSongDetailModalProps> = ({
                   </h2>
                 </div>
                 <button
+                  type="button"
+                  aria-label="Song-Details schließen"
+                  title="Schließen"
                   onClick={async () => {
                     await triggerAutoSaveSongProgress();
                     onClose();

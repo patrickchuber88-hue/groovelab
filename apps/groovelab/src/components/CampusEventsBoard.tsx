@@ -6401,6 +6401,16 @@ export function CampusEventsBoard({
                 <div key={monthKey} style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '8px' }}>
                   {/* Collapsible Month Header */}
                   <div 
+                    role="button"
+                    tabIndex={0}
+                    aria-expanded={isExpanded}
+                    aria-label={`Monat ${getMonthLabel(monthKey)} ${isExpanded ? 'einklappen' : 'ausklappen'}, ${occs.length} ${occs.length === 1 ? 'Termin' : 'Termine'}`}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        setExpandedMonths(prev => ({ ...prev, [monthKey]: !isExpanded }));
+                      }
+                    }}
                     onClick={() => setExpandedMonths(prev => ({ ...prev, [monthKey]: !isExpanded }))}
                     style={{
                       display: 'flex',

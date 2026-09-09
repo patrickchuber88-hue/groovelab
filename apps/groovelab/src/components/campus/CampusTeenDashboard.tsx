@@ -8,7 +8,7 @@ import { ALL_STICKERS, getUnifiedStickersMap } from '../../domain/stickersAndTre
 import { SimpleVoiceRecorder } from './SimpleVoiceRecorder';
 import { cleanHomeworkNotesText } from '../../utils/nameHelper';
 import { DEFAULT_FOKUS_LEVELS, getEngineEffectiveLevel } from '../../utils/studentProgressEngine';
-import { getAvatarLevelFrameStyle, getInstrumentAvatarUrl } from '../StudioAvatar';
+import { getAvatarLevelFrameStyle, resolveCampusStudentAvatar } from '../StudioAvatar';
 import { getSecureAudioUrl } from '../../utils/audioStorageHelper';
 
 interface CampusTeenDashboardProps {
@@ -204,7 +204,7 @@ export const CampusTeenDashboard: React.FC<CampusTeenDashboardProps> = ({
     return 'Demnächst';
   }, [scheduleOccurrences, briefingData]);
 
-  const instrumentAvatarUrl = getInstrumentAvatarUrl(studentUser?.instrument);
+  const instrumentAvatarUrl = resolveCampusStudentAvatar(studentUser);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '26px', width: '100%', maxWidth: '100%', margin: '0 auto', boxSizing: 'border-box' }} className="animation-slide-up">

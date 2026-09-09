@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import QRCode from 'react-qr-code';
 import { 
   Users, X, Check, Copy, Download, ShieldCheck, QrCode, Building2, 
-  HelpCircle, ArrowRight, Sparkles, HeartHandshake, CheckCircle2 
+  HelpCircle, ArrowRight, Sparkles, HeartHandshake, CheckCircle2,
+  Lock, ChevronLeft, Mic, MessageSquare, Shield, Zap, Crown, Eye, EyeOff
 } from 'lucide-react';
 import { 
   generateEpcGiroCodePayload, 
@@ -36,6 +37,7 @@ export interface ParentCampusActivationModalProps {
   masterBillingBic?: string;
   masterBillingCompany?: string;
   annualFee?: number; // default 5.88 (0.49 * 12)
+  isParentUnlocked?: boolean;
   onClose: () => void;
   onPaymentSubmitted?: () => void;
 }
@@ -47,6 +49,7 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
   masterBillingBic = 'GENODEFFXXX',
   masterBillingCompany = 'Campus-Groovelab Plattformbetrieb',
   annualFee = 5.88,
+  isParentUnlocked = false,
   onClose,
   onPaymentSubmitted
 }) => {
@@ -54,6 +57,25 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submittedSuccess, setSubmittedSuccess] = useState(false);
   const [showHardshipConfirm, setShowHardshipConfirm] = useState(false);
+
+  // Stage 2 Wizard State
+  type WizardStep = 'payment' | 'pin_gate' | 'permissions' | 'ui_level' | 'success';
+  const [wizardStep, setWizardStep] = useState<WizardStep>('payment');
+  const [parentPinInput, setParentPinInput] = useState<string>('');
+  const [parentPinError, setParentPinError] = useState<string | null>(null);
+  const [isVerifyingPin, setIsVerifyingPin] = useState<boolean>(false);
+  const [showParentPinMask, setShowParentPinMask] = useState<boolean>(false);
+  const [allowStudentAudio, setAllowStudentAudio] = useState<boolean>(() => {
+    return (student as any)?.parent_allow_audio !== false;
+  });
+  const [allowStudentChat, setAllowStudentChat] = useState<boolean>(true);
+  const [allowStudentAbsences, setAllowStudentAbsences] = useState<boolean>(false);
+  const [selectedUiLevel, setSelectedUiLevel] = useState<'junior' | 'teen' | 'pro'>(() => {
+    const existingLevel = (student as any)?.campus_ui_level;
+    if (existingLevel === 'junior' || existingLevel === 'teen' || existingLevel === 'pro') return existingLevel;
+    return 'teen';
+  });
+
   interface LinkedSibling {
     name: string;
     id?: string;
@@ -125,6 +147,7 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
 
   // Generate stable GoBD Reference Code: CG-[HASH8]-[YYMM]
   const referenceCode = generateStudentGoBdCode(student.id || 'TEMP-ID');
+  const studentDisplayName = formatSingleStudentAnonymized(student.first_name, student.last_name);
   const recipientName = masterBillingCompany;
   const effectiveIban = masterBillingIban;
   const effectiveBic = masterBillingBic;
@@ -144,8 +167,47 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
     setTimeout(() => setCopiedField(null), 2500);
   };
 
-  // Mark as transfer initiated and activate student profile
-  const handleConfirmTransferInitiated = async () => {
+  // Step transition into Stage-2 Wizard
+  const handleProceedToWizard = () => {
+    if (isParentUnlocked) {
+      setWizardStep('permissions');
+    } else {
+      setWizardStep('pin_gate');
+    }
+  };
+
+  // Authoritative server-side verify_parent_pin RPC
+  const handleVerifyParentPin = async () => {
+    if (!parentPinInput || parentPinInput.trim().length < 4) {
+      setParentPinError('Bitte gib dein 6-stelliges Eltern-Passwort ein.');
+      return;
+    }
+    setIsVerifyingPin(true);
+    setParentPinError(null);
+    try {
+      const { data: parentOk, error } = await supabase.rpc('verify_parent_pin', {
+        p_parent_pin: parentPinInput.trim(),
+        p_student_id: student.id
+      });
+      if (error) {
+        setParentPinError('Authentifizierung fehlgeschlagen: ' + error.message);
+        return;
+      }
+      if (parentOk === true) {
+        setParentPinError(null);
+        setWizardStep('permissions');
+      } else {
+        setParentPinError('Das eingegebene Eltern-Passwort ist nicht korrekt.');
+      }
+    } catch (err: any) {
+      setParentPinError('Fehler bei der Verifikation: ' + (err.message || 'Unbekannt'));
+    } finally {
+      setIsVerifyingPin(false);
+    }
+  };
+
+  // Finalize activation: update DB, save parent permissions & UI level, log audit consent, download PDF
+  const handleFinalizeActivation = async () => {
     try {
       setIsSubmitting(true);
       const isFamilyBonus = linkedSiblings.length >= 2;
@@ -153,32 +215,37 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
       const isCashPaid = isFamilyBonus ? true : false;
       const nowIso = new Date().toISOString();
 
+      const parentPermissionsObj = {
+        allow_student_audio: allowStudentAudio,
+        allow_chat: allowStudentChat,
+        allow_absences: allowStudentAbsences,
+        allow_reschedule_confirm: allowStudentAbsences,
+        campus_ui_level: selectedUiLevel
+      };
+
+      const updatePayload: Record<string, any> = {
+        student_billing_payment_method: isFamilyBonus ? 'family_bonus' : 'bank_transfer',
+        payment_status: initialPaymentStatus,
+        student_billing_cash_paid: isCashPaid,
+        is_campus_active: true,
+        campus_ui_level: selectedUiLevel,
+        parent_allow_audio: allowStudentAudio,
+        parent_permissions: parentPermissionsObj,
+        exempt_from_direct_billing: isFamilyBonus ? true : false,
+        activated_at: nowIso,
+        updated_at: nowIso
+      };
+
       const { error } = await supabase
         .from('students')
-        .update({
-          student_billing_payment_method: isFamilyBonus ? 'family_bonus' : 'bank_transfer',
-          payment_status: initialPaymentStatus,
-          student_billing_cash_paid: isCashPaid,
-          is_campus_active: true,
-          exempt_from_direct_billing: isFamilyBonus ? true : false,
-          activated_at: nowIso,
-          updated_at: nowIso
-        })
+        .update(updatePayload)
         .eq('id', student.id);
 
       if (error) {
         // Fallback: also try updating users table if students table is a view
         await supabase
           .from('users')
-          .update({
-            student_billing_payment_method: isFamilyBonus ? 'family_bonus' : 'bank_transfer',
-            payment_status: initialPaymentStatus,
-            student_billing_cash_paid: isCashPaid,
-            is_campus_active: true,
-            exempt_from_direct_billing: isFamilyBonus ? true : false,
-            activated_at: nowIso,
-            updated_at: nowIso
-          })
+          .update(updatePayload)
           .eq('id', student.id);
       }
 
@@ -193,6 +260,8 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
             localStorage.removeItem(`campus_paid_${student.id}`);
           }
           localStorage.setItem(`campus_active_${student.id}`, 'true');
+          localStorage.setItem(`groovelab_parent_allow_student_audio_${student.id}`, String(allowStudentAudio));
+          localStorage.setItem(`campus_student_ui_level_${student.id}`, selectedUiLevel);
         }
       } catch (e) {}
 
@@ -209,6 +278,8 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
           period: periodDescription,
           remaining_paid_months: remainingMonths,
           effective_fee: effectiveAnnualFee,
+          campus_ui_level: selectedUiLevel,
+          permissions: parentPermissionsObj,
           audit_checksum: auditConsentChecksum,
           timestamp: new Date().toISOString()
         }
@@ -218,21 +289,24 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
 
       // § 312f Abs. 2 BGB: Automatischer Download des offiziellen Vertrags- & Zahlungsbelegs (Dauerhafter Datenträger)
       try {
-        handleDownloadPdfVoucher();
+        await handleDownloadPdfVoucher();
       } catch (pdfErr) {
         console.warn('Automatische PDF-Beleg-Erstellung:', pdfErr);
       }
-      if (onPaymentSubmitted) onPaymentSubmitted();
-      setTimeout(() => {
-        onClose();
-      }, 2000);
+
+      setWizardStep('success');
     } catch (err) {
       console.warn('Payment update notice error:', err);
       setSubmittedSuccess(true);
-      setTimeout(() => onClose(), 2000);
+      setWizardStep('success');
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleCompleteAndClose = () => {
+    if (onPaymentSubmitted) onPaymentSubmitted();
+    onClose();
   };
 
   // Download PDF Payment Voucher
@@ -409,7 +483,7 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
         
         {/* Modal Header */}
         <div style={{
-          padding: '24px 28px 20px 28px',
+          padding: '22px 28px 18px 28px',
           borderBottom: '1px solid rgba(15, 23, 42, 0.06)',
           display: 'flex',
           justifyContent: 'space-between',
@@ -428,14 +502,26 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
               justifyContent: 'center',
               boxShadow: '0 6px 16px rgba(52, 168, 83, 0.3)'
             }} aria-hidden="true">
-              <QrCode size={22} />
+              {wizardStep === 'pin_gate' ? <Lock size={20} /> :
+               wizardStep === 'permissions' ? <ShieldCheck size={20} /> :
+               wizardStep === 'ui_level' ? <Sparkles size={20} /> :
+               wizardStep === 'success' ? <CheckCircle2 size={20} /> :
+               <QrCode size={22} />}
             </div>
             <div>
               <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#059669', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                Elternbereich • Direktaktivierung
+                {wizardStep === 'payment' ? 'Elternbereich • Direktaktivierung' :
+                 wizardStep === 'pin_gate' ? 'Schritt 2/4 • Eltern-Authentifizierung' :
+                 wizardStep === 'permissions' ? 'Schritt 3/4 • Pädagogische Freigaben' :
+                 wizardStep === 'ui_level' ? 'Schritt 4/4 • Ansicht für Schüler' :
+                 'Fertiggestellt'}
               </span>
-              <h3 id="parent-activation-title" style={{ fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', margin: 0, letterSpacing: '-0.02em' }}>
-                Campus-Modul aktivieren
+              <h3 id="parent-activation-title" style={{ fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', margin: 0, letterSpacing: '-0.02em' }}>
+                {wizardStep === 'payment' ? 'Campus-Modul aktivieren' :
+                 wizardStep === 'pin_gate' ? 'Eltern-Passwort bestätigen' :
+                 wizardStep === 'permissions' ? 'Rechte & Freigaben festlegen' :
+                 wizardStep === 'ui_level' ? 'UI-Level für dein Kind wählen' :
+                 'Campus-App erfolgreich startklar!'}
               </h3>
             </div>
           </div>
@@ -464,11 +550,58 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
           </button>
         </div>
 
+        {/* Mini Step Indicator */}
+        {wizardStep !== 'success' && (
+          <div style={{
+            display: 'flex',
+            padding: '12px 28px 0 28px',
+            gap: '8px',
+            alignItems: 'center'
+          }}>
+            {[
+              { key: 'payment', label: '1. Tarif' },
+              { key: 'pin_gate', label: '2. Eltern-PIN' },
+              { key: 'permissions', label: '3. Freigaben' },
+              { key: 'ui_level', label: '4. Ansicht' }
+            ].map((step, idx) => {
+              const stepOrder = ['payment', 'pin_gate', 'permissions', 'ui_level'];
+              const currentIdx = stepOrder.indexOf(wizardStep);
+              const isActive = step.key === wizardStep;
+              const isDone = idx < currentIdx;
+              return (
+                <div key={step.key} style={{
+                  flex: 1,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '4px'
+                }}>
+                  <div style={{
+                    height: '4px',
+                    borderRadius: '2px',
+                    background: isDone ? '#10b981' : isActive ? '#34a853' : '#e2e8f0',
+                    transition: 'all 0.2s'
+                  }} />
+                  <span style={{
+                    fontSize: '0.64rem',
+                    fontWeight: isActive || isDone ? 800 : 600,
+                    color: isDone ? '#10b981' : isActive ? '#0f172a' : '#94a3b8',
+                    whiteSpace: 'nowrap'
+                  }}>
+                    {step.label}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
         {/* Modal Body */}
         <div style={{ padding: '24px 28px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
           
-          {/* Price Summary Banner with Dynamic School Year Trial */}
-          <div style={{
+          {wizardStep === 'payment' && (
+            <>
+              {/* Price Summary Banner with Dynamic School Year Trial */}
+              <div style={{
             background: '#f8fafc',
             border: '1px solid #e2e8f0',
             borderRadius: '16px',
@@ -1002,10 +1135,10 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
             {/* Primary confirmation CTA with strict § 312j BGB Compliance */}
             <button
               type="button"
-              disabled={isSubmitting || submittedSuccess || !agreeWithdrawalWaiver}
-              onClick={handleConfirmTransferInitiated}
+              disabled={!agreeWithdrawalWaiver}
+              onClick={handleProceedToWizard}
               style={{
-                background: (!agreeWithdrawalWaiver || isSubmitting || submittedSuccess) 
+                background: !agreeWithdrawalWaiver 
                   ? '#94a3b8' 
                   : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
                 color: '#ffffff',
@@ -1014,7 +1147,7 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
                 padding: '14px',
                 fontSize: '0.92rem',
                 fontWeight: 900,
-                cursor: (isSubmitting || submittedSuccess || !agreeWithdrawalWaiver) ? 'default' : 'pointer',
+                cursor: !agreeWithdrawalWaiver ? 'default' : 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -1022,18 +1155,14 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
                 boxShadow: agreeWithdrawalWaiver ? '0 6px 20px rgba(16, 185, 129, 0.35)' : 'none',
                 transition: 'all 0.15s'
               }}
-              onMouseOver={(e) => { if (!submittedSuccess && agreeWithdrawalWaiver) e.currentTarget.style.transform = 'translateY(-1px)'; }}
+              onMouseOver={(e) => { if (agreeWithdrawalWaiver) e.currentTarget.style.transform = 'translateY(-1px)'; }}
               onMouseOut={(e) => { e.currentTarget.style.transform = 'translateY(0)'; }}
             >
-              {isSubmitting 
-                ? 'Wird freigeschaltet...' 
-                : submittedSuccess 
-                  ? (schoolYearCalc.isCurrentTrialPeriod ? '✓ Schnuppermonat freigeschaltet' : '✓ Überweisung gemeldet') 
-                  : isThirdOrMoreChild 
-                    ? 'Kostenlos freischalten' 
-                    : schoolYearCalc.isCurrentTrialPeriod
-                      ? `Kostenfreien Schnuppermonat jetzt starten (${freeMonthDisplay})`
-                      : 'Zahlungspflichtig bestellen'}
+              {isThirdOrMoreChild 
+                ? 'Kostenlos freischalten ➔' 
+                : schoolYearCalc.isCurrentTrialPeriod
+                  ? `Kostenfreien Schnuppermonat jetzt starten (${freeMonthDisplay}) ➔`
+                  : 'Zahlungspflichtig bestellen ➔'}
             </button>
 
             {/* 2-Column secondary tools */}
@@ -1124,6 +1253,711 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
               </div>
             )}
           </div>
+        </>
+      )}
+
+      {/* STAGE 2 WIZARD - STEP 1: PARENT PIN GATE */}
+      {wizardStep === 'pin_gate' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', padding: '10px 4px' }}>
+          <div style={{
+            background: '#f8fafc',
+            border: '1px solid #e2e8f0',
+            borderRadius: '20px',
+            padding: '24px 20px',
+            textAlign: 'center',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '12px'
+          }}>
+            <div style={{
+              width: '54px',
+              height: '54px',
+              borderRadius: '16px',
+              background: '#eff6ff',
+              color: '#2563eb',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              border: '1px solid #bfdbfe',
+              boxShadow: '0 4px 12px rgba(37, 99, 235, 0.15)'
+            }} aria-hidden="true">
+              <Lock size={26} />
+            </div>
+            <div>
+              <h4 style={{ margin: '0 0 6px 0', fontSize: '1.15rem', fontWeight: 900, color: '#0f172a' }}>
+                Eltern-Passwort erforderlich
+              </h4>
+              <p style={{ margin: 0, fontSize: '0.84rem', color: '#64748b', lineHeight: 1.45, maxWidth: '420px' }}>
+                Bitte gib dein 6-stelliges Eltern-Passwort ein, um die App-Funktionen und didaktischen Freigaben für <strong>{studentDisplayName}</strong> festzulegen.
+              </p>
+            </div>
+
+            {/* 6-Digit PIN input */}
+            <div style={{ width: '100%', maxWidth: '280px', marginTop: '10px', position: 'relative' }}>
+              <input
+                type={showParentPinMask ? 'text' : 'password'}
+                inputMode="numeric"
+                maxLength={6}
+                value={parentPinInput}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/\D/g, '').slice(0, 6);
+                  setParentPinInput(val);
+                  if (parentPinError) setParentPinError(null);
+                }}
+                placeholder="••••••"
+                style={{
+                  width: '100%',
+                  textAlign: 'center',
+                  letterSpacing: '0.35em',
+                  fontSize: '1.4rem',
+                  fontWeight: 900,
+                  padding: '12px 42px 12px 16px',
+                  borderRadius: '14px',
+                  border: parentPinError ? '2px solid #ef4444' : '2px solid #cbd5e1',
+                  outline: 'none',
+                  background: '#ffffff',
+                  color: '#0f172a',
+                  boxSizing: 'border-box'
+                }}
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && parentPinInput.length >= 4) {
+                    handleVerifyParentPin();
+                  }
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowParentPinMask(!showParentPinMask)}
+                style={{
+                  position: 'absolute',
+                  right: '12px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: '#64748b',
+                  padding: '4px'
+                }}
+                aria-label={showParentPinMask ? 'Passwort verbergen' : 'Passwort anzeigen'}
+              >
+                {showParentPinMask ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
+
+            {parentPinError && (
+              <div style={{
+                color: '#b91c1c',
+                background: '#fef2f2',
+                border: '1px solid #fecaca',
+                borderRadius: '10px',
+                padding: '8px 14px',
+                fontSize: '0.78rem',
+                fontWeight: 700,
+                width: '100%',
+                maxWidth: '360px'
+              }}>
+                {parentPinError}
+              </div>
+            )}
+          </div>
+
+          <div style={{ display: 'flex', gap: '12px', justifyContent: 'space-between' }}>
+            <button
+              type="button"
+              onClick={() => setWizardStep('payment')}
+              style={{
+                background: '#ffffff',
+                border: '1px solid #cbd5e1',
+                borderRadius: '14px',
+                padding: '12px 18px',
+                fontWeight: 800,
+                fontSize: '0.88rem',
+                color: '#475569',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}
+            >
+              <ChevronLeft size={16} />
+              <span>Zurück</span>
+            </button>
+
+            <button
+              type="button"
+              disabled={parentPinInput.length < 4 || isVerifyingPin}
+              onClick={handleVerifyParentPin}
+              style={{
+                flex: 1,
+                background: parentPinInput.length < 4 || isVerifyingPin ? '#94a3b8' : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                border: 'none',
+                borderRadius: '14px',
+                padding: '12px 20px',
+                fontWeight: 900,
+                fontSize: '0.92rem',
+                color: '#ffffff',
+                cursor: parentPinInput.length < 4 || isVerifyingPin ? 'default' : 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                boxShadow: parentPinInput.length >= 4 ? '0 4px 14px rgba(16, 185, 129, 0.35)' : 'none'
+              }}
+            >
+              {isVerifyingPin ? 'Prüfe PIN...' : 'PIN bestätigen & weiter ➔'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* STAGE 2 WIZARD - STEP 2: PERMISSIONS */}
+      {wizardStep === 'permissions' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '10px 4px' }}>
+          <div>
+            <h4 style={{ margin: '0 0 4px 0', fontSize: '1.08rem', fontWeight: 900, color: '#0f172a' }}>
+              Pädagogische &amp; rechtliche Kernfreigaben
+            </h4>
+            <p style={{ margin: 0, fontSize: '0.82rem', color: '#64748b', lineHeight: 1.45 }}>
+              Lege fest, welche interaktiven Campus-Funktionen für {studentDisplayName} freigeschaltet werden.
+            </p>
+          </div>
+
+          {/* Toggle 1: Audio Tresor (§ 73 UrhG / § 201 StGB) */}
+          <div style={{
+            background: '#ffffff',
+            border: '1px solid #e2e8f0',
+            borderRadius: '16px',
+            padding: '16px 18px',
+            display: 'flex',
+            alignItems: 'flex-start',
+            justifyContent: 'space-between',
+            gap: '14px'
+          }}>
+            <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+              <div style={{
+                width: '38px',
+                height: '38px',
+                borderRadius: '10px',
+                background: allowStudentAudio ? '#f0fdf4' : '#f8fafc',
+                color: allowStudentAudio ? '#16a34a' : '#94a3b8',
+                border: `1px solid ${allowStudentAudio ? '#bbf7d0' : '#e2e8f0'}`,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0
+              }} aria-hidden="true">
+                <Mic size={18} />
+              </div>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: '0.88rem', fontWeight: 850, color: '#0f172a' }}>
+                    Audio-Tresor &amp; Loopstation
+                  </span>
+                  <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#15803d', background: '#dcfce7', padding: '2px 6px', borderRadius: '4px' }}>
+                    § 73 UrhG konform
+                  </span>
+                </div>
+                <p style={{ margin: '3px 0 0 0', fontSize: '0.76rem', color: '#64748b', lineHeight: 1.35 }}>
+                  Erlaubt eigene Übe-Aufnahmen und Unterrichts-Mitschnitte sicher im geschützten Audio-Tresor zu speichern.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setAllowStudentAudio(!allowStudentAudio)}
+              style={{
+                width: '46px',
+                height: '26px',
+                borderRadius: '13px',
+                background: allowStudentAudio ? '#10b981' : '#cbd5e1',
+                border: 'none',
+                cursor: 'pointer',
+                position: 'relative',
+                transition: 'background 0.2s',
+                flexShrink: 0
+              }}
+              role="switch"
+              aria-checked={allowStudentAudio}
+            >
+              <div style={{
+                position: 'absolute',
+                top: '3px',
+                left: allowStudentAudio ? '23px' : '3px',
+                width: '20px',
+                height: '20px',
+                borderRadius: '50%',
+                background: '#ffffff',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+                transition: 'left 0.2s'
+              }} />
+            </button>
+          </div>
+
+          {/* Toggle 2: 1:1 Schüler-Chat (§ 8a SGB VIII) */}
+          <div style={{
+            background: '#ffffff',
+            border: '1px solid #e2e8f0',
+            borderRadius: '16px',
+            padding: '16px 18px',
+            display: 'flex',
+            alignItems: 'flex-start',
+            justifyContent: 'space-between',
+            gap: '14px'
+          }}>
+            <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+              <div style={{
+                width: '38px',
+                height: '38px',
+                borderRadius: '10px',
+                background: allowStudentChat ? '#eff6ff' : '#f8fafc',
+                color: allowStudentChat ? '#2563eb' : '#94a3b8',
+                border: `1px solid ${allowStudentChat ? '#bfdbfe' : '#e2e8f0'}`,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0
+              }} aria-hidden="true">
+                <MessageSquare size={18} />
+              </div>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: '0.88rem', fontWeight: 850, color: '#0f172a' }}>
+                    1:1 Schüler-Lehrer-Chat
+                  </span>
+                  <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#1d4ed8', background: '#dbeafe', padding: '2px 6px', borderRadius: '4px' }}>
+                    § 8a SGB VIII
+                  </span>
+                </div>
+                <p style={{ margin: '3px 0 0 0', fontSize: '0.76rem', color: '#64748b', lineHeight: 1.35 }}>
+                  Direkter didaktischer Austausch mit der Lehrkraft für Hausaufgaben-Fragen. (Der Elternbereich-Chat bleibt unabhängig immer aktiv).
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setAllowStudentChat(!allowStudentChat)}
+              style={{
+                width: '46px',
+                height: '26px',
+                borderRadius: '13px',
+                background: allowStudentChat ? '#10b981' : '#cbd5e1',
+                border: 'none',
+                cursor: 'pointer',
+                position: 'relative',
+                transition: 'background 0.2s',
+                flexShrink: 0
+              }}
+              role="switch"
+              aria-checked={allowStudentChat}
+            >
+              <div style={{
+                position: 'absolute',
+                top: '3px',
+                left: allowStudentChat ? '23px' : '3px',
+                width: '20px',
+                height: '20px',
+                borderRadius: '50%',
+                background: '#ffffff',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+                transition: 'left 0.2s'
+              }} />
+            </button>
+          </div>
+
+          {/* Toggle 3: Terminabsage-Autonomie */}
+          <div style={{
+            background: '#ffffff',
+            border: '1px solid #e2e8f0',
+            borderRadius: '16px',
+            padding: '16px 18px',
+            display: 'flex',
+            alignItems: 'flex-start',
+            justifyContent: 'space-between',
+            gap: '14px'
+          }}>
+            <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+              <div style={{
+                width: '38px',
+                height: '38px',
+                borderRadius: '10px',
+                background: allowStudentAbsences ? '#fef3c7' : '#f8fafc',
+                color: allowStudentAbsences ? '#d97706' : '#94a3b8',
+                border: `1px solid ${allowStudentAbsences ? '#fde68a' : '#e2e8f0'}`,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0
+              }} aria-hidden="true">
+                <ShieldCheck size={18} />
+              </div>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: '0.88rem', fontWeight: 850, color: '#0f172a' }}>
+                    Terminabsage-Autonomie
+                  </span>
+                  <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#92400e', background: '#fef3c7', padding: '2px 6px', borderRadius: '4px' }}>
+                    Elternkontrolle
+                  </span>
+                </div>
+                <p style={{ margin: '3px 0 0 0', fontSize: '0.76rem', color: '#64748b', lineHeight: 1.35 }}>
+                  Darf das Kind Unterrichtsstunden bei Krankheit selbst absagen? (Standard: Deaktiviert, Absagen erfolgen über die Eltern).
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setAllowStudentAbsences(!allowStudentAbsences)}
+              style={{
+                width: '46px',
+                height: '26px',
+                borderRadius: '13px',
+                background: allowStudentAbsences ? '#10b981' : '#cbd5e1',
+                border: 'none',
+                cursor: 'pointer',
+                position: 'relative',
+                transition: 'background 0.2s',
+                flexShrink: 0
+              }}
+              role="switch"
+              aria-checked={allowStudentAbsences}
+            >
+              <div style={{
+                position: 'absolute',
+                top: '3px',
+                left: allowStudentAbsences ? '23px' : '3px',
+                width: '20px',
+                height: '20px',
+                borderRadius: '50%',
+                background: '#ffffff',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+                transition: 'left 0.2s'
+              }} />
+            </button>
+          </div>
+
+          <div style={{ display: 'flex', gap: '12px', justifyContent: 'space-between', marginTop: '6px' }}>
+            <button
+              type="button"
+              onClick={() => setWizardStep(isParentUnlocked ? 'payment' : 'pin_gate')}
+              style={{
+                background: '#ffffff',
+                border: '1px solid #cbd5e1',
+                borderRadius: '14px',
+                padding: '12px 18px',
+                fontWeight: 800,
+                fontSize: '0.88rem',
+                color: '#475569',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}
+            >
+              <ChevronLeft size={16} />
+              <span>Zurück</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setWizardStep('ui_level')}
+              style={{
+                flex: 1,
+                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                border: 'none',
+                borderRadius: '14px',
+                padding: '12px 20px',
+                fontWeight: 900,
+                fontSize: '0.92rem',
+                color: '#ffffff',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                boxShadow: '0 4px 14px rgba(16, 185, 129, 0.35)'
+              }}
+            >
+              <span>Weiter zur Ansicht-Wahl ➔</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* STAGE 2 WIZARD - STEP 3: UI LEVEL */}
+      {wizardStep === 'ui_level' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', padding: '10px 4px' }}>
+          <div>
+            <h4 style={{ margin: '0 0 4px 0', fontSize: '1.08rem', fontWeight: 900, color: '#0f172a' }}>
+              Wähle das passende UI-Level
+            </h4>
+            <p style={{ margin: 0, fontSize: '0.82rem', color: '#64748b', lineHeight: 1.45 }}>
+              Wähle das didaktische Layout für dein Kind. Kann später im Elternbereich jederzeit angepasst werden.
+            </p>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {[
+              {
+                id: 'junior' as const,
+                title: 'Junior',
+                badge: '6 – 10 Jahre',
+                icon: Sparkles,
+                color: '#16a34a',
+                bg: '#f0fdf4',
+                border: '#bbf7d0',
+                desc: 'Große Symbole, 3-Klick Hausaufgaben, Sticker-Sammelalbum und spielerische Farbwelt.'
+              },
+              {
+                id: 'teen' as const,
+                title: 'Teen',
+                badge: '11 – 15 Jahre (Empfohlen)',
+                icon: Zap,
+                color: '#0284c7',
+                bg: '#f0f9ff',
+                border: '#bae6fd',
+                recommended: true,
+                desc: 'Aufgeräumtes Studio-Layout, Flow-Timer, Audio-Memos, XP-Score, Level & Badges.'
+              },
+              {
+                id: 'pro' as const,
+                title: 'Pro',
+                badge: 'Ab 16 Jahre',
+                icon: Crown,
+                color: '#6366f1',
+                bg: '#f5f3ff',
+                border: '#ddd6fe',
+                desc: 'Vollständige Studio-Tools, 4-Spur Loopstation, 6-Achsen Skill-Radar & detaillierte Statistiken.'
+              }
+            ].map((lvl) => {
+              const isSelected = selectedUiLevel === lvl.id;
+              const Icon = lvl.icon;
+              return (
+                <div
+                  key={lvl.id}
+                  onClick={() => setSelectedUiLevel(lvl.id)}
+                  style={{
+                    background: isSelected ? lvl.bg : '#ffffff',
+                    border: isSelected ? `2px solid ${lvl.color}` : '1px solid #e2e8f0',
+                    borderRadius: '16px',
+                    padding: '14px 16px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '12px',
+                    transition: 'all 0.15s'
+                  }}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setSelectedUiLevel(lvl.id); }}
+                >
+                  <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                    <div style={{
+                      width: '40px',
+                      height: '40px',
+                      borderRadius: '12px',
+                      background: isSelected ? lvl.color : '#f1f5f9',
+                      color: isSelected ? '#ffffff' : '#64748b',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0
+                    }} aria-hidden="true">
+                      <Icon size={20} />
+                    </div>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontSize: '0.95rem', fontWeight: 900, color: '#0f172a' }}>
+                          {lvl.title}
+                        </span>
+                        <span style={{
+                          fontSize: '0.68rem',
+                          fontWeight: 800,
+                          color: lvl.color,
+                          background: 'rgba(255,255,255,0.8)',
+                          padding: '2px 8px',
+                          borderRadius: '100px',
+                          border: `1px solid ${lvl.border}`
+                        }}>
+                          {lvl.badge}
+                        </span>
+                      </div>
+                      <p style={{ margin: '2px 0 0 0', fontSize: '0.74rem', color: '#64748b', lineHeight: 1.3 }}>
+                        {lvl.desc}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div style={{
+                    width: '22px',
+                    height: '22px',
+                    borderRadius: '50%',
+                    border: isSelected ? `2px solid ${lvl.color}` : '2px solid #cbd5e1',
+                    background: isSelected ? lvl.color : 'transparent',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#ffffff',
+                    flexShrink: 0
+                  }} aria-hidden="true">
+                    {isSelected && <Check size={14} strokeWidth={3} />}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <div style={{ display: 'flex', gap: '12px', justifyContent: 'space-between', marginTop: '6px' }}>
+            <button
+              type="button"
+              onClick={() => setWizardStep('permissions')}
+              style={{
+                background: '#ffffff',
+                border: '1px solid #cbd5e1',
+                borderRadius: '14px',
+                padding: '12px 18px',
+                fontWeight: 800,
+                fontSize: '0.88rem',
+                color: '#475569',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}
+            >
+              <ChevronLeft size={16} />
+              <span>Zurück</span>
+            </button>
+
+            <button
+              type="button"
+              disabled={isSubmitting}
+              onClick={handleFinalizeActivation}
+              style={{
+                flex: 1,
+                background: isSubmitting ? '#94a3b8' : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                border: 'none',
+                borderRadius: '14px',
+                padding: '12px 20px',
+                fontWeight: 900,
+                fontSize: '0.92rem',
+                color: '#ffffff',
+                cursor: isSubmitting ? 'default' : 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                boxShadow: '0 4px 14px rgba(16, 185, 129, 0.35)'
+              }}
+            >
+              {isSubmitting ? 'Wird gespeichert...' : '✓ Einrichtung abschließen & App freigeben'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* STAGE 2 WIZARD - STEP 4: SUCCESS */}
+      {wizardStep === 'success' && (
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          textAlign: 'center',
+          gap: '18px',
+          padding: '24px 8px'
+        }}>
+          <div style={{
+            width: '68px',
+            height: '68px',
+            borderRadius: '50%',
+            background: '#ecfdf5',
+            color: '#16a34a',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            border: '3px solid #bbf7d0',
+            boxShadow: '0 10px 25px rgba(22, 163, 74, 0.25)'
+          }} aria-hidden="true">
+            <CheckCircle2 size={38} />
+          </div>
+
+              <div>
+                <span style={{
+                  background: '#dcfce7',
+                  color: '#15803d',
+                  fontSize: '0.74rem',
+                  fontWeight: 900,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.08em',
+                  padding: '4px 12px',
+                  borderRadius: '100px',
+                  display: 'inline-block',
+                  marginBottom: '8px'
+                }}>
+                  Campus-Dashboard startklar
+                </span>
+                <h3 style={{ fontSize: '1.45rem', fontWeight: 950, color: '#0f172a', margin: '0 0 6px 0' }}>
+                  Einrichtung erfolgreich abgeschlossen!
+                </h3>
+                <p style={{ fontSize: '0.86rem', color: '#64748b', fontWeight: 650, margin: 0, lineHeight: 1.4, maxWidth: '420px' }}>
+                  Die Campus-App ist ab sofort für <strong>{studentDisplayName}</strong> im Level „<strong>{selectedUiLevel === 'junior' ? 'Junior' : selectedUiLevel === 'pro' ? 'Pro' : 'Teen'}</strong>“ freigeschaltet.
+                </p>
+              </div>
+
+              <div style={{
+                background: '#f8fafc',
+                border: '1px solid #e2e8f0',
+                borderRadius: '16px',
+                padding: '16px 20px',
+                textAlign: 'left',
+                width: '100%',
+                maxWidth: '440px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '10px',
+                fontSize: '0.80rem',
+                color: '#334155',
+                lineHeight: 1.4
+              }}>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <span style={{ color: '#16a34a', fontWeight: 900 }}>✓</span>
+                  <span>Dein Kind meldet sich wie gewohnt mit seiner <strong>4-stelligen PIN</strong> an.</span>
+                </div>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <span style={{ color: '#16a34a', fontWeight: 900 }}>✓</span>
+                  <span>Keine weiteren Registrierungsschritte für das Kind erforderlich.</span>
+                </div>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <span style={{ color: '#16a34a', fontWeight: 900 }}>✓</span>
+                  <span>Beim Erststart erhält dein Kind sein <strong>1. Schuljahres-Wappen (🎒 Campus-Pionier)</strong>.</span>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleCompleteAndClose}
+                style={{
+                  width: '100%',
+                  maxWidth: '440px',
+                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '16px',
+                  padding: '14px',
+                  fontWeight: 950,
+                  fontSize: '1.02rem',
+                  cursor: 'pointer',
+                  boxShadow: '0 6px 20px rgba(16, 185, 129, 0.35)',
+                  transition: 'all 0.15s'
+                }}
+              >
+                Fertig &amp; Schließen
+              </button>
+            </div>
+          )}
 
           {/* Legal Compliance Footer (UWG / PAngV) */}
           <div style={{ textAlign: 'center', borderTop: '1px solid rgba(15, 23, 42, 0.05)', paddingTop: '14px' }}>

@@ -7,7 +7,7 @@ const TeacherTagesplanWidget = lazy(() => import('./teacher/TeacherTagesplanWidg
 const TeacherTagesplanRoomIssuesBanner = lazy(() => import('./teacher/TeacherTagesplanWidget').then(m => ({ default: m.TeacherTagesplanRoomIssuesBanner })));
 const TeacherTourDemoSchedule = lazy(() => import('./teacher/TeacherTagesplanWidget').then(m => ({ default: m.TeacherTourDemoSchedule })));
 const TeacherLiveView = lazy(() => import('./teacher/TeacherLiveView').then(m => ({ default: m.TeacherLiveView })));
-import { AvatarImage, getInstrumentAvatarUrl, getDefaultMusicianAvatarUrl } from './common/AvatarImage';
+import { AvatarImage, getInstrumentAvatarUrl, getDefaultMusicianAvatarUrl, resolveCampusStudentAvatar } from './common/AvatarImage';
 import { MUSIC_QUOTES, getQuotesForAudience, getDailyQuote } from '@groovelab/shared';
 import { usePremiumOnboardingTour, TourStartButton, TourStep } from './PremiumOnboardingTour';
 import { supabase, deleteUserStorageAssets } from '../lib/supabase';
@@ -732,7 +732,9 @@ export function TeacherDashboard({
   const [localCheckedIn, setLocalCheckedIn] = useState(false);
   // Ref mirrors the state so fetchData closures can read it synchronously (no stale closure problem)
   const localCheckedInRef = useRef(false);
-  const isUserCheckedIn = isTeacher || localCheckedIn || (locationMode === 'lab' && !!session && (!!session.station_id || isTeacher));
+  const [stations, setStations] = useState<any[]>([]);
+  const [activeSessions, setActiveSessions] = useState<any[]>([]);
+  const isUserCheckedIn = localCheckedIn || (!!session && !session.check_out_time && (session.user_id === userId || !!session.station_id)) || (activeSessions && activeSessions.some(s => s && s.user_id === userId && !s.check_out_time));
   const [showKioskView, setShowKioskView] = useState(false);
   const [showKioskPinSetup, setShowKioskPinSetup] = useState(false);
   const [kioskPinInput, setKioskPinInput] = useState('');
@@ -740,8 +742,6 @@ export function TeacherDashboard({
   const [checkingInStatus, setCheckingInStatus] = useState<'idle' | 'locating' | 'verifying' | 'success' | 'error'>('idle');
   const [geoErrorMsg, setGeoErrorMsg] = useState<string>('');
   const [shakeLock, setShakeLock] = useState(false);
-  const [stations, setStations] = useState<any[]>([]);
-  const [activeSessions, setActiveSessions] = useState<any[]>([]);
   const [wallSongs, setWallSongs] = useState<any[]>([]);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [showDiagnostics, setShowDiagnostics] = useState(false);
@@ -1040,26 +1040,8 @@ export function TeacherDashboard({
     }
   }, [viewMode, showKioskView]);
 
-  // Auto-checkin for teachers if bypass or localhost is active (passive geolocations removed for Tier-1 privacy)
-  useEffect(() => {
-    if (isTeacher && locationMode !== 'lab' && !localCheckedIn) {
-      const schoolData = Array.isArray(teacher?.schools) ? teacher?.schools[0] : teacher?.schools;
-      const hasGeofenceBypass = !!(schoolData?.opening_hours?.geofence_bypass);
-      const isLocalhost = typeof window !== 'undefined' && (
-        window.location.hostname === 'localhost' || 
-        window.location.hostname === '127.0.0.1' ||
-        window.location.hostname.endsWith('.local') ||
-        /^192\.168\./.test(window.location.hostname) ||
-        /^10\./.test(window.location.hostname) ||
-        /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(window.location.hostname)
-      );
-
-      if (isLocalhost || hasGeofenceBypass) {
-        console.log('[Geofence] Auto-checkin: Bypassing location check (localhost or database bypass active).');
-        performDirectTeacherCheckin();
-      }
-    }
-  }, [isTeacher, locationMode, localCheckedIn, teacher, rooms]);
+  // Auto-checkin intentionally disabled: Teachers explicitly check in via "Einloggen" button
+  // to ensure full control over presence, accurate session lifecycle and visibility of the fine-net overlay (§ 87 BetrVG / DSGVO).
 
   const handleGeofenceCheck = () => {
     // ⚡ Enterprise+ Tier-1 Privacy: Zero geolocation tracking (§ 87 BetrVG / DSGVO Art. 5)
@@ -2851,6 +2833,24 @@ export function TeacherDashboard({
     return teacher?.instrument || '';
   }, [teacher?.instrument, (teacher as any)?.main_instrument, (teacher as any)?.subject, todayTagesplanStudents, briefingData?.timeline]);
 
+  // 🎸 Master Briefing Hero Avatar Engine:
+  // - Lehrer Dashboard + Campus Modul: ALWAYS Instrumenten-Avatar (Gitarre, etc.)
+  // - Lehrer Dashboard + GrooveLab Modul: ALWAYS Musiker-Avatar (/avatar_ghost.jpg or custom musician photo)
+  const teacherBriefingAvatarSrc = useMemo(() => {
+    if (activePlatform === 'groovelab') {
+      const isMusicianCustom = teacher?.photo_url && 
+        !teacher.photo_url.includes('_avatar') && 
+        teacher.photo_url !== '/campus_login_hero.png';
+      return isMusicianCustom ? teacher.photo_url : '/avatar_ghost.jpg';
+    }
+    return resolveCampusStudentAvatar({ 
+      ...(teacher || {}), 
+      role: 'teacher', 
+      isTeacherContext: true,
+      instrument: teacherEffectiveInstrument || teacher?.instrument 
+    });
+  }, [activePlatform, teacher, teacherEffectiveInstrument]);
+
   // 🏢 Raummängel der Musikschule für den Tagesplan (Gezielter Hinweis für Kollegium im selben Raum)
   const [schoolRoomIssues, setSchoolRoomIssues] = useState<UserNote[]>([]);
 
@@ -3033,6 +3033,22 @@ export function TeacherDashboard({
   const [bypassSickView, setBypassSickView] = useState(false);
   const [sickSuccessShown, setSickSuccessShown] = useState(false);
   const [sickNotifModal, setSickNotifModal] = useState<{ notifs: any[]; sickUntilDateStr: string } | null>(null);
+  const [openAnnouncementDetailModal, setOpenAnnouncementDetailModal] = useState<any>(null);
+  const [dismissedAnnouncementBannerIds, setDismissedAnnouncementBannerIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (!showSickModal && !sickNotifModal && !openAnnouncementDetailModal) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (openAnnouncementDetailModal) setOpenAnnouncementDetailModal(null);
+        else if (sickNotifModal) setSickNotifModal(null);
+        else if (showSickModal) setShowSickModal(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showSickModal, sickNotifModal, openAnnouncementDetailModal]);
+
   const [crisisNotifications, setCrisisNotifications] = useState<any[]>([]);
   const [isCrisisWidgetExpanded, setIsCrisisWidgetExpanded] = useState(false);
   const [adminFeedbackRequests, setAdminFeedbackRequests] = useState<any[]>([]);
@@ -5489,8 +5505,6 @@ export function TeacherDashboard({
         // Determine if the currently logged-in teacher should be visible.
         const isSelfCheckedIn =
           localCheckedInRef.current ||
-          locationMode === 'lab' ||
-          sessionStorage.getItem('groovelab_location_mode') === 'lab' ||
           trulyActive.some(s => s && s.user_id === userId);
 
         const isCurrentTeacher = tData?.role?.toLowerCase() === 'teacher' ||
@@ -5506,8 +5520,8 @@ export function TeacherDashboard({
             return true;
           }
           if (c.id === userId) {
-            // Self: show when checked in, and always show if the board is visible (isUserCheckedIn is true)
-            return isCurrentTeacher && (isUserCheckedIn || isSelfCheckedIn);
+            // Self: show only when checked in
+            return isCurrentTeacher && isSelfCheckedIn;
           }
           // Others: require an actual active DB session
           return trulyActive.some(s => s && s.user_id === c.id);
@@ -6438,7 +6452,9 @@ useEffect(() => {
     localCheckedInRef.current = false;
     // Immediately reset state so overlay reappears and self is removed from coaches
     setLocalCheckedIn(false);
+    setActiveSessions(prev => prev.filter(s => s && s.user_id !== userId));
     setCoaches(prev => prev.filter(c => c && c.id !== userId));
+    setCheckingInStatus('idle');
     if (onSessionChange) onSessionChange(null);
     if (onLocationModeChange) onLocationModeChange('home');
     sessionStorage.setItem('groovelab_location_mode', 'home');
@@ -6837,7 +6853,7 @@ useEffect(() => {
     return openFeedback + activePlanningEvents.length + pendingFeedbackPoints;
   }, [adminFeedbackRequests, adminFeedbackResponses, mySubmittedProgramPoints, activePlanningEvents]);
 
-  const openCriticalDuty = useMemo(() => {
+  const openCriticalAnnouncement = useMemo(() => {
     return adminFeedbackRequests.find((req: any) => {
       if (req.priority !== 'critical') return false;
       if (req.target_type === 'individual' && req.target_teacher_id !== userId) return false;
@@ -7778,6 +7794,117 @@ useEffect(() => {
             </div>
           </header>
         )}
+
+        {/* 📢 APPLE-STYLE HERO NOTIFICATION BANNER: WICHTIGE SCHULMITTEILUNG (NON-BLOCKING) */}
+        {openCriticalAnnouncement && !dismissedAnnouncementBannerIds.includes(openCriticalAnnouncement.id) && (
+          <div 
+            style={{
+              width: '100%',
+              marginBottom: '16px',
+              background: 'linear-gradient(135deg, #ffffff 0%, #fffbfb 100%)',
+              border: '1.5px solid #fca5a5',
+              borderRadius: '20px',
+              padding: isMobileDevice ? '14px 16px' : '16px 22px',
+              boxShadow: '0 8px 24px -4px rgba(239, 68, 68, 0.12), 0 2px 6px rgba(0,0,0,0.04)',
+              display: 'flex',
+              alignItems: isMobileDevice ? 'flex-start' : 'center',
+              justifyContent: 'space-between',
+              gap: '16px',
+              flexDirection: isMobileDevice ? 'column' : 'row',
+              animation: 'fadeIn 0.25s ease',
+              textAlign: 'left'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flex: 1, minWidth: 0 }}>
+              <div style={{
+                background: '#fee2e2',
+                color: '#ef4444',
+                padding: '10px',
+                borderRadius: '14px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0
+              }}>
+                <AlertCircle size={22} strokeWidth={2.4} />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', minWidth: 0, flex: 1 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                  <span style={{
+                    fontSize: '0.66rem',
+                    fontWeight: 900,
+                    background: '#ef4444',
+                    color: '#ffffff',
+                    padding: '2px 8px',
+                    borderRadius: '6px',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.04em'
+                  }}>
+                    Wichtige Schulmitteilung
+                  </span>
+                  {openCriticalAnnouncement.due_date && (
+                    <span style={{ fontSize: '0.70rem', fontWeight: 700, color: '#dc2626', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <Clock size={11} /> Rückmeldung erbeten bis {new Date(openCriticalAnnouncement.due_date).toLocaleDateString('de-DE')}
+                    </span>
+                  )}
+                </div>
+                <div style={{
+                  fontSize: '0.96rem',
+                  fontWeight: 850,
+                  color: '#0f172a',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis'
+                }}>
+                  {openCriticalAnnouncement.title}
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', width: isMobileDevice ? '100%' : 'auto', justifyContent: isMobileDevice ? 'flex-end' : 'flex-start' }}>
+              <button
+                type="button"
+                onClick={() => setDismissedAnnouncementBannerIds(prev => [...prev, openCriticalAnnouncement.id])}
+                style={{
+                  background: '#f1f5f9',
+                  color: '#475569',
+                  border: 'none',
+                  padding: '8px 14px',
+                  borderRadius: '12px',
+                  fontSize: '0.78rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  transition: 'background 0.15s'
+                }}
+              >
+                Später
+              </button>
+              <button
+                type="button"
+                onClick={() => setOpenAnnouncementDetailModal(openCriticalAnnouncement)}
+                style={{
+                  background: '#ea4335',
+                  color: '#ffffff',
+                  border: 'none',
+                  padding: '8px 18px',
+                  borderRadius: '12px',
+                  fontSize: '0.82rem',
+                  fontWeight: 850,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  boxShadow: '0 4px 12px rgba(234, 67, 53, 0.25)',
+                  transition: 'transform 0.15s'
+                }}
+              >
+                <span>Mitteilung öffnen</span>
+                <ChevronRight size={14} />
+              </button>
+            </div>
+          </div>
+        )}
+
         {activeTab === 'briefing' ? (
           <div style={{ 
             display: 'flex', 
@@ -8382,12 +8509,24 @@ useEffect(() => {
                                 overflow: 'hidden'
                               }}>
                                 <img
-                                  src={getInstrumentAvatarUrl(teacherEffectiveInstrument)}
+                                  src={teacherBriefingAvatarSrc}
                                   alt="Briefing Hero"
                                   style={{
                                     width: '100%',
                                     height: '100%',
                                     objectFit: 'cover'
+                                  }}
+                                  onError={(e) => {
+                                    const target = e.currentTarget;
+                                    if (activePlatform === 'groovelab') {
+                                      if (target.src !== window.location.origin + '/avatar_ghost.jpg') {
+                                        target.src = '/avatar_ghost.jpg';
+                                      }
+                                    } else {
+                                      if (target.src !== window.location.origin + '/avatars/gitarre_avatar_new.png') {
+                                        target.src = '/avatars/gitarre_avatar_new.png';
+                                      }
+                                    }
                                   }}
                                 />
                                 <div style={{
@@ -8655,13 +8794,25 @@ useEffect(() => {
                             className="hover-scale hero-avatar-container"
                             >
                               <img 
-                                src={getInstrumentAvatarUrl(teacherEffectiveInstrument)} 
+                                src={teacherBriefingAvatarSrc} 
                                 alt="" 
                                 style={{ 
                                   width: '100%', 
                                   height: '100%', 
-                                  objectFit: 'cover'
+                                  objectFit: 'cover' 
                                 }} 
+                                onError={(e) => {
+                                  const target = e.currentTarget;
+                                  if (activePlatform === 'groovelab') {
+                                    if (target.src !== window.location.origin + '/avatar_ghost.jpg') {
+                                      target.src = '/avatar_ghost.jpg';
+                                    }
+                                  } else {
+                                    if (target.src !== window.location.origin + '/avatars/gitarre_avatar_new.png') {
+                                      target.src = '/avatars/gitarre_avatar_new.png';
+                                    }
+                                  }
+                                }}
                               />
                             </div>
                             
@@ -8723,18 +8874,26 @@ useEffect(() => {
                       )}
 
                       {/* Segmented Switcher for Left Column: Briefing / Notizen */}
-                      <div style={{
-                        display: 'flex',
-                        background: '#f1f5f9',
-                        padding: '4px',
-                        borderRadius: '14px',
-                        gap: '4px',
-                        width: '100%',
-                        boxSizing: 'border-box'
-                      }}>
+                      <div 
+                        role="tablist"
+                        aria-label="Bereichsauswahl linke Spalte"
+                        style={{
+                          display: 'flex',
+                          background: '#f1f5f9',
+                          padding: '4px',
+                          borderRadius: '14px',
+                          gap: '4px',
+                          width: '100%',
+                          boxSizing: 'border-box'
+                        }}
+                      >
                         {/* 1. Tages-Kompass */}
                         <button
                           type="button"
+                          role="tab"
+                          id="tab-briefing"
+                          aria-selected={leftColumnTab === 'briefing'}
+                          aria-controls="tabpanel-briefing"
                           onClick={() => setLeftColumnTab('briefing')}
                           style={{
                             flex: 1,
@@ -8761,6 +8920,10 @@ useEffect(() => {
                         {/* 2. Notizen */}
                         <button
                           type="button"
+                          role="tab"
+                          id="tab-notes"
+                          aria-selected={leftColumnTab === 'notes'}
+                          aria-controls="tabpanel-notes"
                           onClick={() => setLeftColumnTab('notes')}
                           style={{
                             flex: 1,
@@ -8787,6 +8950,10 @@ useEffect(() => {
                         {/* 3. Toolbox */}
                         <button
                           type="button"
+                          role="tab"
+                          id="tab-toolbox"
+                          aria-selected={leftColumnTab === 'toolbox'}
+                          aria-controls="tabpanel-toolbox"
                           onClick={() => setLeftColumnTab('toolbox')}
                           style={{
                             flex: 1,
@@ -8812,31 +8979,37 @@ useEffect(() => {
                       </div>
 
                       {leftColumnTab === 'briefing' ? (
-                        renderHausaufgabenWidget()
+                        <div role="tabpanel" id="tabpanel-briefing" aria-labelledby="tab-briefing" tabIndex={0} style={{ width: '100%' }}>
+                          {renderHausaufgabenWidget()}
+                        </div>
                       ) : leftColumnTab === 'notes' ? (
-                        <BriefingNotesCard
-                          user={teacher}
-                          schoolId={teacher?.school_id || (teacher as any)?.schoolId || schoolData?.id}
-                          activeStudent={activeStudent}
-                          allStudents={allStudents}
-                          todayStudents={todayTagesplanStudents}
-                          rooms={rooms}
-                          onOpenDrawer={() => setShowNotesDrawer(true)}
-                          onOpenHomeworkModal={(stud) => {
-                            setDocStudent({
-                              ...stud,
-                              id: stud.id,
-                              first_name: stud.first_name || stud.name?.split(' ')[0],
-                              last_name: stud.last_name || stud.name?.split(' ').slice(1).join(' '),
-                              photo_url: stud.photo_url || '/avatar_ghost.jpg',
-                              is_campus_active: stud.is_campus_active ?? false,
-                              school_id: stud.school_id || teacher?.school_id,
-                              schoolId: stud.school_id || teacher?.school_id
-                            });
-                          }}
-                        />
+                        <div role="tabpanel" id="tabpanel-notes" aria-labelledby="tab-notes" tabIndex={0} style={{ width: '100%' }}>
+                          <BriefingNotesCard
+                            user={teacher}
+                            schoolId={teacher?.school_id || (teacher as any)?.schoolId || schoolData?.id}
+                            activeStudent={activeStudent}
+                            allStudents={allStudents}
+                            todayStudents={todayTagesplanStudents}
+                            rooms={rooms}
+                            onOpenDrawer={() => setShowNotesDrawer(true)}
+                            onOpenHomeworkModal={(stud) => {
+                              setDocStudent({
+                                ...stud,
+                                id: stud.id,
+                                first_name: stud.first_name || stud.name?.split(' ')[0],
+                                last_name: stud.last_name || stud.name?.split(' ').slice(1).join(' '),
+                                photo_url: stud.photo_url || '/avatar_ghost.jpg',
+                                is_campus_active: stud.is_campus_active ?? false,
+                                school_id: stud.school_id || teacher?.school_id,
+                                schoolId: stud.school_id || teacher?.school_id
+                              });
+                            }}
+                          />
+                        </div>
                       ) : (
-                        <BriefingToolboxCard />
+                        <div role="tabpanel" id="tabpanel-toolbox" aria-labelledby="tab-toolbox" tabIndex={0} style={{ width: '100%' }}>
+                          <BriefingToolboxCard />
+                        </div>
                       )}
                     </div>
 
@@ -9302,6 +9475,43 @@ useEffect(() => {
  
                                  {/* Slot card on the right containing Uhrzeit inside */}
                                  <div 
+                                   role={((slot.student || slot.isGroup) && !isCanceled && !isRescheduledAway) ? "button" : undefined}
+                                   tabIndex={((slot.student || slot.isGroup) && !isCanceled && !isRescheduledAway) ? 0 : undefined}
+                                   aria-label={((slot.student || slot.isGroup) && !isCanceled && !isRescheduledAway) ? `Termin ${slot.timeSlot}: ${slot.isGroup ? 'Gruppe' : (slot.student?.name || 'Schüler')} aufrufen` : undefined}
+                                   onKeyDown={(e) => {
+                                     if ((slot.student || slot.isGroup) && !isCanceled && !isRescheduledAway) {
+                                       if (e.key === 'Enter' || e.key === ' ') {
+                                         e.preventDefault();
+                                         const activeStudentObj = slot.isGroup ? slot.students[0] : slot.student;
+                                         if (activeStudentObj) {
+                                           const foundStud = allStudents.find(s => s.id === activeStudentObj.id);
+                                           const groupStudentsList = (slot.isGroup && Array.isArray(slot.students))
+                                             ? slot.students.map((s: any) => {
+                                                 const dbS = allStudents.find(as => as.id === s.id);
+                                                 return {
+                                                   id: s.id,
+                                                   first_name: s.name ? s.name.split(' ')[0] : (dbS?.first_name || ''),
+                                                   last_name: s.name ? s.name.split(' ').slice(1).join(' ') : (dbS?.last_name || ''),
+                                                   photo_url: s.photo_url || dbS?.photo_url || '/avatar_ghost.jpg',
+                                                   is_campus_active: dbS ? dbS.is_campus_active : s.is_campus_active
+                                                 };
+                                               })
+                                             : undefined;
+                                           setDocStudent({
+                                             id: activeStudentObj.id,
+                                             first_name: activeStudentObj.name.split(' ')[0],
+                                             last_name: activeStudentObj.name.split(' ').slice(1).join(' '),
+                                             photo_url: activeStudentObj.photo_url || '/avatar_ghost.jpg',
+                                             is_campus_active: foundStud ? foundStud.is_campus_active : activeStudentObj.is_campus_active,
+                                             groupStudents: groupStudentsList
+                                           });
+                                         }
+                                         const todayStr = getSimulatedNow().toLocaleDateString('sv-SE');
+                                         setSickUntilDate(todayStr);
+                                         setIsSickWidgetExpanded(true);
+                                       }
+                                     }
+                                   }}
                                    onClick={() => {
                                      if (isCanceled || isRescheduledAway) return;
                                      const activeStudentObj = slot.isGroup ? slot.students[0] : slot.student;
@@ -10196,6 +10406,15 @@ useEffect(() => {
                       return (
                         <div 
                           key={b.id} 
+                          role="button"
+                          tabIndex={0}
+                          aria-label={`Terminänderung: ${displayStudentName || 'Termin'} am ${b.formattedDate || b.date} um ${b.startTime || b.time}`}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              handleBookingClick(b);
+                            }
+                          }}
                           onClick={() => handleBookingClick(b)}
                           style={{ 
                             display: 'flex', 
@@ -10508,6 +10727,15 @@ useEffect(() => {
                       return (
                         <div 
                           key={b.id} 
+                          role="button"
+                          tabIndex={0}
+                          aria-label={`Buchung: ${displayStudentName || rName || 'Termin'} am ${b.formattedDate || b.date} um ${b.startTime || b.time}`}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              handleBookingClick(b);
+                            }
+                          }}
                           onClick={() => handleBookingClick(b)}
                           style={{ 
                             display: 'flex', 
@@ -11809,6 +12037,16 @@ useEffect(() => {
                     <div key={band.id} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                       {/* Premium Collapsible Band Header */}
                       <div 
+                        role="button"
+                        tabIndex={0}
+                        aria-expanded={!isCollapsed}
+                        aria-label={`Band ${band.name}: ${proposals.length} ${proposals.length === 1 ? 'offener Song' : 'offene Songs'} ${isCollapsed ? 'aufklappen' : 'zuklappen'}`}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            setCollapsedBands(prev => ({ ...prev, [band.id]: !prev[band.id] }));
+                          }
+                        }}
                         onClick={() => setCollapsedBands(prev => ({ ...prev, [band.id]: !prev[band.id] }))}
                         style={{
                           display: 'flex',
@@ -12000,10 +12238,13 @@ useEffect(() => {
                                               opacity: member && !member.isMastered ? 0.6 : 1
                                             }}>
                                               {member ? (
-                                                <div style={{ width: '100%', height: '100%', position: 'relative' }}>
-                                                  <img 
-                                                    src={member.photo_url || '/avatar_ghost.jpg'} 
-                                                    onClick={(e) => {
+                                                <div 
+                                                  role="button"
+                                                  tabIndex={0}
+                                                  aria-label={`Profil von ${member.first_name || 'Mitglied'} ${member.last_name || ''} aufrufen`}
+                                                  onKeyDown={(e) => {
+                                                    if (e.key === 'Enter' || e.key === ' ') {
+                                                      e.preventDefault();
                                                       e.stopPropagation();
                                                       setSelectedStudentProfile({
                                                         id: member.user_id,
@@ -12014,9 +12255,26 @@ useEffect(() => {
                                                         birth_date: member.birth_date,
                                                         instrument: member.instrument
                                                       });
-                                                    }}
-                                                    style={{ width: '100%', height: '100%', borderRadius: '15px', objectFit: 'cover', cursor: 'pointer' }} 
-                                                    alt="" 
+                                                    }
+                                                  }}
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setSelectedStudentProfile({
+                                                      id: member.user_id,
+                                                      first_name: member.first_name,
+                                                      last_name: member.last_name,
+                                                      photo_url: member.photo_url,
+                                                      created_at: member.created_at,
+                                                      birth_date: member.birth_date,
+                                                      instrument: member.instrument
+                                                    });
+                                                  }}
+                                                  style={{ width: '100%', height: '100%', position: 'relative', cursor: 'pointer' }}
+                                                >
+                                                  <img 
+                                                    src={member.photo_url || '/avatar_ghost.jpg'} 
+                                                    style={{ width: '100%', height: '100%', borderRadius: '15px', objectFit: 'cover' }} 
+                                                    alt={member.first_name ? `${member.first_name} ${member.last_name || ''}` : "Bandmitglied"} 
                                                   />
                                                   {member.isMastered && (
                                                     <div style={{ position: 'absolute', bottom: '-4px', right: '-4px', background: '#34a853', color: 'white', borderRadius: '50%', width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid white', zIndex: 10 }}>
@@ -12220,163 +12478,6 @@ useEffect(() => {
         </div>
       )}
 
-      {/* Add Student Modal */}
-      {showAddStudent && (
-        <div style={{
-          position: 'fixed',
-          inset: 0,
-          background: 'rgba(255, 255, 255, 0.8)',
-          backdropFilter: 'blur(12px)',
-          zIndex: 1500,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '24px'
-        }}>
-          <div style={{
-            background: 'white',
-            border: '1.5px solid #e2e8f0',
-            borderRadius: '32px',
-            width: '100%',
-            maxWidth: '500px',
-            padding: '32px',
-            boxShadow: '0 20px 40px rgba(0,0,0,0.05)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '24px'
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 style={{ fontSize: '1.35rem', fontWeight: 950, color: '#1e293b', margin: 0 }}>Neuen Schüler anlegen</h3>
-              <button 
-                onClick={() => setShowAddStudent(false)}
-                style={{ background: '#f1f5f9', border: 'none', width: '36px', height: '36px', borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b' }}
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <form onSubmit={handleAddStudent} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Vorname *</label>
-                  <input 
-                    type="text" 
-                    required
-                    value={newStudent.firstName} 
-                    onChange={e => setNewStudent({...newStudent, firstName: e.target.value})} 
-                    style={{ padding: '12px 16px', borderRadius: '12px', border: '1.5px solid #e2e8f0', outline: 'none', fontSize: '0.9rem' }}
-                  />
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>
-                    {schoolData?.has_campus_subscription !== false ? 'Nachname *' : 'Nachname (Initial) *'}
-                  </label>
-                  <input 
-                    type="text" 
-                    required
-                    value={newStudent.lastName} 
-                    onChange={e => setNewStudent({...newStudent, lastName: e.target.value})} 
-                    style={{ padding: '12px 16px', borderRadius: '12px', border: '1.5px solid #e2e8f0', outline: 'none', fontSize: '0.9rem' }}
-                  />
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <input 
-                  type="checkbox" 
-                  id="isExternalVocalist"
-                  checked={newStudent.isExternalVocalist} 
-                  onChange={e => setNewStudent({...newStudent, isExternalVocalist: e.target.checked})} 
-                />
-                <label htmlFor="isExternalVocalist" style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1e293b', cursor: 'pointer' }}>Externer Sänger (Vocals)</label>
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <input 
-                  type="checkbox" 
-                  id="isTrial"
-                  checked={newStudent.is_trial} 
-                  onChange={e => setNewStudent({...newStudent, is_trial: e.target.checked})} 
-                />
-                <label htmlFor="isTrial" style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1e293b', cursor: 'pointer' }}>In Testphase (Trial)</label>
-              </div>
-
-              {newStudent.is_trial && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Testphase Ende</label>
-                  <input 
-                    type="date" 
-                    value={newStudent.trial_ends_at} 
-                    onChange={e => setNewStudent({...newStudent, trial_ends_at: e.target.value})} 
-                    style={{ padding: '12px 16px', borderRadius: '12px', border: '1.5px solid #e2e8f0', outline: 'none', fontSize: '0.9rem' }}
-                  />
-                </div>
-              )}
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Vertragsende (optional)</label>
-                <input 
-                  type="date" 
-                  value={newStudent.contract_ends_at} 
-                  onChange={e => setNewStudent({...newStudent, contract_ends_at: e.target.value})} 
-                  style={{ padding: '12px 16px', borderRadius: '12px', border: '1.5px solid #e2e8f0', outline: 'none', fontSize: '0.9rem' }}
-                />
-              </div>
-
-              {/* Campus app_usage_mode Toggle (Only for Campus) */}
-              {activePlatform === 'campus' && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Campus-Nutzungsmodus</label>
-                  <div style={{ display: 'flex', background: '#f1f5f9', borderRadius: '12px', padding: '4px', border: '1px solid #e2e8f0' }}>
-                    <button
-                      type="button"
-                      onClick={() => setNewStudent({...newStudent, app_usage_mode: 'student_only'})}
-                      style={{
-                        flex: 1, padding: '10px', border: 'none', borderRadius: '8px',
-                        background: (newStudent.app_usage_mode || 'student_only') === 'student_only' ? '#ffffff' : 'transparent',
-                        color: (newStudent.app_usage_mode || 'student_only') === 'student_only' ? '#8b5cf6' : '#64748b',
-                        fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s',
-                        boxShadow: (newStudent.app_usage_mode || 'student_only') === 'student_only' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none'
-                      }}
-                    >
-                      📱 Selbstnutzer
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setNewStudent({...newStudent, app_usage_mode: 'parent_hybrid'})}
-                      style={{
-                        flex: 1, padding: '10px', border: 'none', borderRadius: '8px',
-                        background: newStudent.app_usage_mode === 'parent_hybrid' ? '#ffffff' : 'transparent',
-                        color: newStudent.app_usage_mode === 'parent_hybrid' ? '#8b5cf6' : '#64748b',
-                        fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s',
-                        boxShadow: newStudent.app_usage_mode === 'parent_hybrid' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none'
-                      }}
-                    >
-                      👪 Eltern-Hybrid
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              <div style={{ display: 'flex', gap: '12px', marginTop: '12px' }}>
-                <button 
-                  type="button" 
-                  onClick={() => setShowAddStudent(false)}
-                  style={{ flex: 1, padding: '14px', borderRadius: '16px', border: '1.5px solid #e2e8f0', background: 'white', fontWeight: 800, color: '#475569', cursor: 'pointer' }}
-                >
-                  Abbrechen
-                </button>
-                <button 
-                  type="submit" 
-                  style={{ flex: 1, padding: '14px', borderRadius: '16px', border: 'none', background: '#8b5cf6', color: 'white', fontWeight: 800, cursor: 'pointer', boxShadow: '0 4px 12px rgba(139, 92, 246, 0.2)' }}
-                >
-                  Speichern
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
       {/* Edit Student Modal */}
       {editingStudent && (
@@ -12696,6 +12797,9 @@ useEffect(() => {
           onClick={() => setShowSickModal(false)}
         >
           <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="sick-modal-title"
             onClick={(e) => e.stopPropagation()}
             style={{
               background: '#ffffff',
@@ -12739,7 +12843,7 @@ useEffect(() => {
                   <AlertTriangle size={22} />
                 </div>
                 <div>
-                  <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                  <h2 id="sick-modal-title" style={{ margin: 0, fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
                     {teacher?.sick_until ? 'Abwesenheit anpassen' : 'Abwesenheit / Ausfall melden'}
                   </h2>
                   <p style={{ margin: '2px 0 0 0', fontSize: '0.78rem', color: '#64748b', fontWeight: 500 }}>
@@ -12749,6 +12853,7 @@ useEffect(() => {
               </div>
               <button
                 onClick={() => setShowSickModal(false)}
+                aria-label="Abwesenheitsdialog schließen"
                 style={{
                   background: '#f1f5f9',
                   border: 'none',
@@ -13129,6 +13234,9 @@ useEffect(() => {
           onClick={() => setSickNotifModal(null)}
         >
           <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="sick-notif-title"
             onClick={e => e.stopPropagation()}
             style={{
               background: 'white', borderRadius: '28px',
@@ -13148,7 +13256,7 @@ useEffect(() => {
                 <AlertTriangle size={22} color="white" />
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                <h2 id="sick-notif-title" style={{ margin: 0, fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
                   Abwesenheit registriert
                 </h2>
                 <p style={{ margin: '4px 0 0', fontSize: '0.8rem', color: '#64748b' }}>
@@ -13160,6 +13268,7 @@ useEffect(() => {
               </div>
               <button
                 onClick={() => setSickNotifModal(null)}
+                aria-label="Bestätigung schließen"
                 style={{
                   background: '#f1f5f9', border: 'none', borderRadius: '10px',
                   padding: '8px', cursor: 'pointer', flexShrink: 0,
@@ -13415,23 +13524,31 @@ useEffect(() => {
         }}
       />
 
-      {/* 🚨 COMPLIANCE SHIELD MODAL: BLOCKIERENDE PFLICHTMITTEILUNG */}
-      {openCriticalDuty && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(15, 23, 42, 0.82)',
-          backdropFilter: 'blur(16px)',
-          WebkitBackdropFilter: 'blur(16px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 999999,
-          padding: isMobileDevice ? '16px' : '24px'
-        }}>
+      {/* 📢 SCHULMITTEILUNGEN: SCHLIESSBARES LESE- & BESTÄTIGUNGS-MODAL (NON-BLOCKING) */}
+      {openAnnouncementDetailModal && (
+        <div 
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="announcement-reader-modal-title"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setOpenAnnouncementDetailModal(null);
+          }}
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(15, 23, 42, 0.55)',
+            backdropFilter: 'blur(8px)',
+            WebkitBackdropFilter: 'blur(8px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: isMobileDevice ? '16px' : '24px'
+          }}
+        >
           <div style={{
             background: '#ffffff',
             borderRadius: '28px',
@@ -13439,40 +13556,52 @@ useEffect(() => {
             width: '100%',
             maxHeight: '90vh',
             overflowY: 'auto',
-            boxShadow: '0 25px 60px -15px rgba(239, 68, 68, 0.3), 0 0 0 1px rgba(239, 68, 68, 0.15)',
+            boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(239, 68, 68, 0.15)',
             display: 'flex',
             flexDirection: 'column',
             gap: '18px',
-            padding: isMobileDevice ? '22px 18px' : '32px 28px',
+            padding: isMobileDevice ? '22px 18px' : '30px 28px',
             textAlign: 'left',
-            animation: 'fadeIn 0.25s ease'
+            animation: 'fadeIn 0.2s ease',
+            position: 'relative'
           }}>
-            {/* Header Badge Cluster */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <div style={{ background: '#fef2f2', color: '#ef4444', padding: '10px', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <AlertTriangle size={24} strokeWidth={2.4} />
+            {/* Modal Header & Close Button */}
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{ background: '#fef2f2', color: '#ef4444', padding: '10px', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <AlertCircle size={24} strokeWidth={2.4} />
+                </div>
+                <div>
+                  <span style={{ fontSize: '0.68rem', fontWeight: 900, background: '#ef4444', color: '#ffffff', padding: '2px 8px', borderRadius: '6px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    Wichtige Schulmitteilung
+                  </span>
+                  <h3 id="announcement-reader-modal-title" style={{ margin: '4px 0 0 0', fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em' }}>
+                    {openAnnouncementDetailModal.title}
+                  </h3>
+                </div>
               </div>
-              <div>
-                <span style={{ fontSize: '0.68rem', fontWeight: 900, background: '#ef4444', color: '#ffffff', padding: '2px 8px', borderRadius: '6px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  Wichtige Schulmitteilung
-                </span>
-                <h3 style={{ margin: '4px 0 0 0', fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em' }}>
-                  {openCriticalDuty.title}
-                </h3>
-              </div>
+              <button
+                type="button"
+                onClick={() => setOpenAnnouncementDetailModal(null)}
+                style={{ border: 'none', background: '#f1f5f9', color: '#64748b', borderRadius: '12px', padding: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                title="Mitteilung schließen"
+                aria-label="Schließen"
+              >
+                <X size={18} />
+              </button>
             </div>
 
             {/* Description / Instructions */}
-            {(openCriticalDuty.description || openCriticalDuty.message) && (
+            {(openAnnouncementDetailModal.description || openAnnouncementDetailModal.message) && (
               <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0', fontSize: '0.85rem', color: '#334155', lineHeight: '1.55', whiteSpace: 'pre-wrap' }}>
-                {openCriticalDuty.description || openCriticalDuty.message}
+                {openAnnouncementDetailModal.description || openAnnouncementDetailModal.message}
               </div>
             )}
 
             {/* Attachment */}
-            {openCriticalDuty.attachment_url && (
+            {openAnnouncementDetailModal.attachment_url && (
               <a
-                href={openCriticalDuty.attachment_url}
+                href={openAnnouncementDetailModal.attachment_url}
                 target="_blank"
                 rel="noopener noreferrer"
                 style={{
@@ -13494,12 +13623,12 @@ useEffect(() => {
             )}
 
             {/* If Questionnaire: Render Interactive Questions */}
-            {openCriticalDuty.questions && openCriticalDuty.questions.length > 0 ? (
+            {openAnnouncementDetailModal.questions && openAnnouncementDetailModal.questions.length > 0 ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                 <div style={{ fontSize: '0.76rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>
                   Bitte beantworte folgende Fragen:
                 </div>
-                {openCriticalDuty.questions.map((qItem: any, qIdx: number) => {
+                {openAnnouncementDetailModal.questions.map((qItem: any, qIdx: number) => {
                   const qKey = typeof qItem === 'string' ? qItem : qItem.text;
                   const qType = typeof qItem === 'string' ? 'text' : (qItem.type || 'text');
                   const qOptions: string[] = typeof qItem === 'object' && qItem.options ? qItem.options : (qType === 'boolean' ? ['Ja', 'Nein'] : []);
@@ -13529,7 +13658,7 @@ useEffect(() => {
                                   fontWeight: isSelected ? 850 : 650,
                                   fontSize: '0.78rem',
                                   cursor: 'pointer',
-                                  transition: 'all 0.15s'
+                                  transition: 'all 0.15s ease'
                                 }}
                               >
                                 {opt}
@@ -13541,9 +13670,17 @@ useEffect(() => {
                         <textarea
                           value={currentAns}
                           onChange={(e) => setQuestionnaireAnswers(prev => ({ ...prev, [qKey]: e.target.value }))}
-                          placeholder="Deine Antwort eingeben..."
+                          placeholder="Deine Antwort hier eingeben..."
                           rows={2}
-                          style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.80rem', outline: 'none', resize: 'vertical' }}
+                          style={{
+                            padding: '10px 12px',
+                            borderRadius: '10px',
+                            border: '1px solid #cbd5e1',
+                            fontSize: '0.82rem',
+                            outline: 'none',
+                            fontFamily: 'inherit',
+                            resize: 'vertical'
+                          }}
                         />
                       )}
                     </div>
@@ -13552,42 +13689,68 @@ useEffect(() => {
               </div>
             ) : null}
 
-            {/* Notice */}
-            <div style={{ fontSize: '0.72rem', color: '#64748b', fontStyle: 'italic', lineHeight: '1.4' }}>
-              ℹ️ Dies ist eine vom Sekretariat als kritisch eingestufte Pflichtaufgabe. Nach deiner Bestätigung wird dein Dashboard sofort freigeschaltet.
+            {/* Legal Notice § 130 BGB */}
+            <div style={{ fontSize: '0.72rem', color: '#64748b', fontStyle: 'italic', lineHeight: '1.4', background: '#f8fafc', padding: '10px 14px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+              ℹ️ Mit deiner Bestätigung wird der Zugang der Mitteilung nach § 130 BGB für die Schulleitung revisionssicher dokumentiert.
             </div>
 
-            {/* Submission CTA */}
-            <button
-              type="button"
-              disabled={submittingFeedback}
-              onClick={() => {
-                if (openCriticalDuty.questions && openCriticalDuty.questions.length > 0) {
-                  handleSubmitFeedbackResponse(openCriticalDuty.id);
-                } else {
-                  handleMarkRequestAsDone(openCriticalDuty.id);
-                }
-              }}
-              style={{
-                background: '#ea4335',
-                color: '#ffffff',
-                border: 'none',
-                padding: '14px',
-                borderRadius: '16px',
-                fontSize: '0.88rem',
-                fontWeight: 900,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px',
-                boxShadow: '0 8px 24px rgba(234, 67, 53, 0.35)',
-                transition: 'transform 0.15s ease'
-              }}
-            >
-              <CheckCircle size={18} />
-              <span>{submittingFeedback ? 'Wird übermittelt...' : 'Kenntnisnahme bestätigen & Dashboard freischalten'}</span>
-            </button>
+            {/* Action Buttons */}
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+              <button
+                type="button"
+                onClick={() => setOpenAnnouncementDetailModal(null)}
+                style={{
+                  background: '#f1f5f9',
+                  color: '#475569',
+                  border: 'none',
+                  padding: '14px 18px',
+                  borderRadius: '16px',
+                  fontSize: '0.85rem',
+                  fontWeight: 750,
+                  cursor: 'pointer'
+                }}
+              >
+                Später erinnern
+              </button>
+              <button
+                type="button"
+                disabled={submittingFeedback}
+                onClick={async () => {
+                  if (openAnnouncementDetailModal.questions && openAnnouncementDetailModal.questions.length > 0) {
+                    await handleSubmitFeedbackResponse(openAnnouncementDetailModal.id);
+                  } else {
+                    await handleMarkRequestAsDone(openAnnouncementDetailModal.id);
+                  }
+                  setOpenAnnouncementDetailModal(null);
+                }}
+                style={{
+                  flex: 1,
+                  background: '#ea4335',
+                  color: '#ffffff',
+                  border: 'none',
+                  padding: '14px',
+                  borderRadius: '16px',
+                  fontSize: '0.88rem',
+                  fontWeight: 900,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  boxShadow: '0 8px 24px rgba(234, 67, 53, 0.35)',
+                  transition: 'transform 0.15s ease'
+                }}
+              >
+                <CheckCircle size={18} />
+                <span>
+                  {submittingFeedback 
+                    ? 'Wird übermittelt...' 
+                    : (openAnnouncementDetailModal.questions && openAnnouncementDetailModal.questions.length > 0 
+                        ? 'Antworten übermitteln & bestätigen' 
+                        : '✓ Gelesen & zur Kenntnis genommen')}
+                </span>
+              </button>
+            </div>
           </div>
         </div>
       )}
