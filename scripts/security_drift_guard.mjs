@@ -88,6 +88,13 @@ const FORBIDDEN_FRONTEND_PATTERNS = [
     severity: 'CRITICAL',
     description: 'SUPABASE_SERVICE_ROLE_KEY must NEVER be imported or used in frontend client code.',
     allowedFiles: ['src/tests/', 'src/check_view_policies.mjs']
+  },
+  {
+    name: 'Zero US Cloud Services & Third-Party Outbound Invariant',
+    regex: /(?:api\.ipify\.org|corsproxy\.io|api\.allorigins\.win|generativelanguage\.googleapis\.com|\.firebaseio\.com|firebase\.googleapis\.com|\.supabase\.co)/g,
+    severity: 'CRITICAL',
+    description: 'Sovereign Hetzner Invariant: All requests must strictly route through self-hosted Hetzner infrastructure (*.campus-groovelab.de). Third-party US cloud or public proxy domains are strictly forbidden.',
+    allowedFiles: []
   }
 ];
 

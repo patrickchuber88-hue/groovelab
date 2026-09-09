@@ -135,32 +135,9 @@ export async function fetchHolidaysCached(url: string): Promise<HolidayRange[]> 
           if (!res.ok) throw new Error();
           text = await res.text();
         } catch (corsErr) {
-          const proxies = [
-            `https://corsproxy.io/?${encodeURIComponent(singleUrl)}`,
-            `https://api.allorigins.win/get?url=${encodeURIComponent(singleUrl)}`
-          ];
-
-          let success = false;
-          for (const proxyUrl of proxies) {
-            try {
-              const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
-              const tId = controller ? setTimeout(() => controller.abort(), 3500) : null;
-              const res = await fetch(proxyUrl, { signal: controller?.signal });
-              if (tId) clearTimeout(tId);
-              if (!res.ok) continue;
-              if (proxyUrl.includes('allorigins')) {
-                const json = await res.json();
-                text = json.contents;
-              } else {
-                text = await res.text();
-              }
-              if (text && text.includes('BEGIN:VCALENDAR')) {
-                success = true;
-                break;
-              }
-            } catch (e) {}
-          }
-          if (!success) continue;
+          // Zero US / Third-Party Cloud: Do not route school data through unvetted third-party proxies
+          console.warn('[HolidayHelper] Direct calendar sync failed, skipping unreachable external feed:', singleUrl);
+          continue;
         }
 
         if (text) {

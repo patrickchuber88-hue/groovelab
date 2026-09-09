@@ -1028,14 +1028,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
 
   const fetchIpAddress = async () => {
-    try {
-      const res = await fetch('https://api.ipify.org?format=json');
-      const data = await res.json();
-      return data.ip || 'unknown';
-    } catch (e) {
-      console.warn("Failed to fetch IP address, using fallback", e);
-      return 'unknown';
-    }
+    // Sovereign Hetzner deployment: IP audit capture is performed server-side via Nginx X-Forwarded-For & PostgreSQL audit logs
+    return '127.0.0.1';
   };
 
   const downloadQrCode = async () => {

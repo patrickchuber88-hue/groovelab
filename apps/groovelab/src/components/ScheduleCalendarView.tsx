@@ -609,31 +609,9 @@ export function ScheduleCalendarView({
             if (!res.ok) throw new Error();
             text = await res.text();
           } catch (corsErr) {
-            const proxies = [
-              `https://corsproxy.io/?${singleUrl}`,
-              `https://api.allorigins.win/get?url=${encodeURIComponent(singleUrl)}`
-            ];
-
-            let success = false;
-            for (const proxyUrl of proxies) {
-              try {
-                const res = await fetch(proxyUrl);
-                if (!res.ok) continue;
-                if (proxyUrl.includes('allorigins')) {
-                  const json = await res.json();
-                  text = json.contents;
-                } else {
-                  text = await res.text();
-                }
-                if (text && text.includes('BEGIN:VCALENDAR')) {
-                  success = true;
-                  break;
-                }
-              } catch (e) {
-                console.warn(e);
-              }
-            }
-            if (!success) continue;
+            // Zero US / Third-Party Cloud: Fail-safe without third-party proxies
+            console.warn('[ScheduleCalendarView] Direct calendar sync failed, skipping unreachable external feed:', singleUrl);
+            continue;
           }
 
           if (text) {

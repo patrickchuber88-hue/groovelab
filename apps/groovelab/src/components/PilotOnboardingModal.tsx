@@ -70,15 +70,8 @@ export const PilotOnboardingModal: React.FC<PilotOnboardingModalProps> = ({
     setError(null);
 
     try {
-      // 1. Fetch & Anonymize IP Address for GDPR-compliant Audit Trail
+      // 1. Sovereign GDPR-compliant Audit Trail (captured server-side via Hetzner Nginx)
       let ip = '127.0.0.1';
-      try {
-        const res = await fetch('https://api.ipify.org?format=json');
-        const json = await res.json();
-        if (json.ip) ip = json.ip;
-      } catch (ipErr) {
-        console.warn('Could not fetch external IP, using local fallback:', ipErr);
-      }
 
       // Anonymize IP (IPv4: zero last octet, IPv6: zero last group)
       if (ip.includes('.')) {

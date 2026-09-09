@@ -54,15 +54,6 @@ serve(async (req) => {
       });
     }
 
-    const geminiApiKey = Deno.env.get("GEMINI_API_KEY") || "";
-    
-    if (!geminiApiKey) {
-      return new Response(
-        JSON.stringify({ error: "GEMINI_API_KEY is not set on the server" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
     const { transcript } = await req.json();
 
     if (!transcript || !transcript.trim()) {
@@ -72,45 +63,18 @@ serve(async (req) => {
       );
     }
 
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`;
+    // Sovereign Local Formatting: Zero US Cloud / Zero third-party API dependencies
+    // Clean, format, and structure teacher spoken input locally on Hetzner server
+    const cleanLines = transcript
+      .split(/(?<=[.!?])\s+|\n+/)
+      .map((s: string) => s.trim())
+      .filter((s: string) => s.length > 0)
+      .map((s: string) => s.replace(/^[•\-\*]\s*/, ''));
 
-    const promptText = `Du bist ein KI-Assistent für Musiklehrer. Fasse das transkribierte gesprochene Wort eines Lehrers prägnant zusammen und erstelle daraus eine übersichtliche, motivierende Hausaufgaben-Stichpunktliste für das digitale Hausaufgabenheft des Schülers. 
-WICHTIG: 
-- Kürze lange Sätze und reduziere das Transkript auf die wesentlichen Übe-Anweisungen, Hausaufgaben und Ziele.
-- Nutze passende Emojis für Instrumente oder Aktionen.
-- Schreibe absolut keine Begrüßung, Einleitung, Erklärungen oder abschließende Worte. Starte direkt mit den Stichpunkten.
-
-Lehrer-Transkript:
-"${transcript}"`;
-
-    const geminiResponse = await fetch(geminiUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        contents: [
-          {
-            parts: [
-              {
-                text: promptText,
-              },
-            ],
-          },
-        ],
-      }),
-    });
-
-    if (!geminiResponse.ok) {
-      const errText = await geminiResponse.text();
-      throw new Error(`Gemini API returned error: ${errText}`);
-    }
-
-    const result = await geminiResponse.json();
-    const generatedText = result.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    const formattedSummary = cleanLines.join('\n• ');
 
     return new Response(
-      JSON.stringify({ summary: generatedText.trim() }),
+      JSON.stringify({ summary: formattedSummary }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
 

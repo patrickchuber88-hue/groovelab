@@ -730,11 +730,11 @@ Hiermit versichere ich in gutem Glauben, dass die vorstehenden Angaben richtig u
               </div>
 
               <div>
-                <strong style={{ color: '#0f172a' }}>7. Notwendige technische Hilfsdienste zur Funktionserbringung</strong><br />
-                Zur Bereitstellung spezifischer technischer Funktionen werden punktuell folgende Hilfsdienste eingebunden:<br />
-                - QR-Codes für physische Ausweise, Stundenpläne und Kiosk-Stationen werden zu 100 % lokal und offline im Webbrowser des Endgeräts gerendert (Zero-Data-Transmission). Es werden hierbei zu keinem Zeitpunkt Daten oder IP-Adressen an externe QR-Dienste übertragen.<br />
-                - Beim administrativen B2B-Onboarding einer Musikschule wird zur revisionssicheren Vertragsprotokollierung die IP-Adresse des vertretungsberechtigten Administrators abgefragt (<code style={{ background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px' }}>api.ipify.org</code>).<br />
-                - Zur Einbindung öffentlicher Landesschulferien können Kalenderdaten über Standard-Proxies geladen werden. Eine Speicherung personenbezogener Daten findet bei diesen technischen Hilfsdiensten nicht statt.
+                <strong style={{ color: '#0f172a' }}>7. Keine Einbindung externer Drittanbieter- oder US-Cloud-Dienste (Zero US Cloud Governance)</strong><br />
+                Zur strikten Einhaltung europäischer Datenschutzstandards (Schrems II / DSGVO) verzichtet Campus-Groovelab vollständig auf US-Cloud-Dienste, Tracking-Netzwerke oder externe Hilfsdienste:<br />
+                - Sämtliche QR-Codes für physische Ausweise, Stundenpläne und Kiosk-Stationen werden zu 100 % lokal und offline im Webbrowser des Endgeräts gerendert (Zero-Data-Transmission). Es werden zu keinem Zeitpunkt Daten an externe QR-Dienste übertragen.<br />
+                - Die Protokollierung von Administrator-IPs beim B2B-Onboarding erfolgt ausnahmslos serverintern im ISO 27001-zertifizierten Hetzner-Rechenzentrum in Deutschland. Es werden keine externen IP-Dienste oder US-Abfrage-APIs genutzt.<br />
+                - Kalendersynchronisationen und Ferienabfragen erfolgen direkt und ohne Zwischenschaltung ungesicherter Drittanbieter-Proxies.
               </div>
 
               <div>

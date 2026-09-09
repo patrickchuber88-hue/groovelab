@@ -681,31 +681,9 @@ export async function getPiperTtsEngine(): Promise<any> {
     if (piperModule) return piperModule;
   }
 
-  isPiperLoading = true;
-  const dynamicImport = (url: string): Promise<any> => {
-    return (new Function('specifier', 'return import(specifier)'))(url);
-  };
-
-  try {
-    // 1. Versuch: Dynamischer Import via esm.sh
-    const mod = await dynamicImport('https://esm.sh/@mintplex-labs/piper-tts-web@1.0.8');
-    piperModule = mod;
-    isPiperLoading = false;
-    return piperModule;
-  } catch (err1) {
-    console.warn('[NeuralTTS] Failed to load from esm.sh, trying jsdelivr fallback...', err1);
-    try {
-      // 2. Versuch: jsdelivr CDN Fallback
-      const mod2 = await dynamicImport('https://cdn.jsdelivr.net/npm/@mintplex-labs/piper-tts-web@1.0.8/+esm');
-      piperModule = mod2;
-      isPiperLoading = false;
-      return piperModule;
-    } catch (err2) {
-      isPiperLoading = false;
-      console.error('[NeuralTTS] Could not initialize WebAssembly Piper TTS engine:', err2);
-      throw new Error('WebAssembly Neural TTS Engine konnte im Browser nicht geladen werden.');
-    }
-  }
+  // Sovereign Zero External CDN / US Cloud Policy: External CDN imports are forbidden
+  isPiperLoading = false;
+  throw new Error('Externe CDN-Importe sind gemäß Zero-US-Cloud-Richtlinie deaktiviert.');
 }
 
 /**
