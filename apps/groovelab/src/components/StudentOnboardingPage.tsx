@@ -42,6 +42,7 @@ export const StudentOnboardingPage: React.FC<StudentOnboardingPageProps> = ({ to
   const [savingConsent, setSavingConsent] = useState(false);
   const [legalModalTab, setLegalModalTab] = useState<'impressum' | 'privacy' | 'terms' | 'cancellation' | 'accessibility' | null>(null);
   const [showConsentConfetti, setShowConsentConfetti] = useState(false);
+  const [isAlreadyActivated, setIsAlreadyActivated] = useState(false);
 
   // Apple HIG Onboarding Wizard State (1: Modus, 2: PIN & Kinderschutz, 3: Freigabe)
   const [onboardingStep, setOnboardingStep] = useState<1 | 2 | 3>(1);
@@ -313,6 +314,40 @@ export const StudentOnboardingPage: React.FC<StudentOnboardingPageProps> = ({ to
           p_token: token
         });
 
+        // 2. Bereits aktiviertes Profil (Eltern-PIN bereits vergeben): Zur Login-Weiterleitung führen
+        if (!rpcErr && previewRes?.is_already_activated) {
+          setIsAlreadyActivated(true);
+          const s = previewRes.student;
+          if (s) {
+            setStudent({
+              id: s.id,
+              school_id: s.school_id,
+              first_name: s.first_name,
+              last_name: s.last_initial,
+              instrument: s.instrument,
+              photo_url: s.photo_url,
+              role: 'student',
+              schools: {
+                id: s.school_id,
+                name: s.school_name,
+                branding_logo_url: s.school_logo,
+                subdomain: s.school_subdomain
+              }
+            });
+            if (s.school_id || s.school_name) {
+              setSchool({
+                id: s.school_id,
+                name: s.school_name,
+                branding_logo_url: s.school_logo,
+                subdomain: s.school_subdomain,
+                primary_color: s.school_color
+              });
+            }
+          }
+          setLoading(false);
+          return;
+        }
+
         if (!rpcErr && previewRes?.success && previewRes.student) {
           const s = previewRes.student;
           const userObj = {
@@ -325,12 +360,14 @@ export const StudentOnboardingPage: React.FC<StudentOnboardingPageProps> = ({ to
             is_pin_activated: s.is_pin_activated,
             is_campus_active: s.is_campus_active,
             campus_usage_mode: s.campus_usage_mode,
+            photo_url: s.photo_url,
             role: 'student',
             schools: {
               id: s.school_id,
               name: s.school_name,
               branding_logo_url: s.school_logo,
-              hero_image_url: s.school_hero
+              hero_image_url: s.school_hero,
+              subdomain: s.school_subdomain
             }
           };
           if (s.school_id || s.school_name) {
@@ -338,7 +375,9 @@ export const StudentOnboardingPage: React.FC<StudentOnboardingPageProps> = ({ to
               id: s.school_id,
               name: s.school_name,
               branding_logo_url: s.school_logo,
-              hero_image_url: s.school_hero
+              hero_image_url: s.school_hero,
+              subdomain: s.school_subdomain,
+              primary_color: s.school_color
             });
           }
           if (s.campus_usage_mode) setCampusUsageMode(s.campus_usage_mode);
@@ -347,9 +386,8 @@ export const StudentOnboardingPage: React.FC<StudentOnboardingPageProps> = ({ to
           return;
         }
 
-        // Fail-Closed: RPC fehlgeschlagen → kein direkter Tabellen-Fallback (Zero-Trust, DSGVO Art. 25)
-        // Der Onboarding-Link ist ungültig, abgelaufen oder bereits verwendet.
-        const errorMsg = rpcErr?.message || 'Ungültiger oder abgelaufener Einladungs-Link.';
+        // Fail-Closed: RPC meldet Fehler → sprechende Fehlermeldung ausgeben
+        const errorMsg = previewRes?.error || rpcErr?.message || 'Ungültiger oder abgelaufener Einladungs-Link.';
         throw new Error(errorMsg);
 
       } catch (err: any) {
@@ -606,6 +644,133 @@ Deine Vorteile auf einen Blick:
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#09090b', color: '#64748b', fontFamily: 'system-ui' }}>
         <div className="animate-spin" style={{ width: '40px', height: '40px', border: '3px solid rgba(255,255,255,0.1)', borderTopColor: '#eab308', borderRadius: '50%', marginBottom: '16px' }}></div>
         <p style={{ fontWeight: 700, fontSize: '0.9rem' }}>Dein Ausweis wird generiert...</p>
+      </div>
+    );
+  }
+
+  if (isAlreadyActivated && student) {
+    const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams();
+    const platformParam = urlParams.get('platform') || 'campus';
+    const isLocalhost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+    const schoolSub = school?.subdomain;
+    const baseHost = typeof window !== 'undefined' ? window.location.hostname.replace(/^[^.]+\./, '').replace('www.', '') : 'campus-groovelab.de';
+    const targetLoginUrl = !isLocalhost && schoolSub && !window.location.hostname.startsWith(schoolSub)
+      ? `${window.location.protocol}//${schoolSub}.${baseHost}/?school_id=${student.school_id}&platform=${platformParam}`
+      : `/?school_id=${student.school_id}&platform=${platformParam}`;
+
+    return (
+      <div style={{
+        minHeight: '100vh',
+        background: '#f8fafc',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '24px 16px',
+        fontFamily: "'Plus Jakarta Sans', system-ui, -apple-system, sans-serif"
+      }}>
+        <div style={{
+          maxWidth: '420px',
+          width: '100%',
+          background: '#ffffff',
+          borderRadius: '32px',
+          border: '1px solid rgba(0,0,0,0.06)',
+          boxShadow: '0 20px 40px -15px rgba(0,0,0,0.07)',
+          padding: '36px 28px',
+          textAlign: 'center',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: '20px'
+        }}>
+          {/* Schullogo */}
+          {school?.branding_logo_url ? (
+            <img 
+              src={school.branding_logo_url} 
+              alt={school.name || 'Musikschule'} 
+              style={{ maxHeight: '56px', maxWidth: '180px', objectFit: 'contain', marginBottom: '4px' }} 
+            />
+          ) : (
+            <div style={{
+              width: '56px',
+              height: '56px',
+              borderRadius: '18px',
+              background: '#e6f4ea',
+              color: '#166534',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
+              <CheckCircle2 size={32} />
+            </div>
+          )}
+
+          {/* Status-Badge */}
+          <div style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
+            background: '#dcfce7',
+            color: '#15803d',
+            fontSize: '0.78rem',
+            fontWeight: 800,
+            padding: '4px 12px',
+            borderRadius: '100px',
+            letterSpacing: '0.02em'
+          }}>
+            <ShieldCheck size={15} />
+            Bereits freigeschaltet
+          </div>
+
+          <div>
+            <h2 style={{
+              fontSize: '1.45rem',
+              fontWeight: 900,
+              color: '#0f172a',
+              letterSpacing: '-0.02em',
+              margin: '0 0 8px 0'
+            }}>
+              Hallo {student.first_name || 'Musikschüler'}!
+            </h2>
+            <p style={{
+              fontSize: '0.88rem',
+              color: '#64748b',
+              fontWeight: 600,
+              lineHeight: 1.5,
+              margin: 0
+            }}>
+              Dein Schülerprofil bei <strong>{school?.name || 'deiner Musikschule'}</strong> ist bereits vollständig aktiviert.
+              Du kannst dich direkt mit deinem Ausweis-QR-Code oder deiner PIN anmelden.
+            </p>
+          </div>
+
+          {/* Primärer Action-Button: Direkt zum Login */}
+          <button
+            onClick={() => {
+              window.location.href = targetLoginUrl;
+            }}
+            style={{
+              width: '100%',
+              minHeight: '52px',
+              background: '#0f172a',
+              color: '#ffffff',
+              border: 'none',
+              borderRadius: '18px',
+              fontSize: '0.96rem',
+              fontWeight: 900,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              boxShadow: '0 4px 14px rgba(15, 23, 42, 0.25)',
+              transition: 'transform 0.15s ease'
+            }}
+          >
+            <span>Direkt zum Login</span>
+            <ArrowRight size={18} />
+          </button>
+        </div>
       </div>
     );
   }

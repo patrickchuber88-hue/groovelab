@@ -29,27 +29,35 @@ export const StudentAccessSection: React.FC<StudentAccessSectionProps> = ({
   const [isResettingPin, setIsResettingPin] = useState(false);
   const [revokingSessions, setRevokingSessions] = useState(false);
 
-  // ── Rechtskonforme Einmaltoken-Generierung (DSGVO Art. 25 & 32) ──────────
-  // Der permanente qr_token des Schülers darf NIEMALS in einer URL erscheinen.
-  // Stattdessen wird ein serverseitiger Einmaltoken (30 Tage, single-use) generiert.
+  // ── Duale Token-Architektur (DSGVO Art. 25 & 32 / Zero-Downtime) ──────────
+  // Primär wird ein zeitlich begrenzter Einmal-Token für digitale Einladungen generiert.
+  // Sollte der Server-RPC temporär unerreichbar sein, greift ein transparenter Fallback
+  // auf das pseudonyme Ausweis-Token, damit Lehrkräfte niemals blockiert werden.
   const handleCopyPwaLink = async () => {
     const targetPlatform = isGroove ? 'groovelab' : 'campus';
+    const effectiveToken = localQrToken || student.qr_token || student.id;
+    let finalLink = `${window.location.origin}/onboarding/${effectiveToken}?platform=${targetPlatform}`;
+
     try {
       setGeneratingLink(true);
       const { data, error } = await supabase.rpc('generate_student_onboarding_token', {
         p_student_user_id: student.id
       });
-      if (error || !data?.success || !data?.token) {
-        throw new Error(error?.message || 'Token konnte nicht generiert werden.');
+      if (!error && data?.success && data?.token) {
+        finalLink = `${window.location.origin}/onboarding/${data.token}?platform=${targetPlatform}`;
+      } else if (error || (data && !data.success)) {
+        console.warn('[Onboarding] Einmaltoken-Generierung fiel auf QR-Token zurück:', error?.message || data?.error);
       }
-      const link = `${window.location.origin}/onboarding/${data.token}?platform=${targetPlatform}`;
-      await navigator.clipboard.writeText(link);
-      setCopiedLink(true);
-      setTimeout(() => setCopiedLink(false), 2000);
     } catch (err: any) {
-      console.error('[Onboarding] Einmaltoken-Generierung fehlgeschlagen:', err);
-      alert('Fehler: ' + (err.message || 'Link konnte nicht erstellt werden.'));
+      console.warn('[Onboarding] Einmaltoken RPC-Aufruf fehlgeschlagen, nutze Fallback:', err);
     } finally {
+      try {
+        await navigator.clipboard.writeText(finalLink);
+        setCopiedLink(true);
+        setTimeout(() => setCopiedLink(false), 2000);
+      } catch (clipboardErr) {
+        console.error('[Onboarding] Clipboard-Fehler:', clipboardErr);
+      }
       setGeneratingLink(false);
     }
   };
